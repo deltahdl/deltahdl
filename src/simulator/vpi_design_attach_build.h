@@ -13,6 +13,7 @@
 
 #include "common/packed_range.h"
 #include "common/source_loc.h"
+#include "elaborator/rtlir_attribute.h"
 
 namespace delta {
 
@@ -28,7 +29,6 @@ struct Expr;
 struct ModuleItem;
 struct PackageDecl;
 struct PropertyExprNode;
-struct ResolvedAttribute;
 struct SeqLinearBody;
 struct RtlirAssertion;
 struct RtlirPropertyDecl;
@@ -658,6 +658,11 @@ void VpiAttachAttributes(VpiObject* owner,
 // carries none or `mod` is null, a package's or the compilation unit's.
 const std::vector<ResolvedAttribute>& VpiNodeAttributes(const RtlirModule* mod,
                                                         const void* node);
+
+// §37.83: the same, read out of `table`, a module's or the design's
+// (RtlirDesign::node_attrs); none where it is null.
+const std::vector<ResolvedAttribute>& VpiNodeAttributes(
+    const RtlirNodeAttributes* table, const void* node);
 
 // §37.83: the attribute objects of each instance, from its instantiation and
 // its module's declaration, and of each net and variable it declares.

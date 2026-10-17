@@ -15,6 +15,7 @@
 #include "common/packed_range.h"
 #include "common/types.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_attribute.h"
 #include "elaborator/rtlir_scopes.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
@@ -228,6 +229,9 @@ struct AssignBuild {
   VpiCalleeResolver callees;
   std::function<std::string_view(std::string)> keep;
   std::function<bool(const Expr&, VpiObject*)> shape_call = nullptr;
+  // §37.83: the attributes elaboration resolved on the operators of the
+  // instance the expressions stand in; null where none is known.
+  const RtlirNodeAttributes* attrs = nullptr;
 };
 
 VpiObject* ExpressionObject(const Expr* expr, const AssignBuild& build);
@@ -704,6 +708,12 @@ VpiObject* ExpressionObject(const Expr* expr, const AssignBuild& build) {
       expr->kind != ExprKind::kMemberAccess && VpiIsExprType(obj->type)) {
     obj->decompile = VpiExprDecompile(expr);
   }
+  // §37.83: an operation carries the attributes its operator is written with.
+  if (obj != nullptr && obj->type == vpiOperation && build.sim != nullptr) {
+    VpiAttachAttributes(obj, VpiNodeAttributes(build.attrs, expr), false,
+                        *build.sim,
+                        {build.alloc, build.keep, build.sim->GetArena()});
+  }
   return obj;
 }
 
@@ -868,7 +878,8 @@ AssignBuild CallSiteBuild(const VpiObjectMap& objects, const VpiCallSite& site,
                      AssignNames{objects, site.prefix, gen, site.scope},
                      VpiCalleesAt(site),
                      build.keep,
-                     site.shape_call};
+                     site.shape_call,
+                     &site.mod.node_attrs};
 }
 
 }  // namespace
@@ -914,7 +925,8 @@ void VpiContext::AttachContinuousAssignments(
             continue;
           }
           AssignBuild build{
-              [this] { return AllocObject(); }, sim_ctx_,
+              [this] { return AllocObject(); },
+              sim_ctx_,
               AssignNames{object_map_, prefix, ca.gen_block_prefixes, nullptr,
                           ca.gen_block_consts},
               VpiCalleesAt({*design, *mod, prefix,
@@ -923,7 +935,9 @@ void VpiContext::AttachContinuousAssignments(
               [this](std::string name) {
                 name_pool_.push_back(std::move(name));
                 return std::string_view(name_pool_.back());
-              }};
+              },
+              nullptr,
+              &mod->node_attrs};
           // §37.85: an assignment a generate block writes is one of its
           // block instance's gen scope.
           MakeContinuousAssignment(ca, VpiGenScopeOf(scope, ca.gen_block_path),

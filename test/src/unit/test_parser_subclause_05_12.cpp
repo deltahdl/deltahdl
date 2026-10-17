@@ -3,6 +3,7 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_class.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 
@@ -314,8 +315,8 @@ TEST(LexicalConventionParsing, MultipleAttributesOnModule) {
 }
 
 // An attribute instance is the declaration's it is written before: one before
-// an interface or a program is that declaration's, and one before a package
-// or a class is no module's, whatever modules the compilation unit holds.
+// an interface, a program or a class is that declaration's, and one before a
+// package is no module's, whatever modules the compilation unit holds.
 TEST(LexicalConventionParsing, TopLevelAttributesStayWithTheirDeclaration) {
   auto r = Parse(
       "module m; endmodule\n"
@@ -333,6 +334,9 @@ TEST(LexicalConventionParsing, TopLevelAttributesStayWithTheirDeclaration) {
   ASSERT_EQ(r.cu->programs.size(), 1u);
   ASSERT_EQ(r.cu->programs[0]->attrs.size(), 1u);
   EXPECT_EQ(r.cu->programs[0]->attrs[0].name, "on_prog");
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  ASSERT_EQ(r.cu->classes[0]->attrs.size(), 1u);
+  EXPECT_EQ(r.cu->classes[0]->attrs[0].name, "on_class");
 }
 
 }  // namespace

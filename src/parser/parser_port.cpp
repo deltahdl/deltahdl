@@ -1,6 +1,7 @@
 #include <cstddef>
 #include <format>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/diagnostic.h"
@@ -25,9 +26,11 @@ static void ResolvePortDefaults(PortDecl& port, const PortDecl* prev,
 struct ParserPortHelpers {
   // Apply one non-ANSI body port declaration (a single name + dims) to the
   // matching already-declared port(s), reporting a duplicate-direction error.
-  // `has_var` says the declaration was written with `var`.
-  static void ApplyNonAnsiPortDecl(Parser& p, ModuleDecl& mod, Direction dir,
-                                   const DataType& dtype, bool has_var) {
+  // `shape` holds what the declaration gives every name it declares: its
+  // direction, its data type, whether it was written with `var`, and the
+  // attributes written before it.
+  static void ApplyNonAnsiPortDecl(Parser& p, ModuleDecl& mod,
+                                   const PortDecl& shape) {
     auto loc = p.CurrentLoc();
     auto name = p.Expect(TokenKind::kIdentifier, Subclause("23.2.2.1")).text;
     std::vector<Expr*> dims;
@@ -42,9 +45,10 @@ struct ParserPortHelpers {
                       Subclause("23.2.2.1"));
       }
       found = true;
-      port.direction = dir;
-      port.data_type = dtype;
-      port.has_explicit_var = has_var;
+      port.direction = shape.direction;
+      port.data_type = shape.data_type;
+      port.has_explicit_var = shape.has_explicit_var;
+      port.attrs = shape.attrs;
       port.unpacked_dims = dims;
     }
     // §23.5: with a `.*` module header the port names come from the module's
@@ -52,11 +56,8 @@ struct ParserPortHelpers {
     // is materialized from this body declaration; elaboration keeps these
     // body-declared ports instead of the (name-only) extern ports.
     if (found) return;
-    PortDecl np;
+    PortDecl np = shape;
     np.name = name;
-    np.direction = dir;
-    np.data_type = dtype;
-    np.has_explicit_var = has_var;
     np.unpacked_dims = dims;
     np.loc = loc;
     // §23.2.2.1 (printed page 733), Example 5: in `renamed_concat(.a({b, c}),
@@ -475,9 +476,9 @@ struct ParserPortHelpers {
 
   static bool TryParseAttributedNonAnsiPortDecls(Parser& p, ModuleDecl& mod) {
     auto saved = p.lexer_.SavePos();
-    p.ParseAttributes();
+    std::vector<Attribute> attrs = p.ParseAttributes();
     if (IsPortDirection(p.CurrentToken().kind)) {
-      p.ParseNonAnsiPortDecls(mod);
+      p.ParseNonAnsiPortDecls(mod, std::move(attrs));
       return true;
     }
     p.lexer_.RestorePos(saved);
@@ -772,9 +773,8 @@ PortDecl Parser::ParsePortDecl() {
   PortDecl port;
 
   // §A.1.3: each ansi_port_declaration in a list_of_port_declarations may be
-  // preceded by attribute_instances. They carry no ANSI port semantics here,
-  // so consume and discard them before the port itself.
-  ParseAttributes();
+  // preceded by attribute_instances, which are the port's (§5.12).
+  port.attrs = ParseAttributes();
 
   port.loc = CurrentLoc();
 
@@ -868,7 +868,8 @@ static bool NonAnsiPortDeclIsNet(Direction dir, const DataType& dtype,
          dtype.kind == DataTypeKind::kImplicit;
 }
 
-void Parser::ParseNonAnsiPortDecls(ModuleDecl& mod) {
+void Parser::ParseNonAnsiPortDecls(ModuleDecl& mod,
+                                   std::vector<Attribute> attrs) {
   Direction dir = Direction::kNone;
   auto tk = CurrentToken().kind;
   if (tk == TokenKind::kKwInput) dir = Direction::kInput;
@@ -909,8 +910,13 @@ void Parser::ParseNonAnsiPortDecls(ModuleDecl& mod) {
     Expect(TokenKind::kRBracket, Subclause("23.2.2.1"));
   }
 
+  PortDecl shape;
+  shape.direction = dir;
+  shape.data_type = dtype;
+  shape.has_explicit_var = has_var;
+  shape.attrs = std::move(attrs);
   do {
-    ParserPortHelpers::ApplyNonAnsiPortDecl(*this, mod, dir, dtype, has_var);
+    ParserPortHelpers::ApplyNonAnsiPortDecl(*this, mod, shape);
   } while (Match(TokenKind::kComma));
   Expect(TokenKind::kSemicolon, Subclause("23.2.2.1"));
 }

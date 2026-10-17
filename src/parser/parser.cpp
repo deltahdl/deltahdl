@@ -271,6 +271,8 @@ void Parser::AttachAttrs(std::vector<ModuleItem*>& items, size_t before,
   if (attrs.empty()) return;
   for (size_t i = before; i < items.size(); ++i) {
     items[i]->attrs = attrs;
+    // §5.12: a class declared as an item keeps those written before it.
+    if (items[i]->class_decl != nullptr) items[i]->class_decl->attrs = attrs;
   }
 }
 
@@ -567,23 +569,25 @@ bool Parser::TryParsePrimaryTopLevel(CompilationUnit* unit) {
 
 namespace {
 
-// How many UDPs, modules, interfaces and programs a compilation unit holds.
+// How many UDPs, modules, interfaces, programs and classes a compilation unit
+// holds.
 struct TopLevelSizes {
   size_t udps;
   size_t modules;
   size_t interfaces;
   size_t programs;
+  size_t classes;
 };
 
 TopLevelSizes SizesOf(const CompilationUnit& unit) {
   return {unit.udps.size(), unit.modules.size(), unit.interfaces.size(),
-          unit.programs.size()};
+          unit.programs.size(), unit.classes.size()};
 }
 
 // §5.12: the attributes of the declaration `unit` gained since it held
 // `before`, which those written before it are given: a UDP's, a module's, an
-// interface's or a program's. Null for a package or a class, whose records
-// keep none (#7263), and for anything else.
+// interface's, a program's or a class's. Null for a package, whose record
+// keeps none, and for anything else.
 std::vector<Attribute>* AttributesOfNewest(CompilationUnit& unit,
                                            const TopLevelSizes& before) {
   if (unit.udps.size() > before.udps) return &unit.udps.back()->attrs;
@@ -594,6 +598,7 @@ std::vector<Attribute>* AttributesOfNewest(CompilationUnit& unit,
   if (unit.programs.size() > before.programs) {
     return &unit.programs.back()->attrs;
   }
+  if (unit.classes.size() > before.classes) return &unit.classes.back()->attrs;
   return nullptr;
 }
 

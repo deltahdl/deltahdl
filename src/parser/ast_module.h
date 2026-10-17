@@ -46,6 +46,7 @@ struct PortDecl {
   bool is_explicit_named = false;
   bool has_explicit_var = false;
   SourceLoc loc;
+  std::vector<Attribute> attrs;  // §5.12: those written before it.
 };
 
 // §16.14.7: the inferred clocking or disable function a formal argument of a

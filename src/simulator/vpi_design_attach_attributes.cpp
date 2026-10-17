@@ -61,12 +61,17 @@ void AttachDeclaredAttributes(const std::vector<Declared>& declared,
 
 }  // namespace
 
+const std::vector<ResolvedAttribute>& VpiNodeAttributes(
+    const RtlirNodeAttributes* table, const void* node) {
+  static const std::vector<ResolvedAttribute> kNone;
+  if (table == nullptr) return kNone;
+  const auto kFound = table->find(node);
+  return kFound == table->end() ? kNone : kFound->second;
+}
+
 const std::vector<ResolvedAttribute>& VpiNodeAttributes(const RtlirModule* mod,
                                                         const void* node) {
-  static const std::vector<ResolvedAttribute> kNone;
-  if (mod == nullptr) return kNone;
-  const auto kFound = mod->node_attrs.find(node);
-  return kFound == mod->node_attrs.end() ? kNone : kFound->second;
+  return VpiNodeAttributes(mod == nullptr ? nullptr : &mod->node_attrs, node);
 }
 
 void VpiAttachAttributes(VpiObject* owner,

@@ -133,7 +133,9 @@ class Parser {
   void ParseNonAnsiPortList(ModuleDecl& mod);
   PortDecl ParsePortDecl();
   void ParseModuleBody(ModuleDecl& mod);
-  void ParseNonAnsiPortDecls(ModuleDecl& mod);
+  // §5.12: `attrs` are those written before the declaration.
+  void ParseNonAnsiPortDecls(ModuleDecl& mod,
+                             std::vector<Attribute> attrs = {});
   void ParseModuleItem(std::vector<ModuleItem*>& items);
   std::string_view TryParseAssertionItemLabel();
   void ParseDataDeclItem(std::vector<ModuleItem*>& items, size_t before,

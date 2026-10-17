@@ -397,6 +397,9 @@ static RtlirPort BuildRtlirPortBase(const PortDecl& port, bool port_is_var,
                                     DiagEngine& diag) {
   RtlirPort rp;
   rp.name = port.name;
+  // §5.12: the attributes written on the port, folded against the module's
+  // parameters.
+  rp.attrs = ResolveAttributes(port.attrs, diag, scope);
   // §23.2.2.1: a named port connection may reach an implicit port only when its
   // port expression is a simple (or escaped) identifier, which serves as the
   // port name. An implicit port written as a bit-select, part-select, or

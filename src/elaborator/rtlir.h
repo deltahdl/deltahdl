@@ -917,6 +917,7 @@ struct RtlirDesign {
   std::vector<PackageDecl*> packages;
 
   std::vector<ClassDecl*> cu_class_decls;
+  RtlirNodeAttributes node_attrs;  // §37.83: its unit's and packages' classes'.
 
   // §20.4.1: the compilation unit's time unit and precision, for $unit.
   TimeScale cu_timescale;

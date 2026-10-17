@@ -46,6 +46,14 @@ enum class ExprKind : uint8_t {
   kTagged,
 };
 
+// §5.12: one attribute instance, `name` or `name = value`, where it was
+// written.
+struct Attribute {
+  std::string_view name;
+  Expr* value = nullptr;
+  SourceLoc loc;
+};
+
 struct Expr {
   ExprKind kind;
   SourceRange range;
@@ -156,6 +164,8 @@ struct Expr {
   // makes, with its packed dimensions as selects, which is the shape the
   // elaborator's override readers take.
   DataType* type_value = nullptr;
+  // §5.12: the attributes written after the operator an operation is.
+  std::vector<Attribute> attrs;
 };
 
 // §11.5: an operand is "simple" iff it is not parenthesized AND is a primary
@@ -207,11 +217,5 @@ inline bool IsSignedLiteral(std::string_view text) {
   char c = text[tick + 1];
   return c == 's' || c == 'S';
 }
-
-struct Attribute {
-  std::string_view name;
-  Expr* value = nullptr;
-  SourceLoc loc;
-};
 
 }  // namespace delta

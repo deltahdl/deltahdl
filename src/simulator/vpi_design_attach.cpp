@@ -333,6 +333,16 @@ void VpiContext::AttachDesignPorts(const RtlirDesign* design) {
       // where the declaration does and reports it.
       RecordSourceLocation(obj, port.loc, sources);
       RecordProtection(obj, port.loc, sources);
+      // §37.83: the attributes the port is written with.
+      if (sim_ctx_ != nullptr) {
+        VpiAttachAttributes(obj, port.attrs, false, *sim_ctx_,
+                            {kAlloc,
+                             [this](std::string name) {
+                               name_pool_.push_back(std::move(name));
+                               return std::string_view(name_pool_.back());
+                             },
+                             sim_ctx_->GetArena()});
+      }
       if (port.is_interconnect) {
         FillInterconnectNetObject(AllocObject(), port, obj, name_pool_, kAlloc);
       }

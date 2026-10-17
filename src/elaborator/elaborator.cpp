@@ -17,6 +17,7 @@
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator_child_type_params.h"
 #include "elaborator/elaborator_helpers.h"
+#include "elaborator/elaborator_node_attributes.h"
 #include "elaborator/elaborator_type_facts.h"
 #include "elaborator/elaborator_validate_classes.h"
 #include "elaborator/package_assertion_scope.h"
@@ -609,6 +610,8 @@ RtlirDesign* Elaborator::ElaborateTops(
   // cu_param_scope_ by now, and a compilation-unit class is lowered ahead of
   // the modules, with the design as its only scope.
   design->unit_constants = cu_param_scope_;
+  // §37.83: the attributes of the classes outside every module.
+  RecordDesignClassAttributes(*design, diag_, cu_param_scope_);
   FinalizeDesignTail(
       design, unit_,
       TypeNameSources{typedefs_, aggregate_typedef_names_, arena_},

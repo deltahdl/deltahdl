@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -402,6 +403,87 @@ TEST_F(AttributesOfARun, AnAssertionAPropertyAndAClockingBlockCarryTheirs) {
   EXPECT_EQ(kTagOf(Named(vpiPropertyDecl, By("top"), "p")), "1");
   EXPECT_EQ(kTagOf(Named(vpiAssertion, By("top"), "a1")), "2");
   EXPECT_EQ(kTagOf(Named(vpiClockingBlock, By("top"), "cb")), "3");
+}
+
+// A port carries the attributes written before its declaration, an ANSI
+// port's in the module header and a non-ANSI port's before the body
+// declaration that gives it its direction.
+TEST_F(AttributesOfARun, APortCarriesItsAttributes) {
+  Run("module ansi((* keep *) input logic a, (* tag = 4 *) output logic b);\n"
+      "endmodule\n"
+      "module plain(c);\n"
+      "  (* note *) input c;\n"
+      "endmodule\n"
+      "module top; logic a, b, c;\n"
+      "  ansi u1(.a(a), .b(b));\n"
+      "  plain u2(.c(c));\n"
+      "endmodule\n");
+  vpiHandle a = Named(vpiPort, By("top.u1"), "a");
+  vpiHandle b = Named(vpiPort, By("top.u1"), "b");
+  vpiHandle c = Named(vpiPort, By("top.u2"), "c");
+  ASSERT_NE(a, nullptr);
+  ASSERT_NE(b, nullptr);
+  ASSERT_NE(c, nullptr);
+  EXPECT_EQ(NamesOf(vpiAttribute, a), std::vector<std::string>{"keep"});
+  vpiHandle tag = Named(vpiAttribute, b, "tag");
+  ASSERT_NE(tag, nullptr);
+  EXPECT_EQ(ValueOf(tag, vpiIntVal), "4");
+  EXPECT_EQ(NamesOf(vpiAttribute, c), std::vector<std::string>{"note"});
+}
+
+// A class carries the attributes written before its declaration, whether
+// the compilation unit, a package or a module declares it, and a constraint
+// those written before it in the class.
+TEST_F(AttributesOfARun, AClassAndAConstraintCarryTheirAttributes) {
+  Run("(* tag = 1 *) class Unit; endclass\n"
+      "package p; (* tag = 2 *) class Pkg; endclass endpackage\n"
+      "module top;\n"
+      "  (* tag = 3 *) class Inner;\n"
+      "    rand int x;\n"
+      "    (* soft_c *) constraint c { x > 0; }\n"
+      "  endclass\n"
+      "endmodule\n");
+  const auto kTagOf = [](vpiHandle obj) {
+    vpiHandle tag = Named(vpiAttribute, obj, "tag");
+    return tag == nullptr ? std::string() : ValueOf(tag, vpiIntVal);
+  };
+  EXPECT_EQ(kTagOf(Named(vpiClassDefn, nullptr, "Unit")), "1");
+  EXPECT_EQ(kTagOf(Named(vpiClassDefn, By("p"), "Pkg")), "2");
+  vpiHandle inner = Named(vpiClassDefn, By("top"), "Inner");
+  ASSERT_NE(inner, nullptr);
+  EXPECT_EQ(kTagOf(inner), "3");
+  vpiHandle c = Named(vpiConstraint, inner, "c");
+  ASSERT_NE(c, nullptr);
+  EXPECT_EQ(NamesOf(vpiAttribute, c), std::vector<std::string>{"soft_c"});
+}
+
+// An operation carries the attributes written after its operator, in a
+// continuous assignment and in a procedural statement alike, and for a
+// binary, a unary and a conditional operator.
+TEST_F(AttributesOfARun, AnOperationCarriesItsOperatorsAttributes) {
+  Run("module top; wire [7:0] a, b, y, u, t; logic [7:0] z; wire c;\n"
+      "  assign y = a + (* mode = \"cla\" *) b;\n"
+      "  assign u = ~ (* inv *) a;\n"
+      "  assign t = c ? (* pick *) a : b;\n"
+      "  initial z = a & (* tag *) b;\n"
+      "endmodule\n");
+  std::vector<std::string> names;
+  vpiHandle it = vpi_iterate(vpiContAssign, By("top"));
+  ASSERT_NE(it, nullptr);
+  while (vpiHandle assign = vpi_scan(it)) {
+    for (const std::string& name :
+         NamesOf(vpiAttribute, vpi_handle(vpiRhs, assign))) {
+      names.push_back(name);
+    }
+  }
+  std::ranges::sort(names);
+  EXPECT_EQ(names, (std::vector<std::string>{"inv", "mode", "pick"}));
+  vpiHandle procs = vpi_iterate(vpiProcess, By("top"));
+  ASSERT_NE(procs, nullptr);
+  vpiHandle assignment = vpi_handle(vpiStmt, vpi_scan(procs));
+  ASSERT_NE(assignment, nullptr);
+  EXPECT_EQ(NamesOf(vpiAttribute, vpi_handle(vpiRhs, assignment)),
+            std::vector<std::string>{"tag"});
 }
 
 }  // namespace

@@ -172,6 +172,7 @@ struct ConstraintItem {
 struct ClassMember {
   ClassMemberKind kind = ClassMemberKind::kProperty;
   SourceLoc loc;
+  std::vector<Attribute> attrs;  // §5.12: those written before it.
 
   bool is_static = false;
   bool is_virtual = false;
@@ -294,6 +295,7 @@ struct InterfaceRef {
 struct ClassDecl {
   std::string_view name;
   SourceRange range;
+  std::vector<Attribute> attrs;  // §5.12: those written before it.
   bool is_virtual = false;
   bool is_final = false;
   bool is_interface = false;

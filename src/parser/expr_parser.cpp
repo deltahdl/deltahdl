@@ -5,6 +5,8 @@
 #include <format>
 #include <string>
 #include <string_view>
+#include <utility>
+#include <vector>
 
 #include "common/diagnostic.h"
 #include "common/types.h"
@@ -131,9 +133,10 @@ Expr* Parser::ParseExprBp(int min_bp) {
 Expr* Parser::TryParseSpecialInfix(Expr*& lhs, const Token& tok, int min_bp) {
   if (tok.kind == TokenKind::kQuestion && min_bp <= 1) {
     Consume();
-    ParseAttributes();
+    std::vector<Attribute> attrs = ParseAttributes();
     auto* tern = arena_.Create<Expr>();
     tern->kind = ExprKind::kTernary;
+    tern->attrs = std::move(attrs);
     // §11.4.11 writes the conditional expression as its condition followed by
     // the operator, so it begins where the condition begins.
     tern->range.start = lhs->range.start;
@@ -208,10 +211,11 @@ Expr* Parser::ParseInfixBp(Expr* lhs, int min_bp) {
     }
 
     auto op = Consume();
-    ParseAttributes();
+    std::vector<Attribute> attrs = ParseAttributes();
     auto* rhs = ParseExprBp(rbp);
     auto* bin = arena_.Create<Expr>();
     bin->kind = ExprKind::kBinary;
+    bin->attrs = std::move(attrs);
     bin->op = op.kind;
     bin->lhs = lhs;
     bin->rhs = rhs;
@@ -228,10 +232,11 @@ Expr* Parser::ParsePrefixExpr() {
     auto op = Consume();
     // §A.8.3 inc_or_dec_expression allows an attribute_instance between the
     // prefix ++/-- operator and its variable_lvalue.
-    ParseAttributes();
+    std::vector<Attribute> attrs = ParseAttributes();
     auto* operand = ParsePrimaryExpr();
     auto* unary = arena_.Create<Expr>();
     unary->kind = ExprKind::kUnary;
+    unary->attrs = std::move(attrs);
     unary->op = op.kind;
     unary->lhs = operand;
     unary->range.start = op.loc;
@@ -243,10 +248,11 @@ Expr* Parser::ParsePrefixExpr() {
     auto op = Consume();
     // §A.8.3 expression/constant_expression allow an attribute_instance between
     // a unary_operator and its (constant_)primary.
-    ParseAttributes();
+    std::vector<Attribute> attrs = ParseAttributes();
     auto* operand = ParseExprBp(bp);
     auto* unary = arena_.Create<Expr>();
     unary->kind = ExprKind::kUnary;
+    unary->attrs = std::move(attrs);
     unary->op = op.kind;
     unary->lhs = operand;
     unary->range.start = op.loc;

@@ -647,7 +647,7 @@ bool Parser::TryParseKeywordClassMember(std::vector<ClassMember*>& members,
 }
 
 void Parser::ParseClassMembers(std::vector<ClassMember*>& members) {
-  ParseAttributes();
+  std::vector<Attribute> attrs = ParseAttributes();
 
   if (Check(TokenKind::kKwImport)) {
     SourceLoc import_loc = CurrentLoc();
@@ -694,6 +694,7 @@ void Parser::ParseClassMembers(std::vector<ClassMember*>& members) {
   }
   auto* member = arena_.Create<ClassMember>();
   member->loc = CurrentLoc();
+  member->attrs = std::move(attrs);
   bool proto = ParseClassQualifiers(member);
 
   if (TryParseKeywordClassMember(members, member, proto)) return;

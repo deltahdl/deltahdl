@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_attribute.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -24,11 +25,14 @@ namespace delta {
 namespace {
 
 // A class defn made for a class declaration, with the flat name of the scope
-// the declaration's expressions resolve their names in.
+// the declaration's expressions resolve their names in, and the table the
+// attributes elaboration resolved on it and its items are kept in (§37.83):
+// its module's, or the design's for a class outside every module.
 struct MadeClassDefn {
   const ClassDecl* decl;
   VpiObject* defn;
   std::string prefix;
+  const RtlirNodeAttributes* attrs;
 };
 
 // §37.31: the class defn `decl` stands as, hung from the scope declaring it
@@ -44,7 +48,7 @@ void MakeClassDefn(VpiObject* scope, const ClassDecl* decl,
   defn->parent = scope;
   defn->is_virtual = decl->is_virtual;
   if (scope != nullptr) scope->children.push_back(defn);
-  made.push_back({decl, defn, prefix});
+  made.push_back({decl, defn, prefix, nullptr});
 }
 
 // The class defns of the classes each module instance declares.
@@ -59,6 +63,7 @@ void MakeInstanceClassDefns(const RtlirDesign& design,
         if (scope == nullptr) return;
         for (const ClassDecl* decl : mod->class_decls) {
           MakeClassDefn(scope, decl, prefix, build, made);
+          if (decl != nullptr) made.back().attrs = &mod->node_attrs;
         }
       });
 }
@@ -74,8 +79,10 @@ void MakePackageClassDefns(const RtlirDesign& design,
     VpiObject* scope = FindObjectForFlatName(objects, kPackage);
     if (scope == nullptr) continue;
     for (const ModuleItem* item : pkg->items) {
-      if (item != nullptr && item->kind == ModuleItemKind::kClassDecl) {
+      if (item != nullptr && item->kind == ModuleItemKind::kClassDecl &&
+          item->class_decl != nullptr) {
         MakeClassDefn(scope, item->class_decl, kPackage, build, made);
+        made.back().attrs = &design.node_attrs;
       }
     }
   }
@@ -91,7 +98,9 @@ void MakeUnitClassDefns(const RtlirDesign& design, const VpiObjectMap& objects,
   VpiObject* scope = unit == objects.end() ? nullptr : unit->second;
   for (const ClassDecl* decl : design.cu_class_decls) {
     MakeClassDefn(scope, decl, "$unit", build, made);
-    if (decl != nullptr) made.back().defn->in_compilation_unit = true;
+    if (decl == nullptr) continue;
+    made.back().defn->in_compilation_unit = true;
+    made.back().attrs = &design.node_attrs;
   }
 }
 
@@ -270,9 +279,13 @@ void MakeConstraints(const MadeClassDefn& owner, const VpiObjectMap& objects,
     if (member == nullptr || member->kind != ClassMemberKind::kConstraint) {
       continue;
     }
-    owner.defn->children.push_back(VpiMakeConstraint(
+    VpiObject* constraint = VpiMakeConstraint(
         *member, owner.defn, {objects, owner.prefix, kNoGenBlocks, scope, ctx},
-        build));
+        build);
+    owner.defn->children.push_back(constraint);
+    // §37.83: the attributes the constraint is written with.
+    VpiAttachAttributes(constraint, VpiNodeAttributes(owner.attrs, member),
+                        false, ctx, build);
   }
 }
 
@@ -301,6 +314,9 @@ VpiClassDefnObjects AttachClassDefinitions(const RtlirDesign* design,
   for (const MadeClassDefn& owner : made) {
     // §37.3.3: where the class was written.
     VpiRecordWrittenLocation(owner.defn, owner.decl->range.start, ctx);
+    // §37.83: the attributes the class is written with.
+    VpiAttachAttributes(owner.defn, VpiNodeAttributes(owner.attrs, owner.decl),
+                        false, ctx, build);
     MakeMembers(owner, *design, made, ctx, build);
     if (!owner.decl->base_class.empty()) {
       MakeExtends(owner, made, objects, ctx, build);
