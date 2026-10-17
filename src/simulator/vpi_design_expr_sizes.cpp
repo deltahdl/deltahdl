@@ -68,13 +68,15 @@ bool IsLeftWidthOp(int op_type) {
 }
 
 // §6.11 Table 6-8 and §6.12: the width of the built-in type a cast names by
-// keyword, 0 for one with no bit width (§37.59 leaves it to the typespec).
+// keyword, 0 for one with no bit width (§37.59 leaves it to the typespec). A
+// bit or logic typespec a size, signing or const cast makes from its operand
+// records its own width (§6.24.1).
 int CastWidth(const VpiObject& op) {
   for (const VpiObject* child : op.children) {
     switch (child->type) {
       case vpiBitTypespec:
       case vpiLogicTypespec:
-        return 1;
+        return child->size != 0 ? child->size : 1;
       case vpiByteTypespec:
         return 8;
       case vpiShortIntTypespec:

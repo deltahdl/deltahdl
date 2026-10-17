@@ -99,6 +99,67 @@ TEST_F(AssignedExpressionsOfARun, ACastToATypedefReachesItsTypespec) {
   EXPECT_STREQ(vpi_get_str(vpiName, typespec), "nib_t");
 }
 
+// The typespec a cast relates to, null for none.
+vpiHandle CastTypespec(vpiHandle cast) {
+  if (cast == nullptr || vpi_get(vpiOpType, cast) != vpiCastOp) return nullptr;
+  return vpi_handle(vpiTypespec, cast);
+}
+
+// ...or, for a size cast, a vector keeping the operand's 2-state nature
+// (§6.24.1)...
+TEST_F(AssignedExpressionsOfARun, ASizeCastOfATwoStateOperandIsABitVector) {
+  Run("module top; int i; wire [7:0] w; assign w = 8'(i); endmodule\n");
+  vpiHandle typespec = CastTypespec(Rhs());
+  ASSERT_NE(typespec, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, typespec), vpiBitTypespec);
+}
+
+// ...or its 4-state nature...
+TEST_F(AssignedExpressionsOfARun, ASizeCastOfAFourStateOperandIsALogicVector) {
+  Run("module top; logic [3:0] r; wire [7:0] w; assign w = 8'(r);\n"
+      "endmodule\n");
+  vpiHandle typespec = CastTypespec(Rhs());
+  ASSERT_NE(typespec, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, typespec), vpiLogicTypespec);
+}
+
+// ...as wide as its size expression's value, a parameter's included...
+TEST_F(AssignedExpressionsOfARun, ASizeCastIsAsWideAsItsSizeExpression) {
+  Run("module top; localparam W = 6; logic [3:0] r; wire [7:0] w;\n"
+      "  assign w = W'(r);\n"
+      "endmodule\n");
+  ASSERT_NE(CastTypespec(Rhs()), nullptr);
+  EXPECT_EQ(vpi_get(vpiSize, Rhs()), 6);
+}
+
+// ...or, for a signing cast, the operand's type of the signedness it names...
+TEST_F(AssignedExpressionsOfARun, ASigningCastIsTheOperandsTypeSigned) {
+  Run("module top; logic [7:0] r; wire [7:0] w; assign w = signed'(r);\n"
+      "endmodule\n");
+  vpiHandle typespec = CastTypespec(Rhs());
+  ASSERT_NE(typespec, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, typespec), vpiLogicTypespec);
+  EXPECT_EQ(vpi_get(vpiSigned, typespec), 1);
+}
+
+// ...unsigned where it names that...
+TEST_F(AssignedExpressionsOfARun, AnUnsigningCastIsTheOperandsTypeUnsigned) {
+  Run("module top; int i; wire [31:0] w; assign w = unsigned'(i);\n"
+      "endmodule\n");
+  vpiHandle typespec = CastTypespec(Rhs());
+  ASSERT_NE(typespec, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, typespec), vpiIntTypespec);
+  EXPECT_EQ(vpi_get(vpiSigned, typespec), 0);
+}
+
+// ...or, for a const cast, the operand's own type.
+TEST_F(AssignedExpressionsOfARun, AConstCastIsTheOperandsType) {
+  Run("module top; int i; wire [31:0] w; assign w = const'(i); endmodule\n");
+  vpiHandle typespec = CastTypespec(Rhs());
+  ASSERT_NE(typespec, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, typespec), vpiIntTypespec);
+}
+
 // Every expression has vpiSize, an operation's being its self-determined
 // width (§11.6.1): a bitwise and is as wide as its wider operand, and an
 // equality is one bit.

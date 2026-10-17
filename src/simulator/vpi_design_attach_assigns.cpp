@@ -589,6 +589,22 @@ VpiObject* HierarchicalObject(const Expr* expr, const AssignBuild& build) {
 // name stands for, a constant, a select, a call, or an operation over these.
 // The kinds of expression the switch does not name are not modelled and give
 // null.
+// §37.59 details 3 and 5: a cast, an operation related to the typespec of the
+// type it casts its operand to. Where the cast names no type, the expression
+// it was written with is a size cast's width (§6.24.1), whose value it has
+// where the source wrote it.
+VpiObject* CastObject(const Expr* expr, const AssignBuild& build) {
+  const VpiObject* width = expr->text.empty() && expr->rhs != nullptr
+                               ? ExpressionObject(expr->rhs, build)
+                               : nullptr;
+  return VpiTypedCast(
+      OperationObject(vpiCastOp, {expr->lhs}, build), *expr,
+      VpiScopeOrInstance(build.names.scope != nullptr ? build.names.scope
+                                                      : build.names.instance,
+                         build.names.objects, build.names.prefix),
+      width, build.alloc);
+}
+
 VpiObject* ModelledExpression(const Expr* expr, const AssignBuild& build) {
   switch (expr->kind) {
     case ExprKind::kIdentifier: {
@@ -622,13 +638,7 @@ VpiObject* ModelledExpression(const Expr* expr, const AssignBuild& build) {
     case ExprKind::kAssignmentPattern:
       return PatternObject(expr, build);
     case ExprKind::kCast:
-      return VpiTypedCast(
-          OperationObject(vpiCastOp, {expr->lhs}, build), *expr,
-          VpiScopeOrInstance(build.names.scope != nullptr
-                                 ? build.names.scope
-                                 : build.names.instance,
-                             build.names.objects, build.names.prefix),
-          build.alloc);
+      return CastObject(expr, build);
     case ExprKind::kMinTypMax:
       return OperationObject(vpiMinTypMaxOp,
                              {expr->lhs, expr->condition, expr->rhs}, build);
