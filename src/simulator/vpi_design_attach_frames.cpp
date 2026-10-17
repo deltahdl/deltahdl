@@ -6,8 +6,8 @@
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
-#include "simulator/vpi_data_structs.h"
 #include "simulator/vpi_context.h"
+#include "simulator/vpi_data_structs.h"
 #include "simulator/vpi_design_attach.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_internal.h"
@@ -56,14 +56,15 @@ void VpiContext::NoteThreadEnded(Process* proc) {
 
 void VpiContext::RefreshRunObjects() {
   RefreshThreadObjects();
-  // §37.81: the time queue a run's iteration walks is the scheduler's slots
-  // still holding events, the current one marked; a run without a scheduler
-  // keeps the slots it was given.
-  if (scheduler_ == nullptr) return;
+  // §37.81: the time queue a run's iteration walks is its scheduler's slots
+  // still holding events, the current one marked; a context no run is
+  // attached to keeps the slots it was given.
+  if (sim_ctx_ == nullptr) return;
+  const Scheduler& scheduler = sim_ctx_->GetScheduler();
   std::vector<VpiTimeQueueSlot> slots;
-  for (const PendingTimeSlot& pending : scheduler_->PendingTimeSlots()) {
+  for (const PendingTimeSlot& pending : scheduler.PendingTimeSlots()) {
     slots.push_back({pending.time.ticks,
-                     pending.time == scheduler_->CurrentTime(),
+                     pending.time == scheduler.CurrentTime(),
                      pending.before_read_only_synch});
   }
   time_queue_slots_ = std::move(slots);

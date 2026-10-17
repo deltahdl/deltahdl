@@ -2,6 +2,7 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <vector>
 
 #include "common/arena.h"
 #include "common/types.h"
