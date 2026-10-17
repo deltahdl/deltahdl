@@ -456,34 +456,37 @@ VpiCalledSubroutine EnclosingSubroutine(const VpiCallSite& site,
   return {};
 }
 
-// §26.3: the imports the package `package` writes, in the order written.
-std::vector<const ImportItem*> PackageImports(const RtlirDesign& design,
-                                              std::string_view package) {
-  std::vector<const ImportItem*> imports;
+// §26.2 with §26.3: the packages a call of `name` standing in the package
+// `package` finds its callee among, in the order it looks: the package
+// itself, then the one each import it writes names, a named import of `name`
+// or a wildcard one, in the order written. A package refers to none of the
+// compilation unit's declarations (§26.2).
+std::vector<std::string_view> PackagesSearched(const RtlirDesign& design,
+                                               std::string_view package,
+                                               std::string_view name) {
+  std::vector<std::string_view> searched{package};
   for (const PackageDecl* decl : design.packages) {
     if (decl->name != package) continue;
     for (const ModuleItem* item : decl->items) {
-      if (item->kind == ModuleItemKind::kImportDecl) {
-        imports.push_back(&item->import_item);
+      if (item->kind != ModuleItemKind::kImportDecl) continue;
+      const ImportItem& imported = item->import_item;
+      if (imported.is_wildcard || imported.item_name == name) {
+        searched.push_back(imported.package_name);
       }
     }
   }
-  return imports;
+  return searched;
 }
 
-// §26.2 with §26.3: the task or function `name` a call standing in a package
-// reaches: one the package declares, or else one an import it writes makes
-// visible, a named import of it or a wildcard one, the first in the order
-// written. A package refers to none of the compilation unit's (§26.2).
+// The task or function `name` a call standing in a package reaches: the
+// first PackagesSearched names declares.
 VpiCalledSubroutine PackageVisibleSubroutine(const VpiCallSite& site,
                                              std::string_view name) {
-  VpiCalledSubroutine called =
-      VpiPackageSubroutine(site.design, site.package, name, site.made);
-  for (const ImportItem* imported : PackageImports(site.design, site.package)) {
-    if (called.decl != nullptr) break;
-    if (imported->is_wildcard || imported->item_name == name) {
-      called = VpiPackageSubroutine(site.design, imported->package_name, name,
-                                    site.made);
+  VpiCalledSubroutine called;
+  for (std::string_view package :
+       PackagesSearched(site.design, site.package, name)) {
+    if (called.decl == nullptr) {
+      called = VpiPackageSubroutine(site.design, package, name, site.made);
     }
   }
   return called;

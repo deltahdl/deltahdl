@@ -217,8 +217,9 @@ TEST_F(CallsOutsideProcedures, AnExtendsClausesCallIsShaped) {
 
 // A call a package's property makes of a function the package imports finds
 // it through the import, a named one of another name passed over and a
-// wildcard one of a package not declaring it too, while a function the
-// package declares itself is found ahead of every import (§26.3) (#7290).
+// wildcard one of a package not declaring it too, a named import of it ahead
+// of a wildcard import written after it, while a function the package
+// declares itself is found ahead of every import (§26.3) (#7290).
 TEST_F(CallsOutsideProcedures, APackagesCallFindsAnImportedFunction) {
   Run("package p;\n"
       "  function automatic int g(int v); return v; endfunction\n"
@@ -228,7 +229,7 @@ TEST_F(CallsOutsideProcedures, APackagesCallFindsAnImportedFunction) {
       "endpackage\n"
       "package q; import p::h; import r::*; import p::*;\n"
       "  function automatic int own(int v); return v; endfunction\n"
-      "  property s(x); g(x) == own(x); endproperty\n"
+      "  property s(x); g(x) == own(x) + h(x); endproperty\n"
       "endpackage\n"
       "module top; endmodule\n");
   vpiHandle q = By("q");
@@ -239,7 +240,11 @@ TEST_F(CallsOutsideProcedures, APackagesCallFindsAnImportedFunction) {
   ExpectFunctionCall(OperandOf(equality, 0), "g", q);
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiFunction, OperandOf(equality, 0))),
             VpiObjectOf(Named(vpiTaskFunc, By("p"), "g")));
-  ExpectFunctionCall(OperandOf(equality, 1), "own", q);
+  vpiHandle sum = OperandOf(equality, 1);
+  ExpectFunctionCall(OperandOf(sum, 0), "own", q);
+  ExpectFunctionCall(OperandOf(sum, 1), "h", q);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiFunction, OperandOf(sum, 1))),
+            VpiObjectOf(Named(vpiTaskFunc, By("p"), "h")));
 }
 
 // A call a class's constraint makes of a method the class declares, or one
