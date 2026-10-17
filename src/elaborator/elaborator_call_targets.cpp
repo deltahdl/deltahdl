@@ -94,6 +94,12 @@ struct DataScope {
   // The site of the scope `items` belong to, seeing each of them.
   TypeSite Site() const { return {&items, items.size(), site}; }
 
+  // The site of the scope declaring the variable `var`, whose typedefs its
+  // type names first (§23.9).
+  TypeSite SiteOf(const DeclaredVar& var) const {
+    return var.site != nullptr ? *var.site : Site();
+  }
+
   bool Names(std::string_view name) const {
     return module.contains(name) ||
            std::ranges::any_of(blocks, [name](const auto& declared) {
@@ -185,10 +191,16 @@ std::string_view VifInterface(const DataType& type) {
                                                       : std::string_view();
 }
 
-// §6.18 with §26.3: the type the type `type` of a variable of the module
-// stands for, through each typedef it is written as (ThroughTypedefsAt).
+// §6.18 with §26.3: the type the type `type`, written among the items of the
+// scope, stands for, through each typedef it is written as (ThroughTypedefsAt).
 SitedType ThroughTypedefs(const DataScope& scope, const DataType& type) {
   return ThroughTypedefsAt(scope.unit, {&type, scope.Site()});
+}
+
+// §6.18 with §23.9: the type the type the variable `var` is declared with
+// stands for, its typedefs looked up from the scope declaring it.
+SitedType VarType(const DataScope& scope, const DeclaredVar& var) {
+  return ThroughTypedefsAt(scope.unit, {var.type, scope.SiteOf(var)});
 }
 
 // The type the variable `root` names is declared with, as written in the
@@ -201,8 +213,7 @@ SitedType DeclaredType(const Expr& root, const DataScope& scope) {
   if (var == nullptr || scope.local_types.contains(var->type->type_name)) {
     return {};
   }
-  return {var->type, var->site != nullptr ? *var->site : scope.Site(),
-          var->dims};
+  return {var->type, scope.SiteOf(*var), var->dims};
 }
 
 // §8.3 with §7.4: the class declaration whose handle the element of the
@@ -211,7 +222,7 @@ SitedType DeclaredType(const Expr& root, const DataScope& scope) {
 // own (§6.18); null where none is, and where the selects reach no element.
 const ClassDecl* ClassNamed(const DataScope& scope, const DeclaredVar& var,
                             std::size_t selects) {
-  const auto [named, site, dims] = ThroughTypedefs(scope, *var.type);
+  const auto [named, site, dims] = VarType(scope, var);
   if (var.dims + dims != selects) return nullptr;
   if (!named->scope_name.empty()) {
     return ScopedClass(scope.unit, site, named->scope_name, named->type_name);
@@ -494,7 +505,7 @@ AppliedValue ValueOf(const Expr& root, std::size_t selects,
   const Expr* callee =
       root.kind == ExprKind::kCall && selects == 0 ? root.lhs : nullptr;
   if (var != nullptr) {
-    const SitedType kNamed = ThroughTypedefs(scope, *var->type);
+    const SitedType kNamed = VarType(scope, *var);
     if (var->dims + kNamed.dims == selects) value.kind = kNamed.type->kind;
     value.named = std::format("'{}'", root.text);
     value.property = scope.Property(root.text) == var;
