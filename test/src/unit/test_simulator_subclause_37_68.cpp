@@ -235,8 +235,9 @@ TEST_F(DelayControlsOfARun, ADelayWrittenAsANameIsWhatItNames) {
 // value its delay expression holds, read in simulation time units: 5 in a
 // module of 1ns units under a 1ps precision is 5000 of them.
 TEST_F(DelayControlsOfARun, ADelayControlGivesItsDelayThroughGetDelays) {
-  Run("`timescale 1ns/1ps\n"
-      "module top; int a; initial #5 a = 1; endmodule\n");
+  Run("module top; timeunit 1ns; timeprecision 1ps;\n"
+      "  int a; initial #5 a = 1;\n"
+      "endmodule\n");
   vpiHandle control = Control();
   ASSERT_NE(control, nullptr);
   s_vpi_time slot = {};
