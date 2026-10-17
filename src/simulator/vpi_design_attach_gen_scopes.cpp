@@ -35,8 +35,7 @@ VpiObject* GenScopeArrayOf(VpiObject* scope, std::string_view name,
 
 // §37.85: the gen var of the loop generate whose gen scope array is `array`,
 // the genvar `genvar` the loop iterates over (§27.4), named in the scope the
-// array is, made under the array the first time it is asked for. It is no
-// element of the array, so no index selects it (§38.19).
+// array is, made under the array the first time it is asked for.
 void MakeGenVar(VpiObject* array, std::string_view genvar,
                 const VpiAttachBuild& build) {
   for (VpiObject* child : array->children) {
@@ -48,7 +47,6 @@ void MakeGenVar(VpiObject* array, std::string_view genvar,
   var->full_name =
       array->full_name.substr(0, array->full_name.size() - array->name.size()) +
       std::string(genvar);
-  var->index = -1;
   var->parent = array;
   array->children.push_back(var);
 }
