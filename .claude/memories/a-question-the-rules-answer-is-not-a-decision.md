@@ -1,11 +1,11 @@
 ---
 name: a-question-the-rules-answer-is-not-a-decision
-description: "Before labelling an issue 'needs decision', check whether the standing reminders, the issue or the standards (1800-2023 and 1800.2-2020, and the clauses that cite or parallel the rule) already answer the question; if one does, act on it"
+description: "Before labelling an issue 'needs decision', check whether the standing reminders, the issue or the standards (1800-2023 and 1800.2-2020, and the clauses that cite, parallel or are named by the rule) already answer the question; if one does, act on it"
 metadata:
   node_type: memory
   type: feedback
   originSessionId: 51a015a3-4652-42ac-8c15-ce1bc6f6ae12
-  modified: 2026-10-15T23:09:10.817Z
+  modified: 2026-10-17T00:48:21.577Z
 ---
 
 # A question the rules answer is not a decision
@@ -29,7 +29,17 @@ Read beyond the clause itself too: the clause that states the parallel rule
 for a sibling construct, and every clause that cites this one, often settle
 a reading the clause alone leaves open, as §16.3's grant for immediate
 assertions and §17.3's use of the §16.14 list settle that §16.14's list of
-places is the whole grant. Questions of order or priority
+places is the whole grant. Read the clauses the rule itself names as well
+as those that cite it. When a rule lists constructs that have subclauses
+of their own, the list is a summary those subclauses fill in. Read each
+listed construct's subclause before weighing readings of the list's
+wording. §34.5.27.2 lets a key_block's buffer draw on five pragma
+expressions without saying which. But §34.5.10 through §34.5.14 each say
+whether their pragma is encrypted into the key_block under a digital
+signature, and §34.5.20.2 and §34.5.22.2 show that the list's digest_block
+stands for the digest's key, since the digest itself follows the block it
+refers to. So a loose and a strict reading of the list were never the
+options. Questions of order or priority
 between issues the loop selects are answered that way. A concern the
 standard does not raise, such as the hazard of loading a library a source
 file names under §34.5.28.2, does not make a shall optional: the shall is
