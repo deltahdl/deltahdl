@@ -465,9 +465,9 @@ static Logic4Vec ResolveMemberByType(std::string_view base_name,
     if (TryUnionTagMismatch(ma, sinfo, out)) {
       return out;
     }
-    if (TryStructMemberObjectRead(base_var, sinfo, field_name, ctx, arena,
-                                  out)) {
-      return out;
+    if (auto read = StructMemberObjectRead(base_var->value, sinfo, field_name,
+                                           ctx, arena)) {
+      return *read;
     }
     return ExtractStructField(base_var, sinfo, field_name, arena);
   }

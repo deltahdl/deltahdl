@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string_view>
 
 #include "common/types.h"
@@ -35,13 +36,14 @@ const StructFieldInfo* StructMemberOfClassType(const StructTypeInfo* info,
 // §7.2 with §8.4: a structure's member declared with a class type holds a
 // handle, not a structure, so in `s.k.v` and `s.n.h.v` the path past that
 // member names a property of the object the handle refers to, which no
-// member of the structure's layout does. True with `out` that property's
-// value where a member along `field` of the structure `base_var` holds, whose
-// layout is `info`, is of a class type and refers to an object; false where
-// none is, or its handle is null, which leaves the read to the structure.
-bool TryStructMemberObjectRead(Variable* base_var, const StructTypeInfo* info,
-                               std::string_view field, SimContext& ctx,
-                               Arena& arena, Logic4Vec& out);
+// member of the structure's layout does. That property's value where a member
+// along `field` of the structure `value`, whose layout is `info`, is of a
+// class type and refers to an object; none where no member is, or its handle
+// is null, which leaves the read to the structure.
+std::optional<Logic4Vec> StructMemberObjectRead(const Logic4Vec& value,
+                                                const StructTypeInfo* info,
+                                                std::string_view field,
+                                                SimContext& ctx, Arena& arena);
 
 // §8.11: inside a method, a property of the enclosing class may be named
 // without a `this.` prefix -- the clause resolves an unqualified name by

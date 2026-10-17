@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -76,24 +77,23 @@ const StructFieldInfo* StructMemberOfClassType(const StructTypeInfo* info,
   return field;
 }
 
-bool TryStructMemberObjectRead(Variable* base_var, const StructTypeInfo* info,
-                               std::string_view field, SimContext& ctx,
-                               Arena& arena, Logic4Vec& out) {
+std::optional<Logic4Vec> StructMemberObjectRead(const Logic4Vec& value,
+                                                const StructTypeInfo* info,
+                                                std::string_view field,
+                                                SimContext& ctx, Arena& arena) {
   for (size_t dot = field.find('.'); dot != std::string_view::npos;
        dot = field.find('.', dot + 1)) {
     uint32_t bit_offset = 0;
     const StructFieldInfo* member =
         StructMemberOfClassType(info, field.substr(0, dot), ctx, &bit_offset);
     if (member == nullptr) continue;
-    Logic4Vec handle =
-        ExtractBitField(arena, base_var->value, bit_offset, member->width);
+    Logic4Vec handle = ExtractBitField(arena, value, bit_offset, member->width);
     ClassObject* obj = ctx.GetClassObject(handle.ToUint64());
-    if (obj == nullptr) return false;
-    out = ResolveClassFieldChain(obj, ctx.FindClassType(member->type_name),
-                                 field.substr(dot + 1), ctx, arena);
-    return true;
+    if (obj == nullptr) return std::nullopt;
+    return ResolveClassFieldChain(obj, ctx.FindClassType(member->type_name),
+                                  field.substr(dot + 1), ctx, arena);
   }
-  return false;
+  return std::nullopt;
 }
 
 bool TryImplicitThisHandleMember(std::string_view base_name,
