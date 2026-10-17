@@ -7,6 +7,7 @@
 #include "common/types.h"
 #include "fixture_simulator.h"
 #include "simulator/awaiters.h"
+#include "simulator/sim_context.h"
 #include "simulator/sync_objects.h"
 
 using namespace delta;
@@ -48,8 +49,9 @@ struct BlockingPutter {
 };
 
 inline BlockingPutter SpawnPutter(MailboxObject& mbx, uint64_t msg,
-                                  std::vector<int>& ran, int id) {
-  co_await MailboxPutAwaiter{mbx, Msg(msg), {}};
+                                  std::vector<int>& ran, int id,
+                                  SimContext* ctx = nullptr) {
+  co_await MailboxPutAwaiter{mbx, Msg(msg), {}, false, ctx};
   ran.push_back(id);
 }
 
@@ -136,6 +138,27 @@ TEST(IpcSync, MailboxPutSuspendsWhenFullThenResumesWhenRoomFrees) {
   // The message that had to wait is now in the queue.
   EXPECT_EQ(Word(tail), 20u);
 
+  putter.h.destroy();
+}
+
+// §15.4.3 with §37.33 detail 3: a put() parked under a run that is executing
+// no process records no waiting process, and the get() that frees room still
+// resumes it, storing the message.
+TEST(IpcSync, MailboxPutParkedOutsideAProcessResumesWhenRoomFrees) {
+  SimFixture f;
+  MailboxObject mb(1);
+  EXPECT_EQ(mb.Put(Msg(10).Get()), MbxPutStatus::kPlaced);
+  std::vector<int> ran;
+  auto putter = SpawnPutter(mb, 20, ran, 3, &f.ctx);
+  putter.h.resume();
+  ASSERT_EQ(mb.put_waiters.size(), 1u);
+  Logic4Snapshot got;
+  EXPECT_EQ(mb.Get(got), MbxGetStatus::kRetrieved);
+  ASSERT_EQ(ran.size(), 1u);
+  EXPECT_EQ(ran[0], 3);
+  Logic4Snapshot tail;
+  EXPECT_EQ(mb.Get(tail), MbxGetStatus::kRetrieved);
+  EXPECT_EQ(Word(tail), 20u);
   putter.h.destroy();
 }
 
