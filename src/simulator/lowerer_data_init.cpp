@@ -11,15 +11,18 @@
 
 #include <algorithm>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/packed_range.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast_class.h"
 #include "parser/ast_module.h"
+#include "simulator/class_object.h"
 #include "simulator/lowerer.h"
 #include "simulator/lowerer_register.h"
 #include "simulator/sim_context.h"
+#include "simulator/unit_scope_items.h"
 
 namespace delta {
 
@@ -130,6 +133,26 @@ static std::vector<std::string_view> UnboundPackageClassNames(
     }
   }
   return names;
+}
+
+void Lowerer::LowerUnitClassPackageBases() {
+  const std::vector<const ClassDecl*> kUnitClasses =
+      UnitClassesToLower(design_);
+  for (const auto* pkg : design_->packages) {
+    const bool kNamed =
+        std::ranges::any_of(kUnitClasses, [pkg](const ClassDecl* cls) {
+          return cls->base_class_scope == pkg->name;
+        });
+    if (!kNamed) continue;
+    std::vector<std::pair<std::string_view, ClassTypeInfo*>> held;
+    for (const auto* item : pkg->items) {
+      if (item->kind != ModuleItemKind::kClassDecl) continue;
+      held.emplace_back(item->class_decl->name,
+                        ctx_.FindClassType(item->class_decl->name));
+    }
+    LowerUnimportedClassesOf(pkg);
+    for (const auto& [name, info] : held) ctx_.RegisterClassType(name, info);
+  }
 }
 
 // §26.2 (printed page 808) with §6.21 (printed 132-133): a package's

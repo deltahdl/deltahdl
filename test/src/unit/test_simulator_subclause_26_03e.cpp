@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "simulator/sim_context_types.h"
@@ -291,6 +293,63 @@ TEST(PackageImportSim,
                       "endmodule\n",
                       "y"),
             47u);
+}
+
+// §26.3 with §8.13: a class a module declares extending a class the module
+// imports, by name or by wildcard, inherits it: the package's B holds b = 3
+// and its get() adds 4, so 3 and 7 read as 37. The module registered its
+// classes before binding its imports, so D found no B and inherited nothing.
+TEST(PackageImportSim, AModuleClassExtendsAnImportedClass) {
+  for (const char* import : {"import p::B;", "import p::*;"}) {
+    EXPECT_EQ(RunAndGet(std::string("package p;\n"
+                                    "  localparam int K = 4;\n"
+                                    "  class B;\n"
+                                    "    int b = 3;\n"
+                                    "    function int get(); return b + K; "
+                                    "endfunction\n"
+                                    "  endclass\n"
+                                    "endpackage\n"
+                                    "module t; ") +
+                            import +
+                            "\n"
+                            "  class D extends B;\n"
+                            "  endclass\n"
+                            "  D d = new;\n"
+                            "  int r;\n"
+                            "  initial r = d.b * 10 + d.get();\n"
+                            "endmodule\n",
+                        "r"),
+              37u)
+        << import;
+  }
+}
+
+// §26.3 with §8.13 and §3.12.1: a class of the compilation unit extending
+// `p::B`, with nothing importing p, inherits the package's B, not the unit's
+// own B of that name, whose b is 9: 3 and 7 read as 37. The unit's classes
+// were lowered before the packages', so no "p::B" was found and the bare
+// name gave the unit's B.
+TEST(PackageImportSim, AUnitClassExtendsAClassNamedThroughAPackage) {
+  EXPECT_EQ(RunAndGet("package p;\n"
+                      "  localparam int K = 4;\n"
+                      "  class B;\n"
+                      "    int b = 3;\n"
+                      "    function int get(); return b + K; endfunction\n"
+                      "  endclass\n"
+                      "endpackage\n"
+                      "class B;\n"
+                      "  int b = 9;\n"
+                      "endclass\n"
+                      "class D extends p::B;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  D d = new;\n"
+                      "  B u = new;\n"
+                      "  int r;\n"
+                      "  initial r = d.b * 100 + d.get() * 10 + u.b;\n"
+                      "endmodule\n",
+                      "r"),
+            379u);
 }
 
 }  // namespace

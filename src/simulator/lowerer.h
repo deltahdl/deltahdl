@@ -258,6 +258,14 @@ class Lowerer {
   // Defined in lowerer_import.cpp.
   void LowerUnimportedPackageClasses();
   void LowerUnimportedClassesOf(const PackageDecl* pkg);
+  // §8.13 with §26.3: the classes of each package a compilation-unit class's
+  // extends clause names through its scope, `class D extends p::B`, lowered
+  // as LowerUnimportedClassesOf lowers them ahead of the unit's classes, which
+  // are lowered before the packages' others, so that D finds its base under
+  // "p::B"; every bare name those classes have is then given back to what
+  // held it, nothing included, as the unit's own scope does not see them.
+  // Defined in lowerer_data_init.cpp.
+  void LowerUnitClassPackageBases();
   // Lowers the class `cls` that package `pkg` declares and binds it under
   // "pkg::name" as well as under the bare name LowerClassDecl gives it, once:
   // a second call for the same class finds the qualified key and does nothing,

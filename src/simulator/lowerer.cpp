@@ -273,17 +273,22 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
   // new(K); endclass` read K before LowerVar had given it 3: s was 0 and the
   // mailbox unbounded. A package's K was already right, ConstructDesignData
   // running ahead of every module.
-  for (auto* cls : mod->class_decls) {
-    RegisterClassDecl(cls, mod->function_decls);
-  }
+  //
   // §6.8 sets a static variable's initial value as part of its declaration,
   // a reference the declaring scope makes, and §26.3 makes an import's names
   // visible throughout the importing scope, so the names the module's imports
   // bring in are bound before any variable's initializer is evaluated;
   // `import p1::*; int z = x;` read 0 while the binding came after the
-  // variables. LowerImports leaves a name the module declares to the
-  // declaration (§26.5). LowerChildModules orders an instance's the same way.
+  // variables. They are bound before the module's classes too, whose extends
+  // clauses may name an imported class (§8.13): registered first, `class D
+  // extends B` after `import p::B` found no B and D inherited nothing. A class
+  // the module declares replaces an imported one of its name as it registers,
+  // and LowerImports leaves a name the module declares to the declaration
+  // (§26.5). LowerChildInstance orders an instance's the same way.
   LowerImports(mod);
+  for (auto* cls : mod->class_decls) {
+    RegisterClassDecl(cls, mod->function_decls);
+  }
   RegisterChildInstanceKeys(mod);
   for (const auto& var : mod->variables) LowerVar(var.name, var);
   RegisterModulePorts(mod, ctx_, arena_);
@@ -859,6 +864,7 @@ void Lowerer::Lower(const RtlirDesign* design) {
       [ctx = &ctx_]() { ctx->AssertionSamples().Refill(ctx->GetArena()); });
 
   InitCompilationUnitData();
+  LowerUnitClassPackageBases();
   LowerCompilationUnitClasses();
   RegisterFreeCuFunctions(design, ctx_, arena_);
   RegisterDesignScopeDpiImports(design, ctx_);
