@@ -74,6 +74,40 @@ class VpiDesignRun : public ::testing::Test {
     return nullptr;
   }
 
+  // The objects of `type` `ref` reaches, in the order reached.
+  static std::vector<vpiHandle> ObjectsOf(int type, vpiHandle ref) {
+    std::vector<vpiHandle> objects;
+    vpiHandle it = vpi_iterate(type, ref);
+    if (it == nullptr) return objects;
+    while (vpiHandle obj = vpi_scan(it)) objects.push_back(obj);
+    return objects;
+  }
+
+  // §37.42: the name of what the call `call` calls, read off the task or
+  // function it reaches or, for a system task or function call, off the call
+  // it decompiles to (detail 9); empty for a call of a built-in method, which
+  // reaches neither (detail 11).
+  static std::string CalleeOf(vpiHandle call) {
+    for (const int kRelation : {vpiTask, vpiFunction}) {
+      vpiHandle called = vpi_handle(kRelation, call);
+      if (called != nullptr) return vpi_get_str(vpiName, called);
+    }
+    const char* decompile = vpi_get_str(vpiDecompile, call);
+    if (decompile == nullptr) return "";
+    const std::string_view kText(decompile);
+    return std::string(kText.substr(0, kText.find('(')));
+  }
+
+  // The call of `type` `ref` reaches that calls `callee`, null for none. A
+  // call statement is named by its label alone (§37.60 detail 1), so it is
+  // found by what it calls rather than by a name of its own.
+  static vpiHandle CallOf(int type, vpiHandle ref, std::string_view callee) {
+    for (vpiHandle call : ObjectsOf(type, ref)) {
+      if (CalleeOf(call) == callee) return call;
+    }
+    return nullptr;
+  }
+
   // §37.50 and §37.52: the property expr the property spec of the assertion
   // `name` of `top` reaches, null for none.
   static vpiHandle PropertyOf(const char* name) {

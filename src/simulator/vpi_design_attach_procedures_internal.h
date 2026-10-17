@@ -56,8 +56,9 @@ struct BodyWalk {
 // subroutine it calls; `prefix` is the object a method is applied to (detail
 // 2), or the class var a chain of `prefix_members` starts from;
 // `user_defined` is the figure's vpiUserDefn; `systf` is the systf object
-// a call of a registered system task reaches; and `called` is the task or
-// function object of the declaration a task, function or method call calls.
+// a call of a registered system task reaches; `called` is the task or
+// function object of the declaration a task, function or method call calls;
+// and `sysfunctype` is the kind of value a registered system function returns.
 struct CallShape {
   int type = 0;
   std::string_view name;
@@ -66,6 +67,7 @@ struct CallShape {
   bool user_defined = false;
   VpiObject* systf = nullptr;
   VpiObject* called = nullptr;
+  int sysfunctype = 0;
 };
 
 // The items a begin or fork block holds, its declarations among them.

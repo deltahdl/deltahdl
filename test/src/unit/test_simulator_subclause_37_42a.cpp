@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <cstddef>
 #include <string>
-#include <utility>
 #include <vector>
 
 #include "fixture_vpi_run.h"
@@ -468,38 +468,43 @@ class CallStatementsOfARun : public VpiDesignRun {
   vpiHandle probe_ = nullptr;
 };
 
-// A system task call a procedure writes is a sys task call of the run, named
-// after the system task, standing in the scope that writes it and running in
-// its procedure (#5011).
+// A system task call a procedure writes is a sys task call of the run,
+// standing in the scope that writes it and running in its procedure (#5011).
+// Written as a statement with no label, it has no name (§37.60 detail 1); what
+// it calls is read off the call it decompiles to.
 TEST_F(CallStatementsOfARun, ASystemTaskCallIsAnObjectOfTheRun) {
   Run("module top; initial $display(\"hi\"); endmodule\n");
   vpiHandle call = BodyOf("top");
   ASSERT_NE(call, nullptr);
   EXPECT_EQ(vpi_get(vpiType, call), vpiSysTaskCall);
-  EXPECT_STREQ(vpi_get_str(vpiName, call), "$display");
+  EXPECT_EQ(vpi_get_str(vpiName, call), nullptr);
+  EXPECT_EQ(CalleeOf(call), "$display");
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiScope, call)), VpiObjectOf(By("top")));
   EXPECT_NE(vpi_handle(vpiProcess, call), nullptr);
 }
 
-// A call of a task is a task call named after the task it calls (#5016)...
+// A call of a task is a task call, unnamed as a statement with no label is,
+// reaching the task it calls (#5016)...
 TEST_F(CallStatementsOfARun, ATaskCallIsAnObjectOfTheRun) {
   Run("module top; task t; endtask initial t; endmodule\n");
   vpiHandle call = BodyOf("top");
   ASSERT_NE(call, nullptr);
   EXPECT_EQ(vpi_get(vpiType, call), vpiTaskCall);
-  EXPECT_STREQ(vpi_get_str(vpiName, call), "t");
+  EXPECT_EQ(vpi_get_str(vpiName, call), nullptr);
+  EXPECT_EQ(CalleeOf(call), "t");
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiScope, call)), VpiObjectOf(By("top")));
 }
 
 // ...and a call of a void function written as a statement is a func call
-// statement named after the function, the tf call class §37.60 draws in atomic
-// stmt holding the function calls too (#5034).
+// statement, the tf call class §37.60 draws in atomic stmt holding the
+// function calls too, and so unnamed as well (#5034).
 TEST_F(CallStatementsOfARun, AFunctionCallStatementIsAFuncCall) {
   Run("module top; function void f(); endfunction initial f(); endmodule\n");
   vpiHandle call = BodyOf("top");
   ASSERT_NE(call, nullptr);
   EXPECT_EQ(vpi_get(vpiType, call), vpiFuncCall);
-  EXPECT_STREQ(vpi_get_str(vpiName, call), "f");
+  EXPECT_EQ(vpi_get_str(vpiName, call), nullptr);
+  EXPECT_EQ(CalleeOf(call), "f");
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiScope, call)), VpiObjectOf(By("top")));
   EXPECT_NE(vpi_handle(vpiProcess, call), nullptr);
 }
@@ -511,7 +516,8 @@ TEST_F(CallStatementsOfARun, ABuiltInSystemFunctionStatementIsASysFuncCall) {
   vpiHandle call = BodyOf("top");
   ASSERT_NE(call, nullptr);
   EXPECT_EQ(vpi_get(vpiType, call), vpiSysFuncCall);
-  EXPECT_STREQ(vpi_get_str(vpiName, call), "$random");
+  EXPECT_EQ(vpi_get_str(vpiName, call), nullptr);
+  EXPECT_EQ(CalleeOf(call), "$random");
   EXPECT_EQ(vpi_get(vpiUserDefn, call), 0);
   EXPECT_EQ(vpi_handle(vpiUserSystf, call), nullptr);
 }
@@ -527,7 +533,8 @@ TEST_F(CallStatementsOfARun, AMethodFunctionCallStatementIsAMethodFuncCall) {
   vpiHandle call = BodyOf("top");
   ASSERT_NE(call, nullptr);
   EXPECT_EQ(vpi_get(vpiType, call), vpiMethodFuncCall);
-  EXPECT_STREQ(vpi_get_str(vpiName, call), "go");
+  EXPECT_EQ(vpi_get_str(vpiName, call), nullptr);
+  EXPECT_EQ(CalleeOf(call), "go");
   EXPECT_STREQ(vpi_get_str(vpiName, vpi_handle(vpiPrefix, call)), "obj");
   EXPECT_EQ(vpi_get(vpiUserDefn, call), 1);
 }
@@ -539,15 +546,16 @@ constexpr const char* kMethodTaskCall =
     "  initial obj.run();\n"
     "endmodule\n";
 
-// A call of a class's task method is a method task call named after the
-// method, whose vpiPrefix is the class var it is applied to (#5017, detail 2)
-// and which, the class being the design's own, is user-defined.
+// A call of a class's task method is a method task call reaching the method,
+// whose vpiPrefix is the class var it is applied to (#5017, detail 2) and
+// which, the class being the design's own, is user-defined.
 TEST_F(CallStatementsOfARun, AMethodTaskCallIsAnObjectOfTheRun) {
   Run(kMethodTaskCall);
   vpiHandle call = BodyOf("top");
   ASSERT_NE(call, nullptr);
   EXPECT_EQ(vpi_get(vpiType, call), vpiMethodTaskCall);
-  EXPECT_STREQ(vpi_get_str(vpiName, call), "run");
+  EXPECT_EQ(vpi_get_str(vpiName, call), nullptr);
+  EXPECT_EQ(CalleeOf(call), "run");
   EXPECT_STREQ(vpi_get_str(vpiName, vpi_handle(vpiPrefix, call)), "obj");
   EXPECT_EQ(vpi_get(vpiUserDefn, call), 1);
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiScope, call)), VpiObjectOf(By("top")));
@@ -558,8 +566,8 @@ TEST_F(CallStatementsOfARun, AMethodTaskCallIsAnObjectOfTheRun) {
 TEST_F(CallStatementsOfARun, ACallStatementReachesItsDeclaration) {
   Run("module top; task t; endtask function void f(); endfunction\n"
       "  initial begin t; f(); end endmodule\n");
-  vpiHandle task = Named(vpiTaskCall, BodyOf("top"), "t");
-  vpiHandle func = Named(vpiFuncCall, BodyOf("top"), "f");
+  vpiHandle task = CallOf(vpiTaskCall, BodyOf("top"), "t");
+  vpiHandle func = CallOf(vpiFuncCall, BodyOf("top"), "f");
   ASSERT_NE(task, nullptr);
   ASSERT_NE(func, nullptr);
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiTask, task)),
@@ -589,8 +597,8 @@ TEST_F(CallStatementsOfARun, AMethodCallReachesItsMethod) {
       "  initial begin obj.run(); obj.go(); end\n"
       "endmodule\n");
   vpiHandle defn = Named(vpiClassDefn, By("top"), "C");
-  vpiHandle run = Named(vpiMethodTaskCall, BodyOf("top"), "run");
-  vpiHandle go = Named(vpiMethodFuncCall, BodyOf("top"), "go");
+  vpiHandle run = CallOf(vpiMethodTaskCall, BodyOf("top"), "run");
+  vpiHandle go = CallOf(vpiMethodFuncCall, BodyOf("top"), "go");
   ASSERT_NE(run, nullptr);
   ASSERT_NE(go, nullptr);
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiTask, run)),
@@ -629,7 +637,8 @@ TEST_F(CallStatementsOfARun, AMethodTaskCallThroughAMemberChain) {
   vpiHandle call = BodyOf("top");
   ASSERT_NE(call, nullptr);
   EXPECT_EQ(vpi_get(vpiType, call), vpiMethodTaskCall);
-  EXPECT_STREQ(vpi_get_str(vpiName, call), "run");
+  EXPECT_EQ(vpi_get_str(vpiName, call), nullptr);
+  EXPECT_EQ(CalleeOf(call), "run");
   EXPECT_EQ(vpi_get(vpiUserDefn, call), 1);
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiTask, call)),
             VpiObjectOf(
@@ -668,8 +677,8 @@ TEST_F(CallStatementsOfARun, ABuiltInClassFunctionCallIsAMethodFuncCall) {
 TEST_F(CallStatementsOfARun, ACallStatementReachesItsArguments) {
   Run("module top; int x; task t(input int a, input int b); endtask\n"
       "  initial begin $display(\"%d\", x); t(1, x); end endmodule\n");
-  vpiHandle display = Named(vpiSysTaskCall, BodyOf("top"), "$display");
-  vpiHandle task = Named(vpiTaskCall, BodyOf("top"), "t");
+  vpiHandle display = CallOf(vpiSysTaskCall, BodyOf("top"), "$display");
+  vpiHandle task = CallOf(vpiTaskCall, BodyOf("top"), "t");
   ASSERT_NE(display, nullptr);
   ASSERT_NE(task, nullptr);
   vpiHandle it = vpi_iterate(vpiArgument, display);
@@ -731,9 +740,9 @@ TEST_F(CallStatementsOfARun, ARegisteredSystemTaskCallIsUserDefined) {
   ASSERT_EQ(g_probe_sightings.size(), 1U);
   EXPECT_EQ(g_probe_sightings[0].user_defn, 1);
   EXPECT_EQ(
-      vpi_get(vpiUserDefn, Named(vpiSysTaskCall, BodyOf("top"), "$probe")), 1);
+      vpi_get(vpiUserDefn, CallOf(vpiSysTaskCall, BodyOf("top"), "$probe")), 1);
   EXPECT_EQ(
-      vpi_get(vpiUserDefn, Named(vpiSysTaskCall, BodyOf("top"), "$display")),
+      vpi_get(vpiUserDefn, CallOf(vpiSysTaskCall, BodyOf("top"), "$display")),
       0);
 }
 
@@ -745,7 +754,7 @@ TEST_F(CallStatementsOfARun, ASystemTaskCallReachesItsUserSystf) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiUserSystf, g_probe_sightings[0].call)),
             VpiObjectOf(probe_));
   EXPECT_EQ(vpi_handle(vpiUserSystf,
-                       Named(vpiSysTaskCall, BodyOf("top"), "$display")),
+                       CallOf(vpiSysTaskCall, BodyOf("top"), "$display")),
             nullptr);
 }
 
@@ -785,9 +794,9 @@ TEST_F(CallStatementsOfARun, ARegisteredSystemFunctionStatementIsASysFuncCall) {
 TEST_F(CallStatementsOfARun, ABuiltInSystemFunctionStatementIsNoSysTaskCall) {
   Run("module top; int a; real r = 2.0;\n"
       "  initial begin $random; $urandom; $cast(a, r); end endmodule\n");
-  EXPECT_EQ(Named(vpiSysTaskCall, BodyOf("top"), "$random"), nullptr);
-  EXPECT_EQ(Named(vpiSysTaskCall, BodyOf("top"), "$urandom"), nullptr);
-  EXPECT_NE(Named(vpiSysTaskCall, BodyOf("top"), "$cast"), nullptr);
+  EXPECT_EQ(CallOf(vpiSysTaskCall, BodyOf("top"), "$random"), nullptr);
+  EXPECT_EQ(CallOf(vpiSysTaskCall, BodyOf("top"), "$urandom"), nullptr);
+  EXPECT_NE(CallOf(vpiSysTaskCall, BodyOf("top"), "$cast"), nullptr);
 }
 
 // An argument naming a scope that stands around the call is reached through
@@ -810,7 +819,7 @@ TEST_F(CallStatementsOfARun, AMethodTaskCallOnABlockVariableIsAnObject) {
       "  int obj;\n"
       "  initial begin : b C obj; obj = new; obj.run(); end\n"
       "endmodule\n");
-  vpiHandle call = Named(vpiMethodTaskCall, By("top.b"), "run");
+  vpiHandle call = CallOf(vpiMethodTaskCall, By("top.b"), "run");
   ASSERT_NE(call, nullptr);
   ASSERT_NE(By("top.b.obj"), nullptr);
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiPrefix, call)),
@@ -827,16 +836,14 @@ TEST_F(CallStatementsOfARun, ABuiltInMethodOfAModuleVariableIsAMethodFuncCall) {
       "  initial begin q.push_back(1); aa.delete(); s.putc(0, \"c\");\n"
       "    e.next(); end\n"
       "endmodule\n");
-  for (const auto& [method, holder] :
-       std::vector<std::pair<std::string, std::string>>{{"push_back", "q"},
-                                                        {"delete", "aa"},
-                                                        {"putc", "s"},
-                                                        {"next", "e"}}) {
-    vpiHandle call = Named(vpiMethodFuncCall, BodyOf("top"), method);
-    ASSERT_NE(call, nullptr) << method;
-    EXPECT_STREQ(vpi_get_str(vpiName, vpi_handle(vpiPrefix, call)),
-                 holder.c_str());
-    EXPECT_EQ(vpi_get(vpiUserDefn, call), 0) << method;
+  const std::vector<vpiHandle> kCalls =
+      ObjectsOf(vpiMethodFuncCall, BodyOf("top"));
+  const std::vector<std::string> kHolders{"q", "aa", "s", "e"};
+  ASSERT_EQ(kCalls.size(), kHolders.size());
+  for (std::size_t i = 0; i < kCalls.size(); ++i) {
+    EXPECT_STREQ(vpi_get_str(vpiName, vpi_handle(vpiPrefix, kCalls[i])),
+                 kHolders[i].c_str());
+    EXPECT_EQ(vpi_get(vpiUserDefn, kCalls[i]), 0) << i;
   }
 }
 
@@ -846,13 +853,12 @@ TEST_F(CallStatementsOfARun, ABuiltInMethodOfABlockArrayIsAMethodFuncCall) {
   Run("module top; initial begin : b\n"
       "  int d[]; int f[2]; d.delete(); f.sort();\n"
       "end endmodule\n");
-  vpiHandle del = Named(vpiMethodFuncCall, By("top.b"), "delete");
-  vpiHandle sort = Named(vpiMethodFuncCall, By("top.b"), "sort");
-  ASSERT_NE(del, nullptr);
-  ASSERT_NE(sort, nullptr);
-  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiPrefix, del)),
+  const std::vector<vpiHandle> kCalls =
+      ObjectsOf(vpiMethodFuncCall, By("top.b"));
+  ASSERT_EQ(kCalls.size(), 2U);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiPrefix, kCalls[0])),
             VpiObjectOf(By("top.b.d")));
-  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiPrefix, sort)),
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiPrefix, kCalls[1])),
             VpiObjectOf(By("top.b.f")));
 }
 
@@ -875,7 +881,8 @@ TEST_F(CallStatementsOfARun, ACallOfAnImportedPackageTaskIsATaskCall) {
   vpiHandle call = BodyOf("top");
   ASSERT_NE(call, nullptr);
   EXPECT_EQ(vpi_get(vpiType, call), vpiTaskCall);
-  EXPECT_STREQ(vpi_get_str(vpiName, call), "t");
+  EXPECT_EQ(vpi_get_str(vpiName, call), nullptr);
+  EXPECT_EQ(CalleeOf(call), "t");
 }
 
 // ...or written behind the package's name.
@@ -884,7 +891,8 @@ TEST_F(CallStatementsOfARun, AScopedCallOfAPackageTaskIsATaskCall) {
   vpiHandle call = BodyOf("top");
   ASSERT_NE(call, nullptr);
   EXPECT_EQ(vpi_get(vpiType, call), vpiTaskCall);
-  EXPECT_STREQ(vpi_get_str(vpiName, call), "t");
+  EXPECT_EQ(vpi_get_str(vpiName, call), nullptr);
+  EXPECT_EQ(CalleeOf(call), "t");
 }
 
 // A system task call statement decompiles to the call it makes, its arguments
@@ -916,7 +924,7 @@ TEST_F(CallStatementsOfARun, AnArgumentNamesTheBlocksDeclaration) {
   Run("module top; int x;\n"
       "  initial begin : b int x; $display(x); end\n"
       "endmodule\n");
-  vpiHandle call = Named(vpiSysTaskCall, By("top.b"), "$display");
+  vpiHandle call = CallOf(vpiSysTaskCall, By("top.b"), "$display");
   ASSERT_NE(call, nullptr);
   vpiHandle it = vpi_iterate(vpiArgument, call);
   ASSERT_NE(it, nullptr);

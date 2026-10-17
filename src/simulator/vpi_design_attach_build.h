@@ -598,6 +598,9 @@ void VpiFillStmt(VpiObject* obj, const Stmt& stmt, const VpiStmtBuild& with);
 struct VpiRegisteredSystf {
   VpiObject* object = nullptr;
   int type = 0;
+  // §38.37.1: the kind of value a registered system function returns, zero
+  // for a system task.
+  int sysfunctype = 0;
 };
 
 // §37.42 detail 3: the model's object for each call statement of a run, keyed
@@ -775,6 +778,25 @@ void AttachPortConnections(const RtlirDesign* design,
 // object per concurrent assertion written as an item (VpiMakeItemAssertion).
 void AttachProcedures(const RtlirDesign* design, const VpiObjectMap& objects,
                       const VpiCallBuild& calls, const VpiAttachBuild& build);
+
+// Where an expression an instance writes outside every procedure stands: the
+// design, the instance's module and the flat name its objects are keyed
+// under, the generate block instances it stands in, innermost last, and the
+// scope object it stands in, the instance or the gen scope of one of them.
+struct VpiItemSite {
+  const RtlirDesign& design;
+  const RtlirModule& mod;
+  const std::string& prefix;
+  const std::vector<std::string_view>& gen_prefixes;
+  VpiObject* scope;
+};
+
+// §37.42: what makes a call written in an expression at `site` into the tf
+// call a call written in a procedure's expression there is made into, true
+// where it does. Each reference it is given outlives it.
+std::function<bool(const Expr& call, VpiObject* made)> VpiItemCallShaper(
+    const VpiItemSite& site, const VpiObjectMap& objects,
+    const VpiCallBuild& calls, const VpiAttachBuild& build);
 
 // §8.13 with §37.31 detail 5: the class defn of the class the class defn
 // `defn` extends, reached through its extends object; null for none.

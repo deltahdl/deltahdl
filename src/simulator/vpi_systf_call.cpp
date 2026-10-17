@@ -4,6 +4,7 @@
 #include <map>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "common/arena.h"
 #include "common/source_loc.h"
@@ -69,7 +70,9 @@ int RunTimeConstType(const Expr& actual) {
 // nowhere to put it.
 //
 // §37.42 detail 8 spells an omitted argument, which a call site writes as an
-// empty position, and VpiMakeEmptyArgument is what sets that shape.
+// empty position, and VpiMakeEmptyArgument is what sets that shape; it spells
+// the special value null, which the parser reads as a name, as a null
+// constant, which VpiMakeNullArgument sets.
 //
 // `evaluate` is what separates the two periods a call object is built in.
 // §36.8.3 has the calltf called on every execution of its user-defined system
@@ -85,6 +88,10 @@ VpiObject* SystfCallArgument(VpiObject* arg, const Expr* actual,
                              SimContext& ctx, Arena& arena, bool evaluate) {
   if (actual == nullptr) {
     VpiMakeEmptyArgument(arg);
+    return arg;
+  }
+  if (actual->kind == ExprKind::kIdentifier && actual->text == "null") {
+    VpiMakeNullArgument(arg);
     return arg;
   }
   Variable* named = actual->kind == ExprKind::kIdentifier
@@ -219,16 +226,28 @@ struct SystfArgumentBuild {
 };
 
 // §36.4: the arguments the call site wrote, held as the call's arguments so
-// §37.42's vpiArgument iteration reaches them.
+// §37.42's vpiArgument iteration reaches them. Where the model built an
+// argument for an actual, the argument is the model's (§38.3): the variable
+// an actual names (detail 8), or an expression evaluated whenever an
+// application asks for its value rather than when the call is made (detail
+// 7), its side effects with it (§37.3.5).
 void AppendSystfCallArguments(VpiObject* call, const Expr& call_site,
                               const SystfArgumentBuild& build) {
-  for (const Expr* actual : call_site.args) {
-    VpiObject* arg = build.alloc();
+  const std::vector<VpiObject*>& written = call->written_arguments;
+  for (std::size_t i = 0; i < call_site.args.size(); ++i) {
+    const Expr* actual = call_site.args[i];
     // §37.61 detail 1: an actual the source prefixed by a virtual interface
     // is the prefixed object the clause is written about, and it is built as
     // one rather than as the anonymous expression holder every non-identifier
     // actual used to become.
     Variable* base = DynamicPrefixBaseVar(actual, build.ctx);
+    VpiObject* model = i < written.size() ? written[i] : nullptr;
+    if (base == nullptr && model != nullptr) {
+      if (VpiSourceExprHasSideEffects(actual)) model->has_side_effects = true;
+      call->arguments.push_back(model);
+      continue;
+    }
+    VpiObject* arg = build.alloc();
     if (base != nullptr) {
       FillPrefixedArgument(
           arg, build.alloc(), actual,
@@ -280,12 +299,17 @@ VpiHandle VpiContext::MakeSystfCallObject(const s_vpi_systf_data& data,
       CallSiteObject(call_site_objects_, call_site, ctx.ActiveInstancePrefix());
   if (call == nullptr) {
     call = AllocObject();
-    // A registration is refused without a name (RegisterSystf).
-    call->name = std::string_view(data.tfname);
+    // A registration is refused without a name (RegisterSystf). A system task
+    // is called only as a statement, which its label alone names (§37.60
+    // detail 1), so only a system function's call is named after it.
+    if (data.type == vpiSysFunc) call->name = std::string_view(data.tfname);
     // §37.3.3: the call stands for the text its call site was written as.
     VpiRecordWrittenLocation(call, call_site->range.start, ctx);
   }
   call->type = (data.type == vpiSysFunc) ? vpiSysFuncCall : vpiSysTaskCall;
+  // §37.42 with §38.37.1: a system function call's vpiFuncType is the kind of
+  // value its registration says the function returns.
+  call->func_type = data.type == vpiSysFunc ? data.sysfunctype : 0;
   // §37.42 detail 9: the call decompiles to the one the source wrote.
   call->decompile = VpiExprDecompile(call_site);
   // §37.42 detail 5: every call built here is of a registration an

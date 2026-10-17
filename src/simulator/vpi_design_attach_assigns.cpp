@@ -390,12 +390,11 @@ VpiObject* CallObject(const Expr* expr, const AssignBuild& build) {
   VpiObject* call = build.alloc();
   call->type =
       expr->kind == ExprKind::kSystemCall ? vpiSysFuncCall : vpiFuncCall;
-  // A call a procedure writes is the tf call its statement would be: a method
-  // func call of a method, named, with its prefix (details 2 and 11).
-  if (expr->kind == ExprKind::kCall && build.shape_call &&
-      build.shape_call(*expr, call)) {
-    return call;
-  }
+  // A call is the tf call its statement would be: a method func call of a
+  // method, named, with its prefix (details 2 and 11), and a system function
+  // call named, reaching the systf of its registration, wherever the
+  // expression stands, a procedure or a continuous assignment.
+  if (build.shape_call && build.shape_call(*expr, call)) return call;
   if (call->type == vpiFuncCall && expr->lhs != nullptr && build.callees) {
     call->tf_decl = build.callees(*expr->lhs);
   }
@@ -868,8 +867,9 @@ VpiObject* VpiCallSiteAssignedExpression(const VpiAssignedSide& side,
                                   CallSiteBuild(objects, site, ctx, build));
 }
 
-void VpiContext::AttachContinuousAssignments(
-    const RtlirDesign* design, const VpiSubroutineObjects& subroutines) {
+void VpiContext::AttachContinuousAssignments(const RtlirDesign* design,
+                                             const VpiCallBuild& calls,
+                                             const VpiAttachBuild& attach) {
   // §37.47: a module reaches the continuous assignments it holds. Nothing made
   // one, so the relation reached none and no net had a driver or a load
   // (§37.46).
@@ -893,6 +893,9 @@ void VpiContext::AttachContinuousAssignments(
               !made.emplace(ca.source_item, ca.gen_block_prefixes).second) {
             continue;
           }
+          // §37.85: an assignment a generate block writes is one of its
+          // block instance's gen scope.
+          VpiObject* within = VpiGenScopeOf(scope, ca.gen_block_path);
           AssignBuild build{
               [this] { return AllocObject(); },
               sim_ctx_,
@@ -900,17 +903,16 @@ void VpiContext::AttachContinuousAssignments(
                           ca.gen_block_consts, scope},
               VpiCalleesAt({*design, *mod, prefix,
                             CalleeScope(*mod, ca.gen_block_prefixes, scope),
-                            subroutines}),
+                            calls.subroutines}),
               [this](std::string name) {
                 name_pool_.push_back(std::move(name));
                 return std::string_view(name_pool_.back());
               },
-              nullptr,
+              VpiItemCallShaper(
+                  {*design, *mod, prefix, ca.gen_block_prefixes, within},
+                  object_map_, calls, attach),
               &mod->node_attrs};
-          // §37.85: an assignment a generate block writes is one of its
-          // block instance's gen scope.
-          MakeContinuousAssignment(ca, VpiGenScopeOf(scope, ca.gen_block_path),
-                                   build);
+          MakeContinuousAssignment(ca, within, build);
         }
       });
 }

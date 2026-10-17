@@ -105,8 +105,13 @@ static VpiHandle NearestScopeAround(VpiHandle obj) {
 bool TryResolveStmtScopeRelation(int type, VpiHandle ref, VpiHandle& out) {
   // §37.12 and §37.63 (figures): a statement reaches the scope it stands in
   // through the untagged arrow to `scope`, the nearest object around it that
-  // is one; a block that is no scope is passed over.
-  if (type != vpiScope || !VpiIsScopeBodyStmtObject(ref)) return false;
+  // is one; a block that is no scope is passed over. §37.42 draws the arrow on
+  // every tf call, so a call within an expression reaches the scope its
+  // expression stands in the same way.
+  if (type != vpiScope ||
+      !(VpiIsScopeBodyStmtObject(ref) || VpiIsTfCallType(ref->type))) {
+    return false;
+  }
   out = NearestScopeAround(ref);
   return true;
 }

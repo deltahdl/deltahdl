@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <functional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -167,8 +168,10 @@ VpiObject* MakeEventStatement(const Stmt& stmt, const BlockParent& parent,
 
 // §37.42: the arguments `expr`, standing in `parent`, was written with, in
 // order, each the expression object the instance's names resolve it to
-// (§37.58, §37.59), an empty position being detail 8's empty argument. An
-// expression of a kind the model builds no object for is passed over.
+// (§37.58, §37.59), an empty position being detail 8's empty argument and the
+// special value null, which the parser reads as a name, its null constant. An
+// expression of a kind the model builds no object for is passed over, and
+// recorded as a written argument of none.
 void MakeCallArguments(VpiObject* call, const Expr& expr,
                        const BlockParent& parent, const BodyWalk& walk) {
   if (expr.kind != ExprKind::kCall && expr.kind != ExprKind::kSystemCall) {
@@ -180,11 +183,16 @@ void MakeCallArguments(VpiObject* call, const Expr& expr,
     if (actual == nullptr) {
       arg = walk.build.alloc();
       VpiMakeEmptyArgument(arg);
+    } else if (actual->kind == ExprKind::kIdentifier &&
+               actual->text == "null") {
+      arg = walk.build.alloc();
+      VpiMakeNullArgument(arg);
     } else {
       arg = VpiCallSiteExpression(actual, walk.objects, kSite, walk.calls.ctx,
                                   walk.build);
     }
     if (arg != nullptr) call->arguments.push_back(arg);
+    call->written_arguments.push_back(arg);
   }
 }
 
@@ -243,33 +251,45 @@ void MakeWithClause(VpiObject* call, std::string_view method, const Expr& expr,
 // in `parent`, says it is: its kind, its name, what a method is applied to
 // (detail 2), the subroutine it calls, whether that is user-defined, the
 // systf of a registered system task or function, its arguments and its with
-// clause (detail 1).
+// clause (detail 1). A system task or function call is recorded as the call a
+// run's invocation of a registered one stands as (detail 3), under the call
+// written and the instance writing it, whether a statement or an expression
+// writes it.
 void FillCall(VpiObject* call, const CallShape& shape, const Expr& called,
               const BlockParent& parent, const BodyWalk& walk) {
   call->type = shape.type;
-  // §37.60 detail 1: a call written as a labelled statement is named by its
-  // label, which MakeAtomicStatement gave it; the callee is reached through
-  // vpiTask or vpiFunction.
-  if (call->name.empty()) call->name = walk.build.keep(std::string(shape.name));
+  // §37.60 detail 1: a call written as a statement is named by its label,
+  // which MakeAtomicStatement gave it, or not at all; only a call within an
+  // expression is named after what it calls. The callee is reached through
+  // vpiTask or vpiFunction either way.
+  if (!call->written_as_stmt) {
+    call->name = walk.build.keep(std::string(shape.name));
+  }
   call->tf_prefix = shape.prefix;
   call->prefix_members = shape.prefix_members;
   call->tf_decl = shape.called;
+  // A function call's vpiFuncType is the kind of value its function returns
+  // (§37.41), and a system function call's the one its registration gives
+  // (§38.37.1).
+  call->func_type =
+      shape.called != nullptr ? shape.called->func_type : shape.sysfunctype;
   call->user_defined = shape.user_defined;
   call->user_systf = shape.systf;
   MakeCallArguments(call, called, parent, walk);
   MakeWithClause(call, shape.name, called, parent, walk);
+  if (shape.type == vpiSysTaskCall || shape.type == vpiSysFuncCall) {
+    walk.calls.sites[{&called, walk.prefix}] = call;
+  }
 }
 
 // §37.42 with §37.60: the call statement `stmt` stands as, null for a
-// statement that calls nothing the walk resolves. A call is named after what
-// it calls; a label written on it names the begin §9.3.5 makes around it
-// instead. It is marked as written as a statement, which tells a function call
-// standing as one from a function call standing as an expression. A system
-// task or function call decompiles to the call written (detail 9), and is
-// recorded as the call statement it is, which a run's invocation of a
-// registered system task or function stands as (detail 3). A function call
-// written in a void cast, void'(f()); (§13.4.1), is the call it wraps: the
-// parser records that statement as the cast, the one cast a statement can be.
+// statement that calls nothing the walk resolves. It is marked as written as
+// a statement, which tells a function call standing as one from a function
+// call standing as an expression, and leaves it named by its label alone
+// (§37.60 detail 1). A system task or function call decompiles to the call
+// written (detail 9). A function call written in a void cast, void'(f());
+// (§13.4.1), is the call it wraps: the parser records that statement as the
+// cast, the one cast a statement can be.
 VpiObject* MakeCallStatement(const Stmt& stmt, const BlockParent& parent,
                              const BodyWalk& walk) {
   if (stmt.kind != StmtKind::kExprStmt) return nullptr;
@@ -282,7 +302,6 @@ VpiObject* MakeCallStatement(const Stmt& stmt, const BlockParent& parent,
   FillCall(call, kShape, *called, parent, walk);
   if (kShape.type == vpiSysTaskCall || kShape.type == vpiSysFuncCall) {
     call->decompile = VpiExprDecompile(called);
-    walk.calls.sites[{called, walk.prefix}] = call;
   }
   return call;
 }
@@ -595,10 +614,27 @@ void AttachInstanceProcedures(VpiObject* instance,
 
 bool ShapeExprCall(const Expr& call, VpiObject* made, const BlockParent& parent,
                    const BodyWalk& walk) {
-  const CallShape kShape = CallShapeOf(call, parent, walk);
-  if (kShape.type == 0) return false;
-  FillCall(made, kShape, call, parent, walk);
+  CallShape shape = CallShapeOf(call, parent, walk);
+  if (shape.type == 0) return false;
+  // §36.5: a system call within an expression yields a value, so it is a
+  // function call whatever its name.
+  if (call.kind == ExprKind::kSystemCall) shape.type = vpiSysFuncCall;
+  // §37.42: the call stands in the scope its expression is written in, which
+  // vpiScope reaches, as a call statement's does.
+  made->parent = parent.scope;
+  FillCall(made, shape, call, parent, walk);
   return true;
+}
+
+std::function<bool(const Expr& call, VpiObject* made)> VpiItemCallShaper(
+    const VpiItemSite& site, const VpiObjectMap& objects,
+    const VpiCallBuild& calls, const VpiAttachBuild& build) {
+  return [site, &objects, &calls, &build](const Expr& call, VpiObject* made) {
+    BodyWalk walk{site.design, site.mod, objects, site.prefix, calls, build};
+    walk.gen_prefixes = &site.gen_prefixes;
+    const BlockParent kParent{site.scope, site.scope->full_name};
+    return ShapeExprCall(call, made, kParent, walk);
+  };
 }
 
 void AttachProcedures(const RtlirDesign* design, const VpiObjectMap& objects,

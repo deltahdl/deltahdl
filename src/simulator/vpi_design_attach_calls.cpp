@@ -209,6 +209,7 @@ CallShape SystemCallShape(const Expr& call, const BodyWalk& walk) {
   CallShape shape{kFunction ? vpiSysFuncCall : vpiSysTaskCall, call.callee};
   shape.user_defined = kSystf.type == vpiSysTask || kSystf.type == vpiSysFunc;
   shape.systf = kSystf.object;
+  shape.sysfunctype = kSystf.sysfunctype;
   return shape;
 }
 

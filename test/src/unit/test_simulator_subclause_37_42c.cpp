@@ -23,7 +23,9 @@ class BuiltInCallsThroughMembers : public VpiDesignRun {
   }
 };
 
-// A queue member of a structure variable takes the queue's methods.
+// A queue member of a structure variable takes the queue's methods. The call,
+// a statement with no label, has no name (§37.60 detail 1), and nothing else
+// names the built-in method it makes (§37.42 detail 11).
 TEST_F(BuiltInCallsThroughMembers, AStructuresQueueMemberTakesItsMethods) {
   Run("module top; typedef struct { int q[$]; } s_t; s_t s;\n"
       "  initial begin : b s.q.delete(); end\n"
@@ -31,7 +33,7 @@ TEST_F(BuiltInCallsThroughMembers, AStructuresQueueMemberTakesItsMethods) {
   vpiHandle call = FirstStatement();
   ASSERT_NE(call, nullptr);
   EXPECT_EQ(vpi_get(vpiType, call), vpiMethodFuncCall);
-  EXPECT_STREQ(vpi_get_str(vpiName, call), "delete");
+  EXPECT_EQ(vpi_get_str(vpiName, call), nullptr);
 }
 
 // A queue property of a class takes them too, and a call of one within an

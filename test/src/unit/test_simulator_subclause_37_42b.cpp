@@ -244,22 +244,19 @@ TEST(TaskFuncCallModel, ABlocksFunctionCalledOutsideItsBlockHasNoObject) {
   EXPECT_EQ(kCalled.object, nullptr);
 }
 
-// The method func calls a scope's statements make, each as its method's name
-// and the name of the variable it is applied to, in the order written.
+// The method func calls a scope's statements make, each as the name of the
+// variable it is applied to, in the order written. Nothing names the built-in
+// method such a call makes (§37.42 detail 11, §37.60 detail 1), so the
+// variable is what tells the calls apart.
 class CallStatementsInAScope : public VpiDesignRun {
  protected:
-  static std::vector<std::pair<std::string, std::string>> MethodCallsOf(
-      vpiHandle scope) {
-    std::vector<std::pair<std::string, std::string>> calls;
+  static std::vector<std::string> MethodCallsOf(vpiHandle scope) {
+    std::vector<std::string> calls;
     vpiHandle it = vpi_iterate(vpiStmt, scope);
     if (it == nullptr) return calls;
     while (vpiHandle stmt = vpi_scan(it)) {
       if (vpi_get(vpiType, stmt) != vpiMethodFuncCall) continue;
-      // vpi_get_str answers in one buffer the next call overwrites, so the
-      // method's name is copied before the prefix's is read.
-      std::string method = vpi_get_str(vpiName, stmt);
-      calls.emplace_back(method,
-                         vpi_get_str(vpiName, vpi_handle(vpiPrefix, stmt)));
+      calls.emplace_back(vpi_get_str(vpiName, vpi_handle(vpiPrefix, stmt)));
     }
     return calls;
   }
@@ -268,7 +265,7 @@ class CallStatementsInAScope : public VpiDesignRun {
   // method of that name of the class defn `cls` that `scope` holds.
   static void ExpectTaskCallReaches(const char* method, const char* scope,
                                     const char* cls) {
-    vpiHandle call = Named(vpiMethodTaskCall, By("top.b"), method);
+    vpiHandle call = CallOf(vpiMethodTaskCall, By("top.b"), method);
     vpiHandle declared =
         Named(vpiMethods, Named(vpiClassDefn, By(scope), cls), method);
     ASSERT_NE(call, nullptr) << method;
@@ -295,15 +292,8 @@ TEST_F(CallStatementsInAScope, ABlocksBuiltInValuesTakeTheirKindsMethods) {
       "    str.putc(0, \"c\"); e.next();\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_EQ(
-      MethodCallsOf(By("top.b")),
-      (std::vector<std::pair<std::string, std::string>>{{"push_back", "q"},
-                                                        {"delete", "s"},
-                                                        {"delete", "t"},
-                                                        {"delete", "c"},
-                                                        {"sort", "p"},
-                                                        {"putc", "str"},
-                                                        {"next", "e"}}));
+  EXPECT_EQ(MethodCallsOf(By("top.b")),
+            (std::vector<std::string>{"q", "s", "t", "c", "p", "str", "e"}));
 }
 
 // A module's dynamic array (§7.5), its fixed-size array (§7.12.2) and its enum
@@ -314,8 +304,7 @@ TEST_F(CallStatementsInAScope, AModulesArraysAndAnonymousEnumTakeTheirMethods) {
       "  initial begin : b d.delete(); f.sort(); e.next(); end\n"
       "endmodule\n");
   EXPECT_EQ(MethodCallsOf(By("top.b")),
-            (std::vector<std::pair<std::string, std::string>>{
-                {"delete", "d"}, {"sort", "f"}, {"next", "e"}}));
+            (std::vector<std::string>{"d", "f", "e"}));
 }
 
 // §8.4 with §37.42 detail 2: a call through a member chain, h.b.run(), finds
@@ -346,7 +335,7 @@ TEST_F(CallStatementsInAScope, AVoidCastCallIsTheFuncCallItWraps) {
   Run("module top; function int f(int a); return a; endfunction\n"
       "  initial begin : b void'(f(3)); end\n"
       "endmodule\n");
-  vpiHandle call = Named(vpiFuncCall, By("top.b"), "f");
+  vpiHandle call = CallOf(vpiFuncCall, By("top.b"), "f");
   ASSERT_NE(call, nullptr);
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiFunction, call)),
             VpiObjectOf(Named(vpiTaskFunc, By("top"), "f")));
@@ -366,8 +355,8 @@ TEST_F(CallStatementsInAScope, AStaticMethodCalledThroughItsScopeIsACall) {
       "  class C; static function void f(); endfunction endclass\n"
       "  initial begin : b C::f(); p::D::g(); end\n"
       "endmodule\n");
-  vpiHandle f = Named(vpiMethodFuncCall, By("top.b"), "f");
-  vpiHandle g = Named(vpiMethodFuncCall, By("top.b"), "g");
+  vpiHandle f = CallOf(vpiMethodFuncCall, By("top.b"), "f");
+  vpiHandle g = CallOf(vpiMethodFuncCall, By("top.b"), "g");
   vpiHandle c_f = Named(vpiMethods, Named(vpiClassDefn, By("top"), "C"), "f");
   vpiHandle d_g = Named(vpiMethods, Named(vpiClassDefn, By("p"), "D"), "g");
   ASSERT_NE(f, nullptr);
@@ -450,7 +439,7 @@ TEST_F(CallStatementsInAScope, AChainThroughAnInstanceReachesItsVariable) {
       "endmodule\n"
       "module top; sub u (); initial begin : b u.h.run(); end endmodule\n");
   ExpectTaskCallReaches("run", "top.u", "B");
-  vpiHandle call = Named(vpiMethodTaskCall, By("top.b"), "run");
+  vpiHandle call = CallOf(vpiMethodTaskCall, By("top.b"), "run");
   ASSERT_NE(call, nullptr);
   ASSERT_NE(By("top.u.h"), nullptr);
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiPrefix, call)),
@@ -497,8 +486,8 @@ TEST_F(CallStatementsInAScope, ACallThroughAnExpressionReachesItsMethod) {
 }
 
 // §25.9 with §37.42: a call of an interface's task through a virtual
-// interface, a module's, a block's or a class property's, is a task call named
-// after the task (#5784), and one of its function a func call. The
+// interface, a module's, a block's or a class property's, is a task call
+// (#5784), and one of its function a func call. The
 // interface's declaration says which, so a call through a virtual interface
 // of an interface nothing instantiates is a task call too (#5791).
 TEST_F(CallStatementsInAScope, ACallThroughAVirtualInterfaceIsATaskCall) {
@@ -515,15 +504,14 @@ TEST_F(CallStatementsInAScope, ACallThroughAVirtualInterfaceIsATaskCall) {
       "    if (0) begin : g w.t(); end\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_EQ(NamesOf(vpiTaskCall, By("top.b")),
-            (std::vector<std::string>{"t", "t", "t"}));
-  EXPECT_EQ(NamesOf(vpiFuncCall, By("top.b")), std::vector<std::string>{"f"});
-  EXPECT_EQ(NamesOf(vpiTaskCall, By("top.b.g")), std::vector<std::string>{"t"});
+  EXPECT_EQ(ObjectsOf(vpiTaskCall, By("top.b")).size(), 3U);
+  EXPECT_EQ(ObjectsOf(vpiFuncCall, By("top.b")).size(), 1U);
+  EXPECT_EQ(ObjectsOf(vpiTaskCall, By("top.b.g")).size(), 1U);
 }
 
-// §35.5 with §37.42: a call of a function imported through DPI is a func call
-// named after it, and a call of an imported task a task call, though no task
-// or function object stands for either (#5785). The calls never run, so the
+// §35.5 with §37.42: a call of a function imported through DPI is a func
+// call, and a call of an imported task a task call, though no task or function
+// object stands for either (#5785). The calls never run, so the
 // run calls no foreign code.
 TEST_F(CallStatementsInAScope, ACallOfADpiImportIsACall) {
   Run("module top;\n"
@@ -531,8 +519,8 @@ TEST_F(CallStatementsInAScope, ACallOfADpiImportIsACall) {
       "  import \"DPI-C\" task c_t();\n"
       "  initial if (0) begin : b void'(c_f(1)); c_t(); end\n"
       "endmodule\n");
-  EXPECT_EQ(NamesOf(vpiFuncCall, By("top.b")), std::vector<std::string>{"c_f"});
-  EXPECT_EQ(NamesOf(vpiTaskCall, By("top.b")), std::vector<std::string>{"c_t"});
+  EXPECT_EQ(ObjectsOf(vpiFuncCall, By("top.b")).size(), 1U);
+  EXPECT_EQ(ObjectsOf(vpiTaskCall, By("top.b")).size(), 1U);
 }
 
 // §8.6, §8.10 and §11.4.11 with §37.42: a method called on the handle a
@@ -554,8 +542,7 @@ TEST_F(CallStatementsInAScope, ACallOnAResultOrAConditionalReachesItsMethod) {
       "    B::make().run(); p::make_d().go();\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_EQ(NamesOf(vpiMethodTaskCall, By("top.b")),
-            (std::vector<std::string>{"go", "run", "run", "run"}));
+  EXPECT_EQ(ObjectsOf(vpiMethodTaskCall, By("top.b")).size(), 4U);
   ExpectTaskCallReaches("run", "top", "B");
   ExpectTaskCallReaches("go", "p", "D");
 }
@@ -575,8 +562,7 @@ TEST_F(CallStatementsInAScope, ACallThroughAStructMemberReachesItsMethod) {
       "    s.h.run(); t.h.run(); r.h.run();\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_EQ(NamesOf(vpiMethodTaskCall, By("top.b")),
-            (std::vector<std::string>{"run", "run", "run"}));
+  EXPECT_EQ(ObjectsOf(vpiMethodTaskCall, By("top.b")).size(), 3U);
   ExpectTaskCallReaches("run", "top", "B");
 }
 
@@ -586,8 +572,10 @@ TEST_F(CallStatementsInAScope, ACallThroughAStructMemberReachesItsMethod) {
 TEST_F(CallStatementsInAScope, ACallOnProcessSelfIsAMethodFuncCall) {
   Run("module top; initial begin : b process::self().srandom(1); end\n"
       "endmodule\n");
-  vpiHandle call = Named(vpiMethodFuncCall, By("top.b"), "srandom");
-  ASSERT_NE(call, nullptr);
+  const std::vector<vpiHandle> kCalls =
+      ObjectsOf(vpiMethodFuncCall, By("top.b"));
+  ASSERT_EQ(kCalls.size(), 1U);
+  vpiHandle call = kCalls.front();
   EXPECT_EQ(vpi_get(vpiUserDefn, call), 0);
 }
 
@@ -603,7 +591,7 @@ TEST_F(CallStatementsInAScope, ACallResolvedUpwardReachesTheEnclosingTask) {
       "module top; task t; endtask other s (); mid m (); endmodule\n");
   vpiHandle task = Named(vpiTaskFunc, By("top"), "t");
   ASSERT_NE(task, nullptr);
-  vpiHandle call = Named(vpiTaskCall, By("top.m.l.k.b"), "t");
+  vpiHandle call = CallOf(vpiTaskCall, By("top.m.l.k.b"), "t");
   ASSERT_NE(call, nullptr);
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiTask, call)), VpiObjectOf(task));
 }
@@ -618,7 +606,7 @@ TEST_F(CallStatementsInAScope, ACallOnALetsHandleReachesItsMethod) {
       "  let cur() = b;\n"
       "  initial begin : b0 cur().run(); end\n"
       "endmodule\n");
-  vpiHandle call = Named(vpiMethodTaskCall, By("top.b0"), "run");
+  vpiHandle call = CallOf(vpiMethodTaskCall, By("top.b0"), "run");
   vpiHandle run = Named(vpiMethods, Named(vpiClassDefn, By("top"), "B"), "run");
   ASSERT_NE(call, nullptr);
   ASSERT_NE(run, nullptr);
@@ -626,18 +614,20 @@ TEST_F(CallStatementsInAScope, ACallOnALetsHandleReachesItsMethod) {
 }
 
 // §18.12 with §37.42: a call of the scope randomize function, written without
-// its std:: prefix or with it, is a func call named randomize. No design
-// declares the function, so the call reaches no function object, as detail 11
-// has a built-in method's call reach none (#5828).
+// its std:: prefix or with it, is a func call, unnamed as any call statement
+// without a label is (§37.60 detail 1). No design declares the function, so
+// the call reaches no function object, as detail 11 has a built-in method's
+// call reach none (#5828).
 TEST_F(CallStatementsInAScope, AScopeRandomizeCallIsAFuncCall) {
   Run("module top; int a;\n"
       "  initial begin : b randomize(a); std::randomize(a); end\n"
       "endmodule\n");
-  EXPECT_EQ(NamesOf(vpiFuncCall, By("top.b")),
-            (std::vector<std::string>{"randomize", "randomize"}));
-  vpiHandle call = Named(vpiFuncCall, By("top.b"), "randomize");
-  ASSERT_NE(call, nullptr);
-  EXPECT_EQ(vpi_handle(vpiFunction, call), nullptr);
+  const std::vector<vpiHandle> kCalls = ObjectsOf(vpiFuncCall, By("top.b"));
+  ASSERT_EQ(kCalls.size(), 2U);
+  for (vpiHandle call : kCalls) {
+    EXPECT_EQ(vpi_get_str(vpiName, call), nullptr);
+    EXPECT_EQ(vpi_handle(vpiFunction, call), nullptr);
+  }
 }
 
 // §37.42 detail 1 with §7.12.1: an array locator method call written as a
@@ -692,18 +682,9 @@ TEST_F(CallStatementsInAScope, ACallOfAClassBuiltInMethodIsAMethodFuncCall) {
       "    void'(k.randomize()); k.pre_randomize();\n"
       "  end\n"
       "endmodule\n");
-  using Call = std::pair<std::string, std::string>;
   EXPECT_EQ(MethodCallsOf(By("top.b")),
-            (std::vector<Call>{{"randomize", "h"},
-                               {"pre_randomize", "h"},
-                               {"post_randomize", "h"},
-                               {"rand_mode", "h"},
-                               {"constraint_mode", "h"},
-                               {"srandom", "h"},
-                               {"get_randstate", "h"},
-                               {"set_randstate", "h"},
-                               {"randomize", "k"},
-                               {"pre_randomize", "k"}}));
+            (std::vector<std::string>{"h", "h", "h", "h", "h", "h", "h", "h",
+                                      "k", "k"}));
   vpiHandle it = vpi_iterate(vpiStmt, By("top.b"));
   ASSERT_NE(it, nullptr);
   std::vector<vpiHandle> calls;
@@ -803,7 +784,7 @@ TEST_F(CallStatementsInAScope, AStructMembersSpecializationChoosesItsBase) {
       "  s_t s;\n"
       "  initial begin : b s.c = new; s.c.tick(); end\n"
       "endmodule\n");
-  vpiHandle call = Named(vpiMethodTaskCall, By("top.b"), "tick");
+  vpiHandle call = CallOf(vpiMethodTaskCall, By("top.b"), "tick");
   vpiHandle tick =
       Named(vpiMethods, Named(vpiClassDefn, By("top"), "B2"), "tick");
   ASSERT_NE(call, nullptr);
@@ -821,9 +802,7 @@ TEST_F(CallStatementsInAScope, ACallOfRandomizeThroughABuiltInBaseIsACall) {
       "  M m = new;\n"
       "  initial begin : b void'(m.randomize()); end\n"
       "endmodule\n");
-  using Call = std::pair<std::string, std::string>;
-  EXPECT_EQ(MethodCallsOf(By("top.b")),
-            (std::vector<Call>{{"randomize", "m"}}));
+  EXPECT_EQ(MethodCallsOf(By("top.b")), std::vector<std::string>{"m"});
 }
 
 // §18.8 and §18.9 with §37.42: rand_mode applied to a random variable, and
@@ -838,14 +817,14 @@ TEST_F(CallStatementsInAScope, AModeCallOnAMemberIsAMethodFuncCall) {
       "  C h = new;\n"
       "  initial begin : b h.x.rand_mode(0); h.c.constraint_mode(0); end\n"
       "endmodule\n");
-  for (const char* method : {"rand_mode", "constraint_mode"}) {
-    vpiHandle call = Named(vpiMethodFuncCall, By("top.b"), method);
-    ASSERT_NE(call, nullptr) << method;
-    EXPECT_EQ(vpi_get(vpiUserDefn, call), 0) << method;
-    EXPECT_EQ(vpi_handle(vpiFunction, call), nullptr) << method;
+  const std::vector<vpiHandle> kCalls =
+      ObjectsOf(vpiMethodFuncCall, By("top.b"));
+  ASSERT_EQ(kCalls.size(), 2U);
+  for (vpiHandle call : kCalls) {
+    EXPECT_EQ(vpi_get(vpiUserDefn, call), 0);
+    EXPECT_EQ(vpi_handle(vpiFunction, call), nullptr);
   }
-  vpiHandle prefix =
-      vpi_handle(vpiPrefix, Named(vpiMethodFuncCall, By("top.b"), "rand_mode"));
+  vpiHandle prefix = vpi_handle(vpiPrefix, kCalls.front());
   ASSERT_NE(prefix, nullptr);
   EXPECT_STREQ(vpi_get_str(vpiName, prefix), "x");
 }
@@ -878,8 +857,9 @@ TEST_F(CallStatementsInAScope, ARandomizeCallReachesItsInlineConstraint) {
 }
 
 // §37.42 details 2 and 11: a method call written within an expression is a
-// method func call named after its method and applied through vpiPrefix to
-// the value it is called on, as a call statement of it is. A method the class
+// method func call named after its method, which a call statement of it is
+// not (§37.60 detail 1), and applied through vpiPrefix to the value it is
+// called on, as a call statement of it is. A method the class
 // declares is reached through vpiFunction, a built-in method's call reaches
 // none, and the call's value is the method's result (#5832).
 TEST_F(CallStatementsInAScope, AMethodCallInAnExpressionIsAMethodFuncCall) {

@@ -301,9 +301,10 @@ TEST_F(ConstraintsOfARun, AClassObjIteratesItsConstraints) {
   EXPECT_EQ(vpi_get(vpiIsConstraintEnabled, b), 1);
   EXPECT_EQ(vpi_get(vpiIsConstraintEnabled, c), 0);
   EXPECT_EQ(vpi_get(vpiIsConstraintEnabled, s), 0);
-  vpiHandle call = Named(vpiMethodFuncCall, By("top.p"), "constraint_mode");
-  ASSERT_NE(call, nullptr);
-  vpiHandle prefix = vpi_handle(vpiPrefix, call);
+  const std::vector<vpiHandle> kCalls =
+      ObjectsOf(vpiMethodFuncCall, By("top.p"));
+  ASSERT_EQ(kCalls.size(), 2U);
+  vpiHandle prefix = vpi_handle(vpiPrefix, kCalls.front());
   ASSERT_NE(prefix, nullptr);
   EXPECT_EQ(vpi_get(vpiType, prefix), vpiConstraint);
 }

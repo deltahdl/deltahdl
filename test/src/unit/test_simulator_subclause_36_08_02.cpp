@@ -161,19 +161,21 @@ TEST_F(CompiletfApplicationRoutine,
 // -----------------------------------------------------------------------------
 
 // What the compiletf below found, left at file scope because a compiletf is a
-// plain C function with no return path to the case that provoked it. The two
+// plain C function with no return path to the case that provoked it. The
 // names are copied rather than kept as pointers: §38.11 has vpi_get_str() place
 // its answer in one buffer reused by every call, so the pointer from the first
 // call names the second call's string by the time a case reads it.
 int g_call_type_seen = 0;
 int g_args_seen_at_compile = -1;
 std::string g_call_name_seen;
+std::string g_systf_name_seen;
 std::string g_first_arg_name_seen;
 
 PLI_INT32 InspectingCompiletf(PLI_BYTE8*) {
   g_call_type_seen = 0;
   g_args_seen_at_compile = -1;
   g_call_name_seen.clear();
+  g_systf_name_seen.clear();
   g_first_arg_name_seen.clear();
 
   vpiHandle call = vpi_handle(vpiSysTfCall, nullptr);
@@ -181,6 +183,14 @@ PLI_INT32 InspectingCompiletf(PLI_BYTE8*) {
   g_call_type_seen = vpi_get(vpiType, call);
   const char* call_name = vpi_get_str(vpiName, call);
   if (call_name != nullptr) g_call_name_seen = call_name;
+  // §37.42 detail 5: the registration the call is of, whose name
+  // vpi_get_systf_info() reads back through the call's user systf.
+  vpiHandle systf = vpi_handle(vpiUserSystf, call);
+  if (systf != nullptr) {
+    s_vpi_systf_data info = {};
+    vpi_get_systf_info(systf, &info);
+    if (info.tfname != nullptr) g_systf_name_seen = info.tfname;
+  }
 
   vpiHandle args = vpi_iterate(vpiArgument, call);
   g_args_seen_at_compile = 0;
@@ -220,11 +230,13 @@ TEST_F(CompiletfApplicationRoutine, ReachesTheCallTheSourceWroteItFor) {
   LowerAndRun(design, f);
 
   // The call the compiletf was run for is the one the source wrote: a system
-  // task call named by the registration's tfname, carrying the two arguments
-  // the call site listed. A compiletf reached with no call standing leaves
-  // every one of these at the value it was cleared to.
+  // task call of the registration, carrying the two arguments the call site
+  // listed. Written as a statement with no label, it has no name of its own
+  // (§37.60 detail 1). A compiletf reached with no call standing leaves every
+  // one of these at the value it was cleared to.
   EXPECT_EQ(g_call_type_seen, vpiSysTaskCall);
-  EXPECT_EQ(g_call_name_seen, "$probe");
+  EXPECT_EQ(g_call_name_seen, "");
+  EXPECT_EQ(g_systf_name_seen, "$probe");
   EXPECT_EQ(g_args_seen_at_compile, 2);
   // §36.4: an argument that names a variable is reached as that variable, which
   // is what lets a compiletf say which name a call was written against.
@@ -250,6 +262,7 @@ TEST_F(CompiletfApplicationRoutine, ReachesASystemFunctionCallTheSameWay) {
 
   EXPECT_EQ(g_call_type_seen, vpiSysFuncCall);
   EXPECT_EQ(g_call_name_seen, "$probe");
+  EXPECT_EQ(g_systf_name_seen, "$probe");
   EXPECT_EQ(g_args_seen_at_compile, 1);
   EXPECT_EQ(g_first_arg_name_seen, "r");
 }

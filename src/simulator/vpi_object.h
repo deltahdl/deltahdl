@@ -575,6 +575,15 @@ struct VpiObject {
   // Empty for every object that is neither.
   std::vector<VpiObject*> arguments;
 
+  // §37.42 detail 3 with §38.3: the argument the model built for each actual a
+  // tf call was written with, in order, null where it built none. The call a
+  // run's invocation of a registered system task or function stands as takes
+  // these as its arguments, so an argument naming a variable is that variable
+  // (detail 8) and an expression is evaluated whenever an application asks
+  // for its value (detail 7). Empty for every object the model built no call
+  // for.
+  std::vector<VpiObject*> written_arguments;
+
   // §37.60 with §37.59: whether a tf call was written as a statement. Both
   // classes draw the three function call kinds, so for a function call the
   // kind alone cannot say whether it is a statement's body or its condition;

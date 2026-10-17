@@ -194,7 +194,6 @@ void VpiContext::AttachPackages(const RtlirDesign* design) {
 void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
   AttachInstanceDefinitions(design);
   AttachVariableFacts(design);
-  VpiSubroutineObjects subroutines;
   if (design != nullptr) {
     const VpiAttachBuild kBuild{[this] { return AllocObject(); },
                                 [this](std::string name) {
@@ -228,7 +227,8 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
     for (const auto& [key, defn] : kClasses) {
       run_objects_.try_emplace(key.first, defn);
     }
-    subroutines = AttachSubroutines(*design, object_map_, *sim_ctx_, kBuild);
+    const VpiSubroutineObjects kSubroutines =
+        AttachSubroutines(*design, object_map_, *sim_ctx_, kBuild);
     AttachVariableRanges(*design, object_map_, *sim_ctx_, kBuild);
     AttachModports(design, object_map_, *sim_ctx_, kBuild);
     // §37.42: a system call finds the registration its name resolves to, and
@@ -241,6 +241,7 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
               ResolveSystf(std::string(name).c_str());
           if (data == nullptr) return found;
           found.type = data->type;
+          if (data->type == vpiSysFunc) found.sysfunctype = data->sysfunctype;
           found.object =
               systf_objects_[static_cast<std::size_t>(data - systfs_.data())];
           return found;
@@ -248,7 +249,7 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
         call_site_objects_,
         stmt_objects_,
         kClasses,
-        subroutines,
+        kSubroutines,
         kUnitTypespecs};
     // §37.51: a package's properties are built ahead of the assertions
     // instantiating them.
@@ -260,8 +261,8 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
         // Attach made a udp defn for every UDP declaration of the design.
         [this](const UdpDecl* decl) { return run_objects_.at(decl); },
         *sim_ctx_, kBuild);
+    AttachContinuousAssignments(design, kCalls, kBuild);
   }
-  AttachContinuousAssignments(design, subroutines);
   AttachGenBlockStorage(design, object_map_);
   AttachGenBlockInstances(design, object_map_, [this](std::string name) {
     name_pool_.push_back(std::move(name));

@@ -356,7 +356,7 @@ TEST_F(GeneratesOfARun, AnInstanceOfAGenerateBlockIsInItsGenScope) {
   vpiHandle b = By("top.g.d2.b");
   ASSERT_NE(b, nullptr);
   EXPECT_STREQ(vpi_get_str(vpiFullName, b), "top.g.d2.b");
-  vpiHandle call = Named(vpiTaskCall, b, "t");
+  vpiHandle call = CallOf(vpiTaskCall, b, "t");
   ASSERT_NE(call, nullptr);
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiTask, call)),
             VpiObjectOf(Named(vpiTaskFunc, By("top"), "t")));

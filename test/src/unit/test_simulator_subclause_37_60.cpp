@@ -252,6 +252,39 @@ TEST_F(AtomicStatementsOfARun, ALabelledCallIsNamedByItsLabel) {
   EXPECT_STREQ(vpi_get_str(vpiName, task), "t");
 }
 
+// Detail 1: a call written as a statement with no label has no name, whether
+// it calls a task, a system task or a built-in method; the task it calls is
+// still reached through vpiTask (§37.42).
+TEST_F(AtomicStatementsOfARun, AnUnlabelledCallStatementHasNoName) {
+  Run("module top; task t; endtask int q[$];\n"
+      "  initial begin : b t(); $display(\"hi\"); q.delete(); end\n"
+      "endmodule\n");
+  vpiHandle task = First(vpiTaskCall, By("top.b"));
+  vpiHandle display = First(vpiSysTaskCall, By("top.b"));
+  vpiHandle method = First(vpiMethodFuncCall, By("top.b"));
+  ASSERT_NE(task, nullptr);
+  ASSERT_NE(display, nullptr);
+  ASSERT_NE(method, nullptr);
+  EXPECT_EQ(vpi_get_str(vpiName, task), nullptr);
+  EXPECT_EQ(vpi_get_str(vpiName, display), nullptr);
+  EXPECT_EQ(vpi_get_str(vpiName, method), nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, vpi_handle(vpiTask, task)), "t");
+}
+
+// A call written within an expression is no statement, so detail 1 does not
+// reach it, and it is named after the function it calls (§37.42).
+TEST_F(AtomicStatementsOfARun, ACallWithinAnExpressionIsNamedAfterItsCallee) {
+  Run("module top; function int f(int a); return a; endfunction int r;\n"
+      "  initial begin : b r = f(1); end\n"
+      "endmodule\n");
+  vpiHandle assign = First(vpiAssignment, By("top.b"));
+  ASSERT_NE(assign, nullptr);
+  vpiHandle call = vpi_handle(vpiRhs, assign);
+  ASSERT_NE(call, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, call), vpiFuncCall);
+  EXPECT_STREQ(vpi_get_str(vpiName, call), "f");
+}
+
 // An unlabeled statement has no label to report.
 TEST_F(AtomicStatementsOfARun, AnUnlabeledStatementReportsNoLabel) {
   Run("module top; event e; initial -> e; endmodule\n");
