@@ -90,7 +90,7 @@ VpiObject* VpiMakePropertyInst(VpiObject* holder, const Expr& instance,
 // event (§9.4.2.4) stands as: a sequence inst where it names a sequence a
 // declaration where it stands makes visible, and otherwise the expression it
 // is, each built through `with`.
-VpiObject* VpiSequenceOperandObject(const Expr* operand,
+VpiObject* VpiSequenceOperandObject(const Expr& operand,
                                     const VpiStmtBuild& with);
 
 }  // namespace delta

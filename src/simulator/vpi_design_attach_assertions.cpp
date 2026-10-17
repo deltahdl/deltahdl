@@ -148,7 +148,7 @@ VpiObject* WithMatchItems(VpiObject* object,
 // bounds (detail 3); an operand naming a sequence its instance (§37.54).
 VpiObject* RepeatedOperand(const SeqLinearBody& body, size_t index,
                            const VpiStmtBuild& with) {
-  VpiObject* operand = VpiSequenceOperandObject(body.operands[index], with);
+  VpiObject* operand = VpiSequenceOperandObject(*body.operands[index], with);
   if (index < body.match_items.size()) {
     operand = WithMatchItems(operand, body.match_items[index], with);
   }
@@ -187,7 +187,7 @@ VpiObject* JoinChain(const std::vector<ChainElement>& elements,
   if (elements.empty()) return nullptr;
   VpiObject* chain = elements[0].sequence;
   const SeqCycleDelay& lead = elements[0].before;
-  if (lead.written || lead.min != 0 || lead.max != 0) {
+  if (lead.min != 0 || lead.max != 0 || lead.written) {
     std::vector<VpiObject*> operands{chain};
     AppendBounds(operands, lead.min, lead.max, with.build);
     chain =
@@ -593,7 +593,7 @@ VpiObject* UnclockedPropertyExpr(const PropertyExprNode* node,
   using Kind = PropertyExprNode::Kind;
   switch (node->kind) {
     case Kind::kBoolean:
-      return VpiSequenceOperandObject(node->boolean, with);
+      return VpiSequenceOperandObject(*node->boolean, with);
     case Kind::kSequence:
       return SequenceOperand(node->sequence, with, flowing);
     case Kind::kNot:

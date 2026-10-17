@@ -486,12 +486,11 @@ VpiObject* VpiSequenceDeclNamed(const VpiObject* scope,
              : ImportedDecl(vpiSequenceDecl, name, imports, objects);
 }
 
-VpiObject* VpiSequenceOperandObject(const Expr* operand,
+VpiObject* VpiSequenceOperandObject(const Expr& operand,
                                     const VpiStmtBuild& with) {
-  VpiObject* decl =
-      operand != nullptr ? NamedSequenceDecl(*operand, with) : nullptr;
-  return decl != nullptr ? MakeSequenceInst(decl, *operand, with)
-                         : with.expression(operand);
+  VpiObject* decl = NamedSequenceDecl(operand, with);
+  return decl != nullptr ? MakeSequenceInst(decl, operand, with)
+                         : with.expression(&operand);
 }
 
 void AttachPackageAssertionItemDecls(const RtlirDesign& design,

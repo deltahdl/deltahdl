@@ -60,7 +60,7 @@ VpiObject* MakeOperation(int op_type,
 // sequence inst its name writes (§37.65 with §37.54).
 VpiObject* EventItem(const EventExpr& event, const VpiStmtBuild& with) {
   if (event.is_sequence_event) {
-    return VpiSequenceOperandObject(event.signal, with);
+    return VpiSequenceOperandObject(*event.signal, with);
   }
   VpiObject* item = with.expression(event.signal);
   if (event.edge == Edge::kEdge) {
