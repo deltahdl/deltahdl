@@ -2,6 +2,7 @@
 #include <string_view>
 #include <vector>
 
+#include "elaborator/rtlir_attribute.h"
 #include "parser/ast_class.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_design_attach_build.h"
@@ -28,10 +29,12 @@ struct ItemBuild {
   VpiObject* scope;
   SimContext& ctx;
   const VpiAttachBuild& build;
+  // §37.83: the table the operators' attributes are kept in; null for none.
+  const RtlirNodeAttributes* attrs = nullptr;
 
   VpiObject* Expression(const Expr* expr) const {
-    return VpiGenBlockExpression(expr, {objects, prefix, gen, scope}, ctx,
-                                 build);
+    return VpiGenBlockExpression(expr, {objects, prefix, gen, scope, attrs},
+                                 ctx, build);
   }
 };
 
@@ -74,7 +77,8 @@ VpiObject* ForeachItem(const ConstraintItem& item, const ItemBuild& at) {
     }
     loop->loop_vars.push_back(index);
   }
-  const ItemBuild kBody{at.objects, at.prefix, at.gen, loop, at.ctx, at.build};
+  const ItemBuild kBody{at.objects, at.prefix, at.gen,  loop,
+                        at.ctx,     at.build,  at.attrs};
   loop->constraint_exprs = MakeItems(item.body, kBody);
   return loop;
 }
@@ -219,8 +223,8 @@ VpiObject* VpiMakeConstraint(const ClassMember& block, VpiObject* holder,
   constraint->access_type = block.is_constraint_prototype ? vpiExternAcc : 0;
   constraint->constraint_enabled = true;
   constraint->children = MakeItems(
-      block.constraint_items,
-      {names.objects, names.prefix, names.gen, names.scope, names.ctx, build});
+      block.constraint_items, {names.objects, names.prefix, names.gen,
+                               names.scope, names.ctx, build, names.attrs});
   return constraint;
 }
 

@@ -329,6 +329,9 @@ struct VpiExprNames {
   // The object whose declarations, and those of the objects above it up to
   // the instance, a name finds first (§23.9); null for none.
   const VpiObject* scope = nullptr;
+  // §37.83: the attributes elaboration resolved on the operators written
+  // where the expression is, its instance's or the design's; null for none.
+  const RtlirNodeAttributes* attrs = nullptr;
 };
 
 // The same of an expression written in the generate block instances `names`
@@ -745,6 +748,8 @@ struct VpiConstraintNames {
   const std::vector<std::string_view>& gen;
   VpiObject* scope;
   SimContext& ctx;
+  // §37.83: the table the operators' attributes are kept in; null for none.
+  const RtlirNodeAttributes* attrs = nullptr;
 };
 
 // §37.34: the constraint object the constraint block `block` stands as, held

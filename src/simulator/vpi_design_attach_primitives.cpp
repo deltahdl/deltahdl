@@ -6,6 +6,7 @@
 
 #include "common/packed_range.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_attribute.h"
 #include "elaborator/rtlir_primitives.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -115,7 +116,18 @@ struct PrimSite {
   VpiObject* instance;
   const std::string& prefix;
   const VpiObjectMap& objects;
+  // §37.83: the instance's table of operator attributes.
+  const RtlirNodeAttributes* attrs = nullptr;
 };
+
+// The expression object of the terminal `terminal` written at `site`.
+VpiObject* TerminalExpression(const Expr* terminal, const PrimSite& site,
+                              SimContext& ctx, const VpiAttachBuild& build) {
+  static const std::vector<std::string_view> kNoGenBlocks;
+  return VpiGenBlockExpression(
+      terminal, {site.objects, site.prefix, kNoGenBlocks, nullptr, site.attrs},
+      ctx, build);
+}
 
 // §37.35: a primitive of `shape` hung from `instance`, named `name`, reporting
 // its definition name, its primitive type and as its size the number of its
@@ -176,8 +188,7 @@ std::vector<VpiObject*> TerminalObjects(const ModuleItem& item,
   std::vector<VpiObject*> terminals;
   terminals.reserve(item.gate_terminals.size());
   for (const Expr* terminal : item.gate_terminals) {
-    terminals.push_back(
-        VpiInstanceExpression(terminal, site.objects, site.prefix, ctx, build));
+    terminals.push_back(TerminalExpression(terminal, site, ctx, build));
   }
   return terminals;
 }
@@ -239,11 +250,9 @@ VpiObject* MakeUdpObject(const RtlirUdpInst& inst, const PrimSite& site,
                          const VpiAttachBuild& build) {
   std::vector<VpiObject*> terminals;
   terminals.reserve(inst.inputs.size() + 1);
-  terminals.push_back(VpiInstanceExpression(inst.output, site.objects,
-                                            site.prefix, ctx, build));
+  terminals.push_back(TerminalExpression(inst.output, site, ctx, build));
   for (const Expr* input : inst.inputs) {
-    terminals.push_back(
-        VpiInstanceExpression(input, site.objects, site.prefix, ctx, build));
+    terminals.push_back(TerminalExpression(input, site, ctx, build));
   }
   const PrimShape kShape{inst.decl->name,
                          inst.decl->is_sequential ? vpiSeqPrim : vpiCombPrim,
@@ -273,7 +282,7 @@ void AttachPrimitives(const RtlirDesign* design, const VpiObjectMap& objects,
       [&](const RtlirModule* mod, const std::string& prefix,
           VpiObject* instance) {
         for (const ModuleItem* item : mod->gate_insts) {
-          const PrimSite kSite{instance, prefix, objects};
+          const PrimSite kSite{instance, prefix, objects, &mod->node_attrs};
           // §28.3.6: an instantiation declaring a range is an
           // instance array.
           if (item->inst_range_left != nullptr) {
@@ -291,8 +300,9 @@ void AttachPrimitives(const RtlirDesign* design, const VpiObjectMap& objects,
                               build);
         }
         for (const RtlirUdpInst& inst : mod->udp_insts) {
-          VpiObject* udp = MakeUdpObject(inst, {instance, prefix, objects},
-                                         udp_defn_of(inst.decl), ctx, build);
+          VpiObject* udp =
+              MakeUdpObject(inst, {instance, prefix, objects, &mod->node_attrs},
+                            udp_defn_of(inst.decl), ctx, build);
           VpiAttachAttributes(udp, VpiNodeAttributes(mod, inst.source_item),
                               false, ctx, build);
         }

@@ -16,6 +16,7 @@
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/elaborator_items_params.h"
+#include "elaborator/elaborator_node_attributes.h"
 #include "elaborator/global_clock_assertion_event.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
@@ -589,6 +590,9 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
 
   module_decl_path_.push_back(decl);
   ElaborateItems(decl, mod);
+  // §37.83: the attributes of the operators a modport's port expressions are
+  // written with.
+  RecordModportAttributes(*mod, diag_, [&] { return BuildParamScope(mod); });
   module_decl_path_.pop_back();
   ResolveExplicitPortTypes(decl, mod, BuildParamScope(mod));
   module_global_clocking_event_ = saved_global_clocking_event;

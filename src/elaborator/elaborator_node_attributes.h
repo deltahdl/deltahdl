@@ -21,6 +21,12 @@ void RecordNodeAttributes(const ModuleItem& item, RtlirModule& mod,
                           DiagEngine& diag,
                           const std::function<ScopeMap()>& params);
 
+// §5.12 with §37.83: resolve the attribute instances written on the operators
+// of the port expressions the modports of `mod`, an interface, declare, into
+// RtlirModule::node_attrs, folded against the scope `params` gives.
+void RecordModportAttributes(RtlirModule& mod, DiagEngine& diag,
+                             const std::function<ScopeMap()>& params);
+
 // §5.12 with §37.83: resolve the attribute instances written on each class
 // the compilation unit or a package declares, and on its items, into
 // RtlirDesign::node_attrs of `design`, folded against `params`, the

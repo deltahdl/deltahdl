@@ -486,5 +486,58 @@ TEST_F(AttributesOfARun, AnOperationCarriesItsOperatorsAttributes) {
             std::vector<std::string>{"tag"});
 }
 
+// An operation written in a primitive's terminal, an instantiation's port
+// connection, a clocking signal's expression, a modport's port expression, an
+// extends argument or a constraint carries the attributes its operator is
+// written with.
+TEST_F(AttributesOfARun, AnOperationOutsideAnAssignmentCarriesItsAttributes) {
+  Run("interface ifc; logic a, b;\n"
+      "  modport mp(input .p(a & (* t4 *) b));\n"
+      "endinterface\n"
+      "module sub(input logic [7:0] i); endmodule\n"
+      "module top; wire y, a, b, c, clk; logic [7:0] x, z;\n"
+      "  and g (y, a & (* t1 *) b, c);\n"
+      "  sub u(.i(x | (* t2 *) z));\n"
+      "  clocking cb @(posedge clk); input w = a ^ (* t3 *) b; endclocking\n"
+      "  ifc i0();\n"
+      "  class Base; function new(int n); endfunction endclass\n"
+      "  class Derived extends Base(2 + (* t5 *) 3);\n"
+      "    rand int v;\n"
+      "    constraint k { v > (* t6 *) 1; }\n"
+      "  endclass\n"
+      "endmodule\n");
+  vpiHandle terms =
+      vpi_iterate(vpiPrimTerm, Named(vpiPrimitive, By("top"), "g"));
+  ASSERT_NE(terms, nullptr);
+  vpi_scan(terms);
+  EXPECT_EQ(NamesOf(vpiAttribute, vpi_handle(vpiExpr, vpi_scan(terms))),
+            std::vector<std::string>{"t1"});
+  vpiHandle i = Named(vpiPort, By("top.u"), "i");
+  ASSERT_NE(i, nullptr);
+  EXPECT_EQ(NamesOf(vpiAttribute, vpi_handle(vpiHighConn, i)),
+            std::vector<std::string>{"t2"});
+  vpiHandle cb = Named(vpiClockingBlock, By("top"), "cb");
+  ASSERT_NE(cb, nullptr);
+  EXPECT_EQ(
+      NamesOf(vpiAttribute, vpi_handle(vpiExpr, Named(vpiIODecl, cb, "w"))),
+      std::vector<std::string>{"t3"});
+  vpiHandle mp = Named(vpiModport, By("top.i0"), "mp");
+  ASSERT_NE(mp, nullptr);
+  EXPECT_EQ(
+      NamesOf(vpiAttribute, vpi_handle(vpiExpr, Named(vpiIODecl, mp, "p"))),
+      std::vector<std::string>{"t4"});
+  vpiHandle derived = Named(vpiClassDefn, By("top"), "Derived");
+  ASSERT_NE(derived, nullptr);
+  vpiHandle args = vpi_iterate(vpiArgument, vpi_handle(vpiExtends, derived));
+  ASSERT_NE(args, nullptr);
+  EXPECT_EQ(NamesOf(vpiAttribute, vpi_scan(args)),
+            std::vector<std::string>{"t5"});
+  vpiHandle items =
+      vpi_iterate(vpiConstraintItem, Named(vpiConstraint, derived, "k"));
+  ASSERT_NE(items, nullptr);
+  EXPECT_EQ(NamesOf(vpiAttribute, vpi_scan(items)),
+            std::vector<std::string>{"t6"});
+}
+
 }  // namespace
 }  // namespace delta

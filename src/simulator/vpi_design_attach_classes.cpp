@@ -166,9 +166,11 @@ void MakeExtends(const MadeClassDefn& derived,
       std::string(SplitClassReference(derived.decl->base_class).name));
   typespec->parent = extends;
   extends->children.push_back(typespec);
+  static const std::vector<std::string_view> kNoGenBlocks;
   for (const Expr* arg : derived.decl->extends_args) {
-    VpiObject* obj =
-        VpiInstanceExpression(arg, objects, derived.prefix, ctx, build);
+    VpiObject* obj = VpiGenBlockExpression(
+        arg, {objects, derived.prefix, kNoGenBlocks, nullptr, derived.attrs},
+        ctx, build);
     if (obj == nullptr) continue;
     obj->parent = extends;
     extends->children.push_back(obj);
@@ -280,8 +282,8 @@ void MakeConstraints(const MadeClassDefn& owner, const VpiObjectMap& objects,
       continue;
     }
     VpiObject* constraint = VpiMakeConstraint(
-        *member, owner.defn, {objects, owner.prefix, kNoGenBlocks, scope, ctx},
-        build);
+        *member, owner.defn,
+        {objects, owner.prefix, kNoGenBlocks, scope, ctx, owner.attrs}, build);
     owner.defn->children.push_back(constraint);
     // §37.83: the attributes the constraint is written with.
     VpiAttachAttributes(constraint, VpiNodeAttributes(owner.attrs, member),

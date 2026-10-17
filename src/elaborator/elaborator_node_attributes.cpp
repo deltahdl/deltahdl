@@ -75,13 +75,49 @@ struct NodeAttributeRecord {
     ForEachChildStmt(stmt, [this](const Stmt* sub) { RecordStmt(sub); });
   }
 
-  // §8.3 with §5.12: a class written with attributes, and its items written
-  // with them.
+  // §18.5 with §5.12: the operators the constraint item `item` and the items
+  // it holds are written with.
+  void RecordConstraintItem(const ConstraintItem* item) {
+    if (item == nullptr) return;
+    RecordExpr(item->expr);
+    for (const ConstraintDistItem& dist : item->dist) {
+      for (const Expr* expr :
+           {dist.value, dist.lo, dist.hi, dist.tolerance, dist.weight}) {
+        RecordExpr(expr);
+      }
+    }
+    for (const Expr* expr : item->exprs) RecordExpr(expr);
+    for (const Expr* expr : item->after) RecordExpr(expr);
+    for (const ConstraintItem* sub : item->body) RecordConstraintItem(sub);
+    for (const ConstraintItem* sub : item->else_body) RecordConstraintItem(sub);
+  }
+
+  // §8.3 with §5.12: a class written with attributes, its items written with
+  // them, and the operators its extends arguments and constraints are.
   void RecordClass(const ClassDecl* decl) {
     if (decl == nullptr) return;
     Record(decl, decl->attrs);
+    for (const Expr* arg : decl->extends_args) RecordExpr(arg);
     for (const ClassMember* member : decl->members) {
       Record(member, member->attrs);
+      for (const Expr* expr : member->constraint_exprs) RecordExpr(expr);
+      for (const ConstraintItem* item : member->constraint_items) {
+        RecordConstraintItem(item);
+      }
+    }
+  }
+
+  // §14.3 with §5.12: the operators a clocking block's event and signals are
+  // written with.
+  void RecordClocking(const ModuleItem& item) {
+    for (const EventExpr& event : item.clocking_event) {
+      RecordExpr(event.signal);
+      RecordExpr(event.iff_condition);
+    }
+    for (const ClockingSignalDecl& signal : item.clocking_signals) {
+      RecordExpr(signal.skew_delay);
+      RecordExpr(signal.out_skew_delay);
+      RecordExpr(signal.hier_expr);
     }
   }
 };
@@ -98,7 +134,20 @@ void RecordNodeAttributes(const ModuleItem& item, RtlirModule& mod,
   record.RecordExpr(item.assign_lhs);
   record.RecordExpr(item.assign_rhs);
   record.RecordExpr(item.init_expr);
+  for (const Expr* terminal : item.gate_terminals) record.RecordExpr(terminal);
+  for (const auto& [name, connection] : item.inst_ports) {
+    record.RecordExpr(connection);
+  }
+  record.RecordClocking(item);
   record.RecordClass(item.class_decl);
+}
+
+void RecordModportAttributes(RtlirModule& mod, DiagEngine& diag,
+                             const std::function<ScopeMap()>& params) {
+  NodeAttributeRecord record{mod.node_attrs, diag, params, std::nullopt};
+  for (const ModportDecl* decl : mod.modports) {
+    for (const ModportPort& port : decl->ports) record.RecordExpr(port.expr);
+  }
 }
 
 void RecordDesignClassAttributes(RtlirDesign& design, DiagEngine& diag,

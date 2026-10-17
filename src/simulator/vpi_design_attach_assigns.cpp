@@ -229,9 +229,7 @@ struct AssignBuild {
   VpiCalleeResolver callees;
   std::function<std::string_view(std::string)> keep;
   std::function<bool(const Expr&, VpiObject*)> shape_call = nullptr;
-  // §37.83: the attributes elaboration resolved on the operators of the
-  // instance the expressions stand in; null where none is known.
-  const RtlirNodeAttributes* attrs = nullptr;
+  const RtlirNodeAttributes* attrs = nullptr;  // §37.83: its operators'.
 };
 
 VpiObject* ExpressionObject(const Expr* expr, const AssignBuild& build);
@@ -860,7 +858,9 @@ VpiObject* VpiGenBlockExpression(const Expr* expr, const VpiExprNames& names,
                         AssignNames{names.objects, names.prefix,
                                     names.gen_prefixes, names.scope},
                         {},
-                        build.keep});
+                        build.keep,
+                        nullptr,
+                        names.attrs});
 }
 
 namespace {

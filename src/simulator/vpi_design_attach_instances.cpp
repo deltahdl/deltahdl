@@ -2,11 +2,13 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include "common/source_loc.h"
 #include "common/source_mgr.h"
 #include "common/types.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_attribute.h"
 #include "parser/ast_module.h"
 #include "parser/ast_specify.h"
 #include "parser/ast_type.h"
@@ -87,6 +89,8 @@ struct ModportScope {
   const std::string& prefix;
   SimContext& ctx;
   const VpiAttachBuild& build;
+  // §37.83: the interface instance's table of operator attributes.
+  const RtlirNodeAttributes* attrs = nullptr;
 };
 
 // §37.13 detail 2: what the io decl `io_decl` of the modport port `port`
@@ -96,8 +100,11 @@ struct ModportScope {
 VpiObject* ModportPortExpr(const ModportScope& scope, VpiObject* io_decl,
                            const ModportPort& port) {
   if (port.is_named_port) {
-    return VpiInstanceExpression(port.expr, scope.objects, scope.prefix,
-                                 scope.ctx, scope.build);
+    static const std::vector<std::string_view> kNoGenBlocks;
+    return VpiGenBlockExpression(
+        port.expr,
+        {scope.objects, scope.prefix, kNoGenBlocks, nullptr, scope.attrs},
+        scope.ctx, scope.build);
   }
   VpiObject* item = FindObjectForFlatName(scope.objects,
                                           VpiFlatName(scope.prefix, port.name));
@@ -270,7 +277,8 @@ void AttachModports(const RtlirDesign* design, const VpiObjectMap& objects,
   WalkInstanceObjects(
       design, objects,
       [&](const RtlirModule* mod, const std::string& prefix, VpiObject* iface) {
-        const ModportScope kScope{iface, objects, prefix, ctx, build};
+        const ModportScope kScope{iface, objects, prefix,
+                                  ctx,   build,   &mod->node_attrs};
         for (const ModportDecl* decl : mod->modports) {
           MakeModport(kScope, *decl);
         }

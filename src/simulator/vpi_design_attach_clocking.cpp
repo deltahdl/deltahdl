@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_attribute.h"
 #include "elaborator/rtlir_scopes.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -71,6 +72,8 @@ struct ClockingSite {
   const std::string& prefix;
   const VpiObjectMap& objects;
   const std::vector<std::string_view>& gen_prefixes;
+  // §37.83: the instance's table of operator attributes.
+  const RtlirNodeAttributes* attrs = nullptr;
 };
 
 // What a clocking block is built with: its site, the run and the attach.
@@ -81,8 +84,10 @@ struct ClockingBuild {
 
   VpiObject* Expression(const Expr* expr) const {
     return VpiGenBlockExpression(
-        expr, VpiExprNames{site.objects, site.prefix, site.gen_prefixes}, ctx,
-        build);
+        expr,
+        VpiExprNames{site.objects, site.prefix, site.gen_prefixes, nullptr,
+                     site.attrs},
+        ctx, build);
   }
 };
 
@@ -226,8 +231,12 @@ void AttachClockingBlocks(const RtlirDesign* design,
                              : VpiGenScopeOf(instance, gen->gen_block_path);
           if (item == nullptr || holder == nullptr) continue;
           const ClockingSite kSite{
-              holder, instance, prefix, objects,
-              gen == nullptr ? kNoGenPrefixes : gen->gen_block_prefixes};
+              holder,
+              instance,
+              prefix,
+              objects,
+              gen == nullptr ? kNoGenPrefixes : gen->gen_block_prefixes,
+              &mod->node_attrs};
           VpiObject* block =
               MakeClockingBlock(*item, ClockingBuild{kSite, ctx, build});
           // §37.83: the attributes the block is written with.

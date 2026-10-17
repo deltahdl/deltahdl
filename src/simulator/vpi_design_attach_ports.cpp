@@ -44,17 +44,17 @@ VpiObject* PortNamed(VpiHandle module, std::string_view name) {
   return nullptr;
 }
 
-// §37.14 details 3, 4 and 10: the ports of the instance `inst` of the module
-// at `prefix` connected - each port's higher connection the expression the
-// instantiation wrote for it, its names resolved in the generate blocks and
-// the instance holding the instantiation, and its lower connection the
-// instance's own net or variable of the port's name. A port the instantiation
-// leaves unconnected reaches no higher connection, though the elaborator
-// supplies its default, a pull or 'z in its place.
-void ConnectPorts(const RtlirModuleInst& inst, const std::string& prefix,
-                  const VpiObjectMap& objects, SimContext& ctx,
-                  const VpiAttachBuild& build) {
-  const std::string kInstance = VpiFlatName(prefix, inst.inst_name);
+// §37.14 details 3, 4 and 10: the ports of the instance `inst` connected -
+// each port's higher connection the expression the instantiation wrote for
+// it, its names resolved as `names` says, in the generate blocks and the
+// instance holding the instantiation, and its lower connection the instance's
+// own net or variable of the port's name. A port the instantiation leaves
+// unconnected reaches no higher connection, though the elaborator supplies its
+// default, a pull or 'z in its place.
+void ConnectPorts(const RtlirModuleInst& inst, const VpiExprNames& names,
+                  SimContext& ctx, const VpiAttachBuild& build) {
+  const VpiObjectMap& objects = names.objects;
+  const std::string kInstance = VpiFlatName(names.prefix, inst.inst_name);
   VpiHandle module = FindObjectForFlatName(objects, kInstance);
   if (module == nullptr) return;
   for (const RtlirPortBinding& binding : inst.port_bindings) {
@@ -63,9 +63,7 @@ void ConnectPorts(const RtlirModuleInst& inst, const std::string& prefix,
     port->high_conn =
         binding.unconnected
             ? nullptr
-            : VpiGenBlockExpression(binding.connection,
-                                    {objects, prefix, inst.gen_block_prefixes},
-                                    ctx, build);
+            : VpiGenBlockExpression(binding.connection, names, ctx, build);
   }
   for (VpiObject* port : module->children) {
     if (port->type != kVpiPort || port->low_conn != nullptr ||
@@ -127,7 +125,10 @@ void AttachPortConnections(const RtlirDesign* design,
   WalkInstancePaths(design,
                     [&](const RtlirModule* mod, const std::string& prefix) {
                       for (const RtlirModuleInst& inst : mod->children) {
-                        ConnectPorts(inst, prefix, objects, ctx, build);
+                        ConnectPorts(inst,
+                                     {objects, prefix, inst.gen_block_prefixes,
+                                      nullptr, &mod->node_attrs},
+                                     ctx, build);
                       }
                     });
 }
