@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <functional>
 #include <string_view>
 #include <vector>
@@ -15,28 +16,46 @@ namespace delta {
 class SimContext;
 struct ClassObject;
 struct ClassTypeInfo;
+struct Process;
 
-// The class defn a class obj's typespec reaches, null for none (§37.32), and
-// where the calls the constraints each class of its chain declares write find
-// their callees: where that class is declared (§37.42, §8.13).
+// What a class obj is made with besides its object: the class defn each class
+// of the object's chain stands as, null for none (§37.32), and where the calls
+// a class defn's class's constraints write find their callees: where that
+// class is declared (§37.42, §8.13).
 struct VpiClassObjDefn {
-  VpiObject* defn;
-  std::function<const VpiClassCallSite&(const ClassTypeInfo& cls)> calls;
+  std::function<VpiObject*(const ClassTypeInfo& cls)> defn_of;
+  std::function<const VpiClassCallSite&(const VpiObject* defn)> calls;
 };
 
-// §37.33 details 1, 5 and 6: the class obj standing for the run's class object
-// `obj`, made with `build`: its vpiObjId is the object's handle, it holds a
-// class typespec of the class the object was created with, reaching that
-// class's defn `of.defn` where there is one (§37.32), and a variable per
-// property that class and the classes it extends declare, base first, each
-// holding a copy of the value the object holds; and a constraint per
-// constraint block they declare (§37.34), whose names resolve among the
-// object's variables and then among `objects`, and a call in which stands in
-// the class obj, its callee found where `of.calls` says of the class
-// declaring the constraint (§37.42).
+// §37.33 details 1, 5, 6 and 8: the class obj standing for the run's class
+// object `obj`, made with `build`: its vpiObjId is the object's handle, it
+// holds a class typespec of the class the object was created with, reaching
+// that class's defn where there is one (§37.32); a parameter per parameter
+// that class declares, holding the value its class typespec gives it; a
+// variable per property that class and the classes it extends declare, base
+// first, each holding a copy of the value the object holds; the methods they
+// declare; and a constraint per constraint block they declare (§37.34), whose
+// names resolve among the object's variables and then among `objects`, and a
+// call in which stands in the class obj, its callee found where `of.calls`
+// says of the class declaring the constraint (§37.42).
 VpiObject* VpiMakeClassObject(ClassObject& obj, const VpiClassObjDefn& of,
                               const VpiObjectMap& objects, SimContext& ctx,
                               const VpiAttachBuild& build);
+
+// §15.3 and §15.4 with §37.33: the class obj standing for the semaphore or
+// mailbox whose handle is `handle`: an object of the built-in class `cls`
+// names, a class typespec of which it holds, reaching no class defn (§37.32).
+VpiObject* VpiMakeSyncClassObject(uint64_t handle, std::string_view cls,
+                                  const VpiAttachBuild& build);
+
+// §37.33 details 3 and 4: bring the class obj `obj` up to date where it stands
+// for a semaphore or mailbox the run `ctx` holds - a constant per message a
+// mailbox holds, in queue order, each made by `alloc`, and the thread
+// `thread_of` gives for each process parked on either - after its class
+// typespec; nothing for any other class obj.
+void VpiRefreshSyncClassObject(
+    VpiObject& obj, SimContext& ctx, const std::function<VpiObject*()>& alloc,
+    const std::function<VpiObject*(Process*)>& thread_of);
 
 // The storage of the value the property `name` of `obj` holds now: a ref
 // cell's where one stands (§13.5.2), the object's own, or the class's where

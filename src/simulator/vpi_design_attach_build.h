@@ -315,6 +315,14 @@ VpiClassDefnObjects AttachClassDefinitions(const RtlirDesign* design,
                                            const VpiAttachBuild& build,
                                            VpiClassCallSites& sites);
 
+// §37.33 detail 5: give each class var an instance declares the class typespec
+// of the class it was declared with, reaching that class's defn among `defns`
+// where one was made.
+void AttachClassVarTypespecs(const RtlirDesign* design,
+                             const VpiObjectMap& objects,
+                             const VpiClassDefnObjects& defns,
+                             const VpiAttachBuild& build);
+
 // §37.17 details 4 and 6, §37.22: give each variable of the design its range
 // objects and its leftmost bounds.
 void AttachVariableRanges(const RtlirDesign& design,

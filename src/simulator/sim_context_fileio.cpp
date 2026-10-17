@@ -482,6 +482,8 @@ SemaphoreObject* SimContext::CreateSemaphore(std::string_view name,
                                              int32_t keys) {
   auto* sem = arena_.Create<SemaphoreObject>(keys);
   semaphores_[name] = sem;
+  // §37.33: a class var's handle names the object by its identity.
+  RecordContainedSemaphore(sem);
   return sem;
 }
 
@@ -527,6 +529,8 @@ MailboxObject** SimContext::MailboxSlot(std::string_view name) {
 MailboxObject* SimContext::CreateMailbox(std::string_view name, int32_t bound) {
   auto* mb = arena_.Create<MailboxObject>(bound);
   mailboxes_[name] = mb;
+  // §37.33: a class var's handle names the object by its identity.
+  RecordContainedMailbox(mb);
   return mb;
 }
 

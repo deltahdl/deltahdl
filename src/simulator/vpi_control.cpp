@@ -630,8 +630,12 @@ void VpiContext::ReleaseClassObject(VpiHandle class_object) {
   DispatchCallbacks(cbEndOfObject, class_object);
 
   ReleaseHandleWithCallbacks(class_object);
+  // §37.33 detail 6: a method the class obj reaches is its class defn's, no
+  // data member of the object, and lives on with the class.
   for (VpiObject* member : class_object->children) {
-    if (member->automatic) ReleaseHandleSubtree(member);
+    if (member->automatic && !VpiIsClassMethodType(member->type)) {
+      ReleaseHandleSubtree(member);
+    }
   }
 }
 

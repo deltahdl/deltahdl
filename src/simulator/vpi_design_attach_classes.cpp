@@ -307,6 +307,34 @@ void MakeConstraints(const MadeClassDefn& owner, const VpiObjectMap& objects,
   }
 }
 
+// §37.33 detail 5: the class defn the class type `written` names from the
+// instance keyed under `prefix`: the package's class where it names its
+// package, and otherwise one the instance's module declares, then the
+// compilation unit's, then a package's an import brought in. Null where none
+// does, as for a built-in class (§37.32).
+VpiObject* NamedClassDefn(const VpiClassDefnObjects& defns,
+                          std::string_view written, const std::string& prefix) {
+  const ClassReference kRef = SplitClassReference(written);
+  constexpr int kNone = 3;
+  VpiObject* best = nullptr;
+  int best_rank = kNone;
+  for (const auto& [key, defn] : defns) {
+    if (key.first->name != kRef.name) continue;
+    int rank = 2;
+    if (!kRef.package.empty()) {
+      rank = key.second == kRef.package ? 0 : kNone;
+    } else if (key.second == prefix) {
+      rank = 0;
+    } else if (key.second == "$unit") {
+      rank = 1;
+    }
+    if (rank < best_rank) {
+      best = defn;
+      best_rank = rank;
+    }
+  }
+  return best;
+}
 }  // namespace
 
 std::string VpiScopedFullName(const VpiObject* scope, std::string_view name) {
@@ -350,6 +378,33 @@ VpiClassDefnObjects AttachClassDefinitions(const RtlirDesign* design,
     sites[owner.defn] = {owner.mod, owner.package};
   }
   return defns;
+}
+
+void AttachClassVarTypespecs(const RtlirDesign* design,
+                             const VpiObjectMap& objects,
+                             const VpiClassDefnObjects& defns,
+                             const VpiAttachBuild& build) {
+  // §37.33 detail 5: a class var reaches the class typespec it was declared
+  // with, whatever class the object it references was created as. None was
+  // made, so vpiClassTypespec of a class var was null.
+  WalkInstancePaths(
+      design, [&](const RtlirModule* mod, const std::string& prefix) {
+        for (const RtlirVariable& var : VpiDeclaredVariables(*mod)) {
+          VpiObject* obj =
+              FindObjectForFlatName(objects, VpiFlatName(prefix, var.name));
+          if (obj == nullptr || obj->type != vpiClassVar) continue;
+          VpiObject* typespec = build.alloc();
+          typespec->type = vpiClassTypespec;
+          typespec->name = build.keep(
+              std::string(SplitClassReference(var.class_type_name).name));
+          typespec->parent = obj;
+          if (VpiObject* defn =
+                  NamedClassDefn(defns, var.class_type_name, prefix)) {
+            typespec->children.push_back(defn);
+          }
+          obj->children.push_back(typespec);
+        }
+      });
 }
 
 }  // namespace delta

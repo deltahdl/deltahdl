@@ -592,5 +592,145 @@ TEST_F(ClassObjectsOfARun, ANameThroughANullClassVariableReachesNothing) {
   ASSERT_NE(vpi_handle_by_name(VpiText("top.c"), nullptr), nullptr);
   EXPECT_EQ(vpi_handle_by_name(VpiText("top.c.x"), nullptr), nullptr);
 }
+// Detail 6: a class obj reaches the methods its class declares and those it
+// inherits, static and automatic alike, an overridden one through its
+// override, each the method object of the class defn declaring it (#7130).
+TEST_F(ClassObjectsOfARun, AClassObjReachesItsClasssMethods) {
+  Run("module top;\n"
+      "  class A; function int f(); return 1; endfunction\n"
+      "    task t(); endtask\n"
+      "  endclass\n"
+      "  class C extends A; function int f(); return 2; endfunction\n"
+      "    static function int g(); return 3; endfunction\n"
+      "  endclass\n"
+      "  C c = new;\n"
+      "endmodule\n");
+  vpiHandle obj = vpi_handle(vpiClassObj, By("top.c"));
+  ASSERT_NE(obj, nullptr);
+  EXPECT_EQ(NamesOf(vpiMethods, obj),
+            (std::vector<std::string>{"f", "g", "t"}));
+  EXPECT_EQ(
+      VpiObjectOf(Named(vpiMethods, obj, "f")),
+      VpiObjectOf(Named(vpiMethods, Named(vpiClassDefn, By("top"), "C"), "f")));
+  EXPECT_EQ(
+      VpiObjectOf(Named(vpiMethods, obj, "t")),
+      VpiObjectOf(Named(vpiMethods, Named(vpiClassDefn, By("top"), "A"), "t")));
+}
+
+// Detail 8: a class obj's parameters are those its class declares in its
+// parameter port list and within its body, the latter local, each with the
+// value the class typespec it was created with gives it; a type parameter is
+// one too (#7123).
+TEST_F(ClassObjectsOfARun, AClassObjReachesItsClasssParameters) {
+  Run("module top;\n"
+      "  class P #(int N = 2, type T = int);\n"
+      "    localparam int W = 4;\n"
+      "    T v;\n"
+      "  endclass\n"
+      "  P #(5) p = new;\n"
+      "endmodule\n");
+  vpiHandle obj = vpi_handle(vpiClassObj, By("top.p"));
+  ASSERT_NE(obj, nullptr);
+  EXPECT_EQ(NamesOf(vpiParameter, obj), (std::vector<std::string>{"N", "W"}));
+  vpiHandle n = Named(vpiParameter, obj, "N");
+  vpiHandle w = Named(vpiParameter, obj, "W");
+  ASSERT_NE(n, nullptr);
+  ASSERT_NE(w, nullptr);
+  EXPECT_EQ(IntValueOf(n), 5);
+  EXPECT_EQ(vpi_get(vpiLocalParam, n), 0);
+  EXPECT_EQ(IntValueOf(w), 4);
+  EXPECT_EQ(vpi_get(vpiLocalParam, w), 1);
+  EXPECT_NE(Named(vpiTypeParameter, obj, "T"), nullptr);
+}
+
+// Detail 5: a class var reaches the class typespec it was declared with,
+// whatever its object was created as: a class the module declares, one a
+// package declares named through it, the compilation unit's, and one a named
+// import brings in, each reaching its class defn (#7129).
+TEST_F(ClassObjectsOfARun, AClassVarReachesTheTypespecItWasDeclaredWith) {
+  Run("class U; endclass\n"
+      "package pk; class C; endclass class P; endclass endpackage\n"
+      "module top; import pk::P;\n"
+      "  class C; endclass\n"
+      "  class D extends C; endclass\n"
+      "  D d = new;\n"
+      "  C c;\n"
+      "  pk::C q;\n"
+      "  U u;\n"
+      "  P w;\n"
+      "  initial c = d;\n"
+      "endmodule\n");
+  const auto kDefnOf = [](const char* var) {
+    return vpi_handle(vpiClassDefn, vpi_handle(vpiClassTypespec, By(var)));
+  };
+  vpiHandle typespec = vpi_handle(vpiClassTypespec, By("top.c"));
+  ASSERT_NE(typespec, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, typespec), "C");
+  EXPECT_STREQ(
+      vpi_get_str(vpiName, vpi_handle(vpiClassTypespec,
+                                      vpi_handle(vpiClassObj, By("top.c")))),
+      "D");
+  EXPECT_EQ(VpiObjectOf(kDefnOf("top.c")),
+            VpiObjectOf(Named(vpiClassDefn, By("top"), "C")));
+  EXPECT_EQ(VpiObjectOf(kDefnOf("top.q")),
+            VpiObjectOf(Named(vpiClassDefn, By("pk"), "C")));
+  EXPECT_EQ(VpiObjectOf(kDefnOf("top.u")),
+            VpiObjectOf(Named(vpiClassDefn, nullptr, "U")));
+  EXPECT_EQ(VpiObjectOf(kDefnOf("top.w")),
+            VpiObjectOf(Named(vpiClassDefn, By("pk"), "P")));
+}
+
+// §15.3 and §15.4: a mailbox or semaphore variable reaches the class obj of the
+// object it holds, of the built-in class, reaching no class defn (§37.32)
+// (#7294); detail 4: a mailbox's iterates the messages it holds, in queue
+// order (#7132); and detail 3: a mailbox's or semaphore's iterates the threads
+// waiting on it (#7131).
+TEST_F(ClassObjectsOfARun, AMailboxsClassObjIteratesItsMessagesAndWaiters) {
+  Run("module top; mailbox m = new; mailbox e = new; semaphore s = new(0);\n"
+      "  initial begin m.put(7); m.put(2.5); m.put(\"ab\"); end\n"
+      "  initial begin int x; e.get(x); end\n"
+      "  initial s.get(1);\n"
+      "endmodule\n");
+  vpiHandle m = vpi_handle(vpiClassObj, By("top.m"));
+  ASSERT_NE(m, nullptr);
+  EXPECT_EQ(vpi_handle(vpiClassObj, By("top.m")), m);
+  EXPECT_EQ(vpi_get64(vpiObjId, m), vpi_get64(vpiObjId, By("top.m")));
+  vpiHandle typespec = vpi_handle(vpiClassTypespec, m);
+  ASSERT_NE(typespec, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, typespec), "mailbox");
+  EXPECT_EQ(vpi_handle(vpiClassDefn, typespec), nullptr);
+  const std::vector<vpiHandle> kMessages = ObjectsOf(vpiMessages, m);
+  ASSERT_EQ(kMessages.size(), 3U);
+  EXPECT_EQ(IntValueOf(kMessages[0]), 7);
+  EXPECT_EQ(vpi_get(vpiConstType, kMessages[0]), vpiBinaryConst);
+  EXPECT_EQ(vpi_get(vpiConstType, kMessages[1]), vpiRealConst);
+  EXPECT_EQ(vpi_get(vpiConstType, kMessages[2]), vpiStringConst);
+  EXPECT_TRUE(ObjectsOf(vpiWaitingProcesses, m).empty());
+  for (const char* waited : {"top.e", "top.s"}) {
+    vpiHandle obj = vpi_handle(vpiClassObj, By(waited));
+    ASSERT_NE(obj, nullptr) << waited;
+    const std::vector<vpiHandle> kWaiting = ObjectsOf(vpiWaitingProcesses, obj);
+    ASSERT_EQ(kWaiting.size(), 1U) << waited;
+    EXPECT_EQ(vpi_get(vpiType, kWaiting[0]), vpiThread) << waited;
+  }
+  EXPECT_STREQ(
+      vpi_get_str(vpiName, vpi_handle(vpiClassTypespec,
+                                      vpi_handle(vpiClassObj, By("top.s")))),
+      "semaphore");
+}
+
+// Detail 7: a class obj's vpiVirtualInterfaceVar iteration returns each
+// element of an array of virtual interfaces separately (#7133).
+TEST_F(ClassObjectsOfARun, AClassObjsVirtualInterfaceArrayIsIteratedByElement) {
+  Run("interface ifc; endinterface\n"
+      "module top; ifc i0 ();\n"
+      "  class C; virtual ifc vs [2]; virtual ifc v; int n; endclass\n"
+      "  C c = new;\n"
+      "endmodule\n");
+  vpiHandle obj = vpi_handle(vpiClassObj, By("top.c"));
+  ASSERT_NE(obj, nullptr);
+  EXPECT_EQ(NamesOf(vpiVirtualInterfaceVar, obj),
+            (std::vector<std::string>{"v", "vs[0]", "vs[1]"}));
+}
 }  // namespace
 }  // namespace delta

@@ -121,6 +121,9 @@ struct Process {
   uint32_t id = 0;
   bool active = true;
   bool is_reactive = false;
+  // §37.33 detail 3: the semaphore or mailbox the process is parked on, which
+  // vpiWaitingProcesses reports it waiting on; null while it waits on none.
+  const void* waiting_on_sync = nullptr;
 
   uint32_t program_block_id = 0;
 

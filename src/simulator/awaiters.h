@@ -769,11 +769,16 @@ struct ProcessAwaitAwaiter {
 // (CycleDelayAwaiter::ResumeIn), and the waking process is restored for the
 // rest of its statement. Resumed in the waker's, a class task's `s.get();`
 // went on to read `this.id` of no object. Without a context, as a test drives
-// an awaiter, the handle is resumed as it stands.
+// an awaiter, the handle is resumed as it stands. §37.33 detail 3: the waiting
+// process records `object`, what it waits on, until it is resumed.
 inline std::function<void()> SyncWaiterResume(std::coroutine_handle<> h,
-                                              SimContext* ctx) {
+                                              SimContext* ctx,
+                                              const void* object) {
   if (ctx == nullptr) return h;
-  return [h, proc = ctx->CurrentProcess(), ctx] {
+  Process* proc = ctx->CurrentProcess();
+  if (proc != nullptr) proc->waiting_on_sync = object;
+  return [h, proc, ctx] {
+    if (proc != nullptr) proc->waiting_on_sync = nullptr;
     Process* waker = ctx->CurrentProcess();
     CycleDelayAwaiter::ResumeIn(h, proc, *ctx);
     ctx->SetCurrentProcess(waker);
@@ -791,7 +796,7 @@ struct SemaphoreGetAwaiter {
   }
 
   void await_suspend(std::coroutine_handle<> h) {
-    sem.waiters.emplace_back(count, SyncWaiterResume(h, ctx));
+    sem.waiters.emplace_back(count, SyncWaiterResume(h, ctx, &sem));
   }
 
   void await_resume() const noexcept {}
@@ -821,7 +826,7 @@ struct MailboxPutAwaiter {
   }
 
   void await_suspend(std::coroutine_handle<> h) {
-    mbx.put_waiters.push_back(SyncWaiterResume(h, ctx));
+    mbx.put_waiters.push_back(SyncWaiterResume(h, ctx, &mbx));
   }
 
   // await_resume runs on both the ready and the resumed paths. The message is
@@ -855,7 +860,7 @@ struct MailboxGetAwaiter {
   }
 
   void await_suspend(std::coroutine_handle<> h) {
-    mbx.get_waiters.push_back(SyncWaiterResume(h, ctx));
+    mbx.get_waiters.push_back(SyncWaiterResume(h, ctx, &mbx));
   }
 
   MbxGetStatus await_resume() {
@@ -884,7 +889,7 @@ struct MailboxPeekAwaiter {
   }
 
   void await_suspend(std::coroutine_handle<> h) {
-    mbx.peek_waiters.push_back(SyncWaiterResume(h, ctx));
+    mbx.peek_waiters.push_back(SyncWaiterResume(h, ctx, &mbx));
   }
 
   MbxPeekStatus await_resume() {

@@ -7,6 +7,7 @@
 // §37.10 detail 3: the package/interface/program instance kinds are defined in
 // the SystemVerilog VPI header alongside the §37.10 vpiInstance relation.
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_class_objects.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_constraint_relations.h"
 #include "simulator/vpi_context.h"
@@ -797,6 +798,13 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref, int compatibility_mode) {
   // §37.44: a thread that started since the last iteration is one of the run's
   // threads too, so the objects are brought up to date before this one answers.
   RefreshRunObjects();
+  // §37.33 details 3 and 4: so are a mailbox's messages and the processes
+  // waiting on a mailbox or a semaphore.
+  if (ref != nullptr && ref->type == vpiClassObj && sim_ctx_ != nullptr) {
+    VpiRefreshSyncClassObject(
+        *ref, *sim_ctx_, [this] { return AllocObject(); },
+        [this](auto* proc) { return ThreadObjectFor(proc); });
+  }
 
   // Classify this (type, ref) iteration into its special modes. The detailed
   // §37.x reasoning for each mode lives in ComputeVpiIterateModes; collecting

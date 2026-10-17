@@ -165,7 +165,8 @@ TEST_F(VpiHandleReleaseSim, EndingAThreadLeavesTheThreadsItSpawnedLive) {
 // shall release the handle to the class object, to any automatic data member,
 // and to any subelement of those automatic members, plus callbacks placed on
 // them. Static data members persist (NOTE 3) and their handles are not
-// released.
+// released, and nor is a method the object reaches, which is its class defn's
+// (§37.33 detail 6) and no data member.
 TEST_F(VpiHandleReleaseSim, ReclaimingClassObjectReleasesAutomaticNotStatic) {
   auto* class_obj = vpi_ctx_.CreateModule("obj", "obj");
 
@@ -177,8 +178,13 @@ TEST_F(VpiHandleReleaseSim, ReclaimingClassObjectReleasesAutomaticNotStatic) {
   auto* static_member = vpi_ctx_.CreateModule("obj.st", "obj.st");
   static_member->automatic = false;
 
+  auto* method = vpi_ctx_.CreateModule("C::f", "C::f");
+  method->type = vpiFunction;
+  method->automatic = true;
+
   class_obj->children.push_back(automatic_member);
   class_obj->children.push_back(static_member);
+  class_obj->children.push_back(method);
 
   s_cb_data cb_data{};
   cb_data.reason = cbStmt;  // a callback placed on the automatic member
@@ -193,6 +199,7 @@ TEST_F(VpiHandleReleaseSim, ReclaimingClassObjectReleasesAutomaticNotStatic) {
   EXPECT_TRUE(vpi_ctx_.HandleReleased(cb));
   // A static data member is not reclaimed with the class object.
   EXPECT_FALSE(vpi_ctx_.HandleReleased(static_member));
+  EXPECT_FALSE(vpi_ctx_.HandleReleased(method));
 }
 
 // §37.2.2 (list item a): some VPI calls release a handle as part of what they

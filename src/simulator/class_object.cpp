@@ -400,9 +400,8 @@ ClassTypespecInfo VpiClassTypespecOf(const ClassTypeInfo* type) {
   ts.name = type->name;
   ts.kind = ClassTypespecKind::kSpecialization;
   ts.class_defn = type;
-  for (const auto& [pname, pexpr] : type->decl->params) {
-    ts.params.push_back(
-        {pname, type->decl->localparam_port_names.count(pname) != 0});
+  const auto kAdd = [&ts, type](std::string_view pname, bool local) {
+    ts.params.push_back({pname, local});
     ClassTypespecParamAssign pa;
     pa.name = pname;
     auto held = type->static_properties.find(std::string(pname));
@@ -411,6 +410,16 @@ ClassTypespecInfo VpiClassTypespecOf(const ClassTypeInfo* type) {
       pa.bound_value = held->second;
     }
     ts.param_assigns.push_back(pa);
+  };
+  for (const auto& [pname, pexpr] : type->decl->params) {
+    kAdd(pname, type->decl->localparam_port_names.count(pname) != 0);
+  }
+  // §37.33 detail 8 with §8.25: a parameter declared within the class body is
+  // one of the class's parameters too, and a local one.
+  for (const ClassMember* member : type->decl->members) {
+    if (member->kind == ClassMemberKind::kProperty && member->is_param) {
+      kAdd(member->name, true);
+    }
   }
   return ts;
 }

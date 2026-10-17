@@ -258,6 +258,7 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
     for (const auto& [key, defn] : call_objects_.classes) {
       run_objects_.try_emplace(key.first, defn);
     }
+    AttachClassVarTypespecs(design, object_map_, call_objects_.classes, kBuild);
     call_objects_.subroutines =
         AttachSubroutines(*design, object_map_, *sim_ctx_, kBuild);
     AttachVariableRanges(*design, object_map_, *sim_ctx_, kBuild);
