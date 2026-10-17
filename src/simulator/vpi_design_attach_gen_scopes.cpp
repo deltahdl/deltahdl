@@ -51,6 +51,17 @@ void MakeGenVar(VpiObject* array, std::string_view genvar,
   array->children.push_back(var);
 }
 
+// §27.4 with §37.28: the implicit localparam the iteration of a loop generate
+// whose gen scope is `block` declares under the name of its genvar `genvar`,
+// a local parameter. The run keys it as a variable of the block, and the
+// object that key made for it was a reg. A block with no name has none.
+void MakeGenvarParameter(VpiObject* block, std::string_view genvar) {
+  VpiObject* param = ChildNamed(block, genvar);
+  if (param == nullptr) return;
+  param->type = vpiParameter;
+  param->local_param = true;
+}
+
 // §37.85: `block`, a gen scope of an iteration of a loop generate, as an
 // element of the gen scope array `array`, reached by its index - the value
 // of the loop's genvar in the iteration, which vpiIndex reaches as a constant
@@ -84,8 +95,9 @@ VpiObject* BlockNamed(VpiObject* scope, const std::string& name,
 // §37.85: the generate block instances the path `path` names below
 // `instance`, outermost first, each made the gen scope it is, named by its
 // external name (§27.6), and each iteration of a loop generate an element of
-// its gen scope array, which reaches the loop's gen var. Detail 2: an unnamed
-// block's is an implicit scope.
+// its gen scope array, which reaches the loop's gen var, holding the genvar's
+// value as a local parameter. Detail 2: an unnamed block's is an implicit
+// scope.
 void MakeGenScopes(VpiObject* instance, const HierPath& path,
                    const VpiAttachBuild& build) {
   VpiObject* scope = instance;
@@ -99,6 +111,7 @@ void MakeGenScopes(VpiObject* instance, const HierPath& path,
       VpiObject* array = GenScopeArrayOf(scope, step.external_name, build);
       MakeArrayElement(block, array, step.index, build);
       MakeGenVar(array, step.genvar, build);
+      MakeGenvarParameter(block, step.genvar);
     }
     scope = block;
   }

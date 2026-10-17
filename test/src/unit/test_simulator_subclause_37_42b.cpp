@@ -54,13 +54,14 @@ TEST(TaskFuncCallModel, OnlyASystemCallReachesAUserSystf) {
   EXPECT_EQ(out, nullptr);
 }
 
-// A design whose top's one continuous assignment calls a function, run with a
-// PLI application registered.
+// A design whose one continuous assignment calls a function, run with a PLI
+// application registered.
 class CallsInAnAssignment : public VpiDesignRun {
  protected:
-  // The function the call on the right of the assignment reaches.
-  static vpiHandle CalledFunction() {
-    vpiHandle it = vpi_iterate(vpiContAssign, By("top"));
+  // The function the call on the right of the assignment `scope` holds, the
+  // top or the gen scope of the generate block writing it (§37.85), reaches.
+  static vpiHandle CalledFunction(const char* scope = "top") {
+    vpiHandle it = vpi_iterate(vpiContAssign, By(scope));
     if (it == nullptr) return nullptr;
     return vpi_handle(vpiFunction, vpi_handle(vpiRhs, vpi_scan(it)));
   }
@@ -85,7 +86,7 @@ TEST_F(CallsInAnAssignment, ACallReachesItsNameAmongTheBlocksFunctions) {
       "  wire [31:0] w; assign w = b(); end endmodule\n");
   vpiHandle b = Named(vpiTaskFunc, By("top.g"), "b");
   ASSERT_NE(b, nullptr);
-  EXPECT_EQ(VpiObjectOf(CalledFunction()), VpiObjectOf(b));
+  EXPECT_EQ(VpiObjectOf(CalledFunction("top.g")), VpiObjectOf(b));
 }
 
 // ...and a call in a block nested in it reaches the function of the
@@ -96,7 +97,7 @@ TEST_F(CallsInAnAssignment, ACallReachesTheEnclosingBlocksFunction) {
       "  if (1) begin : h wire [31:0] w; assign w = f(); end end endmodule\n");
   vpiHandle f = Named(vpiTaskFunc, By("top.g"), "f");
   ASSERT_NE(f, nullptr);
-  EXPECT_EQ(VpiObjectOf(CalledFunction()), VpiObjectOf(f));
+  EXPECT_EQ(VpiObjectOf(CalledFunction("top.g.h")), VpiObjectOf(f));
 }
 
 // §23.9: a call in the second of two sibling blocks that each declare a
@@ -108,7 +109,7 @@ TEST_F(CallsInAnAssignment, ACallReachesItsOwnBlocksFunctionOverASiblings) {
       "  wire [31:0] w; assign w = f(); end endmodule\n");
   vpiHandle f = Named(vpiTaskFunc, By("top.b"), "f");
   ASSERT_NE(f, nullptr);
-  EXPECT_EQ(VpiObjectOf(CalledFunction()), VpiObjectOf(f));
+  EXPECT_EQ(VpiObjectOf(CalledFunction("top.b")), VpiObjectOf(f));
 }
 
 // §37.85 detail 2: a call in an unnamed block reaches the function of the
@@ -119,7 +120,7 @@ TEST_F(CallsInAnAssignment, ACallInAnUnnamedBlockReachesItsFunction) {
       "  wire [31:0] w; assign w = f(); end endmodule\n");
   vpiHandle f = Named(vpiTaskFunc, By("top.genblk1"), "f");
   ASSERT_NE(f, nullptr);
-  EXPECT_EQ(VpiObjectOf(CalledFunction()), VpiObjectOf(f));
+  EXPECT_EQ(VpiObjectOf(CalledFunction("top.genblk1")), VpiObjectOf(f));
 }
 
 // §23.9: a call the module writes outside every block reaches the module's

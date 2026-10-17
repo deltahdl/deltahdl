@@ -253,13 +253,13 @@ void Elaborator::ElaborateGenerateBlockItem(ModuleItem* item,
   }
   StampGenBlockInstance(mod->processes, first_proc, gen_loop_consts_,
                         gen_prefix_scopes_);
-  // §21.2.1.5: the block instances are levels of the name a process
-  // reports, so the path is stamped on the processes alone.
-  for (size_t i = first_proc; i < mod->processes.size(); ++i) {
-    mod->processes[i].gen_block_path = gen_block_path_;
-  }
-  // §37.49 and §37.12: an assertion the block writes, and a property it
-  // declares, is an object of this instance.
+  // §21.2.1.5: a process reports the block instances as levels of its name;
+  // §37.85, §37.49 and §37.12: an assignment and an assertion the block
+  // writes, and a property it declares, are objects of this instance.
+  StampGenBlockScope(mod->processes, first_proc, gen_block_path_,
+                     gen_prefix_scopes_);
+  StampGenBlockScope(mod->assigns, first_assign, gen_block_path_,
+                     gen_prefix_scopes_);
   StampGenBlockScope(mod->assertions, first_assertion, gen_block_path_,
                      gen_prefix_scopes_);
   StampGenBlockScope(mod->declared_properties, first_property, gen_block_path_,

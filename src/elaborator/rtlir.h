@@ -405,6 +405,7 @@ struct RtlirContAssign {
   std::vector<ResolvedAttribute> attrs;
   GenBlockConsts gen_block_consts;
   GenBlockPrefixes gen_block_prefixes;
+  HierPath gen_block_path;  // §37.85: the gen scope it stands in.
 };
 
 struct RtlirAlias {

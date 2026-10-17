@@ -924,7 +924,10 @@ void VpiContext::AttachContinuousAssignments(
                 name_pool_.push_back(std::move(name));
                 return std::string_view(name_pool_.back());
               }};
-          MakeContinuousAssignment(ca, scope, build);
+          // §37.85: an assignment a generate block writes is one of its
+          // block instance's gen scope.
+          MakeContinuousAssignment(ca, VpiGenScopeOf(scope, ca.gen_block_path),
+                                   build);
         }
       });
 }

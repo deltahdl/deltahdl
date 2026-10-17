@@ -361,10 +361,11 @@ TEST_F(TaskFuncCall, DecompileReportedForSystemCalls) {
 // PLI application registered.
 class CallsOfARun : public VpiDesignRun {
  protected:
-  // The right side of the top's continuous assignment.
-  static vpiHandle CallOnTheRight() {
+  // The right side of the continuous assignment `scope` holds, the top or the
+  // gen scope of the generate block writing it (§37.85).
+  static vpiHandle CallOnTheRight(const char* scope = "top") {
     vpiHandle it =
-        vpi_iterate(vpiContAssign, vpi_handle_by_name(VpiText("top"), nullptr));
+        vpi_iterate(vpiContAssign, vpi_handle_by_name(VpiText(scope), nullptr));
     if (it == nullptr) return nullptr;
     return vpi_handle(vpiRhs, vpi_scan(it));
   }
@@ -420,7 +421,7 @@ TEST_F(CallsOfARun, AGenerateBlockAssignmentReachesItsBlocksFunction) {
       "endmodule\n");
   vpiHandle f = Named(vpiTaskFunc, By("top.g"), "f");
   ASSERT_NE(f, nullptr);
-  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiFunction, CallOnTheRight())),
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiFunction, CallOnTheRight("top.g"))),
             VpiObjectOf(f));
 }
 

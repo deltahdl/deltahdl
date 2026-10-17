@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
-#include <algorithm>
+#include <string>
+#include <utility>
 #include <vector>
 
 #include "fixture_vpi_run.h"
@@ -31,11 +32,11 @@ namespace {
 // Every other relation in the diagram (vpiInstance, vpiInternalScope,
 // vpiMemory, vpiParameter, vpiTypedef, vpiNetTypedef and the names) is served
 // by generic scope, instance, typedef, and property machinery owned by §37.10,
-// §37.12, §37.23, and §37.25, so it is not re-tested here; the gen var, and the
-// gen scope's vpiProtected and deprecated vpiArray, are tested on a run below.
-// Details 5 and 6 (the
-// vpiTypedef/vpiNetTypedef iterations) restate the instance rule already
-// implemented for §37.10, so they add no production for this clause.
+// §37.12, §37.23, and §37.25, so it is not re-tested here; the gen var, the
+// gen scope's vpiProtected and deprecated vpiArray, and its cont assigns, are
+// tested on a run below. Details 5 and 6 (the vpiTypedef/vpiNetTypedef
+// iterations) restate the instance rule already implemented for §37.10, so
+// they add no production for this clause.
 //
 // Details 3 and 4 - a reference to a gen var inside the gen scope, and a
 // parameter inside it, each count as a local parameter - were read as
@@ -409,12 +410,11 @@ TEST_F(GeneratesOfARun, AGenVarReferenceIsALocalParameter) {
       "  end\n"
       "endmodule\n");
   std::vector<int> values;
-  vpiHandle it = vpi_iterate(vpiContAssign, By("top"));
-  ASSERT_NE(it, nullptr);
-  for (vpiHandle assign = vpi_scan(it); assign != nullptr;
-       assign = vpi_scan(it)) {
+  for (const char* scope : {"top.g[0]", "top.g[1]"}) {
+    vpiHandle it = vpi_iterate(vpiContAssign, By(scope));
+    ASSERT_NE(it, nullptr);
     const std::vector<vpiHandle> kOperands =
-        OperandsOf(vpi_handle(vpiRhs, assign));
+        OperandsOf(vpi_handle(vpiRhs, vpi_scan(it)));
     ASSERT_EQ(kOperands.size(), 2u);
     vpiHandle ref = kOperands[0];
     EXPECT_EQ(vpi_get(vpiType, ref), vpiParameter);
@@ -425,8 +425,51 @@ TEST_F(GeneratesOfARun, AGenVarReferenceIsALocalParameter) {
     vpi_get_value(ref, &value);
     values.push_back(value.value.integer);
   }
-  std::ranges::sort(values);
   EXPECT_EQ(values, (std::vector<int>{0, 1}));
+}
+
+// The gen scope's cont assign: a continuous assignment a generate block
+// writes is one of the gen scope of the block instance it stands in, the
+// innermost where blocks nest, and none of the module's or of an enclosing
+// block's.
+TEST_F(GeneratesOfARun, AGenerateBlocksAssignmentIsOneOfItsGenScope) {
+  Run("module top;\n"
+      "  wire a;\n"
+      "  assign a = 1;\n"
+      "  for (genvar i = 0; i < 2; i++) begin : g\n"
+      "    wire w;\n"
+      "    if (1) begin : h wire x; assign x = i; end\n"
+      "    assign w = i;\n"
+      "  end\n"
+      "endmodule\n");
+  const std::vector<std::pair<const char*, const char*>> kAssigned = {
+      {"top", "a"}, {"top.g[0]", "w"}, {"top.g[1]", "w"}, {"top.g[1].h", "x"}};
+  for (const auto& [scope, target] : kAssigned) {
+    EXPECT_EQ(KindsOf(vpiContAssign, By(scope)),
+              std::vector<int>{vpiContAssign});
+    vpiHandle it = vpi_iterate(vpiContAssign, By(scope));
+    ASSERT_NE(it, nullptr);
+    EXPECT_STREQ(vpi_get_str(vpiName, vpi_handle(vpiLhs, vpi_scan(it))),
+                 target);
+  }
+}
+
+// §27.4 with §37.28: the implicit localparam an iteration of a loop declares
+// in its block instance under the genvar's name is a local parameter of the
+// gen scope, holding the genvar's value in that iteration, and none of the
+// scope's variables.
+TEST_F(GeneratesOfARun, AnIterationsGenvarLocalparamIsAParameterOfItsScope) {
+  Run(kGenerates);
+  vpiHandle i = Named(vpiParameter, By("top.g[2]"), "i");
+  ASSERT_NE(i, nullptr);
+  EXPECT_EQ(vpi_get(vpiLocalParam, i), 1);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, i), "top.g[2].i");
+  s_vpi_value value = {};
+  value.format = vpiIntVal;
+  vpi_get_value(i, &value);
+  EXPECT_EQ(value.value.integer, 2);
+  EXPECT_EQ(NamesOf(vpiVariables, By("top.g[2]")),
+            std::vector<std::string>{"v"});
 }
 
 }  // namespace

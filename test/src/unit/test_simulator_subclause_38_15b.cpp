@@ -150,7 +150,7 @@ TEST_F(ExpressionValuesOfARun, AGenvarIndexedSelectNamesItsBlocksElement) {
       "    wire [7:0] y; assign y = m[g];\n"
       "  end\n"
       "endmodule\n");
-  vpiHandle select = RhsIn("top");
+  vpiHandle select = RhsIn("top.gb[2]");
   ASSERT_NE(select, nullptr);
   EXPECT_EQ(IntOf(select), 0x33);
 }
