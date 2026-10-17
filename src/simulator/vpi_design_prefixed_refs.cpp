@@ -13,22 +13,31 @@ bool VpiIsDynamicPrefixHolderType(int type) {
          type == vpiClockingBlock;
 }
 
-VpiObject* VpiClockingBlockAround(const VpiObject* scope,
-                                  const VpiObjectMap& objects,
-                                  const std::string& instance,
-                                  std::string_view name) {
-  // §14.3: a clocking block is a scope of the instance rather than a name in
-  // it, found from the blocks around the expression out to the instance.
-  if (scope == nullptr) {
-    const auto kAt = objects.find(instance);
-    if (kAt != objects.end()) scope = kAt->second;
-  }
-  for (const VpiObject* at = scope; at != nullptr; at = at->parent) {
+namespace {
+
+// The clocking block named `name` that `from`, or a scope around it, declares.
+VpiObject* ClockingBlockOutFrom(const VpiObject* from, std::string_view name) {
+  for (const VpiObject* at = from; at != nullptr; at = at->parent) {
     for (VpiObject* child : at->children) {
       if (child->type == vpiClockingBlock && child->name == name) return child;
     }
   }
   return nullptr;
+}
+
+}  // namespace
+
+VpiObject* VpiClockingBlockAround(const VpiObject* scope,
+                                  const VpiObjectMap& objects,
+                                  const std::string& instance,
+                                  std::string_view name) {
+  // §14.3: a clocking block is a scope of the instance rather than a name in
+  // it, found from the blocks around the expression out to the instance, and
+  // in the instance itself where those blocks are not yet hung from it.
+  if (VpiObject* block = ClockingBlockOutFrom(scope, name)) return block;
+  const auto kAt = objects.find(instance);
+  return kAt != objects.end() ? ClockingBlockOutFrom(kAt->second, name)
+                              : nullptr;
 }
 
 VpiObject* VpiPrefixedReference(VpiObject* holder, std::string_view written,

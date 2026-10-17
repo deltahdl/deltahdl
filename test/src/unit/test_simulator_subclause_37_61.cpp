@@ -340,11 +340,16 @@ TEST(DynamicPrefixHasActual, AnUnlistedOriginTracksTheCurrentActual) {
 // interface, a class var or a clocking block, and the objects it declares.
 class PrefixingOfARun : public VpiDesignRun {
  protected:
-  // The right side of the assignment the first procedure of `top` runs.
+  // The right side of the assignment the procedure of `top` that runs one
+  // runs.
   static vpiHandle RhsOfFirst() {
     vpiHandle it = vpi_iterate(vpiProcess, By("top"));
     if (it == nullptr) return nullptr;
-    return vpi_handle(vpiRhs, vpi_handle(vpiStmt, vpi_scan(it)));
+    vpiHandle rhs = nullptr;
+    for (vpiHandle proc = vpi_scan(it); proc != nullptr; proc = vpi_scan(it)) {
+      if (rhs == nullptr) rhs = vpi_handle(vpiRhs, vpi_handle(vpiStmt, proc));
+    }
+    return rhs;
   }
 
   // That right side is a ref obj reaching an object of kind `holder` through

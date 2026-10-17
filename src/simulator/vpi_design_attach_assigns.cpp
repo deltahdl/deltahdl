@@ -620,7 +620,9 @@ VpiObject* HierarchicalObject(const Expr* expr, const AssignBuild& build) {
     if (VpiIsDynamicPrefixHolderType(holder->type)) {
       return VpiPrefixedReference(holder, dotted, build.alloc, build.keep);
     }
-    return FindObjectForFlatName(VpiObjectMap{{kFirst, holder}}, dotted);
+    VpiObject* member =
+        FindObjectForFlatName(VpiObjectMap{{kFirst, holder}}, dotted);
+    if (member != nullptr) return member;
   }
   if (VpiObject* block = VpiClockingBlockAround(
           build.names.scope, build.names.objects, build.names.prefix, kFirst)) {
