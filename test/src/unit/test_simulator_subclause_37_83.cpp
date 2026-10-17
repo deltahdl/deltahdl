@@ -487,7 +487,7 @@ TEST_F(AttributesOfARun, AnOperationCarriesItsOperatorsAttributes) {
 }
 
 // An operation written in a primitive's terminal, an instantiation's port
-// connection, a clocking signal's expression, a modport's port expression, an
+// connection, a clocking block's event, a modport's port expression, an
 // extends argument or a constraint carries the attributes its operator is
 // written with.
 TEST_F(AttributesOfARun, AnOperationOutsideAnAssignmentCarriesItsAttributes) {
@@ -495,10 +495,10 @@ TEST_F(AttributesOfARun, AnOperationOutsideAnAssignmentCarriesItsAttributes) {
       "  modport mp(input .p(a & (* t4 *) b));\n"
       "endinterface\n"
       "module sub(input logic [7:0] i); endmodule\n"
-      "module top; wire y, a, b, c, clk; logic [7:0] x, z;\n"
+      "module top; wire y, a, b, c, clk, en; logic [7:0] x, z;\n"
       "  and g (y, a & (* t1 *) b, c);\n"
       "  sub u(.i(x | (* t2 *) z));\n"
-      "  clocking cb @(posedge clk); input w = a ^ (* t3 *) b; endclocking\n"
+      "  clocking cb @(posedge (clk & (* t3 *) en)); endclocking\n"
       "  ifc i0();\n"
       "  class Base; function new(int n); endfunction endclass\n"
       "  class Derived extends Base(2 + (* t5 *) 3);\n"
@@ -518,8 +518,10 @@ TEST_F(AttributesOfARun, AnOperationOutsideAnAssignmentCarriesItsAttributes) {
             std::vector<std::string>{"t2"});
   vpiHandle cb = Named(vpiClockingBlock, By("top"), "cb");
   ASSERT_NE(cb, nullptr);
-  EXPECT_EQ(NamesOf(vpiAttribute,
-                    vpi_handle(vpiExpr, Named(vpiClockingIODecl, cb, "w"))),
+  const std::vector<vpiHandle> kEdgeOperands =
+      OperandsOf(vpi_handle(vpiCondition, vpi_handle(vpiClockingEvent, cb)));
+  ASSERT_EQ(kEdgeOperands.size(), 1u);
+  EXPECT_EQ(NamesOf(vpiAttribute, kEdgeOperands[0]),
             std::vector<std::string>{"t3"});
   vpiHandle mp = Named(vpiModport, By("top.i0"), "mp");
   ASSERT_NE(mp, nullptr);
