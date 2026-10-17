@@ -53,6 +53,9 @@ struct RtlirBidirSwitch {
 // one.
 struct RtlirUdpInst {
   const UdpDecl* decl = nullptr;
+  // §37.83: the instantiation it was elaborated from, which the attributes it
+  // is written with are kept under (RtlirModule::node_attrs).
+  const ModuleItem* source_item = nullptr;
   // §29.8: the instance name is optional, as for gates. Empty where the source
   // wrote none, which is why it cannot be what identifies the instance.
   std::string_view name;

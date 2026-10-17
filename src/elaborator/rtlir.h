@@ -10,6 +10,7 @@
 #include "common/packed_range.h"
 #include "common/source_loc.h"
 #include "common/types.h"
+#include "elaborator/rtlir_alias.h"
 #include "elaborator/rtlir_attribute.h"
 #include "elaborator/rtlir_checker_site.h"
 #include "elaborator/rtlir_element_shape.h"
@@ -408,11 +409,6 @@ struct RtlirContAssign {
   HierPath gen_block_path;  // §37.85: the gen scope it stands in.
 };
 
-struct RtlirAlias {
-  std::vector<Expr*> nets;
-  GenBlockPrefixes gen_block_prefixes;  // §27.5: the blocks it stands in.
-};
-
 struct RtlirProcess {
   RtlirProcessKind kind = RtlirProcessKind::kInitial;
   // §16.4.3 and §16.14.5: true where this process carries a static assertion,
@@ -682,6 +678,7 @@ struct RtlirModule {
   bool is_interface = false;
   bool is_checker = false;
   std::vector<ResolvedAttribute> attrs;
+  RtlirNodeAttributes node_attrs;  // §37.83: its items' and statements'.
   // Annex E.4 to E.7: the delay mode the last directive before this module
   // selected, in force where the module was declared or, for a module parsed
   // without the preprocessor, the compilation unit's.

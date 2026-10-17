@@ -607,9 +607,10 @@ void AttachClockingBlocks(const RtlirDesign* design,
 // block instance writing it or the instance itself, with its clock, its
 // property spec and its actions, each built through `with`; none for a
 // deferred immediate assertion, which stands as the statement its process
-// runs.
-void VpiMakeItemAssertion(const RtlirAssertion& assertion, VpiObject* scope,
-                          SimContext& ctx, const VpiStmtBuild& with);
+// runs. Answers the object made, null for none.
+VpiObject* VpiMakeItemAssertion(const RtlirAssertion& assertion,
+                                VpiObject* scope, SimContext& ctx,
+                                const VpiStmtBuild& with);
 
 // §37.49: give the assertion `obj` the location of its text, `range`: its
 // file and the line and column it starts and ends at.
@@ -651,6 +652,12 @@ void VpiAttachAttributes(VpiObject* owner,
                          const std::vector<ResolvedAttribute>& attrs,
                          bool on_definition, SimContext& ctx,
                          const VpiAttachBuild& build);
+
+// §37.83: the attributes elaboration resolved on the syntax node `node` of
+// `mod`, the instance it stands in (RtlirModule::node_attrs); none where it
+// carries none or `mod` is null, a package's or the compilation unit's.
+const std::vector<ResolvedAttribute>& VpiNodeAttributes(const RtlirModule* mod,
+                                                        const void* node);
 
 // §37.83: the attribute objects of each instance, from its instantiation and
 // its module's declaration, and of each net and variable it declares.

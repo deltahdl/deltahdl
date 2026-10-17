@@ -326,5 +326,82 @@ TEST_F(AttributesOfARun, NoNameOrIndexReachesAnAttribute) {
   EXPECT_EQ(vpi_handle_by_index(By("top.bus"), 0), nullptr);
 }
 
+// A task and a function carry the attributes they are written with.
+TEST_F(AttributesOfARun, ATaskAndAFunctionCarryTheirAttributes) {
+  Run("module top;\n"
+      "  (* inline *) function int f(); return 0; endfunction\n"
+      "  (* slow = 2 *) task t(); endtask\n"
+      "endmodule\n");
+  vpiHandle f = Named(vpiTaskFunc, By("top"), "f");
+  vpiHandle t = Named(vpiTaskFunc, By("top"), "t");
+  ASSERT_NE(f, nullptr);
+  ASSERT_NE(t, nullptr);
+  EXPECT_EQ(NamesOf(vpiAttribute, f), std::vector<std::string>{"inline"});
+  vpiHandle slow = Named(vpiAttribute, t, "slow");
+  ASSERT_NE(slow, nullptr);
+  EXPECT_EQ(ValueOf(slow, vpiIntVal), "2");
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiParent, slow)), VpiObjectOf(t));
+}
+
+// A gate and a UDP instance carry the attributes their instantiations are
+// written with.
+TEST_F(AttributesOfARun, AGateAndAUdpCarryTheirAttributes) {
+  Run("primitive u_and(output y, input a, b);\n"
+      "  table 1 1 : 1; 0 ? : 0; ? 0 : 0; endtable\n"
+      "endprimitive\n"
+      "module top; wire y, z, a, b;\n"
+      "  (* keep *) and g1 (y, a, b);\n"
+      "  (* place = \"west\" *) u_and u1 (z, a, b);\n"
+      "endmodule\n");
+  vpiHandle g1 = Named(vpiPrimitive, By("top"), "g1");
+  vpiHandle u1 = Named(vpiPrimitive, By("top"), "u1");
+  ASSERT_NE(g1, nullptr);
+  ASSERT_NE(u1, nullptr);
+  EXPECT_EQ(NamesOf(vpiAttribute, g1), std::vector<std::string>{"keep"});
+  vpiHandle place = Named(vpiAttribute, u1, "place");
+  ASSERT_NE(place, nullptr);
+  EXPECT_EQ(ValueOf(place, vpiStringVal), "west");
+}
+
+// A statement carries the attributes it is written with, here a case
+// statement, the statement an initial procedure runs, and an assignment the
+// case statement holds.
+TEST_F(AttributesOfARun, AStatementCarriesItsAttributes) {
+  Run("module top; logic [1:0] s; logic y;\n"
+      "  initial (* parallel_case *) case (s)\n"
+      "    0: (* note *) y = 1;\n"
+      "    default: y = 0;\n"
+      "  endcase\n"
+      "endmodule\n");
+  vpiHandle it = vpi_iterate(vpiProcess, By("top"));
+  ASSERT_NE(it, nullptr);
+  vpiHandle case_stmt = vpi_handle(vpiStmt, vpi_scan(it));
+  ASSERT_NE(case_stmt, nullptr);
+  EXPECT_EQ(NamesOf(vpiAttribute, case_stmt),
+            std::vector<std::string>{"parallel_case"});
+  vpiHandle items = vpi_iterate(vpiCaseItem, case_stmt);
+  ASSERT_NE(items, nullptr);
+  vpiHandle first = vpi_handle(vpiStmt, vpi_scan(items));
+  ASSERT_NE(first, nullptr);
+  EXPECT_EQ(NamesOf(vpiAttribute, first), std::vector<std::string>{"note"});
+}
+
+// A concurrent assertion, a property declaration and a clocking block carry
+// the attributes they are written with.
+TEST_F(AttributesOfARun, AnAssertionAPropertyAndAClockingBlockCarryTheirs) {
+  Run("module top; logic clk, x;\n"
+      "  (* tag = 1 *) property p; @(posedge clk) x; endproperty\n"
+      "  (* tag = 2 *) a1: assert property (@(posedge clk) x);\n"
+      "  (* tag = 3 *) clocking cb @(posedge clk); endclocking\n"
+      "endmodule\n");
+  const auto kTagOf = [](vpiHandle obj) {
+    vpiHandle tag = Named(vpiAttribute, obj, "tag");
+    return tag == nullptr ? std::string() : ValueOf(tag, vpiIntVal);
+  };
+  EXPECT_EQ(kTagOf(Named(vpiPropertyDecl, By("top"), "p")), "1");
+  EXPECT_EQ(kTagOf(Named(vpiAssertion, By("top"), "a1")), "2");
+  EXPECT_EQ(kTagOf(Named(vpiClockingBlock, By("top"), "cb")), "3");
+}
+
 }  // namespace
 }  // namespace delta

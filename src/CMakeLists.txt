@@ -117,6 +117,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_extern_modules.cpp
     elaborator/elaborator_type_facts.cpp
     elaborator/elaborator_items.cpp
+    elaborator/elaborator_node_attributes.cpp
     elaborator/elaborator_items_checker_rules.cpp
     elaborator/elaborator_items_udp.cpp
     elaborator/elaborator_udp_inst.cpp

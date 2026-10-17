@@ -405,18 +405,31 @@ VpiObject* WalkStmtItself(const Stmt& stmt, const BlockParent& parent,
   return nullptr;
 }
 
+// §37.83: `obj`, the object the statement `stmt` itself stands as, given the
+// attributes the statement is written with; none where it stands as none.
+VpiObject* WithStmtAttributes(VpiObject* obj, const Stmt& stmt,
+                              const BodyWalk& walk) {
+  if (obj != nullptr) {
+    VpiAttachAttributes(obj, VpiNodeAttributes(&walk.mod, &stmt), false,
+                        walk.calls.ctx, walk.build);
+  }
+  return obj;
+}
+
 // The object `stmt` stands as: the named begin its label creates around it
 // (§9.3.5), holding what the statement itself stands as, or that object alone.
 VpiObject* WalkStmt(const Stmt* stmt, const BlockParent& parent,
                     const BodyWalk& walk) {
   if (stmt == nullptr) return nullptr;
   if (!LabelCreatesNamedBegin(*stmt)) {
-    return WalkStmtItself(*stmt, parent, walk);
+    return WithStmtAttributes(WalkStmtItself(*stmt, parent, walk), *stmt, walk);
   }
   std::string path;
   VpiObject* begin =
       MakeScopeObject(vpiNamedBegin, stmt->label, parent, walk, path);
-  WalkStmtItself(*stmt, BlockParent{begin, path, nullptr, &parent}, walk);
+  WithStmtAttributes(
+      WalkStmtItself(*stmt, BlockParent{begin, path, nullptr, &parent}, walk),
+      *stmt, walk);
   return begin;
 }
 
@@ -491,10 +504,14 @@ void AttachInstanceProperties(VpiObject* instance,
       [&instance_walk](const RtlirPropertyDecl& declared, VpiObject* scope,
                        const VpiStmtBuild& with) {
         const VpiCallBuild& calls = instance_walk.calls;
-        VpiMakePropertyDecl(
+        VpiObject* made = VpiMakePropertyDecl(
             declared,
             {scope, calls.unit_typespecs, calls.ctx, instance_walk.mod.imports},
             with);
+        // §37.83: the attributes the declaration is written with.
+        VpiAttachAttributes(
+            made, VpiNodeAttributes(&instance_walk.mod, declared.item), false,
+            calls.ctx, instance_walk.build);
       });
 }
 
@@ -509,7 +526,14 @@ void AttachInstanceProcedures(VpiObject* instance,
       instance, instance_walk, instance_walk.mod.assertions,
       [&instance_walk](const RtlirAssertion& assertion, VpiObject* scope,
                        const VpiStmtBuild& with) {
-        VpiMakeItemAssertion(assertion, scope, instance_walk.calls.ctx, with);
+        VpiObject* made = VpiMakeItemAssertion(assertion, scope,
+                                               instance_walk.calls.ctx, with);
+        // §37.83: the attributes the assertion is written with.
+        if (made != nullptr) {
+          VpiAttachAttributes(
+              made, VpiNodeAttributes(&instance_walk.mod, assertion.item),
+              false, instance_walk.calls.ctx, instance_walk.build);
+        }
       });
   for (const RtlirProcess& proc : instance_walk.mod.processes) {
     // A process stands in the generate block instance its path names.

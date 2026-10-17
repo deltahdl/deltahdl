@@ -158,8 +158,9 @@ void MakeIoDecl(const ClockingSignalDecl& signal, VpiObject* block,
 // through vpiClockingEvent the event control its clocking event makes, its
 // default skews (detail 1) and an io decl per clocking signal, and marked
 // where §14.12 made it the scope's default clocking or §14.14 its global
-// clocking.
-void MakeClockingBlock(const ModuleItem& item, const ClockingBuild& with) {
+// clocking. Answers the object made.
+VpiObject* MakeClockingBlock(const ModuleItem& item,
+                             const ClockingBuild& with) {
   VpiObject* holder = with.site.holder;
   VpiObject* block = with.build.alloc();
   block->type = vpiClockingBlock;
@@ -189,6 +190,7 @@ void MakeClockingBlock(const ModuleItem& item, const ClockingBuild& with) {
   for (const ClockingSignalDecl& signal : item.clocking_signals) {
     MakeIoDecl(signal, block, kInput, kOutput, with);
   }
+  return block;
 }
 
 // The generate block instance that declared the clocking block at `index` of
@@ -226,7 +228,11 @@ void AttachClockingBlocks(const RtlirDesign* design,
           const ClockingSite kSite{
               holder, instance, prefix, objects,
               gen == nullptr ? kNoGenPrefixes : gen->gen_block_prefixes};
-          MakeClockingBlock(*item, ClockingBuild{kSite, ctx, build});
+          VpiObject* block =
+              MakeClockingBlock(*item, ClockingBuild{kSite, ctx, build});
+          // §37.83: the attributes the block is written with.
+          VpiAttachAttributes(block, VpiNodeAttributes(mod, item), false, ctx,
+                              build);
         }
       });
 }

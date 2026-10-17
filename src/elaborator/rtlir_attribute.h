@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <optional>
 #include <string_view>
+#include <unordered_map>
+#include <vector>
 
 #include "common/source_loc.h"
 
@@ -25,5 +27,14 @@ struct ResolvedAttribute {
   const Expr* value = nullptr;
   SourceLoc loc;
 };
+
+// §37.83 with §5.12: the attribute instances elaboration resolved on the
+// syntax nodes of a module instance that keep no record of their own -- a
+// task or function, a gate or UDP instance, a specparam, a concurrent
+// assertion, a sequence or property declaration, a clocking block and a
+// statement -- keyed by the node, from which the VPI object made of the node
+// takes its attributes.
+using RtlirNodeAttributes =
+    std::unordered_map<const void*, std::vector<ResolvedAttribute>>;
 
 }  // namespace delta

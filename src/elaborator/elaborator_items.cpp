@@ -23,12 +23,14 @@
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/elaborator_items_params.h"
+#include "elaborator/elaborator_node_attributes.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/global_clock_assertion_event.h"
 #include "elaborator/procedural_checker_instance.h"
 #include "elaborator/procedural_concurrent_assertion.h"
 #include "elaborator/property_instance.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_alias.h"
 #include "elaborator/rtlir_checker_site.h"
 #include "elaborator/rtlir_scopes.h"
 #include "elaborator/sensitivity.h"
@@ -572,6 +574,10 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
     ValidateItemDelaysNonNegative(item, BuildParamScope(mod), diag_);
   }
   DeclareInModuleNameSpace(ModuleNameSpaceEntry(item), item->loc);
+  // §37.83: the attributes of an item, and of the statements it holds, that
+  // no record of the item's own keeps.
+  RecordNodeAttributes(*item, *mod, diag_,
+                       [&] { return BuildParamScope(mod); });
   if (ElaborateDeclItem(item, mod)) return;
   ResolveProceduralTypeRefs(
       item, [&](DataType& dt, SourceLoc loc) { ResolveTypeRef(dt, loc, mod); });

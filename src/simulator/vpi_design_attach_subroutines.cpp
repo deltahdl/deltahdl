@@ -260,6 +260,9 @@ VpiObject* MakeSubroutine(const SubroutineScope& where, const ModuleItem* item,
   sb.made[{item, where.key}] = tf;
   // §37.3.3: where the task or function was written.
   VpiRecordWrittenLocation(tf, item->loc, sb.ctx);
+  // §37.83: the attributes it is written with.
+  VpiAttachAttributes(tf, VpiNodeAttributes(where.mod, item), false, sb.ctx,
+                      sb.build);
   // A declared width or range reads the parameters of the scope declaring it.
   InstancePrefixOverride scope(sb.ctx.InstancePrefixOverride(), where.params);
   MakeIoDecls(tf, *item, where, sb);

@@ -349,6 +349,7 @@ void Elaborator::ElaborateOneUdpInst(const ModuleItem* item, RtlirModule* mod) {
 
   RtlirUdpInst inst;
   inst.decl = decl;
+  inst.source_item = item;
   inst.name = item->gate_inst_name;
   inst.loc = item->loc;
   inst.output = item->gate_terminals.front();

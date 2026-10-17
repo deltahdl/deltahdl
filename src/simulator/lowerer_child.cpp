@@ -14,6 +14,7 @@
 #include "common/arena.h"
 #include "common/packed_range.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_alias.h"
 #include "elaborator/rtlir_scopes.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"

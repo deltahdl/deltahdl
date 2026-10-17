@@ -61,6 +61,14 @@ void AttachDeclaredAttributes(const std::vector<Declared>& declared,
 
 }  // namespace
 
+const std::vector<ResolvedAttribute>& VpiNodeAttributes(const RtlirModule* mod,
+                                                        const void* node) {
+  static const std::vector<ResolvedAttribute> kNone;
+  if (mod == nullptr) return kNone;
+  const auto kFound = mod->node_attrs.find(node);
+  return kFound == mod->node_attrs.end() ? kNone : kFound->second;
+}
+
 void VpiAttachAttributes(VpiObject* owner,
                          const std::vector<ResolvedAttribute>& attrs,
                          bool on_definition, SimContext& ctx,

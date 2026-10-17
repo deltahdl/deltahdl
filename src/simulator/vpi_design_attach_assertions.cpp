@@ -694,14 +694,15 @@ void VpiRecordWrittenLocation(VpiObject* obj, SourceLoc loc, SimContext& ctx) {
   obj->file = std::string(sources.FilePath(kWritten.file_id));
 }
 
-void VpiMakeItemAssertion(const RtlirAssertion& assertion, VpiObject* scope,
-                          SimContext& ctx, const VpiStmtBuild& with) {
+VpiObject* VpiMakeItemAssertion(const RtlirAssertion& assertion,
+                                VpiObject* scope, SimContext& ctx,
+                                const VpiStmtBuild& with) {
   const ModuleItem& item = *assertion.item;
   // §37.49 with §39.3.1 step b: an assertion written as an item is an
   // assertion of the scope writing it. A deferred immediate one runs as a
   // process the elaborator makes of it, whose walk builds it as the statement
   // it is, with its parts (§37.55).
-  if (item.body != nullptr && item.body->is_deferred) return;
+  if (item.body != nullptr && item.body->is_deferred) return nullptr;
   VpiObject* obj = MakeConcurrentAssertion(item, scope, ctx, with.build);
   // §37.50: the clock the elaborator resolved onto the statement it carries,
   // where it carries one, and the property: a property inst where the spec
@@ -723,6 +724,7 @@ void VpiMakeItemAssertion(const RtlirAssertion& assertion, VpiObject* scope,
   // pass action alone.
   with.statement(item.assert_pass_stmt, obj);
   obj->else_stmt = with.statement(item.assert_fail_stmt, obj);
+  return obj;
 }
 
 }  // namespace delta

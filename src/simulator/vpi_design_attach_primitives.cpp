@@ -232,10 +232,11 @@ void MakePrimitiveArray(const ModuleItem& item, const PrimSite& site,
 
 // §29.8 with §37.35: the udp the instantiation `inst` of a UDP makes at `site`,
 // its output terminal first and its inputs after it as §29.8 writes them, and
-// reaching the udp defn `defn` of the UDP it instantiates.
-void MakeUdpObject(const RtlirUdpInst& inst, const PrimSite& site,
-                   VpiObject* defn, SimContext& ctx,
-                   const VpiAttachBuild& build) {
+// reaching the udp defn `defn` of the UDP it instantiates. Answers the object
+// made.
+VpiObject* MakeUdpObject(const RtlirUdpInst& inst, const PrimSite& site,
+                         VpiObject* defn, SimContext& ctx,
+                         const VpiAttachBuild& build) {
   std::vector<VpiObject*> terminals;
   terminals.reserve(inst.inputs.size() + 1);
   terminals.push_back(VpiInstanceExpression(inst.output, site.objects,
@@ -254,6 +255,7 @@ void MakeUdpObject(const RtlirUdpInst& inst, const PrimSite& site,
       PrimitiveDelayExpression({inst.delay, inst.delay_fall}, site, ctx, build);
   // §37.3.3: where the instantiation was written.
   VpiRecordWrittenLocation(udp, inst.loc, ctx);
+  return udp;
 }
 
 }  // namespace
@@ -284,10 +286,15 @@ void AttachPrimitives(const RtlirDesign* design, const VpiObjectMap& objects,
           prim->delay_expr = GateDelayExpression(*item, kSite, ctx, build);
           // §37.3.3: where the instantiation was written.
           VpiRecordWrittenLocation(prim, item->loc, ctx);
+          // §37.83: the attributes it is written with.
+          VpiAttachAttributes(prim, VpiNodeAttributes(mod, item), false, ctx,
+                              build);
         }
         for (const RtlirUdpInst& inst : mod->udp_insts) {
-          MakeUdpObject(inst, {instance, prefix, objects},
-                        udp_defn_of(inst.decl), ctx, build);
+          VpiObject* udp = MakeUdpObject(inst, {instance, prefix, objects},
+                                         udp_defn_of(inst.decl), ctx, build);
+          VpiAttachAttributes(udp, VpiNodeAttributes(mod, inst.source_item),
+                              false, ctx, build);
         }
       });
 }
