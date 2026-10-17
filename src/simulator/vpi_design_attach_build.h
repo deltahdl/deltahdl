@@ -643,10 +643,10 @@ void AttachPrimitives(const RtlirDesign* design, const VpiObjectMap& objects,
 void AttachGenScopes(const RtlirDesign* design, const VpiObjectMap& objects,
                      const VpiAttachBuild& build);
 
-// §27.4 with §37.17: give each variable and net a generate block instance
-// declares the object the passes built for it, named as declared under the
-// block's gen scope, in place of the bare one its alias was given. Run after
-// every pass that resolves a name to such an object.
+// §27.4 with §37.17 and §37.28: give each variable, net and parameter a
+// generate block instance declares the object the passes built for it, named
+// as declared under the block's gen scope, in place of the bare one its alias
+// was given. Run after every pass that resolves a name to such an object.
 void AttachGenBlockStorage(const RtlirDesign* design,
                            const VpiObjectMap& objects);
 

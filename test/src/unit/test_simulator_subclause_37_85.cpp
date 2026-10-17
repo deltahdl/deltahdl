@@ -472,5 +472,27 @@ TEST_F(GeneratesOfARun, AnIterationsGenvarLocalparamIsAParameterOfItsScope) {
             std::vector<std::string>{"v"});
 }
 
+// Detail 4 with §27.4: a parameter a generate block declares is a local
+// parameter of its block instance's gen scope, named as declared and holding
+// the value it has in that instance, and none of the scope's variables; the
+// module holds nothing under the name the elaborator flattens it to.
+TEST_F(GeneratesOfARun, AGenerateBlocksParameterIsALocalParameterOfItsScope) {
+  Run("module top;\n"
+      "  for (genvar i = 0; i < 2; i++) begin : g\n"
+      "    parameter P = 3 + i;\n"
+      "  end\n"
+      "endmodule\n");
+  vpiHandle p = Named(vpiParameter, By("top.g[1]"), "P");
+  ASSERT_NE(p, nullptr);
+  EXPECT_EQ(vpi_get(vpiLocalParam, p), 1);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, p), "top.g[1].P");
+  s_vpi_value value = {};
+  value.format = vpiIntVal;
+  vpi_get_value(p, &value);
+  EXPECT_EQ(value.value.integer, 4);
+  EXPECT_EQ(NamesOf(vpiVariables, By("top.g[1]")), std::vector<std::string>{});
+  EXPECT_EQ(By("top.g_1_P"), nullptr);
+}
+
 }  // namespace
 }  // namespace delta

@@ -148,6 +148,18 @@ void Refullname(VpiObject* obj, const std::string& from,
   }
 }
 
+// §27.4: the flattened key the run stores the generate block member `member`
+// of `mod` under: a variable's or net's storage key, and a parameter's
+// declaration's block prefix and name.
+std::string StoredKey(const RtlirModule& mod,
+                      const RtlirGenBlockMember& member) {
+  if (member.kind == RtlirGenBlockMember::Kind::kStorage) {
+    return std::string(member.storage);
+  }
+  const RtlirParamDecl& param = mod.params[member.param_index];
+  return std::string(param.gen_block_prefix) + std::string(param.name);
+}
+
 // §23.6 with §27.4 and §37.85: the instance `flat` a generate block instance
 // holds, which the run keys under a flattened name, `g_d2`, moved under the
 // block's gen scope `scope` and named as the source wrote it, `d2`, with what
@@ -189,20 +201,21 @@ void AttachGenBlockInstances(const RtlirDesign* design,
 
 void AttachGenBlockStorage(const RtlirDesign* design,
                            const VpiObjectMap& objects) {
-  // §27.4: a variable or net a generate block instance declares is named
-  // under that instance's gen scope. The run keys it under a flattened name
-  // and its alias under the block's, and an object was made for each.
+  // §27.4: a variable, net or parameter a generate block instance declares is
+  // named under that instance's gen scope. The run keys it under a flattened
+  // name and its alias under the block's, and an object was made for each;
+  // AttachParameters made the flattened one of a parameter its vpiParameter.
   WalkInstanceObjects(
       design, objects,
       [&](const RtlirModule* mod, const std::string& prefix,
           VpiObject* instance) {
         for (const RtlirGenBlockMember& member : mod->gen_block_members) {
-          if (member.kind != RtlirGenBlockMember::Kind::kStorage) continue;
+          if (member.kind == RtlirGenBlockMember::Kind::kIndex) continue;
           VpiObject* scope = VpiGenScopeOf(instance, member.gen_block_path);
           VpiObject* alias =
               scope == nullptr ? nullptr : ChildNamed(scope, member.name);
           VpiObject* flat = FindObjectForFlatName(
-              objects, VpiFlatName(prefix, member.storage));
+              objects, VpiFlatName(prefix, StoredKey(*mod, member)));
           if (alias == nullptr || flat == nullptr || alias == flat) continue;
           FoldInto(flat, alias);
         }
