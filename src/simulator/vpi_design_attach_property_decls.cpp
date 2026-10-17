@@ -330,7 +330,7 @@ void AttachPackagePropertyDecls(const RtlirDesign& design,
     const std::string kPrefix(pkg->name);
     VpiObject* package = FindObjectForFlatName(objects, pkg->name);
     // §37.42: a call a property makes stands in the package.
-    const VpiCallStand kStand{package};
+    const VpiCallStand kStand{package, nullptr, pkg->name};
     // §37.83: an operation carries the attributes its operator is written
     // with, which elaboration kept for a package's items on the design.
     const VpiExprNames kNames{

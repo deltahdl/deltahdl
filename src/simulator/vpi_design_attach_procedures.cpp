@@ -4,6 +4,7 @@
 #include <functional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/source_loc.h"
@@ -635,14 +636,15 @@ void VpiShapeDeferredCalls(const RtlirDesign& design,
   // callee among the compilation unit's and the packages' declarations alone.
   static const RtlirModule kNoModule{};
   // Shaping a call builds its arguments, which may hold a call of their own
-  // held here in turn, so each is taken by its place and copied out.
+  // held here in turn, so each is taken by its place and moved out.
   for (std::size_t index = 0; index < deferred.size(); ++index) {
-    const VpiDeferredCall held = deferred[index];
+    VpiDeferredCall held = std::move(deferred[index]);
     BodyWalk walk{
         design,  held.stand.mod != nullptr ? *held.stand.mod : kNoModule,
         objects, held.prefix,
         calls,   build};
     walk.gen_prefixes = &held.gen_prefixes;
+    walk.package = held.stand.package;
     const BlockParent kParent{held.stand.scope, held.stand.scope->full_name};
     if (!ShapeExprCall(*held.call, held.made, kParent, walk)) {
       MakeCallArguments(held.made, *held.call, kParent, walk);

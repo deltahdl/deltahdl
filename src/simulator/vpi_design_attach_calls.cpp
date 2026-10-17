@@ -857,7 +857,8 @@ VpiCallSite CallSiteOf(const BlockParent& parent, const BodyWalk& walk) {
           walk.gen_prefixes,
           [&parent, &walk](const Expr& call, VpiObject* made) {
             return ShapeExprCall(call, made, parent, walk);
-          }};
+          },
+          walk.package};
 }
 
 int TypeVariableKind(const DataType& type, const BodyWalk& walk) {

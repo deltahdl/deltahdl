@@ -460,6 +460,11 @@ VpiCalledSubroutine EnclosingSubroutine(const VpiCallSite& site,
 
 VpiCalledSubroutine VpiNamedSubroutine(const VpiCallSite& site,
                                        std::string_view name) {
+  // §26.2: a package refers to no declaration outside it but by import, and
+  // to none of the compilation unit's.
+  if (!site.package.empty()) {
+    return VpiPackageSubroutine(site.design, site.package, name, site.made);
+  }
   VpiCalledSubroutine called = GenerateBlockSubroutine(site, name);
   if (called.decl != nullptr) return called;
   if (const ModuleItem* found = InstanceSubroutine(site.mod, name)) {

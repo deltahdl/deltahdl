@@ -256,6 +256,9 @@ struct VpiCallSite {
   // written there is made, true where it does; none where the site stands in
   // no procedure.
   std::function<bool(const Expr& call, VpiObject* made)> shape_call = nullptr;
+  // §26.2: the package the site stands in, whose declarations alone a name
+  // finds; empty for a site of an instance or the compilation unit.
+  std::string_view package = {};
 };
 
 // §26.2: the task or function the package `package` declares under `name`.
@@ -379,12 +382,14 @@ VpiObject* VpiInstanceExpression(const Expr* expr, const VpiObjectMap& objects,
                                  const VpiAttachBuild& build);
 
 // §37.42 with §37.12: where a call written outside every procedure stands:
-// the scope its vpiScope reaches - the instance, gen scope, clocking block or
-// class defn it is written in - and the module whose declarations its callee
-// is found among, null where it stands in no module.
+// the scope its vpiScope reaches - the instance, gen scope, clocking block,
+// package or class defn it is written in - and the module whose declarations
+// its callee is found among, null where it stands in no module, or the
+// package, for a call a package or a class it declares writes (§26.2).
 struct VpiCallStand {
   VpiObject* scope;
   const RtlirModule* mod = nullptr;
+  std::string_view package = {};
 };
 
 // Where the names of an expression written in an instance resolve: the

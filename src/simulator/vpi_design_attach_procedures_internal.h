@@ -49,6 +49,9 @@ struct BodyWalk {
   // in, innermost last, empty for one of the instance itself; each walk of an
   // item sets it before any statement is walked.
   const GenBlockPrefixes* gen_prefixes = nullptr;
+  // §26.2: the package a call held outside every procedure stands in, empty
+  // for none (VpiCallStand).
+  std::string_view package = {};
 };
 
 // §37.42: what a call statement stands as. `type` is the kind of tf call, zero

@@ -7,7 +7,6 @@
 #include <utility>
 #include <vector>
 
-#include "common/arena.h"
 #include "elaborator/rtlir.h"
 #include "fixture_simulator.h"
 #include "fixture_vpi_run.h"
@@ -81,7 +80,7 @@ class CallsOutsideProcedures : public VpiDesignRun {
 // A call a port connection makes stands in the instance writing the
 // connection (#7279).
 TEST_F(CallsOutsideProcedures, APortConnectionsCallIsShaped) {
-  Run("module sub(input int a); endmodule\n"
+  Run("module sub(input logic [31:0] a); endmodule\n"
       "module top; int x;\n"
       "  function automatic int f(int v); return v; endfunction\n"
       "  sub u (.a(f(x)));\n"
@@ -107,19 +106,25 @@ TEST_F(CallsOutsideProcedures, APrimitiveTerminalsCallIsShaped) {
   ExpectSystemCall(kInputOf("h"), By("top"));
 }
 
-// A call a clocking block's signal is written with stands in the block, a
+// A call a clocking block's event is written with stands in the block, a
 // scope of its own (§37.12) (#7283).
 TEST_F(CallsOutsideProcedures, AClockingBlocksCallIsShaped) {
-  Run("module top; logic clk; int a;\n"
-      "  function automatic int f(int v); return v; endfunction\n"
-      "  clocking cb @(posedge clk); input w = f(a); input v = $sf(a);\n"
-      "  endclocking\n"
+  Run("module top; logic clk;\n"
+      "  function automatic logic f(logic v); return v; endfunction\n"
+      "  clocking cb @(posedge f(clk)); endclocking\n"
+      "  clocking cs @(posedge $sf(clk)); endclocking\n"
       "endmodule\n");
+  const auto kEdgeOf = [](vpiHandle block) {
+    vpiHandle event = vpi_handle(vpiClockingEvent, block);
+    return OperandOf(
+        event == nullptr ? nullptr : vpi_handle(vpiCondition, event), 0);
+  };
   vpiHandle cb = Named(vpiClockingBlock, By("top"), "cb");
+  vpiHandle cs = Named(vpiClockingBlock, By("top"), "cs");
   ASSERT_NE(cb, nullptr);
-  ExpectFunctionCall(vpi_handle(vpiExpr, Named(vpiClockingIODecl, cb, "w")),
-                     "f", cb);
-  ExpectSystemCall(vpi_handle(vpiExpr, Named(vpiClockingIODecl, cb, "v")), cb);
+  ASSERT_NE(cs, nullptr);
+  ExpectFunctionCall(kEdgeOf(cb), "f", cb);
+  ExpectSystemCall(kEdgeOf(cs), cs);
 }
 
 // A call a constraint makes stands in the class declaring it (#7284).
@@ -139,10 +144,13 @@ TEST_F(CallsOutsideProcedures, AConstraintsCallIsShaped) {
 }
 
 // A call a package's property makes stands in the package, its callee found
-// among the compilation unit's functions (#7285).
+// among the package's own functions, as a package sees no other but by
+// import (§26.2) (#7285).
 TEST_F(CallsOutsideProcedures, APackagePropertysCallIsShaped) {
-  Run("function automatic int f(int v); return v; endfunction\n"
-      "package pk; property q(x); f(x) == $sf(x); endproperty endpackage\n"
+  Run("package pk;\n"
+      "  function automatic int f(int v); return v; endfunction\n"
+      "  property q(x); f(x) == $sf(x); endproperty\n"
+      "endpackage\n"
       "module top; endmodule\n");
   vpiHandle pk = By("pk");
   ASSERT_NE(pk, nullptr);
@@ -151,6 +159,22 @@ TEST_F(CallsOutsideProcedures, APackagePropertysCallIsShaped) {
   vpiHandle equality = vpi_handle(vpiPropertyExpr, spec);
   ExpectFunctionCall(OperandOf(equality, 0), "f", pk);
   ExpectSystemCall(OperandOf(equality, 1), pk);
+}
+
+// A call a constraint of a package's class makes finds its callee among the
+// package's functions too (§26.2).
+TEST_F(CallsOutsideProcedures, APackageClasssConstraintFindsItsCallee) {
+  Run("package pk;\n"
+      "  function automatic int f(int v); return v; endfunction\n"
+      "  class C; rand int x; constraint c { x < f(5); } endclass\n"
+      "endpackage\n"
+      "module top; endmodule\n");
+  vpiHandle defn = Named(vpiClassDefn, By("pk"), "C");
+  ASSERT_NE(defn, nullptr);
+  const std::vector<vpiHandle> kItems =
+      ObjectsOf(vpiConstraintItem, Named(vpiConstraint, defn, "c"));
+  ASSERT_EQ(kItems.size(), 1U);
+  ExpectFunctionCall(OperandOf(kItems[0], 1), "f", defn);
 }
 
 // A call a modport port's expression makes stands in the interface instance
