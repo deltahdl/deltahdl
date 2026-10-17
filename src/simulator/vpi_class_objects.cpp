@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
-#include <deque>
 #include <functional>
 #include <string>
 #include <string_view>
@@ -30,6 +29,7 @@
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_user.h"
 
 namespace delta {
 
@@ -230,6 +230,20 @@ void MakeObjectParameter(VpiObject* holder, const ClassDecl& decl,
   holder->children.push_back(made);
 }
 
+// §37.33 detail 4 with §15.4.5: the kind of constant a message is, as the
+// type the mailbox placed it with says: a literal's value carries no string
+// mark of its own.
+int MessageConstType(const MailboxMessageType& type) {
+  switch (type.kind) {
+    case MailboxMessageType::Kind::kReal:
+      return vpiRealConst;
+    case MailboxMessageType::Kind::kString:
+      return vpiStringConst;
+    default:
+      return vpiBinaryConst;
+  }
+}
+
 }  // namespace
 
 Logic4Vec* VpiHeldPropertyValue(ClassObject& obj, std::string_view name) {
@@ -315,15 +329,12 @@ void VpiRefreshSyncClassObject(
   obj.children.resize(1);
   // §37.33 detail 4 with §15.4: a message is any singular expression, held as
   // the value put() was handed.
-  static const std::deque<Logic4Snapshot> kNoMessages;
-  for (const Logic4Snapshot& message :
-       mbx != nullptr ? mbx->messages : kNoMessages) {
-    const Logic4Vec& held = message.Get();
+  const size_t kMessages = mbx != nullptr ? mbx->messages.size() : 0;
+  for (size_t index = 0; index < kMessages; ++index) {
+    const Logic4Vec& held = mbx->messages[index].Get();
     VpiObject* constant = alloc();
     constant->type = vpiConstant;
-    constant->const_type = held.is_real     ? vpiRealConst
-                           : held.is_string ? vpiStringConst
-                                            : vpiBinaryConst;
+    constant->const_type = MessageConstType(mbx->message_types[index]);
     Arena& arena = ctx.GetArena();
     auto* storage = arena.Create<Variable>();
     storage->value = MakeLogic4Vec(arena, held.width);
