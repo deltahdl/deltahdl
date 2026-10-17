@@ -360,6 +360,7 @@ TEST(LexicalConventionParsing, PropertyBodyAttributeIsNoRead) {
   }
   ASSERT_NE(decl, nullptr);
   std::vector<std::string_view> reads;
+  reads.reserve(decl->assertion_reads.size());
   for (const AssertionRead& read : decl->assertion_reads) {
     reads.push_back(read.name);
   }
