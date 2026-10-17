@@ -719,6 +719,21 @@ TEST_F(ClassObjectsOfARun, AClassTypedPropertyReachesItsDeclaredTypespec) {
                "D");
 }
 
+// ...where the object's class has a class defn: an object of a nested class,
+// which has none yet (§8.23, #7124), still holds its class-typed property as a
+// class var.
+TEST_F(ClassObjectsOfARun, ANestedClassObjectHoldsItsClassTypedProperty) {
+  Run("module top; class B; endclass\n"
+      "  class O; class I; B b; endclass endclass\n"
+      "  O::I i = new;\n"
+      "endmodule\n");
+  vpiHandle obj = vpi_handle(vpiClassObj, By("top.i"));
+  ASSERT_NE(obj, nullptr);
+  vpiHandle b = Named(vpiVariables, obj, "b");
+  ASSERT_NE(b, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, b), vpiClassVar);
+}
+
 // §15.3 and §15.4: a mailbox or semaphore variable reaches the class obj of the
 // object it holds, of the built-in class, reaching no class defn (§37.32)
 // (#7294); detail 4: a mailbox's iterates the messages it holds, in queue
