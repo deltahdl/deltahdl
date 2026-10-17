@@ -664,6 +664,12 @@ const std::vector<ResolvedAttribute>& VpiNodeAttributes(const RtlirModule* mod,
 const std::vector<ResolvedAttribute>& VpiNodeAttributes(
     const RtlirNodeAttributes* table, const void* node);
 
+// §37.83: the attribute objects of each port of each instance, from the
+// attributes its declaration is written with. Run once the ports are made.
+void AttachPortAttributes(const RtlirDesign* design,
+                          const VpiObjectMap& objects, SimContext& ctx,
+                          const VpiAttachBuild& build);
+
 // §37.83: the attribute objects of each instance, from its instantiation and
 // its module's declaration, and of each net and variable it declares.
 void AttachAttributes(const RtlirDesign* design, const VpiObjectMap& objects,

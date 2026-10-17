@@ -315,6 +315,10 @@ void VpiContext::AttachDesignPorts(const RtlirDesign* design) {
   if (design == nullptr) return;
 
   const std::function<VpiObject*()> kAlloc = [this] { return AllocObject(); };
+  const VpiNameKeeper kKeep = [this](std::string name) {
+    name_pool_.push_back(std::move(name));
+    return std::string_view(name_pool_.back());
+  };
   WalkInstancePaths(design, [this, &kAlloc](const RtlirModule* mod,
                                             const std::string& prefix) {
     // A top module has no module object over it to hang ports from, the
@@ -333,29 +337,16 @@ void VpiContext::AttachDesignPorts(const RtlirDesign* design) {
       // where the declaration does and reports it.
       RecordSourceLocation(obj, port.loc, sources);
       RecordProtection(obj, port.loc, sources);
-      // §37.83: the attributes the port is written with.
-      if (sim_ctx_ != nullptr) {
-        VpiAttachAttributes(obj, port.attrs, false, *sim_ctx_,
-                            {kAlloc,
-                             [this](std::string name) {
-                               name_pool_.push_back(std::move(name));
-                               return std::string_view(name_pool_.back());
-                             },
-                             sim_ctx_->GetArena()});
-      }
       if (port.is_interconnect) {
         FillInterconnectNetObject(AllocObject(), port, obj, name_pool_, kAlloc);
       }
     }
   });
   if (sim_ctx_ == nullptr) return;
-  AttachPortConnections(design, object_map_, *sim_ctx_,
-                        {[this] { return AllocObject(); },
-                         [this](std::string name) {
-                           name_pool_.push_back(std::move(name));
-                           return std::string_view(name_pool_.back());
-                         },
-                         sim_ctx_->GetArena()});
+  const VpiAttachBuild kBuild{kAlloc, kKeep, sim_ctx_->GetArena()};
+  AttachPortConnections(design, object_map_, *sim_ctx_, kBuild);
+  // §37.83: the attributes each port is written with.
+  AttachPortAttributes(design, object_map_, *sim_ctx_, kBuild);
 }
 
 namespace {

@@ -1,6 +1,7 @@
 // §37.83: the attribute objects of a design, each the attribute instance
 // (§5.12) elaboration resolved on the object it is a child of.
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -93,6 +94,23 @@ void VpiAttachAttributes(VpiObject* owner,
     obj->parent = owner;
     owner->children.push_back(obj);
   }
+}
+
+void AttachPortAttributes(const RtlirDesign* design,
+                          const VpiObjectMap& objects, SimContext& ctx,
+                          const VpiAttachBuild& build) {
+  // §37.83: a port carries the attributes its declaration is written with.
+  // Each port object holds the position its module declared it at.
+  WalkInstanceObjects(
+      design, objects,
+      [&](const RtlirModule* mod, const std::string&, VpiObject* instance) {
+        for (VpiObject* child : instance->children) {
+          if (child->type != vpiPort) continue;
+          const RtlirPort& port =
+              mod->ports.at(static_cast<std::size_t>(child->index));
+          VpiAttachAttributes(child, port.attrs, false, ctx, build);
+        }
+      });
 }
 
 void AttachAttributes(const RtlirDesign* design, const VpiObjectMap& objects,

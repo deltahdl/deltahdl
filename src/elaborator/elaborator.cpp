@@ -610,14 +610,15 @@ RtlirDesign* Elaborator::ElaborateTops(
   // cu_param_scope_ by now, and a compilation-unit class is lowered ahead of
   // the modules, with the design as its only scope.
   design->unit_constants = cu_param_scope_;
-  // §37.83: the attributes of the classes outside every module.
-  RecordDesignClassAttributes(*design, diag_, cu_param_scope_);
   FinalizeDesignTail(
       design, unit_,
       TypeNameSources{typedefs_, aggregate_typedef_names_, arena_},
       DesignMetadata{elab_simulation_blocked_, elab_last_severity_,
                      elab_last_severity_msg_, elab_last_severity_scope_,
                      elab_last_severity_loc_});
+  // §37.83: the attributes of the classes outside every module, which the
+  // tail has just put on the design.
+  RecordDesignClassAttributes(*design, diag_, cu_param_scope_);
   UnitScopeTables::PopulateUnitTypeFacts(*this, design);
   return design;
 }
