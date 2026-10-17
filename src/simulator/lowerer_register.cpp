@@ -778,10 +778,9 @@ static ClassTypeInfo* ClassNamedByDesignTypedef(std::string_view alias,
 }
 
 void RegisterClassTypeAliases(const RtlirDesign* design, SimContext& ctx,
-                              Arena& arena, std::string_view alias_prefix) {
+                              Arena& arena) {
   for (const auto& [alias, target] : design->type_targets) {
-    if (!alias.starts_with(alias_prefix) || ctx.FindClassType(alias) != nullptr)
-      continue;
+    if (ctx.FindClassType(alias) != nullptr) continue;
     ClassTypeInfo* cls = ctx.FindClassType(target);
     if (cls != nullptr) {
       ctx.RegisterClassType(alias,

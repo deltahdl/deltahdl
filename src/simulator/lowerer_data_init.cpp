@@ -10,7 +10,6 @@
 // steps.
 
 #include <algorithm>
-#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -152,11 +151,6 @@ void Lowerer::LowerUnitClassPackageBases() {
                         ctx_.FindClassType(item->class_decl->name));
     }
     LowerUnimportedClassesOf(pkg);
-    // §6.18 with §26.3: the package's typedefs naming its classes are bound
-    // while the bare names still name them, as LowerUnimportedPackageClasses
-    // binds them; once the names are given back, `p::bt` would name none.
-    RegisterClassTypeAliases(design_, ctx_, arena_,
-                             std::string(pkg->name) + "::");
     for (const auto& [name, info] : held) ctx_.RegisterClassType(name, info);
   }
 }

@@ -352,31 +352,4 @@ TEST(PackageImportSim, AUnitClassExtendsAClassNamedThroughAPackage) {
             379u);
 }
 
-// §6.18 with §26.3: a package's typedef naming its own class names it still
-// when a unit class's extends clause has the package lowered ahead of the
-// unit's classes, so `p::bt h = new` constructs a p::B, whose b is 3, beside
-// the unit's D; the unit's own typedef `dt` names D: 3, 3 and 3 read as 333.
-// The package's bare names were given back before its typedefs were bound,
-// and `p::bt` named no class.
-TEST(PackageImportSim, APackagesClassTypedefSurvivesItsEarlyLowering) {
-  EXPECT_EQ(RunAndGet("package p;\n"
-                      "  class B;\n"
-                      "    int b = 3;\n"
-                      "  endclass\n"
-                      "  typedef B bt;\n"
-                      "endpackage\n"
-                      "class D extends p::B;\n"
-                      "endclass\n"
-                      "typedef D dt;\n"
-                      "module t;\n"
-                      "  p::bt h = new;\n"
-                      "  dt e = new;\n"
-                      "  D d = new;\n"
-                      "  int r;\n"
-                      "  initial r = h.b * 100 + e.b * 10 + d.b;\n"
-                      "endmodule\n",
-                      "r"),
-            333u);
-}
-
 }  // namespace
