@@ -327,7 +327,17 @@ void FillAssertion(VpiObject* obj, const Stmt& stmt, const VpiStmtBuild& with) {
     AddChild(obj, with.expression(stmt.assert_expr));
   } else {
     if (stmt.kind != StmtKind::kExpect) VpiFillAssertionClock(obj, stmt, with);
-    if (stmt.assert_instance != nullptr) {
+    if (stmt.assert_instance != nullptr && stmt.kind == StmtKind::kExpect) {
+      // §37.73: an expect stmt reaches a property spec whatever it watches,
+      // the spec's property expr being the instance of a declared property.
+      VpiObject* spec = with.build.alloc();
+      spec->type = vpiPropertySpec;
+      spec->parent = obj;
+      spec->clocking_event = EventCondition(stmt.assert_clock, with);
+      spec->disable_condition = with.expression(stmt.assert_disable_iff);
+      obj->children.push_back(spec);
+      VpiMakePropertyInst(spec, *stmt.assert_instance, with);
+    } else if (stmt.assert_instance != nullptr) {
       VpiMakePropertyInst(obj, *stmt.assert_instance, with);
     } else {
       VpiMakePropertySpec(obj, stmt, with);

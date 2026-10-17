@@ -219,6 +219,26 @@ TEST_F(ExpectsOfARun, AnExpectStatementReachesItsPropertySpec) {
   EXPECT_NE(vpi_handle(vpiClockingEvent, spec), nullptr);
 }
 
+// An expect statement watching a declared property reaches a property spec as
+// any other does, the spec's property expression being the instance of the
+// property it names.
+TEST_F(ExpectsOfARun, AnExpectOfADeclaredPropertyReachesAPropertySpec) {
+  Run("module top; logic clk, a;\n"
+      "  property p; @(posedge clk) a; endproperty\n"
+      "  initial begin\n"
+      "    expect (p) $display(\"p\");\n"
+      "  end\n"
+      "endmodule\n");
+  vpiHandle expect = FirstHeldStatement();
+  ASSERT_NE(expect, nullptr);
+  vpiHandle spec = vpi_handle(vpiPropertySpec, expect);
+  ASSERT_NE(spec, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, spec), vpiPropertySpec);
+  vpiHandle instance = vpi_handle(vpiPropertyExpr, spec);
+  ASSERT_NE(instance, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, instance), vpiPropertyInst);
+}
+
 // The expect statement's else is drawn from an expect statement alone: no
 // object and an object of another kind have none.
 TEST(ExpectModel, OnlyAnExpectStatementHasAnElse) {
