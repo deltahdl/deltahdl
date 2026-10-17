@@ -622,6 +622,10 @@ VpiObject* HierarchicalObject(const Expr* expr, const AssignBuild& build) {
     }
     return FindObjectForFlatName(VpiObjectMap{{kFirst, holder}}, dotted);
   }
+  if (VpiObject* block = VpiClockingBlockAround(
+          build.names.scope, build.names.objects, build.names.prefix, kFirst)) {
+    return VpiPrefixedReference(block, dotted, build.alloc, build.keep);
+  }
   VpiObject* below = FindObjectForFlatName(
       build.names.objects, VpiFlatName(build.names.prefix, dotted));
   return below != nullptr ? below

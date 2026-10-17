@@ -315,6 +315,14 @@ VpiObject* VpiBitAtOffset(const VpiObject& root, int64_t offset);
 // class var, a virtual interface var or a clocking block.
 bool VpiIsDynamicPrefixHolderType(int type);
 
+// §14.3 with §23.9: the clocking block named `name` that `scope`, or a scope
+// around it, declares - from the instance `objects` holds under `instance`
+// where no scope is given; null for none.
+VpiObject* VpiClockingBlockAround(const VpiObject* scope,
+                                  const VpiObjectMap& objects,
+                                  const std::string& instance,
+                                  std::string_view name);
+
 // §37.61 detail 1: the simple expression written through `holder`, one of the
 // three, as `written`: a ref obj named as written whose vpiPrefix is `holder`.
 // Which object it stands for is fixed only as the run goes, so it holds none.
