@@ -45,6 +45,14 @@ struct EventQueue {
   void Clear();
 };
 
+// §37.81: a time whose time slot still holds events, and whether one of them
+// stands in a region before the Postponed region, where cbReadOnlySynch runs
+// (§4.10, Table 4-1).
+struct PendingTimeSlot {
+  SimTime time;
+  bool before_read_only_synch = false;
+};
+
 struct TimeSlot {
   std::array<EventQueue, kRegionCount> regions{};
 
@@ -143,6 +151,8 @@ class Scheduler {
 
   Region CurrentRegion() const { return current_region_; }
   bool HasEvents() const { return !event_calendar_.empty(); }
+  // §37.81: the time slots still holding events, in increasing time.
+  std::vector<PendingTimeSlot> PendingTimeSlots() const;
 
   // Back-reference to the owning context, set once at construction. Used to
   // clear the executing process when the scheduler goes idle (see Run()) and

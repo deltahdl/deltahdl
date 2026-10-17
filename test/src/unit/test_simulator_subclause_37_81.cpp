@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <vector>
 
+#include "fixture_vpi_run.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_object.h"
@@ -98,6 +100,57 @@ TEST_F(TimeQueue, FutureSlotContributesWhileCurrentSlotIsFiltered) {
   ASSERT_NE(only, nullptr);
   EXPECT_EQ(VpiObjectOf(only)->time_queue_time, 8u);
   EXPECT_EQ(vpi_scan(it), nullptr);
+}
+
+// The times of the time queue objects the last call of $tq found after its
+// own time, in the order the iteration handed them back.
+std::vector<uint64_t> g_queued_times;
+
+uint64_t TicksOf(const s_vpi_time& time) {
+  return (static_cast<uint64_t>(time.high) << 32) | time.low;
+}
+
+PLI_INT32 TimeQueueCalltf(PLI_BYTE8* /*user_data*/) {
+  s_vpi_time now = {};
+  now.type = vpiSimTime;
+  vpi_get_time(nullptr, &now);
+  g_queued_times.clear();
+  vpiHandle it = vpi_iterate(vpiTimeQueue, nullptr);
+  while (vpiHandle slot = it == nullptr ? nullptr : vpi_scan(it)) {
+    s_vpi_time time = {};
+    time.type = vpiSimTime;
+    vpi_get_time(slot, &time);
+    if (TicksOf(time) > TicksOf(now)) g_queued_times.push_back(TicksOf(time));
+  }
+  return 0;
+}
+
+// A design run with the system task $tq registered beside the fixture's own,
+// which reads the time queue from inside the run.
+class TimeQueueOfARun : public VpiDesignRun {
+ protected:
+  void SetUp() override {
+    VpiDesignRun::SetUp();
+    g_queued_times.clear();
+    s_vpi_systf_data data = {};
+    data.type = vpiSysTask;
+    data.tfname = VpiText("$tq");
+    data.calltf = &TimeQueueCalltf;
+    ASSERT_NE(vpi_register_systf(&data), nullptr);
+  }
+};
+
+// A run's time queue is the time slots still holding events when it is read:
+// a call at time 5 finds the slots of the delays still pending, at 10 and 30,
+// in increasing time (detail 1).
+TEST_F(TimeQueueOfARun, ARunsPendingSlotsAreItsTimeQueue) {
+  Run("module top; logic x;\n"
+      "  initial #30 x = 1;\n"
+      "  initial #10 x = 0;\n"
+      "  initial #5 $tq;\n"
+      "endmodule\n");
+  ASSERT_EQ(g_queued_times.size(), 2u);
+  EXPECT_LT(g_queued_times[0], g_queued_times[1]);
 }
 
 }  // namespace

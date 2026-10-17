@@ -324,4 +324,14 @@ void Scheduler::RunEvent(Event* event) {
   pool_.Release(event);
 }
 
+std::vector<PendingTimeSlot> Scheduler::PendingTimeSlots() const {
+  std::vector<PendingTimeSlot> slots;
+  for (const auto& [time, slot] : event_calendar_) {
+    if (!slot.AnyNonemptyIn(Region::kPreponed, Region::kPostponed)) continue;
+    slots.push_back(
+        {time, slot.AnyNonemptyIn(Region::kPreponed, Region::kPrePostponed)});
+  }
+  return slots;
+}
+
 }  // namespace delta

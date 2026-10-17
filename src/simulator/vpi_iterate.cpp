@@ -852,7 +852,7 @@ void DispatchVpiIterate(int type, VpiHandle ref, const VpiIterateModes& modes,
 VpiHandle VpiContext::Iterate(int type, VpiHandle ref, int compatibility_mode) {
   // §37.44: a thread that started since the last iteration is one of the run's
   // threads too, so the objects are brought up to date before this one answers.
-  RefreshThreadObjects();
+  RefreshRunObjects();
 
   // Classify this (type, ref) iteration into its special modes. The detailed
   // §37.x reasoning for each mode lives in ComputeVpiIterateModes; collecting

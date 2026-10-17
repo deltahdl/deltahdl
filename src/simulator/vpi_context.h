@@ -733,10 +733,12 @@ class VpiContext {
 
   // §37.44: the VPI object standing for one of the run's threads, and the pass
   // that brings the set of them up to date with the run, written in
-  // src/simulator/vpi_design_attach.cpp; §37.33 details 2 and 5: the class obj
-  // a class var references now, written in vpi_class_objects.cpp.
+  // src/simulator/vpi_design_attach.cpp; that pass with §37.81's time queue
+  // slots made from the run's pending ones; §37.33 details 2 and 5: the class
+  // obj a class var references now, written in vpi_class_objects.cpp.
   VpiHandle ThreadObjectFor(Process* proc);
   void RefreshThreadObjects();
+  void RefreshRunObjects();
   VpiHandle ClassObjectOf(VpiObject& class_var);
 
   // §37.43 detail 4: activate the frame of a subroutine the run has just
