@@ -799,6 +799,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/vpi_helpers_variables.cpp
     simulator/vpi_include_file.cpp
     simulator/vpi_iterate.cpp
+    simulator/vpi_net_driver_load_kinds.cpp
     simulator/vpi_query.cpp
     simulator/vpi_query_str.cpp
     simulator/vpi_select_indexes.cpp

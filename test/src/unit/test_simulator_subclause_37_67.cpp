@@ -255,5 +255,20 @@ TEST_F(WaitsOfARun, AnElseActionAloneIsTheElseStatement) {
   EXPECT_EQ(vpi_get(vpiType, otherwise), vpiAssignment);
 }
 
+// An ordered wait reaches the events it waits on through its one-to-many
+// vpiCondition, in the order written, and not its actions.
+TEST_F(WaitsOfARun, AnOrderedWaitIteratesTheEventsItWaitsOn) {
+  Run("module top; event a, b; int r;\n"
+      "  initial begin wait_order (b, a) r = 1; else r = 2; end\n"
+      "endmodule\n");
+  const std::vector<vpiHandle> kStmts = BlockStatements();
+  ASSERT_EQ(kStmts.size(), 1U);
+  vpiHandle it = vpi_iterate(vpiCondition, kStmts[0]);
+  ASSERT_NE(it, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(it)), VpiObjectOf(By("top.b")));
+  EXPECT_EQ(VpiObjectOf(vpi_scan(it)), VpiObjectOf(By("top.a")));
+  EXPECT_EQ(vpi_scan(it), nullptr);
+}
+
 }  // namespace
 }  // namespace delta

@@ -626,6 +626,10 @@ bool VpiIsVariableLoadType(int type);
 // the complex-expression rule of detail 1, recognised separately below.
 // ===========================================================================
 
+// §37.46 (figure): the kinds the dotted `ports` enclosure of the net drivers
+// and net loads classes groups - a port and a port bit (§37.14).
+bool VpiIsPortsType(int type);
+
 // §37.46 (figure, net drivers): the object kinds that drive a net - a port, a
 // force, a delay terminal, a continuous assignment (whole or single bit), or a
 // primitive terminal.
