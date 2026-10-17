@@ -305,13 +305,14 @@ TEST_F(CallsOutsideProcedures, AClassObjsConstraintsCallIsShaped) {
 
 // A call a class obj's constraint inherited from a package's class makes
 // finds its callee where the base is declared, the package, rather than where
-// the derived class is (§8.13) (#7291).
+// the derived class is, which imports the class alone and so sees no g
+// (§8.13, §26.3) (#7291).
 TEST_F(CallsOutsideProcedures, AnInheritedConstraintsCallFindsItsCallee) {
   Run("package p;\n"
       "  function automatic int g(int v); return v; endfunction\n"
       "  class B; rand int x; constraint b { x < g(1); } endclass\n"
       "endpackage\n"
-      "module top; class D extends p::B; endclass\n"
+      "module top; import p::B; class D extends B; endclass\n"
       "  D h = new;\n"
       "endmodule\n");
   vpiHandle obj = vpi_handle(vpiClassObj, By("top.h"));
