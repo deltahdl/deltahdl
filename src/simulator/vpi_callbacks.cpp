@@ -27,6 +27,7 @@
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers2.h"
+#include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
 
 namespace delta {
@@ -162,8 +163,10 @@ bool VpiIsCallbackHostType(int type) {
   // `callback` - a prim term, an expr, a time queue and a stmt. Two of the four
   // are drawn in dotted enclosures, which §37.4.1 makes classes grouping other
   // objects and classes rather than kinds, so what they stand for is every kind
-  // §37.59 draws in `expr` and every kind the `stmt` class groups.
+  // §37.59 draws in `expr`, the nets and variables §37.58's `expr` groups
+  // among them, and every kind the `stmt` class groups.
   return type == vpiPrimTerm || type == kVpiTimeQueue || VpiIsExprType(type) ||
+         VpiIsNetsType(type) || VpiIsVariablesType(type) ||
          VpiIsScopeBodyStmtType(type);
 }
 

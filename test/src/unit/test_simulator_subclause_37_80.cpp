@@ -298,5 +298,32 @@ TEST_F(Callback, TheSingleArrowReachesNothingOnceTheCallbackIsRemoved) {
   EXPECT_EQ(vpi_handle(vpiCallback, VpiHandleOf(&statement)), nullptr);
 }
 
+// The single arrow from `expr` is drawn from the nets and variables §37.58's
+// `expr` class groups too: a callback placed on a net or a variable is reached
+// from it, and so is not among those the NULL-reference iteration reaches
+// (detail 2).
+TEST_F(Callback, ANetAndAVariableReachTheirCallbacks) {
+  VpiObject net;
+  net.type = vpiNet;
+  VpiObject var;
+  var.type = vpiReg;
+
+  s_cb_data on_net = {};
+  on_net.reason = cbForce;
+  on_net.obj = VpiHandleOf(&net);
+  vpiHandle net_cb = vpi_register_cb(&on_net);
+  ASSERT_NE(net_cb, nullptr);
+
+  s_cb_data on_var = {};
+  on_var.reason = cbForce;
+  on_var.obj = VpiHandleOf(&var);
+  vpiHandle var_cb = vpi_register_cb(&on_var);
+  ASSERT_NE(var_cb, nullptr);
+
+  EXPECT_EQ(vpi_handle(vpiCallback, VpiHandleOf(&net)), net_cb);
+  EXPECT_EQ(vpi_handle(vpiCallback, VpiHandleOf(&var)), var_cb);
+  EXPECT_EQ(vpi_iterate(vpiCallback, nullptr), nullptr);
+}
+
 }  // namespace
 }  // namespace delta
