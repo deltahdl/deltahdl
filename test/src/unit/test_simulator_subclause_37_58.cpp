@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <vector>
 
 #include "fixture_vpi_run.h"
@@ -291,6 +292,98 @@ TEST_F(BitSelectsOfARun, AVaryingBitOfANetHoldsTheBitItsIndexSelects) {
       "assign a = 8'b0000_0100;\n"
       "endmodule\n");
   EXPECT_EQ(IntOf(Rhs()), 1);
+}
+
+// §37.58 detail 3: a bit select whose index is a variable is no constant
+// select...
+TEST_F(BitSelectsOfARun, ABitSelectByAVariableIsNoConstantSelect) {
+  Run("module top; integer i, j; wire w; assign w = i[j]; endmodule\n");
+  EXPECT_EQ(vpi_get(vpiConstantSelect, Rhs()), 0);
+}
+
+// ...where one by a constant of a static variable is.
+TEST_F(BitSelectsOfARun, ABitSelectByAConstantIsAConstantSelect) {
+  Run(kIntegerBit);
+  EXPECT_EQ(vpi_get(vpiConstantSelect, Rhs()), 1);
+}
+
+// §37.58: a bit select is named by its parent and the index it was written
+// with...
+TEST_F(BitSelectsOfARun, ABitSelectIsNamedByItsParentAndIndex) {
+  Run(kIntegerBit);
+  EXPECT_STREQ(vpi_get_str(vpiName, Rhs()), "i[3]");
+}
+
+// ...under the parent's full name.
+TEST_F(BitSelectsOfARun, ABitSelectsFullNameIsItsParents) {
+  Run(kIntegerBit);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, Rhs()), "top.i[3]");
+}
+
+constexpr const char* kElementBit =
+    "module top; logic [7:0] arr [0:3]; wire y; assign y = arr[1][3];\n"
+    "endmodule\n";
+
+// §37.17 details 2 and 18: an element of an array of vectors is a variable of
+// the element's type, so a bit of it is one of its var bits...
+TEST_F(BitSelectsOfARun, ABitOfAnElementIsTheElementsVarBit) {
+  Run(kElementBit);
+  vpiHandle element = vpi_handle_by_index(By("top.arr"), 1);
+  ASSERT_NE(element, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, Rhs()), vpiRegBit);
+  EXPECT_EQ(Rhs(), vpi_handle_by_index(element, 3));
+}
+
+// ...none of which is an index of the element.
+TEST_F(BitSelectsOfARun, AnElementsBitsAreNoIndicesOfIt) {
+  Run(kElementBit);
+  vpiHandle element = vpi_handle_by_index(By("top.arr"), 1);
+  ASSERT_NE(element, nullptr);
+  vpiHandle it = vpi_iterate(vpiIndex, element);
+  ASSERT_NE(it, nullptr);
+  int count = 0;
+  while (vpi_scan(it) != nullptr) ++count;
+  EXPECT_EQ(count, 1);
+}
+
+// The lines the objects vpiUse reaches from `expr` were written on, lowest
+// first.
+std::vector<int> LinesOfUses(vpiHandle expr) {
+  std::vector<int> lines;
+  vpiHandle it = vpi_iterate(vpiUse, expr);
+  if (it == nullptr) return lines;
+  for (vpiHandle use = vpi_scan(it); use != nullptr; use = vpi_scan(it)) {
+    lines.push_back(vpi_get(vpiLineNo, use));
+  }
+  std::ranges::sort(lines);
+  return lines;
+}
+
+// §37.58 detail 1: the uses of a vector are those of the vector and of its
+// bit and part selects, a continuous assignment and a statement among them,
+// and no other.
+TEST_F(BitSelectsOfARun, AVectorIsUsedWhereItOrASelectOfItIs) {
+  Run("module top; logic [7:0] v; wire a, b, c; logic [7:0] w;\n"
+      "assign a = v[2];\n"
+      "assign b = c;\n"
+      "assign c = |v[5:4];\n"
+      "initial w = v;\n"
+      "endmodule\n");
+  EXPECT_EQ(LinesOfUses(By("top.v")), (std::vector<int>{2, 4, 5}));
+}
+
+// §37.58 detail 2: the uses of a bit select are those of that bit, of the
+// vector it selects from and of a part select of the vector holding it, and
+// not one of another bit.
+TEST_F(BitSelectsOfARun, ABitIsUsedWhereItItsVectorOrASelectHoldingItIs) {
+  Run("module top; integer i, j; wire a, b, c, d;\n"
+      "assign a = i[3];\n"
+      "assign b = i[3];\n"
+      "assign c = i[5];\n"
+      "assign d = ^i[4:2];\n"
+      "initial j = i;\n"
+      "endmodule\n");
+  EXPECT_EQ(LinesOfUses(Rhs()), (std::vector<int>{2, 3, 5, 6}));
 }
 
 // §37.58 with §37.16: a bit reaches its index and the object it is a bit of,

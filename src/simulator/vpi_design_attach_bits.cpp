@@ -131,9 +131,33 @@ void AddNetBitTargets(const RtlirModule* mod, const std::string& prefix,
   }
 }
 
+// The keys the run holds `var`'s objects under, `key` being the variable's:
+// that key alone, or for an array whose every unpacked dimension is fixed, the
+// key of each of its elements, which is a variable of the element's type and
+// has bits as one (§37.17 details 2 and 18).
+std::vector<std::string> VariableBitKeys(const RtlirVariable& var,
+                                         const std::string& key) {
+  std::vector<std::string> keys{key};
+  if (var.num_unpacked_dims == 0 || var.is_queue || var.is_dynamic ||
+      var.is_assoc || var.unpacked_dims.size() != var.num_unpacked_dims) {
+    return keys;
+  }
+  for (const RtlirUnpackedDim& dim : var.unpacked_dims) {
+    std::vector<std::string> inner;
+    for (const std::string& outer : keys) {
+      for (int64_t i = dim.Low(); i < dim.Low() + dim.Size(); ++i) {
+        inner.push_back(outer + "[" + std::to_string(i) + "]");
+      }
+    }
+    keys = std::move(inner);
+  }
+  return keys;
+}
+
 // The objects of the instance at `prefix` that have bits: its vector nets and
-// its packed logic and bit variables. The ranges are the declarations', read in
-// the instance's own scope, where its parameters have their instance's values.
+// its packed logic and bit variables, the elements of arrays of them included.
+// The ranges are the declarations', read in the instance's own scope, where
+// its parameters have their instance's values.
 std::vector<BitTarget> BitTargets(const RtlirModule* mod,
                                   const std::string& prefix,
                                   const VpiObjectMap& objects,
@@ -143,11 +167,13 @@ std::vector<BitTarget> BitTargets(const RtlirModule* mod,
   std::vector<BitTarget> targets;
   AddNetBitTargets(mod, prefix, objects, ctx, targets);
   for (const RtlirVariable& var : VpiDeclaredVariables(*mod)) {
-    VpiHandle obj =
-        FindObjectForFlatName(objects, VpiFlatName(prefix, var.name));
-    if (obj == nullptr || !HasVarBits(*obj)) continue;
-    auto dims = VarBitDims(*obj, var, ctx);
-    if (dims) targets.push_back({obj, vpiRegBit, std::move(*dims)});
+    for (const std::string& key :
+         VariableBitKeys(var, VpiFlatName(prefix, var.name))) {
+      VpiHandle obj = FindObjectForFlatName(objects, key);
+      if (obj == nullptr || !HasVarBits(*obj)) continue;
+      auto dims = VarBitDims(*obj, var, ctx);
+      if (dims) targets.push_back({obj, vpiRegBit, std::move(*dims)});
+    }
   }
   return targets;
 }

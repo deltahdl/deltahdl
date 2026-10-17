@@ -842,10 +842,11 @@ bool VpiBitSelectConstantSelectOf(VpiHandle select) {
   // parent.
   if (!select || select->type != vpiBitSelect) return false;
 
-  // The index expressions are the ones vpi_iterate(vpiIndex, sel) reaches - the
-  // select's expression children - and an index that is an elaboration-time
-  // constant stands as a constant expression object.
-  bool all_indices_constant = true;
+  // The index expressions are the one the select was written with, which
+  // vpiIndex reaches, and the select's expression children; an index that is
+  // an elaboration-time constant stands as a constant expression object.
+  bool all_indices_constant =
+      select->index_expr == nullptr || select->index_expr->type == vpiConstant;
   for (const VpiObject* child : select->children) {
     if (!VpiIsExprType(child->type)) continue;
     if (child->type != vpiConstant) all_indices_constant = false;

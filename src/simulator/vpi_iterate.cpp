@@ -16,6 +16,7 @@
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_simple_expr_uses.h"
 
 namespace delta {
 
@@ -118,6 +119,8 @@ struct VpiIterateModes {
   // §37.67: an ordered wait's vpiCondition iteration, which reaches the events
   // it waits on in order.
   bool ordered_wait_events = false;
+  // §37.58 details 1 and 2: a simple expression's vpiUse relation.
+  bool simple_expr_use = false;
 };
 
 // The context-owned object and registry stores an iteration is resolved
@@ -217,6 +220,7 @@ void ComputeDriverLoadModes(int type, VpiHandle ref, VpiIterateModes& m) {
   m.net_load = kNetSide && type == vpiLoad;
   m.variable_driver = ref && type == vpiDriver && !m.net_driver;
   m.variable_load = ref && type == vpiLoad && !m.net_load;
+  m.simple_expr_use = type == vpiUse && VpiIsSimpleExpr(ref);
 }
 
 // §37.31 details 1/3/5/6 + §37.33 details 3/4/6: classify the class special
@@ -406,6 +410,11 @@ bool VpiIterateMatchesEdgeMode(VpiHandle obj, int type, VpiHandle ref,
 bool VpiIterateMatches(VpiHandle obj, int type, VpiHandle ref,
                        const VpiIterateModes& modes) {
   bool matched = false;
+  // §37.17 detail 18: an element of an array of vectors holds its bits beside
+  // its indices, and none of them is an index of it.
+  if (modes.var_select_index && obj->type == vpiRegBit && obj->parent == ref) {
+    return false;
+  }
   // §37.20 detail 1: a reg array's vpiMemoryWord iteration collects reg word
   // objects, etc. - the fixed-kind special modes resolved first to preserve
   // precedence.
@@ -693,6 +702,8 @@ bool DispatchListedMode(int type, VpiHandle ref, const VpiIterateModes& modes,
     listed = VpiStructUnionMembers(ref);
   } else if (modes.terms_and_ports) {
     listed = VpiTermOrPortObjects(type, ref);
+  } else if (modes.simple_expr_use) {
+    listed = VpiSimpleExprUses(ref);
   } else {
     return false;
   }

@@ -1,0 +1,22 @@
+#pragma once
+
+#include <vector>
+
+#include "simulator/vpi_object.h"
+
+namespace delta {
+
+// §37.58 (figure): whether `obj` is a simple expression, the kinds whose
+// vpiUse relation reaches the objects that use them: a net, a variable, a ref
+// obj, a parameter, a spec param, a var select or a bit select.
+bool VpiIsSimpleExpr(VpiHandle obj);
+
+// §37.58 details 1 and 2: the objects the vpiUse relation of the simple
+// expression `expr` reaches, in the order the design holds them. Each is a
+// prim term, path term, tchk term, delay term, port, statement, cont assign or
+// cont assign bit whose own expressions use `expr`. Of a vector, a use of the
+// vector or of any select of it counts; of a bit, a use of that bit, of the
+// vector it is a bit of, or of a part select of that vector holding it.
+std::vector<VpiObject*> VpiSimpleExprUses(VpiHandle expr);
+
+}  // namespace delta

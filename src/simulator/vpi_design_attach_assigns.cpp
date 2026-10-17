@@ -331,6 +331,12 @@ VpiObject* BitSelectObject(const Expr* expr, const AssignBuild& build) {
     select->parent = base;
     select->size = 1;
     select->index_expr = ExpressionObject(expr->index, build);
+    // §37.58: named by its parent and the index it was written with.
+    const std::string kSuffix = "[" + VpiExprDecompile(expr->index) + "]";
+    select->name = build.keep(std::string(base->name) + kSuffix);
+    select->full_name =
+        (base->full_name.empty() ? std::string(base->name) : base->full_name) +
+        kSuffix;
     return select;
   }
   if (!base->packed_dims.empty() || base->select_dim) {
