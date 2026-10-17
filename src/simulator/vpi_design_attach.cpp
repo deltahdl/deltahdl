@@ -347,7 +347,7 @@ void VpiContext::AttachDesignPorts(const RtlirDesign* design) {
   std::vector<VpiDeferredCall> deferred;
   const VpiAttachBuild kBuild{kAlloc, kKeep, sim_ctx_->GetArena(), &deferred};
   AttachPortConnections(design, object_map_, *sim_ctx_, kBuild);
-  VpiShapeDeferredCalls(*design, object_map_, deferred, CallBuild(), kBuild);
+  VpiShapeDeferredCalls(design, object_map_, deferred, CallBuild(), kBuild);
   // §37.83: the attributes each port is written with.
   AttachPortAttributes(design, object_map_, *sim_ctx_, kBuild);
 }

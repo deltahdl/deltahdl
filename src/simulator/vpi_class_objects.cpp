@@ -143,7 +143,7 @@ Logic4Vec* VpiHeldPropertyValue(ClassObject& obj, std::string_view name) {
   return found == declarer->static_properties.end() ? nullptr : &found->second;
 }
 
-VpiObject* VpiMakeClassObject(ClassObject& obj, VpiObject* defn,
+VpiObject* VpiMakeClassObject(ClassObject& obj, const VpiClassObjDefn& of,
                               const VpiObjectMap& objects, SimContext& ctx,
                               const VpiAttachBuild& build) {
   VpiObject* made = build.alloc();
@@ -154,7 +154,7 @@ VpiObject* VpiMakeClassObject(ClassObject& obj, VpiObject* defn,
   typespec->type = vpiClassTypespec;
   typespec->name = build.keep(std::string(obj.type->name));
   typespec->parent = made;
-  if (defn != nullptr) typespec->children.push_back(defn);
+  if (of.defn != nullptr) typespec->children.push_back(of.defn);
   made->children.push_back(typespec);
   std::vector<const ClassTypeInfo*> chain;
   for (const ClassTypeInfo* cls : ClassChain(obj.type)) {
@@ -173,8 +173,12 @@ VpiObject* VpiMakeClassObject(ClassObject& obj, VpiObject* defn,
   static const std::vector<std::string_view> kNoGenBlocks;
   std::string prefix(obj.instance);
   if (!prefix.empty() && prefix.back() == '.') prefix.pop_back();
-  MakeObjectConstraints(made, obj, chain,
-                        {objects, prefix, kNoGenBlocks, made, ctx}, build);
+  // §37.42 with §37.12: a call a constraint writes stands in the class obj,
+  // its callee found where the class is declared.
+  const VpiCallStand kStand{made, of.calls.mod, of.calls.package};
+  MakeObjectConstraints(
+      made, obj, chain,
+      {objects, prefix, kNoGenBlocks, made, ctx, nullptr, &kStand}, build);
   return made;
 }
 
@@ -208,14 +212,21 @@ VpiHandle VpiContext::MadeClassObject(ClassObject& obj) {
   // reclaimed, so an object made for one that has since gone is made afresh.
   VpiObject*& made = run_objects_[&obj];
   if (made == nullptr || made->obj_id != static_cast<int64_t>(obj.handle)) {
-    made = VpiMakeClassObject(obj, ClassDefnOf(obj, object_map_, run_objects_),
-                              object_map_, *sim_ctx_,
-                              {[this] { return AllocObject(); },
-                               [this](std::string name) {
-                                 name_pool_.push_back(std::move(name));
-                                 return std::string_view(name_pool_.back());
-                               },
-                               sim_ctx_->GetArena()});
+    // §37.42: the calls the object's constraints write, shaped once it is.
+    std::vector<VpiDeferredCall> deferred;
+    const VpiAttachBuild kBuild{[this] { return AllocObject(); },
+                                [this](std::string name) {
+                                  name_pool_.push_back(std::move(name));
+                                  return std::string_view(name_pool_.back());
+                                },
+                                sim_ctx_->GetArena(), &deferred};
+    // A class whose defn was not made finds its callees among the
+    // compilation unit's declarations alone.
+    VpiObject* defn = ClassDefnOf(obj, object_map_, run_objects_);
+    made = VpiMakeClassObject(obj, {defn, call_objects_.class_sites[defn]},
+                              object_map_, *sim_ctx_, kBuild);
+    VpiShapeDeferredCalls(call_objects_.design, object_map_, deferred,
+                          CallBuild(), kBuild);
   }
   return made;
 }

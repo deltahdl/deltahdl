@@ -320,7 +320,8 @@ std::string VpiScopedFullName(const VpiObject* scope, std::string_view name) {
 VpiClassDefnObjects AttachClassDefinitions(const RtlirDesign* design,
                                            const VpiObjectMap& objects,
                                            SimContext& ctx,
-                                           const VpiAttachBuild& build) {
+                                           const VpiAttachBuild& build,
+                                           VpiClassCallSites& sites) {
   // §37.31: each class a design declares is a class defn, reached from the
   // instance or package declaring it, or with a NULL reference for a class of
   // the compilation unit. Nothing made one, so vpiClassDefn reached none.
@@ -346,6 +347,7 @@ VpiClassDefnObjects AttachClassDefinitions(const RtlirDesign* design,
   VpiClassDefnObjects defns;
   for (const MadeClassDefn& owner : made) {
     defns[{owner.decl, owner.prefix}] = owner.defn;
+    sites[owner.defn] = {owner.mod, owner.package};
   }
   return defns;
 }

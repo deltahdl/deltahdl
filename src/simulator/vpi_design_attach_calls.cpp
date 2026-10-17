@@ -846,6 +846,24 @@ CallShape ScopedCallShape(const Expr& callee, const BlockParent& parent,
       nullptr, walk);
 }
 
+// §8.6 and §8.13 with §37.42 detail 2: a call a class's constraint writes of
+// a method its class declares or inherits - the class defn's, or a class
+// obj's, named by its class typespec, the first object it holds (§37.33) - a
+// method call applied to the class obj, or to no object in the defn; nothing
+// for any other scope or name.
+CallShape OwnMethodCallShape(const Expr& callee, const BlockParent& parent,
+                             const BodyWalk& walk) {
+  const VpiObject& scope = *parent.scope;
+  const bool kInObject = scope.type == vpiClassObj;
+  if (!kInObject && scope.type != vpiClassDefn) return {};
+  const MethodCall kCall = ClassMethodCall(
+      walk, kInObject ? scope.children.front()->name : scope.name, callee.text,
+      walk.package);
+  if (!kCall.declared) return {};
+  return MethodShape(kCall, callee.text, kInObject ? parent.scope : nullptr,
+                     walk);
+}
+
 }  // namespace
 
 VpiCallSite CallSiteOf(const BlockParent& parent, const BodyWalk& walk) {
@@ -866,34 +884,6 @@ int TypeVariableKind(const DataType& type, const BodyWalk& walk) {
     return VpiNamedTypeVariableKind(walk.design, walk.mod, type.type_name);
   }
   return VpiDataTypeVariableKind(type.kind);
-}
-
-const Stmt* BlockVarDecl(const BlockParent& parent, std::string_view name,
-                         const BlockParent*& where) {
-  for (const BlockParent* at = &parent; at != nullptr; at = at->outer) {
-    if (at->block == nullptr) continue;
-    for (const Stmt* item : BlockItems(*at->block)) {
-      if (item->kind == StmtKind::kVarDecl && item->var_name == name) {
-        where = at;
-        return item;
-      }
-    }
-  }
-  return nullptr;
-}
-
-bool ChainNames(const Expr& expr, std::vector<std::string_view>& names) {
-  if (expr.kind == ExprKind::kIdentifier) {
-    names.push_back(expr.text);
-    return true;
-  }
-  if (expr.kind != ExprKind::kMemberAccess || expr.is_scope_resolution) {
-    return false;
-  }
-  // The right-hand side of a member access is always the member's name.
-  if (!ChainNames(*expr.lhs, names)) return false;
-  names.push_back(expr.rhs->text);
-  return true;
 }
 
 int ForeachIndexKind(const Expr* array, const BlockParent& parent,
@@ -924,6 +914,8 @@ CallShape CallShapeOf(const Expr& expr, const BlockParent& parent,
   const Expr* callee = expr.kind == ExprKind::kCall ? expr.lhs : &expr;
   if (callee == nullptr) return {};
   if (callee->kind == ExprKind::kIdentifier) {
+    CallShape own = OwnMethodCallShape(*callee, parent, walk);
+    if (own.type != 0) return own;
     return SubroutineCallShape(
         VpiCalleeSubroutine(CallSiteOf(parent, walk), *callee), callee->text);
   }

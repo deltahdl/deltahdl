@@ -14,15 +14,23 @@ namespace delta {
 class SimContext;
 struct ClassObject;
 
+// The class defn a class obj's typespec reaches, null for none (§37.32), and
+// where the calls its constraints write find their callees (§37.42).
+struct VpiClassObjDefn {
+  VpiObject* defn;
+  const VpiClassCallSite& calls;
+};
+
 // §37.33 details 1, 5 and 6: the class obj standing for the run's class object
 // `obj`, made with `build`: its vpiObjId is the object's handle, it holds a
 // class typespec of the class the object was created with, reaching that
-// class's defn `defn` where there is one (§37.32), and a variable per property
-// that class and the classes it extends declare, base first, each holding a
-// copy of the value the object holds; and a constraint per constraint block
-// they declare (§37.34), whose names resolve among the object's variables and
-// then among `objects`.
-VpiObject* VpiMakeClassObject(ClassObject& obj, VpiObject* defn,
+// class's defn `of.defn` where there is one (§37.32), and a variable per
+// property that class and the classes it extends declare, base first, each
+// holding a copy of the value the object holds; and a constraint per
+// constraint block they declare (§37.34), whose names resolve among the
+// object's variables and then among `objects`, and a call in which stands in
+// the class obj, its callee found where `of.calls` says (§37.42).
+VpiObject* VpiMakeClassObject(ClassObject& obj, const VpiClassObjDefn& of,
                               const VpiObjectMap& objects, SimContext& ctx,
                               const VpiAttachBuild& build);
 

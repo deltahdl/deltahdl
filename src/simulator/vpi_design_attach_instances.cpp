@@ -248,8 +248,9 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
     AttachParameters(design, object_map_, call_objects_.unit_typespecs,
                      *sim_ctx_, kBuild);
     AttachAttributes(design, object_map_, *sim_ctx_, kBuild);
-    call_objects_.classes =
-        AttachClassDefinitions(design, object_map_, *sim_ctx_, kBuild);
+    call_objects_.design = design;
+    call_objects_.classes = AttachClassDefinitions(
+        design, object_map_, *sim_ctx_, kBuild, call_objects_.class_sites);
     // §37.32: the class defn a run's class obj reaches through its typespec,
     // kept per declaration. A class a module declares has one per instance,
     // and ClassDefnOf in vpi_class_objects.cpp takes the one under the
@@ -273,7 +274,7 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
         [this](const UdpDecl* decl) { return run_objects_.at(decl); },
         *sim_ctx_, kBuild);
     AttachContinuousAssignments(design, kCalls);
-    VpiShapeDeferredCalls(*design, object_map_, deferred, kCalls, kBuild);
+    VpiShapeDeferredCalls(design, object_map_, deferred, kCalls, kBuild);
   }
   AttachGenBlockStorage(design, object_map_);
   AttachGenBlockInstances(design, object_map_, [this](std::string name) {

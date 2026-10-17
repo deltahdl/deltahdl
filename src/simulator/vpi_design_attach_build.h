@@ -292,15 +292,28 @@ VpiCalleeResolver VpiCalleesAt(const VpiCallSite& site);
 using VpiClassDefnObjects =
     std::map<std::pair<const ClassDecl*, std::string>, VpiObject*>;
 
+// §37.42: where a call a class's constraint writes stands, by the class defn:
+// the module or package declaring the class, whose declarations its callee is
+// found among, which a class obj of the class keeps, standing as the call's
+// scope itself (§37.12).
+struct VpiClassCallSite {
+  const RtlirModule* mod = nullptr;
+  std::string_view package;
+};
+using VpiClassCallSites =
+    std::unordered_map<const VpiObject*, VpiClassCallSite>;
+
 // §37.31: give each module instance and each package a class defn per class it
 // declares, and make one per class of the compilation unit, reached with a
 // NULL reference, each with its properties and methods; and details 5 and 6:
 // give each derived class its extends object and hang it from its base's
-// derived classes. Answers the class defns it made.
+// derived classes. Answers the class defns it made, and records in `sites`
+// where each one's calls stand.
 VpiClassDefnObjects AttachClassDefinitions(const RtlirDesign* design,
                                            const VpiObjectMap& objects,
                                            SimContext& ctx,
-                                           const VpiAttachBuild& build);
+                                           const VpiAttachBuild& build,
+                                           VpiClassCallSites& sites);
 
 // §37.17 details 4 and 6, §37.22: give each variable of the design its range
 // objects and its leftmost bounds.
@@ -677,13 +690,18 @@ struct VpiCallObjects {
   VpiClassDefnObjects classes;
   VpiSubroutineObjects subroutines;
   VpiObjectMap unit_typespecs;
+  // Where each class defn's calls stand, and the design they were made of,
+  // which a class obj made once the run is under way shapes its calls with.
+  VpiClassCallSites class_sites;
+  const RtlirDesign* design = nullptr;
 };
 
 // §37.42: shapes each call of `deferred` as a call a procedure's expression
 // writes where it stands is shaped, once every task, function and class defn
 // of `design` it may reach has its object, and any call shaping one holds in
 // turn. A call no shape resolves keeps the arguments it is written with.
-void VpiShapeDeferredCalls(const RtlirDesign& design,
+// Holding no call, it reads nothing of `design`, which may then be null.
+void VpiShapeDeferredCalls(const RtlirDesign* design,
                            const VpiObjectMap& objects,
                            std::vector<VpiDeferredCall>& deferred,
                            const VpiCallBuild& calls,

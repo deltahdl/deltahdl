@@ -627,7 +627,35 @@ std::function<bool(const Expr& call, VpiObject* made)> VpiItemCallShaper(
   };
 }
 
-void VpiShapeDeferredCalls(const RtlirDesign& design,
+const Stmt* BlockVarDecl(const BlockParent& parent, std::string_view name,
+                         const BlockParent*& where) {
+  for (const BlockParent* at = &parent; at != nullptr; at = at->outer) {
+    if (at->block == nullptr) continue;
+    for (const Stmt* item : BlockItems(*at->block)) {
+      if (item->kind == StmtKind::kVarDecl && item->var_name == name) {
+        where = at;
+        return item;
+      }
+    }
+  }
+  return nullptr;
+}
+
+bool ChainNames(const Expr& expr, std::vector<std::string_view>& names) {
+  if (expr.kind == ExprKind::kIdentifier) {
+    names.push_back(expr.text);
+    return true;
+  }
+  if (expr.kind != ExprKind::kMemberAccess || expr.is_scope_resolution) {
+    return false;
+  }
+  // The right-hand side of a member access is always the member's name.
+  if (!ChainNames(*expr.lhs, names)) return false;
+  names.push_back(expr.rhs->text);
+  return true;
+}
+
+void VpiShapeDeferredCalls(const RtlirDesign* design,
                            const VpiObjectMap& objects,
                            std::vector<VpiDeferredCall>& deferred,
                            const VpiCallBuild& calls,
@@ -640,7 +668,7 @@ void VpiShapeDeferredCalls(const RtlirDesign& design,
   for (std::size_t index = 0; index < deferred.size(); ++index) {
     VpiDeferredCall held = std::move(deferred[index]);
     BodyWalk walk{
-        design,  held.stand.mod != nullptr ? *held.stand.mod : kNoModule,
+        *design, held.stand.mod != nullptr ? *held.stand.mod : kNoModule,
         objects, held.prefix,
         calls,   build};
     walk.gen_prefixes = &held.gen_prefixes;

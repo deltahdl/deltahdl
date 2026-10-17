@@ -215,6 +215,89 @@ TEST_F(CallsOutsideProcedures, AnExtendsClausesCallIsShaped) {
   ExpectSystemCall(kPassed(e), e);
 }
 
+// A call a package's property makes of a function the package imports finds
+// it through the import, a named one of another name passed over and a
+// wildcard one of a package not declaring it too, while a function the
+// package declares itself is found ahead of every import (§26.3) (#7290).
+TEST_F(CallsOutsideProcedures, APackagesCallFindsAnImportedFunction) {
+  Run("package p;\n"
+      "  function automatic int g(int v); return v; endfunction\n"
+      "  function automatic int h(int v); return v; endfunction\n"
+      "endpackage\n"
+      "package r; function automatic int k(int v); return v; endfunction\n"
+      "endpackage\n"
+      "package q; import p::h; import r::*; import p::*;\n"
+      "  function automatic int own(int v); return v; endfunction\n"
+      "  property s(x); g(x) == own(x); endproperty\n"
+      "endpackage\n"
+      "module top; endmodule\n");
+  vpiHandle q = By("q");
+  ASSERT_NE(q, nullptr);
+  vpiHandle spec = vpi_handle(vpiPropertySpec, Named(vpiPropertyDecl, q, "s"));
+  ASSERT_NE(spec, nullptr);
+  vpiHandle equality = vpi_handle(vpiPropertyExpr, spec);
+  ExpectFunctionCall(OperandOf(equality, 0), "g", q);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiFunction, OperandOf(equality, 0))),
+            VpiObjectOf(Named(vpiTaskFunc, By("p"), "g")));
+  ExpectFunctionCall(OperandOf(equality, 1), "own", q);
+}
+
+// A call a class's constraint makes of a method the class declares, or one
+// it inherits, is a method call of that method, applied to no object in the
+// class defn (§8.6, §37.42 detail 2) (#7289).
+TEST_F(CallsOutsideProcedures, AConstraintsCallOfItsClasssMethodReachesIt) {
+  Run("module top;\n"
+      "  class B; function int g(); return 2; endfunction endclass\n"
+      "  class C extends B; rand int x;\n"
+      "    function int m(); return 1; endfunction\n"
+      "    constraint c { x < m(); x > g(); }\n"
+      "  endclass\n"
+      "endmodule\n");
+  vpiHandle b = Named(vpiClassDefn, By("top"), "B");
+  vpiHandle c = Named(vpiClassDefn, By("top"), "C");
+  ASSERT_NE(c, nullptr);
+  const std::vector<vpiHandle> kItems =
+      ObjectsOf(vpiConstraintItem, Named(vpiConstraint, c, "c"));
+  ASSERT_EQ(kItems.size(), 2U);
+  vpiHandle own = OperandOf(kItems[0], 1);
+  vpiHandle inherited = OperandOf(kItems[1], 1);
+  ASSERT_NE(own, nullptr);
+  ASSERT_NE(inherited, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, own), vpiMethodFuncCall);
+  EXPECT_STREQ(vpi_get_str(vpiName, own), "m");
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiScope, own)), VpiObjectOf(c));
+  EXPECT_EQ(vpi_handle(vpiPrefix, own), nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiFunction, own)),
+            VpiObjectOf(Named(vpiMethods, c, "m")));
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiFunction, inherited)),
+            VpiObjectOf(Named(vpiMethods, b, "g")));
+}
+
+// A call a class obj's constraint makes stands in the class obj, its callee
+// found where the class is declared, and a call of the class's own method is
+// applied to the class obj (§37.12, §37.42 detail 2) (#7288).
+TEST_F(CallsOutsideProcedures, AClassObjsConstraintsCallIsShaped) {
+  Run("module top;\n"
+      "  function automatic int f(int v); return v; endfunction\n"
+      "  class C; rand int x;\n"
+      "    function int m(); return 1; endfunction\n"
+      "    constraint c { x < f(5); x > $sf(1); x != m(); }\n"
+      "  endclass\n"
+      "  C h = new;\n"
+      "endmodule\n");
+  vpiHandle obj = vpi_handle(vpiClassObj, By("top.h"));
+  ASSERT_NE(obj, nullptr);
+  const std::vector<vpiHandle> kItems =
+      ObjectsOf(vpiConstraintItem, Named(vpiConstraint, obj, "c"));
+  ASSERT_EQ(kItems.size(), 3U);
+  ExpectFunctionCall(OperandOf(kItems[0], 1), "f", obj);
+  ExpectSystemCall(OperandOf(kItems[1], 1), obj);
+  vpiHandle own = OperandOf(kItems[2], 1);
+  ASSERT_NE(own, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, own), vpiMethodFuncCall);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiPrefix, own)), VpiObjectOf(obj));
+}
+
 // A held call whose callee no shape resolves - here none is written - keeps
 // the arguments it is written with, as an unshaped call does.
 TEST(DeferredCallModel, ACallNoShapeResolvesKeepsItsArguments) {
@@ -253,7 +336,7 @@ TEST(DeferredCallModel, ACallNoShapeResolvesKeepsItsArguments) {
   held.type = vpiFuncCall;
   std::vector<VpiDeferredCall> deferred = {
       {&call, &held, VpiCallStand{&scope}, "top", {}}};
-  VpiShapeDeferredCalls(*design, {}, deferred, kCalls, kBuild);
+  VpiShapeDeferredCalls(design, {}, deferred, kCalls, kBuild);
   ASSERT_EQ(held.arguments.size(), 1U);
   EXPECT_EQ(held.arguments[0]->type, vpiConstant);
   EXPECT_EQ(held.parent, nullptr);

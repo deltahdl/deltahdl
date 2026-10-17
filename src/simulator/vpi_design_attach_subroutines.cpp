@@ -456,15 +456,44 @@ VpiCalledSubroutine EnclosingSubroutine(const VpiCallSite& site,
   return {};
 }
 
+// §26.3: the imports the package `package` writes, in the order written.
+std::vector<const ImportItem*> PackageImports(const RtlirDesign& design,
+                                              std::string_view package) {
+  std::vector<const ImportItem*> imports;
+  for (const PackageDecl* decl : design.packages) {
+    if (decl->name != package) continue;
+    for (const ModuleItem* item : decl->items) {
+      if (item->kind == ModuleItemKind::kImportDecl) {
+        imports.push_back(&item->import_item);
+      }
+    }
+  }
+  return imports;
+}
+
+// §26.2 with §26.3: the task or function `name` a call standing in a package
+// reaches: one the package declares, or else one an import it writes makes
+// visible, a named import of it or a wildcard one, the first in the order
+// written. A package refers to none of the compilation unit's (§26.2).
+VpiCalledSubroutine PackageVisibleSubroutine(const VpiCallSite& site,
+                                             std::string_view name) {
+  VpiCalledSubroutine called =
+      VpiPackageSubroutine(site.design, site.package, name, site.made);
+  for (const ImportItem* imported : PackageImports(site.design, site.package)) {
+    if (called.decl != nullptr) break;
+    if (imported->is_wildcard || imported->item_name == name) {
+      called = VpiPackageSubroutine(site.design, imported->package_name, name,
+                                    site.made);
+    }
+  }
+  return called;
+}
+
 }  // namespace
 
 VpiCalledSubroutine VpiNamedSubroutine(const VpiCallSite& site,
                                        std::string_view name) {
-  // §26.2: a package refers to no declaration outside it but by import, and
-  // to none of the compilation unit's.
-  if (!site.package.empty()) {
-    return VpiPackageSubroutine(site.design, site.package, name, site.made);
-  }
+  if (!site.package.empty()) return PackageVisibleSubroutine(site, name);
   VpiCalledSubroutine called = GenerateBlockSubroutine(site, name);
   if (called.decl != nullptr) return called;
   if (const ModuleItem* found = InstanceSubroutine(site.mod, name)) {
