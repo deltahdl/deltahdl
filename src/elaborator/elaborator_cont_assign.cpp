@@ -17,6 +17,7 @@
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_attribute.h"
 #include "elaborator/rtlir_scopes.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
@@ -96,9 +97,11 @@ void ValidateContAssignVarTarget(ModuleItem* item, DiagEngine& diag) {
   }
 }
 
-RtlirContAssign BuildContAssignFor(ModuleItem* item, Expr* lhs, Expr* rhs,
-                                   uint32_t width, DiagEngine& diag,
-                                   const ScopeMap& scope) {
+// §5.12: `attrs` are the item's attributes, resolved once for every
+// assignment it splits into.
+RtlirContAssign BuildContAssignFor(
+    ModuleItem* item, Expr* lhs, Expr* rhs, uint32_t width,
+    const std::vector<ResolvedAttribute>& attrs) {
   RtlirContAssign ca;
   ca.lhs = lhs;
   ca.rhs = rhs;
@@ -109,14 +112,14 @@ RtlirContAssign BuildContAssignFor(ModuleItem* item, Expr* lhs, Expr* rhs,
   ca.delay = item->assign_delay;
   ca.delay_fall = item->assign_delay_fall;
   ca.delay_decay = item->assign_delay_decay;
-  ca.attrs = ResolveAttributes(item->attrs, diag, scope);
+  ca.attrs = attrs;
   return ca;
 }
 
 RtlirContAssign BuildContAssign(ModuleItem* item, RtlirModule* mod,
-                                DiagEngine& diag, const ScopeMap& scope) {
+                                const std::vector<ResolvedAttribute>& attrs) {
   return BuildContAssignFor(item, item->assign_lhs, item->assign_rhs,
-                            LookupLhsWidth(item->assign_lhs, mod), diag, scope);
+                            LookupLhsWidth(item->assign_lhs, mod), attrs);
 }
 
 }  // namespace
@@ -183,12 +186,13 @@ Expr* MakeRhsPartSelect(Expr* rhs, int64_t first, int64_t second,
 // Recursion-invariant context for splitting a concatenation continuous-assign
 // lvalue (bundled to keep the helper within the parameter-count threshold).
 // `scope` folds the packed dimension of whatever signal the right-hand side
-// names, so a slice of one can be written in its declared range.
+// names, so a slice of one can be written in its declared range; `attrs` are
+// the item's resolved attributes, which each split assignment carries.
 struct ConcatContAssignCtx {
   ModuleItem* item;
   RtlirModule* mod;
   Arena& arena;
-  DiagEngine& diag;
+  const std::vector<ResolvedAttribute>& attrs;
   const ScopeMap& scope;
 };
 
@@ -266,7 +270,7 @@ void EmitConcatContAssigns(const ConcatContAssignCtx& cx, Expr* lhs,
       EmitConcatContAssigns(cx, el, elem_rhs);
     } else {
       cx.mod->assigns.push_back(
-          BuildContAssignFor(cx.item, el, elem_rhs, w, cx.diag, cx.scope));
+          BuildContAssignFor(cx.item, el, elem_rhs, w, cx.attrs));
     }
   }
 }
@@ -524,14 +528,16 @@ void Elaborator::ElaborateContAssign(ModuleItem* item, RtlirModule* mod) {
                 Subclause("10.3.3"));
   }
   ValidateGetpatternContAssign(item, mod);
-  // §5.12: the scope the assignment's attributes fold their values against.
+  // §5.12: the attributes fold their values against the module's parameters.
   ScopeMap scope = BuildParamScope(mod);
+  const std::vector<ResolvedAttribute> kAttrs =
+      ResolveAttributes(item->attrs, diag_, scope);
   if (item->assign_lhs->kind == ExprKind::kConcatenation) {
-    ConcatContAssignCtx cx{item, mod, arena_, diag_, scope};
+    ConcatContAssignCtx cx{item, mod, arena_, kAttrs, scope};
     EmitConcatContAssigns(cx, item->assign_lhs, item->assign_rhs);
     return;
   }
-  mod->assigns.push_back(BuildContAssign(item, mod, diag_, scope));
+  mod->assigns.push_back(BuildContAssign(item, mod, kAttrs));
 }
 
 }  // namespace delta
