@@ -619,8 +619,9 @@ VpiObject* NamedObject(const Expr* expr, const AssignBuild& build) {
 
 // The object standing for one side of an assignment: the net or variable a
 // name stands for, a constant, a select, a call, or an operation over these.
-// A kind of expression the switch does not name is no dotted name either, so
-// HierarchicalObject gives null for it: such a kind is not modelled.
+// A member access is left to the default, HierarchicalObject, which gives
+// null for any other kind the switch does not name, as no dotted name: such a
+// kind is not modelled.
 VpiObject* ModelledExpression(const Expr* expr, const AssignBuild& build) {
   switch (expr->kind) {
     case ExprKind::kIdentifier:
@@ -662,7 +663,6 @@ VpiObject* ModelledExpression(const Expr* expr, const AssignBuild& build) {
     case ExprKind::kCall:
     case ExprKind::kSystemCall:
       return CallObject(expr, build);
-    case ExprKind::kMemberAccess:
     default:
       return HierarchicalObject(expr, build);
   }
