@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 51a015a3-4652-42ac-8c15-ce1bc6f6ae12
-  modified: 2026-10-17T12:24:19.987Z
+  modified: 2026-10-17T12:41:06.144Z
 ---
 
 # A question the rules answer is not a decision
@@ -68,7 +68,13 @@ its own subclause. §37.72 alone seemed to leave open how a struct pattern,
 which has one name and one pattern, could stand for a whole `'{a: .x, b: .*}`.
 But §37.59 draws an operation's vpiOperand arrow to `pattern`. That makes the
 written pattern a vpiAssignmentPatternOp whose operands are the struct
-patterns, one per member. A closed set of values that lacks an exact
+patterns, one per member. A property drawn on a diagram whose value no
+detail states does not clash with a shall that states the value for the
+same object. §37.42 draws vpiName on every tf call and never says what it
+holds. §37.60 detail 1 says that an atomic statement, a call written as a
+statement among them, is named by its label or NULL. So an unlabelled call
+statement has no name, and only a call inside an expression is named after
+its callee. A closed set of values that lacks an exact
 match for a construct does not leave the value open: the construct takes the
 one defined value whose meaning holds for it, and a value outside the
 normative header is never an option. Annex M gives vpiQualifier no unique0
