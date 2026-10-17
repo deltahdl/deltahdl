@@ -284,8 +284,10 @@ void FillConditional(VpiObject* obj, const Stmt& stmt,
   if (stmt.kind == StmtKind::kIf) obj->qualifier = QualifierOf(stmt);
   AddChild(obj, with.expression(stmt.condition));
   if (stmt.kind == StmtKind::kIf) {
-    with.statement(stmt.then_branch, obj);
-    with.statement(stmt.else_branch, obj);
+    // §37.71: each branch is recorded as the one it is, so a then branch that
+    // stands as no object leaves the else branch vpiElseStmt's still.
+    obj->body = with.statement(stmt.then_branch, obj);
+    obj->else_stmt = with.statement(stmt.else_branch, obj);
     return;
   }
   obj->body = with.statement(stmt.body, obj);

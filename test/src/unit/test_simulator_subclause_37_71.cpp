@@ -342,6 +342,25 @@ TEST_F(IfStatementsOfARun, AnIfElseReachesBothBranches) {
   EXPECT_EQ(vpi_get(vpiType, nested), vpiIf);
 }
 
+// An if-else reaches its else branch through vpiElseStmt whatever its then
+// branch stands as, one that stands as no object, as `i++` may, among them:
+// the branches are told apart by which each is, not by how many came before.
+TEST_F(IfStatementsOfARun, AnElseBranchIsReachedWhateverTheThenBranchIs) {
+  Run("module top; int c, i, j;\n"
+      "  initial if (c) i++; else j = 1;\n"
+      "endmodule\n");
+  const std::vector<vpiHandle> kBodies = Bodies();
+  ASSERT_EQ(kBodies.size(), 1U);
+  vpiHandle branch = kBodies[0];
+  ASSERT_NE(branch, nullptr);
+  vpiHandle otherwise = vpi_handle(vpiElseStmt, branch);
+  ASSERT_NE(otherwise, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, otherwise), vpiAssignment);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiLhs, otherwise)),
+            VpiObjectOf(By("top.j")));
+  EXPECT_NE(VpiObjectOf(vpi_handle(vpiStmt, branch)), VpiObjectOf(otherwise));
+}
+
 // Annex M gives vpiQualifier no unique0 bit; §12.4.2 makes a unique0-if
 // assert the same absence of overlap a unique-if does, so an if or if-else
 // written with unique0 reports the unique qualifier, and no other bit (#5063).
