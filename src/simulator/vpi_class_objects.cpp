@@ -80,17 +80,18 @@ std::vector<const ClassTypeInfo*> ClassChain(const ClassTypeInfo* type) {
   return chain;
 }
 
-// §37.32 with §37.31: the class defn of the class `obj` was created with. A
-// class a module declares has one under each instance of the module, and the
-// object's is the one under the instance it was created in, found among the
-// `objects` by that instance's path; any other class has the one `by_decl`
-// holds for its declaration, as has a class of the first top.
+// §37.32 with §37.31: the class defn of the class `type`, for an object
+// created in the instance `instance` names. A class a module declares has one
+// under each instance of the module, and the object's is the one under the
+// instance it was created in, found among the `objects` by that instance's
+// path; any other class has the one `by_decl` holds for its declaration, as
+// has a class of the first top.
 VpiObject* ClassDefnOf(
-    const ClassObject& obj, const VpiObjectMap& objects,
+    const ClassTypeInfo* type, std::string_view instance,
+    const VpiObjectMap& objects,
     const std::unordered_map<const void*, VpiObject*>& by_decl) {
-  const ClassTypeInfo* type = obj.type;
   if (type == nullptr || type->decl == nullptr) return nullptr;
-  std::string_view path = obj.instance;
+  std::string_view path = instance;
   if (!path.empty() && path.back() == '.') path.remove_suffix(1);
   VpiObject* scope = type->package.empty() && !path.empty()
                          ? FindObjectForFlatName(objects, path)
@@ -106,22 +107,38 @@ VpiObject* ClassDefnOf(
   return found == by_decl.end() ? nullptr : found->second;
 }
 
-// §37.33 with §37.34: a constraint per constraint block of the classes
-// `chain` names, base first, under the class obj `holder` of the object `obj`,
-// whose constraint_mode() state each reports (§18.9). A name in one resolves
-// through `names`.
-void MakeObjectConstraints(VpiObject* holder, ClassObject& obj,
-                           const std::vector<const ClassTypeInfo*>& chain,
+// What a class obj's constraints are made with: the class obj `holder` of
+// the object `obj`, the classes `chain` names, base first, and where each
+// class's calls find their callees (`of`).
+struct ObjectConstraintSite {
+  VpiObject* holder;
+  ClassObject& obj;
+  const std::vector<const ClassTypeInfo*>& chain;
+  const VpiClassObjDefn& of;
+};
+
+// §37.33 with §37.34: a constraint per constraint block of the classes `at`
+// names, under its class obj, whose constraint_mode() state each reports
+// (§18.9). A name in one resolves through `names`, and a call in one stands
+// in the class obj, its callee found where the class declaring the block is
+// declared (§37.42, §8.13).
+void MakeObjectConstraints(const ObjectConstraintSite& at,
                            const VpiConstraintNames& names,
                            const VpiAttachBuild& build) {
-  for (const ClassTypeInfo* cls : chain) {
+  for (const ClassTypeInfo* cls : at.chain) {
+    const VpiClassCallSite& site = at.of.calls(*cls);
+    const VpiCallStand kStand{at.holder, site.mod, site.package};
+    const VpiConstraintNames kNames{names.objects, names.prefix, names.gen,
+                                    names.scope,   names.ctx,    names.attrs,
+                                    &kStand};
     for (const ClassMember* member : cls->decl->members) {
       if (member == nullptr || member->kind != ClassMemberKind::kConstraint) {
         continue;
       }
-      VpiObject* constraint = VpiMakeConstraint(*member, holder, names, build);
-      constraint->constraint_of = &obj;
-      holder->children.push_back(constraint);
+      VpiObject* constraint =
+          VpiMakeConstraint(*member, at.holder, kNames, build);
+      constraint->constraint_of = &at.obj;
+      at.holder->children.push_back(constraint);
     }
   }
 }
@@ -173,12 +190,8 @@ VpiObject* VpiMakeClassObject(ClassObject& obj, const VpiClassObjDefn& of,
   static const std::vector<std::string_view> kNoGenBlocks;
   std::string prefix(obj.instance);
   if (!prefix.empty() && prefix.back() == '.') prefix.pop_back();
-  // §37.42 with §37.12: a call a constraint writes stands in the class obj,
-  // its callee found where the class is declared.
-  const VpiCallStand kStand{made, of.calls.mod, of.calls.package};
-  MakeObjectConstraints(
-      made, obj, chain,
-      {objects, prefix, kNoGenBlocks, made, ctx, nullptr, &kStand}, build);
+  MakeObjectConstraints({made, obj, chain, of},
+                        {objects, prefix, kNoGenBlocks, made, ctx}, build);
   return made;
 }
 
@@ -222,9 +235,16 @@ VpiHandle VpiContext::MadeClassObject(ClassObject& obj) {
                                 sim_ctx_->GetArena(), &deferred};
     // A class whose defn was not made finds its callees among the
     // compilation unit's declarations alone.
-    VpiObject* defn = ClassDefnOf(obj, object_map_, run_objects_);
-    made = VpiMakeClassObject(obj, {defn, call_objects_.class_sites[defn]},
-                              object_map_, *sim_ctx_, kBuild);
+    const auto kSiteOf =
+        [this, &obj](const ClassTypeInfo& cls) -> const VpiClassCallSite& {
+      return call_objects_.class_sites[ClassDefnOf(&cls, obj.instance,
+                                                   object_map_, run_objects_)];
+    };
+    made = VpiMakeClassObject(
+        obj,
+        {ClassDefnOf(obj.type, obj.instance, object_map_, run_objects_),
+         kSiteOf},
+        object_map_, *sim_ctx_, kBuild);
     VpiShapeDeferredCalls(call_objects_.design, object_map_, deferred,
                           CallBuild(), kBuild);
   }

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <string_view>
 #include <vector>
 
@@ -13,12 +14,14 @@ namespace delta {
 
 class SimContext;
 struct ClassObject;
+struct ClassTypeInfo;
 
 // The class defn a class obj's typespec reaches, null for none (§37.32), and
-// where the calls its constraints write find their callees (§37.42).
+// where the calls the constraints each class of its chain declares write find
+// their callees: where that class is declared (§37.42, §8.13).
 struct VpiClassObjDefn {
   VpiObject* defn;
-  const VpiClassCallSite& calls;
+  std::function<const VpiClassCallSite&(const ClassTypeInfo& cls)> calls;
 };
 
 // §37.33 details 1, 5 and 6: the class obj standing for the run's class object
@@ -29,7 +32,8 @@ struct VpiClassObjDefn {
 // holding a copy of the value the object holds; and a constraint per
 // constraint block they declare (§37.34), whose names resolve among the
 // object's variables and then among `objects`, and a call in which stands in
-// the class obj, its callee found where `of.calls` says (§37.42).
+// the class obj, its callee found where `of.calls` says of the class
+// declaring the constraint (§37.42).
 VpiObject* VpiMakeClassObject(ClassObject& obj, const VpiClassObjDefn& of,
                               const VpiObjectMap& objects, SimContext& ctx,
                               const VpiAttachBuild& build);

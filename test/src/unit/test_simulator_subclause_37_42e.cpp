@@ -303,6 +303,27 @@ TEST_F(CallsOutsideProcedures, AClassObjsConstraintsCallIsShaped) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiPrefix, own)), VpiObjectOf(obj));
 }
 
+// A call a class obj's constraint inherited from a package's class makes
+// finds its callee where the base is declared, the package, rather than where
+// the derived class is (§8.13) (#7291).
+TEST_F(CallsOutsideProcedures, AnInheritedConstraintsCallFindsItsCallee) {
+  Run("package p;\n"
+      "  function automatic int g(int v); return v; endfunction\n"
+      "  class B; rand int x; constraint b { x < g(1); } endclass\n"
+      "endpackage\n"
+      "module top; class D extends p::B; endclass\n"
+      "  D h = new;\n"
+      "endmodule\n");
+  vpiHandle obj = vpi_handle(vpiClassObj, By("top.h"));
+  ASSERT_NE(obj, nullptr);
+  const std::vector<vpiHandle> kItems =
+      ObjectsOf(vpiConstraintItem, Named(vpiConstraint, obj, "b"));
+  ASSERT_EQ(kItems.size(), 1U);
+  ExpectFunctionCall(OperandOf(kItems[0], 1), "g", obj);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiFunction, OperandOf(kItems[0], 1))),
+            VpiObjectOf(Named(vpiTaskFunc, By("p"), "g")));
+}
+
 // A held call whose callee no shape resolves - here none is written - keeps
 // the arguments it is written with, as an unshaped call does.
 TEST(DeferredCallModel, ACallNoShapeResolvesKeepsItsArguments) {
