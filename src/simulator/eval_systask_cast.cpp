@@ -126,10 +126,13 @@ Logic4Vec EvalCastSysFunc(const Expr* expr, SimContext& ctx, Arena& arena) {
   auto src = EvalExpr(expr->args[1], ctx, arena);
   uint64_t src_val = src.ToUint64();
   // §6.24.2: the destination is a variable or a class property, named bare or
-  // through a handle; a class handle destination is screened by the class its
-  // variable is declared with, which a bare name alone records.
+  // through a handle, or one element of an array of them, which the cast
+  // writes as an assignment to the select writes it; a class handle
+  // destination is screened by the class its variable is declared with, which
+  // a bare name alone records.
   if (dest_expr->kind != ExprKind::kIdentifier &&
-      dest_expr->kind != ExprKind::kMemberAccess) {
+      dest_expr->kind != ExprKind::kMemberAccess &&
+      dest_expr->kind != ExprKind::kSelect) {
     return MakeLogic4VecVal(arena, 32, 0);
   }
   std::string_view dest_name = dest_expr->kind == ExprKind::kIdentifier

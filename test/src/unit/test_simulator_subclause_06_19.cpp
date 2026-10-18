@@ -422,7 +422,8 @@ TEST(EnumerationSimulation, XMemberOfAnEnumArrayIsNamedAtItsBaseWidth) {
 // §6.19 with §23.9: a block's enumeration written with packed dimensions after
 // its body declares constants as wide as its base type, while a variable of
 // the typedef, or of the inline enumeration, is the whole packed array of it
-// (#7316).
+// (#7316). A variable of an inline enumeration with a base range and no
+// dimensions after the body is as wide as that range.
 TEST(EnumerationSimulation, BlockEnumArrayConstantsAreAsWideAsItsBase) {
   SimFixture f;
   auto out = RunCapture(
@@ -431,11 +432,13 @@ TEST(EnumerationSimulation, BlockEnumArrayConstantsAreAsWideAsItsBase) {
       "    typedef enum bit [1:0] {A, B, C} [1:0] e_t;\n"
       "    e_t x;\n"
       "    enum logic [2:0] {P, Q} [1:0] w;\n"
-      "    $display(\"%b %b %0d %0d\", C, Q, $bits(x), $bits(w));\n"
+      "    enum logic [2:0] {R, S} y;\n"
+      "    $display(\"%b %b %0d %0d %0d\", C, Q, $bits(x), $bits(w),\n"
+      "             $bits(y));\n"
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_EQ(out, "10 001 4 6\n");
+  EXPECT_EQ(out, "10 001 4 6 3\n");
 }
 
 // §6.19 with §26.3: a package's enumeration written with packed dimensions

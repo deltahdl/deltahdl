@@ -117,7 +117,10 @@ struct BlockEnumWalk {
   // §6.19 with A.2.8: a block variable declared with an inline enumerated
   // type is of that enumeration, which is registered under the declaration's
   // own key and named by a reshaped copy of the declaration, as a typedef's
-  // is.
+  // is. The key's width already holds the base type's range and the packed
+  // dimensions after the body (§7.4.1), so the copy names the key with none
+  // of its own: one left on it is a use-site dimension stacking on the key's
+  // width (§7.4.4), and `enum logic [2:0] {P, Q} [1:0] w` was 18 bits.
   void RegisterInlineEnum(const Stmt* s) {
     auto* key = arena.Create<std::string>(BlockVarEnumKey(s));
     if (ctx.FindEnumType(*key) == nullptr) Register(*key, s->var_decl_type);
@@ -125,6 +128,10 @@ struct BlockEnumWalk {
     shaped->var_decl_type.kind = DataTypeKind::kNamed;
     shaped->var_decl_type.type_name = *key;
     shaped->var_decl_type.enum_members.clear();
+    shaped->var_decl_type.packed_dim_left = nullptr;
+    shaped->var_decl_type.packed_dim_right = nullptr;
+    shaped->var_decl_type.extra_packed_dims.clear();
+    shaped->var_decl_type.enum_array_dims.clear();
     ctx.ClassTypedefShapedDecls()[s] = shaped;
   }
 
