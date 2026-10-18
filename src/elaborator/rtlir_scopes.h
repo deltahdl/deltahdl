@@ -166,6 +166,17 @@ struct RtlirGenBlockTypedef {
   HierPath gen_block_path;
 };
 
+// §37.12 with §37.85 and §27.4: a let declared in a generate block instance,
+// with the path that names the instance, whose gen scope the let's let decl
+// belongs to, and the prefixes, innermost last, a name its body writes
+// resolves through (§23.9). The instances of a loop generate block share one
+// body, so the item alone says not which instance declared the entry.
+struct RtlirGenBlockLet {
+  const ModuleItem* item = nullptr;
+  HierPath gen_block_path;
+  GenBlockPrefixes gen_block_prefixes;
+};
+
 // §14.3 with §27.4: a clocking block declared in a generate block instance.
 // The run registers the block, so what is kept is what the registration needs
 // beyond the item: the prefixes a bare name written in the block resolves

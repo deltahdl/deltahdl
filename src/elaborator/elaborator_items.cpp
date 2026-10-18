@@ -854,6 +854,12 @@ bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
       ValidateLetDecl(item);
       let_names_.insert(item->name);
       mod->let_decls.push_back(item);
+      // §37.12 with §27.4: a generate block instance's let is its gen
+      // scope's.
+      if (!gen_block_path_.empty()) {
+        mod->gen_block_lets.push_back(
+            {item, gen_block_path_, gen_prefix_scopes_});
+      }
       return true;
     case ModuleItemKind::kSpecifyBlock:
       RegisterSpecifyBlockSpecparams(item, mod, typedefs_, specparam_names_,

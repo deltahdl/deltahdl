@@ -374,5 +374,39 @@ TEST_F(LetsOfARun, AUseOfALetIsALetExpr) {
   EXPECT_TRUE(ArgumentKinds(kUses[1]).empty());
 }
 
+// §37.12 with §37.85 and §27.4: a let a generate block declares is a let decl
+// of the gen scope of the block instance declaring it, one per instance of a
+// loop generate block, and of no scope around it; a use of it in the block is
+// a let expr reaching it (#7322).
+TEST_F(LetsOfARun, AGenerateBlocksLetIsALetDeclOfItsGenScope) {
+  Run("module top; logic a, w, v;\n"
+      "  let h(x) = x;\n"
+      "  if (1) begin : g\n"
+      "    let f(x) = x + 1;\n"
+      "    assign w = f(a);\n"
+      "  end\n"
+      "  for (genvar i = 0; i < 2; i++) begin : l\n"
+      "    let k(x) = x;\n"
+      "  end\n"
+      "  assign v = h(a);\n"
+      "endmodule\n");
+  EXPECT_EQ(NamesOf(vpiLetDecl, By("top")), (std::vector<std::string>{"h"}));
+  vpiHandle g = By("top.g");
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(NamesOf(vpiLetDecl, g), (std::vector<std::string>{"f"}));
+  for (const char* block : {"top.l[0]", "top.l[1]"}) {
+    EXPECT_EQ(NamesOf(vpiLetDecl, By(block)), (std::vector<std::string>{"k"}))
+        << block;
+  }
+  vpiHandle assigns = vpi_iterate(vpiContAssign, g);
+  vpiHandle assign = assigns == nullptr ? nullptr : vpi_scan(assigns);
+  ASSERT_NE(assign, nullptr);
+  vpiHandle used = vpi_handle(vpiRhs, assign);
+  ASSERT_NE(used, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, used), vpiLetExpr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiLetDecl, used)),
+            VpiObjectOf(Named(vpiLetDecl, g, "f")));
+}
+
 }  // namespace
 }  // namespace delta

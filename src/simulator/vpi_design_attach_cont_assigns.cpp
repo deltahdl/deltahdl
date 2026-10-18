@@ -170,12 +170,13 @@ void VpiContext::AttachContinuousAssignments(const RtlirDesign* design,
             continue;
           }
           // §37.85: an assignment a generate block writes is one of its
-          // block instance's gen scope.
+          // block instance's gen scope, whose declarations, a let's among
+          // them (§37.12), its names find ahead of the instance's (§23.9).
           VpiObject* within = VpiGenScopeOf(scope, ca.gen_block_path);
           AssignBuild build{
               kAttach.alloc,
               sim_ctx_,
-              AssignNames{object_map_, prefix, ca.gen_block_prefixes, nullptr,
+              AssignNames{object_map_, prefix, ca.gen_block_prefixes, within,
                           ca.gen_block_consts, scope},
               VpiCalleesAt({*design, *mod, prefix,
                             CalleeScope(*mod, ca.gen_block_prefixes, scope),

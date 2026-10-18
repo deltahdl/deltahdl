@@ -753,6 +753,8 @@ struct RtlirModule {
   // §37.85 detail 5: the typedefs declared in generate blocks.
   std::vector<RtlirGenBlockTypedef> gen_block_typedefs;
   std::vector<ModuleItem*> let_decls;
+  // §37.12 with §27.4: those of let_decls declared in generate blocks.
+  std::vector<RtlirGenBlockLet> gen_block_lets;
   // §35.5.4's imported subroutines, declared in this module. They are held
   // apart from let_decls because §11.12's let is a substitution of the
   // expression its declaration writes, while an imported subroutine is a call

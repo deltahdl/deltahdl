@@ -4,6 +4,7 @@
 #include <functional>
 #include <string>
 #include <string_view>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -574,16 +575,34 @@ bool IsSequenceDecl(const RtlirAssertionItemDecl& declared) {
   return declared.item->kind == ModuleItemKind::kSequenceDecl;
 }
 
-// §11.12 with §37.12 and §37.57: each let the instance declares is a let decl
-// of it, its body built with its formals' names found first. A covergroup,
-// which its module holds among its lets, is none.
+// §11.12 with §37.57: the let decl the let `item` stands as in `scope`, its
+// body built with its formals' names found first, walked with `walk`.
+void AttachLetDecl(const ModuleItem& item, VpiObject* scope,
+                   const BodyWalk& walk) {
+  VpiObject* made = VpiMakeLetDecl(item, scope, walk.build);
+  const BlockParent kParent{scope, scope->full_name, nullptr, nullptr,
+                            VpiLetFormalNames(made, item, walk.build)};
+  VpiFillLetDecl(made, item, StmtBuildAt(kParent, walk));
+}
+
+// §11.12 with §37.12: each let the instance declares is a let decl of it, and
+// each one a generate block instance declares one of that instance's gen
+// scope (§37.85), whose names its body resolves through first (§27.4). A
+// covergroup, which its module holds among its lets, is none.
 void AttachInstanceLetDecls(VpiObject* instance, const BodyWalk& walk) {
+  std::unordered_set<const ModuleItem*> in_blocks;
+  for (const RtlirGenBlockLet& let : walk.mod.gen_block_lets) {
+    in_blocks.insert(let.item);
+    BodyWalk in_block = walk;
+    in_block.gen_prefixes = &let.gen_block_prefixes;
+    AttachLetDecl(*let.item, VpiGenScopeOf(instance, let.gen_block_path),
+                  in_block);
+  }
   for (const ModuleItem* item : walk.mod.let_decls) {
-    if (item->kind != ModuleItemKind::kLetDecl) continue;
-    VpiObject* made = VpiMakeLetDecl(*item, instance, walk.build);
-    const BlockParent kParent{instance, instance->full_name, nullptr, nullptr,
-                              VpiLetFormalNames(made, *item, walk.build)};
-    VpiFillLetDecl(made, *item, StmtBuildAt(kParent, walk));
+    if (item->kind != ModuleItemKind::kLetDecl || in_blocks.contains(item)) {
+      continue;
+    }
+    AttachLetDecl(*item, instance, walk);
   }
 }
 
