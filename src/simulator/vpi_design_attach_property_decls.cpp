@@ -130,10 +130,7 @@ VpiObject* ClassTypespec(VpiObject* formal, std::string_view name,
 void MakeFormalTypespec(const ModuleItem& decl, size_t index, VpiObject* formal,
                         const VpiPropertyDeclSite& at,
                         const VpiAttachBuild& build) {
-  // A sequence's formals carry their type keyword alone (§16.8).
-  const DataType* type = index < decl.prop_formal_types.size()
-                             ? decl.prop_formal_types[index]
-                             : nullptr;
+  const DataType* type = decl.prop_formal_types[index];
   if (type != nullptr && type->kind == DataTypeKind::kNamed) {
     VpiObject* named = TypedefTypespec(formal->parent, type->type_name, at);
     formal->children.push_back(
