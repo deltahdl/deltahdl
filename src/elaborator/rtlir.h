@@ -26,17 +26,6 @@
 
 namespace delta {
 
-enum class RtlirNodeKind : uint8_t {
-  kModule,
-  kPort,
-  kNet,
-  kVariable,
-  kContAssign,
-  kProcess,
-  kParamDecl,
-  kModuleInst,
-};
-
 enum class RtlirProcessKind : uint8_t {
   kInitial,
   kAlways,
