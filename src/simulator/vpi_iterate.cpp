@@ -589,7 +589,8 @@ bool VpiLetArgumentIsOmitted(VpiHandle actual) {
 // reaches, in declaration order, and the actuals are the expressions the
 // instantiation wrote. Detail 1 puts the arguments in formal order and fills an
 // omitted one from its formal's default value, so that each argument can be
-// matched to its formal.
+// matched to its formal. An actual naming a net or variable is that net or
+// variable, which §37.58 counts among the expressions an argument may be.
 //
 // Nothing collected these. vpiArgument is a relation tag and no object's type
 // is one, so the generic child walk this fell through to matched nothing, a let
@@ -601,7 +602,7 @@ void CollectLetExprArguments(VpiObject* ref, VpiObject* iter) {
   for (auto* child : ref->children) {
     if (child->type == vpiLetDecl) {
       decl = child;
-    } else if (VpiIsExprType(child->type)) {
+    } else if (VpiIsExprOperandType(child->type)) {
       provided.push_back(VpiLetArgumentIsOmitted(child) ? nullptr : child);
     }
   }
