@@ -238,17 +238,11 @@ struct PropertyPortScan {
 
   // Handles the formal-name harvest branch (§16.12 formal_port_identifier).
   void HarvestFormalName(Lexer& lexer, ModuleItem* item) {
-    auto name_tok = lexer.Next();
-    if (!LexerCheck(lexer, TokenKind::kComma) &&
-        !LexerCheck(lexer, TokenKind::kRParen) &&
-        !LexerCheck(lexer, TokenKind::kEq)) {
-      if (LexerCheck(lexer, TokenKind::kIdentifier)) {
-        carry_type =
-            ParserPropertySpecHelpers::NamedFormalType(*parser, name_tok.text);
-        name_tok = lexer.Next();
-        carry_type_kw = TokenKind::kEof;
-      }
+    if (ParserPropertySpecHelpers::StartsNamedFormalType(*parser)) {
+      carry_type = ParserPropertySpecHelpers::ParseNamedFormalType(*parser);
+      carry_type_kw = TokenKind::kEof;
     }
+    auto name_tok = lexer.Next();
     item->prop_formals.push_back(name_tok.text);
     // §16.12 with §16.8: an untyped formal is recorded as `untyped`.
     bool untyped = carry_type_kw == TokenKind::kEof && carry_type == nullptr;

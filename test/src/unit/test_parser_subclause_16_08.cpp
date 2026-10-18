@@ -532,4 +532,80 @@ TEST(SequenceDeclaration, AChandleFormalIsReported) {
   EXPECT_TRUE(ReportedError(r.diags, kMessage, 4, "16.8"));
 }
 
+// §16.8 with Annex A.2.2.1: a formal's data type may be a type a package or a
+// parameterized class declares, written with its scope, so the identifier
+// after the type is the formal, in a sequence's port list and, by §16.12's
+// sequence_formal_type, in a property's; the formal after them carries the
+// class-scoped type (#7304).
+TEST(SequenceDeclaration, AFormalOfAScopedTypeIsNamedAfterItself) {
+  auto r = Parse(
+      "package pk; typedef logic [1:0] t; endpackage\n"
+      "class C #(int W = 1); typedef logic [W-1:0] t; endclass\n"
+      "module m;\n"
+      "  logic clk;\n"
+      "  sequence s(pk::t x, C#(8)::t y, z); @(posedge clk) 1; endsequence\n"
+      "  property p(pk::t x, C#(8)::t y, z); @(posedge clk) 1; endproperty\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  const ModuleItemKind kKinds[] = {ModuleItemKind::kSequenceDecl,
+                                   ModuleItemKind::kPropertyDecl};
+  for (ModuleItemKind kind : kKinds) {
+    auto* item = FindItemByKind(r, kind);
+    ASSERT_NE(item, nullptr);
+    ASSERT_EQ(item->prop_formals.size(), 3u);
+    EXPECT_EQ(item->prop_formals[0], "x");
+    EXPECT_EQ(item->prop_formals[1], "y");
+    EXPECT_EQ(item->prop_formals[2], "z");
+    ASSERT_EQ(item->prop_formal_types.size(), 3u);
+    ASSERT_NE(item->prop_formal_types[0], nullptr);
+    EXPECT_EQ(item->prop_formal_types[0]->scope_name, "pk");
+    EXPECT_EQ(item->prop_formal_types[0]->type_name, "t");
+    ASSERT_NE(item->prop_formal_types[1], nullptr);
+    EXPECT_EQ(item->prop_formal_types[1]->scope_name, "C");
+    EXPECT_EQ(item->prop_formal_types[1]->type_name, "t");
+    EXPECT_EQ(item->prop_formal_types[2], item->prop_formal_types[1]);
+  }
+}
+
+// §16.8 with Annex A.2.2.1: a formal's data type may be a user-defined type
+// with packed dimensions, so the identifier after the dimension is the formal,
+// in a sequence's port list and in a property's, while a dimension after a
+// formal's own name is an unpacked dimension of that formal, which carries
+// the type before it (#7305).
+TEST(SequenceDeclaration, AFormalOfANamedTypeWithPackedDimsIsNamedAfterItself) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef logic [1:0] my_t;\n"
+      "  logic clk;\n"
+      "  sequence s(my_t [3:0] x, y [2]); @(posedge clk) 1; endsequence\n"
+      "  property p(my_t [3:0] x, y [2]); @(posedge clk) 1; endproperty\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  const ModuleItemKind kKinds[] = {ModuleItemKind::kSequenceDecl,
+                                   ModuleItemKind::kPropertyDecl};
+  for (ModuleItemKind kind : kKinds) {
+    auto* item = FindItemByKind(r, kind);
+    ASSERT_NE(item, nullptr);
+    ASSERT_EQ(item->prop_formals.size(), 2u);
+    EXPECT_EQ(item->prop_formals[0], "x");
+    EXPECT_EQ(item->prop_formals[1], "y");
+    ASSERT_EQ(item->prop_formal_types.size(), 2u);
+    ASSERT_NE(item->prop_formal_types[0], nullptr);
+    EXPECT_EQ(item->prop_formal_types[0]->type_name, "my_t");
+    EXPECT_NE(item->prop_formal_types[0]->packed_dim_left, nullptr);
+    EXPECT_EQ(item->prop_formal_types[1], item->prop_formal_types[0]);
+  }
+}
+
+// §16.8: a port list the source ends inside, within a formal's packed
+// dimension, is rejected where the ';' closing the header belongs.
+TEST(SequenceDeclaration, APortListEndingInsideAFormalsTypeIsReported) {
+  auto r = Parse(
+      "module m;\n"
+      "  sequence s(my_t [3");
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';'", 2, "16.8"));
+}
+
 }  // namespace

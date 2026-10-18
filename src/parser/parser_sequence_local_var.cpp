@@ -423,27 +423,17 @@ struct SequencePortScan {
     }
   }
 
-  // Harvests the formal_port_identifier (rightmost identifier of the chain).
+  // Harvests the formal_port_identifier, after the user-defined type that
+  // leads it, where one does; §16.8.2: such a type satisfies the
+  // explicit-type requirement.
   void HarvestFormalName(Lexer& lexer, ModuleItem* item) {
-    auto name_tok = lexer.Next();
-    // Walk past any subsequent identifiers/type tokens until we hit the
-    // separator; the rightmost identifier is the formal_port_identifier.
-    // §16.8.2: a chain of more than one identifier means the leading
-    // identifier(s) supply a (user-defined) type alias, satisfying the
-    // explicit-type requirement.
-    const auto kTypeName = name_tok.text;
-    bool user_typed = false;
-    while (LexerCheck(lexer, TokenKind::kIdentifier)) {
-      name_tok = lexer.Next();
-      item_saw_explicit_type = true;
-      user_typed = true;
-    }
-    if (user_typed) {
-      carry_type =
-          ParserPropertySpecHelpers::NamedFormalType(*parser, kTypeName);
+    if (ParserPropertySpecHelpers::StartsNamedFormalType(*parser)) {
+      carry_type = ParserPropertySpecHelpers::ParseNamedFormalType(*parser);
       carry_type_kw = TokenKind::kEof;
+      item_saw_explicit_type = true;
       clock_default_allowed = false;
     }
+    auto name_tok = lexer.Next();
     item->prop_formals.push_back(name_tok.text);
     // §16.8: an untyped formal, written `untyped` or with no type in force, is
     // recorded as `untyped`, apart from a type the keyword alone does not name,
@@ -721,12 +711,40 @@ DataType* ParserPropertySpecHelpers::ParseFormalType(Parser& p) {
   return p.arena_.Create<DataType>(p.ParseDataType());
 }
 
-// §16.12 with §6.18: a formal declared with the user-defined type `name`.
-DataType* ParserPropertySpecHelpers::NamedFormalType(Parser& p,
-                                                     std::string_view name) {
-  auto* type = p.arena_.Create<DataType>();
-  type->kind = DataTypeKind::kNamed;
-  type->type_name = name;
+// §16.8 and §16.12 with Annex A.2.2.1: whether the identifier at the cursor
+// names a formal's user-defined type rather than the formal, which another
+// identifier following it shows, past the scope, class parameters and packed
+// dimensions the type is written with; a dimension after the formal's own
+// name is followed by none.
+bool ParserPropertySpecHelpers::StartsNamedFormalType(Parser& p) {
+  auto saved = p.lexer_.SavePos();
+  p.Consume();
+  int depth = 0;
+  while (!p.Check(TokenKind::kEof)) {
+    TokenKind k = p.CurrentToken().kind;
+    if (k == TokenKind::kLParen || k == TokenKind::kLBracket) {
+      ++depth;
+    } else if (k == TokenKind::kRParen || k == TokenKind::kRBracket) {
+      if (depth == 0) break;
+      --depth;
+    } else if (depth == 0 && k == TokenKind::kColonColon) {
+      p.Consume();
+    } else if (depth == 0 && k != TokenKind::kHash) {
+      break;
+    }
+    p.Consume();
+  }
+  bool typed = depth == 0 && p.Check(TokenKind::kIdentifier);
+  p.lexer_.RestorePos(saved);
+  return typed;
+}
+
+// §16.8 and §16.12 with §6.18: a formal declared with the user-defined type
+// named at the cursor, with the scope, class parameters and packed dimensions
+// it is written with.
+DataType* ParserPropertySpecHelpers::ParseNamedFormalType(Parser& p) {
+  auto* type = p.arena_.Create<DataType>(p.ParseNamedType());
+  p.ParsePackedDims(*type);
   return type;
 }
 
