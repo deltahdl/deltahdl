@@ -43,6 +43,44 @@
 
 namespace delta {
 
+// §7.4.1: the range one element of a packed array of `dt` is addressed by,
+// where its element is a type of its own: a named type's declared range, the
+// base type's dimension of an enumeration written with packed dimensions
+// after its body, and none for a structure or union, whose bits are counted
+// from zero.
+static std::optional<PackedRange> PackedElementRange(const DataType& dt,
+                                                     SimContext& ctx,
+                                                     Arena& arena) {
+  if (dt.kind == DataTypeKind::kNamed) return ctx.FindTypeRange(dt.type_name);
+  if (dt.kind != DataTypeKind::kEnum || dt.packed_dim_left == nullptr) {
+    return std::nullopt;
+  }
+  return PackedRange{
+      SelectBoundValue(EvalExpr(dt.packed_dim_left, ctx, arena)),
+      SelectBoundValue(EvalExpr(dt.packed_dim_right, ctx, arena))};
+}
+
+// §7.4.1: the packed dimensions of `dt`, outermost first: for an enumeration,
+// those written after its body, the one its base type writes being its
+// element's.
+static std::vector<std::pair<Expr*, Expr*>> PackedDimsOf(const DataType& dt) {
+  std::vector<std::pair<Expr*, Expr*>> dims = dt.enum_array_dims;
+  if (dims.empty() && dt.packed_dim_left != nullptr) {
+    dims.emplace_back(dt.packed_dim_left, dt.packed_dim_right);
+    dims.insert(dims.end(), dt.extra_packed_dims.begin(),
+                dt.extra_packed_dims.end());
+  }
+  return dims;
+}
+
+// Whether the packed dimensions of `dt` are those of an array of a type that
+// is not itself one of them: a named type, a structure or union, or an
+// enumeration written with dimensions after its body.
+static bool HasPackedElement(const DataType& dt) {
+  return dt.kind == DataTypeKind::kNamed || dt.kind == DataTypeKind::kStruct ||
+         dt.kind == DataTypeKind::kUnion || !dt.enum_array_dims.empty();
+}
+
 // §6.9.1: either bound of a packed dimension may be negative, so each is read
 // as the integer it stands for (SelectBoundValue) and not as the magnitude of
 // its bits: `logic [-1:4] b` read its `-1` as 4294967295, a span that did not
@@ -53,7 +91,9 @@ void RecordPackedRange(const DataType* dt, Variable* v, SimContext& ctx,
   // §7.4.4: a type written as a name alone has the dimensions its typedef
   // writes, `T x` under `typedef logic [1:0][3:0] T` two elements of four bits.
   if (dt != nullptr) dt = ctx.PackedTypeBehind(*dt);
-  if (!dt || !dt->packed_dim_left || !dt->packed_dim_right) return;
+  if (dt == nullptr) return;
+  const std::vector<std::pair<Expr*, Expr*>> kDims = PackedDimsOf(*dt);
+  if (kDims.empty()) return;
   auto eval = [&](const Expr* e) {
     return SelectBoundValue(EvalExpr(e, ctx, arena));
   };
@@ -66,20 +106,21 @@ void RecordPackedRange(const DataType* dt, Variable* v, SimContext& ctx,
   // `logic [1:0][1:0][7:0]` a bit of the sixteen-bit `z[1]`.
   uint64_t stride = 1;
   std::vector<PackedRange> inner;
-  for (const auto& [l, r] : dt->extra_packed_dims) {
-    inner.push_back({eval(l), eval(r)});
+  for (size_t i = 1; i < kDims.size(); ++i) {
+    inner.push_back({eval(kDims[i].first), eval(kDims[i].second)});
     stride *= span(inner.back().left, inner.back().right);
   }
-  PackedRange range{eval(dt->packed_dim_left), eval(dt->packed_dim_right)};
+  PackedRange range{eval(kDims[0].first), eval(kDims[0].second)};
   // §7.4.4: packed dimensions may also be built up in stages through a
   // typedef, and those the name stands for vary most rapidly, inside the ones
   // written where it is used: `bsix [1:10] v5` under `typedef bit [1:5] bsix`
-  // is ten elements of the five bits [1:5].
+  // is ten elements of the five bits [1:5]. §7.4.1: a packed structure,
+  // union or enumeration with dimensions is an array of it in the same way.
   uint64_t outer = span(range.left, range.right) * stride;
-  if (dt->kind == DataTypeKind::kNamed && outer > 0 && v->value.width > outer &&
+  if (HasPackedElement(*dt) && outer > 0 && v->value.width > outer &&
       v->value.width % outer == 0) {
     auto named = static_cast<uint32_t>(v->value.width / outer);
-    std::optional<PackedRange> declared = ctx.FindTypeRange(dt->type_name);
+    std::optional<PackedRange> declared = PackedElementRange(*dt, ctx, arena);
     inner.push_back(declared && span(declared->left, declared->right) == named
                         ? *declared
                         : PackedRange::Implicit(named));
@@ -99,7 +140,7 @@ void RecordPackedRange(const DataType* dt, Variable* v, SimContext& ctx,
   // §7.4.1: the elements a select reaches through every dimension written
   // here are of the named type, signed when it was declared so.
   if (dt->kind == DataTypeKind::kNamed && DeclaredTypeIsSigned(*dt, ctx))
-    v->signed_elem_depth = dt->extra_packed_dims.size();
+    v->signed_elem_depth = kDims.size() - 1;
 }
 
 // §6.20.2 lets a value parameter's expression name literals, parameters,

@@ -176,4 +176,51 @@ TEST(PackedArraySimulation, ElementOfSignedNamedTypeIsSigned) {
   EXPECT_EQ(out, "ff80 ff80 00008080 ffff 1\nff80 0180 1\n");
 }
 
+// §7.4.1 with A.2.2.1: packed dimensions written after an enumeration's body
+// make a packed array of the enumeration, each element as wide as its base
+// type, the 2-bit `bit [1:0]` or the 32-bit default int, and an index selects
+// one element; they are not the base type's dimension, which they used to
+// replace (#7312).
+TEST(PackedArraySimulation, EnumWithDimsAfterItsBodyIsAnArrayOfIt) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  enum bit [1:0] {A, B, C} [3:0] v;\n"
+      "  enum {P, Q} [1:0] w;\n"
+      "  struct packed { enum bit [1:0] {X, Y} [2:0] e; bit f; } r;\n"
+      "  initial begin\n"
+      "    v[1] = B;\n"
+      "    v[2] = C;\n"
+      "    w[1] = Q;\n"
+      "    $display(\"%0d %h %0d %0d\", $bits(v), v, v[2], v[2] == C);\n"
+      "    $display(\"%0d %0d %0d %0d\", $bits(w), w[1], w[0], $bits(r));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "8 24 2 1\n64 1 0 7\n");
+}
+
+// §7.4.1: a packed structure or union with packed dimensions after its body is
+// a packed array of it, as wide as its members make one element times the
+// elements, written plainly, through a typedef, or as a member, and an index
+// selects one whole element (#7313).
+TEST(PackedArraySimulation, AggregateWithDimsAfterItsBodyIsAnArrayOfIt) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  struct packed { logic [7:0] a; logic [7:0] b; } [3:0] s;\n"
+      "  typedef union packed { bit [7:0] x; bit [7:0] y; } [2:0] u_t;\n"
+      "  u_t u;\n"
+      "  struct packed { struct packed { bit [1:0] a; } [2:0] n; bit f; } q;\n"
+      "  initial begin\n"
+      "    s = '0;\n"
+      "    s[1] = 16'hABCD;\n"
+      "    $display(\"%0d %h %h\", $bits(s), s, s[1]);\n"
+      "    $display(\"%0d %0d\", $bits(u), $bits(q));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "64 00000000abcd0000 abcd\n24 7\n");
+}
+
 }  // namespace

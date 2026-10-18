@@ -255,6 +255,25 @@ static uint32_t EvalRangeWidth(const Expr* left_expr, const Expr* right_expr,
   return static_cast<uint32_t>(std::abs(*left - *right) + 1);
 }
 
+// §7.4.1: how many enumerations the packed dimensions written after an
+// enumeration's body make a packed array of, their bounds folded under
+// `scope` where one is given.
+static uint32_t EnumArrayCount(const DataType& dtype, const ScopeMap* scope) {
+  uint32_t count = 1;
+  for (const auto& [left, right] : dtype.enum_array_dims) {
+    count *= scope != nullptr ? EvalRangeWidth(left, right, *scope)
+                              : EvalRangeWidth(left, right);
+  }
+  return count;
+}
+
+// The enumeration a packed array of enumerations is an array of.
+static DataType EnumArrayElement(const DataType& dtype) {
+  DataType element = dtype;
+  element.enum_array_dims.clear();
+  return element;
+}
+
 uint32_t EvalTypeWidth(const DataType& dtype) {
   // §7.4.4: packed dimensions may also be built up in stages through typedef,
   // and its example `typedef bit [1:5] bsix; bsix [1:10] v5;` is 50 bits: a
@@ -267,11 +286,21 @@ uint32_t EvalTypeWidth(const DataType& dtype) {
   // dimension, what every caller's fallback is written to handle, and what lets
   // a typedef-aware caller take over.
   if (dtype.kind == DataTypeKind::kNamed) return 0;
+  if (!dtype.enum_array_dims.empty()) {
+    return EvalTypeWidth(EnumArrayElement(dtype)) *
+           EnumArrayCount(dtype, nullptr);
+  }
   if (dtype.packed_dim_left && dtype.packed_dim_right) {
     uint32_t w = EvalRangeWidth(dtype.packed_dim_left, dtype.packed_dim_right);
 
     for (const auto& [left, right] : dtype.extra_packed_dims) {
       w *= EvalRangeWidth(left, right);
+    }
+    // §7.4.1: the dimensions of a packed structure or union are those of an
+    // array of it, each element as wide as its members make it.
+    if (dtype.kind == DataTypeKind::kStruct ||
+        dtype.kind == DataTypeKind::kUnion) {
+      return w * EvalStructOrUnionWidth(dtype);
     }
     if (w > 0) return w;
   }
@@ -418,8 +447,7 @@ uint32_t EvalTypeWidth(const DataType& dtype, const TypedefMap& typedefs) {
   if (dtype.kind == DataTypeKind::kStruct ||
       dtype.kind == DataTypeKind::kUnion) {
     uint32_t w = PackedDimProduct(dtype);
-    if (w > 0) return w;
-    return EvalStructOrUnionWidth(dtype, typedefs);
+    return (w > 0 ? w : 1) * EvalStructOrUnionWidth(dtype, typedefs);
   }
   return EvalTypeWidth(dtype);
 }
@@ -434,15 +462,18 @@ uint32_t EvalTypeWidth(const DataType& dtype, const TypedefMap& typedefs,
     uint32_t outer = PackedDimProduct(dtype, scope);
     return outer > 0 ? base * outer : base;
   }
+  if (!dtype.enum_array_dims.empty()) {
+    return EvalTypeWidth(EnumArrayElement(dtype), typedefs, scope) *
+           EnumArrayCount(dtype, &scope);
+  }
   uint32_t w = PackedDimProduct(dtype, scope);
-  if (w > 0) return w;
-  // Mirror the 2-arg overload: a struct/union with no resolvable packed
-  // outer dimension still sizes from its members (using typedefs), not the
-  // 1-bit base-type fallback.
+  // Mirror the 2-arg overload: a struct/union sizes from its members (using
+  // typedefs), an element of its packed dimensions where it has any.
   if (dtype.kind == DataTypeKind::kStruct ||
       dtype.kind == DataTypeKind::kUnion) {
-    return EvalStructOrUnionWidth(dtype, typedefs);
+    return (w > 0 ? w : 1) * EvalStructOrUnionWidth(dtype, typedefs);
   }
+  if (w > 0) return w;
   return EvalTypeWidth(dtype);
 }
 

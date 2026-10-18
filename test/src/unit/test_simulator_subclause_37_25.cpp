@@ -737,6 +737,25 @@ TEST_F(TypespecsOfARun, AMemberWrittenAsAStructureReachesItsOwnTypespec) {
             vpiIntTypespec);
 }
 
+// §37.25 detail 8 with §7.4.1: a typedef of an enumeration written with
+// packed dimensions after its body is a packed array typespec ranging over
+// them, whose element is an enum typespec over the base type the enumeration
+// was written with (#7312).
+TEST_F(TypespecsOfARun, AnEnumWithDimsAfterItsBodyIsAPackedArrayOfIt) {
+  Run("module top;\n"
+      "  typedef enum bit [1:0] {A, B} [3:0] e_t;\n"
+      "endmodule\n");
+  vpiHandle e = Named(vpiTypedef, By("top"), "e_t");
+  ASSERT_NE(e, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, e), vpiPackedArrayTypespec);
+  EXPECT_EQ(RangeSizesOf(e), (std::vector<int>{4}));
+  vpiHandle element = vpi_handle(vpiElemTypespec, e);
+  ASSERT_NE(element, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, element), vpiEnumTypespec);
+  EXPECT_EQ(RangeSizesOf(vpi_handle(vpiBaseTypespec, element)),
+            (std::vector<int>{2}));
+}
+
 // A typedef of a type the run draws no typespec for, a virtual interface's
 // until #7120 gives it one, written plain or with unpacked dimensions of its
 // own, hangs nothing from its scope, and the typedefs declared after it still

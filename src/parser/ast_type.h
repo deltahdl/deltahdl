@@ -136,6 +136,11 @@ struct DataType {
   std::string_view enum_base_name;
 
   DataTypeKind enum_base_kind = DataTypeKind::kImplicit;
+  // §7.4.1 with A.2.2.1: the packed dimensions written after an enumeration's
+  // body, outermost first, which make a packed array of the enumeration. The
+  // base type's own dimension (§6.19) stays in packed_dim_left and
+  // packed_dim_right.
+  std::vector<std::pair<Expr*, Expr*>> enum_array_dims;
 
   Expr* type_ref_expr = nullptr;
   std::vector<EnumMember> enum_members;

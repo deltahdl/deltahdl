@@ -403,7 +403,6 @@ bool Parser::TryParseNetDataType(DataType& dtype, bool has_intervening) {
 
   if (Check(TokenKind::kKwEnum)) {
     auto inner = ParseEnumType();
-    ParsePackedDims(inner);
     ApplyNetInfo(inner, dtype);
     dtype = inner;
     return true;

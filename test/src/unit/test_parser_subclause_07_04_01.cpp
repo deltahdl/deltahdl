@@ -96,4 +96,32 @@ TEST(PackedArrayParsing, EnumPackedDimMissingBracketNames7_4_1) {
   EXPECT_TRUE(ReportedError(r.diags, "expected ']'", 2, "7.4.1"));
 }
 
+// A.2.2.1 writes packed dimensions after an enumeration's body, making a
+// packed array of the enumeration (§7.4.1); they are kept apart from the one
+// its base type writes, which they used to overwrite, and a typedef takes
+// them as a declaration does (#7312).
+TEST(PackedArrayParsing, EnumDimsAfterTheBodyKeepTheBaseTypesOwn) {
+  auto r = Parse(
+      "module t;\n"
+      "  enum bit [1:0] {A, B, C} [3:0][4:1] v;\n"
+      "  typedef enum {P, Q} [2:0] e_t;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules[0]->items.size(), 2u);
+  const DataType& v = r.cu->modules[0]->items[0]->data_type;
+  EXPECT_EQ(v.kind, DataTypeKind::kEnum);
+  ASSERT_NE(v.packed_dim_left, nullptr);
+  EXPECT_EQ(v.packed_dim_left->int_val, 1u);
+  EXPECT_TRUE(v.extra_packed_dims.empty());
+  ASSERT_EQ(v.enum_array_dims.size(), 2u);
+  EXPECT_EQ(v.enum_array_dims[0].first->int_val, 3u);
+  EXPECT_EQ(v.enum_array_dims[1].second->int_val, 1u);
+  const DataType& e = r.cu->modules[0]->items[1]->typedef_type;
+  EXPECT_EQ(e.kind, DataTypeKind::kEnum);
+  EXPECT_EQ(e.packed_dim_left, nullptr);
+  ASSERT_EQ(e.enum_array_dims.size(), 1u);
+  EXPECT_EQ(e.enum_array_dims[0].first->int_val, 2u);
+}
+
 }  // namespace

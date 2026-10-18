@@ -115,10 +115,11 @@ DataType MemberType(const StructMember& member) {
 }
 
 // §37.25 detail 8: the type `type`'s dimensions are written over, the type
-// without its packed dimensions, which for an enumeration are its base type's
-// and stay with it.
+// without its packed dimensions; for an enumeration, without those written
+// after its body, the one in its base type staying with it.
 DataType ElementOf(const DataType& type) {
   DataType element = type;
+  element.enum_array_dims.clear();
   if (type.kind != DataTypeKind::kEnum) {
     element.packed_dim_left = nullptr;
     element.packed_dim_right = nullptr;
@@ -173,13 +174,20 @@ class TypespecMaker {
 
   // §37.25 detail 10: the dimensions of a type written with the unpacked
   // dimensions `unpacked` over the packed ones of `type`, outermost first; an
-  // enumeration's packed dimensions are its base type's.
+  // enumeration's packed dimensions are those written after its body (§7.4.1),
+  // the one written in its base type being the base type's.
   std::vector<VpiTypespecDim> DimsOf(const DataType& type,
                                      const std::vector<Expr*>& unpacked) {
     std::vector<VpiTypespecDim> dims;
     dims.reserve(unpacked.size());
     for (const Expr* dim : unpacked) dims.push_back(UnpackedDim(dim));
-    if (type.kind == DataTypeKind::kEnum) return dims;
+    if (type.kind == DataTypeKind::kEnum) {
+      for (const auto& [left, right] : type.enum_array_dims) {
+        dims.push_back({false, VpiEvaluatedRange(left, right, at_.design.ctx),
+                        0, nullptr});
+      }
+      return dims;
+    }
     for (const PackedRange& dim : WrittenPackedDims(&type, at_.design.ctx)) {
       dims.push_back({false, dim, 0, nullptr});
     }

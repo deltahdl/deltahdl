@@ -682,7 +682,6 @@ void Parser::ParseVarPrefixed(std::vector<ModuleItem*>& items) {
     DataType dtype;
     if (Check(TokenKind::kKwEnum)) {
       dtype = ParseEnumType();
-      ParsePackedDims(dtype);
     } else if (Check(TokenKind::kKwStruct) || Check(TokenKind::kKwUnion)) {
       dtype = ParseStructOrUnionType();
       ParsePackedDims(dtype);
@@ -742,7 +741,6 @@ void Parser::ParseTypedItemOrInst(std::vector<ModuleItem*>& items,
   }
   if (Check(TokenKind::kKwEnum)) {
     auto dtype = ParseEnumType();
-    ParsePackedDims(dtype);
     ParseVarDeclList(items, dtype);
     return;
   }

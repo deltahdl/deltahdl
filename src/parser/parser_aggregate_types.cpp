@@ -64,6 +64,20 @@ DataType Parser::ParseEnumType() {
 
   dtype = ParseEnumBody(dtype);
 
+  // A.2.2.1: packed dimensions after the body make a packed array of the
+  // enumeration (§7.4.1), kept apart from the base type's dimension, which
+  // they would otherwise overwrite.
+  DataType array;
+  array.kind = DataTypeKind::kEnum;
+  ParsePackedDims(array);
+  if (array.packed_dim_left != nullptr) {
+    dtype.enum_array_dims.emplace_back(array.packed_dim_left,
+                                       array.packed_dim_right);
+  }
+  dtype.enum_array_dims.insert(dtype.enum_array_dims.end(),
+                               array.extra_packed_dims.begin(),
+                               array.extra_packed_dims.end());
+  dtype.has_unsized_packed_dim = array.has_unsized_packed_dim;
   return dtype;
 }
 
@@ -206,11 +220,7 @@ DataType Parser::ParseStructMemberType() {
     ParsePackedDims(member_type);
     return member_type;
   }
-  if (Check(TokenKind::kKwEnum)) {
-    member_type = ParseEnumType();
-    ParsePackedDims(member_type);
-    return member_type;
-  }
+  if (Check(TokenKind::kKwEnum)) return ParseEnumType();
   member_type = ParseDeclaredDataType();
   if (member_type.kind != DataTypeKind::kImplicit || !CheckIdentifier()) {
     return member_type;

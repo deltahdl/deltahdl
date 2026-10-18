@@ -514,7 +514,6 @@ bool Parser::TryParseInlineAggregateType(DataType& dt) {
   // left the cursor on the keyword, derailing the surrounding parse.
   if (Check(TokenKind::kKwEnum)) {
     dt = ParseEnumType();
-    ParsePackedDims(dt);
     return true;
   }
   if (Check(TokenKind::kKwStruct) || Check(TokenKind::kKwUnion)) {
