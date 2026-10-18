@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstddef>
 #include <string>
 #include <string_view>
@@ -9,6 +10,7 @@
 #include "common/types.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_attribute.h"
+#include "parser/ast_design.h"
 #include "parser/ast_module.h"
 #include "parser/ast_specify.h"
 #include "parser/ast_type.h"
@@ -182,6 +184,14 @@ void VpiContext::AttachPackages(const RtlirDesign* design) {
   // under its own scope name, "$unit#k", and each unit is a compilation-unit
   // scope of its own, named and drawn as the one unit is below.
   for (size_t k = 0; k < design->compilation_units.size(); ++k) {
+    // §37.12: a unit declaring lets is the scope of their let decls (§11.12),
+    // whatever else it declares.
+    if (std::ranges::any_of(design->compilation_units[k]->cu_items,
+                            [](const ModuleItem* item) {
+                              return item->kind == ModuleItemKind::kLetDecl;
+                            })) {
+      DesignObjectForFlatName(UnitScopes::ScopeName(static_cast<int>(k)));
+    }
     auto own = object_map_.find(UnitScopes::ScopeName(static_cast<int>(k)));
     if (own == object_map_.end()) continue;
     own->second->name = kUnitScope;

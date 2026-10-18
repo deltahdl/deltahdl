@@ -41,6 +41,10 @@ struct AssignNames {
   // which a name it does not declare may name a package's let (§11.12); none
   // for an expression of no module.
   const std::vector<RtlirImport>& imports = NoImports();
+  // §3.12.1: the compilation unit the module the expression is written in
+  // was declared in, whose declarations its names reach after the imports'
+  // (UnitScopes::ScopeName); -1 for a design of one unit.
+  int unit = -1;
 
   static const GenBlockConsts& NoGenvars() {
     static const GenBlockConsts kNone;

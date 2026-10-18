@@ -4,11 +4,13 @@
 #include <vector>
 
 #include "elaborator/rtlir.h"
+#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
 #include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/unit_scopes.h"
 #include "simulator/vpi_design_attach_assertion_decls.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_walk.h"
@@ -112,6 +114,12 @@ void VpiAttachPackageAndUnitLets(const RtlirDesign& design,
   for (const PackageDecl* pkg : design.packages) {
     AttachScopeLets(pkg->items, FindObjectForFlatName(objects, pkg->name),
                     std::string(pkg->name), kAt);
+  }
+  // §3.12.1: where each file is a unit, each unit's lets are its own scope's.
+  for (std::size_t k = 0; k < design.compilation_units.size(); ++k) {
+    const std::string kScope = UnitScopes::ScopeName(static_cast<int>(k));
+    AttachScopeLets(design.compilation_units[k]->cu_items,
+                    FindObjectForFlatName(objects, kScope), kScope, kAt);
   }
   VpiObject* unit = FindObjectForFlatName(objects, "$unit");
   if (unit != nullptr) AttachScopeLets(design.cu_let_decls, unit, "$unit", kAt);

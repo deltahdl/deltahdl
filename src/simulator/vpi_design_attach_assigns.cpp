@@ -20,6 +20,7 @@
 #include "simulator/pattern_type_key.h"
 #include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/unit_scopes.h"
 #include "simulator/variable.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_design_attach_assigns_internal.h"
@@ -584,7 +585,7 @@ VpiObject* LetDeclIn(const VpiObject* scope, std::string_view name) {
 // scope around the expression, or its instance, declares, the innermost
 // first; else one a package declares that an import of the module makes
 // visible, by its name or with a wildcard (§26.3); else one the compilation
-// unit declares (§3.12.1). Null where none is.
+// unit the module belongs to declares (§3.12.1). Null where none is.
 VpiObject* LetDeclNamed(const AssignNames& names, std::string_view name) {
   for (const VpiObject* at = VpiScopeOrInstance(
            names.scope != nullptr ? names.scope : names.instance, names.objects,
@@ -598,7 +599,9 @@ VpiObject* LetDeclNamed(const AssignNames& names, std::string_view name) {
         FindObjectForFlatName(names.objects, entry.package_name), name);
     if (let != nullptr) return let;
   }
-  return LetDeclIn(FindObjectForFlatName(names.objects, "$unit"), name);
+  return LetDeclIn(
+      FindObjectForFlatName(names.objects, UnitScopes::ScopeName(names.unit)),
+      name);
 }
 
 // §11.12 with §26.3: the let decl the call `call` names: its callee's name,
@@ -794,7 +797,8 @@ AssignBuild CallSiteBuild(const VpiObjectMap& objects, const VpiCallSite& site,
       &ctx,
       AssignNames{objects, site.prefix, gen,
                   site.formals != nullptr ? site.formals : site.scope,
-                  AssignNames::NoGenvars(), nullptr, site.mod.imports},
+                  AssignNames::NoGenvars(), nullptr, site.mod.imports,
+                  site.mod.unit_index},
       VpiCalleesAt(site),
       build.keep,
       site.shape_call,

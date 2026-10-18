@@ -18,6 +18,7 @@
 #include "simulator/sv_vpi_user.h"
 #include "simulator/unit_scopes.h"
 #include "simulator/variable.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 using namespace delta;
@@ -338,6 +339,40 @@ TEST_F(SeparateUnitsVpi, EachUnitIsACompilationUnitScope) {
   }
   std::ranges::sort(values);
   EXPECT_EQ(values, (std::vector<int>{3, 4}));
+}
+
+// §3.12.1 with §37.12 and §37.57: a let a compilation unit declares is a let
+// decl of that unit's own scope, which a unit declaring nothing else has too,
+// and a module's use of it is a let expr reaching the let of the unit the
+// module was declared in.
+TEST_F(SeparateUnitsVpi, EachUnitsLetIsALetDeclOfItsOwnScope) {
+  RunUnits(
+      {"let g(y) = y + 1;\n"
+       "module top; logic [3:0] a, w; assign w = g(a); child c();\n"
+       "endmodule\n",
+       "let h(y) = y + 2;\n"
+       "module child; logic [3:0] b, v; assign v = h(b); endmodule\n",
+       "module other; endmodule\n"});
+  // The let decl the right side of the first continuous assignment of
+  // `scope` instantiates, null where it is no let expr.
+  const auto kUsed = [](vpiHandle scope) -> VpiObject* {
+    vpiHandle assigns = vpi_iterate(vpiContAssign, scope);
+    vpiHandle assign = assigns == nullptr ? nullptr : vpi_scan(assigns);
+    vpiHandle used = assign == nullptr ? nullptr : vpi_handle(vpiRhs, assign);
+    if (used == nullptr || vpi_get(vpiType, used) != vpiLetExpr) return nullptr;
+    return VpiObjectOf(vpi_handle(vpiLetDecl, used));
+  };
+  VpiObject* g = kUsed(By("top"));
+  VpiObject* h = kUsed(By("top.c"));
+  ASSERT_NE(g, nullptr);
+  ASSERT_NE(h, nullptr);
+  EXPECT_EQ(g->name, "g");
+  EXPECT_EQ(h->name, "h");
+  ASSERT_NE(g->parent, nullptr);
+  ASSERT_NE(h->parent, nullptr);
+  EXPECT_NE(g->parent, h->parent);
+  EXPECT_EQ(g->parent->name, "$unit");
+  EXPECT_EQ(h->parent->name, "$unit");
 }
 
 }  // namespace
