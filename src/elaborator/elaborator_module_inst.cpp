@@ -463,47 +463,87 @@ bool ConcatElementsUniform(const Expr* conn, uint32_t total,
   return true;
 }
 
+// One dimension of an instance array, the bounds its declaration wrote.
+struct InstArrayDim {
+  int64_t left = 0;
+  int64_t right = 0;
+
+  [[nodiscard]] int64_t Size() const { return std::abs(left - right) + 1; }
+  // The index `from_left` places from the left bound.
+  [[nodiscard]] int64_t IndexFromLeft(int64_t from_left) const {
+    return left <= right ? left + from_left : left - from_left;
+  }
+};
+
+// §23.3.3.5 (printed page 748): where the instance at flat position
+// `position` of an array of `dims` stands in each dimension, counted from that
+// dimension's left bound. Position 0 is the instance at every dimension's right
+// index, and the rightmost dimension varies fastest, the order the part-selects
+// of a packed connection are taken in.
+std::vector<int64_t> FromLeftOffsets(const std::vector<InstArrayDim>& dims,
+                                     uint32_t position) {
+  std::vector<int64_t> from_left(dims.size());
+  int64_t rest = position;
+  for (std::size_t d = dims.size(); d-- > 0;) {
+    const int64_t kSize = dims[d].Size();
+    from_left[d] = kSize - 1 - rest % kSize;
+    rest /= kSize;
+  }
+  return from_left;
+}
+
 // §23.3.3.5 (printed page 748): an unpacked array connection is split across
 // an array of instances, each element of the connection matched to the port
-// left index to left index and right index to right index, so the instance
-// `position` places from the right stands `total - 1 - position` places from
-// the left and takes the element that far from the array's left bound. A
-// variable's bounds are its declared ones; a net array is read as written
-// `[size]`, from 0. Empty where the name is no unpacked array, a variable's or
-// a net's.
-std::optional<int64_t> UnpackedElementForInstance(
-    const InstArrayDistribCtx& ctx, std::string_view name, uint32_t position,
-    uint32_t total) {
-  const auto kFromLeft = static_cast<int64_t>(total - 1 - position);
+// left index to left index and right index to right index in each of the
+// array's dimensions, the connection's slowest varying ones. So the instance
+// standing `from_left[d]` places from the left in dimension d takes the
+// element that far from the connection's left bound in its dimension d. A
+// variable's bounds are its declared ones; a net array, and a dimension whose
+// bounds did not fold, are read as written `[size]`, from 0. Empty where the
+// name is no unpacked array, a variable's or a net's.
+std::optional<std::vector<int64_t>> UnpackedElementForInstance(
+    const InstArrayDistribCtx& ctx, std::string_view name,
+    const std::vector<int64_t>& from_left) {
   auto it = ctx.var_array_info.find(name);
   if (it != ctx.var_array_info.end() && it->second.num_unpacked_dims > 0) {
-    if (it->second.declared_dims.empty()) return kFromLeft;
-    const auto& dim = it->second.declared_dims.front();
-    return dim.left <= dim.right ? dim.left + kFromLeft : dim.left - kFromLeft;
+    std::vector<int64_t> indices = from_left;
+    const auto& declared = it->second.declared_dims;
+    for (std::size_t d = 0; d < indices.size() && d < declared.size(); ++d) {
+      indices[d] =
+          InstArrayDim{declared[d].left, declared[d].right}.IndexFromLeft(
+              from_left[d]);
+    }
+    return indices;
   }
   for (const auto& net : ctx.parent_mod->nets) {
-    if (net.name == name && net.num_unpacked_dims > 0) return kFromLeft;
+    if (net.name == name && net.num_unpacked_dims > 0) return from_left;
   }
   return std::nullopt;
 }
 
-// §23.3.3.5: rewrite one port connection for the instance at array position
-// `position` (0 = least-significant / right index). An unpacked-array
-// connection maps element-by-position; a packed connection whose width is
-// port_width*total is part-selected (rightmost instance to the LSB); an
-// equal-width connection is replicated to every instance.
+// §23.3.3.5: rewrite one port connection for the instance at flat array
+// position `position` (0 = least-significant / every right index) of a `total`
+// instance array, standing `from_left` places from the left in each
+// dimension. An unpacked-array connection maps element-by-position; a packed
+// connection whose width is port_width*total is part-selected (rightmost
+// instance to the LSB); an equal-width connection is replicated to every
+// instance.
 Expr* DistributeInstanceConnection(const InstArrayDistribCtx& ctx,
                                    const RtlirPortBinding& binding,
-                                   uint32_t position, uint32_t total) {
+                                   uint32_t position, uint32_t total,
+                                   const std::vector<int64_t>& from_left) {
   Expr* conn = binding.connection;
   uint32_t port_width = binding.width;
   if (!conn || port_width == 0 || total < 2) return conn;
 
   if (conn->kind == ExprKind::kIdentifier) {
-    if (auto index =
-            UnpackedElementForInstance(ctx, conn->text, position, total)) {
-      return MakeElementSelectExpr(ctx.arena, conn,
-                                   static_cast<uint32_t>(*index));
+    if (auto indices = UnpackedElementForInstance(ctx, conn->text, from_left)) {
+      Expr* element = conn;
+      for (const int64_t kIndex : *indices) {
+        element = MakeElementSelectExpr(ctx.arena, element,
+                                        static_cast<uint32_t>(kIndex));
+      }
+      return element;
     }
     if (FindSignalWidth(conn->text, ctx.parent_mod) == port_width * total) {
       return MakePartSelectPlusExpr(
@@ -526,57 +566,73 @@ Expr* DistributeInstanceConnection(const InstArrayDistribCtx& ctx,
   return conn;
 }
 
-// Materializes a single-dimension instance array `c[left:right]` as `total`
-// separate instances, each named `c[idx]` and carrying its distributed port
-// connections (§23.3.3.5). The resolved child module is shared across copies;
-// per-instance variable storage is created later under each instance's prefix.
+// Materializes an instance array `c[l0:r0][l1:r1]...` as one instance per
+// element, each named by every index it stands at, `c[i0][i1]`, and carrying
+// its distributed port connections (§23.3.3.5). The resolved child module is
+// shared across copies; per-instance variable storage is created later under
+// each instance's prefix. §37.11: an element of a one-dimensional array records
+// the array it belongs to and its index, which its expanded name alone does
+// not say.
 void PushInstanceArray(const InstArrayDistribCtx& ctx, RtlirModule* mod,
-                       const RtlirModuleInst& base, int64_t left,
-                       int64_t right) {
-  auto total = static_cast<uint32_t>(std::abs(left - right) + 1);
-  int64_t step = (right <= left) ? 1 : -1;
+                       const RtlirModuleInst& base,
+                       const std::vector<InstArrayDim>& dims) {
+  int64_t total = 1;
+  for (const InstArrayDim& dim : dims) total *= dim.Size();
   for (uint32_t p = 0; p < total; ++p) {
-    int64_t idx = right + step * static_cast<int64_t>(p);
+    const std::vector<int64_t> kFromLeft = FromLeftOffsets(dims, p);
     RtlirModuleInst copy = base;
-    // §37.11: the element records the array it belongs to and its index,
-    // which its expanded name alone does not say.
-    copy.array = {base.simple_inst_name, left, right, idx};
-    std::string name = std::format("{}[{}]", base.inst_name, idx);
+    std::string name(base.inst_name);
+    for (std::size_t d = 0; d < dims.size(); ++d) {
+      const int64_t kIndex = dims[d].IndexFromLeft(kFromLeft[d]);
+      name += std::format("[{}]", kIndex);
+      if (dims.size() == 1) {
+        copy.array = {base.simple_inst_name, dims[d].left, dims[d].right,
+                      kIndex};
+      }
+    }
     auto* buf = ctx.arena.AllocString(name.c_str(), name.size());
     copy.inst_name = std::string_view(buf, name.size());
     for (auto& b : copy.port_bindings) {
-      b.connection = DistributeInstanceConnection(ctx, b, p, total);
+      b.connection = DistributeInstanceConnection(
+          ctx, b, p, static_cast<uint32_t>(total), kFromLeft);
     }
     mod->children.push_back(std::move(copy));
   }
 }
 
-// Appends `inst` to `mod`, expanding a single-dimension instance array into one
-// distributed instance per index (§23.3.3.5). Other forms append a single
-// instance unchanged.
+// §23.3.2: the dimensions of the instance array `item` declares, each folded
+// against `scope`; empty where it declares none or a bound does not fold. A
+// dimension is an unpacked_dimension, whose `[size]` form §7.4.2 makes
+// `[0:size-1]`: `leaf arr[2]()` is arr[0] and arr[1].
+std::vector<InstArrayDim> InstanceArrayDims(const ModuleItem* item,
+                                            const ScopeMap& scope) {
+  std::vector<InstArrayDim> dims;
+  for (const auto& [left_expr, right_expr] : item->inst_dims) {
+    const std::optional<int64_t> kLeft = ConstEvalInt(left_expr, scope);
+    if (!kLeft) return {};
+    if (right_expr == nullptr) {
+      if (*kLeft < 1) return {};
+      dims.push_back({0, *kLeft - 1});
+      continue;
+    }
+    const std::optional<int64_t> kRight = ConstEvalInt(right_expr, scope);
+    if (!kRight) return {};
+    dims.push_back({*kLeft, *kRight});
+  }
+  return dims;
+}
+
+// Appends `inst` to `mod`, expanding an instance array of any number of
+// dimensions into one distributed instance per element (§23.3.3.5). Other forms
+// append a single instance unchanged.
 void AppendModuleInstOrArray(const InstArrayDistribCtx& ctx, RtlirModule* mod,
                              const RtlirModuleInst& inst,
                              const ModuleItem* item, const ScopeMap& scope) {
-  std::optional<int64_t> arr_left;
-  std::optional<int64_t> arr_right;
-  if (item->inst_dims.size() == 1) {
-    if (item->inst_range_left)
-      arr_left = ConstEvalInt(item->inst_range_left, scope);
-    if (item->inst_range_right)
-      arr_right = ConstEvalInt(item->inst_range_right, scope);
-    // §23.3.2 writes an instance's dimension as an unpacked_dimension, whose
-    // `[size]` form §7.4.2 makes `[0:size-1]`: `leaf arr[2]()` is arr[0] and
-    // arr[1]. Read as a range with no right bound it was one instance.
-    if (arr_left && item->inst_range_right == nullptr) {
-      arr_right = *arr_left - 1;
-      arr_left = 0;
-      if (*arr_right < 0) arr_left.reset();
-    }
-  }
-  if (arr_left && arr_right) {
-    PushInstanceArray(ctx, mod, inst, *arr_left, *arr_right);
-  } else {
+  const std::vector<InstArrayDim> kDims = InstanceArrayDims(item, scope);
+  if (kDims.empty()) {
     mod->children.push_back(inst);
+  } else {
+    PushInstanceArray(ctx, mod, inst, kDims);
   }
 }
 

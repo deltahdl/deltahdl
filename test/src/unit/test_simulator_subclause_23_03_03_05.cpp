@@ -334,4 +334,31 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesSimulation,
       "1 2\n");
 }
 
+// §23.3.3.5 (printed page 748): an array of instances of two dimensions is
+// an instance per element. Each takes the element of an unpacked connection
+// left index to left index in both dimensions, so c[1][2], leftmost in each,
+// takes ins[0][0]; and the part-select of a packed one that counts from the
+// rightmost indices, the rightmost dimension first, so c[1][2] drives out[5]
+// and c[0][2] drives out[2]. It was one instance.
+TEST(UnpackedArrayPortsAndArraysOfInstancesSimulation,
+     ATwoDimensionalArrayOfInstancesConnectsEveryElement) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module pass (output o, input i);\n"
+      "  assign o = i;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  wire [5:0] out;\n"
+      "  logic ins [0:1][0:2];\n"
+      "  pass c[1:0][2:0] (.o(out), .i(ins));\n"
+      "  initial begin\n"
+      "    ins[0][0] = 1; ins[0][1] = 1; ins[0][2] = 0;\n"
+      "    ins[1][0] = 1; ins[1][1] = 0; ins[1][2] = 0;\n"
+      "    #1 $display(\"out=%b\", out);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "out=110100\n");
+}
+
 }  // namespace

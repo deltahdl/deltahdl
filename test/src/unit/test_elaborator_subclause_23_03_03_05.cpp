@@ -1,7 +1,9 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <string>
+#include <vector>
 
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
@@ -446,6 +448,33 @@ TEST(UnpackedArrayPortElaboration, InterfaceArrayAfterDeclarationsMatches) {
              "  ifc ia[2]();\n"
              "  user u(ia);\n"
              "endmodule\n"));
+}
+
+// §23.3.3.5 (printed page 748): `child c[8][4](o, i);` is an instance per
+// element of both dimensions, each named by both its indices, c[0][0] to
+// c[7][3]; it was one instance named c.
+TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
+     ATwoDimensionalInstanceArrayIsAnInstancePerElement) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module child(output o, input i[5]);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic o [8][4];\n"
+      "  logic i [8][4][5];\n"
+      "  child c[8][4](.o(o), .i(i));\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  ASSERT_FALSE(f.has_errors);
+  std::vector<std::string> names;
+  for (const RtlirModuleInst& inst : design->top_modules.front()->children) {
+    names.emplace_back(inst.inst_name);
+  }
+  ASSERT_EQ(names.size(), 32u);
+  EXPECT_EQ(names.front(), "c[7][3]");
+  EXPECT_EQ(names.back(), "c[0][0]");
+  EXPECT_TRUE(std::ranges::find(names, "c[5][2]") != names.end());
 }
 
 }  // namespace
