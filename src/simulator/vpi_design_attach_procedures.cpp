@@ -779,7 +779,7 @@ void AttachClassMethodBodies(const RtlirDesign& design,
                   calls,   build};
     if (!kInModule) walk.package = key.second;
     for (const ClassMember* member : key.first->members) {
-      if (member == nullptr || member->method == nullptr) continue;
+      if (member->method == nullptr) continue;
       const ModuleItem* body = member->method->out_of_block_body != nullptr
                                    ? member->method->out_of_block_body
                                    : member->method;
