@@ -129,9 +129,9 @@ bool VpiIsScopeBodyStmtObject(VpiHandle obj) {
 bool VpiIsPatternType(int type) {
   // §37.72: `pattern` is drawn as a class definition - bold italic letters in a
   // dotted enclosure - and §37.4.1 makes such an enclosure a grouping of the
-  // object definitions inside it rather than an object anything can be. The
-  // three inside this one are what the class holds, and vpiPattern is the name
-  // of the group rather than a kind any pattern object has.
+  // object definitions inside it rather than an object anything can be. These
+  // are its three pattern kinds; the expr it also holds is an object of its
+  // own kind (VpiPatternOf), and vpiPattern names the group, not a kind.
   switch (type) {
     case vpiAnyPattern:
     case vpiTaggedPattern:
@@ -144,13 +144,14 @@ bool VpiIsPatternType(int type) {
 
 VpiHandle VpiPatternOf(VpiHandle pattern) {
   // §37.72 (figure): a tagged pattern reaches the pattern it tags and a struct
-  // pattern the patterns of its members, each drawn to the `pattern` class. The
-  // arrow names the class, so what it reaches is an object of one of the kinds
-  // the class groups - never one whose own type is vpiPattern, which is the
-  // group's name. Null where the pattern holds none.
+  // pattern the pattern of its member, each drawn to the `pattern` class: an
+  // object of a kind the class groups, an expr among them (§12.6's
+  // constant_expression), never one typed vpiPattern. Null where it holds none.
   if (!pattern) return nullptr;
   for (auto* child : pattern->children) {
-    if (VpiIsPatternType(child->type)) return child;
+    if (VpiIsPatternType(child->type) || VpiIsExprOperandType(child->type)) {
+      return child;
+    }
   }
   return nullptr;
 }

@@ -531,5 +531,38 @@ TEST_F(CaseStatementsOfARun, ATaggedPatternReachesItsMembersTypespec) {
   EXPECT_EQ(vpi_handle(vpiTypespec, kSelected[0][0]), nullptr);
 }
 
+// The pattern class holds expr beside the three pattern kinds, as §12.6 has a
+// pattern be a constant expression: a tagged pattern written with one,
+// tagged V 5, reaches it through vpiPattern, as does the struct pattern a of
+// '{a: 5, b: .*} (#7320).
+TEST_F(CaseStatementsOfARun, APatternWrittenAsAnExpressionIsReached) {
+  Run("module top;\n"
+      "  typedef union tagged { int V; void N; } u_t;\n"
+      "  typedef struct { int a; int b; } s_t;\n"
+      "  u_t u; s_t s; int r;\n"
+      "  initial case (u) matches\n"
+      "    tagged V 5: r = 1;\n"
+      "  endcase\n"
+      "  initial case (s) matches\n"
+      "    '{a: 5, b: .*}: r = 2;\n"
+      "  endcase\n"
+      "endmodule\n");
+  const std::vector<std::vector<vpiHandle>> kTagged = ItemConditions(0);
+  ASSERT_EQ(kTagged.size(), 1U);
+  ASSERT_EQ(kTagged[0].size(), 1U);
+  vpiHandle constant = vpi_handle(vpiPattern, kTagged[0][0]);
+  ASSERT_NE(constant, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, constant), vpiConstant);
+  const std::vector<std::vector<vpiHandle>> kStruct = ItemConditions(1);
+  ASSERT_EQ(kStruct.size(), 1U);
+  ASSERT_EQ(kStruct[0].size(), 1U);
+  const std::vector<vpiHandle> kMembers =
+      Scanned(vpi_iterate(vpiOperand, kStruct[0][0]));
+  ASSERT_EQ(kMembers.size(), 2U);
+  vpiHandle member = vpi_handle(vpiPattern, kMembers[0]);
+  ASSERT_NE(member, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, member), vpiConstant);
+}
+
 }  // namespace
 }  // namespace delta
