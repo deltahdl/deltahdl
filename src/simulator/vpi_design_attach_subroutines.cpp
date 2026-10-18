@@ -16,9 +16,11 @@
 #include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_alloc_scheme.h"
+#include "simulator/vpi_declared_shape.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_model_helpers2.h"
+#include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -134,13 +136,33 @@ void MakeIoDecls(VpiObject* tf, const ModuleItem& item,
         tf->automatic, sb.build);
     AttachDeclaredRanges(var, arg.data_type, arg.unpacked_dims, sb.ctx,
                          sb.build);
+    // §37.13: the io decl reports the size, signing and shape of the variable
+    // it declares, which no RtlirVariable records for an argument.
+    VpiRecordDeclaredShape(var, arg.data_type);
+    if (arg.unpacked_dims.empty()) {
+      var->size = static_cast<int>(DeclaredTypeWidth(arg.data_type, sb.ctx));
+    }
     VpiObject* io_decl = sb.build.alloc();
     io_decl->type = vpiIODecl;
     io_decl->name = var->name;
     io_decl->full_name = var->full_name;
     io_decl->parent = tf;
-    io_decl->direction = ArgumentDirection(arg.direction);
+    // §37.13 details 1 and 3: vpiRef for an argument passed by reference, its
+    // vpiExpr a ref obj whose actual is the variable (detail 2), and no
+    // direction for a virtual interface (§25.9).
+    io_decl->direction =
+        VpiIoDeclDirection(ArgumentDirection(arg.direction), false, false,
+                           var->type == vpiVirtualInterfaceVar);
     io_decl->io_expr = var;
+    if (arg.direction == Direction::kRef) {
+      VpiObject* ref_obj = sb.build.alloc();
+      ref_obj->type = vpiRefObj;
+      ref_obj->parent = io_decl;
+      ref_obj->name = io_decl->name;
+      ref_obj->full_name = io_decl->full_name;
+      ref_obj->actual = var;
+      io_decl->io_expr = ref_obj;
+    }
     tf->children.push_back(io_decl);
   }
 }

@@ -4,6 +4,7 @@
 
 #include "simulator/vpi_coverage.h"
 #include "simulator/vpi_internal.h"
+#include "simulator/vpi_io_decl_stand_in.h"
 #include "simulator/vpi_user.h"
 // §37.10 detail 3: the package/interface/program instance kinds are defined in
 // the SystemVerilog VPI header alongside the §37.10 vpiInstance relation.
@@ -803,6 +804,8 @@ int VpiContext::Get(int property, VpiHandle obj) {
     if (property == vpiSaveRestartID) return kVpiRunSaveRestartId;
     return 0;
   }
+  // §37.13: an io decl's size, signing and shape are those of what it declares.
+  obj = VpiIoDeclStandIn(obj, property);
   // §37.3.6: unless otherwise specified, asking vpi_get() for a property of a
   // protected object is an error - it represents code sealed in a decryption
   // envelope. Access to the vpiType and vpiIsProtected properties is the stated

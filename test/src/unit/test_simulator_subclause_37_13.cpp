@@ -287,5 +287,121 @@ TEST_F(ModportIoDeclsOfARun, AnEmptyExpressionPortReachesNone) {
   EXPECT_EQ(vpi_handle(vpiExpr, lo), nullptr);
 }
 
+// A design run whose tasks, udp defns and modports are read back for their io
+// decls.
+class IoDeclsOfARun : public ModportIoDeclsOfARun {
+ protected:
+  // The io decl `arg` of top's task or function `tf`.
+  static vpiHandle ArgOf(const char* tf, const char* arg) {
+    return Named(vpiIODecl, Named(vpiTaskFunc, By("top"), tf), arg);
+  }
+
+  static int IntOf(vpiHandle obj) {
+    s_vpi_value value = {};
+    value.format = vpiIntVal;
+    vpi_get_value(obj, &value);
+    return value.value.integer;
+  }
+};
+
+// The figure with detail 4: an argument's io decl reports the size, signing,
+// shape and ranges of the variable it declares, its typespec being the
+// variable's; one passed by reference reaches it through a ref obj (detail 2)
+// and reports vpiRef (detail 1).
+TEST_F(IoDeclsOfARun, AnArgumentsIoDeclReportsTheVariableItDeclares) {
+  Run("module top;\n"
+      "  task automatic t(input logic signed [7:0] a, input logic b,\n"
+      "                   input int c[2], ref int r);\n"
+      "  endtask\n"
+      "endmodule\n");
+  vpiHandle a = ArgOf("t", "a");
+  ASSERT_NE(a, nullptr);
+  EXPECT_EQ(vpi_get(vpiSize, a), 8);
+  EXPECT_EQ(vpi_get(vpiSigned, a), 1);
+  EXPECT_EQ(vpi_get(vpiScalar, a), 0);
+  EXPECT_EQ(vpi_get(vpiVector, a), 1);
+  EXPECT_EQ(IntOf(vpi_handle(vpiLeftRange, a)), 7);
+  EXPECT_EQ(IntOf(vpi_handle(vpiRightRange, a)), 0);
+  EXPECT_EQ(ObjectsOf(vpiRange, a).size(), 1U);
+  vpiHandle a_var = vpi_handle(vpiExpr, a);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiTypespec, a)),
+            VpiObjectOf(vpi_handle(vpiTypespec, a_var)));
+  vpiHandle b = ArgOf("t", "b");
+  EXPECT_EQ(vpi_get(vpiSize, b), 1);
+  EXPECT_EQ(vpi_get(vpiScalar, b), 1);
+  EXPECT_EQ(vpi_get(vpiSigned, b), 0);
+  EXPECT_NE(ArgOf("t", "c"), nullptr);
+  vpiHandle r = ArgOf("t", "r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(vpi_get(vpiDirection, r), vpiRef);
+  vpiHandle ref_obj = vpi_handle(vpiExpr, r);
+  EXPECT_EQ(vpi_get(vpiType, ref_obj), vpiRefObj);
+  EXPECT_EQ(vpi_get(vpiType, vpi_handle(vpiActual, ref_obj)), vpiIntVar);
+  EXPECT_EQ(vpi_get(vpiSize, r), 32);
+}
+
+// Detail 3: an io decl whose vpiExpr is a virtual interface var, an
+// argument's or a modport port's, has no direction.
+TEST_F(IoDeclsOfARun, AVirtualInterfaceIoDeclHasNoDirection) {
+  Run("interface inner; endinterface\n"
+      "interface ifc; virtual inner v; modport mp(input v); endinterface\n"
+      "module top; inner n(); ifc i0();\n"
+      "  task t(virtual inner w); endtask\n"
+      "endmodule\n");
+  EXPECT_EQ(vpi_get(vpiDirection, ArgOf("t", "w")), vpiNoDirection);
+  EXPECT_EQ(vpi_get(vpiDirection, IoDecl("mp", "v")), vpiNoDirection);
+}
+
+// The figure: a udp defn reaches an io decl per port, its output and then
+// its inputs, each one bit and declaring no net of the defn's.
+TEST_F(IoDeclsOfARun, AUdpDefnReachesAnIoDeclPerPort) {
+  Run("primitive my_and(o, a, b);\n"
+      "  output o;\n"
+      "  input a, b;\n"
+      "  table\n"
+      "    0 ? : 0;\n"
+      "    ? 0 : 0;\n"
+      "    1 1 : 1;\n"
+      "  endtable\n"
+      "endprimitive\n"
+      "module top; wire o; my_and u1(o, 1'b1, 1'b0); endmodule\n");
+  vpiHandle udp = ObjectsOf(vpiPrimitive, By("top")).front();
+  vpiHandle defn = vpi_handle(vpiUdpDefn, udp);
+  ASSERT_NE(defn, nullptr);
+  EXPECT_EQ(NamesOf(vpiIODecl, defn),
+            (std::vector<std::string>{"a", "b", "o"}));
+  vpiHandle o = Named(vpiIODecl, defn, "o");
+  EXPECT_EQ(vpi_get(vpiDirection, o), vpiOutput);
+  EXPECT_EQ(vpi_get(vpiDirection, Named(vpiIODecl, defn, "a")), vpiInput);
+  EXPECT_EQ(vpi_get(vpiSize, o), 1);
+  EXPECT_EQ(vpi_get(vpiScalar, o), 1);
+  EXPECT_EQ(vpi_handle(vpiExpr, o), nullptr);
+}
+
+// The figure with §37.7 and §37.8: a modport's io decl of a task it exports
+// reaches the interface's interface tf decl for it, and of one it imports
+// from the interface's own definitions an interface tf decl reaching that
+// definition, each of vpiExternAcc.
+TEST_F(IoDeclsOfARun, AModportsSubroutineIoDeclReachesAnInterfaceTfDecl) {
+  Run("interface ifc; logic a;\n"
+      "  extern task put();\n"
+      "  task get(); endtask\n"
+      "  modport mp(input a, import get, export put);\n"
+      "endinterface\n"
+      "module tgt(ifc.mp b); task b.put(); endtask endmodule\n"
+      "module top; ifc i0(); tgt t(i0.mp); endmodule\n");
+  vpiHandle put = vpi_handle(vpiExpr, IoDecl("mp", "put"));
+  ASSERT_NE(put, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, put), vpiInterfaceTfDecl);
+  EXPECT_EQ(VpiObjectOf(put),
+            VpiObjectOf(Named(vpiInterfaceTfDecl, By("top.i0"), "put")));
+  vpiHandle get = vpi_handle(vpiExpr, IoDecl("mp", "get"));
+  ASSERT_NE(get, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, get), vpiInterfaceTfDecl);
+  EXPECT_EQ(vpi_get(vpiAccessType, get), vpiExternAcc);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, vpi_handle(vpiTask, get)),
+               "top.i0.get");
+}
+
 }  // namespace
 }  // namespace delta

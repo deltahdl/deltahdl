@@ -126,15 +126,17 @@ void MarkInCompilationUnit(VpiObject* obj) {
 }
 
 // §37.13 detail 1: the vpiDirection of the io decl a modport port is, the
-// direction the modport gave it, and vpiRef for a ref port.
-int ModportPortDirection(Direction direction) {
+// direction the modport gave it, and vpiRef for a ref port; detail 3: none
+// where its vpiExpr `expr` is a virtual interface var the interface declares.
+int ModportPortDirection(Direction direction, const VpiObject* expr) {
   int declared = vpiNoDirection;
   if (direction == Direction::kInput) declared = vpiInput;
   if (direction == Direction::kOutput) declared = vpiOutput;
   if (direction == Direction::kInout) declared = vpiInout;
-  return VpiIoDeclDirection(declared, direction == Direction::kRef,
-                            /*expr_is_ref_obj_to_interface_or_modport=*/false,
-                            /*expr_is_virtual_interface_var=*/false);
+  return VpiIoDeclDirection(
+      declared, direction == Direction::kRef,
+      /*expr_is_ref_obj_to_interface_or_modport=*/false,
+      expr != nullptr && expr->type == vpiVirtualInterfaceVar);
 }
 
 // Where the modports of one interface instance are made: the instance, the
@@ -182,8 +184,9 @@ VpiObject* ModportPortExpr(const ModportScope& scope, VpiObject* io_decl,
 
 // §37.7: the modport `decl` declares, under the interface instance, with an io
 // decl per port it gives a direction. An imported or exported task or
-// function (§25.7) and a clocking block (§25.5.5) a modport names are no io
-// decls.
+// function (§25.7) is one too, made once its interface tf decl is
+// (AttachInterfaceTfDecls); a clocking block a modport names (§25.5.5) is
+// none.
 void MakeModport(const ModportScope& scope, const ModportDecl& decl) {
   VpiObject* modport = scope.build.alloc();
   modport->type = vpiModport;
@@ -198,8 +201,8 @@ void MakeModport(const ModportScope& scope, const ModportDecl& decl) {
     io_decl->parent = modport;
     io_decl->name = scope.build.keep(std::string(port.name));
     io_decl->full_name = modport->full_name + "." + std::string(port.name);
-    io_decl->direction = ModportPortDirection(port.direction);
     io_decl->io_expr = ModportPortExpr(scope, io_decl, port);
+    io_decl->direction = ModportPortDirection(port.direction, io_decl->io_expr);
     modport->children.push_back(io_decl);
   }
 }

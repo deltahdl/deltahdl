@@ -236,9 +236,10 @@ TEST_F(ModportsOfARun, AnIoDeclOfAnInoutPortReportsVpiInout) {
   EXPECT_EQ(vpi_get(vpiDirection, Named(vpiIODecl, mb, "w")), vpiInout);
 }
 
-// §37.7: a modport's io decls are its data ports alone; a task it imports or
-// exports (§25.7) and a clocking block it names (§25.5.5) are none.
-TEST_F(ModportsOfARun, AModportsImportsExportsAndClockingAreNoIoDecls) {
+// §37.7 with §37.13: a modport's io decls are its data ports and the tasks it
+// imports or exports (§25.7), each reaching an interface tf decl through
+// vpiExpr; a clocking block it names (§25.5.5) is none.
+TEST_F(ModportsOfARun, AModportsClockingBlockIsNoIoDecl) {
   Run("interface ifc; logic a;\n"
       "  extern task put();\n"
       "  task get(); endtask\n"
@@ -248,7 +249,7 @@ TEST_F(ModportsOfARun, AModportsImportsExportsAndClockingAreNoIoDecls) {
       "module tgt(ifc.mp b); task b.put(); endtask endmodule\n"
       "module top; ifc i0(); tgt t(i0.mp); endmodule\n");
   EXPECT_EQ(ScannedNames(vpiIODecl, Named(vpiModport, Instance(), "mp")),
-            (std::vector<std::string>{"a"}));
+            (std::vector<std::string>{"a", "get", "put"}));
 }
 
 // §37.7: an io decl of a modport reaches back the modport it belongs to.

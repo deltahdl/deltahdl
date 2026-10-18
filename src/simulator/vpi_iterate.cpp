@@ -13,6 +13,7 @@
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_data_structs.h"
 #include "simulator/vpi_internal.h"
+#include "simulator/vpi_io_decl_stand_in.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_model_helpers3.h"
@@ -843,6 +844,8 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref, int compatibility_mode) {
         [this](auto* proc) { return ThreadObjectFor(proc); });
   }
 
+  // §37.13 detail 4: an io decl's ranges are those of what it declares.
+  ref = VpiIoDeclStandIn(ref, type);
   // Classify this (type, ref) iteration into its special modes. The detailed
   // §37.x reasoning for each mode lives in ComputeVpiIterateModes; collecting
   // them there keeps this routine focused on dispatch.

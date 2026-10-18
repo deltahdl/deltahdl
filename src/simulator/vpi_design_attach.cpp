@@ -583,6 +583,22 @@ void VpiContext::AttachUdpDefns(const RtlirDesign* design) {
     auto* defn = AllocObject();
     VpiFillUdpDefnObject(defn, *decl, name_pool_);
     run_objects_.try_emplace(decl, defn);
+    // §37.13 with §29.3: an io decl per port the primitive declares, its one
+    // output first and then its inputs, each one bit and declaring no net of
+    // the defn's own.
+    const auto kIoDecl = [&](std::string_view name, int direction) {
+      auto* io_decl = AllocObject();
+      io_decl->type = vpiIODecl;
+      name_pool_.emplace_back(name);
+      io_decl->name = name_pool_.back();
+      io_decl->full_name = std::string(decl->name) + "." + std::string(name);
+      io_decl->parent = defn;
+      io_decl->direction = direction;
+      io_decl->size = 1;
+      defn->children.push_back(io_decl);
+    };
+    kIoDecl(decl->output_name, vpiOutput);
+    for (std::string_view input : decl->input_names) kIoDecl(input, vpiInput);
     for (const UdpTableRow& row : decl->table) {
       VpiFillUdpTableEntryObject(AllocObject(), row, defn);
     }

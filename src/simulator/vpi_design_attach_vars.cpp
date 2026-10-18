@@ -7,6 +7,7 @@
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
+#include "simulator/vpi_declared_shape.h"
 #include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_object.h"
@@ -36,14 +37,14 @@ bool IsBitOrLogicKind(DataTypeKind kind) {
          kind == DataTypeKind::kReg || kind == DataTypeKind::kImplicit;
 }
 
-// §37.17 detail 20: what the declaration of `var`, an object of `type`, tells
-// VpiVariableScalar and VpiVariableVector -- its packed dimension and
-// packedness, an enum's base type (int where the enum names none) and an
-// array's element type.
-VpiScalarVectorQuery ScalarVectorQueryOf(int type, const RtlirVariable& var) {
+// §37.17 detail 20: what a declaration of `declared`, of the kind `kind`,
+// tells VpiVariableScalar and VpiVariableVector of an object of `type` -- its
+// packed dimension and packedness, an enum's base type (int where the enum
+// names none) and an array's element type.
+VpiScalarVectorQuery DeclaredShapeQuery(int type, const DataType* declared,
+                                        DataTypeKind kind) {
   VpiScalarVectorQuery query;
   query.var_type = type;
-  const DataType* declared = var.dtype;
   query.has_packed_dimension =
       declared != nullptr && declared->packed_dim_left != nullptr;
   query.packed = declared != nullptr && declared->is_packed;
@@ -53,11 +54,14 @@ VpiScalarVectorQuery ScalarVectorQueryOf(int type, const RtlirVariable& var) {
       IsBitOrLogicKind(declared->enum_base_kind);
   query.base_is_scalar = kBaseIsBitOrLogic && !query.has_packed_dimension;
   query.base_is_vector = !query.base_is_scalar;
-  query.element_is_vector =
-      query.has_packed_dimension || IsIntegerKind(var.decl_kind);
-  query.element_is_scalar =
-      !query.element_is_vector && IsBitOrLogicKind(var.decl_kind);
+  query.element_is_vector = query.has_packed_dimension || IsIntegerKind(kind);
+  query.element_is_scalar = !query.element_is_vector && IsBitOrLogicKind(kind);
   return query;
+}
+
+// The same for the variable `var`, an object of `type`.
+VpiScalarVectorQuery ScalarVectorQueryOf(int type, const RtlirVariable& var) {
+  return DeclaredShapeQuery(type, var.dtype, var.decl_kind);
 }
 
 // §37.17 details 9 and 21: an array var's kind, and its size -- for a fixed
@@ -108,6 +112,14 @@ void RecordVariableFacts(VpiObject* obj, const RtlirVariable& var,
 }
 
 }  // namespace
+
+void VpiRecordDeclaredShape(VpiObject* var, const DataType& type) {
+  var->decl_signed = type.is_signed;
+  const VpiScalarVectorQuery kQuery =
+      DeclaredShapeQuery(var->type, &type, type.kind);
+  var->decl_scalar = VpiVariableScalar(kQuery);
+  var->decl_vector = VpiVariableVector(kQuery);
+}
 
 void VpiContext::AttachVariableFacts(const RtlirDesign* design) {
   // §37.17: vpiSigned, vpiScalar, vpiVector, vpiArrayType and vpiSize are what

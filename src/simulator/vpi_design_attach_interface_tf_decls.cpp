@@ -109,6 +109,54 @@ void MakeInterfaceTfDecls(const TfDeclScope& scope, const RtlirModule& ifc) {
   }
 }
 
+// §37.13 with §37.8 and §25.7: the interface tf decl an io decl `io_decl` of a
+// modport reaches for the subroutine `name` it imports or exports -- the one
+// the interface has for a subroutine a module defines, and otherwise, for an
+// import of one the interface `ifc` defines itself, a declaration of its own
+// whose definition is elsewhere than the modport, the interface body's, and
+// which so has vpiExternAcc.
+VpiObject* ModportTfDecl(const TfDeclScope& scope, const RtlirModule& ifc,
+                         VpiObject* io_decl, std::string_view name) {
+  for (VpiObject* child : scope.iface->children) {
+    if (child->type == vpiInterfaceTfDecl && child->name == name) return child;
+  }
+  const ModuleItem* own = *std::ranges::find_if(
+      ifc.function_decls,
+      [name](const ModuleItem* item) { return item->name == name; });
+  VpiObject* decl = scope.build.alloc();
+  decl->type = vpiInterfaceTfDecl;
+  decl->name = io_decl->name;
+  decl->full_name = io_decl->full_name;
+  decl->parent = io_decl;
+  decl->access_type = vpiExternAcc;
+  std::string_view instance = scope.key_prefix;
+  instance.remove_suffix(1);
+  decl->tf_decl = scope.made.at({own, std::string(instance)});
+  return decl;
+}
+
+// §37.7 with §37.13: an io decl per task or function each modport of the
+// interface `ifc` imports or exports (§25.7), its vpiExpr the interface tf
+// decl of the subroutine.
+void MakeModportTfIoDecls(const TfDeclScope& scope, const RtlirModule& ifc) {
+  for (const ModportDecl* modport_decl : ifc.modports) {
+    VpiObject* modport = *std::ranges::find_if(
+        scope.iface->children, [modport_decl](const VpiObject* child) {
+          return child->type == vpiModport && child->name == modport_decl->name;
+        });
+    for (const ModportPort& port : modport_decl->ports) {
+      if (!port.is_import && !port.is_export) continue;
+      VpiObject* io_decl = scope.build.alloc();
+      io_decl->type = vpiIODecl;
+      io_decl->name = scope.build.keep(std::string(port.name));
+      io_decl->full_name = modport->full_name + "." + std::string(port.name);
+      io_decl->parent = modport;
+      io_decl->io_expr = ModportTfDecl(scope, ifc, io_decl, port.name);
+      modport->children.push_back(io_decl);
+    }
+  }
+}
+
 }  // namespace
 
 void AttachInterfaceTfDecls(const RtlirDesign* design,
@@ -121,7 +169,9 @@ void AttachInterfaceTfDecls(const RtlirDesign* design,
         // The design's tops are its uninstantiated modules and programs
         // (§23.3.1, §24.3), so every interface stands under an instance path.
         if (!mod->is_interface) return;
-        MakeInterfaceTfDecls({iface, prefix + ".", made, ctx, build}, *mod);
+        const TfDeclScope kScope{iface, prefix + ".", made, ctx, build};
+        MakeInterfaceTfDecls(kScope, *mod);
+        MakeModportTfIoDecls(kScope, *mod);
       });
 }
 

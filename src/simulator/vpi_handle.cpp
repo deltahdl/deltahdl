@@ -24,6 +24,7 @@
 #include "simulator/vpi_data_structs.h"
 #include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_internal.h"
+#include "simulator/vpi_io_decl_stand_in.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_model_helpers3.h"
@@ -887,6 +888,8 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
   if (!ref && type == vpiActiveTimeFormat) return active_time_format_call_;
 
   if (!ref) return nullptr;
+  // §37.13 detail 4: an io decl's ranges and typespec are what it declares.
+  ref = VpiIoDeclStandIn(ref, type);
 
   // §38.18: unless otherwise specified, asking vpi_handle() for an object
   // related to a protected reference object is an error. Record it and hand
