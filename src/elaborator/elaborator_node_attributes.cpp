@@ -20,15 +20,15 @@ namespace delta {
 namespace {
 
 // Whether an item of `kind` keeps the attributes it is written with nowhere
-// but RtlirModule::node_attrs. A net's, a variable's, an instance's, a
-// continuous assignment's and a procedure's are kept on their own records.
+// but RtlirModule::node_attrs. A net's, a variable's, a specparam's (on the
+// variable it is lowered as), an instance's, a continuous assignment's and a
+// procedure's are kept on their own records.
 bool KeepsNodeAttributes(ModuleItemKind kind) {
   switch (kind) {
     case ModuleItemKind::kFunctionDecl:
     case ModuleItemKind::kTaskDecl:
     case ModuleItemKind::kGateInst:
     case ModuleItemKind::kUdpInst:
-    case ModuleItemKind::kSpecparam:
     case ModuleItemKind::kPropertyDecl:
     case ModuleItemKind::kSequenceDecl:
     case ModuleItemKind::kAssertProperty:

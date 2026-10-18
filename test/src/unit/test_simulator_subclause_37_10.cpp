@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -411,6 +412,34 @@ TEST_F(InstanceObjectsOfARun, AnEscapedNameHoldingAPeriodIsOneObject) {
 TEST_F(InstanceObjectsOfARun, AnInstanceNamedWithAPeriodHasItsDefinition) {
   Run(kDottedEscapedNames);
   EXPECT_STREQ(vpi_get_str(vpiDefName, By("top.\\u.1 ")), "sub");
+}
+
+// The spec param arrow: a specparam the module body declares and one a
+// specify block declares are spec param objects of the instance, reached
+// through vpiSpecParam and named and full-named in it, and are not among its
+// variables; a PATHPULSE$ specparam, which sets the paths' pulse limits
+// (§30.7.1), stands as none (#6985).
+TEST_F(InstanceObjectsOfARun, AnInstancesSpecparamsAreSpecParams) {
+  Run("module top(input a, output b);\n"
+      "  specparam d = 1;\n"
+      "  logic v;\n"
+      "  specify\n"
+      "    specparam tpd = 2;\n"
+      "    specparam PATHPULSE$ = (1, 2);\n"
+      "    (a => b) = tpd;\n"
+      "  endspecify\n"
+      "  assign b = a;\n"
+      "endmodule\n");
+  vpiHandle top = By("top");
+  std::vector<std::string> names = NamesOf(vpiSpecParam, top);
+  std::ranges::sort(names);
+  EXPECT_EQ(names, (std::vector<std::string>{"d", "tpd"}));
+  vpiHandle d = Named(vpiSpecParam, top, "d");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, d), vpiSpecParam);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, Named(vpiSpecParam, top, "tpd")),
+               "top.tpd");
+  EXPECT_EQ(NamesOf(vpiVariables, top), (std::vector<std::string>{"v"}));
 }
 
 // A cell bound from a precompiled library keeps such a name whole too: its

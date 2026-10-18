@@ -1,8 +1,10 @@
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "elaborator/rtlir.h"
 #include "parser/ast_module.h"
+#include "parser/ast_specify.h"
 #include "parser/ast_type.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_design_attach_build.h"
@@ -106,6 +108,29 @@ void AttachScopeParameters(const RtlirModule* mod, const std::string& prefix,
   }
 }
 
+// §37.10 with §6.20.5: each specparam of the instance at `prefix`, an
+// instance of `mod`, made a vpiSpecParam: the object its storage made, keyed
+// under the name it was lowered as, whether the module body declares it,
+// scoped by any generate block around it, or a specify block does (§30.3). A
+// PATHPULSE$ specparam, which §30.7.1 has set a module path's pulse limits, is
+// lowered as no storage and so has no object.
+void AttachScopeSpecParams(const RtlirModule* mod, const std::string& prefix,
+                           const VpiObjectMap& objects) {
+  std::vector<std::string_view> names = mod->specparam_names;
+  for (const ModuleItem* block : mod->specify_blocks) {
+    for (const SpecifyItem* item : block->specify_items) {
+      if (item->kind == SpecifyItemKind::kSpecparam) {
+        names.push_back(item->param_name);
+      }
+    }
+  }
+  for (std::string_view name : names) {
+    VpiObject* obj =
+        FindObjectForFlatName(objects, VpiFlatName(prefix, std::string(name)));
+    if (obj != nullptr) obj->type = vpiSpecParam;
+  }
+}
+
 // §37.10 with §37.28: the parameters the package `pkg` declares, in `scope`,
 // the package it stands as: a value parameter's object, which its storage
 // made, made a vpiParameter, and a type parameter given one of its own. Each
@@ -151,6 +176,7 @@ void AttachParameters(const RtlirDesign* design, const VpiObjectMap& objects,
   WalkInstancePaths(design,
                     [&](const RtlirModule* mod, const std::string& prefix) {
                       AttachScopeParameters(mod, prefix, objects, kWith);
+                      AttachScopeSpecParams(mod, prefix, objects);
                     });
   for (const PackageDecl* pkg : design->packages) {
     if (pkg == nullptr) continue;

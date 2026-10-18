@@ -262,6 +262,26 @@ TEST_F(AttributesOfARun, ANetAndAVariableCarryTheirAttributes) {
   EXPECT_EQ(vpi_iterate(vpiAttribute, By("top.plain")), nullptr);
 }
 
+// A spec param carries the attributes its declaration is written with, as a
+// net or a variable does, written on it and holding the value written; one
+// written with none carries none (#7256).
+TEST_F(AttributesOfARun, ASpecParamCarriesItsAttributes) {
+  Run("module top;\n"
+      "  (* note, depth = 3 *) specparam d = 1;\n"
+      "  specparam e = 2;\n"
+      "endmodule\n");
+  vpiHandle d = Named(vpiSpecParam, By("top"), "d");
+  ASSERT_NE(d, nullptr);
+  vpiHandle note = Named(vpiAttribute, d, "note");
+  ASSERT_NE(note, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiParent, note)), VpiObjectOf(d));
+  vpiHandle depth = Named(vpiAttribute, d, "depth");
+  ASSERT_NE(depth, nullptr);
+  EXPECT_EQ(ValueOf(depth, vpiIntVal), "3");
+  EXPECT_EQ(vpi_iterate(vpiAttribute, Named(vpiSpecParam, By("top"), "e")),
+            nullptr);
+}
+
 // An attribute written with a parameter's name holds the parameter's value,
 // as an integer where its expression fixes no width.
 TEST_F(AttributesOfARun, AnAttributeOfAParametersValueIsAnInteger) {

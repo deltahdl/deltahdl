@@ -110,6 +110,8 @@ void Elaborator::ElaborateSpecparam(ModuleItem* item, RtlirModule* mod) {
   var.is_real = SpecparamIsReal(item->data_type, item->init_expr);
   if (var.is_real) var.width = 64;
   var.init_expr = item->init_expr;
+  // §37.83: the attributes it is written with, which its object carries.
+  var.attrs = ResolveAttributes(item->attrs, diag_, BuildParamScope(mod));
   mod->variables.push_back(var);
   // §32.4.3 has an SDF LABEL section annotate to specparams, and §6.20.5 admits
   // this declaration site as much as the one inside a specify block: a
