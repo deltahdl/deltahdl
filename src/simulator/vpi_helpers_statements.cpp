@@ -236,11 +236,12 @@ std::vector<VpiHandle> VpiOperationOperands(VpiHandle operation) {
   if (!operation || operation->type != vpiOperation) return operands;
   // §37.52 draws a property operation's operands as property exprs, and
   // §37.54 a sequence operation's as sequence exprs, a sequence inst among
-  // them.
+  // them; §37.59 draws them to a class holding §37.72's patterns, which a
+  // structure pattern's assignment pattern operation has (detail 6).
   for (auto* child : operation->children) {
     if (VpiIsExprOperandType(child->type) ||
         VpiIsPropertyExprType(child->type) ||
-        VpiIsSequenceExprType(child->type)) {
+        VpiIsSequenceExprType(child->type) || VpiIsPatternType(child->type)) {
       operands.push_back(child);
     }
   }

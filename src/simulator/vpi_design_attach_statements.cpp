@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstddef>
 #include <initializer_list>
 #include <string>
@@ -13,6 +14,7 @@
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_model_helpers1.h"
+#include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -178,30 +180,124 @@ int QualifierOf(const Stmt& stmt) {
   return qualifier;
 }
 
+// §37.25: the typespec `obj` reaches, null for none or for no object.
+VpiObject* TypespecOf(const VpiObject* obj) {
+  if (obj == nullptr) return nullptr;
+  for (VpiObject* child : obj->children) {
+    if (VpiIsTypespecType(child->type)) return child;
+  }
+  return nullptr;
+}
+
+// §37.25 detail 3: the typespec members of the structure or union typespec
+// `typespec`, in the order its members are declared; none for no typespec.
+const std::vector<VpiObject*>& MembersOf(const VpiObject* typespec) {
+  static const std::vector<VpiObject*> kNone;
+  return typespec != nullptr ? typespec->children : kNone;
+}
+
+// §12.6: the pattern a structure pattern written with member names, `keyed`,
+// writes for the member `name`; null where it leaves the member out.
+const Expr* KeyedMemberPattern(const Expr& keyed, std::string_view name) {
+  for (std::size_t i = 0; i < keyed.pattern_keys.size(); ++i) {
+    if (keyed.pattern_keys[i]->text == name) return keyed.elements[i];
+  }
+  return nullptr;
+}
+
+VpiObject* PatternObject(const Expr* pattern, VpiObject* parent,
+                         const VpiObject* typespec, const VpiStmtBuild& with);
+
+// §37.72: an any pattern hung from `parent`, named after the variable it
+// binds, none for `.*` or for a member a structure pattern leaves out.
+VpiObject* AnyPattern(std::string_view binds, VpiObject* parent,
+                      const VpiStmtBuild& with) {
+  VpiObject* any = with.build.alloc();
+  any->type = vpiAnyPattern;
+  any->parent = parent;
+  if (!binds.empty()) any->name = with.build.keep(std::string(binds));
+  return any;
+}
+
+// §37.72 with §37.59 detail 6: a structure pattern `pattern` matching a value
+// of the typespec `typespec`, hung from `parent`, as the assignment pattern
+// operation it is. Its operands are those of the pattern written
+// positionally: written with member names, a struct pattern per member of
+// the structure in declaration order, named after the member and reaching the
+// pattern written for it, an any pattern binding no name for one left out,
+// since §12.6 has an omitted member match anything; written positionally, the
+// member patterns themselves. A member's pattern matches a value of that
+// member's typespec.
+VpiObject* StructurePattern(const Expr& pattern, VpiObject* parent,
+                            const VpiObject* typespec,
+                            const VpiStmtBuild& with) {
+  VpiObject* op = with.build.alloc();
+  op->type = vpiOperation;
+  op->op_type = vpiAssignmentPatternOp;
+  op->parent = parent;
+  const std::vector<VpiObject*>& kMembers = MembersOf(typespec);
+  if (pattern.pattern_keys.empty()) {
+    for (std::size_t i = 0; i < pattern.elements.size(); ++i) {
+      AddChild(op, PatternObject(
+                       pattern.elements[i], op,
+                       TypespecOf(i < kMembers.size() ? kMembers[i] : nullptr),
+                       with));
+    }
+    return op;
+  }
+  for (const VpiObject* member : kMembers) {
+    VpiObject* struct_pattern = with.build.alloc();
+    struct_pattern->type = vpiStructPattern;
+    struct_pattern->parent = op;
+    struct_pattern->name = member->name;
+    const Expr* written = KeyedMemberPattern(pattern, member->name);
+    struct_pattern->children.push_back(
+        written != nullptr
+            ? PatternObject(written, struct_pattern, TypespecOf(member), with)
+            : AnyPattern({}, struct_pattern, with));
+    op->children.push_back(struct_pattern);
+  }
+  return op;
+}
+
+// §37.25 detail 3: the typespec of the member `name` of the structure or
+// union typespec `typespec`; null where it has no such member or the member
+// no typespec.
+VpiObject* MemberTypespec(const VpiObject* typespec, std::string_view name) {
+  const std::vector<VpiObject*>& kMembers = MembersOf(typespec);
+  const auto kMember = std::ranges::find_if(
+      kMembers, [name](const VpiObject* m) { return m->name == name; });
+  return kMember != kMembers.end() ? TypespecOf(*kMember) : nullptr;
+}
+
 // §37.72: the object the pattern `pattern` of a case matches item stands as,
-// hung from `parent`: an any pattern for `.name`, named after the variable it
-// binds, or for `.*`, which binds none; a tagged pattern, named after the
-// member it is tagged with and holding the pattern of the member; and the
+// matching a value of the typespec `typespec`, null for none, and hung from
+// `parent`: an any pattern for `.name`, named after the variable it binds, or
+// for `.*`, which binds none; a tagged pattern, named after the member it is
+// tagged with, reaching the typespec of that member and holding the pattern
+// of the member; a structure pattern as StructurePattern makes it; and the
 // expression it is for any other.
 VpiObject* PatternObject(const Expr* pattern, VpiObject* parent,
-                         const VpiStmtBuild& with) {
+                         const VpiObject* typespec, const VpiStmtBuild& with) {
   if (pattern == nullptr) return nullptr;
   const bool kWildcard =
       pattern->kind == ExprKind::kIdentifier && pattern->text == ".*";
   if (kWildcard || pattern->is_pattern_binding) {
-    VpiObject* any = with.build.alloc();
-    any->type = vpiAnyPattern;
-    any->parent = parent;
-    if (!kWildcard) any->name = with.build.keep(std::string(pattern->text));
-    return any;
+    return AnyPattern(kWildcard ? std::string_view{} : pattern->text, parent,
+                      with);
   }
   if (pattern->kind == ExprKind::kTagged) {
     VpiObject* tagged = with.build.alloc();
     tagged->type = vpiTaggedPattern;
     tagged->parent = parent;
     tagged->name = with.build.keep(std::string(pattern->rhs->text));
-    AddChild(tagged, PatternObject(pattern->lhs, tagged, with));
+    VpiObject* member = MemberTypespec(typespec, pattern->rhs->text);
+    AddChild(tagged, member);
+    AddChild(tagged, PatternObject(pattern->lhs, tagged, member, with));
     return tagged;
+  }
+  if (pattern->kind == ExprKind::kAssignmentPattern) {
+    return StructurePattern(*pattern, parent, typespec, with);
   }
   return with.expression(pattern);
 }
@@ -215,7 +311,10 @@ void FillCase(VpiObject* obj, const Stmt& stmt, const VpiStmtBuild& with) {
                    : stmt.case_kind == TokenKind::kKwCasez ? vpiCaseZ
                                                            : vpiCaseExact;
   obj->qualifier = QualifierOf(stmt);
-  AddChild(obj, with.expression(stmt.condition));
+  VpiObject* condition = with.expression(stmt.condition);
+  AddChild(obj, condition);
+  // §37.72: a pattern matches a value of the type the expression is of.
+  const VpiObject* kTypespec = TypespecOf(condition);
   for (const CaseItem& item : stmt.case_items) {
     VpiObject* made = with.build.alloc();
     made->type = vpiCaseItem;
@@ -224,8 +323,9 @@ void FillCase(VpiObject* obj, const Stmt& stmt, const VpiStmtBuild& with) {
     made->default_case_item = item.is_default;
     obj->children.push_back(made);
     for (const Expr* pattern : item.patterns) {
-      AddChild(made, stmt.case_matches ? PatternObject(pattern, made, with)
-                                       : with.expression(pattern));
+      AddChild(made, stmt.case_matches
+                         ? PatternObject(pattern, made, kTypespec, with)
+                         : with.expression(pattern));
     }
     with.statement(item.body, made);
   }

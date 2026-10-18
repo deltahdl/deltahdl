@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
+#include <string>
+#include <utility>
 #include <vector>
 
 #include "fixture_vpi_run.h"
@@ -286,6 +289,31 @@ class CaseStatementsOfARun : public VpiDesignRun {
     while (vpiHandle obj = it ? vpi_scan(it) : nullptr) objects.push_back(obj);
     return objects;
   }
+
+  // The conditions of each case item of the case statement the process
+  // `index` of `top` is, item by item.
+  static std::vector<std::vector<vpiHandle>> ItemConditions(size_t index) {
+    const std::vector<vpiHandle> kProcs =
+        Scanned(vpi_iterate(vpiProcess, By("top")));
+    std::vector<std::vector<vpiHandle>> conditions;
+    if (index >= kProcs.size()) return conditions;
+    for (vpiHandle item : Scanned(
+             vpi_iterate(vpiCaseItem, vpi_handle(vpiStmt, kProcs[index])))) {
+      conditions.push_back(Scanned(vpi_iterate(vpiExpr, item)));
+    }
+    return conditions;
+  }
+
+  // The kind and the name, "" for none, of each operand of `op`.
+  static std::vector<std::pair<int, std::string>> KindsAndNames(vpiHandle op) {
+    std::vector<std::pair<int, std::string>> shown;
+    for (vpiHandle operand : Scanned(vpi_iterate(vpiOperand, op))) {
+      const char* name = vpi_get_str(vpiName, operand);
+      shown.emplace_back(vpi_get(vpiType, operand),
+                         name == nullptr ? "" : name);
+    }
+    return shown;
+  }
 };
 
 // A case reaches its type, the expression it selects on, and an item per case
@@ -409,6 +437,98 @@ TEST_F(CaseStatementsOfARun, ACaseMatchesItemReachesItsPatterns) {
       Scanned(vpi_iterate(vpiExpr, kItems[2]));
   ASSERT_EQ(kThird.size(), 1U);
   EXPECT_EQ(vpi_get(vpiType, kThird[0]), vpiAnyPattern);
+}
+
+// Detail 1 with §37.59 detail 6 and §12.6: a structure pattern is one case
+// condition, an assignment pattern operation. Written with member names, its
+// operands are a struct pattern per member of the structure in declaration
+// order, each named after its member and reaching the pattern written for it,
+// an omitted one an any pattern binding no name; written positionally, the
+// member patterns themselves, a constant among them as the expression it is.
+// A case expression reaching no typespec, a select of an array (#7019), gives
+// a positional pattern those operands too (#7270).
+TEST_F(CaseStatementsOfARun, AStructurePatternIsAnAssignmentPatternOperation) {
+  Run("module top;\n"
+      "  typedef struct { int a; int b; int c; } s_t;\n"
+      "  s_t s; s_t sa [2]; int r;\n"
+      "  initial case (s) matches\n"
+      "    '{b: .y, a: .x}: r = x + y;\n"
+      "    '{.x, .*, .z}: r = x + z;\n"
+      "  endcase\n"
+      "  initial case (sa[0]) matches\n"
+      "    '{.x, 1, .z}: r = x;\n"
+      "  endcase\n"
+      "endmodule\n");
+  const std::vector<std::vector<vpiHandle>> kItems = ItemConditions(0);
+  ASSERT_EQ(kItems.size(), 2U);
+  ASSERT_EQ(kItems[0].size(), 1U);
+  vpiHandle keyed = kItems[0][0];
+  EXPECT_EQ(vpi_get(vpiType, keyed), vpiOperation);
+  EXPECT_EQ(vpi_get(vpiOpType, keyed), vpiAssignmentPatternOp);
+  const std::vector<vpiHandle> kMembers =
+      Scanned(vpi_iterate(vpiOperand, keyed));
+  ASSERT_EQ(kMembers.size(), 3U);
+  const std::vector<std::pair<int, std::string>> kStruct{
+      {vpiStructPattern, "a"},
+      {vpiStructPattern, "b"},
+      {vpiStructPattern, "c"}};
+  EXPECT_EQ(KindsAndNames(keyed), kStruct);
+  std::vector<std::pair<int, std::string>> bound;
+  for (vpiHandle member : kMembers) {
+    vpiHandle pattern = vpi_handle(vpiPattern, member);
+    ASSERT_NE(pattern, nullptr);
+    const char* name = vpi_get_str(vpiName, pattern);
+    bound.emplace_back(vpi_get(vpiType, pattern), name == nullptr ? "" : name);
+  }
+  const std::vector<std::pair<int, std::string>> kAny{
+      {vpiAnyPattern, "x"}, {vpiAnyPattern, "y"}, {vpiAnyPattern, ""}};
+  EXPECT_EQ(bound, kAny);
+  ASSERT_EQ(kItems[1].size(), 1U);
+  EXPECT_EQ(vpi_get(vpiOpType, kItems[1][0]), vpiAssignmentPatternOp);
+  const std::vector<std::pair<int, std::string>> kPositional{
+      {vpiAnyPattern, "x"}, {vpiAnyPattern, ""}, {vpiAnyPattern, "z"}};
+  EXPECT_EQ(KindsAndNames(kItems[1][0]), kPositional);
+  const std::vector<std::vector<vpiHandle>> kSelected = ItemConditions(1);
+  ASSERT_EQ(kSelected.size(), 1U);
+  ASSERT_EQ(kSelected[0].size(), 1U);
+  EXPECT_EQ(
+      KindsAndNames(kSelected[0][0]),
+      (std::vector<std::pair<int, std::string>>{
+          {vpiAnyPattern, "x"}, {vpiConstant, ""}, {vpiAnyPattern, "z"}}));
+}
+
+// The tagged pattern -> typespec arrow: a tagged pattern reaches the typespec
+// of the member it is tagged with, int's for V and a bit typespec for the
+// bit [3:0] W; none for the void N, which has no typespec yet (#7085), nor
+// where the case expression reaches no typespec, a select of an array (#7019)
+// (#7271).
+TEST_F(CaseStatementsOfARun, ATaggedPatternReachesItsMembersTypespec) {
+  Run("module top;\n"
+      "  typedef union tagged { int V; bit [3:0] W; void N; } u_t;\n"
+      "  u_t u; u_t ua [2]; int r;\n"
+      "  initial case (u) matches\n"
+      "    tagged V .n: r = n;\n"
+      "    tagged W .w: r = w;\n"
+      "    tagged N: r = 0;\n"
+      "  endcase\n"
+      "  initial case (ua[0]) matches\n"
+      "    tagged V .n: r = n;\n"
+      "  endcase\n"
+      "endmodule\n");
+  const std::vector<std::vector<vpiHandle>> kItems = ItemConditions(0);
+  ASSERT_EQ(kItems.size(), 3U);
+  std::vector<int> kinds;
+  for (const std::vector<vpiHandle>& conditions : kItems) {
+    ASSERT_EQ(conditions.size(), 1U);
+    vpiHandle typespec = vpi_handle(vpiTypespec, conditions[0]);
+    kinds.push_back(typespec == nullptr ? 0 : vpi_get(vpiType, typespec));
+  }
+  EXPECT_EQ(kinds, (std::vector<int>{vpiIntTypespec, vpiBitTypespec, 0}));
+  const std::vector<std::vector<vpiHandle>> kSelected = ItemConditions(1);
+  ASSERT_EQ(kSelected.size(), 1U);
+  ASSERT_EQ(kSelected[0].size(), 1U);
+  EXPECT_EQ(vpi_get(vpiType, kSelected[0][0]), vpiTaggedPattern);
+  EXPECT_EQ(vpi_handle(vpiTypespec, kSelected[0][0]), nullptr);
 }
 
 }  // namespace
