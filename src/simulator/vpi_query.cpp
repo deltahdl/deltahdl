@@ -278,17 +278,16 @@ int VpiGetConstantSelect(VpiHandle obj) {
 }
 
 // §37.17 detail 20: a variable's vpiScalar or vpiVector, as its declaration
-// made it when the run built its object; a var bit is a scalar. A port or net
-// answers by its width, and any other object FALSE.
+// made it when the run built its object; a var bit is a scalar. §37.25: a bit,
+// logic or packed array typespec is a vector where it has a packed range, and
+// never a scalar. A port or net answers by its width, and any other object
+// FALSE.
 int VpiGetScalarOrVector(int property, VpiHandle obj) {
   const bool kScalar = property == vpiScalar;
   if (obj->type == vpiRegBit) return kScalar ? 1 : 0;
-  if (VpiIsVariablesType(obj->type)) {
+  if (VpiIsVariablesType(obj->type) || VpiIsTypespecType(obj->type)) {
     return (kScalar ? obj->decl_scalar : obj->decl_vector) ? 1 : 0;
   }
-  // §37.25: a bit, logic or packed array typespec is a vector where it has a
-  // packed range.
-  if (VpiIsTypespecType(obj->type)) return !kScalar && obj->decl_vector ? 1 : 0;
   if (!VpiScalarVectorAppliesTo(obj->type)) return 0;
   return (kScalar ? VpiPortScalar(obj->size) : VpiPortVector(obj->size)) ? 1
                                                                          : 0;

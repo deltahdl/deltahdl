@@ -535,14 +535,16 @@ TEST_F(TypespecsOfARun, ABitOrLogicTypespecRangesAndUnwinds) {
   EXPECT_EQ(KindReached(vpiElemTypespec, b), vpiLogicTypespec);
 }
 
-// Detail 8's example: a packed array typespec of packed structs, one over it
-// ranging over both, an array typespec over that, and a variable's own
-// unpacked dimensions over the last making an unnamed array typespec of both
-// unpacked ones, each unwinding to the typedef it is written over and the
-// structure to nothing (#7083, #7084, #7096, #7099).
+// Detail 8's example, its packed structure named by a typedef of its own: a
+// packed array typespec of packed structs, one over it ranging over both, an
+// array typespec over that, and a variable's own unpacked dimensions over the
+// last making an unnamed array typespec of both unpacked ones, each unwinding
+// to the typedef it is written over and the structure to nothing (#7083,
+// #7084, #7096, #7099).
 TEST_F(TypespecsOfARun, DetailEightsArraysUnwindToTheirTypedefs) {
   Run("module top;\n"
-      "  typedef struct packed { int i1; bit bvec; } [1:3] parrtype;\n"
+      "  typedef struct packed { int i1; bit bvec; } s_t;\n"
+      "  typedef s_t [1:3] parrtype;\n"
       "  typedef parrtype [2:1] parrtype2;\n"
       "  typedef parrtype2 unparrtype [6:4];\n"
       "  unparrtype arr [3:0];\n"
