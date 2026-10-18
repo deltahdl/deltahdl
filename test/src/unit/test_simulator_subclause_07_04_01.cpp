@@ -211,7 +211,9 @@ TEST(PackedArraySimulation, AggregateWithDimsAfterItsBodyIsAnArrayOfIt) {
       "  struct packed { logic [7:0] a; logic [7:0] b; } [3:0] s;\n"
       "  typedef union packed { bit [7:0] x; bit [7:0] y; } [2:0] u_t;\n"
       "  u_t u;\n"
-      "  struct packed { struct packed { bit [1:0] a; } [2:0] n; bit f; } q;\n"
+      "  struct packed { struct packed { bit [1:0] a; } [2:0] n;\n"
+      "                  union packed { bit [1:0] x; bit [1:0] y; } [1:0] m;\n"
+      "                  bit f; } q;\n"
       "  initial begin\n"
       "    s = '0;\n"
       "    s[1] = 16'hABCD;\n"
@@ -220,7 +222,7 @@ TEST(PackedArraySimulation, AggregateWithDimsAfterItsBodyIsAnArrayOfIt) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_EQ(out, "64 00000000abcd0000 abcd\n24 7\n");
+  EXPECT_EQ(out, "64 00000000abcd0000 abcd\n24 11\n");
 }
 
 }  // namespace
