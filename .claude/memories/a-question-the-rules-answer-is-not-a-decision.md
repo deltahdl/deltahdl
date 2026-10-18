@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 51a015a3-4652-42ac-8c15-ce1bc6f6ae12
-  modified: 2026-10-17T12:41:06.144Z
+  modified: 2026-10-18T05:21:07.358Z
 ---
 
 # A question the rules answer is not a decision
@@ -68,7 +68,15 @@ its own subclause. §37.72 alone seemed to leave open how a struct pattern,
 which has one name and one pattern, could stand for a whole `'{a: .x, b: .*}`.
 But §37.59 draws an operation's vpiOperand arrow to `pattern`. That makes the
 written pattern a vpiAssignmentPatternOp whose operands are the struct
-patterns, one per member. A property drawn on a diagram whose value no
+patterns, one per member. Read the construct's own clause for what
+the standard calls it, then match that against each Clause 37 class's
+definition, not only against the cases the class lists. §16.8 calls a
+formal named in a sequence body a reference to a formal argument, which
+each instance binds to its actual. §37.15 detail 1 defines a ref obj as a
+declared object referring to an actual, and detail 3 lets vpiActual be
+NULL while nothing is bound. So the name is a ref obj with no actual,
+although detail 1's cases leave it out. §16.8.2 makes a local variable
+formal a local variable, so a use of one is a variable. A property drawn on a diagram whose value no
 detail states does not clash with a shall that states the value for the
 same object. §37.42 draws vpiName on every tf call and never says what it
 holds. §37.60 detail 1 says that an atomic statement, a call written as a
