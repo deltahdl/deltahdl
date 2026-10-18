@@ -177,6 +177,24 @@ TEST(SeparateUnitsSim, EachUnitsCovergroupIsItsOwn) {
             (std::vector<uint64_t>{50, 25}));
 }
 
+// §3.12.1 with §11.12: each unit's let of one name is its own, so a module's
+// use of it expands its own unit's body, adding one in the first unit and
+// multiplying by ten in the second.
+TEST(SeparateUnitsSim, EachUnitsLetIsItsOwn) {
+  EXPECT_EQ(RunTopAndChild({"let f(x) = x + 1;\n"
+                            "module top;\n"
+                            "  int a;\n"
+                            "  child c();\n"
+                            "  initial a = f(4);\n"
+                            "endmodule\n",
+                            "let f(x) = x * 10;\n"
+                            "module child;\n"
+                            "  int b;\n"
+                            "  initial b = f(4);\n"
+                            "endmodule\n"}),
+            (std::vector<uint64_t>{5, 40}));
+}
+
 // §3.12.1 with §35.5.4: each unit's import of one SystemVerilog name is its
 // own, so a call reaches the C function the module's own unit imported; an
 // import the module declares itself is reached as ever.

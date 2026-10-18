@@ -65,6 +65,12 @@ ScopeSameNamedUnitClasses(const RtlirDesign* design, Arena& arena);
 void RegisterUnitTimeScales(const RtlirDesign* design, SimContext& ctx,
                             Arena& arena);
 
+// §3.12.1 with §11.12: registers the compilation unit's lets by their bare
+// names and, in a design of several units, each unit's under "$unit#k::name"
+// as well, which DeclaredNameTables::FindLetDecl asks first for the running
+// code's unit, so two units' lets of one name stay two lets.
+void RegisterUnitLets(const RtlirDesign* design, SimContext& ctx, Arena& arena);
+
 // The compilation unit's classes to lower: the first of each name, and in a
 // design of several units every unit's own, two units' classes of one name
 // being two classes (§3.12.1). Defined in unit_scope_items.cpp.

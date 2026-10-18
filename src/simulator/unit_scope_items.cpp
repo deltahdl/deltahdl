@@ -13,6 +13,7 @@
 #include "elaborator/rtlir.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
+#include "parser/ast_module.h"
 #include "simulator/sim_context.h"
 #include "simulator/unit_scopes.h"
 
@@ -85,6 +86,24 @@ void RegisterUnitTimeScales(const RtlirDesign* design, SimContext& ctx,
         }
         ctx.SetScopeTimeScale(
             *arena.Create<std::string>(std::string(scope) + "::"), scale);
+      });
+}
+
+void RegisterUnitLets(const RtlirDesign* design, SimContext& ctx,
+                      Arena& arena) {
+  for (auto* let_decl : design->cu_let_decls) {
+    ctx.RegisterLetDecl(let_decl->name, let_decl);
+  }
+  if (design->compilation_units.empty()) return;
+  ForEachUnitScope(
+      design, arena, [&](const CompilationUnit& unit, std::string_view scope) {
+        for (auto* item : unit.cu_items) {
+          if (item->kind != ModuleItemKind::kLetDecl) continue;
+          ctx.RegisterLetDecl(
+              *arena.Create<std::string>(std::string(scope) +
+                                         "::" + std::string(item->name)),
+              item);
+        }
       });
 }
 

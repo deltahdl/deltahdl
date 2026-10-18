@@ -902,9 +902,7 @@ void Lowerer::Lower(const RtlirDesign* design) {
 
   RegisterDesignTiming();
 
-  for (auto* let_decl : design->cu_let_decls) {
-    ctx_.RegisterLetDecl(let_decl->name, let_decl);
-  }
+  RegisterUnitLets(design, ctx_, arena_);
 
   // §H.7.3 and §H.7.4: every import is declared by now, and the typedef names
   // its formals were written with are resolved to the types they cross as
