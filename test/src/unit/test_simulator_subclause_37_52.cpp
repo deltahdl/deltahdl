@@ -735,5 +735,24 @@ TEST_F(PropertyExprsOfARun, ADeclarationsBodyReachesItsFormalAsARefObj) {
   EXPECT_EQ(vpi_handle(vpiActual, x), nullptr);
 }
 
+// Detail 3 with §37.58: a strong sequence written over an operand that stands
+// for no object is no sequence expr, so no strength is set on one. A member of
+// a nested structure, s.in.j, has no object yet (#7013), so a select of one has
+// no base to select from and stands for none either; the same sequence over a
+// net is the strong operation it writes.
+TEST_F(PropertyExprsOfARun, AStrongSequenceOverAnOperandOfNoObjectIsNone) {
+  Run("module top; logic clk, b;\n"
+      "  typedef struct { logic [1:0] j; } in_t;\n"
+      "  struct { in_t in; } s;\n"
+      "  k1: assert property (@(posedge clk) strong(s.in.j[0] ##1 b));\n"
+      "  k2: assert property (@(posedge clk) strong(b ##1 b));\n"
+      "endmodule\n");
+  vpiHandle assertion = Named(vpiAssertion, By("top"), "k1");
+  ASSERT_NE(assertion, nullptr);
+  EXPECT_NE(vpi_handle(vpiProperty, assertion), nullptr);
+  EXPECT_EQ(PropertyOf("k1"), nullptr);
+  EXPECT_EQ(vpi_get(vpiOpStrong, PropertyOf("k2")), 1);
+}
+
 }  // namespace
 }  // namespace delta
