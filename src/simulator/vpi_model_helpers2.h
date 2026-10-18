@@ -587,6 +587,13 @@ VpiHandle VpiTypespecRightRange(const std::vector<VpiArrayDimension>& dims);
 VpiHandle VpiTypespecForTypeParameter(VpiHandle type_parameter,
                                       VpiHandle resolved_typespec);
 
+// §37.25: the relations a typespec reaches through vpiElemTypespec (detail 8),
+// vpiBaseTypespec, vpiIndexTypespec (detail 2), vpiLeftRange and vpiRightRange
+// (detail 9), and a typespec member through vpiExpr (detail 7). Answers
+// whether `ref` is one and `type` one of its relations, with the target in
+// `out`.
+bool TryResolveTypespecRelation(int type, VpiHandle ref, VpiHandle& out);
+
 // ===========================================================================
 // §37.26 Structures and unions. The VPI object model for a structure or union
 // declared as a variable (struct/union var) or as a net (struct/union net).

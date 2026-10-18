@@ -178,15 +178,6 @@ void AttachArrayElements(const RtlirDesign* design, const VpiObjectMap& objects,
 void AttachStructMembers(const RtlirDesign* design, const VpiObjectMap& objects,
                          SimContext& ctx, const VpiAttachBuild& build);
 
-// §37.25, §37.26, §37.85 detail 5 and §37.17: give each scope a typespec per
-// typedef it declares, and link each variable declared with one to it. Answers
-// the compilation unit's typespecs by typedef name, since no scope object of
-// the model holds them, and each package's by the package's name, "::" and
-// the typedef's name, for a scope importing them to reach.
-VpiObjectMap AttachTypespecs(const RtlirDesign* design,
-                             const VpiObjectMap& objects,
-                             const VpiAttachBuild& build);
-
 // §26.3: the typespec of the typedef `name` a package declares that one of
 // `imports` makes visible, among those AttachTypespecs answered, `answered`,
 // under the package's name and "::"; null where no import reaches one.
@@ -313,6 +304,28 @@ VpiClassDefnObjects AttachClassDefinitions(const RtlirDesign* design,
                                            SimContext& ctx,
                                            const VpiAttachBuild& build,
                                            VpiClassCallSites& sites);
+
+// §37.33 detail 5: the class defn among `defns` the class type `written`
+// names from the scope keyed under `prefix`: the package's class where it
+// names its package, and otherwise one the scope declares, then the
+// compilation unit's, then a package's. Null where none does, as for a
+// built-in class (§37.32).
+VpiObject* VpiNamedClassDefn(const VpiClassDefnObjects& defns,
+                             std::string_view written,
+                             const std::string& prefix);
+
+// §37.25, §37.26, §37.85 detail 5 and §37.17: give each scope a typespec per
+// typedef it declares, with the ranges, elements, members and base its type
+// makes, a class's reaching its class defn among `classes`, its dimensions
+// evaluated in the instance declaring it through `ctx`; and link each
+// variable declared with one to it. Answers the compilation unit's typespecs
+// by typedef name, since no scope object of the model holds them, and each
+// package's by the package's name, "::" and the typedef's name, for a scope
+// importing them to reach.
+VpiObjectMap AttachTypespecs(const RtlirDesign* design,
+                             const VpiObjectMap& objects,
+                             const VpiClassDefnObjects& classes,
+                             SimContext& ctx, const VpiAttachBuild& build);
 
 // §37.33 detail 5: give each class var an instance declares the class typespec
 // of the class it was declared with, reaching that class's defn among `defns`

@@ -874,14 +874,9 @@ struct VpiObject {
   // program vpi_release_handle() has not yet released.
   int handles_held = 0;
 
-  // §37.3.5: whether this expression has side effects when it is evaluated. The
-  // subclause classifies such expressions as ones built from assignment
-  // operators, increment or decrement operators, function or system-function
-  // calls (including built-in methods) that change simulation state by some
-  // means other than their return value, or any expression that contains such
-  // an expression as an operand, argument, or index. This flag marks an
-  // already-classified expression; the VPI value, property, and relation
-  // routines consult it. False by default.
+  // §37.3.5: whether this expression has side effects when it is evaluated:
+  // an assignment, an increment or decrement, a call changing state by more
+  // than its return value, or an expression holding one of those.
   bool has_side_effects = false;
 
   // §37.3.5: a running count of how many times this expression has been
@@ -900,11 +895,8 @@ struct VpiObject {
   // calling it. False by default; most queries are answerable structurally.
   bool property_needs_side_effect_eval = false;
 
-  // §37.3.5: the index expressions that select into this object, in order. It
-  // is an error to apply vpi_put_value() to an object when any of these index
-  // expressions has side effects (for instance my_array[i++]); vpi_put_value()
-  // consults this list and refuses the write in that case. Empty for an object
-  // that is not an indexed select.
+  // §37.3.5: the index expressions that select into this object, in order;
+  // vpi_put_value() refuses a write where one has side effects (a[i++]).
   std::vector<VpiObject*> index_expressions;
 
   // §37.23 detail 2 and §37.25 detail 1: for a nettype declaration or a
@@ -913,10 +905,15 @@ struct VpiObject {
   // typespec. Null for one that aliases nothing.
   VpiObject* aliased = nullptr;
 
-  // §37.23 detail 1: for a nettype declaration (type vpiNettypeDecl), the
-  // resolution function associated with it, reached through vpiWith. A nettype
-  // declared without an associated resolution function has none, so this stays
-  // null and vpiWith reports NULL.
+  // §37.25: the typespec a typespec is built over, an enum's base reached
+  // through vpiBaseTypespec and the one an array, packed array, bit or logic
+  // typespec unwinds to through vpiElemTypespec (detail 8); and a typespec
+  // member's vpiRandType, 0 where it is no typespec member.
+  VpiObject* inner_typespec = nullptr;
+  int rand_type = 0;
+
+  // §37.23 detail 1: a nettype declaration's resolution function, reached
+  // through vpiWith; null where it declares none.
   VpiObject* nettype_with = nullptr;
 };
 

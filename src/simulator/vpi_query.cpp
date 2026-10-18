@@ -286,6 +286,9 @@ int VpiGetScalarOrVector(int property, VpiHandle obj) {
   if (VpiIsVariablesType(obj->type)) {
     return (kScalar ? obj->decl_scalar : obj->decl_vector) ? 1 : 0;
   }
+  // §37.25: a bit, logic or packed array typespec is a vector where it has a
+  // packed range.
+  if (VpiIsTypespecType(obj->type)) return !kScalar && obj->decl_vector ? 1 : 0;
   if (!VpiScalarVectorAppliesTo(obj->type)) return 0;
   return (kScalar ? VpiPortScalar(obj->size) : VpiPortVector(obj->size)) ? 1
                                                                          : 0;
@@ -338,9 +341,13 @@ int VpiGetTypeRestricted(int property, VpiHandle obj, bool& handled) {
     case vpiScalar:
     case vpiVector:
       return VpiGetScalarOrVector(property, obj);
-    // §37.17 detail 21: an array var's kind of array; zero for any other.
+    // §37.17 detail 21 and §37.25: an array var's or array typespec's kind of
+    // array; zero for any other.
     case vpiArrayType:
       return obj->array_type;
+    // §37.25: whether a typespec member is rand or randc; zero for any other.
+    case vpiRandType:
+      return obj->rand_type;
     // §37.16: the kind of net a net was declared.
     case vpiNetType:
       return VpiNetTypeOf(obj);

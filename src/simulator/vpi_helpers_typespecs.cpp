@@ -4,6 +4,7 @@
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_user.h"
 
 namespace delta {
 
@@ -167,6 +168,57 @@ VpiHandle VpiTypespecForTypeParameter(VpiHandle type_parameter,
                                       VpiHandle resolved_typespec) {
   // §37.25 detail 11: an unresolved type parameter acts as the typespec itself.
   return resolved_typespec ? resolved_typespec : type_parameter;
+}
+
+// §37.25 detail 8: whether a typespec of the kind `type` unwinds a range at a
+// time through vpiElemTypespec.
+static bool VpiTypespecUnwinds(int type) {
+  switch (type) {
+    case vpiArrayTypespec:
+    case vpiPackedArrayTypespec:
+    case vpiBitTypespec:
+      return true;
+    default:
+      return type == vpiLogicTypespec;
+  }
+}
+
+// §37.25 detail 2: the typespec an associative array typespec's key is, the
+// one typespec among its objects.
+static VpiHandle VpiTypespecKey(VpiHandle typespec) {
+  for (auto* child : typespec->children) {
+    if (VpiIsTypespecType(child->type)) return child;
+  }
+  return nullptr;
+}
+
+bool TryResolveTypespecRelation(int type, VpiHandle ref, VpiHandle& out) {
+  if (ref->type == vpiTypespecMember && type == vpiExpr) {
+    out = VpiTypespecMemberDefaultExpr(ref);
+    return true;
+  }
+  if (!VpiIsTypespecType(ref->type)) return false;
+  switch (type) {
+    case vpiElemTypespec:
+      out = VpiTypespecElemTypespec(VpiTypespecUnwinds(ref->type),
+                                    ref->inner_typespec);
+      return true;
+    case vpiBaseTypespec:
+      out = ref->type == vpiEnumTypespec ? ref->inner_typespec : nullptr;
+      return true;
+    case vpiIndexTypespec:
+      out = VpiTypespecIndexTypespec(ref->array_type == vpiAssocArray, false,
+                                     VpiTypespecKey(ref));
+      return true;
+    case vpiLeftRange:
+      out = ref->left_range;
+      return true;
+    case vpiRightRange:
+      out = ref->right_range;
+      return true;
+    default:
+      return false;
+  }
 }
 
 }  // namespace delta

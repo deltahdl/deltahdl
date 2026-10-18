@@ -320,13 +320,11 @@ void MakeConstraints(const MadeClassDefn& owner, const VpiObjectMap& objects,
   }
 }
 
-// §37.33 detail 5: the class defn the class type `written` names from the
-// instance keyed under `prefix`: the package's class where it names its
-// package, and otherwise one the instance's module declares, then the
-// compilation unit's, then a package's an import brought in. Null where none
-// does, as for a built-in class (§37.32).
-VpiObject* NamedClassDefn(const VpiClassDefnObjects& defns,
-                          std::string_view written, const std::string& prefix) {
+}  // namespace
+
+VpiObject* VpiNamedClassDefn(const VpiClassDefnObjects& defns,
+                             std::string_view written,
+                             const std::string& prefix) {
   const ClassReference kRef = SplitClassReference(written);
   constexpr int kNone = 3;
   VpiObject* best = nullptr;
@@ -349,8 +347,10 @@ VpiObject* NamedClassDefn(const VpiClassDefnObjects& defns,
   return best;
 }
 
+namespace {
+
 // §37.33 detail 5: the class typespec the class var `var` was declared with,
-// the class type written `written`, reaching the class defn NamedClassDefn
+// the class type written `written`, reaching the class defn VpiNamedClassDefn
 // finds for it from the scope keyed under `prefix`.
 void AttachDeclaredClassTypespec(VpiObject* var, std::string_view written,
                                  const VpiClassDefnObjects& defns,
@@ -360,7 +360,7 @@ void AttachDeclaredClassTypespec(VpiObject* var, std::string_view written,
   typespec->type = vpiClassTypespec;
   typespec->name = build.keep(std::string(SplitClassReference(written).name));
   typespec->parent = var;
-  if (VpiObject* defn = NamedClassDefn(defns, written, prefix)) {
+  if (VpiObject* defn = VpiNamedClassDefn(defns, written, prefix)) {
     typespec->children.push_back(defn);
   }
   var->children.push_back(typespec);

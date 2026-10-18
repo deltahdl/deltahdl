@@ -245,11 +245,6 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
     // A net's bits and members are made while it is still a logic net, the
     // kind both passes above look for, so its own kind comes after them.
     RecordNetObjectKinds(design, object_map_);
-    call_objects_.unit_typespecs = AttachTypespecs(design, object_map_, kBuild);
-    AttachParameters(design, object_map_, call_objects_.unit_typespecs,
-                     *sim_ctx_, kBuild);
-    AttachAttributes(design, object_map_, *sim_ctx_, kBuild);
-    call_objects_.design = design;
     call_objects_.classes = AttachClassDefinitions(
         design, object_map_, *sim_ctx_, kBuild, call_objects_.class_sites);
     // §37.32: the class defn a run's class obj reaches through its typespec,
@@ -259,6 +254,14 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
     for (const auto& [key, defn] : call_objects_.classes) {
       run_objects_.try_emplace(key.first, defn);
     }
+    // A typedef of a class is a class typespec reaching the class's defn, so
+    // the defns come first.
+    call_objects_.unit_typespecs = AttachTypespecs(
+        design, object_map_, call_objects_.classes, *sim_ctx_, kBuild);
+    AttachParameters(design, object_map_, call_objects_.unit_typespecs,
+                     *sim_ctx_, kBuild);
+    AttachAttributes(design, object_map_, *sim_ctx_, kBuild);
+    call_objects_.design = design;
     AttachClassVarTypespecs(design, object_map_, call_objects_.classes, kBuild);
     call_objects_.subroutines =
         AttachSubroutines(*design, object_map_, *sim_ctx_, kBuild);

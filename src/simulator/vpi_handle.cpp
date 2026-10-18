@@ -851,6 +851,7 @@ bool TryResolveDesignatedRelation(int type, VpiHandle ref,
                                   const ObjectOf& object_of, VpiHandle& out) {
   return TryResolveRunClassRelation(type, ref, object_of, out) ||
          TryResolveSelectRelation(type, ref, out) ||
+         TryResolveTypespecRelation(type, ref, out) ||
          TryResolveConnectionRelation(type, ref, out) ||
          TryResolveClassAndActualRelation(type, ref, out) ||
          TryResolveClockingAndParentRelation(type, ref, out) ||

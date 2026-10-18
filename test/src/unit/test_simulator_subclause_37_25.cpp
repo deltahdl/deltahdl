@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <string>
 #include <vector>
 
 #include "elaborator/rtlir.h"
@@ -405,7 +406,32 @@ TEST(TypespecModel, AttachToleratesAnEnumWithoutConstantsAndAnUnbuiltVariable) {
 
 // A design run with a PLI application registered, its VPI model read back
 // once the run is over.
-class TypespecsOfARun : public VpiDesignRun {};
+class TypespecsOfARun : public VpiDesignRun {
+ protected:
+  // The sizes of the ranges `typespec` iterates, leftmost first.
+  static std::vector<int> RangeSizesOf(vpiHandle typespec) {
+    std::vector<int> sizes;
+    for (vpiHandle range : ObjectsOf(vpiRange, typespec)) {
+      sizes.push_back(vpi_get(vpiSize, range));
+    }
+    return sizes;
+  }
+
+  // The value of the integer constant `bound`, -1 for none.
+  static int ValueOf(vpiHandle bound) {
+    if (bound == nullptr) return -1;
+    s_vpi_value value{};
+    value.format = vpiIntVal;
+    vpi_get_value(bound, &value);
+    return value.value.integer;
+  }
+
+  // The kind of what `relation` reaches from `ref`, 0 for nothing.
+  static int KindReached(int relation, vpiHandle ref) {
+    vpiHandle reached = vpi_handle(relation, ref);
+    return reached == nullptr ? 0 : vpi_get(vpiType, reached);
+  }
+};
 
 // Detail 1: a typedef of another typedef is a typespec of the aliased one's
 // kind, reaching it through vpiTypedefAlias, whether the typedef it aliases
@@ -469,6 +495,221 @@ TEST_F(TypespecsOfARun, RealtimeEventAndChandleTypedefsAreTypespecs) {
   vpiHandle v = vpi_handle(vpiTypespec, Named(vpiPropFormalDecl, decl, "v"));
   ASSERT_NE(v, nullptr);
   EXPECT_STREQ(vpi_get_str(vpiName, v), "rt_t");
+}
+
+// Details 8 to 10: a bit or logic typespec ranges over its packed dimensions,
+// those of a typedef it is written over included, its leftmost one's bounds
+// being its vpiLeftRange and vpiRightRange, and is a vector; vpiElemTypespec
+// unwinds it a range at a time, to the typedef it is written over and then to
+// a bit typespec of no ranges and no name, which is no vector and unwinds to
+// nothing (#7094, #7095, #7096).
+TEST_F(TypespecsOfARun, ABitOrLogicTypespecRangesAndUnwinds) {
+  Run("module top;\n"
+      "  typedef bit [3:0] nib_t; typedef nib_t [1:0] byte_t;\n"
+      "  typedef logic [7:0] b_t;\n"
+      "endmodule\n");
+  vpiHandle top = By("top");
+  vpiHandle nib = Named(vpiTypedef, top, "nib_t");
+  vpiHandle byte_t = Named(vpiTypedef, top, "byte_t");
+  vpiHandle b = Named(vpiTypedef, top, "b_t");
+  ASSERT_NE(nib, nullptr);
+  ASSERT_NE(byte_t, nullptr);
+  ASSERT_NE(b, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, byte_t), vpiBitTypespec);
+  EXPECT_EQ(RangeSizesOf(byte_t), (std::vector<int>{2, 4}));
+  EXPECT_EQ(ValueOf(vpi_handle(vpiLeftRange, byte_t)), 1);
+  EXPECT_EQ(ValueOf(vpi_handle(vpiRightRange, byte_t)), 0);
+  EXPECT_EQ(vpi_handle(vpiTypedefAlias, byte_t), nullptr);
+  EXPECT_TRUE(vpi_compare_objects(vpi_handle(vpiElemTypespec, byte_t), nib));
+  EXPECT_EQ(vpi_get(vpiVector, nib), 1);
+  EXPECT_EQ(vpi_get(vpiScalar, nib), 0);
+  vpiHandle bit = vpi_handle(vpiElemTypespec, nib);
+  ASSERT_NE(bit, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, bit), vpiBitTypespec);
+  EXPECT_EQ(vpi_get_str(vpiName, bit), nullptr);
+  EXPECT_TRUE(RangeSizesOf(bit).empty());
+  EXPECT_EQ(vpi_get(vpiVector, bit), 0);
+  EXPECT_EQ(vpi_handle(vpiElemTypespec, bit), nullptr);
+  EXPECT_EQ(vpi_get(vpiType, b), vpiLogicTypespec);
+  EXPECT_EQ(ValueOf(vpi_handle(vpiLeftRange, b)), 7);
+  EXPECT_EQ(KindReached(vpiElemTypespec, b), vpiLogicTypespec);
+}
+
+// Detail 8's example: a packed array typespec of packed structs, one over it
+// ranging over both, an array typespec over that, and a variable's own
+// unpacked dimensions over the last making an unnamed array typespec of both
+// unpacked ones, each unwinding to the typedef it is written over and the
+// structure to nothing (#7083, #7084, #7096, #7099).
+TEST_F(TypespecsOfARun, DetailEightsArraysUnwindToTheirTypedefs) {
+  Run("module top;\n"
+      "  typedef struct packed { int i1; bit bvec; } [1:3] parrtype;\n"
+      "  typedef parrtype [2:1] parrtype2;\n"
+      "  typedef parrtype2 unparrtype [6:4];\n"
+      "  unparrtype arr [3:0];\n"
+      "endmodule\n");
+  vpiHandle top = By("top");
+  vpiHandle parr = Named(vpiTypedef, top, "parrtype");
+  vpiHandle parr2 = Named(vpiTypedef, top, "parrtype2");
+  vpiHandle unparr = Named(vpiTypedef, top, "unparrtype");
+  ASSERT_NE(parr, nullptr);
+  ASSERT_NE(parr2, nullptr);
+  ASSERT_NE(unparr, nullptr);
+  vpiHandle arr = vpi_handle(vpiTypespec, By("top.arr"));
+  ASSERT_NE(arr, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, arr), vpiArrayTypespec);
+  EXPECT_EQ(vpi_get_str(vpiName, arr), nullptr);
+  EXPECT_EQ(RangeSizesOf(arr), (std::vector<int>{4, 3}));
+  EXPECT_TRUE(vpi_compare_objects(vpi_handle(vpiElemTypespec, arr), unparr));
+  EXPECT_EQ(vpi_get(vpiType, unparr), vpiArrayTypespec);
+  EXPECT_EQ(vpi_get(vpiArrayType, unparr), vpiStaticArray);
+  EXPECT_EQ(RangeSizesOf(unparr), (std::vector<int>{3}));
+  EXPECT_EQ(vpi_get(vpiVector, unparr), 0);
+  EXPECT_TRUE(vpi_compare_objects(vpi_handle(vpiElemTypespec, unparr), parr2));
+  EXPECT_EQ(vpi_get(vpiType, parr2), vpiPackedArrayTypespec);
+  EXPECT_EQ(RangeSizesOf(parr2), (std::vector<int>{2, 3}));
+  EXPECT_EQ(vpi_get(vpiVector, parr2), 1);
+  EXPECT_TRUE(vpi_compare_objects(vpi_handle(vpiElemTypespec, parr2), parr));
+  EXPECT_EQ(vpi_get(vpiType, parr), vpiPackedArrayTypespec);
+  vpiHandle element = vpi_handle(vpiElemTypespec, parr);
+  ASSERT_NE(element, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, element), vpiStructTypespec);
+  EXPECT_EQ(NamesOf(vpiTypespecMember, element),
+            (std::vector<std::string>{"bvec", "i1"}));
+  EXPECT_EQ(vpi_handle(vpiElemTypespec, element), nullptr);
+}
+
+// Details 2, 9 and 10 with §7.5 to §7.10: an array typespec's vpiArrayType is
+// the kind of array its leftmost dimension makes, a dynamic, queue or
+// associative one being an empty range with no bounds; an associative one's
+// vpiIndexTypespec is its index type's typespec, a keyword's or a typedef's,
+// and none for the wildcard index or any other array (#7084, #7097).
+TEST_F(TypespecsOfARun, AnArraysKindAndIndexTypeAreItsLeftmostDimensions) {
+  Run("module top; typedef int my_t;\n"
+      "  typedef int aa_t [string]; typedef bit ab_t [my_t];\n"
+      "  typedef byte aw_t [*]; typedef int da_t []; typedef int q_t [$];\n"
+      "endmodule\n");
+  vpiHandle top = By("top");
+  vpiHandle aa = Named(vpiTypedef, top, "aa_t");
+  vpiHandle ab = Named(vpiTypedef, top, "ab_t");
+  vpiHandle aw = Named(vpiTypedef, top, "aw_t");
+  vpiHandle da = Named(vpiTypedef, top, "da_t");
+  vpiHandle q = Named(vpiTypedef, top, "q_t");
+  ASSERT_NE(aa, nullptr);
+  ASSERT_NE(da, nullptr);
+  EXPECT_EQ(vpi_get(vpiArrayType, aa), vpiAssocArray);
+  EXPECT_EQ(KindReached(vpiIndexTypespec, aa), vpiStringTypespec);
+  EXPECT_TRUE(vpi_compare_objects(vpi_handle(vpiIndexTypespec, ab),
+                                  Named(vpiTypedef, top, "my_t")));
+  EXPECT_EQ(vpi_get(vpiArrayType, aw), vpiAssocArray);
+  EXPECT_EQ(vpi_handle(vpiIndexTypespec, aw), nullptr);
+  EXPECT_EQ(vpi_get(vpiArrayType, da), vpiDynamicArray);
+  EXPECT_EQ(vpi_handle(vpiIndexTypespec, da), nullptr);
+  EXPECT_EQ(RangeSizesOf(da), (std::vector<int>{0}));
+  EXPECT_EQ(vpi_handle(vpiLeftRange, da), nullptr);
+  EXPECT_EQ(vpi_get(vpiArrayType, q), vpiQueueArray);
+  EXPECT_EQ(KindReached(vpiElemTypespec, q), vpiIntTypespec);
+}
+
+// Details 3, 4 and 7 with §7.2 and §37.26: a struct or union typespec says
+// whether it is packed, tagged or soft, and each typespec member reaches the
+// typespec of its type, a typedef's where it names one, the default value it
+// was declared with through vpiExpr, and says through vpiRandType whether it
+// is rand or randc (#7090, #7091, #7092, #7093).
+TEST_F(TypespecsOfARun, AnAggregatesMembersReachTheirTypesAndDefaults) {
+  Run("module top; typedef bit [3:0] nib_t;\n"
+      "  typedef struct packed { logic [3:0] a; nib_t b; } ps_t;\n"
+      "  typedef union tagged { int i; bit b; } tu_t;\n"
+      "  typedef union soft packed { bit [3:0] x; bit [3:0] y; } su_t;\n"
+      "  typedef struct { rand int r; randc bit [1:0] c; int d = 5; } us_t;\n"
+      "endmodule\n");
+  vpiHandle top = By("top");
+  vpiHandle ps = Named(vpiTypedef, top, "ps_t");
+  vpiHandle us = Named(vpiTypedef, top, "us_t");
+  ASSERT_NE(ps, nullptr);
+  ASSERT_NE(us, nullptr);
+  EXPECT_EQ(vpi_get(vpiPacked, ps), 1);
+  vpiHandle a = vpi_handle(vpiTypespec, Named(vpiTypespecMember, ps, "a"));
+  ASSERT_NE(a, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, a), vpiLogicTypespec);
+  EXPECT_EQ(RangeSizesOf(a), (std::vector<int>{4}));
+  EXPECT_TRUE(vpi_compare_objects(
+      vpi_handle(vpiTypespec, Named(vpiTypespecMember, ps, "b")),
+      Named(vpiTypedef, top, "nib_t")));
+  vpiHandle tu = Named(vpiTypedef, top, "tu_t");
+  vpiHandle su = Named(vpiTypedef, top, "su_t");
+  EXPECT_EQ(vpi_get(vpiTagged, tu), 1);
+  EXPECT_EQ(vpi_get(vpiSoft, tu), 0);
+  EXPECT_EQ(vpi_get(vpiSoft, su), 1);
+  EXPECT_EQ(vpi_get(vpiPacked, su), 1);
+  EXPECT_EQ(vpi_get(vpiPacked, us), 0);
+  vpiHandle r = Named(vpiTypespecMember, us, "r");
+  vpiHandle c = Named(vpiTypespecMember, us, "c");
+  vpiHandle d = Named(vpiTypespecMember, us, "d");
+  EXPECT_EQ(vpi_get(vpiRandType, r), vpiRand);
+  EXPECT_EQ(vpi_get(vpiRandType, c), vpiRandC);
+  EXPECT_EQ(vpi_get(vpiRandType, d), vpiNotRand);
+  EXPECT_EQ(vpi_handle(vpiExpr, r), nullptr);
+  vpiHandle value = vpi_handle(vpiExpr, d);
+  ASSERT_NE(value, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, value), vpiConstant);
+  EXPECT_EQ(ValueOf(value), 5);
+  EXPECT_EQ(KindReached(vpiTypespec, d), vpiIntTypespec);
+}
+
+// Details 1 and 6 with §6.19 and §37.32: an enum typespec reaches its base
+// type's typespec, int's where it names none, through vpiBaseTypespec, which
+// no other typespec reaches; a typedef of an enum typedef is an enum typespec
+// with its constants and base; one of a predefined type aliases that type's
+// unnamed typespec; one of a package's type aliases the package's typedef;
+// and one of a class is a class typespec of its own name reaching the class
+// defn (#7082, #7088, #7089, #7098).
+TEST_F(TypespecsOfARun, EnumsAliasesAndClassesReachWhatTheyStandFor) {
+  Run("package pk; typedef logic [1:0] t; endpackage\n"
+      "module top;\n"
+      "  typedef enum bit [1:0] {red, yellow, blue} primary_colors;\n"
+      "  typedef primary_colors colors; typedef enum {X, Y} plain_e;\n"
+      "  typedef enum bit [2:0] {P, Q} ea_t [2];\n"
+      "  typedef time my_time; typedef pk::t pt_t;\n"
+      "  class C; endclass typedef C c_t;\n"
+      "endmodule\n");
+  vpiHandle top = By("top");
+  vpiHandle primary = Named(vpiTypedef, top, "primary_colors");
+  vpiHandle colors = Named(vpiTypedef, top, "colors");
+  ASSERT_NE(primary, nullptr);
+  ASSERT_NE(colors, nullptr);
+  vpiHandle base = vpi_handle(vpiBaseTypespec, primary);
+  ASSERT_NE(base, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, base), vpiBitTypespec);
+  EXPECT_EQ(RangeSizesOf(base), (std::vector<int>{2}));
+  EXPECT_EQ(vpi_handle(vpiElemTypespec, primary), nullptr);
+  EXPECT_EQ(vpi_get(vpiType, colors), vpiEnumTypespec);
+  EXPECT_TRUE(
+      vpi_compare_objects(vpi_handle(vpiTypedefAlias, colors), primary));
+  EXPECT_EQ(NamesOf(vpiEnumConst, colors),
+            (std::vector<std::string>{"blue", "red", "yellow"}));
+  EXPECT_TRUE(vpi_compare_objects(vpi_handle(vpiBaseTypespec, colors), base));
+  EXPECT_EQ(KindReached(vpiBaseTypespec, Named(vpiTypedef, top, "plain_e")),
+            vpiIntTypespec);
+  vpiHandle enums = vpi_handle(vpiElemTypespec, Named(vpiTypedef, top, "ea_t"));
+  ASSERT_NE(enums, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, enums), vpiEnumTypespec);
+  EXPECT_EQ(RangeSizesOf(vpi_handle(vpiBaseTypespec, enums)),
+            (std::vector<int>{3}));
+  vpiHandle my_time = Named(vpiTypedef, top, "my_time");
+  ASSERT_NE(my_time, nullptr);
+  vpiHandle time = vpi_handle(vpiTypedefAlias, my_time);
+  ASSERT_NE(time, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, time), vpiTimeTypespec);
+  EXPECT_EQ(vpi_get_str(vpiName, time), nullptr);
+  EXPECT_EQ(vpi_handle(vpiBaseTypespec, my_time), nullptr);
+  EXPECT_TRUE(vpi_compare_objects(
+      vpi_handle(vpiTypedefAlias, Named(vpiTypedef, top, "pt_t")),
+      Named(vpiTypedef, By("pk"), "t")));
+  vpiHandle c = Named(vpiTypedef, top, "c_t");
+  ASSERT_NE(c, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, c), vpiClassTypespec);
+  EXPECT_TRUE(vpi_compare_objects(vpi_handle(vpiClassDefn, c),
+                                  Named(vpiClassDefn, top, "C")));
 }
 
 }  // namespace
