@@ -88,6 +88,12 @@ one defined value whose meaning holds for it, and a value outside the
 normative header is never an option. Annex M gives vpiQualifier no unique0
 bit, yet §12.4.2 makes unique0 assert the same no-overlap check as unique,
 so it reports vpiUniqueQualifier; vpiNoQualifier would deny a check it makes.
+The same holds for an integer property whose object is in a state no count
+can express. §38.6 sends defined values to Annex K, where vpiUndefined marks
+an undefined property. A module whose charge never decays therefore answers
+vpiDefDecayTime with vpiUndefined: every count, 0 included, names a decay
+§28.16.2.1 says does happen, and only the informative Annex E can make the
+decay infinite at all.
 A rule stated over "items" applies again to every nested item that fits its
 terms. Before calling a nested shape open, apply the rule at each level. §6.24.3's
 greedy rule (the first dynamically sized item takes the remainder, and the later
