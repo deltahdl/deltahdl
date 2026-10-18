@@ -307,6 +307,8 @@ constexpr const char* kSequenceOperators =
     "  i2: assert property (@(posedge clk) u);\n"
     "  e1: assert property (@(posedge clk) st.f ##1 b);\n"
     "  x1: assert property (@(posedge clk) a dist {0 := 1, 1 := 3} ##1 b);\n"
+    "  x2: assert property (@(posedge clk) a dist {1 := 3, default :/ 1} ##1 "
+    "b);\n"
     "  r1: assert property (@(posedge clk) a[*2] ##1 b);\n"
     "  r2: assert property (@(posedge clk) a[->1:2] ##1 b);\n"
     "  r3: assert property (@(posedge clk) a[=3] ##1 b);\n"
@@ -424,6 +426,20 @@ TEST_F(SequenceExprsOfARun, ADistOperandIsADistribution) {
   const std::vector<vpiHandle> kEntries = ObjectsOf(vpiDistItem, kParts[0]);
   ASSERT_EQ(kEntries.size(), 2u);
   EXPECT_EQ(vpi_get(vpiDistType, kEntries[1]), vpiEqualDist);
+}
+
+// A dist whose list writes a default item, which §18.5.3 has stand for the
+// values no other item names, keeps the default among its dist items,
+// weighted as a whole and reaching no value range (#7326).
+TEST_F(SequenceExprsOfARun, ADistOperandsDefaultItemIsADistItem) {
+  const std::vector<vpiHandle> kParts = OperandsOf(PropertyOf("x2"));
+  ASSERT_FALSE(kParts.empty());
+  EXPECT_EQ(vpi_get(vpiType, kParts[0]), vpiDistribution);
+  const std::vector<vpiHandle> kEntries = ObjectsOf(vpiDistItem, kParts[0]);
+  ASSERT_EQ(kEntries.size(), 2u);
+  EXPECT_EQ(vpi_get(vpiDistType, kEntries[1]), vpiDivDist);
+  EXPECT_EQ(vpi_handle(vpiValueRange, kEntries[1]), nullptr);
+  EXPECT_NE(vpi_handle(vpiWeight, kEntries[1]), nullptr);
 }
 
 // A repetition takes the sequence repeated and its bounds, the right only

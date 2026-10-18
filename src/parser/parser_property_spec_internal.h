@@ -33,8 +33,9 @@ struct SimpleSpecBody {
 // condition, and a boolean, a sequential property or a property of operands
 // under not, or, and, if-else, case, implication, followed-by, implies,
 // iff, nexttime, always, until, eventually and the aborts. A
-// friend of Parser, defined in src/parser/parser_property_spec.cpp and, for
-// the event actuals, src/parser/parser_event_actual.cpp.
+// friend of Parser, defined in src/parser/parser_property_spec.cpp, for
+// the event actuals in src/parser/parser_event_actual.cpp, and for the
+// expression_or_dist in src/parser/parser_property_dist.cpp.
 struct ParserPropertySpecHelpers {
   static Expr* PropertySpecPlaceholder(Arena& arena, SourceLoc loc);
   static ModuleItem* TryParseSequenceSpec(Parser& p, bool& strong, bool term);
@@ -60,6 +61,8 @@ struct ParserPropertySpecHelpers {
   static bool ParsePropertyActualList(Parser& p, Expr* call, bool& plain);
   static Expr* TryParsePropertyInstance(Parser& p);
   static Expr* RangeOfDistItem(Parser& p, const ConstraintDistItem& item);
+  static bool ParseAssertionDistItem(Parser& p, ConstraintDistItem& item,
+                                     int& defaults);
   static Expr* ParseExpressionOrDist(Parser& p);
   static PropertyExprNode* ParsePropertyIfElse(Parser& p);
   static bool ParsePropertyCaseItem(Parser& p, PropertyExprNode& node);

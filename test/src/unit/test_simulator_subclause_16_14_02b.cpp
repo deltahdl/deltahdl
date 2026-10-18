@@ -106,6 +106,22 @@ TEST(AssumeStatementRun, AnAssertedDistIsTheInsideOperator) {
   EXPECT_EQ(f.ctx.FindVariable("inside_fails")->value.ToUint64(), 1u);
 }
 
+// §16.14.2 with §18.5.3: a default item of a dist_list stands for every value
+// the other items leave out, so v dist {5:/1, default:/1} asserted holds at
+// all nine ticks though v is never 5, where v dist {5:/1} would fail at each.
+TEST(AssumeStatementRun, AnAssertedDistWithADefaultItemHoldsForEveryValue) {
+  SimFixture f;
+  auto* passes = RunAndFindVar(
+      AssumeSource(
+          "  dist_assert: assert property (@(posedge clk) v dist {5:/1, "
+          "default:/1})\n"
+          "    passes++; else fails++;\n"),
+      f, "passes");
+  ASSERT_NE(passes, nullptr);
+  EXPECT_EQ(passes->value.ToUint64(), 9u);
+  EXPECT_EQ(f.ctx.FindVariable("fails")->value.ToUint64(), 0u);
+}
+
 // §16.14.2: within a cover statement a dist is the inside operator as
 // well, so v dist {0:=40, 1:=60} is covered at the eight ticks v is 0 or 1.
 TEST(AssumeStatementRun, ACoveredDistIsTheInsideOperator) {

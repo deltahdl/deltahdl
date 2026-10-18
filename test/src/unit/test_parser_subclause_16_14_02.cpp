@@ -2,6 +2,8 @@
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
+#include "parser/ast_class.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 
@@ -93,6 +95,72 @@ TEST(AssertionSemanticsParsing, ADistInADisableConditionIsReadAsInside) {
   EXPECT_EQ(decl->prop_disable_iff->elements.size(), 2u);
   ASSERT_NE(decl->prop_body_tree, nullptr);
   EXPECT_EQ(decl->prop_body_tree->kind, PropertyExprNode::Kind::kImplication);
+}
+
+// §16.14.2 with §18.5.3: an assertion's expression_or_dist takes the
+// dist_list a constraint does, a default item among its entries; inside holds
+// no range for the values the default stands for, so the inside's elements
+// are the other items alone, and the items as written keep the default.
+TEST(AssertionSemanticsParsing,
+     ADefaultItemOfAnAssertedDistIsKeptAmongItsItems) {
+  auto r = Parse(
+      "module m;\n"
+      "  a1: assert property (@(posedge clk) v dist {[0:3]:/3, default:/1});\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindItemByKind(r, ModuleItemKind::kAssertProperty);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->body, nullptr);
+  const Expr* boolean = item->body->assert_expr;
+  ASSERT_NE(boolean, nullptr);
+  EXPECT_EQ(boolean->kind, ExprKind::kInside);
+  EXPECT_EQ(boolean->elements.size(), 1u);
+  ASSERT_NE(boolean->dist_items, nullptr);
+  ASSERT_EQ(boolean->dist_items->size(), 2u);
+  EXPECT_FALSE((*boolean->dist_items)[0].is_default);
+  EXPECT_TRUE((*boolean->dist_items)[1].is_default);
+}
+
+// §18.5.3: a default specification takes its weight through :/ only, in an
+// assertion's dist as in a constraint's, so := there is an error.
+TEST(AssertionSemanticsParsing,
+     AnAssertedDistsDefaultWrittenWithAssignIsAnError) {
+  auto r = Parse(
+      "module m;\n"
+      "  a1: assert property (@(posedge clk) v dist {0:=1, default:=1});\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "a distribution's default specification takes its "
+                            "weight through :/ and nothing else",
+                            2, "18.5.3"));
+}
+
+// §18.5.3: a default specification written with no weight operator is an
+// error in an assertion's dist too.
+TEST(AssertionSemanticsParsing, AnAssertedDistsDefaultWithoutAWeightIsAnError) {
+  auto r = Parse(
+      "module m;\n"
+      "  a1: assert property (@(posedge clk) v dist {0:=1, default});\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "a distribution's default specification takes its "
+                            "weight through :/ and nothing else",
+                            2, "18.5.3"));
+}
+
+// §18.5.3: a distribution holds one default specification at most, so an
+// assertion's dist writing two is an error.
+TEST(AssertionSemanticsParsing, AnAssertedDistWithTwoDefaultsIsAnError) {
+  auto r = Parse(
+      "module m;\n"
+      "  a1: assert property (@(posedge clk) v dist {default:/1, "
+      "default:/2});\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "this distribution already has a default "
+                            "specification; it can have only one",
+                            2, "18.5.3"));
 }
 
 }  // namespace

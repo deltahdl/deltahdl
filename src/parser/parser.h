@@ -289,6 +289,7 @@ class Parser {
   void CaptureForeachConstraintBody(std::vector<Expr*>& body);
   void CheckSolveBeforeConstraint(ClassMember* member);
   void ParseSolveBeforeList(std::vector<ConstraintSolveBeforeEntry>& out);
+  bool CheckDistDefault(SourceLoc loc, int& default_count);
   void CheckDistSet();
   std::pair<uint8_t, uint8_t> ParseGateStrength(GateKind kind, SourceLoc loc);
   bool IsAtGateKeyword();

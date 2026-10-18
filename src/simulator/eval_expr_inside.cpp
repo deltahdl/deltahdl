@@ -8,6 +8,7 @@
 #include "common/arena.h"
 #include "common/types.h"
 #include "lexer/token.h"
+#include "parser/ast_class.h"
 #include "parser/ast_expr.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_class_array.h"
@@ -245,6 +246,16 @@ int EvalInsideElement(const Logic4Vec& lhs, const Expr* elem, SimContext& ctx,
                   : InsideMatchValue(lhs, elem, ctx, arena);
 }
 
+// §16.14.2 with §18.5.3: whether `expr` is an assertion's dist whose list
+// writes a default item, which stands for every value the other items leave
+// out, so that the set the inside reading tests holds every value.
+static bool DistHasDefaultItem(const Expr* expr) {
+  if (expr->dist_items == nullptr) return false;
+  return std::any_of(
+      expr->dist_items->begin(), expr->dist_items->end(),
+      [](const ConstraintDistItem& item) { return item.is_default; });
+}
+
 Logic4Vec EvalInside(const Expr* expr, SimContext& ctx, Arena& arena) {
   auto lhs = EvalExpr(expr->lhs, ctx, arena);
   bool ambiguous = false;
@@ -253,6 +264,7 @@ Logic4Vec EvalInside(const Expr* expr, SimContext& ctx, Arena& arena) {
     if (r == 1) return MakeLogic4VecVal(arena, 1, 1);
     if (r == 2) ambiguous = true;
   }
+  if (DistHasDefaultItem(expr)) return MakeLogic4VecVal(arena, 1, 1);
   if (ambiguous) {
     auto x = MakeLogic4Vec(arena, 1);
     x.words[0] = {~uint64_t{0}, ~uint64_t{0}};

@@ -510,10 +510,28 @@ ClassMember* Parser::ParseConstraintStub(ClassMember* member) {
   return member;
 }
 
+// 18.5.3: the rules that govern a distribution's default specification, its
+// default keyword at `loc` just consumed: it takes the :/ operator (the :=
+// operator or an omitted operator is an error), which the result says follows,
+// and a distribution holds one default specification at most, `default_count`
+// counting those its dist_list has written so far.
+bool Parser::CheckDistDefault(SourceLoc loc, int& default_count) {
+  if (++default_count > 1) {
+    diag_.Error(loc,
+                "this distribution already has a default specification; it "
+                "can have only one",
+                Subclause("18.5.3"));
+  }
+  if (CheckColonSlash()) return true;
+  diag_.Error(loc,
+              "a distribution's default specification takes its weight "
+              "through :/ and nothing else",
+              Subclause("18.5.3"));
+  return false;
+}
+
 // 18.5.3: scan a dist_list ('{ dist_item { , dist_item } }') and enforce the
-// rules that govern its default specification: it takes the :/ operator (the :=
-// operator or an omitted operator is an error), and a distribution holds one
-// default specification at most.
+// rules that govern its default specification.
 void Parser::CheckDistSet() {
   if (!Match(TokenKind::kLBrace)) return;
   int depth = 1;
@@ -521,20 +539,7 @@ void Parser::CheckDistSet() {
   while (depth > 0 && !AtEnd()) {
     if (Check(TokenKind::kKwDefault)) {
       Token def = Consume();
-      if (++default_count > 1) {
-        diag_.Error(def.loc,
-                    "this distribution already has a default specification; it "
-                    "can have only one",
-                    Subclause("18.5.3"));
-      }
-      if (CheckColonSlash()) {
-        MatchColonSlash();
-      } else {
-        diag_.Error(def.loc,
-                    "a distribution's default specification takes its weight "
-                    "through :/ and nothing else",
-                    Subclause("18.5.3"));
-      }
+      if (CheckDistDefault(def.loc, default_count)) MatchColonSlash();
     } else if (Match(TokenKind::kLBrace)) {
       ++depth;
     } else if (Match(TokenKind::kRBrace)) {
