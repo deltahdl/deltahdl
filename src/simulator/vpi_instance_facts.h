@@ -7,6 +7,8 @@
 
 namespace delta {
 
+struct VpiObject;
+
 // §37.10: what an instance takes from where its definition was written, the
 // compiler directives in force there and whether the code is protected, which
 // it reports through the properties the figure draws on every instance, and,
@@ -34,6 +36,11 @@ struct VpiInstanceFacts {
   // which vpi_handle_by_multi_index() names it by; empty for an object of no
   // array.
   std::vector<int64_t> array_indices;
+  // §37.12 detail 4: the objects an import of the instance's module brings in
+  // and an expression of the instance references, each once, which the
+  // vpiImport iteration returns. Recorded as each such reference resolves,
+  // from an expression's name lookup, which holds the scope read-only.
+  mutable std::vector<VpiObject*> imported;
 };
 
 }  // namespace delta

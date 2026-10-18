@@ -72,6 +72,29 @@ VpiHandle BlockDeclaration(const VpiObject* scope, std::string_view name,
   return nullptr;
 }
 
+// §26.3 with §37.12 detail 4: the item of a package an import of the module
+// makes visible under `name`, by its name or with a wildcard, recorded among
+// the objects imported into the instance the expression stands in, which it
+// references; null where no import makes one visible. An expression of a
+// module, which alone carries imports, stands in a scope of the module's
+// instance or in the instance itself.
+VpiHandle ImportedObject(const AssignNames& names, std::string_view name) {
+  for (const RtlirImport& entry : names.imports) {
+    if (!entry.is_wildcard && entry.item_name != name) continue;
+    VpiHandle item = FindObjectForFlatName(
+        names.objects, VpiFlatName(std::string(entry.package_name), name));
+    if (item == nullptr) continue;
+    const VpiObject* at = names.scope;
+    while (!VpiIsInstanceType(at->type)) at = at->parent;
+    std::vector<VpiObject*>& imported = at->instance_facts.imported;
+    if (std::ranges::find(imported, item) == imported.end()) {
+      imported.push_back(item);
+    }
+    return item;
+  }
+  return nullptr;
+}
+
 }  // namespace
 
 VpiHandle Resolve(const AssignNames& names, std::string_view name) {
@@ -88,7 +111,9 @@ VpiHandle Resolve(const AssignNames& names, std::string_view name) {
   // What a generate block instance holds under no such key, a loop's genvar.
   declared = BlockDeclaration(names.scope, name, true);
   if (declared != nullptr) return declared;
-  return FindObjectForFlatName(names.objects, VpiFlatName(names.prefix, name));
+  VpiHandle own =
+      FindObjectForFlatName(names.objects, VpiFlatName(names.prefix, name));
+  return own != nullptr ? own : ImportedObject(names, name);
 }
 
 namespace {

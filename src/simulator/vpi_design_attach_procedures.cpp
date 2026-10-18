@@ -8,6 +8,7 @@
 #include <utility>
 #include <vector>
 
+#include "common/arena.h"
 #include "common/source_loc.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
@@ -677,6 +678,39 @@ void AttachInstanceProcedures(VpiObject* instance,
   }
 }
 
+// §37.12 detail 5 with §37.41: the statements the body of `item`, the task
+// or function `tf` stands for, holds: its one statement, an unnamed begin
+// holding them where it holds more than one, and none where it holds none. A
+// declaration the body writes is a variable of the task or function itself
+// (§13.3, §13.4), no statement of it.
+void WalkSubroutineBody(const ModuleItem& item, VpiObject* tf,
+                        const BodyWalk& walk) {
+  std::vector<Stmt*> statements;
+  for (Stmt* stmt : item.func_body_stmts) {
+    if (stmt->kind != StmtKind::kVarDecl) statements.push_back(stmt);
+  }
+  if (statements.empty()) return;
+  const BlockParent kParent{tf, tf->full_name};
+  if (statements.size() == 1) {
+    WalkStmt(statements.front(), kParent, walk);
+    return;
+  }
+  Stmt* begin = walk.build.arena.Create<Stmt>();
+  begin->kind = StmtKind::kBlock;
+  begin->range = statements.front()->range;
+  begin->stmts = std::move(statements);
+  MakeBlock(*begin, vpiBegin, kParent, walk);
+}
+
+// §37.12 detail 5: the body of each task and function the instance declares
+// outside every generate block, the ones made under the instance's prefix.
+void AttachInstanceSubroutineBodies(VpiObject* /*instance*/,
+                                    const BodyWalk& walk) {
+  for (const auto& [key, tf] : walk.calls.subroutines) {
+    if (key.second == walk.prefix) WalkSubroutineBody(*key.first, tf, walk);
+  }
+}
+
 }  // namespace
 
 bool ShapeExprCall(const Expr& call, VpiObject* made, const BlockParent& parent,
@@ -786,6 +820,7 @@ void AttachProcedures(const RtlirDesign* design, const VpiObjectMap& objects,
   kWalk(AttachInstanceLetDecls);
   kWalk(AttachInstanceAssertionItemDecls);
   kWalk(AttachInstanceProcedures);
+  kWalk(AttachInstanceSubroutineBodies);
 }
 
 }  // namespace delta

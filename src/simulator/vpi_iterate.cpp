@@ -488,10 +488,14 @@ bool VpiIterateMatches(VpiHandle obj, int type, VpiHandle ref,
 }
 
 // §37.12 detail 4: collect the objects actually imported into the scope - those
-// referenced across an import declaration, marked imported.
+// referenced across an import declaration, marked imported, and those an
+// expression of the instance resolved through one of its module's imports.
 void CollectImportedObjects(VpiObject* ref, VpiObject* iter) {
   for (auto* child : ref->children) {
     if (child->imported) iter->children.push_back(child);
+  }
+  for (VpiObject* item : ref->instance_facts.imported) {
+    iter->children.push_back(item);
   }
 }
 

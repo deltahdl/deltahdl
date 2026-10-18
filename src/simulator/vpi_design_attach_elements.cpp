@@ -8,6 +8,7 @@
 #include "common/packed_range.h"
 #include "common/types.h"
 #include "elaborator/rtlir.h"
+#include "parser/ast_type.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_walk.h"
@@ -113,6 +114,18 @@ void RecordDimensionIndices(VpiObject& array,
   }
 }
 
+// The kind an element of the array `var` stands as where its declaration says
+// it, zero where the run's object for the element says it. §37.17 with
+// §37.33: an element of an array of class handles is a class var, and §37.12
+// detail 7 with §37.29: an element of an array of virtual interfaces is a
+// virtual interface var, which the run made a reg like every element.
+int DeclaredElementType(const RtlirVariable& var) {
+  if (!var.class_type_name.empty()) return vpiClassVar;
+  return var.decl_kind == DataTypeKind::kVirtualInterface
+             ? vpiVirtualInterfaceVar
+             : 0;
+}
+
 // Whether `var` is an array var whose every unpacked dimension is fixed, the
 // arrays whose elements the run keys under the array's name.
 bool HasFixedElements(const RtlirVariable& var) {
@@ -188,11 +201,9 @@ void AttachArrayElements(const RtlirDesign* design, const VpiObjectMap& objects,
           const std::string kKey = VpiFlatName(prefix, var.name);
           VpiObject* array = FindObjectForFlatName(objects, kKey);
           if (array == nullptr) continue;
-          // §37.17 with §37.33: an element of an array of class handles is a
-          // class var, which the run made a reg like every element.
           AttachArray(*array, kKey,
                       {var.unpacked_dims, *array, objects, build,
-                       var.class_type_name.empty() ? 0 : vpiClassVar});
+                       DeclaredElementType(var)});
         }
         for (const RtlirNet& net : VpiDeclaredNets(*mod)) {
           AttachNetArray(net, prefix, objects, build);
