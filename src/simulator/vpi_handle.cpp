@@ -712,15 +712,18 @@ bool TryResolveIndexRelation(int type, VpiHandle ref, VpiHandle& out) {
 }
 
 // §37.42 (figure): the function or task a tf call calls, NULL for a built-in
-// method's.
+// method's. §37.8: the one an interface tf decl's definition is, if of `type`.
 bool TryResolveCalledTfRelation(int type, VpiHandle ref, VpiHandle& out) {
-  const bool kTask = ref->type == vpiMethodTaskCall || ref->type == vpiTaskCall;
+  const bool kDecl = ref->type == vpiInterfaceTfDecl;
+  const bool kTask =
+      kDecl || ref->type == vpiMethodTaskCall || ref->type == vpiTaskCall;
   const bool kFunction =
-      ref->type == vpiMethodFuncCall || ref->type == vpiFuncCall;
+      kDecl || ref->type == vpiMethodFuncCall || ref->type == vpiFuncCall;
   if (!(type == vpiTask ? kTask : type == vpiFunction && kFunction)) {
     return false;
   }
   out = ref->builtin_method ? nullptr : ref->tf_decl;
+  if (kDecl && out != nullptr && out->type != type) out = nullptr;
   return true;
 }
 
