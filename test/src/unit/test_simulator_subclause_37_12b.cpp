@@ -131,5 +131,15 @@ TEST_F(ScopesOfARun, EveryTaskReachesTheStatementOfItsBody) {
   EXPECT_EQ(StmtKindOf(uf), vpiReturnStmt);
 }
 
+// Detail 5 for a generate block's function an expression calls by its
+// hierarchical name (§23.6): its body's one statement, the return.
+TEST_F(ScopesOfARun, AGenerateBlocksFunctionReachesItsReturn) {
+  Run("module top; int r;\n"
+      "  if (1) begin : b function int g(); return 2; endfunction end\n"
+      "  initial r = b.g();\n"
+      "endmodule\n");
+  EXPECT_EQ(StmtKindOf(Named(vpiTaskFunc, By("top.b"), "g")), vpiReturnStmt);
+}
+
 }  // namespace
 }  // namespace delta

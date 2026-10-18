@@ -251,9 +251,11 @@ TEST_F(CallsWithinADesign, AnIncrementStepsEachTimeItIsRead) {
 TEST_F(CallsWithinADesign, ATaskBodysSystemTaskCallIsUnnamed) {
   ASSERT_NE(RegisterArgs(0), nullptr);
   Run("module top; logic [3:0] v;\n"
-      "  class C; task t; $args(v, , null); endtask endclass\n"
+      "  class C;\n"
+      "    task t(input logic [3:0] w); $args(w, , null); endtask\n"
+      "  endclass\n"
       "  C c;\n"
-      "  initial begin c = new; c.t(); end\n"
+      "  initial begin c = new; c.t(v); end\n"
       "endmodule\n");
   ASSERT_NE(g_invoked_call, nullptr);
   EXPECT_EQ(vpi_get_str(vpiName, g_invoked_call), nullptr);
