@@ -1,4 +1,5 @@
 #include <cstddef>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -9,7 +10,9 @@
 #include "common/source_loc.h"
 #include "elaborator/assertion_rules.h"
 #include "elaborator/concurrent_assertion_expr.h"
+#include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_class_typedef_specialization.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/global_clock_assertion_event.h"
@@ -21,9 +24,11 @@
 #include "elaborator/rtlir_scopes.h"
 #include "elaborator/semantic_leading_clocks.h"
 #include "elaborator/sequence_match_class.h"
+#include "elaborator/type_eval.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 #include "parser/expr_substitute.h"
 
 namespace delta {
@@ -466,9 +471,35 @@ void PromotePropertyInstanceBoolean(ModuleItem* item, Arena& arena,
   }
 }
 
+// §8.23 and §8.25: a formal of a type a class declares, C::t or C#(8)::t,
+// takes the type the typedef stands for, under the specialization where the
+// class has parameters, as a variable does (Elaborator::ElaborateVarDecl),
+// rewritten where it is held, since a formal writing no type shares it
+// (§16.8). A formal holds no unpacked dimensions, so one of a typedef writing
+// some is left as written, as is one of a package's type (§26.3).
+void ResolveClassScopedFormalTypes(const ModuleItem& item,
+                                   const CompilationUnit* unit,
+                                   const ScopeMap& module_scope,
+                                   const TypedefMap& typedefs, Arena& arena) {
+  for (DataType* type : item.prop_formal_types) {
+    if (type == nullptr || type->scope_name.empty()) continue;
+    std::optional<SpecializedClassType> spec =
+        SpecializeClassScopedType(*type, unit, module_scope, typedefs, arena);
+    if (spec.has_value()) {
+      if (spec->unpacked_dims.empty()) *type = spec->type;
+      continue;
+    }
+    const DataType* declared =
+        FindClassScopedTypedefType(type->scope_name, type->type_name, unit);
+    if (declared != nullptr) *type = *declared;
+  }
+}
+
 }  // namespace
 
 void Elaborator::ElaborateSequenceDeclItem(ModuleItem* item, RtlirModule* mod) {
+  ResolveClassScopedFormalTypes(*item, unit_, BuildParamScope(mod), typedefs_,
+                                arena_);
   sequence_names_.insert(item->name);
   mod->sequence_decls.push_back(item);
   mod->assertion_item_decls.push_back(
@@ -571,6 +602,8 @@ void PromoteSequenceInstancesInProperties(const ModuleDecl* decl,
 }
 
 void Elaborator::ElaboratePropertyDeclItem(ModuleItem* item, RtlirModule* mod) {
+  ResolveClassScopedFormalTypes(*item, unit_, BuildParamScope(mod), typedefs_,
+                                arena_);
   mod->property_decls.push_back(item);
   mod->assertion_item_decls.push_back(
       RtlirAssertionItemDecl{item, {}, {}, nullptr});

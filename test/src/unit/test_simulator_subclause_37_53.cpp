@@ -294,6 +294,46 @@ TEST_F(SequenceDeclsOfARun, AFormalOfAPackagesTypeReachesItsTypespec) {
   EXPECT_TRUE(vpi_compare_objects(x, Named(vpiTypedef, By("pk"), "t")));
 }
 
+// Detail 2 and §37.51 detail 3 with §8.23 and §8.25: a sequence or property
+// formal of a class's type, C#(8)::t, reaches a typespec of the type the
+// typedef stands for under the specialization, as does a formal it carries
+// its type on to (§16.8), and one of an unparameterized class's, D::u, the
+// typedef's type; one of an array typedef is not taken for its element type
+// (#7307).
+TEST_F(SequenceDeclsOfARun, AFormalOfAClassesTypeReachesTheTypedefsType) {
+  Run("class C #(int W = 1);\n"
+      "  typedef logic [W-1:0] t; typedef logic [W-1:0] arr_t [2];\n"
+      "endclass\n"
+      "class D; typedef bit [2:0] u; endclass\n"
+      "module top; logic a, clk;\n"
+      "  sequence s(C#(8)::t x, y, D::u z, C#(2)::arr_t w);\n"
+      "    a ##1 x[0];\n"
+      "  endsequence\n"
+      "  property p(C#(8)::t v); @(posedge clk) v[0]; endproperty\n"
+      "endmodule\n");
+  vpiHandle seq = Named(vpiSequenceDecl, By("top"), "s");
+  vpiHandle prop = Named(vpiPropertyDecl, By("top"), "p");
+  ASSERT_NE(seq, nullptr);
+  ASSERT_NE(prop, nullptr);
+  // The kind of the typespec `formal` reaches and the size of its first
+  // range, 0 for none.
+  const auto kKindAndSize = [](vpiHandle formal) {
+    vpiHandle ts = vpi_handle(vpiTypespec, formal);
+    vpiHandle ranges = ts == nullptr ? nullptr : vpi_iterate(vpiRange, ts);
+    vpiHandle range = ranges == nullptr ? nullptr : vpi_scan(ranges);
+    return std::vector<int>{ts == nullptr ? 0 : vpi_get(vpiType, ts),
+                            range == nullptr ? 0 : vpi_get(vpiSize, range)};
+  };
+  const std::vector<int> kLogic8{vpiLogicTypespec, 8};
+  EXPECT_EQ(kKindAndSize(Named(vpiSeqFormalDecl, seq, "x")), kLogic8);
+  EXPECT_EQ(kKindAndSize(Named(vpiSeqFormalDecl, seq, "y")), kLogic8);
+  EXPECT_EQ(kKindAndSize(Named(vpiSeqFormalDecl, seq, "z")),
+            (std::vector<int>{vpiBitTypespec, 3}));
+  EXPECT_NE(kKindAndSize(Named(vpiSeqFormalDecl, seq, "w"))[0],
+            vpiLogicTypespec);
+  EXPECT_EQ(kKindAndSize(Named(vpiPropFormalDecl, prop, "v")), kLogic8);
+}
+
 // Detail 4: a local variable argument written as an output or an inout has
 // that direction (§16.8.2).
 TEST_F(SequenceDeclsOfARun, AnOutputAndAnInoutFormalHaveTheirDirections) {
