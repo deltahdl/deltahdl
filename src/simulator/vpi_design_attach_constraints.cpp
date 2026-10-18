@@ -1,3 +1,4 @@
+#include <functional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -101,35 +102,31 @@ VpiObject* SoftDisableItem(const ConstraintItem& item, const ItemBuild& at) {
 // item and a range written about a centre (§11.4.13) reach no value range,
 // and an item written with no weight reaches none either.
 VpiObject* DistItem(const ConstraintDistItem& entry, VpiObject* dist,
-                    const ItemBuild& at) {
-  VpiObject* item = at.build.alloc();
+                    const std::function<VpiObject*()>& alloc,
+                    const std::function<VpiObject*(const Expr*)>& expression) {
+  VpiObject* item = alloc();
   item->type = vpiDistItem;
   item->parent = dist;
   item->dist_type = entry.per_element ? vpiEqualDist : vpiDivDist;
-  item->weight = at.Expression(entry.weight);
+  item->weight = expression(entry.weight);
   if (!entry.is_range) {
-    item->value_range = at.Expression(entry.value);
+    item->value_range = expression(entry.value);
   } else if (entry.hi != nullptr) {
-    VpiObject* range = at.build.alloc();
+    VpiObject* range = alloc();
     range->type = vpiRange;
     range->parent = item;
-    range->left_range = at.Expression(entry.lo);
-    range->right_range = at.Expression(entry.hi);
+    range->left_range = expression(entry.lo);
+    range->right_range = expression(entry.hi);
     item->value_range = range;
   }
   return item;
 }
 
-// §37.34 and §37.38: a distribution, reaching the expression it weights and a
-// dist item per entry of its list, in order.
+// §37.34 and §37.38: the distribution a constraint's dist item stands as.
 VpiObject* DistributionItem(const ConstraintItem& item, const ItemBuild& at) {
-  VpiObject* dist = at.build.alloc();
-  dist->type = vpiDistribution;
-  Append(dist->children, at.Expression(item.expr));
-  for (const ConstraintDistItem& entry : item.dist) {
-    dist->children.push_back(DistItem(entry, dist, at));
-  }
-  return dist;
+  return VpiMakeDistribution(
+      at.Expression(item.expr), item.dist, at.build.alloc,
+      [&at](const Expr* expr) { return at.Expression(expr); });
 }
 
 // §37.34: a constraint ordering, reaching the expressions it solves before
@@ -209,6 +206,19 @@ VpiObject* VpiClassNameScope(const VpiObject* defn, VpiObject* outer,
     }
   }
   return scope;
+}
+
+VpiObject* VpiMakeDistribution(
+    VpiObject* weighted, const std::vector<ConstraintDistItem>& items,
+    const std::function<VpiObject*()>& alloc,
+    const std::function<VpiObject*(const Expr*)>& expression) {
+  VpiObject* dist = alloc();
+  dist->type = vpiDistribution;
+  Append(dist->children, weighted);
+  for (const ConstraintDistItem& entry : items) {
+    dist->children.push_back(DistItem(entry, dist, alloc, expression));
+  }
+  return dist;
 }
 
 VpiObject* VpiMakeConstraint(const ClassMember& block, VpiObject* holder,

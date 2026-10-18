@@ -306,6 +306,7 @@ constexpr const char* kSequenceOperators =
     "  i1: assert property (@(posedge clk) s(a) ##1 b);\n"
     "  i2: assert property (@(posedge clk) u);\n"
     "  e1: assert property (@(posedge clk) st.f ##1 b);\n"
+    "  x1: assert property (@(posedge clk) a dist {0 := 1, 1 := 3} ##1 b);\n"
     "  r1: assert property (@(posedge clk) a[*2] ##1 b);\n"
     "  r2: assert property (@(posedge clk) a[->1:2] ##1 b);\n"
     "  r3: assert property (@(posedge clk) a[=3] ##1 b);\n"
@@ -407,6 +408,22 @@ TEST_F(SequenceExprsOfARun, AMemberOperandIsNoSequenceInst) {
   const std::vector<vpiHandle> kParts = OperandsOf(chain);
   ASSERT_EQ(kParts.size(), 3u);
   EXPECT_NE(vpi_get(vpiType, kParts[0]), vpiSequenceInst);
+}
+
+// A Boolean operand written as a dist is a distribution, which the diagram
+// draws among the sequence exprs, reaching the expression it weights and a
+// dist item per entry of its list (§37.34), rather than an inside operation
+// (#7179).
+TEST_F(SequenceExprsOfARun, ADistOperandIsADistribution) {
+  vpiHandle chain = PropertyOf("x1");
+  EXPECT_EQ(OpOf(chain), vpiCycleDelayOp);
+  const std::vector<vpiHandle> kParts = OperandsOf(chain);
+  ASSERT_FALSE(kParts.empty());
+  EXPECT_EQ(vpi_get(vpiType, kParts[0]), vpiDistribution);
+  EXPECT_STREQ(vpi_get_str(vpiName, vpi_handle(vpiExpr, kParts[0])), "a");
+  const std::vector<vpiHandle> kEntries = ObjectsOf(vpiDistItem, kParts[0]);
+  ASSERT_EQ(kEntries.size(), 2u);
+  EXPECT_EQ(vpi_get(vpiDistType, kEntries[1]), vpiEqualDist);
 }
 
 // A repetition takes the sequence repeated and its bounds, the right only

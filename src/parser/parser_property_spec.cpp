@@ -429,7 +429,8 @@ Expr* ParserPropertySpecHelpers::RangeOfDistItem(
 // property an assume statement assumes hold the same with or without its
 // biasing, the weights only selecting among the values of a free
 // variable, which this tool leaves to the design; so a dist is read as the
-// inside expression over its items. A `default` item weights the values
+// inside expression over its items, with the items as written beside it for
+// §37.34's distribution. A `default` item weights the values
 // the other items leave out, which inside holds no range for, so a
 // dist_list writing one is not read.
 Expr* ParserPropertySpecHelpers::ParseExpressionOrDist(Parser& p) {
@@ -441,11 +442,14 @@ Expr* ParserPropertySpecHelpers::ParseExpressionOrDist(Parser& p) {
   inside->kind = ExprKind::kInside;
   inside->range.start = expr->range.start;
   inside->lhs = expr;
+  auto* items = p.arena_.Create<std::vector<ConstraintDistItem>>();
+  inside->dist_items = items;
   do {
     ConstraintDistItem item;
     if (!p.ParseDistItem(item) || item.is_default) return nullptr;
     inside->elements.push_back(item.is_range ? RangeOfDistItem(p, item)
                                              : item.value);
+    items->push_back(item);
   } while (p.Match(TokenKind::kComma));
   return p.Match(TokenKind::kRBrace) ? inside : nullptr;
 }

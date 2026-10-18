@@ -19,6 +19,7 @@ struct ClassMember;
 struct PropertyExprNode;
 struct DataType;
 struct EventExpr;
+struct ConstraintDistItem;
 
 enum class ExprKind : uint8_t {
   kIntegerLiteral,
@@ -153,6 +154,11 @@ struct Expr {
   // event, `$rose(req, @(posedge clk))`, that event, at whose ticks the
   // argument is sampled; nullptr where none is written.
   const std::vector<EventExpr>* sampled_clock = nullptr;
+  // §16.14.2 with §37.34: for the kInside an assertion's `expression dist {
+  // dist_list }` is read as, the dist_list as written, each item's weight and
+  // its := or :/ kept, which the inside's elements drop; nullptr for an inside
+  // written as one.
+  const std::vector<ConstraintDistItem>* dist_items = nullptr;
 
   // kTypeRef only: the data_type the node stands for, read by ParseDataType.
   // It is set on `type(data_type)`, whose text keeps only the type's name, so

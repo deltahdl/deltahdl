@@ -549,6 +549,32 @@ TEST_F(PropertyOperationsOfARun, AStrongSequenceReportsItsStrength) {
   EXPECT_EQ(vpi_get(vpiOpStrong, covered), 1);
 }
 
+// A disable iff condition written as a dist is a distribution (§16.12),
+// reaching the expression it weights and a dist item per entry of its list
+// with its weight's form (§37.34), rather than the inside operation the dist
+// is evaluated as (#7179).
+TEST_F(PropertyExprsOfARun, ADisableConditionWrittenAsADistIsADistribution) {
+  Run("module top; logic clk, a, b; logic [1:0] x;\n"
+      "  d1: assert property (@(posedge clk)\n"
+      "        disable iff (x dist {0 := 1, [1:3] :/ 2}) a |-> b);\n"
+      "endmodule\n");
+  vpiHandle assertion = Named(vpiAssertion, By("top"), "d1");
+  ASSERT_NE(assertion, nullptr);
+  vpiHandle spec = vpi_handle(vpiProperty, assertion);
+  ASSERT_NE(spec, nullptr);
+  vpiHandle dist = vpi_handle(vpiDisableCondition, spec);
+  ASSERT_NE(dist, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, dist), vpiDistribution);
+  EXPECT_STREQ(vpi_get_str(vpiName, vpi_handle(vpiExpr, dist)), "x");
+  const std::vector<vpiHandle> kEntries = ObjectsOf(vpiDistItem, dist);
+  ASSERT_EQ(kEntries.size(), 2u);
+  EXPECT_EQ(vpi_get(vpiDistType, kEntries[0]), vpiEqualDist);
+  EXPECT_EQ(vpi_get(vpiDistType, kEntries[1]), vpiDivDist);
+  EXPECT_EQ(vpi_get(vpiType, vpi_handle(vpiValueRange, kEntries[0])),
+            vpiConstant);
+  EXPECT_EQ(vpi_get(vpiType, vpi_handle(vpiValueRange, kEntries[1])), vpiRange);
+}
+
 // A property named inside a property expression is a property inst, reaching
 // its declaration and an argument per formal, rather than a func call
 // (§16.12) (#7180).

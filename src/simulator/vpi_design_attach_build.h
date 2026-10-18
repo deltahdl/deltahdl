@@ -21,6 +21,7 @@ class Arena;
 class SimContext;
 struct ClassDecl;
 struct ClassMember;
+struct ConstraintDistItem;
 struct DataType;
 struct EventExpr;
 enum class DataTypeKind : uint8_t;
@@ -905,6 +906,15 @@ struct VpiConstraintNames {
 VpiObject* VpiMakeConstraint(const ClassMember& block, VpiObject* holder,
                              const VpiConstraintNames& names,
                              const VpiAttachBuild& build);
+
+// §37.34 and §37.38: a distribution reaching `weighted`, the expression it
+// weights, and a dist item per entry of `items`, in order, each expression an
+// item writes built with `expression`: a constraint's dist and an assertion's
+// (§16.14.2) alike.
+VpiObject* VpiMakeDistribution(
+    VpiObject* weighted, const std::vector<ConstraintDistItem>& items,
+    const std::function<VpiObject*()>& alloc,
+    const std::function<VpiObject*(const Expr*)>& expression);
 
 // §37.7: give each interface instance a modport per modport its interface
 // declares, each with an io decl per port it gives a direction, and §37.13:

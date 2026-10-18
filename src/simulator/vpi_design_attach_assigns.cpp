@@ -375,6 +375,15 @@ VpiObject* ListOperationObject(const Expr* expr, const AssignBuild& build) {
                              Operands(expr->repeat_count, expr->elements),
                              build);
     case ExprKind::kInside:
+      // §37.34 with §16.14.2: an assertion's dist is a distribution, though
+      // the run evaluates it as the inside expression it was read into.
+      if (expr->dist_items != nullptr) {
+        return VpiMakeDistribution(ExpressionObject(expr->lhs, build),
+                                   *expr->dist_items, build.alloc,
+                                   [&build](const Expr* item) {
+                                     return ExpressionObject(item, build);
+                                   });
+      }
       return OperationObject(vpiInsideOp, Operands(expr->lhs, expr->elements),
                              build);
     default:
