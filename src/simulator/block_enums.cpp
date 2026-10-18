@@ -60,12 +60,18 @@ struct BlockEnumWalk {
   Arena& arena;
 
   // Registers the enumerations the typedef `td` declares, and makes its name
-  // stand for the one it declares at the top, if any, in `aliases`.
+  // stand for the one it declares at the top, if any, in `aliases`. §7.4.1
+  // with §7.4.4: that one is recorded as the declaration behind its key
+  // (SimContext::RegisterTypeDeclaration), where RecordPackedRange reads the
+  // dimensions after its body that make a variable of it an array of the
+  // enumeration, so `x[1]` selects one element.
   void RegisterTypedef(const ModuleItem* td, BlockEnumAliases& aliases) {
     ForEachEnumTypeOfItem(td, [&](std::string_view path, const DataType& t) {
       auto* key = arena.Create<std::string>(BlockEnumKey(td, path));
       if (ctx.FindEnumType(*key) == nullptr) Register(*key, t);
-      if (path.empty()) aliases[td->name] = *key;
+      if (!path.empty()) return;
+      aliases[td->name] = *key;
+      ctx.RegisterTypeDeclaration(*key, td);
     });
   }
 
@@ -120,10 +126,20 @@ struct BlockEnumWalk {
   // is. The key's width already holds the base type's range and the packed
   // dimensions after the body (§7.4.1), so the copy names the key with none
   // of its own: one left on it is a use-site dimension stacking on the key's
-  // width (§7.4.4), and `enum logic [2:0] {P, Q} [1:0] w` was 18 bits.
+  // width (§7.4.4), and `enum logic [2:0] {P, Q} [1:0] w` was 18 bits. The
+  // dimensions are read instead off a typedef of the enumeration recorded as
+  // the declaration behind the key, as RegisterTypedef records a block
+  // typedef's, so `w[1]` selects one element.
   void RegisterInlineEnum(const Stmt* s) {
     auto* key = arena.Create<std::string>(BlockVarEnumKey(s));
-    if (ctx.FindEnumType(*key) == nullptr) Register(*key, s->var_decl_type);
+    if (ctx.FindEnumType(*key) == nullptr) {
+      Register(*key, s->var_decl_type);
+      auto* item = arena.Create<ModuleItem>();
+      item->kind = ModuleItemKind::kTypedef;
+      item->name = *key;
+      item->typedef_type = s->var_decl_type;
+      ctx.RegisterTypeDeclaration(*key, item);
+    }
     auto* shaped = arena.Create<Stmt>(*s);
     shaped->var_decl_type.kind = DataTypeKind::kNamed;
     shaped->var_decl_type.type_name = *key;

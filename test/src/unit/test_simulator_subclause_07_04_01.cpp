@@ -225,4 +225,29 @@ TEST(PackedArraySimulation, AggregateWithDimsAfterItsBodyIsAnArrayOfIt) {
   EXPECT_EQ(out, "64 00000000abcd0000 abcd\n24 11\n");
 }
 
+// §7.4.1 with §7.4.4: an enumeration with packed dimensions after its body,
+// declared inside a procedural block through a typedef or inline, is a packed
+// array of it, so an index selects one whole enumeration; a block's plain
+// enumeration with a base range is still indexed by bit (#7318).
+TEST(PackedArraySimulation, BlockEnumArrayIsIndexedByElement) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  initial begin\n"
+      "    typedef enum bit [1:0] {A, B, C} [1:0] e_t;\n"
+      "    e_t x;\n"
+      "    enum logic [2:0] {P, Q} [1:0] w;\n"
+      "    enum logic [2:0] {R, S} y;\n"
+      "    x[1] = C;\n"
+      "    x[0] = B;\n"
+      "    w[1] = Q;\n"
+      "    w[0] = P;\n"
+      "    y = S;\n"
+      "    $display(\"%b %b %b %b %b\", x, x[1], w, w[1], y[0]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1001 10 001000 001 1\n");
+}
+
 }  // namespace
