@@ -150,14 +150,14 @@ TEST_F(ScopesOfARun, AClassMethodReachesTheStatementOfItsBody) {
       "module top;\n"
       "  class C;\n"
       "    int n;\n"
-      "    task inside; n = 1; n = 2; endtask\n"
+      "    task within; n = 1; n = 2; endtask\n"
       "    extern task outside();\n"
       "  endclass\n"
       "  task C::outside(); n = 3; endtask\n"
       "endmodule\n");
   vpiHandle c = Named(vpiClassDefn, By("top"), "C");
   ASSERT_NE(c, nullptr);
-  EXPECT_EQ(StmtKindOf(Named(vpiTaskFunc, c, "inside")), vpiBegin);
+  EXPECT_EQ(StmtKindOf(Named(vpiTaskFunc, c, "within")), vpiBegin);
   EXPECT_EQ(StmtKindOf(Named(vpiTaskFunc, c, "outside")), vpiAssignment);
   vpiHandle p = Named(vpiClassDefn, By("pk"), "P");
   ASSERT_NE(p, nullptr);
