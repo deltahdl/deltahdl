@@ -714,5 +714,47 @@ TEST_F(TypespecsOfARun, EnumsAliasesAndClassesReachWhatTheyStandFor) {
                                   Named(vpiClassDefn, top, "C")));
 }
 
+// Detail 5: a member whose type is a structure written in place reaches an
+// unnamed typespec of that structure, packed as it was declared, whose own
+// members reach their types in turn.
+TEST_F(TypespecsOfARun, AMemberWrittenAsAStructureReachesItsOwnTypespec) {
+  Run("module top;\n"
+      "  typedef struct { struct packed { bit [1:0] lo; logic hi; } inner;\n"
+      "                   int x; } n_t;\n"
+      "endmodule\n");
+  vpiHandle n = Named(vpiTypedef, By("top"), "n_t");
+  ASSERT_NE(n, nullptr);
+  vpiHandle inner =
+      vpi_handle(vpiTypespec, Named(vpiTypespecMember, n, "inner"));
+  ASSERT_NE(inner, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, inner), vpiStructTypespec);
+  EXPECT_EQ(vpi_get(vpiPacked, inner), 1);
+  EXPECT_EQ(vpi_get_str(vpiName, inner), nullptr);
+  EXPECT_EQ(NamesOf(vpiTypespecMember, inner),
+            (std::vector<std::string>{"hi", "lo"}));
+  EXPECT_EQ(RangeSizesOf(
+                vpi_handle(vpiTypespec, Named(vpiTypespecMember, inner, "lo"))),
+            (std::vector<int>{2}));
+  EXPECT_EQ(KindReached(vpiTypespec, Named(vpiTypespecMember, n, "x")),
+            vpiIntTypespec);
+}
+
+// A typedef of a type the run draws no typespec for, a virtual interface's
+// until #7120 gives it one, written plain or with unpacked dimensions of its
+// own, hangs nothing from its scope, and the typedefs declared after it still
+// reach theirs.
+TEST_F(TypespecsOfARun, ATypedefWithNoTypespecLeavesTheOthersInPlace) {
+  Run("interface bus_a; endinterface\n"
+      "module top;\n"
+      "  typedef virtual bus_a vbus; typedef virtual bus_a vbus_arr [2];\n"
+      "  typedef bit [2:0] tri_t [4];\n"
+      "endmodule\n");
+  vpiHandle tri = Named(vpiTypedef, By("top"), "tri_t");
+  ASSERT_NE(tri, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, tri), vpiArrayTypespec);
+  EXPECT_EQ(RangeSizesOf(tri), (std::vector<int>{4}));
+  EXPECT_EQ(KindReached(vpiElemTypespec, tri), vpiBitTypespec);
+}
+
 }  // namespace
 }  // namespace delta
