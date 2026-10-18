@@ -625,4 +625,21 @@ TEST(EnumerationElaboration, AnEnumArraysConstantOutsideItsBaseIsReported) {
                             2, "6.19"));
 }
 
+// §6.19: an enumeration array whose base is 64 bits wide gives its constants
+// the whole unsigned 64-bit range, and a literal written at the base's width
+// matches it rather than the 128 bits of the array.
+TEST(EnumerationElaboration, AnEnumArrayOfA64BitBaseTakesItsWholeRange) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  enum bit [63:0] {A, B = 64'h1_0000_0000} [1:0] v;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+  const auto* b = FindVar(design, "m", "B");
+  ASSERT_NE(b, nullptr);
+  EXPECT_EQ(b->width, 64u);
+}
+
 }  // namespace
