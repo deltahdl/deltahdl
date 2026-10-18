@@ -294,6 +294,10 @@ struct Stmt {
   // default clocking or the procedure, rather than written, which §37.50
   // reports as vpiIsClockInferred.
   bool assert_clock_inferred = false;
+  // §16.16 (a) and §16.14.6: whether the clock inferred is the default
+  // clocking's rather than the procedure's, so that the default clocking block
+  // is the one clocking the assertion (§37.49).
+  bool assert_clock_from_default_clocking = false;
   // §16.12.1 and §37.50: the instance of a declared property the spec of a
   // concurrent assertion embedded in procedural code is, kept by the
   // elaborator where it substitutes the property's body; null for any other.

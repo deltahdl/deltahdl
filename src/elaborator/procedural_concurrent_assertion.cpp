@@ -339,6 +339,10 @@ void ResolveProceduralAssertions(const std::vector<Stmt*>& assertions,
     PromoteSequenceInstances(stmt->assert_property, registry, arena);
     if (!TakesInferredClock(stmt, inferred, registry, diag)) continue;
     ResolveProceduralClock(stmt, at_instance.clock, registry, diag);
+    // §16.14.6: a procedure that gives no clock leaves the default clocking's
+    // to be inferred.
+    stmt->assert_clock_from_default_clocking =
+        stmt->assert_clock_inferred && inferred.empty();
   }
 }
 

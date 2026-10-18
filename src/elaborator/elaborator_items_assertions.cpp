@@ -620,6 +620,8 @@ void Elaborator::ResolveStaticAssertionClock(
   if (item->sensitivity.empty()) {
     item->sensitivity = default_clock;
     item->body->assert_clock_inferred = !default_clock.empty();
+    item->body->assert_clock_from_default_clocking =
+        item->body->assert_clock_inferred;
   }
   if (item->sensitivity.empty()) {
     diag_.Error(item->loc,
@@ -700,6 +702,7 @@ static void ElaborateRestrictPropertyItem(ModuleItem* item,
   if (item->sensitivity.empty()) {
     item->sensitivity = kInferred.clock;
     body->assert_clock_inferred = !kInferred.clock.empty();
+    body->assert_clock_from_default_clocking = body->assert_clock_inferred;
   }
   if (body->assert_clock.empty()) body->assert_clock = item->sensitivity;
 }

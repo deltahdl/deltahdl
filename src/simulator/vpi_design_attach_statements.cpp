@@ -504,13 +504,11 @@ bool NamesClockingBlock(const std::vector<EventExpr>& clock,
 
 // §37.49 with §39.3.2: the clocking block that clocks the assertion `obj` on
 // `property`'s clock, the nearest from the scope it stands in outward: the
-// block its clock names (§14.13), or, for an assertion written as an item
-// whose clock was inferred, the default clocking it was inferred from (§16.16
-// (a)). A procedural assertion's inferred clock may be its procedure's
-// (§16.14.6), which no block gives. Null where no block clocks it.
+// block its clock names (§14.13), or the default clocking where its clock was
+// inferred from one (§16.16 (a), §16.14.6). Null where no block clocks it, as
+// where its clock is a procedure's.
 VpiObject* ClockingBlockClocking(const VpiObject* obj, const Stmt& property) {
-  const bool kFromDefault =
-      property.assert_clock_inferred && !property.is_procedural_concurrent;
+  const bool kFromDefault = property.assert_clock_from_default_clocking;
   for (const VpiObject* at = obj->parent; at != nullptr; at = at->parent) {
     for (VpiObject* child : at->children) {
       if (child->type != vpiClockingBlock) continue;

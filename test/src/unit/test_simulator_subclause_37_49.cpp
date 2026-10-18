@@ -335,9 +335,10 @@ TEST_F(AssertionsOfARun,
 // An assertion reaches the clocking block that clocks it (§39.3.2): the
 // default clocking whose event it takes where it writes no clock (§16.16
 // (a)), a generate block's assertion among them, and the block it names as
-// its clocking event (§14.13), in a procedure too. One clocked by an event
+// its clocking event (§14.13), in a procedure too, and the default clocking
+// a procedure giving no clock leaves it (§16.14.6). One clocked by an event
 // of no block reaches none, though a default clocking stands in its scope,
-// and so does one taking its procedure's clock (§16.14.6) (#7176).
+// and so does one taking its procedure's clock (#7176, #7331).
 TEST_F(AssertionsOfARun, AnAssertionReachesTheClockingBlockClockingIt) {
   Run("module top; logic clk, a; logic [1:0] v;\n"
       "  clocking other @(posedge clk); endclocking\n"
@@ -355,6 +356,7 @@ TEST_F(AssertionsOfARun, AnAssertionReachesTheClockingBlockClockingIt) {
       "    p1: assert property (a);\n"
       "    p2: assert property (@(other) a);\n"
       "  end\n"
+      "  initial p3: assert property (a);\n"
       "endmodule\n");
   vpiHandle top = By("top");
   ASSERT_NE(top, nullptr);
@@ -372,6 +374,7 @@ TEST_F(AssertionsOfARun, AnAssertionReachesTheClockingBlockClockingIt) {
   EXPECT_EQ(kBlockOf(Named(vpiAssertion, By("top.g[0]"), "a4")), "cb");
   EXPECT_EQ(kBlockOf(Named(vpiAssertion, top, "p1")), "");
   EXPECT_EQ(kBlockOf(Named(vpiAssertion, top, "p2")), "other");
+  EXPECT_EQ(kBlockOf(Named(vpiAssertion, top, "p3")), "cb");
 }
 
 }  // namespace
