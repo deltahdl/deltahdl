@@ -176,16 +176,5 @@ TEST_F(InterfaceTfDeclOfARun, AnInterfaceReachesADeclPerDefinitionOfItsTfs) {
   EXPECT_EQ(AccessOf(iface, "Wait"), std::vector<int>{vpiForkJoinAcc});
 }
 
-// §37.6 with §25.7.4: an interface standing as the design's top has no module
-// connected to it, so its extern forkjoin task is one decl reaching no task.
-TEST_F(InterfaceTfDeclOfARun, AnUnconnectedInterfaceReachesADeclOfNoTask) {
-  Run("interface solo; extern forkjoin task Ping(); endinterface\n");
-  vpiHandle iface = By("solo");
-  ASSERT_NE(iface, nullptr);
-  EXPECT_EQ(DefinitionsOf(iface, "Ping", vpiTask),
-            std::vector<std::string>{""});
-  EXPECT_EQ(AccessOf(iface, "Ping"), std::vector<int>{vpiForkJoinAcc});
-}
-
 }  // namespace
 }  // namespace delta

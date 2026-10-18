@@ -60,15 +60,16 @@ void MakeTfDecl(const TfDeclScope& scope, std::string_view name, int access,
 
 // §25.7.4 with §37.8 detail 1: a decl per definition the connected modules
 // give the extern forkjoin task `name`, and one reaching none where they give
-// none.
+// none. Lowering the instance declared the task under the instance's key
+// (RegisterInstanceSubroutines), so the run holds a list for it.
 void MakeForkjoinDecls(const TfDeclScope& scope, std::string_view name) {
-  const std::vector<std::string_view>* defs =
-      scope.ctx.FindForkjoinTask(scope.key_prefix + std::string(name));
-  if (defs == nullptr || defs->empty()) {
+  const std::vector<std::string_view>& defs =
+      *scope.ctx.FindForkjoinTask(scope.key_prefix + std::string(name));
+  if (defs.empty()) {
     MakeTfDecl(scope, name, vpiForkJoinAcc, nullptr);
     return;
   }
-  for (std::string_view own : *defs) {
+  for (std::string_view own : defs) {
     MakeTfDecl(
         scope, name, vpiForkJoinAcc,
         DefinitionAt(scope, scope.ctx.FindGenBlockSubroutineScope(own), name));
@@ -117,10 +118,10 @@ void AttachInterfaceTfDecls(const RtlirDesign* design,
   WalkInstanceObjects(
       design, objects,
       [&](const RtlirModule* mod, const std::string& prefix, VpiObject* iface) {
+        // The design's tops are its uninstantiated modules and programs
+        // (§23.3.1, §24.3), so every interface stands under an instance path.
         if (!mod->is_interface) return;
-        MakeInterfaceTfDecls(
-            {iface, prefix.empty() ? "" : prefix + ".", made, ctx, build},
-            *mod);
+        MakeInterfaceTfDecls({iface, prefix + ".", made, ctx, build}, *mod);
       });
 }
 
