@@ -235,17 +235,17 @@ VpiObject* StructurePattern(const Expr& pattern, VpiObject* parent,
   op->type = vpiOperation;
   op->op_type = vpiAssignmentPatternOp;
   op->parent = parent;
-  const std::vector<VpiObject*>& kMembers = MembersOf(typespec);
+  const std::vector<VpiObject*>& members = MembersOf(typespec);
   if (pattern.pattern_keys.empty()) {
     for (std::size_t i = 0; i < pattern.elements.size(); ++i) {
-      AddChild(op, PatternObject(
-                       pattern.elements[i], op,
-                       TypespecOf(i < kMembers.size() ? kMembers[i] : nullptr),
-                       with));
+      AddChild(
+          op, PatternObject(
+                  pattern.elements[i], op,
+                  TypespecOf(i < members.size() ? members[i] : nullptr), with));
     }
     return op;
   }
-  for (const VpiObject* member : kMembers) {
+  for (const VpiObject* member : members) {
     VpiObject* struct_pattern = with.build.alloc();
     struct_pattern->type = vpiStructPattern;
     struct_pattern->parent = op;
@@ -264,10 +264,10 @@ VpiObject* StructurePattern(const Expr& pattern, VpiObject* parent,
 // union typespec `typespec`; null where it has no such member or the member
 // no typespec.
 VpiObject* MemberTypespec(const VpiObject* typespec, std::string_view name) {
-  const std::vector<VpiObject*>& kMembers = MembersOf(typespec);
+  const std::vector<VpiObject*>& members = MembersOf(typespec);
   const auto kMember = std::ranges::find_if(
-      kMembers, [name](const VpiObject* m) { return m->name == name; });
-  return kMember != kMembers.end() ? TypespecOf(*kMember) : nullptr;
+      members, [name](const VpiObject* m) { return m->name == name; });
+  return kMember != members.end() ? TypespecOf(*kMember) : nullptr;
 }
 
 // §37.72: the object the pattern `pattern` of a case matches item stands as,
@@ -314,7 +314,7 @@ void FillCase(VpiObject* obj, const Stmt& stmt, const VpiStmtBuild& with) {
   VpiObject* condition = with.expression(stmt.condition);
   AddChild(obj, condition);
   // §37.72: a pattern matches a value of the type the expression is of.
-  const VpiObject* kTypespec = TypespecOf(condition);
+  const VpiObject* case_typespec = TypespecOf(condition);
   for (const CaseItem& item : stmt.case_items) {
     VpiObject* made = with.build.alloc();
     made->type = vpiCaseItem;
@@ -324,7 +324,7 @@ void FillCase(VpiObject* obj, const Stmt& stmt, const VpiStmtBuild& with) {
     obj->children.push_back(made);
     for (const Expr* pattern : item.patterns) {
       AddChild(made, stmt.case_matches
-                         ? PatternObject(pattern, made, kTypespec, with)
+                         ? PatternObject(pattern, made, case_typespec, with)
                          : with.expression(pattern));
     }
     with.statement(item.body, made);
