@@ -187,7 +187,9 @@ class ParserPropertyGrammar::Scan {
   bool Spec() {
     if (p_.Check(TokenKind::kAt) && !ClockingEvent()) return false;
     if (p_.Match(TokenKind::kKwDisable) && !DisableIff()) return false;
-    return Chain(sequence_) && (p_.Check(TokenKind::kRParen) || Fail());
+    if (!Chain(sequence_)) return false;
+    if (p_.Check(TokenKind::kRParen)) return true;
+    return Fail();
   }
 
   void Report() const {
@@ -207,12 +209,19 @@ class ParserPropertyGrammar::Scan {
 
   bool Fail() { return FailAt(p_.CurrentToken().loc); }
 
+  // Reads the current token where it is `kind`; notes a failure where it is
+  // not.
+  bool Expect(TokenKind kind) {
+    if (p_.Match(kind)) return true;
+    return Fail();
+  }
+
   // Whether nothing read since the suppressed errors numbered `errors` was
   // reported, noting where the last report stood where something was: a
   // reading reports where it broke off, and may have gone past it.
   bool Clean(uint32_t errors) {
-    return p_.diag_.SuppressedErrorCount() == errors ||
-           FailAt(p_.diag_.LastSuppressedErrorLoc());
+    if (p_.diag_.SuppressedErrorCount() == errors) return true;
+    return FailAt(p_.diag_.LastSuppressedErrorLoc());
   }
 
   // The expression `reading` reads from the current token, or null where it
@@ -239,16 +248,13 @@ class ParserPropertyGrammar::Scan {
   bool Expression(Reading reading) { return Read(reading) != nullptr; }
 
   // `disable iff ( expression_or_dist )`, its `disable` read.
-  bool DisableIff() {
-    return (p_.Match(TokenKind::kKwIff) || Fail()) && Condition();
-  }
+  bool DisableIff() { return Expect(TokenKind::kKwIff) && Condition(); }
 
   // `( expression_or_dist )`, the condition of an if, a case, an abort and
   // a disable.
   bool Condition() {
     if (!p_.Match(TokenKind::kLParen)) return Fail();
-    return Expression(Reading::kExpressionOrDist) &&
-           (p_.Match(TokenKind::kRParen) || Fail());
+    return Expression(Reading::kExpressionOrDist) && Expect(TokenKind::kRParen);
   }
 
   // An operand and every operand the chain's binary operators and cycle
@@ -318,10 +324,12 @@ class ParserPropertyGrammar::Scan {
 
   bool AtOperandEnd() {
     const TokenKind kKind = p_.CurrentToken().kind;
-    return IsJoin(kKind, false) || AtRepetition() ||
-           std::find(kOperandEnds.begin(), kOperandEnds.end(), kKind) !=
-               kOperandEnds.end() ||
-           Fail();
+    if (IsJoin(kKind, false) || AtRepetition() ||
+        std::find(kOperandEnds.begin(), kOperandEnds.end(), kKind) !=
+            kOperandEnds.end()) {
+      return true;
+    }
+    return Fail();
   }
 
   // `( chain )`, with the sequence_match_items after the chain where
@@ -332,7 +340,7 @@ class ParserPropertyGrammar::Scan {
     while (match_items && p_.Match(TokenKind::kComma)) {
       if (!MatchItem()) return false;
     }
-    return p_.Match(TokenKind::kRParen) || Fail();
+    return Expect(TokenKind::kRParen);
   }
 
   // §16.10 and §16.11: an operator_assignment, an inc_or_dec_expression or
@@ -345,7 +353,8 @@ class ParserPropertyGrammar::Scan {
       p_.Consume();
       return Expression(Reading::kExpression);
     }
-    return IsMatchItemExpr(*item) || Fail();
+    if (IsMatchItemExpr(*item)) return true;
+    return Fail();
   }
 
   // §16.8 and §16.12: a sequence_instance or a property_instance, a name,
@@ -359,7 +368,7 @@ class ParserPropertyGrammar::Scan {
     do {
       if (!ActualArg()) return false;
     } while (p_.Match(TokenKind::kComma));
-    return p_.Match(TokenKind::kRParen) || Fail();
+    return Expect(TokenKind::kRParen);
   }
 
   // One actual argument: none, `.name ( [actual] )`, `$`, an
@@ -383,7 +392,7 @@ class ParserPropertyGrammar::Scan {
     if (!p_.Match(TokenKind::kIdentifier) || !p_.Match(TokenKind::kLParen)) {
       return Fail();
     }
-    return ActualArg() && (p_.Match(TokenKind::kRParen) || Fail());
+    return ActualArg() && Expect(TokenKind::kRParen);
   }
 
   // §9.4.2: `edge expression [iff expression]`, and the event_expressions
@@ -415,7 +424,7 @@ class ParserPropertyGrammar::Scan {
     do {
       if (!Expression(Reading::kExpressionOrDist)) return false;
     } while (p_.Match(TokenKind::kComma));
-    return p_.Match(TokenKind::kColon) || Fail();
+    return Expect(TokenKind::kColon);
   }
 
   // §9.4.2 and §16.5: `@ identifier` or `@ ( event_expression )`.
@@ -425,7 +434,7 @@ class ParserPropertyGrammar::Scan {
     if (p_.Match(TokenKind::kLParen)) {
       p_.ParseEventList();
       if (!Clean(kErrors)) return false;
-      return p_.Match(TokenKind::kRParen) || Fail();
+      return Expect(TokenKind::kRParen);
     }
     p_.ParseNamedClockingEvent();
     return Clean(kErrors);
@@ -437,7 +446,7 @@ class ParserPropertyGrammar::Scan {
     p_.Consume();
     if (!p_.Match(TokenKind::kLBracket)) return Expression(Reading::kPrimary);
     if (p_.Match(TokenKind::kStar) || p_.Match(TokenKind::kPlus)) {
-      return p_.Match(TokenKind::kRBracket) || Fail();
+      return Expect(TokenKind::kRBracket);
     }
     return BracketBody(Bounds::kRange, true);
   }
@@ -458,7 +467,7 @@ class ParserPropertyGrammar::Scan {
     if (!AtRepetition()) return true;
     p_.Consume();
     if (p_.Match(TokenKind::kPlus)) {
-      return p_.Match(TokenKind::kRBracket) || Fail();
+      return Expect(TokenKind::kRBracket);
     }
     if (p_.Match(TokenKind::kStar)) {
       return p_.Match(TokenKind::kRBracket) ||
@@ -483,7 +492,7 @@ class ParserPropertyGrammar::Scan {
     } else if (bounds == Bounds::kRange) {
       return Fail();
     }
-    return p_.Match(TokenKind::kRBracket) || Fail();
+    return Expect(TokenKind::kRBracket);
   }
 
   bool RangeEnd(bool dollar) {

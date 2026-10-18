@@ -70,6 +70,7 @@ TEST(PropertySpecGrammar, AWellWrittenConstructIsReadPast) {
           {"first_match(a ##1 b, x = 1) ##1\nc dist zz", 3},
           {"if (a) b else c ##1\nd dist zz", 3},
           {"(if (a) b) ##1\nc dist zz", 3},
+          {"(if (a) b else c) ##1\nd dist zz", 3},
           {"(case (s) 1, 2: a; default: b; endcase) ##1\nc dist zz", 3},
           {"(a, x = 1, y += 2, z++, ++w, --v, $display(\"m\"), f(q)) ##1\n"
            "b dist zz",
@@ -126,6 +127,7 @@ TEST(PropertySpecGrammar, ABrokenPrefixOperatorIsReportedWhereItBreaks) {
                         {"case (s)\n] endcase ##1\nb dist zz", 3},
                         {"case (s) 1\n; endcase ##1\nb dist zz", 3},
                         {"case (s) 1:\n] endcase ##1\nb dist zz", 3},
+                        {"case (s) 1: a;\n] endcase ##1\nb dist zz", 3},
                         {"(case (s) 1: a\n) ##1\nb dist zz", 3},
                     });
 }
@@ -160,6 +162,7 @@ TEST(PropertySpecGrammar, ABrokenOperandIsReportedWhereItBreaks) {
                         {"s(.p(a ##1 b\n; c)) ##1\nd dist zz", 3},
                         {"s(posedge\n]) ##1\nc dist zz", 3},
                         {"s(posedge clk iff\n]) ##1\nc dist zz", 3},
+                        {"s(posedge clk or\n]) ##1\nc dist zz", 3},
                     });
 }
 
