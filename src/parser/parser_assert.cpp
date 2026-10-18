@@ -10,6 +10,7 @@
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 #include "parser/parser.h"
+#include "parser/parser_property_grammar.h"
 #include "parser/parser_property_spec_internal.h"
 
 namespace delta {
@@ -159,7 +160,8 @@ Stmt* Parser::ParseProceduralConcurrentAssertLike(StmtKind kind) {
   }
   bool sequence = Match(TokenKind::kKwSequence);
   if (!sequence) Expect(TokenKind::kKwProperty, Subclause("16.14.6"));
-  Stmt* stmt = ParseProceduralPropertySpec(kind, loc, Subclause("16.14.6"));
+  Stmt* stmt =
+      ParseProceduralPropertySpec(kind, loc, Subclause("16.14.6"), sequence);
   stmt->cover_sequence = sequence;
   ParserAssertHelpers::ParseActionBlock(*this, stmt);
   return stmt;
@@ -169,9 +171,12 @@ Stmt* Parser::ParseProceduralConcurrentAssertLike(StmtKind kind) {
 // procedural code, an expect statement's among them (§16.17), read as a
 // static one's is into a statement of `kind` standing at `loc`, its
 // leading clocking event on the statement; a spec beyond the forms this
-// tool evaluates is skipped and the statement left with no property.
+// tool evaluates is skipped and the statement left with no property,
+// reported as a spec the grammar does not admit where it is none and as
+// one not evaluated otherwise. `sequence` marks a cover sequence's spec, a
+// sequence_expr after the clock and the disable condition.
 Stmt* Parser::ParseProceduralPropertySpec(StmtKind kind, SourceLoc loc,
-                                          Subclause subclause) {
+                                          Subclause subclause, bool sequence) {
   auto* spec = arena_.Create<ModuleItem>();
   spec->loc = loc;
   Expect(TokenKind::kLParen, subclause);
@@ -183,11 +188,13 @@ Stmt* Parser::ParseProceduralPropertySpec(StmtKind kind, SourceLoc loc,
     stmt = arena_.Create<Stmt>();
     stmt->kind = kind;
     stmt->range.start = spec->loc;
-    diag_.Warning(spec->loc,
-                  "procedural concurrent assertion is not evaluated: its "
-                  "property_spec holds more than the forms this tool "
-                  "evaluates",
-                  Subclause("16.14.6"));
+    if (ParserPropertyGrammar::CheckPropertySpec(*this, sequence)) {
+      diag_.Warning(spec->loc,
+                    "procedural concurrent assertion is not evaluated: its "
+                    "property_spec holds more than the forms this tool "
+                    "evaluates",
+                    Subclause("16.14.6"));
+    }
     SkipBalancedPropertySpec(lexer_);
   }
   stmt->is_procedural_concurrent = true;
@@ -298,10 +305,10 @@ ModuleItem* Parser::ParseDeferredImmediateItem(SourceLoc loc, StmtKind kind) {
 // implication operators |-> and |=>, so they must be detected here. The lexer
 // position is left unchanged.
 //
-// The scan runs from the token after the leading clock when
-// TryParseSimpleConcurrentProperty calls it, and from the first token of the
-// property_spec when WarnUnevaluatedConcurrentAssertion does. Both are correct
-// because the depth count treats the clocking event's own parentheses like any
+// The scan runs from the token after the leading clock and disable condition
+// when ParserPropertySpecHelpers::ParseSimpleSpecBody calls it for
+// TryParseSimpleConcurrentProperty. A clocking event written further in is
+// read correctly because the depth count treats its parentheses like any
 // other pair: `@ ( posedge clk )` raises the depth to 1 and returns it to 0,
 // leaving the scan to stop on the property_spec's own closing parenthesis.
 // From the body of a named property declaration, where
@@ -333,7 +340,7 @@ bool Parser::BodyHasTemporalOperator() {
 }
 
 // Reports that a concurrent assertion statement the source wrote will not be
-// evaluated, naming which of the reasons below applies.
+// evaluated.
 //
 // §16.14 states the rule the report rests on: a property is checked only when
 // an assertion statement (§16.2) uses it, and never by itself. A source that
@@ -348,40 +355,25 @@ bool Parser::BodyHasTemporalOperator() {
 //
 // This states a limit of this implementation and not a rule the source breaks,
 // which is why it is a warning rather than an error, and why it is removable:
-// #2923 makes assert and assume evaluate, and #2924 and #2927 add the property
-// operators. Each branch below is deleted with the branch that discarded the
-// form it names, and the whole function goes when the last of them does.
+// it goes when the evaluation reads every spec the grammar admits. A spec the
+// grammar does not admit is reported as the error it is by
+// ParserPropertyGrammar::CheckPropertySpec, which each caller asks first.
 //
-// Every caller stands at the first token of the property_spec, which is what
-// lets BodyHasTemporalOperator and the '@' test read the spec this reports on:
-// TryParseSimpleConcurrentProperty restores the lexer when it fails, and the
-// cover and restrict statements never attempt it.
+// The reason it gives is that the spec holds more than the evaluation reads.
+// A spec using |->, |=> or ## has no reason of its own, for the sequence and
+// property parses read every well-formed spec holding one of them, so none
+// reaches here.
 void Parser::WarnUnevaluatedConcurrentAssertion(SourceLoc loc) {
   // Named as §16.14 Syntax 16-18 writes the statement, so the report quotes
   // the source back rather than an internal enumerator name. An assert,
   // assume, cover property or cover sequence statement has the clocked
-  // path, and one of the reasons below says why its spec missed it. A
-  // restrict property never reaches here: §16.2 and §16.14.4 have a
+  // path. A restrict property never reaches here: §16.2 and §16.14.4 have a
   // simulator not check it, so its going unevaluated is the standard's rule
   // rather than this tool's gap.
-  // The spec, with a clocking event or, §16.16 (a), without, was not read
-  // into a body the evaluation reads; a spec with no clock at all is left to
-  // the elaborator, which has the default clocking, so no reason here names
-  // the clock.
-  std::string reason;
-  if (BodyHasTemporalOperator()) {
-    // Reason one: the property is temporal and holds what the evaluation
-    // does not read. #2924 and #2927 cover the operators.
-    reason =
-        "its property is temporal, using |->, |=> or ##, and this tool "
-        "evaluates only a boolean property";
-  } else {
-    // Reason two: the boolean did not consume the rest of the spec.
-    reason =
-        "its property_spec holds more than the @(event) boolean_expression "
-        "this tool evaluates";
-  }
-  diag_.Warning(loc, "concurrent assertion is not evaluated: " + reason,
+  diag_.Warning(loc,
+                "concurrent assertion is not evaluated: its property_spec "
+                "holds more than the @(event) boolean_expression this tool "
+                "evaluates",
                 Subclause("16.14"));
 }
 
@@ -541,8 +533,10 @@ ModuleItem* Parser::ParsePropertyAssertLike(ModuleItemKind kind,
   bool simple_concurrent = ReadStaticPropertySpec(item, body_kind);
   if (!simple_concurrent && item->prop_instance_name.empty()) {
     // Before SkipPropertySpec, which moves the lexer off the property_spec the
-    // reason is read from.
-    WarnUnevaluatedConcurrentAssertion(item->loc);
+    // grammar is checked on.
+    if (ParserPropertyGrammar::CheckPropertySpec(*this, false)) {
+      WarnUnevaluatedConcurrentAssertion(item->loc);
+    }
     item->assert_expr = SkipPropertySpec(arena_, lexer_, CurrentLoc());
   }
   Expect(TokenKind::kRParen, Subclause("16.14"));
@@ -628,7 +622,10 @@ ModuleItem* Parser::ParseCoverProperty() {
   bool simple_concurrent =
       ReadStaticPropertySpec(item, StmtKind::kCoverImmediate);
   if (!simple_concurrent && item->prop_instance_name.empty()) {
-    WarnUnevaluatedConcurrentAssertion(item->loc);
+    if (ParserPropertyGrammar::CheckPropertySpec(
+            *this, item->kind == ModuleItemKind::kCoverSequence)) {
+      WarnUnevaluatedConcurrentAssertion(item->loc);
+    }
     item->assert_expr = SkipPropertySpec(arena_, lexer_, CurrentLoc());
   }
   Expect(TokenKind::kRParen, Subclause("16.14.3"));
@@ -693,9 +690,12 @@ ModuleItem* Parser::ParseRestrictProperty() {
   // is skipped without the §16.14 non-evaluation report the other concurrent
   // assertions draw when this tool cannot evaluate them: here, not evaluating
   // is the rule. The forms read are kept, for §37.50 reaches the clock and the
-  // property spec of a restrict as of any concurrent assertion.
+  // property spec of a restrict as of any concurrent assertion. A spec the
+  // grammar does not admit is reported all the same, for it is no
+  // restrict_property_statement at all.
   if (!ReadStaticPropertySpec(item, StmtKind::kAssumeImmediate) &&
       item->prop_instance_name.empty()) {
+    ParserPropertyGrammar::CheckPropertySpec(*this, false);
     item->assert_expr = SkipPropertySpec(arena_, lexer_, CurrentLoc());
   }
   Expect(TokenKind::kRParen, Subclause("16.14.4"));
@@ -710,8 +710,8 @@ ModuleItem* Parser::ParseRestrictProperty() {
 Stmt* Parser::ParseExpectStmt() {
   SourceLoc loc = CurrentLoc();
   Expect(TokenKind::kKwExpect, Subclause("16.17"));
-  Stmt* stmt =
-      ParseProceduralPropertySpec(StmtKind::kExpect, loc, Subclause("16.17"));
+  Stmt* stmt = ParseProceduralPropertySpec(StmtKind::kExpect, loc,
+                                           Subclause("16.17"), false);
   ParserAssertHelpers::ParseActionBlock(*this, stmt);
   stmt->range.end = CurrentLoc();
   return stmt;

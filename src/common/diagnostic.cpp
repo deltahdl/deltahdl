@@ -38,7 +38,10 @@ void DiagEngine::ErrorOnce(SourceLoc loc, std::string msg,
 void DiagEngine::Emit(DiagSeverity sev, SourceLoc loc, std::string msg,
                       Subclause subclause) {
   if (suppress_depth_ > 0) {
-    if (sev == DiagSeverity::kError) ++suppressed_error_count_;
+    if (sev == DiagSeverity::kError) {
+      ++suppressed_error_count_;
+      last_suppressed_error_loc_ = loc;
+    }
     return;
   }
   if (sev == DiagSeverity::kError) {

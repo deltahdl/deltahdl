@@ -85,6 +85,7 @@ class Parser {
   friend struct ParserDpiHelpers;
   friend struct ParserAssertHelpers;
   friend struct ParserPropertySpecHelpers;
+  friend struct ParserPropertyGrammar;
   friend struct ParserSeqLinearHelpers;
   friend struct ParserClassHelpers;
   friend struct ParserConstraintItemHelpers;
@@ -682,7 +683,7 @@ class Parser {
 
   Stmt* ParseProceduralConcurrentAssertLike(StmtKind kind);
   Stmt* ParseProceduralPropertySpec(StmtKind kind, SourceLoc loc,
-                                    Subclause subclause);
+                                    Subclause subclause, bool sequence);
   ModuleItem* ParseDeferredImmediateItem(SourceLoc loc, StmtKind kind);
   Stmt* ParseExpectStmt();
   Stmt* ParseImmediateCover();

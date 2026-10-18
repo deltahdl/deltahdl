@@ -109,6 +109,11 @@ class DiagEngine {
   // after to learn whether the text it read was well formed, the report
   // itself being discarded.
   uint32_t SuppressedErrorCount() const { return suppressed_error_count_; }
+  // Where the last of them stood, which such a parse reads to learn where its
+  // text broke off once the count has said that it did.
+  SourceLoc LastSuppressedErrorLoc() const {
+    return last_suppressed_error_loc_;
+  }
 
   // Keeps every report in Diagnostics() and the counts without writing it out,
   // for a caller that reads back where a trial parse reported -- which a
@@ -127,6 +132,7 @@ class DiagEngine {
   bool warnings_as_errors_ = false;
   uint32_t suppress_depth_ = 0;
   uint32_t suppressed_error_count_ = 0;
+  SourceLoc last_suppressed_error_loc_;
   bool quiet_ = false;
 };
 
