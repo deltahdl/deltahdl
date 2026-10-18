@@ -101,5 +101,35 @@ TEST_F(ScopesOfARun, AnObjectOfNoScopeKindReachesNoScope) {
   EXPECT_EQ(vpi_handle(vpiScope, VpiHandleOf(&net)), nullptr);
 }
 
+// The kind of the statement the task or function `tf` reaches through vpiStmt,
+// 0 where it reaches none.
+int StmtKindOf(vpiHandle tf) {
+  vpiHandle stmt = vpi_handle(vpiStmt, tf);
+  return stmt == nullptr ? 0 : vpi_get(vpiType, stmt);
+}
+
+// Detail 5 wherever a task or function is declared: a generate block
+// instance's, a package's and the compilation unit's, whose scope the unit's
+// variable gives it (§3.12.1), reach the statement of their body as a
+// module's do.
+TEST_F(ScopesOfARun, EveryTaskReachesTheStatementOfItsBody) {
+  Run("int ug;\n"
+      "function int uf(); return 1; endfunction\n"
+      "package pk; int p; task pt; p = 1; endtask endpackage\n"
+      "module top;\n"
+      "  int y;\n"
+      "  if (1) begin : g task gt; y = 1; y = 2; endtask end\n"
+      "endmodule\n");
+  EXPECT_EQ(StmtKindOf(Named(vpiTaskFunc, By("top.g"), "gt")), vpiBegin);
+  EXPECT_EQ(StmtKindOf(Named(vpiTaskFunc, By("pk"), "pt")), vpiAssignment);
+  vpiHandle uf = nullptr;
+  vpiHandle it = vpi_iterate(vpiPackage, nullptr);
+  while (vpiHandle pkg = it == nullptr ? nullptr : vpi_scan(it)) {
+    if (vpiHandle found = Named(vpiTaskFunc, pkg, "uf")) uf = found;
+  }
+  ASSERT_NE(uf, nullptr);
+  EXPECT_EQ(StmtKindOf(uf), vpiReturnStmt);
+}
+
 }  // namespace
 }  // namespace delta

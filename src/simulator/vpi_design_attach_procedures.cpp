@@ -702,12 +702,47 @@ void WalkSubroutineBody(const ModuleItem& item, VpiObject* tf,
   MakeBlock(*begin, vpiBegin, kParent, walk);
 }
 
-// §37.12 detail 5: the body of each task and function the instance declares
-// outside every generate block, the ones made under the instance's prefix.
-void AttachInstanceSubroutineBodies(VpiObject* /*instance*/,
-                                    const BodyWalk& walk) {
+// §37.12 detail 5: the body of each task and function the instance declares,
+// the ones made under the instance's prefix, and each one a generate block
+// instance declares, made under the block's full name, whose names resolve in
+// the block first (§27.4).
+void AttachInstanceSubroutineBodies(VpiObject* instance, const BodyWalk& walk) {
   for (const auto& [key, tf] : walk.calls.subroutines) {
     if (key.second == walk.prefix) WalkSubroutineBody(*key.first, tf, walk);
+  }
+  for (const RtlirGenBlockSubroutine& sub : walk.mod.gen_block_subroutines) {
+    const VpiObject* block = VpiGenScopeOf(instance, sub.gen_block_path);
+    BodyWalk in_block = walk;
+    in_block.gen_prefixes = &sub.gen_block_prefixes;
+    WalkSubroutineBody(*sub.decl,
+                       walk.calls.subroutines.at({sub.decl, block->full_name}),
+                       in_block);
+  }
+}
+
+// §37.12 detail 5 with §26.2 and §3.12.1: the body of each task and function a
+// package declares, and the compilation unit's, whose names resolve in the
+// package or the unit, standing in no module.
+void AttachPackageSubroutineBodies(const RtlirDesign& design,
+                                   const VpiObjectMap& objects,
+                                   const VpiCallBuild& calls,
+                                   const VpiAttachBuild& build) {
+  static const RtlirModule kNoModule{};
+  for (const PackageDecl* pkg : design.packages) {
+    const std::string kPackage(pkg->name);
+    BodyWalk walk{design, kNoModule, objects, kPackage, calls, build};
+    walk.package = pkg->name;
+    for (const ModuleItem* item : pkg->items) {
+      const auto kMade = calls.subroutines.find({item, kPackage});
+      if (kMade != calls.subroutines.end()) {
+        WalkSubroutineBody(*item, kMade->second, walk);
+      }
+    }
+  }
+  const std::string kUnit("$unit");
+  const BodyWalk kUnitWalk{design, kNoModule, objects, kUnit, calls, build};
+  for (const ModuleItem* item : design.cu_function_decls) {
+    WalkSubroutineBody(*item, calls.subroutines.at({item, kUnit}), kUnitWalk);
   }
 }
 
@@ -821,6 +856,7 @@ void AttachProcedures(const RtlirDesign* design, const VpiObjectMap& objects,
   kWalk(AttachInstanceAssertionItemDecls);
   kWalk(AttachInstanceProcedures);
   kWalk(AttachInstanceSubroutineBodies);
+  AttachPackageSubroutineBodies(*design, objects, calls, build);
 }
 
 }  // namespace delta
