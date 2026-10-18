@@ -493,6 +493,37 @@ void FillAssertion(VpiObject* obj, const Stmt& stmt, const VpiStmtBuild& with) {
   obj->else_stmt = with.statement(stmt.assert_fail_stmt, obj);
 }
 
+// §14.13: whether `clock` is the event of the clocking block `name`, the
+// block named alone as `@(name)`.
+bool NamesClockingBlock(const std::vector<EventExpr>& clock,
+                        std::string_view name) {
+  return clock.size() == 1 && clock[0].edge == Edge::kNone &&
+         clock[0].signal->kind == ExprKind::kIdentifier &&
+         clock[0].signal->text == name;
+}
+
+// §37.49 with §39.3.2: the clocking block that clocks the assertion `obj` on
+// `property`'s clock, the nearest from the scope it stands in outward: the
+// block its clock names (§14.13), or, for an assertion written as an item
+// whose clock was inferred, the default clocking it was inferred from (§16.16
+// (a)). A procedural assertion's inferred clock may be its procedure's
+// (§16.14.6), which no block gives. Null where no block clocks it.
+VpiObject* ClockingBlockClocking(const VpiObject* obj, const Stmt& property) {
+  const bool kFromDefault =
+      property.assert_clock_inferred && !property.is_procedural_concurrent;
+  for (const VpiObject* at = obj->parent; at != nullptr; at = at->parent) {
+    for (VpiObject* child : at->children) {
+      if (child->type != vpiClockingBlock) continue;
+      if (kFromDefault
+              ? child->default_clocking
+              : NamesClockingBlock(property.assert_clock, child->name)) {
+        return child;
+      }
+    }
+  }
+  return nullptr;
+}
+
 }  // namespace
 
 void VpiFillAssertionClock(VpiObject* obj, const Stmt& property,
@@ -501,6 +532,9 @@ void VpiFillAssertionClock(VpiObject* obj, const Stmt& property,
   // writes or the one inferred for it, which vpiIsClockInferred tells apart.
   obj->clocking_event = EventCondition(property.assert_clock, with);
   obj->clock_inferred = property.assert_clock_inferred;
+  // §37.49: the clocking block clocking it, reached through vpiClockingBlock
+  // as VpiAssertionClockingBlock reads it, a child of that type.
+  AddChild(obj, ClockingBlockClocking(obj, property));
 }
 
 VpiObject* VpiMakePropertySpec(VpiObject* holder, const Stmt& property,
