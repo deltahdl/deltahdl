@@ -603,16 +603,16 @@ bool TryResolvePatternRelation(int type, VpiHandle ref, VpiHandle& out) {
 // statements.
 bool TryResolveAssignLhsRhsRelation(int type, VpiHandle ref, VpiHandle& out) {
   const int kRef = ref->type;
-  // §37.64/§37.79/§37.76/§37.47: the assignment kinds that name a left-hand
-  // side - a procedural assignment, the procedural continuous assignment
-  // family, an alias statement, and a continuous assignment in either of the
-  // forms §37.47's enclosure groups. vpiLhs is a relation tag, and the
-  // traversal a kind left out falls through to looks for a child whose own
-  // type is one, which reaches nothing.
+  // §37.64/§37.79/§37.76/§37.47/§37.28: the assignment kinds that name a
+  // left-hand side - a procedural assignment, the procedural continuous
+  // assignment family, an alias statement, a continuous assignment in either of
+  // the forms §37.47's enclosure groups, and a def param. vpiLhs is a relation
+  // tag, and the traversal a kind left out falls through to looks for a child
+  // whose own type is one, which reaches nothing.
   const bool kNamesLhs = kRef == vpiAssignment || kRef == vpiAssignStmt ||
                          kRef == vpiForce || kRef == vpiDeassign ||
                          kRef == vpiRelease || kRef == vpiAliasStmt ||
-                         VpiIsContAssignKind(kRef);
+                         kRef == vpiDefParam || VpiIsContAssignKind(kRef);
   if (type == vpiLhs && kNamesLhs) {
     out = ref->lhs;
     return true;
@@ -621,7 +621,7 @@ bool TryResolveAssignLhsRhsRelation(int type, VpiHandle ref, VpiHandle& out) {
   // assign; §37.79's deassign and release name a target and no source.
   const bool kNamesRhs = kRef == vpiAssignment || kRef == vpiAssignStmt ||
                          kRef == vpiForce || kRef == vpiAliasStmt ||
-                         VpiIsContAssignKind(kRef);
+                         kRef == vpiDefParam || VpiIsContAssignKind(kRef);
   if (type == vpiRhs && kNamesRhs) {
     out = ref->rhs;
     return true;
@@ -839,13 +839,15 @@ bool TryResolveTimingAndNettypeRelation(int type, VpiHandle ref,
 bool TryResolveInstanceRelation(int type, VpiHandle ref, VpiHandle& out) {
   if (type == vpiInstance) {
     out = VpiInstanceOf(ref);
-    return true;
-  }
-  if (type == kVpiModule) {
+  } else if (type == kVpiModule) {
     out = VpiModuleOf(ref);
-    return true;
+  } else if (type == vpiInstanceArray || type == vpiModuleArray) {
+    // §37.5: an element reaches the array it belongs to.
+    out = VpiInstanceArrayOf(ref, type);
+  } else {
+    return false;
   }
-  return false;
+  return true;
 }
 
 // Runs the designated-pointer relation groups in their original order, stopping

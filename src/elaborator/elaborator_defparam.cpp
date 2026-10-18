@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <optional>
 #include <set>
+#include <string>
 #include <string_view>
 #include <tuple>
 #include <unordered_set>
@@ -617,6 +618,10 @@ void Elaborator::ApplyDefparamSite(RtlirModule* mod, const DefparamSite& site,
     param->defparam_value_scope = scope;
     param->defparam_value_scopes = site.scopes;
     param->defparam_module = mod;
+    mod->defparams.push_back(
+        {target_mod,
+         std::string(param->gen_block_prefix) + std::string(param->name),
+         val_expr});
     ReplaceStringParamValue(*param, val_expr, arena_);
     RecomputeDependentParams(target_mod);
     applied_defparams_.insert(key);

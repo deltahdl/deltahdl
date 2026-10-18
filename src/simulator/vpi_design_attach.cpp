@@ -153,6 +153,36 @@ void FillPortObject(VpiObject* obj, const RtlirPort& port, int index,
   module->children.push_back(obj);
 }
 
+// §37.13 with §37.5: the io decl the declaration of `port` is, under `module`.
+// Its vpiExpr is `item`, the net or variable the port declares (detail 2),
+// through a ref obj for a ref port or an interface port, the second of which
+// has no direction (details 1 and 3).
+void MakeModuleIoDecl(const RtlirPort& port, VpiHandle module, VpiObject* item,
+                      const std::function<VpiObject*()>& alloc,
+                      std::deque<std::string>& names) {
+  VpiObject* io_decl = alloc();
+  io_decl->type = vpiIODecl;
+  names.emplace_back(port.name);
+  io_decl->name = names.back();
+  io_decl->full_name = VpiScopedFullName(module, port.name);
+  io_decl->parent = module;
+  const bool kByRef = port.direction == Direction::kRef;
+  io_decl->direction = VpiIoDeclDirection(
+      VpiPortDirectionOf(port.direction), kByRef, port.is_interface_port,
+      /*expr_is_virtual_interface_var=*/false);
+  io_decl->io_expr = item;
+  if (kByRef || port.is_interface_port) {
+    VpiObject* ref_obj = alloc();
+    ref_obj->type = vpiRefObj;
+    ref_obj->parent = io_decl;
+    ref_obj->name = io_decl->name;
+    ref_obj->full_name = io_decl->full_name;
+    ref_obj->actual = item;
+    io_decl->io_expr = ref_obj;
+  }
+  module->children.push_back(io_decl);
+}
+
 // §37.24 (figure): the interconnect net a port declared with the `interconnect`
 // keyword stands for. §37.24's whole model is about these objects and no pass
 // made one, so a design declaring a generic interconnect port had no
@@ -319,29 +349,38 @@ void VpiContext::AttachDesignPorts(const RtlirDesign* design) {
     name_pool_.push_back(std::move(name));
     return std::string_view(name_pool_.back());
   };
-  WalkInstancePaths(design, [this, &kAlloc](const RtlirModule* mod,
-                                            const std::string& prefix) {
-    // A top module has no module object over it to hang ports from, the
-    // same boundary the module paths meet.
-    if (prefix.empty()) return;
-    VpiHandle module = DesignObjectForFlatName(prefix);
-    if (module == nullptr) return;
+  // §37.5: a top module reaches its ports as any instance does, keyed under
+  // its own name since AttachTopModules made its object.
+  WalkInstanceObjects(
+      design, object_map_,
+      [this, &kAlloc](const RtlirModule* mod, const std::string& prefix,
+                      VpiHandle module) {
+        if (module == nullptr) return;
 
-    module->children.reserve(module->children.size() + mod->ports.size());
-    int index = 0;
-    const SourceManager* sources = SourcesOf(sim_ctx_);
-    for (const auto& port : mod->ports) {
-      auto* obj = AllocObject();
-      FillPortObject(obj, port, index++, module, name_pool_);
-      // §37.3.3: a port is written in the source text, so its object stands
-      // where the declaration does and reports it.
-      RecordSourceLocation(obj, port.loc, sources);
-      RecordProtection(obj, port.loc, sources);
-      if (port.is_interconnect) {
-        FillInterconnectNetObject(AllocObject(), port, obj, name_pool_, kAlloc);
-      }
-    }
-  });
+        module->children.reserve(module->children.size() + mod->ports.size());
+        int index = 0;
+        const SourceManager* sources = SourcesOf(sim_ctx_);
+        for (const auto& port : mod->ports) {
+          auto* obj = AllocObject();
+          FillPortObject(obj, port, index++, module, name_pool_);
+          // §37.3.3: a port is written in the source text, so its object stands
+          // where the declaration does and reports it.
+          RecordSourceLocation(obj, port.loc, sources);
+          RecordProtection(obj, port.loc, sources);
+          if (port.is_interconnect) {
+            FillInterconnectNetObject(AllocObject(), port, obj, name_pool_,
+                                      kAlloc);
+          }
+          // A port written as an expression stands for no declaration of its
+          // own.
+          if (port.port_expr == nullptr) {
+            MakeModuleIoDecl(port, module,
+                             FindObjectForFlatName(
+                                 object_map_, VpiFlatName(prefix, port.name)),
+                             kAlloc, name_pool_);
+          }
+        }
+      });
   if (sim_ctx_ == nullptr) return;
   // §37.42: a connection's calls are shaped once every connection is made.
   std::vector<VpiDeferredCall> deferred;

@@ -392,6 +392,11 @@ VpiHandle VpiScopeNamedClockingBlock(VpiHandle scope, bool global);
 // disable iff was written with. Null where the scope wrote none.
 VpiHandle VpiScopeDefaultDisableIff(VpiHandle scope);
 
+// §37.5 and §37.11: the instance array `element` is an element of, for
+// `type` vpiInstanceArray of any kind and for vpiModuleArray a module array
+// alone. Null where it is an element of none.
+VpiHandle VpiInstanceArrayOf(VpiHandle element, int type);
+
 // §37.16: the object definitions the `nets` class groups - the net bit, the
 // interconnect array, the array net, and the concrete net kinds of the `net`
 // grouping inside it. §37.4.1 makes a dotted enclosure a grouping rather than

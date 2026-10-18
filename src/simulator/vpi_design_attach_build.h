@@ -726,6 +726,18 @@ void AttachClockingBlocks(const RtlirDesign* design,
                           const VpiObjectMap& objects, SimContext& ctx,
                           const VpiAttachBuild& build);
 
+// §37.76 with §37.5: give each instance an alias statement per net an alias
+// it writes joins to the alias's last net, with that net as its vpiRhs.
+void AttachAliasStatements(const RtlirDesign* design,
+                           const VpiObjectMap& objects, SimContext& ctx,
+                           const VpiAttachBuild& build);
+
+// §37.5, §37.6 and §37.9: give each instance under a default disable iff the
+// condition it writes, which vpiDefaultDisableIff reaches.
+void AttachDefaultDisableIffs(const RtlirDesign* design,
+                              const VpiObjectMap& objects, SimContext& ctx,
+                              const VpiAttachBuild& build);
+
 // §37.49 and §37.50: the assertion object of the concurrent assertion an
 // instance writes as an item, `assertion`, hung from `scope`, the generate
 // block instance writing it or the instance itself, with its clock, its

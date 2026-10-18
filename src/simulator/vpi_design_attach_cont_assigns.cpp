@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cstddef>
 #include <initializer_list>
 #include <set>
 #include <string>
@@ -7,10 +8,12 @@
 #include <vector>
 
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_alias.h"
 #include "elaborator/rtlir_scopes.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "simulator/sim_context.h"
+#include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_design_attach_assigns_internal.h"
 #include "simulator/vpi_design_attach_build.h"
@@ -188,6 +191,32 @@ void VpiContext::AttachContinuousAssignments(const RtlirDesign* design,
                   object_map_, calls, kAttach),
               &mod->node_attrs};
           MakeContinuousAssignment(ca, within, build);
+        }
+      });
+}
+
+void AttachAliasStatements(const RtlirDesign* design,
+                           const VpiObjectMap& objects, SimContext& ctx,
+                           const VpiAttachBuild& build) {
+  // §37.76 with §37.5: an instance reaches the alias statements it writes, one
+  // per net an alias joins to its last, which is the right-hand side of every
+  // one of them: alias a = b = c makes a = c and b = c.
+  WalkInstanceObjects(
+      design, objects,
+      [&](const RtlirModule* mod, const std::string& prefix,
+          VpiObject* instance) {
+        for (const RtlirAlias& alias : mod->aliases) {
+          const VpiExprNames kNames{objects, prefix, alias.gen_block_prefixes};
+          for (std::size_t i = 0; i + 1 < alias.nets.size(); ++i) {
+            VpiObject* stmt = build.alloc();
+            stmt->type = vpiAliasStmt;
+            stmt->parent = instance;
+            stmt->lhs =
+                VpiGenBlockExpression(alias.nets[i], kNames, ctx, build);
+            stmt->rhs =
+                VpiGenBlockExpression(alias.nets.back(), kNames, ctx, build);
+            instance->children.push_back(stmt);
+          }
         }
       });
 }

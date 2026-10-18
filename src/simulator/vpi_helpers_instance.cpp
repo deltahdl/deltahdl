@@ -133,14 +133,25 @@ VpiHandle VpiScopeNamedClockingBlock(VpiHandle scope, bool global) {
 }
 
 VpiHandle VpiScopeDefaultDisableIff(VpiHandle scope) {
-  // §37.5/§37.6/§37.9 (figure): the vpiDefaultDisableIff edge is drawn to an
-  // enclosure with no name holding an expr and a distribution, and §37.4.1
-  // makes such an enclosure a grouping of the objects in it. So what the edge
-  // reaches is an expression or a distribution; a scope names at most one, so
-  // it is the first child of either kind. Null where the scope wrote none.
-  for (auto* child : scope->children) {
-    if (VpiIsExprObject(child) || child->type == vpiDistribution) {
-      return child;
+  // §37.5/§37.6/§37.9 (figure): the vpiDefaultDisableIff edge reaches the
+  // expr or distribution the scope's default disable iff writes, held apart
+  // from its children, among which a parameter is an expression too. Null
+  // where the scope is under none.
+  return scope->disable_condition;
+}
+
+VpiHandle VpiInstanceArrayOf(VpiHandle element, int type) {
+  // An element keeps its place in the scope around it, which holds the array
+  // too (VpiAddArrayElement), so the array is the one of the scope's children
+  // holding the element.
+  if (!element->array_member) return nullptr;
+  for (VpiObject* array : element->parent->children) {
+    const bool kKind = type == vpiModuleArray
+                           ? array->type == vpiModuleArray
+                           : VpiIsInstanceArrayType(array->type);
+    if (kKind &&
+        std::ranges::find(array->children, element) != array->children.end()) {
+      return array;
     }
   }
   return nullptr;

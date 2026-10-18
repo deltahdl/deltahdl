@@ -258,4 +258,20 @@ void AttachClockingBlocks(const RtlirDesign* design,
       });
 }
 
+void AttachDefaultDisableIffs(const RtlirDesign* design,
+                              const VpiObjectMap& objects, SimContext& ctx,
+                              const VpiAttachBuild& build) {
+  // §37.5, §37.6 and §37.9: a scope reaches through vpiDefaultDisableIff the
+  // condition its default disable iff (§16.15) writes, and nothing where none
+  // is in force.
+  WalkInstanceObjects(design, objects,
+                      [&](const RtlirModule* mod, const std::string& prefix,
+                          VpiObject* instance) {
+                        if (mod->default_disable_iff == nullptr) return;
+                        instance->disable_condition =
+                            VpiInstanceExpression(mod->default_disable_iff,
+                                                  objects, prefix, ctx, build);
+                      });
+}
+
 }  // namespace delta

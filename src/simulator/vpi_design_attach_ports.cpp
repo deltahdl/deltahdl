@@ -44,6 +44,21 @@ VpiObject* PortNamed(VpiHandle module, std::string_view name) {
   return nullptr;
 }
 
+// §37.14: the lower connection of each port of `module`, the instance keyed
+// under `instance`, is the instance's own net or variable of the port's name.
+void ConnectLowConns(VpiHandle module, const std::string& instance,
+                     const VpiObjectMap& objects, const VpiAttachBuild& build) {
+  for (VpiObject* port : module->children) {
+    if (port->type != kVpiPort || port->low_conn != nullptr ||
+        port->name.empty()) {
+      continue;
+    }
+    port->low_conn =
+        FindObjectForFlatName(objects, VpiFlatName(instance, port->name));
+    VpiMakePortBits(port, build);
+  }
+}
+
 // §37.14 details 3, 4 and 10: the ports of the instance `inst` connected -
 // each port's higher connection the expression the instantiation wrote for
 // it, its names resolved as `names` says, in the generate blocks and the
@@ -65,15 +80,7 @@ void ConnectPorts(const RtlirModuleInst& inst, const VpiExprNames& names,
             ? nullptr
             : VpiGenBlockExpression(binding.connection, names, ctx, build);
   }
-  for (VpiObject* port : module->children) {
-    if (port->type != kVpiPort || port->low_conn != nullptr ||
-        port->name.empty()) {
-      continue;
-    }
-    port->low_conn =
-        FindObjectForFlatName(objects, VpiFlatName(kInstance, port->name));
-    VpiMakePortBits(port, build);
-  }
+  ConnectLowConns(module, kInstance, objects, build);
 }
 
 // The elements of `holder`, one per index of `dims[depth]` in the order it
@@ -125,6 +132,11 @@ void AttachPortConnections(const RtlirDesign* design,
       design, objects,
       [&](const RtlirModule* mod, const std::string& prefix,
           VpiObject* instance) {
+        // §37.5: a top module's ports have a lower connection and, with no
+        // instantiation over them, no higher one.
+        if (instance->top_module) {
+          ConnectLowConns(instance, prefix, objects, build);
+        }
         for (const RtlirModuleInst& inst : mod->children) {
           // §37.42: a call a connection makes stands in the instance writing
           // it, or in the gen scope the instantiation stands in (§37.85).

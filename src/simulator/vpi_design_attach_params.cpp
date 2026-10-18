@@ -1,8 +1,10 @@
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_defparam.h"
 #include "parser/ast_module.h"
 #include "parser/ast_specify.h"
 #include "parser/ast_type.h"
@@ -160,6 +162,35 @@ void AttachPackageParameters(const PackageDecl& pkg, VpiObject& scope,
   }
 }
 
+// §37.28: the def params each instance writes, one per defparam assignment that
+// changed a parameter, reaching that parameter through vpiLhs and through
+// vpiRhs the right-hand side, written in the instance holding the statement.
+void AttachDefParams(const RtlirDesign* design, const VpiObjectMap& objects,
+                     SimContext& ctx, const VpiAttachBuild& build) {
+  std::unordered_map<const RtlirModule*, std::string> prefixes;
+  WalkInstancePaths(design,
+                    [&](const RtlirModule* mod, const std::string& prefix) {
+                      prefixes.try_emplace(mod, prefix);
+                    });
+  WalkInstanceObjects(
+      design, objects,
+      [&](const RtlirModule* mod, const std::string& prefix,
+          VpiObject* instance) {
+        for (const RtlirDefparam& defparam : mod->defparams) {
+          VpiObject* made = build.alloc();
+          made->type = vpiDefParam;
+          made->parent = instance;
+          // The module a defparam changed is an instance the walk visited.
+          made->lhs = FindObjectForFlatName(
+              objects, VpiFlatName(prefixes[defparam.target_module],
+                                   defparam.target_name));
+          made->rhs =
+              VpiInstanceExpression(defparam.rhs, objects, prefix, ctx, build);
+          instance->children.push_back(made);
+        }
+      });
+}
+
 }  // namespace
 
 void AttachParameters(const RtlirDesign* design, const VpiObjectMap& objects,
@@ -185,6 +216,7 @@ void AttachParameters(const RtlirDesign* design, const VpiObjectMap& objects,
       AttachPackageParameters(*pkg, *scope, kWith);
     }
   }
+  AttachDefParams(design, objects, ctx, build);
 }
 
 }  // namespace delta

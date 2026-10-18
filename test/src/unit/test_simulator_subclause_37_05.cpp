@@ -1,5 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <string>
+#include <vector>
+
+#include "elaborator/rtlir.h"
+#include "fixture_simulator.h"
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
@@ -203,33 +209,168 @@ TEST_F(Module, AModuleThatNamedNoClockingBlockReachesNone) {
 }
 
 // Figure (vpiDefaultDisableIff): the edge is drawn to an enclosure with no name
-// holding an expr and a distribution, so either is what it reaches. A clocking
-// block, drawn by an edge of its own, is not.
+// holding an expr and a distribution, so either is what it reaches: the one the
+// scope's default disable iff writes. An expression among the scope's children,
+// a parameter's among them, is not.
 TEST_F(Module, AModuleReachesItsDefaultDisableIff) {
-  VpiObject block;
-  block.type = vpiClockingBlock;
+  VpiObject param;
+  param.type = vpiParameter;
   VpiObject condition;
   condition.type = vpiOperation;
 
   VpiObject mod;
   mod.type = kVpiModule;
-  mod.children = {&block, &condition};
+  mod.children = {&param};
+  mod.disable_condition = &condition;
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiDefaultDisableIff, VpiHandleOf(&mod))),
             &condition);
 
-  VpiObject dist;
-  dist.type = vpiDistribution;
-  VpiObject with_dist;
-  with_dist.type = kVpiModule;
-  with_dist.children = {&dist};
-  EXPECT_EQ(
-      VpiObjectOf(vpi_handle(vpiDefaultDisableIff, VpiHandleOf(&with_dist))),
-      &dist);
-
   VpiObject plain;
   plain.type = kVpiModule;
-  plain.children = {&block};
+  plain.children = {&param};
   EXPECT_EQ(vpi_handle(vpiDefaultDisableIff, VpiHandleOf(&plain)), nullptr);
+}
+
+// A design run with a PLI application registered, whose module objects are
+// read back for the relations the figure draws.
+class ModuleOfARun : public VpiDesignRun {};
+
+// D1 with the figure's port edge: a top-level module reaches its ports, each
+// reaching the net inside the module as its lower connection and, with no
+// instantiation over the module, no higher one (§37.14 detail 10).
+TEST_F(ModuleOfARun, ATopModuleReachesItsPorts) {
+  Run("module top(input logic a, output logic b); assign b = a; endmodule\n");
+  vpiHandle top = By("top");
+  ASSERT_NE(top, nullptr);
+  EXPECT_EQ(NamesOf(vpiPort, top), (std::vector<std::string>{"a", "b"}));
+  vpiHandle a = Named(vpiPort, top, "a");
+  ASSERT_NE(a, nullptr);
+  EXPECT_EQ(vpi_handle(vpiHighConn, a), nullptr);
+  vpiHandle low = vpi_handle(vpiLowConn, a);
+  ASSERT_NE(low, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, low), "a");
+}
+
+// Figure (io decl): a module reaches an io decl per port declaration, whose
+// vpiExpr is the net or variable it declares, or a ref obj for a ref port and
+// an interface port, the second having no direction (§37.13 details 1 to 3).
+// A port written as an expression is a declaration of none of its own.
+TEST_F(ModuleOfARun, AModuleReachesAnIoDeclPerPortDeclaration) {
+  Run("interface ifc; endinterface\n"
+      "module sub(input logic [3:0] d, ref int r, ifc bus); endmodule\n"
+      "module pick(a[0]); input [1:0] a; endmodule\n"
+      "module top; logic [3:0] w; int x; logic [1:0] v;\n"
+      "  ifc i (); sub u (.d(w), .r(x), .bus(i)); pick p (v[0]);\n"
+      "endmodule\n");
+  vpiHandle u = By("top.u");
+  ASSERT_NE(u, nullptr);
+  EXPECT_EQ(NamesOf(vpiIODecl, u), (std::vector<std::string>{"bus", "d", "r"}));
+  vpiHandle d = Named(vpiIODecl, u, "d");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(vpi_get(vpiDirection, d), vpiInput);
+  vpiHandle d_expr = vpi_handle(vpiExpr, d);
+  ASSERT_NE(d_expr, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, d_expr), "d");
+  vpiHandle r = Named(vpiIODecl, u, "r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(vpi_get(vpiDirection, r), vpiRef);
+  vpiHandle r_expr = vpi_handle(vpiExpr, r);
+  ASSERT_NE(r_expr, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, r_expr), vpiRefObj);
+  vpiHandle bus = Named(vpiIODecl, u, "bus");
+  ASSERT_NE(bus, nullptr);
+  EXPECT_EQ(vpi_get(vpiDirection, bus), vpiNoDirection);
+  vpiHandle bus_expr = vpi_handle(vpiExpr, bus);
+  ASSERT_NE(bus_expr, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, bus_expr), vpiRefObj);
+  for (vpiHandle io_decl : ObjectsOf(vpiIODecl, By("top.p"))) {
+    EXPECT_STRNE(vpi_get_str(vpiName, io_decl), "");
+  }
+}
+
+// Figure (module array, instance array): an element of an array reaches the
+// array it belongs to, a module array through either tag and an interface
+// array through vpiInstanceArray alone; a module of no array reaches none.
+TEST_F(ModuleOfARun, AnArrayElementReachesItsArray) {
+  Run("module sub; endmodule\n"
+      "interface ifc; endinterface\n"
+      "module top; sub arr[1:0] (); sub one (); ifc ifs[0:1] (); endmodule\n");
+  vpiHandle element = By("top.arr[1]");
+  ASSERT_NE(element, nullptr);
+  VpiObject* arr = VpiObjectOf(By("top.arr"));
+  ASSERT_NE(arr, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiModuleArray, element)), arr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiInstanceArray, element)), arr);
+  vpiHandle one = By("top.one");
+  ASSERT_NE(one, nullptr);
+  EXPECT_EQ(vpi_handle(vpiModuleArray, one), nullptr);
+  EXPECT_EQ(vpi_handle(vpiInstanceArray, one), nullptr);
+  vpiHandle iface = By("top.ifs[0]");
+  ASSERT_NE(iface, nullptr);
+  EXPECT_EQ(vpi_handle(vpiModuleArray, iface), nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiInstanceArray, iface)),
+            VpiObjectOf(By("top.ifs")));
+}
+
+// vpiDefDecayTime: a module reports the decay time the `default_decay_time
+// directive (Annex E.2) set for it, which elaboration records on the module.
+TEST_F(ModuleOfARun, AModuleReportsTheDecayTimeItWasCompiledUnder) {
+  RtlirDesign* design = ElaborateSrc("module top; endmodule\n", f_);
+  ASSERT_NE(design, nullptr);
+  ASSERT_FALSE(f_.has_errors);
+  // What the directive `default_decay_time 100 ahead of the module records.
+  design->top_modules.front()->default_decay_time = 100;
+  design->top_modules.front()->default_decay_time_infinite = false;
+  LowerAndRun(design, f_);
+  EXPECT_EQ(vpi_get(vpiDefDecayTime, By("top")), 100);
+}
+
+// Figure (vpiDefaultDisableIff): a module reaches the condition its default
+// disable iff (§16.15) writes, rather than any expression it declares.
+TEST_F(ModuleOfARun, AModuleReachesTheConditionOfItsDefaultDisableIff) {
+  Run("module top #(parameter P = 1); logic rst;\n"
+      "  default disable iff !rst;\n"
+      "endmodule\n");
+  vpiHandle condition = vpi_handle(vpiDefaultDisableIff, By("top"));
+  ASSERT_NE(condition, nullptr);
+  EXPECT_EQ(OpOf(condition), vpiNotOp);
+}
+
+// Figure (vpiDefaultDisableIff): a module under no default disable iff reaches
+// none, though it declares a parameter, which is an expression.
+TEST_F(ModuleOfARun, AModuleUnderNoDefaultDisableIffReachesNone) {
+  Run("module top #(parameter P = 1); endmodule\n");
+  EXPECT_EQ(vpi_handle(vpiDefaultDisableIff, By("top")), nullptr);
+}
+
+// Figure (alias stmt) with §37.76: a module reaches an alias statement per net
+// an alias joins to its last, which is the right-hand side of each.
+TEST_F(ModuleOfARun, AModuleReachesAnAliasStatementPerNetItJoins) {
+  Run("module top; wire a, b, c; alias a = b = c; endmodule\n");
+  std::vector<vpiHandle> stmts = ObjectsOf(vpiAliasStmt, By("top"));
+  ASSERT_EQ(stmts.size(), 2U);
+  EXPECT_STREQ(vpi_get_str(vpiName, vpi_handle(vpiLhs, stmts[0])), "a");
+  EXPECT_STREQ(vpi_get_str(vpiName, vpi_handle(vpiLhs, stmts[1])), "b");
+  for (vpiHandle stmt : stmts) {
+    EXPECT_STREQ(vpi_get_str(vpiName, vpi_handle(vpiRhs, stmt)), "c");
+  }
+}
+
+// Figure (def param) with §37.28: a module reaches a def param per parameter
+// its defparam changes, reaching that parameter through vpiLhs and the value
+// written through vpiRhs.
+TEST_F(ModuleOfARun, AModuleReachesADefParamPerParameterItChanges) {
+  Run("module sub #(parameter W = 1); endmodule\n"
+      "module top; sub u (); defparam u.W = 8; endmodule\n");
+  std::vector<vpiHandle> defparams = ObjectsOf(vpiDefParam, By("top"));
+  ASSERT_EQ(defparams.size(), 1U);
+  vpiHandle lhs = vpi_handle(vpiLhs, defparams[0]);
+  ASSERT_NE(lhs, nullptr);
+  EXPECT_EQ(VpiObjectOf(lhs),
+            VpiObjectOf(Named(vpiParameter, By("top.u"), "W")));
+  vpiHandle rhs = vpi_handle(vpiRhs, defparams[0]);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, rhs), vpiConstant);
 }
 
 }  // namespace

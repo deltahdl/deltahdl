@@ -41,10 +41,14 @@ int TimeExponent(TimeUnit unit, int magnitude) {
 // §37.10: what an instance takes from its definition -- the time unit and
 // precision it was elaborated under, the file and line the definition was
 // written on, restated where it came from (detail 8 lets `line move it), and,
-// by §37.3.7, the lifetime it was declared with.
+// by §37.3.7, the lifetime it was declared with, and, by §37.5, the decay time
+// the `default_decay_time directive (Annex E.2) set for it.
 void RecordInstanceDefinition(VpiObject* obj, const RtlirModule* mod,
                               const SourceManager& sources) {
   obj->automatic = mod->is_automatic;
+  if (!mod->default_decay_time_infinite) {
+    obj->def_decay_time = static_cast<int>(mod->default_decay_time);
+  }
   obj->time_unit = TimeExponent(mod->timescale.unit, mod->timescale.magnitude);
   obj->time_precision =
       TimeExponent(mod->timescale.precision, mod->timescale.prec_magnitude);
@@ -263,6 +267,9 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
     // A net's bits and members are made while it is still a logic net, the
     // kind both passes above look for, so its own kind comes after them.
     RecordNetObjectKinds(design, object_map_);
+    // An alias and a default disable iff name the bits and members above.
+    AttachDefaultDisableIffs(design, object_map_, *sim_ctx_, kBuild);
+    AttachAliasStatements(design, object_map_, *sim_ctx_, kBuild);
     call_objects_.classes = AttachClassDefinitions(
         design, object_map_, *sim_ctx_, kBuild, call_objects_.class_sites);
     // §37.32: the class defn a run's class obj reaches through its typespec,
