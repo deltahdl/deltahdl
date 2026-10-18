@@ -15,6 +15,7 @@
 #include "simulator/instance_prefix_override.h"
 #include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_alloc_scheme.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_model_helpers2.h"
@@ -111,6 +112,9 @@ VpiObject* MakeVariable(VpiObject* tf, std::string_view name, int kind,
   var->full_name = tf->full_name + "." + std::string(name);
   var->parent = tf;
   var->automatic = automatic;
+  // §37.3.7: an automatic variable is allocated with the frame of its call.
+  var->alloc_scheme = VpiAllocSchemeFor(automatic ? VpiAllocKind::kFrameOrThread
+                                                  : VpiAllocKind::kOther);
   tf->children.push_back(var);
   return var;
 }
@@ -202,6 +206,8 @@ void MakeReturnVariable(VpiObject* tf, const ModuleItem& item,
   ret->full_name = tf->full_name;
   ret->parent = tf;
   ret->automatic = tf->automatic;
+  ret->alloc_scheme = VpiAllocSchemeFor(
+      tf->automatic ? VpiAllocKind::kFrameOrThread : VpiAllocKind::kOther);
   ret->decl_signed = type.is_signed;
   AttachDeclaredRanges(ret, type, item.return_array_dims, sb.ctx, sb.build);
   if (item.return_array_dims.empty()) {

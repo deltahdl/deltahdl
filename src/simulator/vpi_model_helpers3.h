@@ -398,6 +398,12 @@ VpiHandle VpiScopeDefaultDisableIff(VpiHandle scope);
 // an object, so these are the kinds an object drawn as a net carries.
 bool VpiIsNetsType(int type);
 
+// §37.16: the object definitions the `net` class inside `nets` groups -- the
+// struct, union, enum, integer, time, logic, packed array, interconnect and
+// user-defined nets -- which leaves out the net bit, the array net and the
+// interconnect array standing beside it in `nets`.
+bool VpiIsNetClassType(int type);
+
 // §37.14, §37.16 and §37.17 (figures): the kinds the vpiBit relation reaches,
 // one per bit of what holds them - a port's port bits, a net's net bits and a
 // variable's var bits.

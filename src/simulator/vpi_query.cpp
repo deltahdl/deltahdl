@@ -526,9 +526,12 @@ int VpiGetSimplePropertyA(int property, VpiHandle obj, bool& handled) {
     // opposed to by position) through the vpiConnByName Boolean property.
     case vpiConnByName:
       return VpiBool(obj->conn_by_name);
-    // §37.3.7: declared lifetime as a Boolean (0 static, 1 non-static).
+    // §37.3.7: declared lifetime as a Boolean (0 static, 1 non-static). A
+    // class defn's and class typespec's is its methods' default, and §8.6 makes
+    // every class method automatic.
     case kVpiAutomatic:
-      return VpiBool(obj->automatic);
+      return VpiBool(obj->automatic || obj->type == vpiClassDefn ||
+                     obj->type == vpiClassTypespec);
     // §37.54 (D2): an operation reports its operation type as an int property.
     case vpiOpType:
       return obj->op_type;

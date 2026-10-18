@@ -436,6 +436,10 @@ bool VpiIterateMatches(VpiHandle obj, int type, VpiHandle ref,
   // the class name, which is a kind no procedure has.
   if (type == vpiProcess) return VpiIsProcessType(obj->type);
   if (type == vpiTaskFunc) return VpiIsTaskFuncType(obj->type);
+  // §37.10 with §37.16: the instance's edge to `net` is drawn to that class,
+  // so it reaches every net kind the class groups, not only the logic net
+  // whose own type vpiNet also is.
+  if (type == vpiNet) return VpiIsNetClassType(obj->type);
   // §37.20 detail 1: vpiMemory is a method returning vpiRegArray objects.
   if (type == vpiMemory) return obj->type == VpiMemoryIterationItemType();
   // §37.10: the vpiNetTypedef iteration reaches the instance's nettype
@@ -818,8 +822,14 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref, int compatibility_mode) {
   // protected object is an error, so no iterator is produced. §37.42 detail 10
   // carves out one exception: a protected system task or function call shall
   // still allow iteration over its vpiArgument relation. Every other protected
-  // iteration is still refused.
-  if (ref && VpiReadSealed(*ref) && !kModes.tf_argument) return nullptr;
+  // iteration is still refused, with the error vpi_chk_error() reports.
+  if (ref && VpiReadSealed(*ref) && !kModes.tf_argument) {
+    last_error_.state = kVpiPLI;
+    last_error_.level = kVpiError;
+    last_error_.message =
+        VpiText("vpi_iterate() on a protected object is an error");
+    return nullptr;
+  }
 
   // §37.72 detail 2: a default case item has no condition expression, so
   // iterating its match expressions (vpi_iterate(vpiExpr, item)) returns NULL.

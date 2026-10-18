@@ -834,6 +834,11 @@ bool VpiIsNetsType(int type) {
   }
 }
 
+bool VpiIsNetClassType(int type) {
+  return VpiIsNetsType(type) && type != vpiNetBit && type != vpiNetArray &&
+         type != vpiInterconnectArray;
+}
+
 bool VpiIsBitObjectType(int type) {
   return type == vpiPortBit || type == vpiNetBit || type == vpiRegBit;
 }

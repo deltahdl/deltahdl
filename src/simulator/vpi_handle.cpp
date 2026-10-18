@@ -832,10 +832,17 @@ bool TryResolveTimingAndNettypeRelation(int type, VpiHandle ref,
 // it is resolved here rather than by the generic single-level parent/child walk
 // below (which would miss any intervening non-instance scope such as a named
 // begin block). A null result is the correct answer when no instance encloses
-// the object, so this always claims the relation.
+// the object, so this always claims the relation. Detail 2's vpiModule is
+// derived the same way: the module the object is inside, through a begin
+// block, a generate scope or an interface or program instance between, and
+// null where it is inside none.
 bool TryResolveInstanceRelation(int type, VpiHandle ref, VpiHandle& out) {
   if (type == vpiInstance) {
     out = VpiInstanceOf(ref);
+    return true;
+  }
+  if (type == kVpiModule) {
+    out = VpiModuleOf(ref);
     return true;
   }
   return false;

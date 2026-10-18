@@ -389,6 +389,27 @@ TEST_F(InstanceObjectsOfARun, ADeepInstanceDeclaringNothingHasItsParent) {
   EXPECT_STREQ(vpi_get_str(vpiFullName, vpi_handle(vpiModule, leaf)), "top.m2");
 }
 
+// Detail 2: vpiModule is the module an object is inside, reached through a
+// generate scope or an interface instance standing between, the module an
+// instance is instantiated in for a module instance, and null for a top module,
+// which no module encloses.
+TEST_F(InstanceObjectsOfARun, VpiModuleIsTheModuleAnObjectIsInside) {
+  Run("module m; endmodule\n"
+      "interface ifc; wire w; endinterface\n"
+      "module top; m m1(); ifc i();\n"
+      "  if (1) begin : g wire gw; end endmodule\n");
+  vpiHandle top = By("top");
+  ASSERT_NE(top, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiModule, By("top.m1"))), VpiObjectOf(top));
+  ASSERT_NE(By("top.g.gw"), nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiModule, By("top.g.gw"))),
+            VpiObjectOf(top));
+  ASSERT_NE(By("top.i.w"), nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiModule, By("top.i.w"))),
+            VpiObjectOf(top));
+  EXPECT_EQ(vpi_handle(vpiModule, top), nullptr);
+}
+
 constexpr const char* kDottedEscapedNames =
     "module sub; endmodule\n"
     "module top; logic \\a.b ; sub \\u.1 (); endmodule\n";

@@ -39,10 +39,12 @@ int TimeExponent(TimeUnit unit, int magnitude) {
 }
 
 // §37.10: what an instance takes from its definition -- the time unit and
-// precision it was elaborated under, and the file and line the definition was
-// written on, restated where it came from (detail 8 lets `line move it).
+// precision it was elaborated under, the file and line the definition was
+// written on, restated where it came from (detail 8 lets `line move it), and,
+// by §37.3.7, the lifetime it was declared with.
 void RecordInstanceDefinition(VpiObject* obj, const RtlirModule* mod,
                               const SourceManager& sources) {
+  obj->automatic = mod->is_automatic;
   obj->time_unit = TimeExponent(mod->timescale.unit, mod->timescale.magnitude);
   obj->time_precision =
       TimeExponent(mod->timescale.precision, mod->timescale.prec_magnitude);
@@ -178,7 +180,10 @@ void VpiContext::AttachPackages(const RtlirDesign* design) {
   // the package stands as, and it is given the package's type and names.
   if (design == nullptr) return;
   for (const PackageDecl* pkg : design->packages) {
-    MakePackageScope(DesignObjectForFlatName(pkg->name), pkg->name);
+    VpiObject* obj = DesignObjectForFlatName(pkg->name);
+    MakePackageScope(obj, pkg->name);
+    // §37.3.7: the lifetime the package was declared with.
+    obj->automatic = pkg->is_automatic;
   }
   // §3.12.1: where each file is a unit of its own, each unit's data is keyed
   // under its own scope name, "$unit#k", and each unit is a compilation-unit

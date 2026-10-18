@@ -6,6 +6,7 @@
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_alloc_scheme.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_data_structs.h"
 #include "simulator/vpi_design_attach.h"
@@ -31,6 +32,8 @@ VpiHandle VpiContext::ThreadObjectFor(Process* proc) {
   }
   auto* obj = AllocObject();
   obj->type = vpiThread;
+  // §37.3.7: a thread has the lifetime of the thread it is.
+  obj->alloc_scheme = VpiAllocSchemeFor(VpiAllocKind::kFrameOrThread);
   obj->active = proc->active;
   run_objects_[proc] = obj;
   // §37.3.8: a thread is one of the transient objects callbacks can follow
@@ -145,6 +148,7 @@ VpiHandle VpiContext::ActivateFrame(const void*& thread) {
   if (frame == nullptr) {
     frame = AllocObject();
     frame->type = vpiFrame;
+    frame->alloc_scheme = VpiAllocSchemeFor(VpiAllocKind::kFrameOrThread);
     frame->parent = holder;
     holder->children.push_back(frame);
   }

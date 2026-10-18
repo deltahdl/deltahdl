@@ -174,6 +174,36 @@ TEST_F(VpiObjectProtection, RelationshipAccessOnProtectedObjectIsAnError) {
   EXPECT_NE(info.level, 0);
 }
 
+// Claim (the one-to-many half): iterating a relationship of a protected object
+// is refused the same way, yielding no iterator and recording an error that
+// vpi_chk_error() reports, while the iteration of an ordinary object succeeds
+// with none.
+TEST_F(VpiObjectProtection, IterationOnProtectedObjectIsAnError) {
+  VpiObject child;
+  child.type = vpiNet;
+
+  VpiObject open_mod;
+  open_mod.type = vpiModule;
+  open_mod.children.push_back(&child);
+  vpiHandle nets = vpi_iterate(vpiNet, VpiHandleOf(&open_mod));
+  EXPECT_NE(nets, nullptr);
+  s_vpi_error_info ok = {};
+  EXPECT_EQ(vpi_chk_error(&ok), 0);
+  vpi_free_object(nets);
+
+  VpiObject locked_mod;
+  locked_mod.type = vpiModule;
+  locked_mod.children.push_back(&child);
+  locked_mod.is_protected = true;
+  EXPECT_EQ(vpi_iterate(vpiNet, VpiHandleOf(&locked_mod)), nullptr);
+
+  s_vpi_error_info info = {};
+  EXPECT_NE(vpi_chk_error(&info), 0);
+  EXPECT_EQ(info.level, vpiError);
+  ASSERT_NE(info.message, nullptr);
+  EXPECT_NE(std::string(info.message).find("protected"), std::string::npos);
+}
+
 // Edge (boundary of the protected-object rule): the access error applies only
 // to protected objects. An ordinary object reports a non-exception property
 // such as vpiSize normally and records no error, confirming the guard keys off
@@ -190,11 +220,22 @@ TEST_F(VpiObjectProtection, GetNonExceptionPropertyOnOrdinaryObjectSucceeds) {
   EXPECT_EQ(vpi_chk_error(&info), 0);
 }
 
+// Whether each object of an instance that a location recorder other than the
+// instance's own marks -- its continuous assignment, its initial process, the
+// block that process runs and its assertion -- is protected, -1 for one the
+// instance holds none of.
+struct WrittenItemsSeen {
+  int cont_assign = -1;
+  int process = -1;
+  int block = -1;
+  int assertion = -1;
+};
+
 // What a PLI application reads of the design below while it runs: whether the
 // instance of the sealed module, the instance of the cleartext one and a net
 // declared inside the sealed module are protected, whether the sealed
-// instance's type and nets can be read, and whether the cleartext one's nets
-// can.
+// instance's type and nets can be read, whether the cleartext one's nets can,
+// and the protection of each instance's written items.
 struct ProtectionSeen {
   int sealed_protected = -1;
   int sealed_type = -1;
@@ -202,6 +243,8 @@ struct ProtectionSeen {
   int inner_net_protected = -1;
   int clear_protected = -1;
   bool clear_nets_reached = false;
+  WrittenItemsSeen sealed_items;
+  WrittenItemsSeen clear_items;
 };
 
 ProtectionSeen g_seen;
@@ -216,6 +259,30 @@ VpiObject* NetNamedIn(vpiHandle scope, std::string_view name) {
   return nullptr;
 }
 
+// The first child of `obj` whose type is `type`, read off the object itself,
+// and null for none.
+VpiObject* ChildOfType(VpiObject* obj, int type) {
+  if (obj == nullptr) return nullptr;
+  for (VpiObject* child : obj->children) {
+    if (child->type == type) return child;
+  }
+  return nullptr;
+}
+
+// Whether `obj` is protected, -1 for no object.
+int ProtectionOf(VpiObject* obj) {
+  return obj == nullptr ? -1 : vpi_get(vpiIsProtected, VpiHandleOf(obj));
+}
+
+WrittenItemsSeen ReadWrittenItems(vpiHandle scope) {
+  VpiObject* instance = VpiObjectOf(scope);
+  VpiObject* process = ChildOfType(instance, vpiInitial);
+  return {ProtectionOf(ChildOfType(instance, vpiContAssign)),
+          ProtectionOf(process),
+          ProtectionOf(process == nullptr ? nullptr : process->body),
+          ProtectionOf(ChildOfType(instance, vpiAssert))};
+}
+
 PLI_INT32 ReadProtectionCalltf(PLI_BYTE8* /*user_data*/) {
   vpiHandle sealed = vpi_handle_by_name(VpiText("u"), nullptr);
   if (sealed != nullptr) {
@@ -224,6 +291,7 @@ PLI_INT32 ReadProtectionCalltf(PLI_BYTE8* /*user_data*/) {
     g_seen.sealed_nets_reached = vpi_iterate(vpiNet, sealed) != nullptr;
     VpiObject* inner = NetNamedIn(sealed, "inner");
     if (inner != nullptr) g_seen.inner_net_protected = inner->is_protected;
+    g_seen.sealed_items = ReadWrittenItems(sealed);
   }
   vpiHandle clear = vpi_handle_by_name(VpiText("c"), nullptr);
   if (clear != nullptr) {
@@ -231,6 +299,7 @@ PLI_INT32 ReadProtectionCalltf(PLI_BYTE8* /*user_data*/) {
     vpiHandle nets = vpi_iterate(vpiNet, clear);
     g_seen.clear_nets_reached = nets != nullptr;
     if (nets != nullptr) vpi_free_object(nets);
+    g_seen.clear_items = ReadWrittenItems(clear);
   }
   return 0;
 }
@@ -245,10 +314,15 @@ std::string SealedDesignSource() {
       "module secret(input a, output y);\n"
       "  wire inner;\n"
       "  assign y = a;\n"
+      "  initial begin end\n"
+      "  a1: assert property (@(posedge a) a);\n"
       "endmodule\n"
       "`pragma protect end\n"
       "module clear(input a);\n"
-      "  wire seen;\n"
+      "  wire seen, z;\n"
+      "  assign z = a;\n"
+      "  initial begin end\n"
+      "  a1: assert property (@(posedge a) a);\n"
       "endmodule\n"
       "module t;\n"
       "  wire a, y;\n"
@@ -313,6 +387,24 @@ TEST_F(VpiProtectionInARun, AnInstanceOfACleartextModuleIsNot) {
 // And its nets are reached as ever.
 TEST_F(VpiProtectionInARun, ACleartextInstancesNetsAreReached) {
   EXPECT_TRUE(g_seen.clear_nets_reached);
+}
+
+// A continuous assignment, a process, the block it runs and an assertion
+// written inside the envelope represent code it contained, so each is
+// protected...
+TEST_F(VpiProtectionInARun, TheItemsWrittenInsideItAreProtected) {
+  EXPECT_EQ(g_seen.sealed_items.cont_assign, 1);
+  EXPECT_EQ(g_seen.sealed_items.process, 1);
+  EXPECT_EQ(g_seen.sealed_items.block, 1);
+  EXPECT_EQ(g_seen.sealed_items.assertion, 1);
+}
+
+// ...and the same items written in the clear are not.
+TEST_F(VpiProtectionInARun, TheItemsWrittenInTheClearAreNot) {
+  EXPECT_EQ(g_seen.clear_items.cont_assign, 0);
+  EXPECT_EQ(g_seen.clear_items.process, 0);
+  EXPECT_EQ(g_seen.clear_items.block, 0);
+  EXPECT_EQ(g_seen.clear_items.assertion, 0);
 }
 
 class VpiProtectionInABoundRun : public ::testing::Test {

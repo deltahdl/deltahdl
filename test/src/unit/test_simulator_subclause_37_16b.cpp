@@ -449,5 +449,35 @@ TEST_F(ArrayNetsOfARun, ANetArrayBelowZeroIsAnArrayNet) {
   EXPECT_TRUE(NamesOf(vpiNet, Array()).empty());
 }
 
+// §37.16 (figure): the `net` class inside `nets` groups the concrete net
+// kinds, a user-defined net's among them, and leaves out the net bit, the
+// array net and the interconnect array that stand beside it in `nets`.
+TEST(NetKindModel, TheNetClassGroupsTheConcreteNetKinds) {
+  for (int kind : {vpiNet, vpiStructNet, vpiUnionNet, vpiEnumNet, vpiIntegerNet,
+                   vpiTimeNet, vpiBitNet, vpiByteNet, vpiShortIntNet, vpiIntNet,
+                   vpiLongIntNet, vpiRealNet, vpiShortRealNet,
+                   vpiPackedArrayNet, vpiInterconnectNet}) {
+    EXPECT_TRUE(VpiIsNetClassType(kind)) << kind;
+  }
+  for (int kind : {vpiNetBit, vpiNetArray, vpiInterconnectArray, vpiReg}) {
+    EXPECT_FALSE(VpiIsNetClassType(kind)) << kind;
+  }
+}
+
+// §37.10 with §37.16: an instance's vpiNet iteration reaches every net it
+// declares of a kind the `net` class groups, an enum, integer and struct net
+// as well as a logic one, and no array net.
+TEST_F(ArrayNetsOfARun, AnInstancesNetIterationReachesEveryNetKind) {
+  Run("module top; typedef enum logic [1:0] {A, B} e_t;\n"
+      "  typedef struct packed { logic x; } s_t;\n"
+      "  wire l; wire integer i; wire e_t e; wire s_t s; wire n [1:0];\n"
+      "endmodule\n");
+  EXPECT_EQ(NamesOf(vpiNet, By("top")),
+            (std::vector<std::string>{"e", "i", "l", "s"}));
+  EXPECT_EQ(vpi_get(vpiType, Named(vpiNet, By("top"), "e")), vpiEnumNet);
+  EXPECT_EQ(vpi_get(vpiType, Named(vpiNet, By("top"), "i")), vpiIntegerNet);
+  EXPECT_EQ(vpi_get(vpiType, Named(vpiNet, By("top"), "s")), vpiStructNet);
+}
+
 }  // namespace
 }  // namespace delta

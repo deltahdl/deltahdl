@@ -690,9 +690,11 @@ void VpiRecordAssertionLocation(VpiObject* obj, const SourceRange& range,
                                 SimContext& ctx) {
   // §37.49: where the assertion stands - its file, the line and column it
   // starts at and those it ends at - read where the text was written (§22.12).
-  // A position the parser did not record leaves its pair as it was.
+  // A position the parser did not record leaves its pair as it was. §37.3.6:
+  // an assertion written inside a decryption envelope is protected.
   const SourceManager& sources = ctx.GetDiag().Sources();
   if (range.start.IsValid()) {
+    if (sources.IsProtected(range.start)) obj->is_protected = true;
     const SourceLoc kStart = sources.ResolveToOrigin(range.start);
     obj->file = std::string(sources.FilePath(kStart.file_id));
     obj->start_line = static_cast<int>(kStart.line);
@@ -707,9 +709,11 @@ void VpiRecordAssertionLocation(VpiObject* obj, const SourceRange& range,
 
 void VpiRecordWrittenLocation(VpiObject* obj, SourceLoc loc, SimContext& ctx) {
   // §22.12: the position is read where the text was written, the file and
-  // line a line of the preprocessor's joined text came from.
+  // line a line of the preprocessor's joined text came from. §37.3.6: an
+  // object written inside a decryption envelope is protected.
   if (!loc.IsValid()) return;
   const SourceManager& sources = ctx.GetDiag().Sources();
+  if (sources.IsProtected(loc)) obj->is_protected = true;
   const SourceLoc kWritten = sources.ResolveToOrigin(loc);
   obj->line_no = static_cast<int>(kWritten.line);
   obj->file = std::string(sources.FilePath(kWritten.file_id));

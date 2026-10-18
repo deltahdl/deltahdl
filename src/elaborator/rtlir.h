@@ -666,6 +666,8 @@ struct RtlirModule {
   bool is_program = false;
   bool is_interface = false;
   bool is_checker = false;
+  // §37.3.7: declared `automatic`, the default lifetime of its subroutines.
+  bool is_automatic = false;
   std::vector<ResolvedAttribute> attrs;
   RtlirNodeAttributes node_attrs;  // §37.83: its items' and statements'.
   // Annex E.4 to E.7: the delay mode the last directive before this module

@@ -22,6 +22,7 @@
 #include "simulator/sv_vpi_user.h"
 #include "simulator/sync_objects.h"
 #include "simulator/variable.h"
+#include "simulator/vpi_alloc_scheme.h"
 #include "simulator/vpi_collection_elements.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_design_attach_build.h"
@@ -107,6 +108,10 @@ VpiObject* MakePropertyVariable(VpiObject* holder, ClassObject& obj,
   var->name = build.keep(std::string(member.name));
   var->parent = holder;
   var->automatic = !member.is_static;
+  // §37.3.7: a property other than a static one is part of the class object,
+  // in the dynamic memory the object was allocated in.
+  var->alloc_scheme = VpiAllocSchemeFor(
+      member.is_static ? VpiAllocKind::kOther : VpiAllocKind::kDynamic);
   if (member.is_local) {
     var->visibility = vpiLocalVis;
   } else if (member.is_protected) {
@@ -290,6 +295,7 @@ VpiObject* VpiMakeClassObject(ClassObject& obj, const VpiClassObjDefn& of,
                               const VpiAttachBuild& build) {
   VpiObject* made = build.alloc();
   made->type = vpiClassObj;
+  made->alloc_scheme = VpiAllocSchemeFor(VpiAllocKind::kDynamic);
   made->obj_id = static_cast<int64_t>(obj.handle);
   if (obj.type == nullptr) return made;
   VpiObject* typespec = build.alloc();
@@ -335,6 +341,7 @@ VpiObject* VpiMakeSyncClassObject(uint64_t handle, std::string_view cls,
                                   const VpiAttachBuild& build) {
   VpiObject* made = build.alloc();
   made->type = vpiClassObj;
+  made->alloc_scheme = VpiAllocSchemeFor(VpiAllocKind::kDynamic);
   made->obj_id = static_cast<int64_t>(handle);
   VpiObject* typespec = build.alloc();
   typespec->type = vpiClassTypespec;

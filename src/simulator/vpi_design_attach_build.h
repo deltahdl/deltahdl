@@ -737,13 +737,16 @@ VpiObject* VpiMakeItemAssertion(const RtlirAssertion& assertion,
                                 const VpiStmtBuild& with);
 
 // §37.49: give the assertion `obj` the location of its text, `range`: its
-// file and the line and column it starts and ends at.
+// file and the line and column it starts and ends at, and, by §37.3.6, its
+// protection where that text stands inside a decryption envelope.
 void VpiRecordAssertionLocation(VpiObject* obj, const SourceRange& range,
                                 SimContext& ctx);
 
 // §37.3.3: give `obj`, which stands for source text starting at `loc`, the
-// file and line that text was written on, which vpiFile and vpiLineNo read; a
-// position the parser did not record leaves both as they were.
+// file and line that text was written on, which vpiFile and vpiLineNo read,
+// and, by §37.3.6, its protection where that text stands inside a decryption
+// envelope; a position the parser did not record leaves all three as they
+// were.
 void VpiRecordWrittenLocation(VpiObject* obj, SourceLoc loc, SimContext& ctx);
 
 // §37.11: make each instance array of modules, interfaces or programs an

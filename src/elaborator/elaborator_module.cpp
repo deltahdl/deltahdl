@@ -161,6 +161,7 @@ static void InitRtlirModuleHeader(RtlirModule* mod, const ModuleDecl* decl,
   mod->is_program = (decl->decl_kind == ModuleDeclKind::kProgram);
   InitInterfaceHeader(mod, decl);
   mod->is_checker = (decl->decl_kind == ModuleDeclKind::kChecker);
+  mod->is_automatic = decl->is_automatic;
   // Annex E: each of its directives applies to the modules that follow it,
   // so the values recorded at this module's header stand ahead of the unit's
   // last.
