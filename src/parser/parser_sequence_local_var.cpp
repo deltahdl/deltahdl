@@ -354,6 +354,8 @@ struct SequencePortScan {
   // untyped, cleared by `untyped` and by a type the keyword alone does not
   // name, which a `[` or a type identifier after it shows.
   TokenKind carry_type_kw = TokenKind::kEof;
+  // §16.8: the data type in force for the formals that follow, null for none.
+  DataType* carry_type = nullptr;
   // §16.14.7: whether the type in force for the formals that follow admits a
   // $inferred_clock default, which only an untyped or `event` formal does. A
   // data type, written or carried from an earlier formal (§16.8), or
@@ -429,6 +431,7 @@ struct SequencePortScan {
     // §16.8.2: a chain of more than one identifier means the leading
     // identifier(s) supply a (user-defined) type alias, satisfying the
     // explicit-type requirement.
+    const auto kTypeName = name_tok.text;
     bool user_typed = false;
     while (LexerCheck(lexer, TokenKind::kIdentifier)) {
       name_tok = lexer.Next();
@@ -436,6 +439,8 @@ struct SequencePortScan {
       user_typed = true;
     }
     if (user_typed) {
+      carry_type =
+          ParserPropertySpecHelpers::NamedFormalType(*parser, kTypeName);
       carry_type_kw = TokenKind::kEof;
       clock_default_allowed = false;
     }
@@ -446,6 +451,7 @@ struct SequencePortScan {
     bool untyped = carry_type_kw == TokenKind::kEof && clock_default_allowed;
     item->prop_formal_type_kw.push_back(untyped ? TokenKind::kKwUntyped
                                                 : carry_type_kw);
+    item->prop_formal_types.push_back(carry_type);
     // §16.8.2: whether this formal is a local variable formal argument, which
     // §16.10 keeps out of the sequence's clocking events.
     item->prop_formal_is_local.push_back(item_saw_local);
@@ -473,17 +479,19 @@ struct SequencePortScan {
     lexer.Next();
   }
 
-  // §16.8.1: a data type keyword types the formals after it until the next
-  // type, and `event`, `sequence` and `untyped` do the same for a formal that
-  // is not local, `untyped` ending a type's reach; a `[` after a data type
-  // keyword makes a type the keyword alone does not name. Returns true where
-  // the token was one of these and was consumed.
+  // §16.8.1: the data type a data type keyword opens types the formals after it
+  // until the next type, and `event`, `sequence` and `untyped` do the same for
+  // a formal that is not local, `untyped` ending a type's reach; packed
+  // dimensions after a data type keyword make a type the keyword alone does
+  // not name. Returns true where the token was one of these and its type was
+  // consumed.
   bool HandleTypeKeyword(Lexer& lexer, DiagEngine& diag) {
     TokenKind kind = lexer.Peek().kind;
     if (IsBuiltinTypeKwForLocalVar(kind)) {
-      ReportChandleFormal(diag, lexer.Next());
+      ReportChandleFormal(diag, lexer.Peek());
+      carry_type = ParserPropertySpecHelpers::ParseFormalType(*parser);
       carry_type_kw =
-          LexerCheck(lexer, TokenKind::kLBracket) ? TokenKind::kEof : kind;
+          carry_type->packed_dim_left != nullptr ? TokenKind::kEof : kind;
       item_saw_explicit_type = true;
       clock_default_allowed = false;
       return true;
@@ -491,6 +499,7 @@ struct SequencePortScan {
     if (item_saw_local || !IsDisallowedLocalVarTypeKw(kind)) return false;
     lexer.Next();
     carry_type_kw = kind == TokenKind::kKwUntyped ? TokenKind::kEof : kind;
+    carry_type = nullptr;
     clock_default_allowed =
         kind == TokenKind::kKwUntyped || kind == TokenKind::kKwEvent;
     return true;

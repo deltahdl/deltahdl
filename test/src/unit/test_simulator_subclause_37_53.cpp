@@ -238,6 +238,46 @@ TEST_F(SequenceDeclsOfARun, AnInstanceReachesTheSequenceItDeclares) {
   EXPECT_EQ(vpi_handle(vpiExpr, x), nullptr);
 }
 
+// Detail 2 with §37.25: a formal of a packed type reaches a typespec of its
+// keyword with the range it was written with, as does a formal it carries its
+// type on to (§16.8); one of a user-defined type the typespec of the typedef
+// naming it, the module's or the compilation unit's; and one of the sequence
+// type a sequence typespec.
+TEST_F(SequenceDeclsOfARun, AFormalOfAWrittenTypeReachesItsTypespec) {
+  Run("typedef logic [7:0] byte_t;\n"
+      "module top; logic a, b;\n"
+      "  typedef struct packed { logic a, b; } pair_t;\n"
+      "  sequence s(bit [3:0] v, u, pair_t t, byte_t w, sequence q);\n"
+      "    a ##1 b;\n"
+      "  endsequence\n"
+      "endmodule\n");
+  vpiHandle decl = Named(vpiSequenceDecl, By("top"), "s");
+  ASSERT_NE(decl, nullptr);
+  // The size of the first range of the typespec `formal` reaches, 0 for none.
+  const auto kRangeSizeOf = [decl](const char* formal) {
+    vpiHandle ts =
+        vpi_handle(vpiTypespec, Named(vpiSeqFormalDecl, decl, formal));
+    vpiHandle ranges = ts == nullptr ? nullptr : vpi_iterate(vpiRange, ts);
+    vpiHandle range = ranges == nullptr ? nullptr : vpi_scan(ranges);
+    return range == nullptr ? 0 : vpi_get(vpiSize, range);
+  };
+  EXPECT_EQ(KindReached(vpiTypespec, Named(vpiSeqFormalDecl, decl, "v")),
+            vpiBitTypespec);
+  EXPECT_EQ(kRangeSizeOf("v"), 4);
+  EXPECT_EQ(KindReached(vpiTypespec, Named(vpiSeqFormalDecl, decl, "u")),
+            vpiBitTypespec);
+  EXPECT_EQ(kRangeSizeOf("u"), 4);
+  vpiHandle t = vpi_handle(vpiTypespec, Named(vpiSeqFormalDecl, decl, "t"));
+  ASSERT_NE(t, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, t), vpiStructTypespec);
+  EXPECT_STREQ(vpi_get_str(vpiName, t), "pair_t");
+  vpiHandle w = vpi_handle(vpiTypespec, Named(vpiSeqFormalDecl, decl, "w"));
+  ASSERT_NE(w, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, w), "byte_t");
+  EXPECT_EQ(KindReached(vpiTypespec, Named(vpiSeqFormalDecl, decl, "q")),
+            vpiSequenceTypespec);
+}
+
 // Detail 4: a local variable argument written as an output or an inout has
 // that direction (§16.8.2).
 TEST_F(SequenceDeclsOfARun, AnOutputAndAnInoutFormalHaveTheirDirections) {
