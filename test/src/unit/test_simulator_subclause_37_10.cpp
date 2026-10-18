@@ -759,6 +759,25 @@ TEST_F(InstanceObjectsOfARun, AnInstanceReachesTheNettypesItDeclares) {
             nullptr);
 }
 
+// Detail 10 with §3.12.1: a nettype the compilation unit declares is a
+// nettype decl of the unit's scope, "$unit::" naming it (detail 5), which a
+// unit declaring nothing else has too; the top beside it declares none.
+TEST_F(InstanceObjectsOfARun, TheCompilationUnitReachesTheNettypesItDeclares) {
+  Run("nettype logic [3:0] unt;\n"
+      "module top; endmodule\n");
+  std::vector<std::string> reached;
+  vpiHandle it = vpi_iterate(vpiPackage, nullptr);
+  ASSERT_NE(it, nullptr);
+  while (vpiHandle pkg = vpi_scan(it)) {
+    if (vpi_get(vpiUnit, pkg) != 1) continue;
+    for (vpiHandle decl : ObjectsOf(vpiNetTypedef, pkg)) {
+      reached.emplace_back(vpi_get_str(vpiFullName, decl));
+    }
+  }
+  EXPECT_EQ(reached, std::vector<std::string>{"$unit::unt"});
+  EXPECT_TRUE(NamesOf(vpiNetTypedef, By("top")).empty());
+}
+
 // §37.10: vpiTimeUnit and vpiTimePrecision are drawn on an instance, and a
 // net reports vpiUndefined for both.
 TEST(InstanceModel, ANonInstanceHasNoTimeUnitOrPrecision) {

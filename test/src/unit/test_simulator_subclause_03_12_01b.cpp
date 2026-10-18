@@ -393,4 +393,24 @@ TEST_F(SeparateUnitsVpi, EachUnitsLetIsALetDeclOfItsOwnScope) {
   EXPECT_EQ(h->parent->name, "$unit");
 }
 
+// §3.12.1 with §37.10 detail 10: a nettype a compilation unit declares is a
+// nettype decl of that unit's own scope, which a unit declaring nothing else
+// has too, so each unit reaches its own and none of another's.
+TEST_F(SeparateUnitsVpi, EachUnitsNettypeIsANettypeDeclOfItsOwnScope) {
+  RunUnits(
+      {"nettype logic una;\n"
+       "module top; child c(); endmodule\n",
+       "nettype logic unb;\n"
+       "module child; endmodule\n",
+       "module other; endmodule\n"});
+  std::vector<std::vector<std::string>> reached;
+  vpiHandle it = vpi_iterate(vpiPackage, nullptr);
+  ASSERT_NE(it, nullptr);
+  while (vpiHandle pkg = vpi_scan(it)) {
+    reached.push_back(NamesOf(vpiNetTypedef, pkg));
+  }
+  std::ranges::sort(reached);
+  EXPECT_EQ(reached, (std::vector<std::vector<std::string>>{{"una"}, {"unb"}}));
+}
+
 }  // namespace

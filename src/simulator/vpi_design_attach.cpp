@@ -16,6 +16,7 @@
 #include "common/types.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_io_decl.h"
+#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_specify.h"
@@ -24,6 +25,7 @@
 #include "simulator/sim_context.h"
 #include "simulator/specify.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/unit_scopes.h"
 #include "simulator/variable.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
@@ -685,6 +687,8 @@ void VpiContext::MakeNettypeDecls(VpiHandle scope,
     decl->name = name_pool_.back();
     decl->full_name = VpiScopedFullName(scope, item.name);
     decl->parent = scope;
+    // §37.10 detail 6: a compilation unit's is no object reached by name.
+    decl->in_compilation_unit = scope->in_compilation_unit;
     // §6.6.7: `nettype T1 T2;` declares T2 an alias of the nettype T1, which
     // writes no with clause of its own and resolves as T1 does. Detail 2: an
     // alias reaches the declaration it aliases, found here among those the
@@ -732,6 +736,19 @@ void VpiContext::AttachNettypeDeclarations(const RtlirDesign* design) {
   if (design == nullptr) return;
   for (const PackageDecl* pkg : design->packages) {
     MakeNettypeDecls(DesignObjectForFlatName(pkg->name), pkg->items);
+  }
+  // §3.12.1: the compilation unit's own nettypes are its scope's, each unit's
+  // where every file is one, "$unit#k", and the one unit's, "$unit", where
+  // they are not; AttachPackages made the scope of a unit declaring one.
+  const bool kOneUnit = design->compilation_units.empty();
+  const std::size_t kUnits = kOneUnit ? 1 : design->compilation_units.size();
+  for (std::size_t k = 0; k < kUnits; ++k) {
+    const CompilationUnit* unit =
+        kOneUnit ? design->compilation_unit : design->compilation_units[k];
+    auto scope = object_map_.find(
+        UnitScopes::ScopeName(kOneUnit ? -1 : static_cast<int>(k)));
+    if (scope != object_map_.end())
+      MakeNettypeDecls(scope->second, unit->cu_items);
   }
 }
 
