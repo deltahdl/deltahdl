@@ -184,6 +184,16 @@ void MakeModuleIoDecl(const RtlirIoDecl& decl, VpiHandle module,
   module->children.push_back(io_decl);
 }
 
+// The net or variable the io decl of `decl` reaches through vpiExpr, under the
+// instance `prefix` names; null where the declaration's expression is no single
+// name (§37.13).
+VpiObject* IoDeclItem(
+    const std::unordered_map<std::string_view, VpiObject*>& objects,
+    const std::string& prefix, const RtlirIoDecl& decl) {
+  if (decl.object_name.empty()) return nullptr;
+  return FindObjectForFlatName(objects, VpiFlatName(prefix, decl.object_name));
+}
+
 // §37.24 (figure): the interconnect net a port declared with the `interconnect`
 // keyword stands for. §37.24's whole model is about these objects and no pass
 // made one, so a design declaring a generic interconnect port had no
@@ -384,13 +394,8 @@ void VpiContext::AttachDesignPorts(const RtlirDesign* design) {
           }
         }
         for (const RtlirIoDecl& decl : mod->port_expr_decls) {
-          MakeModuleIoDecl(
-              decl, module,
-              decl.object_name.empty()
-                  ? nullptr
-                  : FindObjectForFlatName(
-                        object_map_, VpiFlatName(prefix, decl.object_name)),
-              kAlloc, name_pool_);
+          MakeModuleIoDecl(decl, module, IoDeclItem(object_map_, prefix, decl),
+                           kAlloc, name_pool_);
         }
       });
   if (sim_ctx_ == nullptr) return;
