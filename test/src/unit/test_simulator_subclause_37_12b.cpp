@@ -141,5 +141,28 @@ TEST_F(ScopesOfARun, AGenerateBlocksFunctionReachesItsReturn) {
   EXPECT_EQ(StmtKindOf(Named(vpiTaskFunc, By("top.b"), "g")), vpiReturnStmt);
 }
 
+// Detail 5 for a class's methods (§37.31): one written in the class, one an
+// out-of-block declaration defines for an `extern` prototype (§8.24), and a
+// package class's, each reach the statement of its body.
+TEST_F(ScopesOfARun, AClassMethodReachesTheStatementOfItsBody) {
+  Run("package pk; class P; int q; task pt; q = 1; endtask endclass "
+      "endpackage\n"
+      "module top;\n"
+      "  class C;\n"
+      "    int n;\n"
+      "    task inside; n = 1; n = 2; endtask\n"
+      "    extern task outside();\n"
+      "  endclass\n"
+      "  task C::outside(); n = 3; endtask\n"
+      "endmodule\n");
+  vpiHandle c = Named(vpiClassDefn, By("top"), "C");
+  ASSERT_NE(c, nullptr);
+  EXPECT_EQ(StmtKindOf(Named(vpiTaskFunc, c, "inside")), vpiBegin);
+  EXPECT_EQ(StmtKindOf(Named(vpiTaskFunc, c, "outside")), vpiAssignment);
+  vpiHandle p = Named(vpiClassDefn, By("pk"), "P");
+  ASSERT_NE(p, nullptr);
+  EXPECT_EQ(StmtKindOf(Named(vpiTaskFunc, p, "pt")), vpiAssignment);
+}
+
 }  // namespace
 }  // namespace delta

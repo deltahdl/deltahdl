@@ -243,19 +243,19 @@ TEST_F(CallsWithinADesign, AnIncrementStepsEachTimeItIsRead) {
   EXPECT_EQ(ValueAfterReads(kIncrementArgument, 2), 7);
 }
 
-// A call the body of a class's task writes is one the model holds no object
-// for, so the call it runs with is one of its own. A system task's is
-// unnamed all the same, being a statement (§37.60 detail 1), an argument it
-// omits is a null operation and null passed to it is a null constant (detail
-// 8)...
+// A call the body of a package's task writes, run from an instance, finds no
+// object the model holds under that instance, the package's statements being
+// kept under the package, so the call it runs with is one of its own. A system
+// task's is unnamed all the same, being a statement (§37.60 detail 1), an
+// argument it omits is a null operation and null passed to it is a null
+// constant (detail 8)...
 TEST_F(CallsWithinADesign, ATaskBodysSystemTaskCallIsUnnamed) {
   ASSERT_NE(RegisterArgs(0), nullptr);
-  Run("module top; logic [3:0] v;\n"
-      "  class C;\n"
-      "    task t(input logic [3:0] w); $args(w, , null); endtask\n"
-      "  endclass\n"
-      "  C c;\n"
-      "  initial begin c = new; c.t(v); end\n"
+  Run("package pk;\n"
+      "  task t(input logic [3:0] w); $args(w, , null); endtask\n"
+      "endpackage\n"
+      "module top; logic [3:0] v;\n"
+      "  initial pk::t(v);\n"
       "endmodule\n");
   ASSERT_NE(g_invoked_call, nullptr);
   EXPECT_EQ(vpi_get_str(vpiName, g_invoked_call), nullptr);
@@ -269,19 +269,18 @@ TEST_F(CallsWithinADesign, ATaskBodysSystemTaskCallIsUnnamed) {
 // the function (§37.42).
 TEST_F(CallsWithinADesign, ATaskBodysSystemFunctionCallIsNamed) {
   ASSERT_NE(RegisterFunction("$peek", vpiIntFunc), nullptr);
-  Run("module top;\n"
-      "  class C; task t; int x; x = $peek(); endtask endclass\n"
-      "  C c;\n"
-      "  initial begin c = new; c.t(); end\n"
+  Run("package pk; task t; int x; x = $peek(); endtask endpackage\n"
+      "module top;\n"
+      "  initial pk::t();\n"
       "endmodule\n");
   ASSERT_NE(g_invoked_call, nullptr);
   EXPECT_STREQ(vpi_get_str(vpiName, g_invoked_call), "$peek");
 }
 
-// A call the body of a class's function writes, which the model holds no
-// object for either, builds each argument as the kind of expression its
-// actual is (§37.58, §37.59), both when its compiletf runs, which reads no
-// value (§36.8.2), and when its calltf does (§36.8.3).
+// A call the body of a package's function writes, which finds no object of
+// the instance running it either, builds each argument as the kind of
+// expression its actual is (§37.58, §37.59), both when its compiletf runs,
+// which reads no value (§36.8.2), and when its calltf does (§36.8.3).
 TEST_F(CallsWithinADesign, AFunctionBodysCallBuildsEachArgumentKind) {
   g_args_seen.clear();
   g_arg_reads = 0;
@@ -291,16 +290,15 @@ TEST_F(CallsWithinADesign, AFunctionBodysCallBuildsEachArgumentKind) {
   data.compiletf = &ArgsCalltf;
   data.calltf = &ArgsCalltf;
   ASSERT_NE(vpi_register_systf(&data), nullptr);
-  Run("module top; int a, r;\n"
+  Run("package pk; int a;\n"
       "  function int f(int x); return x; endfunction\n"
-      "  class K;\n"
-      "    function int g();\n"
-      "      $kinds(f(1), $clog2(4), 1, '1, 1.5, \"s\", a + 1);\n"
-      "      return 0;\n"
-      "    endfunction\n"
-      "  endclass\n"
-      "  K k;\n"
-      "  initial begin k = new; r = k.g(); end\n"
+      "  function int g();\n"
+      "    $kinds(f(1), $clog2(4), 1, '1, 1.5, \"s\", a + 1);\n"
+      "    return 0;\n"
+      "  endfunction\n"
+      "endpackage\n"
+      "module top; int r;\n"
+      "  initial r = pk::g();\n"
       "endmodule\n");
   std::vector<int> kinds;
   kinds.reserve(g_args_seen.size());

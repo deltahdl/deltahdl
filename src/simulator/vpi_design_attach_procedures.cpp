@@ -4,6 +4,7 @@
 #include <functional>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -14,6 +15,7 @@
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
 #include "lexer/token.h"
+#include "parser/ast_class.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
@@ -746,6 +748,46 @@ void AttachPackageSubroutineBodies(const RtlirDesign& design,
   }
 }
 
+// The task or function the class defn `defn` holds for the method `method`,
+// which MakeMethod made one of for each method the class declares.
+VpiObject* MethodObject(const VpiObject& defn, const ModuleItem& method) {
+  return *std::ranges::find_if(
+      defn.children, [&method](const VpiObject* child) {
+        return VpiIsTaskFuncType(child->type) && child->name == method.name;
+      });
+}
+
+// §37.12 detail 5 with §37.31: the body of each method of each class defn,
+// the one an out-of-block declaration writes for an `extern` method (§8.24),
+// its names resolving in the class first (§8.4) and then in the module or the
+// package declaring it, which the class defn is keyed under.
+void AttachClassMethodBodies(const RtlirDesign& design,
+                             const VpiObjectMap& objects,
+                             const VpiCallBuild& calls,
+                             const VpiAttachBuild& build) {
+  static const RtlirModule kNoModule{};
+  std::unordered_map<std::string, const RtlirModule*> modules;
+  WalkInstancePaths(&design,
+                    [&](const RtlirModule* mod, const std::string& prefix) {
+                      modules.emplace(prefix, mod);
+                    });
+  for (const auto& [key, defn] : calls.classes) {
+    const auto kModule = modules.find(key.second);
+    const bool kInModule = kModule != modules.end();
+    BodyWalk walk{design,  kInModule ? *kModule->second : kNoModule,
+                  objects, key.second,
+                  calls,   build};
+    if (!kInModule) walk.package = key.second;
+    for (const ClassMember* member : key.first->members) {
+      if (member == nullptr || member->method == nullptr) continue;
+      const ModuleItem* body = member->method->out_of_block_body != nullptr
+                                   ? member->method->out_of_block_body
+                                   : member->method;
+      WalkSubroutineBody(*body, MethodObject(*defn, *member->method), walk);
+    }
+  }
+}
+
 }  // namespace
 
 bool ShapeExprCall(const Expr& call, VpiObject* made, const BlockParent& parent,
@@ -857,6 +899,7 @@ void AttachProcedures(const RtlirDesign* design, const VpiObjectMap& objects,
   kWalk(AttachInstanceProcedures);
   kWalk(AttachInstanceSubroutineBodies);
   AttachPackageSubroutineBodies(*design, objects, calls, build);
+  AttachClassMethodBodies(*design, objects, calls, build);
 }
 
 }  // namespace delta
