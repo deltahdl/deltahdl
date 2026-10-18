@@ -568,8 +568,10 @@ void PushInstanceArray(const InstArrayDistribCtx& ctx, RtlirModule* mod,
                        const std::vector<InstArrayDim>& dims) {
   int64_t total = 1;
   for (const InstArrayDim& dim : dims) total *= dim.Size();
-  InstArrayElement array{base.simple_inst_name, dims.front().left,
-                         dims.front().right};
+  InstArrayElement array;
+  array.name = base.simple_inst_name;
+  array.left = dims.front().left;
+  array.right = dims.front().right;
   array.dims = dims;
   // A port the instantiation left unconnected was given a default it did not
   // write, which is no connection of the list.
