@@ -263,7 +263,8 @@ void VpiContext::AttachPackages(const RtlirDesign* design) {
   // and one declaring nettypes of their nettype decls (§37.10 detail 10),
   // whatever else it declares.
   if (!design->cu_let_decls.empty() ||
-      DeclaresScopedItems(design->compilation_unit->cu_items)) {
+      (design->compilation_unit != nullptr &&
+       DeclaresScopedItems(design->compilation_unit->cu_items))) {
     DesignObjectForFlatName(kUnitScope);
   }
   auto unit = object_map_.find(kUnitScope);
