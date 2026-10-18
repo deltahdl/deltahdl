@@ -45,6 +45,44 @@ bool ParserPropertySpecHelpers::ParseAssertionDistItem(Parser& p,
   return true;
 }
 
+// §18.5.3: the default rules of the dist_list whose `{` is the current token,
+// the lexer left past its `}`.
+void ParserPropertySpecHelpers::CheckDistListDefaults(Parser& p) {
+  p.Consume();
+  int depth = 1;
+  int defaults = 0;
+  while (depth > 0) {
+    const Token kToken = p.Consume();
+    if (kToken.kind == TokenKind::kLBrace) {
+      ++depth;
+    } else if (kToken.kind == TokenKind::kRBrace) {
+      --depth;
+    } else if (kToken.kind == TokenKind::kKwDefault) {
+      p.CheckDistDefault(kToken.loc, defaults);
+    }
+  }
+}
+
+// §18.5.3: the default rules of each dist_list of a property_spec a trial
+// parse has read and accepted, from the spec's first token to the
+// parenthesis closing it, where the lexer is left. The trial reads the spec
+// with its reports suppressed, so ParseAssertionDistItem's reports go with
+// the suppression and are made again here; that the trial was accepted means
+// each `dist` opens a list and the closing parenthesis is there.
+void ParserPropertySpecHelpers::CheckSpecDistDefaults(Parser& p) {
+  int parens = 0;
+  while (!p.Check(TokenKind::kRParen) || parens > 0) {
+    const TokenKind kKind = p.Consume().kind;
+    if (kKind == TokenKind::kLParen) {
+      ++parens;
+    } else if (kKind == TokenKind::kRParen) {
+      --parens;
+    } else if (kKind == TokenKind::kKwDist) {
+      CheckDistListDefaults(p);
+    }
+  }
+}
+
 // §A.8.3's expression_or_dist, `expression [ dist { dist_list } ]`, in an
 // assertion. §16.14.2 has a dist in an assert or cover statement be the
 // inside operator over the same values, its weights ignored, and has the

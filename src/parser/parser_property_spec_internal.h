@@ -64,6 +64,8 @@ struct ParserPropertySpecHelpers {
   static bool ParseAssertionDistItem(Parser& p, ConstraintDistItem& item,
                                      int& defaults);
   static Expr* ParseExpressionOrDist(Parser& p);
+  static void CheckDistListDefaults(Parser& p);
+  static void CheckSpecDistDefaults(Parser& p);
   static PropertyExprNode* ParsePropertyIfElse(Parser& p);
   static bool ParsePropertyCaseItem(Parser& p, PropertyExprNode& node);
   static PropertyExprNode* ParsePropertyCase(Parser& p);

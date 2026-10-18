@@ -429,6 +429,12 @@ bool Parser::TryParseSimpleConcurrentProperty(ModuleItem* item,
     return false;
   }
   diag_.PopSuppress();
+  // §18.5.3: the reports the trial's suppression held back, made by a scan of
+  // the spec it read.
+  auto end = lexer_.SavePos();
+  lexer_.RestorePos(saved);
+  ParserPropertySpecHelpers::CheckSpecDistDefaults(*this);
+  lexer_.RestorePos(end);
   item->sensitivity = std::move(events);
   item->body = ParserPropertySpecHelpers::MakeSimplePropertyStmt(
       *this, item, body_kind, body);

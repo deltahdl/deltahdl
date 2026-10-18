@@ -3,7 +3,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
-#include "parser/ast_class.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 
@@ -123,12 +122,14 @@ TEST(AssertionSemanticsParsing,
 }
 
 // §18.5.3: a default specification takes its weight through :/ only, in an
-// assertion's dist as in a constraint's, so := there is an error.
+// assertion's dist as in a constraint's, so := there is an error, reported
+// past an item whose concatenation writes braces of its own.
 TEST(AssertionSemanticsParsing,
      AnAssertedDistsDefaultWrittenWithAssignIsAnError) {
   auto r = Parse(
       "module m;\n"
-      "  a1: assert property (@(posedge clk) v dist {0:=1, default:=1});\n"
+      "  a1: assert property (@(posedge clk) v dist {{1'b0, 1'b1}:=1, "
+      "default:=1});\n"
       "endmodule\n");
   EXPECT_TRUE(ReportedError(r.diags,
                             "a distribution's default specification takes its "
