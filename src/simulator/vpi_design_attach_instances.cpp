@@ -126,17 +126,16 @@ void MarkInCompilationUnit(VpiObject* obj) {
 }
 
 // §37.13 detail 1: the vpiDirection of the io decl a modport port is, the
-// direction the modport gave it, and vpiRef for a ref port; detail 3: none
-// where its vpiExpr `expr` is a virtual interface var the interface declares.
-int ModportPortDirection(Direction direction, const VpiObject* expr) {
+// direction the modport gave it, and vpiRef for a ref port. §25.9 lets no
+// interface declare a virtual interface, so no modport port names one.
+int ModportPortDirection(Direction direction) {
   int declared = vpiNoDirection;
   if (direction == Direction::kInput) declared = vpiInput;
   if (direction == Direction::kOutput) declared = vpiOutput;
   if (direction == Direction::kInout) declared = vpiInout;
-  return VpiIoDeclDirection(
-      declared, direction == Direction::kRef,
-      /*expr_is_ref_obj_to_interface_or_modport=*/false,
-      expr != nullptr && expr->type == vpiVirtualInterfaceVar);
+  return VpiIoDeclDirection(declared, direction == Direction::kRef,
+                            /*expr_is_ref_obj_to_interface_or_modport=*/false,
+                            /*expr_is_virtual_interface_var=*/false);
 }
 
 // Where the modports of one interface instance are made: the instance, the
@@ -202,7 +201,7 @@ void MakeModport(const ModportScope& scope, const ModportDecl& decl) {
     io_decl->name = scope.build.keep(std::string(port.name));
     io_decl->full_name = modport->full_name + "." + std::string(port.name);
     io_decl->io_expr = ModportPortExpr(scope, io_decl, port);
-    io_decl->direction = ModportPortDirection(port.direction, io_decl->io_expr);
+    io_decl->direction = ModportPortDirection(port.direction);
     modport->children.push_back(io_decl);
   }
 }

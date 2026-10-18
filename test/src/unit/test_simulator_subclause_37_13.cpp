@@ -340,16 +340,14 @@ TEST_F(IoDeclsOfARun, AnArgumentsIoDeclReportsTheVariableItDeclares) {
   EXPECT_EQ(vpi_get(vpiSize, r), 32);
 }
 
-// Detail 3: an io decl whose vpiExpr is a virtual interface var, an
-// argument's or a modport port's, has no direction.
+// Detail 3: an argument's io decl whose vpiExpr is a virtual interface var
+// has no direction.
 TEST_F(IoDeclsOfARun, AVirtualInterfaceIoDeclHasNoDirection) {
   Run("interface inner; endinterface\n"
-      "interface ifc; virtual inner v; modport mp(input v); endinterface\n"
-      "module top; inner n(); ifc i0();\n"
+      "module top; inner n();\n"
       "  task t(virtual inner w); endtask\n"
       "endmodule\n");
   EXPECT_EQ(vpi_get(vpiDirection, ArgOf("t", "w")), vpiNoDirection);
-  EXPECT_EQ(vpi_get(vpiDirection, IoDecl("mp", "v")), vpiNoDirection);
 }
 
 // The figure: a udp defn reaches an io decl per port, its output and then
