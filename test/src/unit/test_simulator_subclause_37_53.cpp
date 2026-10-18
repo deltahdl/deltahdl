@@ -278,6 +278,22 @@ TEST_F(SequenceDeclsOfARun, AFormalOfAWrittenTypeReachesItsTypespec) {
             vpiSequenceTypespec);
 }
 
+// Detail 2 with §26.3: a formal of a package's type, pk::t, reaches the
+// package's typespec for it, not the compilation unit's of the same name
+// (#7306).
+TEST_F(SequenceDeclsOfARun, AFormalOfAPackagesTypeReachesItsTypespec) {
+  Run("typedef bit [5:0] t;\n"
+      "package pk; typedef logic [1:0] t; endpackage\n"
+      "module top; logic a;\n"
+      "  sequence s(pk::t x); a ##1 x[0]; endsequence\n"
+      "endmodule\n");
+  vpiHandle decl = Named(vpiSequenceDecl, By("top"), "s");
+  ASSERT_NE(decl, nullptr);
+  vpiHandle x = vpi_handle(vpiTypespec, Named(vpiSeqFormalDecl, decl, "x"));
+  ASSERT_NE(x, nullptr);
+  EXPECT_TRUE(vpi_compare_objects(x, Named(vpiTypedef, By("pk"), "t")));
+}
+
 // Detail 4: a local variable argument written as an output or an inout has
 // that direction (§16.8.2).
 TEST_F(SequenceDeclsOfARun, AnOutputAndAnInoutFormalHaveTheirDirections) {

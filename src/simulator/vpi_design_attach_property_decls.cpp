@@ -132,7 +132,13 @@ void MakeFormalTypespec(const ModuleItem& decl, size_t index, VpiObject* formal,
                         const VpiAttachBuild& build) {
   const DataType* type = decl.prop_formal_types[index];
   if (type != nullptr && type->kind == DataTypeKind::kNamed) {
-    VpiObject* named = TypedefTypespec(formal->parent, type->type_name, at);
+    // §26.3: a package's typedefs are answered among the compilation unit's
+    // as pk::name, which a name written through its package, pk::t, matches.
+    const std::string kWritten = type->scope_name.empty()
+                                     ? std::string(type->type_name)
+                                     : std::string(type->scope_name) +
+                                           "::" + std::string(type->type_name);
+    VpiObject* named = TypedefTypespec(formal->parent, kWritten, at);
     formal->children.push_back(
         named != nullptr ? named
                          : ClassTypespec(formal, type->type_name, build));

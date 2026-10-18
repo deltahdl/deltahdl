@@ -648,6 +648,20 @@ TEST_F(PropertyDeclsOfARun, AFormalOfAnImportedTypedefReachesItsTypespec) {
   EXPECT_TRUE(vpi_compare_objects(v, Named(vpiTypedef, By("pk"), "nib_t")));
 }
 
+// A formal of a package's type, pk::t, reaches the package's typespec for it
+// (detail 3, §26.3), not the compilation unit's of the same name (#7306).
+TEST_F(PropertyDeclsOfARun, AFormalOfAPackagesTypeReachesItsTypespec) {
+  Run("typedef bit [5:0] t;\n"
+      "package pk; typedef logic [1:0] t; endpackage\n"
+      "module top; logic clk;\n"
+      "  property p(pk::t v); @(posedge clk) v[0]; endproperty\n"
+      "endmodule\n");
+  vpiHandle v = vpi_handle(
+      vpiTypespec,
+      Named(vpiPropFormalDecl, Named(vpiPropertyDecl, By("top"), "p"), "v"));
+  EXPECT_TRUE(vpi_compare_objects(v, Named(vpiTypedef, By("pk"), "t")));
+}
+
 // A formal of a typedef of another typedef reaches the typespec of the one it
 // names, which aliases the other (detail 3, §37.25 detail 1) (#5748).
 TEST_F(PropertyDeclsOfARun, AFormalOfAnAliasTypedefReachesItsTypespec) {
