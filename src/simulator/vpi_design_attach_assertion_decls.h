@@ -51,6 +51,16 @@ VpiObject* VpiMakeSequenceDecl(const RtlirAssertionItemDecl& declared,
 void VpiFillAssertionItemDeclBody(VpiObject* made, const ModuleItem& decl,
                                   const VpiStmtBuild& with);
 
+// §16.8, §16.8.2 and §16.12 with §37.15: what the formals of `decl`, which
+// `made` stands as, are where its body names them, held by an object of no
+// kind of its own hung below `made`, for a body to be built with its names
+// found there first, then among `made`'s variables (§16.10) and in the
+// scopes around it: a ref obj named after each formal, bound to no actual
+// since no instance binds one in the declaration (§37.15 detail 3), and a
+// variable of its type, resolved in `ctx`, for a local variable formal.
+VpiObject* VpiFormalNames(VpiObject* made, const ModuleItem& decl,
+                          const SimContext& ctx, const VpiAttachBuild& build);
+
 // What a property or sequence instance names: `type`, vpiPropertyDecl or
 // vpiSequenceDecl, the kind of declaration; `name`, written through the
 // package path `package`, `pk::s`, where that is not empty; and `scope`, where

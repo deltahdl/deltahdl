@@ -276,6 +276,15 @@ void MakeDeclaredVariable(const SeqLocalDecl& local, VpiObject* declared,
   declared->children.push_back(var);
 }
 
+// §16.8.2: the kind of variable a local variable formal declared with `type`
+// is, the kind the type name stands for where it names one (§6.18), resolved
+// in `ctx`, as MakeDeclaredVariable gives a local declared in the body.
+int FormalVariableKind(const DataType& type, const SimContext& ctx) {
+  return VpiDataTypeVariableKind(type.kind == DataTypeKind::kNamed
+                                     ? DeclaredTypeKind(type, ctx)
+                                     : type.kind);
+}
+
 // The child of `scope` of `type` named `name`; null where none is.
 VpiObject* ChildOfType(const VpiObject* scope, int type,
                        std::string_view name) {
@@ -589,7 +598,18 @@ void AttachPackageAssertionItemDecls(const RtlirDesign& design,
       }
     }
     for (const auto& [declared, item] : made) {
-      VpiFillAssertionItemDeclBody(declared, *item, kWith);
+      // §16.8 and §16.12: the body's names find the formals first.
+      const VpiExprNames kBodyNames{objects,
+                                    kPrefix,
+                                    kNoGenBlocks,
+                                    VpiFormalNames(declared, *item, ctx, build),
+                                    &design.node_attrs,
+                                    &kStand};
+      VpiStmtBuild body = kWith;
+      body.expression = [&](const Expr* expr) {
+        return VpiGenBlockExpression(expr, kBodyNames, ctx, build);
+      };
+      VpiFillAssertionItemDeclBody(declared, *item, body);
     }
   }
 }
@@ -620,6 +640,23 @@ VpiObject* VpiMakeSequenceDecl(const RtlirAssertionItemDecl& declared,
     MakeDeclaredVariable(local, obj, at.ctx, with.build);
   }
   return obj;
+}
+
+VpiObject* VpiFormalNames(VpiObject* made, const ModuleItem& decl,
+                          const SimContext& ctx, const VpiAttachBuild& build) {
+  VpiObject* names = build.alloc();
+  names->parent = made;
+  for (size_t i = 0; i < decl.prop_formals.size(); ++i) {
+    VpiObject* stand = build.alloc();
+    stand->type = decl.prop_formal_is_local[i]
+                      ? FormalVariableKind(*decl.prop_formal_types[i], ctx)
+                      : vpiRefObj;
+    stand->parent = made;
+    stand->name = build.keep(std::string(decl.prop_formals[i]));
+    stand->full_name = VpiScopedFullName(made, decl.prop_formals[i]);
+    names->children.push_back(stand);
+  }
+  return names;
 }
 
 void VpiFillAssertionItemDeclBody(VpiObject* made, const ModuleItem& decl,

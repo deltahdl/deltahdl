@@ -590,13 +590,18 @@ void AttachInstanceAssertionItemDecls(VpiObject* instance,
             IsSequenceDecl(item) ? VpiMakeSequenceDecl : VpiMakePropertyDecl,
             item, scope, with, instance_walk));
       });
-  size_t next = 0;
-  AttachScopedItems(instance, instance_walk, declared,
-                    [&made, &next](const RtlirAssertionItemDecl& item,
-                                   VpiObject*, const VpiStmtBuild& with) {
-                      VpiFillAssertionItemDeclBody(made[next++], *item.item,
-                                                   with);
-                    });
+  // §16.8 and §16.12: a body's names find the declaration's formals first.
+  for (size_t i = 0; i < declared.size(); ++i) {
+    VpiObject* scope = VpiGenScopeOf(instance, declared[i].gen_block_path);
+    BodyWalk walk = instance_walk;
+    walk.gen_prefixes = &declared[i].gen_block_prefixes;
+    const BlockParent kParent{
+        scope, scope->full_name, nullptr, nullptr,
+        VpiFormalNames(made[i], *declared[i].item, instance_walk.calls.ctx,
+                       instance_walk.build)};
+    VpiFillAssertionItemDeclBody(made[i], *declared[i].item,
+                                 StmtBuildAt(kParent, walk));
+  }
 }
 
 // The assertions one instance writes as items, each in the generate block

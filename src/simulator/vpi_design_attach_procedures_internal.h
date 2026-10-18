@@ -24,12 +24,15 @@ struct Expr;
 // between them leaves as it was. A scope a block stands as also carries the
 // block, whose declarations a name the statement writes resolves to first
 // (§9.3, §23.9), and every scope carries the one around it, null at a
-// procedure's own scope.
+// procedure's own scope. The body of a sequence or a property declaration
+// also carries the object holding the stand-ins for its formals
+// (VpiFormalNames), whose names a name finds first (§16.8, §16.12).
 struct BlockParent {
   VpiObject* scope;
   const std::string& path;
   const Stmt* block = nullptr;
   const BlockParent* outer = nullptr;
+  const VpiObject* formals = nullptr;
 };
 
 // What a walk of one procedure body builds with: the design and the instance's

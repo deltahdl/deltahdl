@@ -68,17 +68,17 @@ struct AssignNames {
   }
 };
 
-// §23.9 and §12.7.3: the variable or named event `scope` itself declares
-// under `name`, or the index variable of the foreach loop `scope` is; null
-// where neither is.
+// §23.9, §12.7.3 and §16.8: the variable, named event or formal's ref obj
+// (VpiFormalNames) `scope` declares under `name`, or the index variable of the
+// foreach loop `scope` is; null where neither is.
 VpiHandle DeclaredIn(const VpiObject* scope, std::string_view name) {
   for (VpiObject* var : scope->loop_vars) {
     if (var != nullptr && var->name == name) return var;
   }
   for (VpiObject* child : scope->children) {
-    const bool kDeclares = VpiIsVariablesType(child->type) ||
-                           child->type == vpiNamedEvent ||
-                           child->type == vpiNamedEventArray;
+    const bool kDeclares =
+        VpiIsVariablesType(child->type) || child->type == vpiNamedEvent ||
+        child->type == vpiNamedEventArray || child->type == vpiRefObj;
     if (kDeclares && child->name == name) return child;
   }
   return nullptr;
@@ -866,13 +866,15 @@ AssignBuild CallSiteBuild(const VpiObjectMap& objects, const VpiCallSite& site,
   static const GenBlockPrefixes kNoGenBlocks;
   const GenBlockPrefixes& gen =
       site.gen_prefixes != nullptr ? *site.gen_prefixes : kNoGenBlocks;
-  return AssignBuild{build.alloc,
-                     &ctx,
-                     AssignNames{objects, site.prefix, gen, site.scope},
-                     VpiCalleesAt(site),
-                     build.keep,
-                     site.shape_call,
-                     &site.mod.node_attrs};
+  return AssignBuild{
+      build.alloc,
+      &ctx,
+      AssignNames{objects, site.prefix, gen,
+                  site.formals != nullptr ? site.formals : site.scope},
+      VpiCalleesAt(site),
+      build.keep,
+      site.shape_call,
+      &site.mod.node_attrs};
 }
 
 }  // namespace

@@ -198,6 +198,26 @@ class SequenceDeclsOfARun : public VpiDesignRun {
     }
     return names;
   }
+
+  // The kinds of the objects named `name` that `from` reaches, itself
+  // included, through operands, match items and an assignment's right side,
+  // at any depth, in the order reached.
+  static std::vector<int> KindsNamed(vpiHandle from, const std::string& name) {
+    std::vector<int> kinds;
+    if (from == nullptr) return kinds;
+    const char* own = vpi_get_str(vpiName, from);
+    if (own != nullptr && name == own) kinds.push_back(vpi_get(vpiType, from));
+    const auto kAdd = [&kinds](const std::vector<int>& more) {
+      kinds.insert(kinds.end(), more.begin(), more.end());
+    };
+    for (int relation : {vpiOperand, vpiMatchItem}) {
+      for (vpiHandle reached : ObjectsOf(relation, from)) {
+        kAdd(KindsNamed(reached, name));
+      }
+    }
+    kAdd(KindsNamed(vpi_handle(vpiRhs, from), name));
+    return kinds;
+  }
 };
 
 // A sequence a module declares is a sequence decl of its instance, named in
@@ -403,6 +423,33 @@ TEST_F(SequenceDeclsOfARun, AFormalOfAClassesAssocTypedefReachesItsIndex) {
   ASSERT_NE(named, nullptr);
   EXPECT_EQ(vpi_get(vpiType, named), vpiIntTypespec);
   EXPECT_STREQ(vpi_get_str(vpiName, named), "idx_t");
+}
+
+// §16.8 and §16.8.2 with §37.15: a sequence body naming its formals reaches
+// a ref obj named after each formal it references, bound to no actual since
+// no instance binds one there (detail 3), and a variable of the formal's type
+// for each local variable formal, a keyword's or the one a type name stands
+// for; a package's sequence alike (#7303).
+TEST_F(SequenceDeclsOfARun, ABodyReachesItsFormalsAsRefObjsAndVariables) {
+  Run("package pk; sequence ps(x); x; endsequence endpackage\n"
+      "module top; logic a;\n"
+      "  typedef logic [1:0] nib_t;\n"
+      "  sequence s(x, local input int n, local input nib_t m);\n"
+      "    (a, n = n + 1, m = m) ##1 x;\n"
+      "  endsequence\n"
+      "endmodule\n");
+  vpiHandle decl = Named(vpiSequenceDecl, By("top"), "s");
+  ASSERT_NE(decl, nullptr);
+  vpiHandle body = vpi_handle(vpiExpr, decl);
+  EXPECT_EQ(KindsNamed(body, "x"), (std::vector<int>{vpiRefObj}));
+  EXPECT_EQ(KindsNamed(body, "n"), (std::vector<int>{vpiIntVar}));
+  EXPECT_EQ(KindsNamed(body, "m"), (std::vector<int>{vpiLogicVar}));
+  vpiHandle in_package =
+      vpi_handle(vpiExpr, Named(vpiSequenceDecl, By("pk"), "ps"));
+  ASSERT_NE(in_package, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, in_package), vpiRefObj);
+  EXPECT_STREQ(vpi_get_str(vpiName, in_package), "x");
+  EXPECT_EQ(vpi_handle(vpiActual, in_package), nullptr);
 }
 
 // Detail 4: a local variable argument written as an output or an inout has

@@ -716,5 +716,24 @@ TEST(PropertySpecModel, PropertyExprOfASpecAndTagsItDoesNotDraw) {
   EXPECT_EQ(out, nullptr);
   EXPECT_FALSE(TryResolveProcessAndStmtRelation(vpiTypespec, &spec, out));
 }
+
+// §16.12 with §16.8 and §37.15: the property expr of a property declaration
+// naming its formal is a ref obj named after the formal, bound to no actual
+// since no instance binds one there (detail 3) (#7303).
+TEST_F(PropertyExprsOfARun, ADeclarationsBodyReachesItsFormalAsARefObj) {
+  Run("module top; logic clk;\n"
+      "  property p(x); @(posedge clk) x; endproperty\n"
+      "endmodule\n");
+  vpiHandle decl = Named(vpiPropertyDecl, By("top"), "p");
+  ASSERT_NE(decl, nullptr);
+  vpiHandle spec = vpi_handle(vpiPropertySpec, decl);
+  ASSERT_NE(spec, nullptr);
+  vpiHandle x = vpi_handle(vpiPropertyExpr, spec);
+  ASSERT_NE(x, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, x), vpiRefObj);
+  EXPECT_STREQ(vpi_get_str(vpiName, x), "x");
+  EXPECT_EQ(vpi_handle(vpiActual, x), nullptr);
+}
+
 }  // namespace
 }  // namespace delta

@@ -249,6 +249,11 @@ struct VpiCallSite {
   // §26.2: the package the site stands in, whose declarations alone a name
   // finds; empty for a site of an instance or the compilation unit.
   std::string_view package = {};
+  // §16.8 and §16.12: the object holding the stand-ins for the formals of the
+  // sequence or property declaration whose body the site is in
+  // (VpiFormalNames), which a name finds ahead of the blocks around `scope`;
+  // null for a site in no such body.
+  const VpiObject* formals = nullptr;
 };
 
 // §26.2: the task or function the package `package` declares under `name`.
