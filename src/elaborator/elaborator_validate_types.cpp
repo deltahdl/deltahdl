@@ -297,7 +297,7 @@ static const std::unordered_set<std::string_view>* NamesToClashAgainst(
 void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc,
                                   bool declares_its_constants) {
   CheckEnumBaseType(dtype, loc, typedefs_, diag_);
-  auto base_width = EvalTypeWidth(dtype, typedefs_);
+  auto base_width = EvalTypeWidth(EnumArrayElement(dtype), typedefs_);
   bool is_2state = !Is4stateType(dtype, typedefs_);
   bool prev_had_xz = false;
   EnumBaseRange range = ComputeEnumBaseRange(dtype, base_width);

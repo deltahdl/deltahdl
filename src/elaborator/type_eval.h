@@ -68,6 +68,10 @@ uint32_t PackedDimProduct(const DataType& dtype, const ScopeMap& scope);
 
 uint32_t EvalTypeWidth(const DataType& dtype);
 
+// §7.4.1: the enumeration `dtype` writes, without the packed dimensions after
+// its body that make a packed array of it; `dtype` itself where it has none.
+DataType EnumArrayElement(const DataType& dtype);
+
 // §10.9.1's `type:value` key. IsTypeKeyword answers whether a key names a type
 // at all -- the alternative being an index key -- and TypeKeyMatchesKind
 // whether that type is the one an element is declared with, which is what

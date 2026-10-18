@@ -268,7 +268,7 @@ static uint32_t EnumArrayCount(const DataType& dtype, const ScopeMap* scope) {
 }
 
 // The enumeration a packed array of enumerations is an array of.
-static DataType EnumArrayElement(const DataType& dtype) {
+DataType EnumArrayElement(const DataType& dtype) {
   DataType element = dtype;
   element.enum_array_dims.clear();
   return element;

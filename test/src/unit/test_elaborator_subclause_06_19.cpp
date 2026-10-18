@@ -581,4 +581,48 @@ TEST(EnumerationElaboration, ArrayTypedefVariableRedeclaresNoConstant) {
   EXPECT_EQ(e->enum_type_name, "ea_t");
 }
 
+// §6.19 with §7.4.1: the constants of an enumeration written with packed
+// dimensions after its body are as wide as its base type, not as the packed
+// array of it the dimensions make, whether a declaration or a typedef writes
+// it (#7315).
+TEST(EnumerationElaboration, ConstantsOfAnEnumArrayAreAsWideAsItsBase) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  enum bit [1:0] {A, B, C} [3:0] v;\n"
+      "  typedef enum bit [2:0] {P, Q} [1:0] e_t;\n"
+      "  enum {X, Y} [1:0] w;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+  const auto* a = FindVar(design, "m", "A");
+  const auto* p = FindVar(design, "m", "P");
+  const auto* x = FindVar(design, "m", "X");
+  ASSERT_NE(a, nullptr);
+  ASSERT_NE(p, nullptr);
+  ASSERT_NE(x, nullptr);
+  EXPECT_EQ(a->width, 2u);
+  EXPECT_EQ(p->width, 3u);
+  EXPECT_EQ(x->width, 32u);
+  const auto* v = FindVar(design, "m", "v");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->width, 8u);
+}
+
+// §6.19: a constant's value is judged against the base type's range, which
+// the packed dimensions written after the body do not widen (#7315).
+TEST(EnumerationElaboration, AnEnumArraysConstantOutsideItsBaseIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  enum bit [1:0] {A, B, C = 5} [3:0] v;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "enum member 'C' value 5 is outside the "
+                            "representable range of the base type",
+                            2, "6.19"));
+}
+
 }  // namespace

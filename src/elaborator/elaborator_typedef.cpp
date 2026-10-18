@@ -491,7 +491,7 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
       item->typedef_type, [&](std::string_view path, const DataType& type) {
         ValidateEnumDecl(type, item->loc, /*declares_its_constants=*/true);
         DeclareEnumType(type, EnumTypeKey(item->name, path, arena_),
-                        EvalTypeWidth(type, typedefs_), scope,
+                        EvalTypeWidth(EnumArrayElement(type), typedefs_), scope,
                         {scope, arena_, mod, enum_member_names_, nullptr,
                          IsSignedType(type, typedefs_)});
       });
@@ -526,7 +526,7 @@ void Elaborator::EmitBareEnumMembers(const ModuleItem* item, RtlirModule* mod) {
         if (!path.empty())
           ValidateEnumDecl(type, item->loc, /*declares_its_constants=*/true);
         DeclareEnumType(type, EnumTypeKey(item->name, path, arena_),
-                        EvalTypeWidth(type, typedefs_), scope,
+                        EvalTypeWidth(EnumArrayElement(type), typedefs_), scope,
                         {scope, arena_, mod, enum_member_names_, nullptr,
                          IsSignedType(type, typedefs_)});
       });
@@ -872,7 +872,7 @@ void EmitEnumLiteralsOfItems(
     ForEachEnumTypeOfItem(pi, [&](std::string_view path, const DataType& type) {
       std::string_view key = EnumTypeKey(pi->name, path, ctx.arena);
       if (mod->enum_types.count(key) != 0) return;
-      uint32_t width = EvalTypeWidth(type, ctx.typedefs);
+      uint32_t width = EvalTypeWidth(EnumArrayElement(type), ctx.typedefs);
       mod->enum_types[key] = BuildEnumMembers(
           type.enum_members, width,
           {no_scope, ctx.arena, mod, ctx.enum_member_names,
