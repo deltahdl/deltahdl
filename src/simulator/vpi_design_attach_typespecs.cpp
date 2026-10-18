@@ -162,11 +162,12 @@ class TypespecMaker {
       at_.design.shapes.Share(alias, kNamed.typespec);
       return alias;
     }
-    if (kDims.empty()) return Own(type, name, parent);
+    if (kDims.empty()) return Own(type, name, parent, name);
     VpiObject* typespec = Alloc(name, parent);
-    VpiObject* base = type.kind == DataTypeKind::kNamed
-                          ? Named(type, std::string_view{}, typespec).typespec
-                          : Own(ElementOf(type), std::string_view{}, typespec);
+    VpiObject* base =
+        type.kind == DataTypeKind::kNamed
+            ? Named(type, std::string_view{}, typespec).typespec
+            : Own(ElementOf(type), std::string_view{}, typespec, name);
     if (base == nullptr) return nullptr;
     at_.design.shapes.Shape(typespec, kDims, base);
     return typespec;
@@ -231,7 +232,7 @@ class TypespecMaker {
     if (keyword != std::end(kIndexKeywords)) {
       DataType type;
       type.kind = keyword->kind;
-      return Own(type, std::string_view{}, nullptr);
+      return Own(type, std::string_view{}, nullptr, std::string_view{});
     }
     DataType named;
     named.kind = DataTypeKind::kNamed;
@@ -270,33 +271,38 @@ class TypespecMaker {
   }
 
   // §37.25: a typespec of the kind `type` is, with nothing written over it,
-  // named `name` and hung from `parent`: an enumeration's with its constants
-  // and its base type's typespec, a structure's or union's with its members,
-  // and a predefined type's named by a typedef standing as an alias of that
-  // type's own (detail 6). Null for a type it draws no typespec for.
-  VpiObject* Own(const DataType& type, std::string_view name,
-                 VpiObject* parent) {
+  // named `name` and hung from `parent`: an enumeration's with its constants,
+  // those of the typedef `typedef_name`, and its base type's typespec, a
+  // structure's or union's with its members, and a predefined type's named by
+  // a typedef standing as an alias of that type's own (detail 6). Null for a
+  // type it draws no typespec for.
+  VpiObject* Own(const DataType& type, std::string_view name, VpiObject* parent,
+                 std::string_view typedef_name) {
     const int kKind = VpiTypespecKind(type.kind);
     if (kKind == 0) return nullptr;
     VpiObject* typespec = Alloc(name, parent);
     typespec->type = kKind;
     if (kKind == vpiEnumTypespec) {
-      FillEnum(typespec, type);
+      FillEnum(typespec, type, typedef_name);
     } else if (kKind == vpiStructTypespec || kKind == vpiUnionTypespec) {
       FillAggregate(typespec, type);
     } else if (!name.empty()) {
-      typespec->aliased = Own(type, std::string_view{}, typespec);
+      typespec->aliased =
+          Own(type, std::string_view{}, typespec, std::string_view{});
     }
     return typespec;
   }
 
-  // §37.25: an enum typespec's constants, those the run resolved under its
-  // typedef's name, and its base type's typespec, which vpiBaseTypespec
-  // reaches: the one its base names, its keyword's with the packed
-  // dimensions it was written with, or int's where it names none (§6.19).
-  void FillEnum(VpiObject* typespec, const DataType& type) {
+  // §37.25: an enum typespec's constants, those the run resolved under the
+  // name of the typedef `typedef_name` that writes the enumeration, itself or
+  // as the element of its dimensions (detail 8), and its base type's
+  // typespec, which vpiBaseTypespec reaches: the one its base names, its
+  // keyword's with the packed dimensions it was written with, or int's where
+  // it names none (§6.19).
+  void FillEnum(VpiObject* typespec, const DataType& type,
+                std::string_view typedef_name) {
     if (at_.enums != nullptr) {
-      auto it = at_.enums->find(typespec->name);
+      auto it = at_.enums->find(typedef_name);
       if (it != at_.enums->end()) {
         for (const RtlirEnumMember& member : it->second) {
           MakeEnumConst(typespec, member, build_);
@@ -361,7 +367,13 @@ TypespecsByName MakeTypespecs(const std::vector<ModuleItem*>& items,
                               const ScopeTypespecs& at) {
   TypespecsByName made;
   for (const ModuleItem* item : items) {
-    if (item->kind != ModuleItemKind::kTypedef) continue;
+    // §6.18: a forward typedef, whose type is left implicit, names a type the
+    // class or the typedef resolving it defines, and draws no typespec of its
+    // own.
+    if (item->kind != ModuleItemKind::kTypedef ||
+        item->typedef_type.kind == DataTypeKind::kImplicit) {
+      continue;
+    }
     VpiObject* typespec = TypespecMaker(at, made).Of(
         item->typedef_type, item->unpacked_dims, item->name, at.scope);
     if (typespec == nullptr) continue;

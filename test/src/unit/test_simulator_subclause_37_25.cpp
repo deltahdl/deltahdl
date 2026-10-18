@@ -773,5 +773,47 @@ TEST_F(TypespecsOfARun, ATypedefWithNoTypespecLeavesTheOthersInPlace) {
   EXPECT_EQ(KindReached(vpiElemTypespec, tri), vpiBitTypespec);
 }
 
+// §6.18 with detail 1: a forward typedef, of a class, of a structure or bare,
+// draws no typespec of its own; the scope's typedefs are those that define
+// the types, and a variable of the class is related to no logic typespec named
+// after it (#7311).
+TEST_F(TypespecsOfARun, AForwardTypedefDrawsNoTypespecOfItsOwn) {
+  Run("module top;\n"
+      "  typedef class C; typedef T; typedef struct s_t;\n"
+      "  class C; endclass\n"
+      "  typedef int T; typedef struct packed { bit a; } s_t;\n"
+      "  C h;\n"
+      "endmodule\n");
+  vpiHandle top = By("top");
+  EXPECT_EQ(NamesOf(vpiTypedef, top), (std::vector<std::string>{"T", "s_t"}));
+  EXPECT_EQ(vpi_get(vpiType, Named(vpiTypedef, top, "T")), vpiIntTypespec);
+  EXPECT_EQ(vpi_get(vpiType, Named(vpiTypedef, top, "s_t")), vpiStructTypespec);
+  vpiHandle h = By("top.h");
+  ASSERT_NE(h, nullptr);
+  EXPECT_NE(KindReached(vpiTypespec, h), vpiLogicTypespec);
+}
+
+// Detail 8: the enum typespec a typedef's dimensions unwind to is unnamed and
+// reaches the constants the typedef's enumeration declares, whether the
+// dimensions are unpacked or packed ones written after its body (#7314).
+TEST_F(TypespecsOfARun, AnEnumElementOfATypedefReachesItsConstants) {
+  Run("module top;\n"
+      "  typedef enum bit [2:0] {P, Q} ea_t [2];\n"
+      "  typedef enum bit [1:0] {A, B} [3:0] e_t;\n"
+      "endmodule\n");
+  vpiHandle top = By("top");
+  vpiHandle unpacked =
+      vpi_handle(vpiElemTypespec, Named(vpiTypedef, top, "ea_t"));
+  vpiHandle packed = vpi_handle(vpiElemTypespec, Named(vpiTypedef, top, "e_t"));
+  ASSERT_NE(unpacked, nullptr);
+  ASSERT_NE(packed, nullptr);
+  EXPECT_EQ(NamesOf(vpiEnumConst, unpacked),
+            (std::vector<std::string>{"P", "Q"}));
+  EXPECT_EQ(NamesOf(vpiEnumConst, packed),
+            (std::vector<std::string>{"A", "B"}));
+  EXPECT_EQ(vpi_get_str(vpiName, unpacked), nullptr);
+  EXPECT_EQ(vpi_get_str(vpiName, packed), nullptr);
+}
+
 }  // namespace
 }  // namespace delta
