@@ -17,6 +17,7 @@
 #include "parser/ast_design.h"
 #include "parser/ast_module.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_internal.h"
@@ -723,9 +724,13 @@ TEST_F(InstanceObjectsOfARun, EveryInstanceNamesItsDefinitionAndCell) {
   EXPECT_STREQ(vpi_get_str(vpiCell, By("top.p")), "prg");
   EXPECT_STREQ(vpi_get_str(vpiCell, By("pk")), "pk");
   EXPECT_STREQ(vpi_get_str(vpiDefName, By("pk")), "pk");
-  for (const char* kName : {"top.i", "top.p", "pk"}) {
-    EXPECT_STREQ(vpi_get_str(vpiLibrary, By(kName)), "") << kName;
-    EXPECT_STREQ(vpi_get_str(vpiConfig, By(kName)), "") << kName;
+  // An interface and a program are bound from the library the design was
+  // compiled into, as a module is; a package is bound from none.
+  EXPECT_STREQ(vpi_get_str(vpiLibrary, By("top.i")), "work");
+  EXPECT_STREQ(vpi_get_str(vpiLibrary, By("top.p")), "work");
+  EXPECT_STREQ(vpi_get_str(vpiLibrary, By("pk")), "");
+  for (const char* name : {"top.i", "top.p", "pk"}) {
+    EXPECT_STREQ(vpi_get_str(vpiConfig, By(name)), "") << name;
   }
 }
 
