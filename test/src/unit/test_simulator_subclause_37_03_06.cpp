@@ -12,6 +12,7 @@
 #include "preprocessor/protect_processing.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
+#include "simulator/sv_vpi_user.h"
 #include "simulator/variable.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
