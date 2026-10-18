@@ -15,6 +15,7 @@
 #include "elaborator/rtlir_checker_site.h"
 #include "elaborator/rtlir_defparam.h"
 #include "elaborator/rtlir_element_shape.h"
+#include "elaborator/rtlir_io_decl.h"
 #include "elaborator/rtlir_primitives.h"
 #include "elaborator/rtlir_scopes.h"
 #include "parser/ast_class.h"
@@ -702,7 +703,8 @@ struct RtlirModule {
   std::vector<RtlirContAssign> assigns;
   std::vector<RtlirUdpInst> udp_insts;
   std::vector<RtlirAlias> aliases;
-  std::vector<RtlirDefparam> defparams;  // §23.10.1: those it writes.
+  std::vector<RtlirDefparam> defparams;      // §23.10.1: those it writes.
+  std::vector<RtlirIoDecl> port_expr_decls;  // §37.13: see RtlirIoDecl.
   std::vector<RtlirProcess> processes;
   std::vector<RtlirModuleInst> children;
   std::vector<RtlirParamDecl> params;

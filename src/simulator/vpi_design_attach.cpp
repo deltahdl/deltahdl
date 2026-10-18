@@ -15,6 +15,7 @@
 #include "common/source_mgr.h"
 #include "common/types.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_io_decl.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_specify.h"
 #include "parser/ast_type.h"
@@ -153,25 +154,25 @@ void FillPortObject(VpiObject* obj, const RtlirPort& port, int index,
   module->children.push_back(obj);
 }
 
-// §37.13 with §37.5: the io decl the declaration of `port` is, under `module`.
-// Its vpiExpr is `item`, the net or variable the port declares (detail 2),
+// §37.13 with §37.5: the io decl `decl` is, under `module`. Its vpiExpr is
+// `item`, the net or variable the declaration makes or names (detail 2),
 // through a ref obj for a ref port or an interface port, the second of which
 // has no direction (details 1 and 3).
-void MakeModuleIoDecl(const RtlirPort& port, VpiHandle module, VpiObject* item,
-                      const std::function<VpiObject*()>& alloc,
+void MakeModuleIoDecl(const RtlirIoDecl& decl, VpiHandle module,
+                      VpiObject* item, const std::function<VpiObject*()>& alloc,
                       std::deque<std::string>& names) {
   VpiObject* io_decl = alloc();
   io_decl->type = vpiIODecl;
-  names.emplace_back(port.name);
+  names.emplace_back(decl.name);
   io_decl->name = names.back();
-  io_decl->full_name = VpiScopedFullName(module, port.name);
+  io_decl->full_name = VpiScopedFullName(module, decl.name);
   io_decl->parent = module;
-  const bool kByRef = port.direction == Direction::kRef;
+  const bool kByRef = decl.direction == Direction::kRef;
   io_decl->direction = VpiIoDeclDirection(
-      VpiPortDirectionOf(port.direction), kByRef, port.is_interface_port,
+      VpiPortDirectionOf(decl.direction), kByRef, decl.is_interface_port,
       /*expr_is_virtual_interface_var=*/false);
   io_decl->io_expr = item;
-  if (kByRef || port.is_interface_port) {
+  if (kByRef || decl.is_interface_port) {
     VpiObject* ref_obj = alloc();
     ref_obj->type = vpiRefObj;
     ref_obj->parent = io_decl;
@@ -372,13 +373,24 @@ void VpiContext::AttachDesignPorts(const RtlirDesign* design) {
                                       kAlloc);
           }
           // A port written as an expression stands for no declaration of its
-          // own.
+          // own; port_expr_decls holds those it names.
           if (port.port_expr == nullptr) {
-            MakeModuleIoDecl(port, module,
-                             FindObjectForFlatName(
-                                 object_map_, VpiFlatName(prefix, port.name)),
-                             kAlloc, name_pool_);
+            MakeModuleIoDecl(
+                {port.name, port.direction, port.name, port.is_interface_port},
+                module,
+                FindObjectForFlatName(object_map_,
+                                      VpiFlatName(prefix, port.name)),
+                kAlloc, name_pool_);
           }
+        }
+        for (const RtlirIoDecl& decl : mod->port_expr_decls) {
+          MakeModuleIoDecl(
+              decl, module,
+              decl.object_name.empty()
+                  ? nullptr
+                  : FindObjectForFlatName(
+                        object_map_, VpiFlatName(prefix, decl.object_name)),
+              kAlloc, name_pool_);
         }
       });
   if (sim_ctx_ == nullptr) return;

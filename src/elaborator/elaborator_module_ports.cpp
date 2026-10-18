@@ -19,6 +19,7 @@
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/net_data_type.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_io_decl.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -683,6 +684,37 @@ static Direction PortExprDirection(const ModuleDecl* decl, const Expr* expr) {
   return Direction::kNone;
 }
 
+// §37.13: the port declarations no RtlirPort without an expression brings,
+// each an io decl of its own. A non-ANSI port written as an expression is none,
+// and the declarations it names are: those port_expr_objects holds, and the one
+// a select port takes its name and direction from, `input [1:0] a;` under
+// `a[1], a[0]`, once however many ports select it (§23.2.2.1). An ANSI port
+// written with an explicit name declares itself, its vpiExpr reaching the
+// object its expression names where that is a single name (§23.2.2.2).
+static void RecordPortExprDecls(const ModuleDecl* decl, RtlirModule* mod) {
+  for (const PortDecl& obj : decl->port_expr_objects) {
+    mod->port_expr_decls.push_back({obj.name, obj.direction, obj.name});
+  }
+  for (const PortDecl& port : decl->ports) {
+    if (port.port_expr == nullptr || port.name.empty()) continue;
+    if (!decl->is_non_ansi_ports) {
+      const bool kNamesOne = port.port_expr->kind == ExprKind::kIdentifier;
+      mod->port_expr_decls.push_back(
+          {port.name, port.direction,
+           kNamesOne ? port.port_expr->text : std::string_view{}});
+      continue;
+    }
+    // `.p(e)` under `input e;` takes its direction from no declaration.
+    if (port.direction == Direction::kNone) continue;
+    const bool kRecorded = std::ranges::any_of(
+        mod->port_expr_decls,
+        [&](const RtlirIoDecl& io) { return io.name == port.name; });
+    if (!kRecorded) {
+      mod->port_expr_decls.push_back({port.name, port.direction, port.name});
+    }
+  }
+}
+
 // §7.4 (printed page 153): a port's type is an array where it writes a packed
 // dimension, its first one being packed_dim_left, and §6.18 has a typedef carry
 // its packed and unpacked dimensions into the type it names, so a port declared
@@ -719,6 +751,7 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
                       mod};
 
   DeclarePortExprObjects(decl, mod, ctx);
+  RecordPortExprDecls(decl, mod);
   for (const auto& port : decl->ports) {
     if (RejectIllegalPortType(port, diag_)) continue;
 

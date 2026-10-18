@@ -254,13 +254,11 @@ TEST_F(ModuleOfARun, ATopModuleReachesItsPorts) {
 // Figure (io decl): a module reaches an io decl per port declaration, whose
 // vpiExpr is the net or variable it declares, or a ref obj for a ref port and
 // an interface port, the second having no direction (§37.13 details 1 to 3).
-// A port written as an expression is a declaration of none of its own.
 TEST_F(ModuleOfARun, AModuleReachesAnIoDeclPerPortDeclaration) {
   Run("interface ifc; endinterface\n"
       "module sub(input logic [3:0] d, ref int r, ifc bus); endmodule\n"
-      "module pick(a[0]); input [1:0] a; endmodule\n"
-      "module top; logic [3:0] w; int x; logic [1:0] v;\n"
-      "  ifc i (); sub u (.d(w), .r(x), .bus(i)); pick p (v[0]);\n"
+      "module top; logic [3:0] w; int x;\n"
+      "  ifc i (); sub u (.d(w), .r(x), .bus(i));\n"
       "endmodule\n");
   vpiHandle u = By("top.u");
   ASSERT_NE(u, nullptr);
@@ -283,9 +281,44 @@ TEST_F(ModuleOfARun, AModuleReachesAnIoDeclPerPortDeclaration) {
   vpiHandle bus_expr = vpi_handle(vpiExpr, bus);
   ASSERT_NE(bus_expr, nullptr);
   EXPECT_EQ(vpi_get(vpiType, bus_expr), vpiRefObj);
-  for (vpiHandle io_decl : ObjectsOf(vpiIODecl, By("top.p"))) {
-    EXPECT_STRNE(vpi_get_str(vpiName, io_decl), "");
-  }
+}
+
+// Figure (io decl): a port written as an expression is no declaration, so the
+// io decls are the declarations it names, one per name however many ports
+// select it (§23.2.2.1). An ANSI port written with an explicit name declares
+// itself (§23.2.2.2), its vpiExpr the net or variable its expression names and
+// null for an expression §37.13's vpiExpr reaches none of.
+TEST_F(ModuleOfARun, APortWrittenAsAnExpressionHasAnIoDeclPerDeclaration) {
+  Run("module sel(a[1], a[0]); input [1:0] a; endmodule\n"
+      "module cat({b, c}, .p(e)); input b; output c; input e; endmodule\n"
+      "module ansi(output .P1(r[3:0]), input .P2(s));\n"
+      "  logic [7:0] r; logic s;\n"
+      "endmodule\n"
+      "module top; logic [1:0] v; logic x, y, z, t; logic [3:0] q;\n"
+      "  sel u1 (v[1], v[0]); cat u2 ({x, y}, z); ansi u3 (q, t);\n"
+      "endmodule\n");
+  vpiHandle u1 = By("top.u1");
+  ASSERT_NE(u1, nullptr);
+  EXPECT_EQ(NamesOf(vpiIODecl, u1), (std::vector<std::string>{"a"}));
+  vpiHandle u2 = By("top.u2");
+  ASSERT_NE(u2, nullptr);
+  EXPECT_EQ(NamesOf(vpiIODecl, u2), (std::vector<std::string>{"b", "c", "e"}));
+  vpiHandle c = Named(vpiIODecl, u2, "c");
+  ASSERT_NE(c, nullptr);
+  EXPECT_EQ(vpi_get(vpiDirection, c), vpiOutput);
+  vpiHandle c_expr = vpi_handle(vpiExpr, c);
+  ASSERT_NE(c_expr, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, c_expr), "c");
+  vpiHandle u3 = By("top.u3");
+  ASSERT_NE(u3, nullptr);
+  EXPECT_EQ(NamesOf(vpiIODecl, u3), (std::vector<std::string>{"P1", "P2"}));
+  vpiHandle p1 = Named(vpiIODecl, u3, "P1");
+  ASSERT_NE(p1, nullptr);
+  EXPECT_EQ(vpi_get(vpiDirection, p1), vpiOutput);
+  EXPECT_EQ(vpi_handle(vpiExpr, p1), nullptr);
+  vpiHandle p2_expr = vpi_handle(vpiExpr, Named(vpiIODecl, u3, "P2"));
+  ASSERT_NE(p2_expr, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, p2_expr), "s");
 }
 
 // Figure (module array, instance array): an element of an array reaches the
