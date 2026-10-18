@@ -42,13 +42,15 @@ int TimeExponent(TimeUnit unit, int magnitude) {
 // precision it was elaborated under, the file and line the definition was
 // written on, restated where it came from (detail 8 lets `line move it), and,
 // by §37.3.7, the lifetime it was declared with, and, by §37.5, the decay time
-// the `default_decay_time directive (Annex E.2) set for it.
+// the `default_decay_time directive (Annex E.2) set for it. A module whose
+// charge never decays has no decay time, and §38.6 with Annex K.2 makes
+// vpiUndefined its answer: every count names a decay §28.16.2.1 makes happen.
 void RecordInstanceDefinition(VpiObject* obj, const RtlirModule* mod,
                               const SourceManager& sources) {
   obj->automatic = mod->is_automatic;
-  if (!mod->default_decay_time_infinite) {
-    obj->def_decay_time = static_cast<int>(mod->default_decay_time);
-  }
+  obj->def_decay_time = mod->default_decay_time_infinite
+                            ? vpiUndefined
+                            : static_cast<int>(mod->default_decay_time);
   obj->time_unit = TimeExponent(mod->timescale.unit, mod->timescale.magnitude);
   obj->time_precision =
       TimeExponent(mod->timescale.precision, mod->timescale.prec_magnitude);

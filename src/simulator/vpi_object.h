@@ -501,7 +501,8 @@ struct VpiObject {
 
   // §37.5: the default net decay time a module reports through
   // vpi_get(vpiDefDecayTime) - the number of time units a tri-state net holds
-  // its last driven value before decaying to x. Zero when unset.
+  // its last driven value before decaying to x, vpiUndefined for a module
+  // whose charge never decays. Zero when unset.
   int def_decay_time = 0;
 
   // §37.42 detail 2: for a method func/task call, the object the method is

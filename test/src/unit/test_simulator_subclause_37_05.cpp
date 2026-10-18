@@ -358,6 +358,28 @@ TEST_F(ModuleOfARun, AModuleReportsTheDecayTimeItWasCompiledUnder) {
   EXPECT_EQ(vpi_get(vpiDefDecayTime, By("top")), 100);
 }
 
+// vpiDefDecayTime: a module whose charge never decays, under
+// `default_decay_time infinite or under no such directive, has no decay time
+// to report, so vpi_get() answers vpiUndefined (§38.6, Annex K.2) rather than
+// a count, every one of which names a decay §28.16.2.1 makes happen.
+TEST_F(ModuleOfARun, AModuleWhoseChargeNeverDecaysHasAnUndefinedDecayTime) {
+  Run("module top; endmodule\n");
+  EXPECT_EQ(vpi_get(vpiDefDecayTime, By("top")), vpiUndefined);
+}
+
+// vpiDefDecayTime: `default_decay_time 0 makes the charge decay at once
+// (§28.16.2.1), a decay time of 0 the module reports as written.
+TEST_F(ModuleOfARun, AModuleWhoseChargeDecaysAtOnceReportsADecayTimeOfZero) {
+  RtlirDesign* design = ElaborateSrc("module top; endmodule\n", f_);
+  ASSERT_NE(design, nullptr);
+  ASSERT_FALSE(f_.has_errors);
+  // What the directive `default_decay_time 0 ahead of the module records.
+  design->top_modules.front()->default_decay_time = 0;
+  design->top_modules.front()->default_decay_time_infinite = false;
+  LowerAndRun(design, f_);
+  EXPECT_EQ(vpi_get(vpiDefDecayTime, By("top")), 0);
+}
+
 // Figure (vpiDefaultDisableIff): a module reaches the condition its default
 // disable iff (§16.15) writes, rather than any expression it declares.
 TEST_F(ModuleOfARun, AModuleReachesTheConditionOfItsDefaultDisableIff) {
