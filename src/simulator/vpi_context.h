@@ -27,7 +27,7 @@ namespace delta {
 struct Expr;
 struct Process;
 struct RtlirDesign;
-struct RtlirNet;
+struct ModuleItem;
 struct Variable;
 
 class VpiContext {
@@ -792,7 +792,7 @@ class VpiContext {
   // §37.23: the declaration object a design's user-defined nettype stands as,
   // and the pass that makes one per nettype. In vpi_design_attach.cpp.
   void AttachNettypeDeclarations(const RtlirDesign* design);
-  VpiObject* NettypeDeclarationIn(VpiHandle scope, const RtlirNet& net);
+  void MakeNettypeDecls(VpiHandle scope, const std::vector<ModuleItem*>& items);
 
   // §37.3.4: the source-written delay expression each net of the design
   // reaches through vpiDelay. In vpi_design_attach.cpp.

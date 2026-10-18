@@ -22,6 +22,7 @@
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_attach_interface_tf_decls.h"
 #include "simulator/vpi_design_walk.h"
+#include "simulator/vpi_instance_facts.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
@@ -39,6 +40,33 @@ int TimeExponent(TimeUnit unit, int magnitude) {
   return exponent;
 }
 
+// §37.10 with §22.9: the vpiUnconnDrive constant of the pull the directive
+// gave, which the preprocessor records as the net type pulling the same way,
+// tri1 for pull1 and tri0 for pull0.
+int UnconnectedDriveConstant(NetType drive) {
+  if (drive == NetType::kTri1) return vpiPull1;
+  if (drive == NetType::kTri0) return vpiPull0;
+  return vpiHighZ;
+}
+
+// §37.10 with Annex E.4 to E.7: the vpiDefDelayMode constant of the delay mode
+// the last directive selected.
+int DelayModeConstant(DelayModeDirective mode) {
+  switch (mode) {
+    case DelayModeDirective::kDistributed:
+      return vpiDelayModeDistrib;
+    case DelayModeDirective::kPath:
+      return vpiDelayModePath;
+    case DelayModeDirective::kUnit:
+      return vpiDelayModeUnit;
+    case DelayModeDirective::kZero:
+      return vpiDelayModeZero;
+    default:
+      // DelayModeDirective::kNone, the one value left: no directive.
+      return vpiDelayModeNone;
+  }
+}
+
 // §37.10: what an instance takes from its definition -- the time unit and
 // precision it was elaborated under, the file and line the definition was
 // written on, restated where it came from (detail 8 lets `line move it), and,
@@ -46,9 +74,17 @@ int TimeExponent(TimeUnit unit, int magnitude) {
 // the `default_decay_time directive (Annex E.2) set for it. A module whose
 // charge never decays has no decay time, and §38.6 with Annex K.2 makes
 // vpiUndefined its answer: every count names a decay §28.16.2.1 makes happen.
+// `decl` is the definition's declaration.
 void RecordInstanceDefinition(VpiObject* obj, const RtlirModule* mod,
+                              const ModuleDecl& decl,
                               const SourceManager& sources) {
   obj->automatic = mod->is_automatic;
+  VpiInstanceFacts& facts = obj->instance_facts;
+  facts.cell = decl.is_cell;
+  facts.protected_definition = sources.IsProtected(mod->loc);
+  facts.default_net_type = VpiNetTypeConstant(mod->default_nettype);
+  facts.unconnected_drive = UnconnectedDriveConstant(mod->unconnected_drive);
+  facts.delay_mode = DelayModeConstant(mod->delay_mode);
   obj->def_decay_time = mod->default_decay_time_infinite
                             ? vpiUndefined
                             : static_cast<int>(mod->default_decay_time);
@@ -189,6 +225,9 @@ void VpiContext::AttachPackages(const RtlirDesign* design) {
   for (const PackageDecl* pkg : design->packages) {
     VpiObject* obj = DesignObjectForFlatName(pkg->name);
     MakePackageScope(obj, pkg->name);
+    // §37.10: a package is no instantiation of a definition but its own, and
+    // reports that through vpiDefName and vpiCell.
+    obj->def_name = std::string(pkg->name);
     // §37.3.7: the lifetime the package was declared with.
     obj->automatic = pkg->is_automatic;
   }
@@ -343,10 +382,13 @@ void VpiContext::AttachInstanceDefinitions(const RtlirDesign* design) {
   const SourceManager& sources = sim_ctx_->GetDiag().Sources();
   // The first top is keyed under its own name once AttachTopModules has made
   // it.
-  WalkInstanceObjects(
-      design, object_map_,
-      [&](const RtlirModule* mod, const std::string& /*prefix*/,
-          VpiObject* obj) { RecordInstanceDefinition(obj, mod, sources); });
+  WalkInstanceObjects(design, object_map_,
+                      [&](const RtlirModule* mod, const std::string& /*prefix*/,
+                          VpiObject* obj) {
+                        RecordInstanceDefinition(
+                            obj, mod, ElementDeclNamed(*design, mod->name),
+                            sources);
+                      });
 }
 
 void VpiContext::AttachModuleDefNames(SimContext& sim_ctx) {

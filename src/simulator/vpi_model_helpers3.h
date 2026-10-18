@@ -6,6 +6,7 @@
 #include <string_view>
 #include <vector>
 
+#include "common/types.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_object.h"
@@ -419,6 +420,8 @@ bool VpiIsBitObjectType(int type);
 // carrying no net; and the spelling of such a constant, null for any other
 // value (§37.3.2).
 int VpiNetTypeOf(VpiHandle obj);
+// §37.16: the Annex K constant for a net declared of `type`, vpiNone for none.
+int VpiNetTypeConstant(NetType type);
 const char* VpiNetTypeConstantName(int net_type);
 
 // §37.3.2 with §23.3.3.7: a net's vpiResolvedNetType, its type once the nets

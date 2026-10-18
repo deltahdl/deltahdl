@@ -631,7 +631,8 @@ TEST_F(ClassObjectsOfARun, AClassObjReachesItsClasssParameters) {
       "endmodule\n");
   vpiHandle obj = vpi_handle(vpiClassObj, By("top.p"));
   ASSERT_NE(obj, nullptr);
-  EXPECT_EQ(NamesOf(vpiParameter, obj), (std::vector<std::string>{"N", "W"}));
+  EXPECT_EQ(NamesOf(vpiParameter, obj),
+            (std::vector<std::string>{"N", "T", "W"}));
   vpiHandle n = Named(vpiParameter, obj, "N");
   vpiHandle w = Named(vpiParameter, obj, "W");
   ASSERT_NE(n, nullptr);

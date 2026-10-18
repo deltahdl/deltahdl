@@ -9,10 +9,7 @@
 
 namespace delta {
 
-namespace {
-
-// §37.16: the Annex K constant for a net declared of `type`.
-int NetTypeConstant(NetType type) {
+int VpiNetTypeConstant(NetType type) {
   switch (type) {
     case NetType::kWire:
       return vpiWire;
@@ -46,8 +43,6 @@ int NetTypeConstant(NetType type) {
   }
 }
 
-}  // namespace
-
 int VpiNetTypeOf(VpiHandle obj) {
   if (obj->net == nullptr) return 0;
   // §37.16 detail 11: a net declared with a user-defined nettype (§6.6.7) is a
@@ -57,7 +52,7 @@ int VpiNetTypeOf(VpiHandle obj) {
     return VpiNetNettypeValue(obj->parent != nullptr &&
                               obj->parent->net == obj->net);
   }
-  return NetTypeConstant(obj->net->type);
+  return VpiNetTypeConstant(obj->net->type);
 }
 
 // §23.3.3.7.1: the type of the net a port connects `net` to: for the net a

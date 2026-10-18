@@ -11,6 +11,7 @@
 #include "common/envelope_viewport.h"
 #include "common/packed_range.h"
 #include "simulator/vpi_constants.h"
+#include "simulator/vpi_instance_facts.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -190,6 +191,7 @@ struct VpiObject {
   std::string library_name;
   std::string cell_name;
   std::string config_name;
+  VpiInstanceFacts instance_facts;  // §37.10: see VpiInstanceFacts.
 
   // §37.30 detail 1: the definition name an interface typespec reports through
   // vpi_get_str(vpiDefName) - the modport identifier when the typespec

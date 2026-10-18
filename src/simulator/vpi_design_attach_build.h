@@ -28,6 +28,7 @@ enum class DataTypeKind : uint8_t;
 enum class StmtKind : uint8_t;
 enum class TokenKind : uint16_t;
 struct Expr;
+struct ModuleDecl;
 struct ModuleItem;
 struct PackageDecl;
 struct PropertyExprNode;
@@ -215,6 +216,11 @@ using VpiSubroutineObjects =
 // holding its io decls, its return variable and the variables its body
 // declares, a return variable's width read in the run `ctx`. Answers the
 // objects made.
+// The module, interface or program the compilation unit declares under
+// `name`, an empty declaration, declaring nothing, for none.
+const ModuleDecl& ElementDeclNamed(const RtlirDesign& design,
+                                   std::string_view name);
+
 VpiSubroutineObjects AttachSubroutines(const RtlirDesign& design,
                                        const VpiObjectMap& objects,
                                        SimContext& ctx,

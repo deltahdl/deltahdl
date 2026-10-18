@@ -18,6 +18,7 @@
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_query_instance.h"
 
 namespace delta {
 
@@ -321,6 +322,9 @@ int VpiGetInstanceTime(int property, VpiHandle obj) {
 // kept inline so the dispatch table stays self-documenting.
 int VpiGetTypeRestricted(int property, VpiHandle obj, bool& handled) {
   handled = true;
+  if (int instance = 0; VpiGetInstanceProperty(property, obj, instance)) {
+    return instance;
+  }
   switch (property) {
     case vpiObjId:
       return VpiGetObjId(obj);

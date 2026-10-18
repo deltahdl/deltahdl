@@ -17,6 +17,7 @@
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_io_decl.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 #include "parser/ast_specify.h"
 #include "parser/ast_type.h"
 #include "simulator/net.h"
@@ -673,72 +674,65 @@ void PrefixFullNamesWithTop(VpiObject* obj, std::string_view top) {
 
 }  // namespace
 
-VpiObject* VpiContext::NettypeDeclarationIn(VpiHandle scope,
-                                            const RtlirNet& net) {
-  // §37.23: one declaration object per nettype name in the scope, since every
-  // net declared with that nettype names the same declaration.
-  for (auto* child : scope->children) {
-    if (child->type == vpiNettypeDecl && child->name == net.nettype_name) {
-      return child;
+void VpiContext::MakeNettypeDecls(VpiHandle scope,
+                                  const std::vector<ModuleItem*>& items) {
+  for (const ModuleItem* entry : items) {
+    if (entry->kind != ModuleItemKind::kNettypeDecl) continue;
+    const ModuleItem& item = *entry;
+    name_pool_.emplace_back(item.name);
+    auto* decl = AllocObject();
+    decl->type = vpiNettypeDecl;
+    decl->name = name_pool_.back();
+    decl->full_name = VpiScopedFullName(scope, item.name);
+    decl->parent = scope;
+    // §6.6.7: `nettype T1 T2;` declares T2 an alias of the nettype T1, which
+    // writes no with clause of its own and resolves as T1 does. Detail 2: an
+    // alias reaches the declaration it aliases, found here among those the
+    // scope declared before it; detail 1: and the function T1 resolves with.
+    for (auto* earlier : scope->children) {
+      if (earlier->type == vpiNettypeDecl &&
+          earlier->name == item.typedef_type.type_name) {
+        decl->aliased = earlier;
+        decl->nettype_with = earlier->nettype_with;
+      }
+    }
+    scope->children.push_back(decl);
+
+    // §37.23 detail 1: vpiWith answers NULL for a nettype declaration with no
+    // resolution function. A declaration written
+    // with one reaches the function the clause draws vpiWith to.
+    if (!item.nettype_resolve_func.empty()) {
+      name_pool_.emplace_back(item.nettype_resolve_func);
+      auto* func = AllocObject();
+      func->type = vpiFunction;
+      func->name = name_pool_.back();
+      func->parent = scope;
+      // The function is reached through vpiWith and through nothing else: it is
+      // not hung among the scope's children, because a scope's vpiFunction
+      // iteration reports the functions the scope declares and §6.6.7 lets the
+      // with clause name one declared in a package or a class instead.
+      decl->nettype_with = func;
     }
   }
-
-  name_pool_.emplace_back(net.nettype_name);
-  auto* decl = AllocObject();
-  decl->type = vpiNettypeDecl;
-  decl->name = name_pool_.back();
-  decl->full_name =
-      scope->full_name.empty()
-          ? std::string(net.nettype_name)
-          : scope->full_name + "." + std::string(net.nettype_name);
-  decl->parent = scope;
-  scope->children.push_back(decl);
-
-  // §37.23 detail 1: vpiWith answers NULL for a nettype declaration with no
-  // resolution function. A declaration written
-  // with one reaches the function the clause draws vpiWith to.
-  if (!net.resolve_func.empty()) {
-    name_pool_.emplace_back(net.resolve_func);
-    auto* func = AllocObject();
-    func->type = vpiFunction;
-    func->name = name_pool_.back();
-    func->parent = scope;
-    // The function is reached through vpiWith and through nothing else: it is
-    // not hung among the scope's children, because a scope's vpiFunction
-    // iteration reports the functions the scope declares and §6.6.7 lets the
-    // with clause name one declared in a package or a class instead.
-    decl->nettype_with = func;
-  }
-  return decl;
 }
 
 void VpiContext::AttachNettypeDeclarations(const RtlirDesign* design) {
   // §37.23 draws a "nettype decl" object carrying the declaration's name, the
-  // resolution function its with clause names, and the nettype it aliases. No
-  // pass built one, so the object the whole subclause is about did not exist in
-  // any run: §37.10 detail 1's vpiNetTypedef iteration over an instance reached
-  // nothing, and the two details' rules stood over objects a test made.
-  //
-  // §6.6.7's declaration reaches elaboration on the nets declared with it - the
-  // nettype's name and its resolution function travel on RtlirNet - so one
-  // declaration object is made per nettype name in the scope its nets stand in.
-  //
-  // Detail 2's vpiNetTypedefAlias is left null: elaboration resolves an alias
-  // chain to the source nettype's resolution function and keeps no record of
-  // the chain, so which declaration an alias named is not something a run can
-  // still answer.
+  // resolution function its with clause names, and the nettype it aliases.
+  // §37.10 detail 10: an instance's vpiNetTypedef iteration reaches the
+  // nettypes it declares, so each declaration is an object of the scope it is
+  // written in, an instance's or a package's, used by a net or not, and a net
+  // of a package's nettype finds that nettype under the package alone.
+  WalkInstanceObjects(design, object_map_,
+                      [&](const RtlirModule* mod, const std::string& /*prefix*/,
+                          VpiObject* scope) {
+                        MakeNettypeDecls(
+                            scope, ElementDeclNamed(*design, mod->name).items);
+                      });
   if (design == nullptr) return;
-
-  WalkInstancePaths(
-      design, [&](const RtlirModule* mod, const std::string& prefix) {
-        for (const RtlirNet& net : mod->nets) {
-          if (!net.is_user_nettype || net.nettype_name.empty()) continue;
-          VpiHandle obj =
-              FindObjectForFlatName(object_map_, VpiFlatName(prefix, net.name));
-          if (obj == nullptr || obj->parent == nullptr) continue;
-          NettypeDeclarationIn(obj->parent, net);
-        }
-      });
+  for (const PackageDecl* pkg : design->packages) {
+    MakeNettypeDecls(DesignObjectForFlatName(pkg->name), pkg->items);
+  }
 }
 
 // Marks a top after the first, keyed under its own name as an instance is,
@@ -753,6 +747,9 @@ static std::unordered_set<const RtlirModule*> MarkKeyedTops(
     if (named == objects.end() || named->second == nullptr) continue;
     named->second->top_module = true;
     named->second->type = VpiInstanceKind(top);
+    // §37.10: no instantiation names what a top is an instance of, which the
+    // run records for every other instance; it is its own definition's.
+    named->second->def_name = std::string(top->name);
     keyed_tops.insert(top);
   }
   return keyed_tops;
@@ -805,6 +802,7 @@ void VpiContext::AttachTopModules(const RtlirDesign* design) {
     obj->type = VpiInstanceKind(top);
     obj->name = name_pool_.back();
     obj->full_name = std::string(top->name);
+    obj->def_name = std::string(top->name);
     obj->top_module = true;
     for (auto* object : contents) {
       object->parent = obj;

@@ -52,20 +52,6 @@ struct SubroutineBuild {
   VpiSubroutineObjects& made;
 };
 
-// The module, interface or program the compilation unit declares under
-// `name`, null for none.
-const ModuleDecl* ElementDeclNamed(const RtlirDesign& design,
-                                   std::string_view name) {
-  if (design.compilation_unit == nullptr) return nullptr;
-  const CompilationUnit& unit = *design.compilation_unit;
-  for (const auto* list : {&unit.modules, &unit.interfaces, &unit.programs}) {
-    for (const ModuleDecl* decl : *list) {
-      if (decl->name == name) return decl;
-    }
-  }
-  return nullptr;
-}
-
 bool IsSubroutine(const ModuleItem* item) {
   return item->kind == ModuleItemKind::kTaskDecl ||
          item->kind == ModuleItemKind::kFunctionDecl;
@@ -282,8 +268,7 @@ VpiObject* MakeSubroutine(const SubroutineScope& where, const ModuleItem* item,
 // declaring them (§27.4), keyed under that block's full name.
 void MakeScopeSubroutines(const SubroutineBuild& sb, const RtlirModule& mod,
                           VpiObject* scope, const std::string& prefix) {
-  const ModuleDecl* decl = ElementDeclNamed(sb.design, mod.name);
-  const bool kAutomatic = decl != nullptr && decl->is_automatic;
+  const bool kAutomatic = ElementDeclNamed(sb.design, mod.name).is_automatic;
   const std::string kParams = prefix.empty() ? "" : prefix + ".";
   for (const ModuleItem* item : mod.function_decls) {
     if (DeclaredInGenerateBlock(mod, item)) continue;
@@ -394,6 +379,19 @@ const ModuleItem* InstanceSubroutine(const RtlirModule& mod,
 }
 
 }  // namespace
+
+const ModuleDecl& ElementDeclNamed(const RtlirDesign& design,
+                                   std::string_view name) {
+  static const ModuleDecl kNone;
+  if (design.compilation_unit == nullptr) return kNone;
+  const CompilationUnit& unit = *design.compilation_unit;
+  for (const auto* list : {&unit.modules, &unit.interfaces, &unit.programs}) {
+    for (const ModuleDecl* decl : *list) {
+      if (decl->name == name) return *decl;
+    }
+  }
+  return kNone;
+}
 
 VpiSubroutineObjects AttachSubroutines(const RtlirDesign& design,
                                        const VpiObjectMap& objects,

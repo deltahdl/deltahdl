@@ -285,12 +285,12 @@ vpiHandle ChildOf(int type, vpiHandle scope, std::string_view name) {
   return nullptr;
 }
 
-// Detail 1: a module's value parameters are what its vpiParameter iteration
-// reaches...
-TEST_F(ParametersOfARun, AModulesValueParametersAreParameters) {
+// The figure: a module's vpiParameter iteration reaches the `parameters`
+// class, its value parameters and its type parameter alike (§37.10)...
+TEST_F(ParametersOfARun, AModulesParametersAndTypeParametersAreParameters) {
   Run(kParameters);
   EXPECT_EQ(NamesOf(vpiParameter, vpi_handle_by_name(VpiText("top"), nullptr)),
-            (std::vector<std::string>{"L", "P"}));
+            (std::vector<std::string>{"L", "P", "T"}));
 }
 
 // ...each saying through vpiLocalParam whether it is a localparam...
@@ -409,12 +409,12 @@ constexpr const char* kPackageParameters =
     "endpackage\n"
     "module top; endmodule\n";
 
-// Detail 1 with §37.10: a package's value parameters are what its
-// vpiParameter iteration reaches, as a module's are (#5102)...
-TEST_F(ParametersOfARun, APackagesValueParametersAreParameters) {
+// The figure with §37.10: a package's vpiParameter iteration reaches its
+// value parameters and its type parameter, as a module's does (#5102)...
+TEST_F(ParametersOfARun, APackagesParametersAndTypeParametersAreParameters) {
   Run(kPackageParameters);
   EXPECT_EQ(NamesOf(vpiParameter, vpi_handle_by_name(VpiText("pkg"), nullptr)),
-            (std::vector<std::string>{"L", "P"}));
+            (std::vector<std::string>{"L", "P", "T"}));
   EXPECT_EQ(vpi_get(vpiType, vpi_handle_by_name(VpiText("pkg::P"), nullptr)),
             vpiParameter);
 }

@@ -410,6 +410,41 @@ bool VpiIterateMatchesEdgeMode(VpiHandle obj, int type, VpiHandle ref,
   return false;
 }
 
+// §37.4.1: an edge drawn to a class enclosure reaches the objects of the kinds
+// the class groups, and no object's own type is the class. Answers whether
+// `type` names such a class, with `matched` saying whether an object of type
+// `obj_type` is of one of its kinds.
+bool VpiIterateMatchesClass(int type, int obj_type, bool& matched) {
+  switch (type) {
+    // §37.35/§37.5: the module-to-primitive edge reaches the gates, switches
+    // and UDPs the `primitive` class groups.
+    case vpiPrimitive:
+      matched = VpiIsPrimitiveType(obj_type);
+      return true;
+    // §37.9/§37.5/§37.63: the edge from a program or a module to its
+    // procedures reaches the initial, final and always procedures the
+    // `process` class groups.
+    case vpiProcess:
+      matched = VpiIsProcessType(obj_type);
+      return true;
+    case vpiTaskFunc:
+      matched = VpiIsTaskFuncType(obj_type);
+      return true;
+    // §37.10 with §37.16: the instance's edge to `net` reaches every net kind
+    // the class groups, not only the logic net whose own type vpiNet also is.
+    case vpiNet:
+      matched = VpiIsNetClassType(obj_type);
+      return true;
+    // §37.10 with §37.28: the vpiParameter edge is drawn to the `parameters`
+    // class, which groups the value parameter and the type parameter.
+    case vpiParameter:
+      matched = obj_type == vpiParameter || obj_type == vpiTypeParameter;
+      return true;
+    default:
+      return false;
+  }
+}
+
 bool VpiIterateMatches(VpiHandle obj, int type, VpiHandle ref,
                        const VpiIterateModes& modes) {
   bool matched = false;
@@ -425,21 +460,7 @@ bool VpiIterateMatches(VpiHandle obj, int type, VpiHandle ref,
   // §37.x: the vpiAssertion relation reaches every assertion kind, checked
   // between the two grouped mode blocks exactly as in the original order.
   if (type == vpiAssertion) return VpiIsAssertionType(obj->type);
-  // §37.35/§37.5: the module-to-primitive edge is drawn to the `primitive`
-  // class, so it reaches the gates, switches and UDPs the class groups.
-  // Matching the class constant against an object's own type reached none of
-  // them: §37.4.1 makes the enclosure a grouping and no object is one.
-  if (type == vpiPrimitive) return VpiIsPrimitiveType(obj->type);
-  // §37.9/§37.5/§37.63: the edge from a program or a module to its procedures
-  // is drawn to the `process` class, so it reaches the initial, final and
-  // always procedures the class groups rather than an object whose own type is
-  // the class name, which is a kind no procedure has.
-  if (type == vpiProcess) return VpiIsProcessType(obj->type);
-  if (type == vpiTaskFunc) return VpiIsTaskFuncType(obj->type);
-  // §37.10 with §37.16: the instance's edge to `net` is drawn to that class,
-  // so it reaches every net kind the class groups, not only the logic net
-  // whose own type vpiNet also is.
-  if (type == vpiNet) return VpiIsNetClassType(obj->type);
+  if (VpiIterateMatchesClass(type, obj->type, matched)) return matched;
   // §37.20 detail 1: vpiMemory is a method returning vpiRegArray objects.
   if (type == vpiMemory) return obj->type == VpiMemoryIterationItemType();
   // §37.10: the vpiNetTypedef iteration reaches the instance's nettype

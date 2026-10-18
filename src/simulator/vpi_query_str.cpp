@@ -448,10 +448,9 @@ static const char* VpiDefNameStr(VpiHandle obj) {
   // §38.11: an instance reports what it is an instance of, which the design
   // recorded against its path; a module object standing for a definition rather
   // than an instance has no such record and its own name is its definition
-  // name. An interface or program instance is an instance as a module's is
-  // (§37.6, §37.9).
-  if (obj->type == kVpiModule || obj->type == vpiInterface ||
-      obj->type == vpiProgram) {
+  // name. An interface, program or package instance is an instance as a
+  // module's is (§37.6, §37.9, §37.10), a package being its own definition.
+  if (VpiIsInstanceType(obj->type)) {
     return obj->def_name.empty() ? obj->name.data() : obj->def_name.c_str();
   }
   // §37.15 detail 6: a ref obj whose actual is an interface or modport
@@ -509,26 +508,26 @@ static const char* VpiDefFileStr(VpiHandle obj) {
   return obj->def_file.empty() ? nullptr : obj->def_file.c_str();
 }
 
-// §37.5: vpiLibrary names a module's library; any other object kind yields
-// null.
+// §37.10: vpiLibrary names an instance's library, a module's, interface's,
+// program's or package's alike; any other object kind yields null.
 static const char* VpiLibraryStr(VpiHandle obj) {
-  if (obj->type != kVpiModule) return nullptr;
+  if (!VpiIsInstanceType(obj->type)) return nullptr;
   return obj->library_name.c_str();
 }
 
-// §37.5: vpiCell names a module's cell, which is the definition it is an
+// §37.10: vpiCell names an instance's cell, which is the definition it is an
 // instance of where no binding was recorded, never the instance's own name;
 // any other object kind yields null.
 static const char* VpiCellStr(VpiHandle obj) {
-  if (obj->type != kVpiModule) return nullptr;
+  if (!VpiIsInstanceType(obj->type)) return nullptr;
   return obj->cell_name.empty() ? obj->def_name.c_str()
                                 : obj->cell_name.c_str();
 }
 
-// §37.5: vpiConfig names the configuration bound to a module; any other object
-// kind yields null.
+// §37.10: vpiConfig names the configuration bound to an instance; any other
+// object kind yields null.
 static const char* VpiConfigStr(VpiHandle obj) {
-  if (obj->type != kVpiModule) return nullptr;
+  if (!VpiIsInstanceType(obj->type)) return nullptr;
   return obj->config_name.c_str();
 }
 

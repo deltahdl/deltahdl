@@ -1,17 +1,21 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <cstddef>
 #include <string>
 #include <string_view>
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "common/types.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/separate_compilation_bind.h"
 #include "fixture_scratch_dir.h"
 #include "fixture_simulator.h"
 #include "fixture_vpi_run.h"
 #include "helpers_bound_from_library.h"
+#include "parser/ast_design.h"
+#include "parser/ast_module.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
@@ -613,6 +617,141 @@ TEST_F(InstanceObjectsOfARun, APackageReachesTheTypedefsItDeclares) {
   EXPECT_EQ(vpi_get(vpiType, nib), vpiLogicTypespec);
   EXPECT_STREQ(vpi_get_str(vpiFullName, nib), "pk::nib_t");
   EXPECT_EQ(vpi_get(vpiType, Named(vpiTypedef, pk, "word_t")), vpiIntTypespec);
+}
+
+// The figure: an instance reports the compiler directives in force where its
+// definition was written -- vpiDefDelayMode the mode Annex E.4 to E.7 selected,
+// vpiUnconnDrive the pull of `unconnected_drive (§22.9), vpiDefNetType the
+// net type of `default_nettype (§22.8), vpiCellInstance whether `celldefine
+// covered it (§22.10) -- and vpiTop whether it is a top. The run is elaborated
+// without the preprocessor, so each module is given what the directives ahead
+// of it record.
+TEST_F(InstanceObjectsOfARun, AnInstanceReportsItsDefinitionsDirectives) {
+  RtlirDesign* design = ElaborateSrc(
+      "module m0; endmodule\n"
+      "module m1; endmodule\n"
+      "module m2; endmodule\n"
+      "module m3; endmodule\n"
+      "module m4; endmodule\n"
+      "module top; m0 u0(); m1 u1(); m2 u2(); m3 u3(); m4 u4(); endmodule\n",
+      f_);
+  ASSERT_NE(design, nullptr);
+  ASSERT_FALSE(f_.has_errors);
+  struct Directives {
+    DelayModeDirective delay;
+    NetType drive;
+    NetType nettype;
+  };
+  const Directives kGiven[] = {
+      {DelayModeDirective::kDistributed, NetType::kTri1, NetType::kNone},
+      {DelayModeDirective::kPath, NetType::kTri0, NetType::kWand},
+      {DelayModeDirective::kUnit, NetType::kWire, NetType::kWire},
+      {DelayModeDirective::kZero, NetType::kWire, NetType::kWire},
+      {DelayModeDirective::kNone, NetType::kWire, NetType::kWire}};
+  RtlirModule* top = design->top_modules.front();
+  ASSERT_EQ(top->children.size(), 5u);
+  for (size_t k = 0; k < 5; ++k) {
+    RtlirModule* mod = top->children[k].resolved;
+    mod->delay_mode = kGiven[k].delay;
+    mod->unconnected_drive = kGiven[k].drive;
+    mod->default_nettype = kGiven[k].nettype;
+  }
+  for (ModuleDecl* decl : design->compilation_unit->modules) {
+    if (decl->name == "m0") decl->is_cell = true;
+  }
+  LowerAndRun(design, f_);
+  const int kModes[] = {vpiDelayModeDistrib, vpiDelayModePath, vpiDelayModeUnit,
+                        vpiDelayModeZero, vpiDelayModeNone};
+  for (size_t k = 0; k < 5; ++k) {
+    EXPECT_EQ(vpi_get(vpiDefDelayMode, By("top.u" + std::to_string(k))),
+              kModes[k]);
+  }
+  EXPECT_EQ(vpi_get(vpiUnconnDrive, By("top.u0")), vpiPull1);
+  EXPECT_EQ(vpi_get(vpiUnconnDrive, By("top.u1")), vpiPull0);
+  EXPECT_EQ(vpi_get(vpiUnconnDrive, By("top.u4")), vpiHighZ);
+  EXPECT_EQ(vpi_get(vpiDefNetType, By("top.u0")), vpiNone);
+  EXPECT_EQ(vpi_get(vpiDefNetType, By("top.u1")), vpiWand);
+  EXPECT_EQ(vpi_get(vpiDefNetType, By("top.u4")), vpiWire);
+  EXPECT_EQ(vpi_get(vpiCellInstance, By("top.u0")), 1);
+  EXPECT_EQ(vpi_get(vpiCellInstance, By("top.u4")), 0);
+  EXPECT_EQ(vpi_get(vpiTop, By("top")), 1);
+  EXPECT_EQ(vpi_get(vpiTop, By("top.u0")), 0);
+  // §34: no envelope contained these definitions.
+  EXPECT_EQ(vpi_get(vpiProtected, By("top.u0")), 0);
+}
+
+// The figure: an instance whose definition a decryption envelope contained
+// reports vpiProtected TRUE, whatever its own instantiation is.
+TEST(InstanceModel, AnInstanceOfAProtectedDefinitionIsProtected) {
+  VpiContext ctx;
+  SetGlobalVpiContext(&ctx);
+  VpiObject mod;
+  mod.type = kVpiModule;
+  mod.instance_facts.protected_definition = true;
+  EXPECT_EQ(vpi_get(vpiProtected, VpiHandleOf(&mod)), 1);
+  SetGlobalVpiContext(nullptr);
+}
+
+// The figure: vpiUnit is TRUE for the package that is the compilation unit's
+// scope and FALSE for a declared package; a module has no such property.
+TEST_F(InstanceObjectsOfARun, TheCompilationUnitIsTheUnitPackage) {
+  Run("int g = 3;\n"
+      "package pk; int p; endpackage\n"
+      "module top; int x = $unit::g; endmodule\n");
+  std::vector<std::string> units;
+  vpiHandle it = vpi_iterate(vpiPackage, nullptr);
+  ASSERT_NE(it, nullptr);
+  while (vpiHandle pkg = vpi_scan(it)) {
+    if (vpi_get(vpiUnit, pkg) == 1)
+      units.emplace_back(vpi_get_str(vpiName, pkg));
+  }
+  EXPECT_EQ(units, std::vector<std::string>{"$unit"});
+  EXPECT_EQ(vpi_get(vpiUnit, By("pk")), 0);
+  EXPECT_EQ(vpi_get(vpiUnit, By("top")), 0);
+}
+
+// The figure: every instance names its definition, library, cell and
+// configuration, an interface's, a program's and a package's as a module's,
+// and a top is an instance of its own definition (§33.7, §38.11).
+TEST_F(InstanceObjectsOfARun, EveryInstanceNamesItsDefinitionAndCell) {
+  Run("interface ifc; endinterface\n"
+      "program prg; endprogram\n"
+      "package pk; int p; endpackage\n"
+      "module top; ifc i(); prg p(); endmodule\n");
+  EXPECT_STREQ(vpi_get_str(vpiCell, By("top")), "top");
+  EXPECT_STREQ(vpi_get_str(vpiCell, By("top.i")), "ifc");
+  EXPECT_STREQ(vpi_get_str(vpiCell, By("top.p")), "prg");
+  EXPECT_STREQ(vpi_get_str(vpiCell, By("pk")), "pk");
+  EXPECT_STREQ(vpi_get_str(vpiDefName, By("pk")), "pk");
+  for (const char* kName : {"top.i", "top.p", "pk"}) {
+    EXPECT_STREQ(vpi_get_str(vpiLibrary, By(kName)), "") << kName;
+    EXPECT_STREQ(vpi_get_str(vpiConfig, By(kName)), "") << kName;
+  }
+}
+
+// Detail 10: an instance's vpiNetTypedef iteration reaches the nettypes it
+// declares, a nettype no net uses among them, and none a package declares,
+// which the package reaches. §37.23 detail 2: an alias reaches the nettype it
+// aliases, and a nettype of a typedef's type aliases none.
+TEST_F(InstanceObjectsOfARun, AnInstanceReachesTheNettypesItDeclares) {
+  Run("package pk; nettype logic pnt; endpackage\n"
+      "module top;\n"
+      "  typedef logic [3:0] nib_t;\n"
+      "  nettype logic [3:0] bnt;\n"
+      "  nettype bnt alias_nt;\n"
+      "  nettype nib_t nnt;\n"
+      "  pk::pnt n;\n"
+      "endmodule\n");
+  vpiHandle top = By("top");
+  ASSERT_NE(top, nullptr);
+  EXPECT_EQ(NamesOf(vpiNetTypedef, top),
+            (std::vector<std::string>{"alias_nt", "bnt", "nnt"}));
+  EXPECT_EQ(NamesOf(vpiNetTypedef, By("pk")), std::vector<std::string>{"pnt"});
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiNetTypedefAlias,
+                                   Named(vpiNetTypedef, top, "alias_nt"))),
+            VpiObjectOf(Named(vpiNetTypedef, top, "bnt")));
+  EXPECT_EQ(vpi_handle(vpiNetTypedefAlias, Named(vpiNetTypedef, top, "nnt")),
+            nullptr);
 }
 
 // §37.10: vpiTimeUnit and vpiTimePrecision are drawn on an instance, and a
