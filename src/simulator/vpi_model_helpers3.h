@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <deque>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -398,6 +399,12 @@ VpiHandle VpiScopeDefaultDisableIff(VpiHandle scope);
 // and for vpiPrimitiveArray a gate, switch or udp array. Null where it is an
 // element of none.
 VpiHandle VpiInstanceArrayOf(VpiHandle element, int type);
+
+// §38.20: what `indices` name below `parent`, leftmost first: for an instance
+// array the element standing at all of them, one per dimension (§37.11), and
+// otherwise the subobject each index in turn selects, a trailing one a bit;
+// null where any names nothing.
+VpiHandle VpiSubobjectByIndices(VpiHandle parent, std::span<const int> indices);
 
 // §37.16: the object definitions the `nets` class groups - the net bit, the
 // interconnect array, the array net, and the concrete net kinds of the `net`

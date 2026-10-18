@@ -103,6 +103,7 @@ void VpiAddArrayElement(VpiObject* array, VpiObject* element, int64_t index,
                         const VpiAttachBuild& build) {
   element->array_member = true;
   element->index = static_cast<int>(index);
+  element->instance_facts.array_indices = {index};
   element->index_expr = VpiIntConstant(index, build);
   array->children.push_back(element);
 }
@@ -129,6 +130,7 @@ void AttachInstanceArrays(const RtlirDesign* design,
           VpiAddArrayElement(
               ArrayOf(element, inst.array, {objects, prefix, ctx, build}),
               element, inst.array.index, build);
+          element->instance_facts.array_indices = inst.array.indices;
         }
       });
 }

@@ -261,8 +261,10 @@ struct InstArrayElement {
   int64_t left = 0;
   int64_t right = 0;
   int64_t index = 0;
-  // §37.11 detail 2: every dimension, leftmost first.
+  // §37.11 detail 2: every dimension, leftmost first, and §38.20: the
+  // element's index in each of them.
   std::vector<InstArrayDim> dims;
+  std::vector<int64_t> indices;
   // §37.11 detail 1: the port connections the instantiation wrote to the
   // array, before each element was given its share, in the order of the
   // element's port bindings, null for a port it left unconnected.

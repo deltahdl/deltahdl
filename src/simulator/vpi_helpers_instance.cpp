@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <deque>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -23,6 +24,7 @@
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_design_attach_build.h"
+#include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers3.h"
@@ -158,6 +160,50 @@ VpiHandle VpiInstanceArrayOf(VpiHandle element, int type) {
     }
   }
   return nullptr;
+}
+
+namespace {
+
+// §37.11 with §38.20: the element of the instance array `array` that
+// `indices` names, one per dimension of the array, leftmost first; null for
+// none.
+VpiHandle InstanceArrayElementAt(const VpiObject& array,
+                                 std::span<const int> indices) {
+  for (VpiObject* child : array.children) {
+    if (child->array_member &&
+        std::ranges::equal(child->instance_facts.array_indices, indices)) {
+      return child;
+    }
+  }
+  return nullptr;
+}
+
+}  // namespace
+
+VpiHandle VpiSubobjectByIndices(VpiHandle parent,
+                                std::span<const int> indices) {
+  if (VpiIsInstanceArrayType(parent->type)) {
+    return InstanceArrayElementAt(*parent, indices);
+  }
+  // §38.20: apply the indices in the order provided - leftmost first -
+  // following the array dimension declaration from the leftmost to the
+  // rightmost range of the reference handle, with an optional trailing
+  // bit-select index. Each step descends to the subobject carrying that index.
+  // If any index names no subobject the chain is not a legal SystemVerilog
+  // index select expression, so the result is a null handle.
+  VpiHandle current = parent;
+  for (const int kIndex : indices) {
+    VpiHandle next = nullptr;
+    for (auto* child : current->children) {
+      if (VpiIndexSelects(*child, kIndex)) {
+        next = child;
+        break;
+      }
+    }
+    if (!next) return nullptr;
+    current = next;
+  }
+  return current;
 }
 
 VpiHandle VpiModuleOf(VpiHandle obj) {

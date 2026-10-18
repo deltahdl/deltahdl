@@ -582,11 +582,12 @@ void PushInstanceArray(const InstArrayDistribCtx& ctx, RtlirModule* mod,
     const std::vector<int64_t> kFromLeft = FromLeftOffsets(dims, p);
     RtlirModuleInst copy = base;
     copy.array = array;
-    copy.array.index = dims.front().IndexFromLeft(kFromLeft.front());
     std::string name(base.inst_name);
     for (std::size_t d = 0; d < dims.size(); ++d) {
-      name += std::format("[{}]", dims[d].IndexFromLeft(kFromLeft[d]));
+      copy.array.indices.push_back(dims[d].IndexFromLeft(kFromLeft[d]));
+      name += std::format("[{}]", copy.array.indices.back());
     }
+    copy.array.index = copy.array.indices.front();
     auto* buf = ctx.arena.AllocString(name.c_str(), name.size());
     copy.inst_name = std::string_view(buf, name.size());
     for (auto& b : copy.port_bindings) {

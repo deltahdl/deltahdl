@@ -2,6 +2,7 @@
 #include <cstdarg>
 #include <cstddef>
 #include <cstdio>
+#include <span>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -204,25 +205,9 @@ VpiHandle VpiContext::HandleByMultiIndex(int num_index, const int* index_array,
   // index select expression to construct, so no subobject is named.
   if (num_index <= 0 || index_array == nullptr) return nullptr;
 
-  // §38.20: apply the indices in the order provided - leftmost first -
-  // following the array dimension declaration from the leftmost to the
-  // rightmost range of the reference handle, with an optional trailing
-  // bit-select index. Each step descends to the subobject carrying that index.
-  // If any index names no subobject the chain is not a legal SystemVerilog
-  // index select expression, so the result is a null handle.
-  VpiHandle current = parent;
-  for (int i = 0; i < num_index; ++i) {
-    VpiHandle next = nullptr;
-    for (auto* child : current->children) {
-      if (VpiIndexSelects(*child, index_array[i])) {
-        next = child;
-        break;
-      }
-    }
-    if (!next) return nullptr;
-    current = next;
-  }
-  return current;
+  return VpiSubobjectByIndices(
+      parent,
+      std::span<const int>(index_array, static_cast<std::size_t>(num_index)));
 }
 
 namespace {

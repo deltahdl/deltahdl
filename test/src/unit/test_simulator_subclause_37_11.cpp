@@ -649,5 +649,30 @@ TEST_F(InstanceArraysOfARun, AnIndexSelectOfAnInstanceArrayNamesAnElement) {
   EXPECT_EQ(vpi_handle_by_index(s, 0), nullptr);
 }
 
+// The figure's access by index with §38.20: an element of a two-dimensional
+// array of instances is named by both its indices at once, u[1][3] by {1, 3},
+// and a pair naming no element names nothing. §38.19: one index names no
+// instance of such an array, while it names an element of a one-dimensional
+// one, by multiple index too.
+TEST_F(InstanceArraysOfARun, AnElementIsNamedByEveryIndex) {
+  Run("module sub; endmodule\n"
+      "module top; sub u[1:0][2:4] (); sub w[1:0] (); endmodule\n");
+  vpiHandle u = By("top.u");
+  ASSERT_NE(u, nullptr);
+  PLI_INT32 element[] = {1, 3};
+  EXPECT_EQ(VpiObjectOf(vpi_handle_by_multi_index(u, 2, element)),
+            VpiObjectOf(By("top.u[1][3]")));
+  PLI_INT32 none[] = {1, 5};
+  EXPECT_EQ(vpi_handle_by_multi_index(u, 2, none), nullptr);
+  EXPECT_EQ(vpi_handle_by_index(u, 1), nullptr);
+  vpiHandle w = By("top.w");
+  ASSERT_NE(w, nullptr);
+  PLI_INT32 first[] = {0};
+  EXPECT_EQ(VpiObjectOf(vpi_handle_by_multi_index(w, 1, first)),
+            VpiObjectOf(By("top.w[0]")));
+  EXPECT_EQ(VpiObjectOf(vpi_handle_by_index(w, 1)),
+            VpiObjectOf(By("top.w[1]")));
+}
+
 }  // namespace
 }  // namespace delta
