@@ -270,4 +270,24 @@ TEST(TypedPropertyFormalParsing, AClockedBooleanBodyIsCapturedAsATreeToo) {
   EXPECT_EQ(operand->boolean->text, "q");
 }
 
+// §16.12.18: a formal item opened by a user-defined type is differently typed
+// from the `property` run before it, which ends there as it does at a
+// built-in type (#7308).
+TEST(TypedPropertyFormalParsing, AUserDefinedTypeEndsAPropertyRun) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef logic [1:0] my_t;\n"
+      "  property p(property q, my_t x);\n"
+      "    q;\n"
+      "  endproperty\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindItemByKind(r, ModuleItemKind::kPropertyDecl);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->prop_formal_is_property.size(), 2u);
+  EXPECT_TRUE(item->prop_formal_is_property[0]);
+  EXPECT_FALSE(item->prop_formal_is_property[1]);
+}
+
 }  // namespace

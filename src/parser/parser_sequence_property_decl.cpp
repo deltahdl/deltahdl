@@ -239,6 +239,7 @@ struct PropertyPortScan {
   // Handles the formal-name harvest branch (§16.12 formal_port_identifier).
   void HarvestFormalName(Lexer& lexer, ModuleItem* item) {
     if (ParserPropertySpecHelpers::StartsNamedFormalType(*parser)) {
+      BeginDataTypedItem();
       carry_type = ParserPropertySpecHelpers::ParseNamedFormalType(*parser);
       carry_type_kw = TokenKind::kEof;
     }
@@ -258,10 +259,10 @@ struct PropertyPortScan {
     saw_local = false;
   }
 
-  // depth==1 built-in type keyword: a built-in type keyword that does not
-  // directly follow `local` or `input` starts a fresh formal item whose
-  // qualifiers do not include `local`, so the local-variable run ends here.
-  void HandleBuiltinTypeKw(Lexer& lexer, DiagEngine& diag) {
+  // A data type, built-in or user-defined, that does not directly follow
+  // `local` or `input` starts a fresh formal item whose qualifiers do not
+  // include `local`, so the local-variable run ends here.
+  void BeginDataTypedItem() {
     if (prev_kind != TokenKind::kKwLocal && prev_kind != TokenKind::kKwInput) {
       local_run = false;
     }
@@ -272,6 +273,11 @@ struct PropertyPortScan {
     // §16.14.7: a data-typed formal is neither untyped nor `event`, so it may
     // not be defaulted to $inferred_clock.
     clock_default_allowed = false;
+  }
+
+  // depth==1 built-in type keyword: the data type of a fresh formal item.
+  void HandleBuiltinTypeKw(Lexer& lexer, DiagEngine& diag) {
+    BeginDataTypedItem();
     TokenKind kind = lexer.Peek().kind;
     ReportChandleFormal(diag, lexer.Peek());
     carry_type = ParserPropertySpecHelpers::ParseFormalType(*parser);

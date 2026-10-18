@@ -116,4 +116,25 @@ TEST(PropertyLocalLvarArgumentParsing, MultipleInputLocalsParse) {
   EXPECT_EQ(item->prop_formals[1], "b");
 }
 
+// §16.12.19 with §16.8.2: `local` qualifies the formals up to a fresh type, so
+// a user-defined type ends the local run as a built-in one does, while one
+// written directly after `local` opens a local formal of its own (#7308).
+TEST(PropertyLocalLvarArgumentParsing, AUserDefinedTypeEndsALocalRun) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef logic [1:0] my_t;\n"
+      "  property p(local int a, my_t x, local my_t y);\n"
+      "    @(posedge clk) a;\n"
+      "  endproperty\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindItemByKind(r, ModuleItemKind::kPropertyDecl);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->prop_formal_is_local.size(), 3u);
+  EXPECT_TRUE(item->prop_formal_is_local[0]);
+  EXPECT_FALSE(item->prop_formal_is_local[1]);
+  EXPECT_TRUE(item->prop_formal_is_local[2]);
+}
+
 }  // namespace

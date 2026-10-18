@@ -229,4 +229,22 @@ TEST(AssertionParsing, InferredClockDefaultAfterUntypedOrEventIsAccepted) {
               "endmodule\n"));
 }
 
+// §16.14.7: a formal of a user-defined type has a data type, so a
+// $inferred_clock default on it is rejected in a property's port list, the
+// `event` formal before it notwithstanding (#7308).
+TEST(AssertionParsing, InferredClockDefaultOnAUserDefinedTypeIsRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef logic [1:0] my_t;\n"
+      "  property p(event e, my_t x = $inferred_clock);\n"
+      "    @(e) 1'b1;\n"
+      "  endproperty\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "$inferred_clock default requires an untyped or "
+                            "event formal argument",
+                            3, "16.14.7"));
+}
+
 }  // namespace
