@@ -257,7 +257,10 @@ ModuleItem* Parser::ParseTypedef() {
   if (Check(TokenKind::kKwEnum)) {
     item->typedef_type = ParseEnumType();
   } else if (Check(TokenKind::kKwStruct) || Check(TokenKind::kKwUnion)) {
+    // A.2.2.1 lets packed dimensions follow the body, making the typedef a
+    // packed array of the structure or union (§7.4.1).
     item->typedef_type = ParseStructOrUnionType();
+    ParsePackedDims(item->typedef_type);
   } else {
     item->typedef_type = ParseDeclaredDataType();
   }

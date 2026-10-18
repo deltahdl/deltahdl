@@ -481,4 +481,33 @@ TEST(TypeDeclParsing, ForwardStructTypedefStaysForward) {
   EXPECT_EQ(fwd->typedef_type.kind, DataTypeKind::kImplicit);
 }
 
+// A.2.2.1 lets packed dimensions follow an inline struct or union body, so
+// the typedef names a packed array of the aggregate (§7.4.1, and §37.25
+// detail 8's own example); the identifier after them is the typedef's name,
+// not the start of a forward typedef.
+TEST(TypeDeclParsing, TypedefOfAnInlineAggregateTakesPackedDimensions) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef struct packed { int i1; bit bvec; } [1:3] parrtype;\n"
+      "  typedef union packed { bit [3:0] x; logic [3:0] y; } [5:0][1:0] u_t;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules[0]->items.size(), 2u);
+  const auto* parr = r.cu->modules[0]->items[0];
+  EXPECT_EQ(parr->name, "parrtype");
+  EXPECT_EQ(parr->typedef_type.kind, DataTypeKind::kStruct);
+  EXPECT_TRUE(parr->typedef_type.is_packed);
+  EXPECT_EQ(parr->typedef_type.struct_members.size(), 2u);
+  ASSERT_NE(parr->typedef_type.packed_dim_left, nullptr);
+  EXPECT_EQ(parr->typedef_type.packed_dim_left->int_val, 1u);
+  EXPECT_EQ(parr->typedef_type.packed_dim_right->int_val, 3u);
+  const auto* u = r.cu->modules[0]->items[1];
+  EXPECT_EQ(u->name, "u_t");
+  EXPECT_EQ(u->typedef_type.kind, DataTypeKind::kUnion);
+  ASSERT_NE(u->typedef_type.packed_dim_left, nullptr);
+  EXPECT_EQ(u->typedef_type.packed_dim_left->int_val, 5u);
+  EXPECT_EQ(u->typedef_type.extra_packed_dims.size(), 1u);
+}
+
 }  // namespace
