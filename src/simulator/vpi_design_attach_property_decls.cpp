@@ -23,6 +23,7 @@
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_typespec_shapes.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -122,14 +123,16 @@ VpiObject* ClassTypespec(VpiObject* formal, std::string_view name,
   return typespec;
 }
 
-// §37.51 detail 3 with §37.25: the typespec the formal `index` of `decl` is
-// declared with, hung from `formal`: the one the typedef it names declares,
-// which other objects of that type share (§37.17), a class typespec where it
-// names a class (§16.8), or one of the type's own, reaching a range per
-// packed dimension it was written with (§37.22); none for an untyped formal.
-void MakeFormalTypespec(const ModuleItem& decl, size_t index, VpiObject* formal,
-                        const VpiPropertyDeclSite& at,
-                        const VpiAttachBuild& build) {
+// §37.51 detail 3 with §37.25: the typespec of the packed type the formal
+// `index` of `decl` is declared with, hung from `formal`: the one the typedef
+// it names declares, which other objects of that type share (§37.17), a
+// class typespec where it names a class (§16.8), or one of the type's own,
+// reaching a range per packed dimension it was written with (§37.22); null
+// for an untyped formal.
+VpiObject* FormalPackedTypespec(const ModuleItem& decl, size_t index,
+                                VpiObject* formal,
+                                const VpiPropertyDeclSite& at,
+                                const VpiAttachBuild& build) {
   const DataType* type = decl.prop_formal_types[index];
   if (type != nullptr && type->kind == DataTypeKind::kNamed) {
     // §26.3: a package's typedefs are answered among the compilation unit's
@@ -139,10 +142,8 @@ void MakeFormalTypespec(const ModuleItem& decl, size_t index, VpiObject* formal,
                                      : std::string(type->scope_name) +
                                            "::" + std::string(type->type_name);
     VpiObject* named = TypedefTypespec(formal->parent, kWritten, at);
-    formal->children.push_back(
-        named != nullptr ? named
-                         : ClassTypespec(formal, type->type_name, build));
-    return;
+    return named != nullptr ? named
+                            : ClassTypespec(formal, type->type_name, build);
   }
   const TokenKind kKeyword = decl.prop_formal_type_kw[index];
   int kind = 0;
@@ -151,14 +152,32 @@ void MakeFormalTypespec(const ModuleItem& decl, size_t index, VpiObject* formal,
   } else if (type != nullptr) {
     kind = VpiTypespecKind(type->kind);
   }
-  if (kind == 0) return;
+  if (kind == 0) return nullptr;
   VpiObject* typespec = build.alloc();
   typespec->type = kind;
   typespec->parent = formal;
-  formal->children.push_back(typespec);
   for (const PackedRange& dim : WrittenPackedDims(type, at.ctx)) {
     typespec->children.push_back(VpiRangeObject(typespec, dim, build));
   }
+  return typespec;
+}
+
+// §37.51 detail 3 with §37.25 detail 8: the typespec the formal `index` of
+// `decl` is declared with, hung from `formal`: its packed type's, or, where
+// the class-scoped typedef it names writes unpacked dimensions (§7.4.4), an
+// unnamed array typespec ranging over them whose element typespec is the
+// packed type's.
+void MakeFormalTypespec(const ModuleItem& decl, size_t index, VpiObject* formal,
+                        const VpiPropertyDeclSite& at,
+                        const VpiAttachBuild& build) {
+  VpiObject* typespec = FormalPackedTypespec(decl, index, formal, at, build);
+  if (typespec == nullptr) return;
+  std::vector<VpiTypespecDim> dims;
+  for (const Expr* dim : decl.prop_formal_unpacked_dims[index]) {
+    dims.push_back(VpiUnpackedTypespecDim(dim, at.ctx));
+  }
+  VpiTypespecShapes shapes(build);
+  formal->children.push_back(shapes.Unnamed(formal, dims, typespec));
 }
 
 // §37.51: the prop formal decl the formal `index` of `decl` stands as, hung

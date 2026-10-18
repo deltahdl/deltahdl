@@ -3,11 +3,26 @@
 #include <utility>
 #include <vector>
 
+#include "elaborator/queue_dim.h"
+#include "simulator/statement_assign_internal.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_object.h"
 
 namespace delta {
+
+VpiTypespecDim VpiUnpackedTypespecDim(const Expr* dim, SimContext& ctx) {
+  VpiTypespecDim made{true, WrittenUnpackedDim(dim, ctx), vpiStaticArray,
+                      nullptr};
+  if (dim == nullptr) {
+    made.array_type = vpiDynamicArray;
+  } else if (IsQueueDim(dim)) {
+    made.array_type = vpiQueueArray;
+  } else if (IsAssocIndexDim(dim, ctx)) {
+    made.array_type = vpiAssocArray;
+  }
+  return made;
+}
 
 void VpiTypespecShapes::Shape(VpiObject* typespec,
                               const std::vector<VpiTypespecDim>& dims,

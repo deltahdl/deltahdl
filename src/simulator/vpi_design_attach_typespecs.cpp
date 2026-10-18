@@ -9,7 +9,6 @@
 #include "common/arena.h"
 #include "common/packed_range.h"
 #include "common/types.h"
-#include "elaborator/queue_dim.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
 #include "parser/ast_design.h"
@@ -18,7 +17,6 @@
 #include "parser/ast_type.h"
 #include "simulator/instance_prefix_override.h"
 #include "simulator/sim_context.h"
-#include "simulator/statement_assign_internal.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/variable.h"
 #include "simulator/vpi_design_attach_build.h"
@@ -209,14 +207,8 @@ class TypespecMaker {
   // §7.4: an unpacked dimension, the kind of array it makes (§37.17 detail
   // 21) and, for an associative one, the typespec of its index type.
   VpiTypespecDim UnpackedDim(const Expr* dim) {
-    VpiTypespecDim made{true, WrittenUnpackedDim(dim, at_.design.ctx),
-                        vpiStaticArray, nullptr};
-    if (dim == nullptr) {
-      made.array_type = vpiDynamicArray;
-    } else if (IsQueueDim(dim)) {
-      made.array_type = vpiQueueArray;
-    } else if (IsAssocIndexDim(dim, at_.design.ctx)) {
-      made.array_type = vpiAssocArray;
+    VpiTypespecDim made = VpiUnpackedTypespecDim(dim, at_.design.ctx);
+    if (made.array_type == vpiAssocArray) {
       made.index_typespec = IndexTypespec(dim->text);
     }
     return made;

@@ -250,6 +250,7 @@ struct PropertyPortScan {
     item->prop_formal_type_kw.push_back(untyped ? TokenKind::kKwUntyped
                                                 : carry_type_kw);
     item->prop_formal_types.push_back(carry_type);
+    item->prop_formal_unpacked_dims.emplace_back();
     item->prop_formal_is_local.push_back(local_run);
     item->prop_formal_is_property.push_back(property_run);
     item->prop_formal_has_default.push_back(false);

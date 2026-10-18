@@ -475,23 +475,28 @@ void PromotePropertyInstanceBoolean(ModuleItem* item, Arena& arena,
 // takes the type the typedef stands for, under the specialization where the
 // class has parameters, as a variable does (Elaborator::ElaborateVarDecl),
 // rewritten where it is held, since a formal writing no type shares it
-// (§16.8). A formal holds no unpacked dimensions, so one of a typedef writing
-// some is left as written, as is one of a package's type (§26.3).
-void ResolveClassScopedFormalTypes(const ModuleItem& item,
+// (§16.8). The unpacked dimensions the typedef writes, which a DataType does
+// not hold, go to the formal's entry of prop_formal_unpacked_dims (§7.4.4);
+// a formal of a package's type is left as written (§26.3).
+void ResolveClassScopedFormalTypes(ModuleItem& item,
                                    const CompilationUnit* unit,
                                    const ScopeMap& module_scope,
                                    const TypedefMap& typedefs, Arena& arena) {
-  for (DataType* type : item.prop_formal_types) {
+  for (size_t i = 0; i < item.prop_formal_types.size(); ++i) {
+    DataType* type = item.prop_formal_types[i];
     if (type == nullptr || type->scope_name.empty()) continue;
     std::optional<SpecializedClassType> spec =
         SpecializeClassScopedType(*type, unit, module_scope, typedefs, arena);
     if (spec.has_value()) {
-      if (spec->unpacked_dims.empty()) *type = spec->type;
+      *type = spec->type;
+      item.prop_formal_unpacked_dims[i] = spec->unpacked_dims;
       continue;
     }
-    const DataType* declared =
-        FindClassScopedTypedefType(type->scope_name, type->type_name, unit);
-    if (declared != nullptr) *type = *declared;
+    const ModuleItem* declared =
+        FindClassScopedTypedefItem(type->scope_name, type->type_name, unit);
+    if (declared == nullptr) continue;
+    *type = declared->typedef_type;
+    item.prop_formal_unpacked_dims[i] = declared->unpacked_dims;
   }
 }
 

@@ -738,6 +738,12 @@ struct ModuleItem {
   // and a user-defined type's name included, null where it is untyped or of
   // the sequence, property or event type, which prop_formal_type_kw names.
   std::vector<DataType*> prop_formal_types;
+  // §7.4.4 with §8.23: parallel to prop_formals; the unpacked dimensions of
+  // the type a formal's class-scoped typedef names, C#(2)::arr_t under
+  // `typedef logic [W-1:0] arr_t [2]`, which a DataType does not hold. The
+  // parser leaves each empty; the elaborator fills it as it resolves the
+  // formal's type.
+  std::vector<std::vector<Expr*>> prop_formal_unpacked_dims;
 
   // §16.10: identifiers introduced by assertion_variable_declaration items in
   // the body of a sequence or property declaration. Each entry is one local

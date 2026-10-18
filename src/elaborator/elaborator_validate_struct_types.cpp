@@ -356,12 +356,18 @@ static const ModuleItem* FindClassTypedef(const ClassDecl* cls,
   return nullptr;
 }
 
+const ModuleItem* FindClassScopedTypedefItem(std::string_view cls_name,
+                                             std::string_view type_name,
+                                             const CompilationUnit* unit) {
+  const auto* cls = FindClassDecl(cls_name, unit);
+  if (cls == nullptr) return nullptr;
+  return FindClassTypedef(cls, type_name);
+}
+
 const DataType* FindClassScopedTypedefType(std::string_view cls_name,
                                            std::string_view type_name,
                                            const CompilationUnit* unit) {
-  const auto* cls = FindClassDecl(cls_name, unit);
-  if (cls == nullptr) return nullptr;
-  const auto* td = FindClassTypedef(cls, type_name);
+  const ModuleItem* td = FindClassScopedTypedefItem(cls_name, type_name, unit);
   if (td == nullptr) return nullptr;
   return &td->typedef_type;
 }

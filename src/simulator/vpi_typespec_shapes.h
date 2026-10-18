@@ -8,6 +8,8 @@
 
 namespace delta {
 
+class SimContext;
+struct Expr;
 struct VpiAttachBuild;
 struct VpiObject;
 
@@ -23,6 +25,13 @@ struct VpiTypespecDim {
   int array_type = 0;
   VpiObject* index_typespec = nullptr;
 };
+
+// §7.4 with §37.17 detail 21: the unpacked dimension `dim` as a typespec's
+// ranges draw it, evaluated in the scope `ctx` has set, and the kind of array
+// it makes: dynamic where nothing is written, a queue, associative, or
+// otherwise static. An associative one's index typespec is left null for the
+// caller, which finds typespecs by name, to fill.
+VpiTypespecDim VpiUnpackedTypespecDim(const Expr* dim, SimContext& ctx);
 
 // §37.25 detail 8: the typespecs of types written as dimensions over another
 // type, each kept with the dimensions it was written with, so that a type

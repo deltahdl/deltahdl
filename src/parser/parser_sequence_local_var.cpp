@@ -442,6 +442,7 @@ struct SequencePortScan {
     item->prop_formal_type_kw.push_back(untyped ? TokenKind::kKwUntyped
                                                 : carry_type_kw);
     item->prop_formal_types.push_back(carry_type);
+    item->prop_formal_unpacked_dims.emplace_back();
     // §16.8.2: whether this formal is a local variable formal argument, which
     // §16.10 keeps out of the sequence's clocking events.
     item->prop_formal_is_local.push_back(item_saw_local);

@@ -334,6 +334,45 @@ TEST_F(SequenceDeclsOfARun, AFormalOfAClassesTypeReachesTheTypedefsType) {
   EXPECT_EQ(kKindAndSize(Named(vpiPropFormalDecl, prop, "v")), kLogic8);
 }
 
+// Detail 2 and §37.51 detail 3 with §7.4.4 and §37.25 detail 8: a formal of
+// a class's typedef writing an unpacked dimension, C#(2)::arr_t or D::u,
+// reaches an array typespec ranging over that dimension, its element typespec
+// the typedef's packed type under the specialization (#7309).
+TEST_F(SequenceDeclsOfARun, AFormalOfAClassesArrayTypedefIsAnArray) {
+  Run("class C #(int W = 1); typedef logic [W-1:0] arr_t [2]; endclass\n"
+      "class D; typedef bit [2:0] u [2]; endclass\n"
+      "module top; logic a, clk;\n"
+      "  sequence s(C#(2)::arr_t w, D::u z); a ##1 a; endsequence\n"
+      "  property p(D::u v); @(posedge clk) a; endproperty\n"
+      "endmodule\n");
+  vpiHandle seq = Named(vpiSequenceDecl, By("top"), "s");
+  vpiHandle prop = Named(vpiPropertyDecl, By("top"), "p");
+  ASSERT_NE(seq, nullptr);
+  ASSERT_NE(prop, nullptr);
+  // The kind of `ts` and the size of its first range, 0 for none.
+  const auto kKindAndSize = [](vpiHandle ts) {
+    vpiHandle ranges = ts == nullptr ? nullptr : vpi_iterate(vpiRange, ts);
+    vpiHandle range = ranges == nullptr ? nullptr : vpi_scan(ranges);
+    return std::vector<int>{ts == nullptr ? 0 : vpi_get(vpiType, ts),
+                            range == nullptr ? 0 : vpi_get(vpiSize, range)};
+  };
+  // The kind and first range size of the typespec `formal` reaches, then of
+  // the element typespec that one reaches.
+  const auto kShape = [&](vpiHandle formal) {
+    vpiHandle ts = vpi_handle(vpiTypespec, formal);
+    std::vector<int> shape = kKindAndSize(ts);
+    const std::vector<int> kElem =
+        kKindAndSize(ts == nullptr ? nullptr : vpi_handle(vpiElemTypespec, ts));
+    shape.insert(shape.end(), kElem.begin(), kElem.end());
+    return shape;
+  };
+  const std::vector<int> kBits{vpiArrayTypespec, 2, vpiBitTypespec, 3};
+  EXPECT_EQ(kShape(Named(vpiSeqFormalDecl, seq, "w")),
+            (std::vector<int>{vpiArrayTypespec, 2, vpiLogicTypespec, 2}));
+  EXPECT_EQ(kShape(Named(vpiSeqFormalDecl, seq, "z")), kBits);
+  EXPECT_EQ(kShape(Named(vpiPropFormalDecl, prop, "v")), kBits);
+}
+
 // Detail 4: a local variable argument written as an output or an inout has
 // that direction (§16.8.2).
 TEST_F(SequenceDeclsOfARun, AnOutputAndAnInoutFormalHaveTheirDirections) {

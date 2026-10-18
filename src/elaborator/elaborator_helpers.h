@@ -328,6 +328,13 @@ const DataType* FindClassScopedTypedefType(std::string_view cls_name,
                                            std::string_view type_name,
                                            const CompilationUnit* unit);
 
+// §8.23: the typedef declaration whose type FindClassScopedTypedefType
+// answers, which also holds the unpacked dimensions the typedef writes; null
+// where that answers null. Defined in elaborator_validate_struct_types.cpp.
+const ModuleItem* FindClassScopedTypedefItem(std::string_view cls_name,
+                                             std::string_view type_name,
+                                             const CompilationUnit* unit);
+
 // §8.23: rewrites `dtype` in place when it is a type name carrying a class
 // scope prefix -- the `Cfg::my_type` of `Cfg::my_type x;` -- and that prefix
 // names a visible class declaring that typedef. Returns false, leaving `dtype`
