@@ -92,5 +92,14 @@ TEST_F(ScopesOfARun, AScopeImportsWhatItReferencesThroughAnImport) {
             (std::vector<std::string>{"a", "b", "e"}));
 }
 
+// The figure draws vpiScope from statements, calls and the kinds the scope
+// class groups; a net standing in no scope reaches none.
+TEST_F(ScopesOfARun, AnObjectOfNoScopeKindReachesNoScope) {
+  Run("module top; endmodule\n");
+  VpiObject net;
+  net.type = vpiNet;
+  EXPECT_EQ(vpi_handle(vpiScope, VpiHandleOf(&net)), nullptr);
+}
+
 }  // namespace
 }  // namespace delta

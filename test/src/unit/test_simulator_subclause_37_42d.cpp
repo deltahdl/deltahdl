@@ -243,15 +243,16 @@ TEST_F(CallsWithinADesign, AnIncrementStepsEachTimeItIsRead) {
   EXPECT_EQ(ValueAfterReads(kIncrementArgument, 2), 7);
 }
 
-// A call a task's body writes is one the model holds no object for, so the
-// call it runs with is one of its own. A system task's is unnamed all the
-// same, being a statement (§37.60 detail 1), an argument it omits is a null
-// operation and null passed to it is a null constant (detail 8)...
+// A call the body of a generate block's task writes is one the model holds no
+// object for, so the call it runs with is one of its own. A system task's is
+// unnamed all the same, being a statement (§37.60 detail 1), an argument it
+// omits is a null operation and null passed to it is a null constant (detail
+// 8)...
 TEST_F(CallsWithinADesign, ATaskBodysSystemTaskCallIsUnnamed) {
   ASSERT_NE(RegisterArgs(0), nullptr);
   Run("module top; logic [3:0] v;\n"
-      "  task t; $args(v, , null); endtask\n"
-      "  initial t;\n"
+      "  if (1) begin : g task t; $args(v, , null); endtask end\n"
+      "  initial g.t;\n"
       "endmodule\n");
   ASSERT_NE(g_invoked_call, nullptr);
   EXPECT_EQ(vpi_get_str(vpiName, g_invoked_call), nullptr);
@@ -266,16 +267,17 @@ TEST_F(CallsWithinADesign, ATaskBodysSystemTaskCallIsUnnamed) {
 TEST_F(CallsWithinADesign, ATaskBodysSystemFunctionCallIsNamed) {
   ASSERT_NE(RegisterFunction("$peek", vpiIntFunc), nullptr);
   Run("module top;\n"
-      "  task t; int x; x = $peek(); endtask\n"
-      "  initial t;\n"
+      "  if (1) begin : g task t; int x; x = $peek(); endtask end\n"
+      "  initial g.t;\n"
       "endmodule\n");
   ASSERT_NE(g_invoked_call, nullptr);
   EXPECT_STREQ(vpi_get_str(vpiName, g_invoked_call), "$peek");
 }
 
-// A call a function's body writes builds each argument as the kind of
-// expression its actual is (§37.58, §37.59), both when its compiletf runs,
-// which reads no value (§36.8.2), and when its calltf does (§36.8.3).
+// A call the body of a generate block's function writes, which the model holds
+// no object for either, builds each argument as the kind of expression its
+// actual is (§37.58, §37.59), both when its compiletf runs, which reads no
+// value (§36.8.2), and when its calltf does (§36.8.3).
 TEST_F(CallsWithinADesign, AFunctionBodysCallBuildsEachArgumentKind) {
   g_args_seen.clear();
   g_arg_reads = 0;
@@ -287,11 +289,13 @@ TEST_F(CallsWithinADesign, AFunctionBodysCallBuildsEachArgumentKind) {
   ASSERT_NE(vpi_register_systf(&data), nullptr);
   Run("module top; int a, r;\n"
       "  function int f(int x); return x; endfunction\n"
-      "  function int g();\n"
-      "    $kinds(f(1), $clog2(4), 1, '1, 1.5, \"s\", a + 1);\n"
-      "    return 0;\n"
-      "  endfunction\n"
-      "  initial r = g();\n"
+      "  if (1) begin : b\n"
+      "    function int g();\n"
+      "      $kinds(f(1), $clog2(4), 1, '1, 1.5, \"s\", a + 1);\n"
+      "      return 0;\n"
+      "    endfunction\n"
+      "  end\n"
+      "  initial r = b.g();\n"
       "endmodule\n");
   std::vector<int> kinds;
   kinds.reserve(g_args_seen.size());
