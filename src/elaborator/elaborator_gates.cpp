@@ -18,6 +18,7 @@
 #include "elaborator/rtlir_primitives.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_gate_type.h"
 #include "parser/ast_module.h"
 
 namespace delta {

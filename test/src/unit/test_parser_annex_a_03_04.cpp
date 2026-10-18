@@ -3,6 +3,7 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_gate_type.h"
 #include "parser/ast_module.h"
 
 using namespace delta;

@@ -45,4 +45,15 @@ bool SpecializeClassScopedTypedef(ModuleItem* item, const CompilationUnit* unit,
                                   const ScopeMap& module_scope,
                                   const TypedefMap& typedefs, Arena& arena);
 
+// §8.23 and §8.25 with §16.8: each formal of the sequence or property
+// declaration `item` written with a type a class declares, C::t or C#(8)::t,
+// rewritten to the type the typedef stands for, under the specialization
+// where the class has parameters, the unpacked dimensions the typedef writes
+// going to the formal's entry of ModuleItem::prop_formal_unpacked_dims
+// (§7.4.4); a formal of a package's type is left as written (§26.3).
+void ResolveClassScopedFormalTypes(ModuleItem& item,
+                                   const CompilationUnit* unit,
+                                   const ScopeMap& module_scope,
+                                   const TypedefMap& typedefs, Arena& arena);
+
 }  // namespace delta

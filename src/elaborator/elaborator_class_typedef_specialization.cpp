@@ -376,4 +376,29 @@ bool SpecializeClassScopedTypedef(ModuleItem* item, const CompilationUnit* unit,
   return true;
 }
 
+// The formal is rewritten where it is held, since a formal writing no type
+// shares it (§16.8), as a variable declared with the type is
+// (Elaborator::ElaborateVarDecl).
+void ResolveClassScopedFormalTypes(ModuleItem& item,
+                                   const CompilationUnit* unit,
+                                   const ScopeMap& module_scope,
+                                   const TypedefMap& typedefs, Arena& arena) {
+  for (size_t i = 0; i < item.prop_formal_types.size(); ++i) {
+    DataType* type = item.prop_formal_types[i];
+    if (type == nullptr || type->scope_name.empty()) continue;
+    std::optional<SpecializedClassType> spec =
+        SpecializeClassScopedType(*type, unit, module_scope, typedefs, arena);
+    if (spec.has_value()) {
+      *type = spec->type;
+      item.prop_formal_unpacked_dims[i] = spec->unpacked_dims;
+      continue;
+    }
+    const ModuleItem* declared =
+        FindClassScopedTypedefItem(type->scope_name, type->type_name, unit);
+    if (declared == nullptr) continue;
+    *type = declared->typedef_type;
+    item.prop_formal_unpacked_dims[i] = declared->unpacked_dims;
+  }
+}
+
 }  // namespace delta
