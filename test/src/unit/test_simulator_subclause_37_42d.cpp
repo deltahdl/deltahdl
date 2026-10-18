@@ -252,7 +252,8 @@ TEST_F(CallsWithinADesign, ATaskBodysSystemTaskCallIsUnnamed) {
   ASSERT_NE(RegisterArgs(0), nullptr);
   Run("module top; logic [3:0] v;\n"
       "  class C; task t; $args(v, , null); endtask endclass\n"
-      "  initial begin C c = new; c.t(); end\n"
+      "  C c;\n"
+      "  initial begin c = new; c.t(); end\n"
       "endmodule\n");
   ASSERT_NE(g_invoked_call, nullptr);
   EXPECT_EQ(vpi_get_str(vpiName, g_invoked_call), nullptr);
@@ -268,7 +269,8 @@ TEST_F(CallsWithinADesign, ATaskBodysSystemFunctionCallIsNamed) {
   ASSERT_NE(RegisterFunction("$peek", vpiIntFunc), nullptr);
   Run("module top;\n"
       "  class C; task t; int x; x = $peek(); endtask endclass\n"
-      "  initial begin C c = new; c.t(); end\n"
+      "  C c;\n"
+      "  initial begin c = new; c.t(); end\n"
       "endmodule\n");
   ASSERT_NE(g_invoked_call, nullptr);
   EXPECT_STREQ(vpi_get_str(vpiName, g_invoked_call), "$peek");
@@ -295,7 +297,8 @@ TEST_F(CallsWithinADesign, AFunctionBodysCallBuildsEachArgumentKind) {
       "      return 0;\n"
       "    endfunction\n"
       "  endclass\n"
-      "  initial begin K k = new; r = k.g(); end\n"
+      "  K k;\n"
+      "  initial begin k = new; r = k.g(); end\n"
       "endmodule\n");
   std::vector<int> kinds;
   kinds.reserve(g_args_seen.size());
