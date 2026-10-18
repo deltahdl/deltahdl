@@ -618,10 +618,12 @@ bool TryResolveAssignLhsRhsRelation(int type, VpiHandle ref, VpiHandle& out) {
     return true;
   }
   // The right-hand side is drawn on the kinds that carry an expression to
-  // assign; §37.79's deassign and release name a target and no source.
+  // assign, §37.28's param assign among them; §37.79's deassign and release
+  // name a target and no source.
   const bool kNamesRhs = kRef == vpiAssignment || kRef == vpiAssignStmt ||
                          kRef == vpiForce || kRef == vpiAliasStmt ||
-                         kRef == vpiDefParam || VpiIsContAssignKind(kRef);
+                         kRef == vpiDefParam || kRef == vpiParamAssign ||
+                         VpiIsContAssignKind(kRef);
   if (type == vpiRhs && kNamesRhs) {
     out = ref->rhs;
     return true;
@@ -844,8 +846,9 @@ bool TryResolveInstanceRelation(int type, VpiHandle ref, VpiHandle& out) {
     out = VpiInstanceOf(ref);
   } else if (type == kVpiModule) {
     out = VpiModuleOf(ref);
-  } else if (type == vpiInstanceArray || type == vpiModuleArray) {
-    // §37.5: an element reaches the array it belongs to.
+  } else if (type == vpiInstanceArray || type == vpiModuleArray ||
+             type == vpiPrimitiveArray) {
+    // §37.5 and §37.11: an element reaches the array it belongs to.
     out = VpiInstanceArrayOf(ref, type);
   } else {
     return false;

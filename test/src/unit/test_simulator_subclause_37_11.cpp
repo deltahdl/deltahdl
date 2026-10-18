@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <string>
 #include <vector>
 
 #include "fixture_vpi_run.h"
@@ -475,6 +476,116 @@ TEST_F(InstanceArraysOfARun, AnElementKeepsEveryTerminalOfAnOutOfRangeSelect) {
   ASSERT_EQ(kTerms.size(), 3U);
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, kTerms[2])),
             VpiObjectOf(By("top.c")));
+}
+
+// The figure: an instance array reaches its elements through the `instance`
+// class, which groups the kinds an element is.
+TEST_F(InstanceArraysOfARun, AnInstanceArrayIteratesItsInstances) {
+  Run("module sub; endmodule\n"
+      "module top; sub arr[1:0] (); endmodule\n");
+  EXPECT_EQ(NamesOf(vpiInstance, By("top.arr")),
+            (std::vector<std::string>{"arr[0]", "arr[1]"}));
+}
+
+// The full name of what `assign` reaches through vpiLhs, and the value of
+// what it reaches through vpiRhs.
+struct AssignOf {
+  std::string lhs;
+  int rhs;
+  bool operator==(const AssignOf&) const = default;
+};
+
+std::vector<AssignOf> ParamAssignsOf(vpiHandle array) {
+  std::vector<AssignOf> assigns;
+  vpiHandle it = vpi_iterate(vpiParamAssign, array);
+  while (vpiHandle assign = it == nullptr ? nullptr : vpi_scan(it)) {
+    vpiHandle lhs = vpi_handle(vpiLhs, assign);
+    s_vpi_value value = {};
+    value.format = vpiIntVal;
+    vpi_get_value(vpi_handle(vpiRhs, assign), &value);
+    assigns.push_back({lhs == nullptr ? "" : vpi_get_str(vpiFullName, lhs),
+                       value.value.integer});
+  }
+  return assigns;
+}
+
+// The figure with §23.10.2: a module array reaches a param assign per
+// parameter value assignment its instantiation writes, assigning the
+// parameter of the leftmost element by name or, written in order, in the
+// order the module declares its parameters, a local parameter being none of
+// them (§6.20.4). `.Q()` assigns no value (§23.10.2.2) and is no param
+// assign.
+TEST_F(InstanceArraysOfARun, AModuleArrayReachesItsParamAssigns) {
+  Run("module sub #(parameter int P = 1, parameter int Q = 2); endmodule\n"
+      "module ord; parameter int A = 1; localparam int L = 3;\n"
+      "  parameter int B = 2; endmodule\n"
+      "module top; wire w;\n"
+      "  sub #(.P(5), .Q()) s[1:0] ();\n"
+      "  ord #(7, 8) o[0:1] ();\n"
+      "  sub one ();\n"
+      "endmodule\n");
+  EXPECT_EQ(ParamAssignsOf(By("top.s")),
+            (std::vector<AssignOf>{{"top.s[1].P", 5}}));
+  EXPECT_EQ(ParamAssignsOf(By("top.o")),
+            (std::vector<AssignOf>{{"top.o[0].A", 7}, {"top.o[0].B", 8}}));
+}
+
+// The primitive array of `kind` that `scope` declares, null for none.
+vpiHandle PrimitiveArrayOfKind(vpiHandle scope, int kind) {
+  vpiHandle it = vpi_iterate(vpiPrimitiveArray, scope);
+  while (vpiHandle array = it == nullptr ? nullptr : vpi_scan(it)) {
+    if (vpi_get(vpiType, array) == kind) return array;
+  }
+  return nullptr;
+}
+
+// The figure with §29.8: an array of UDP instances is a udp array over a udp
+// per element, each reaching its udp defn and the array, and the array
+// reaching the delay every element is instantiated with; a gate array reaches
+// its delay too, and a gate of no array reaches no primitive array.
+TEST_F(InstanceArraysOfARun, AUdpArrayIsAnObjectOverItsUdps) {
+  Run("primitive my_and(o, a, b);\n"
+      "  output o;\n"
+      "  input a, b;\n"
+      "  table\n"
+      "    0 ? : 0;\n"
+      "    ? 0 : 0;\n"
+      "    1 1 : 1;\n"
+      "  endtable\n"
+      "endprimitive\n"
+      "module top; wire [1:0] y, z; wire lone_out; logic [1:0] a, b;\n"
+      "  my_and #3 u[1:0] (y, a, b);\n"
+      "  and #(2, 4) g[1:0] (z, a, b);\n"
+      "  and lone (lone_out, a[0], b[0]);\n"
+      "endmodule\n");
+  vpiHandle top = By("top");
+  vpiHandle udps = PrimitiveArrayOfKind(top, vpiUdpArray);
+  ASSERT_NE(udps, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, udps), "u");
+  EXPECT_EQ(vpi_get(vpiSize, udps), 2);
+  vpiHandle u1 = vpi_handle_by_index(udps, 1);
+  ASSERT_NE(u1, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, u1), vpiUdp);
+  EXPECT_NE(vpi_handle(vpiUdpDefn, u1), nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiPrimitiveArray, u1)), VpiObjectOf(udps));
+  vpiHandle delay = vpi_handle(vpiDelay, udps);
+  ASSERT_NE(delay, nullptr);
+  EXPECT_EQ(VpiObjectOf(delay), VpiObjectOf(vpi_handle(vpiDelay, u1)));
+  vpiHandle gates = PrimitiveArrayOfKind(top, vpiGateArray);
+  ASSERT_NE(gates, nullptr);
+  vpiHandle gate_delay = vpi_handle(vpiDelay, gates);
+  ASSERT_NE(gate_delay, nullptr);
+  EXPECT_EQ(vpi_get(vpiOpType, gate_delay), vpiListOp);
+  vpiHandle g0 = vpi_handle_by_index(gates, 0);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiPrimitiveArray, g0)), VpiObjectOf(gates));
+  vpiHandle it = vpi_iterate(vpiPrimitive, top);
+  vpiHandle lone = nullptr;
+  while (vpiHandle prim = it == nullptr ? nullptr : vpi_scan(it)) {
+    const char* name = vpi_get_str(vpiName, prim);
+    if (name != nullptr && std::string(name) == "lone") lone = prim;
+  }
+  ASSERT_NE(lone, nullptr);
+  EXPECT_EQ(vpi_handle(vpiPrimitiveArray, lone), nullptr);
 }
 
 }  // namespace

@@ -35,6 +35,11 @@ bool VpiObjectCarriesSourceDelay(int type) {
     // holds the continuous assignment and its bits alike, so a cont assign bit
     // reaches the same source-written delay its assignment does.
     case vpiContAssignBit:
+    // §37.11 (figure): a primitive array reaches the delay its instantiation
+    // writes, which every element of it is instantiated with (§28.3.6).
+    case vpiGateArray:
+    case vpiSwitchArray:
+    case vpiUdpArray:
       return true;
     default:
       return VpiIsNetsType(type);

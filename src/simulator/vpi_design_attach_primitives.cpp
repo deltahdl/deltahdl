@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <unordered_set>
 #include <vector>
 
 #include "common/packed_range.h"
@@ -209,26 +210,36 @@ VpiObject* ElementTerminal(VpiObject* whole, int64_t offset, int64_t length) {
   return bit != nullptr ? bit : whole;
 }
 
-// §37.11 with §28.3.6: the instance array of gates or switches `item`
-// declares at `site`, a gate or switch array over a primitive per element,
-// each named by its index and reaching it (§37.35 detail 4).
-void MakePrimitiveArray(const ModuleItem& item, const PrimSite& site,
+// What one instance array of primitives is made of: the instantiation `item`
+// writing its range and terminals, the shape its elements share, the kind of
+// array, the delay each element is instantiated with, and the udp defn a udp
+// array's elements reach, null for a gate or switch array.
+struct PrimArraySpec {
+  const ModuleItem& item;
+  PrimShape shape;
+  int kind;
+  VpiObject* delay;
+  VpiObject* udp_defn = nullptr;
+};
+
+// §37.11 with §28.3.6: the instance array `spec` describes at `site`, a gate,
+// switch or udp array over a primitive per element, each named by its index
+// and reaching it (§37.35 detail 4), and the array reaching the delay every
+// element is instantiated with.
+void MakePrimitiveArray(const PrimArraySpec& spec, const PrimSite& site,
                         SimContext& ctx, const VpiAttachBuild& build) {
+  const ModuleItem& item = spec.item;
   const PackedRange kRange = [&] {
     InstancePrefixOverride scope(ctx.InstancePrefixOverride(),
                                  site.prefix.empty() ? "" : site.prefix + ".");
     return VpiEvaluatedRange(item.inst_range_left, item.inst_range_right, ctx);
   }();
   const int64_t kLength = kRange.HighIndex() - kRange.LowIndex() + 1;
-  VpiObject* array = VpiMakeInstanceArray(
-      site.instance,
-      ShapeOf(item.gate_kind).type == vpiSwitch ? vpiSwitchArray : vpiGateArray,
-      item.gate_inst_name, kRange, build);
+  VpiObject* array = VpiMakeInstanceArray(site.instance, spec.kind,
+                                          item.gate_inst_name, kRange, build);
+  array->delay_expr = spec.delay;
   const std::vector<VpiObject*> kWhole =
       TerminalObjects(item, site, ctx, build);
-  // Each element is an instance of the primitive the array writes, delay and
-  // all (§28.3.6).
-  VpiObject* const kDelay = GateDelayExpression(item, site, ctx, build);
   for (int64_t index = kRange.LowIndex(); index <= kRange.HighIndex();
        ++index) {
     std::vector<VpiObject*> terminals;
@@ -239,12 +250,27 @@ void MakePrimitiveArray(const ModuleItem& item, const PrimSite& site,
     }
     const std::string kName =
         std::string(item.gate_inst_name) + "[" + std::to_string(index) + "]";
-    VpiObject* prim = MakePrimitiveObject(ShapeOf(item.gate_kind), kName,
-                                          terminals, site.instance, build);
-    prim->delay_expr = kDelay;
+    VpiObject* prim =
+        MakePrimitiveObject(spec.shape, kName, terminals, site.instance, build);
+    prim->delay_expr = spec.delay;
+    prim->udp_defn = spec.udp_defn;
     VpiRecordWrittenLocation(prim, item.loc, ctx);
     VpiAddArrayElement(array, prim, index, build);
   }
+}
+
+// §29.8 with §37.35: the shape of an instance of the UDP `decl`, of the type
+// its state makes it.
+PrimShape UdpShape(const UdpDecl& decl) {
+  return {decl.name, decl.is_sequential ? vpiSeqPrim : vpiCombPrim, vpiUdp};
+}
+
+// §29.8 with §37.3.4: the delay a UDP instantiation `inst` was written with at
+// `site`, the two §29.8 admits.
+VpiObject* UdpDelayExpression(const RtlirUdpInst& inst, const PrimSite& site,
+                              SimContext& ctx, const VpiAttachBuild& build) {
+  return PrimitiveDelayExpression({inst.delay, inst.delay_fall}, site, ctx,
+                                  build);
 }
 
 // §29.8 with §37.35: the udp the instantiation `inst` of a UDP makes at `site`,
@@ -260,17 +286,37 @@ VpiObject* MakeUdpObject(const RtlirUdpInst& inst, const PrimSite& site,
   for (const Expr* input : inst.inputs) {
     terminals.push_back(TerminalExpression(input, site, ctx, build));
   }
-  const PrimShape kShape{inst.decl->name,
-                         inst.decl->is_sequential ? vpiSeqPrim : vpiCombPrim,
-                         vpiUdp};
-  VpiObject* udp =
-      MakePrimitiveObject(kShape, inst.name, terminals, site.instance, build);
+  VpiObject* udp = MakePrimitiveObject(UdpShape(*inst.decl), inst.name,
+                                       terminals, site.instance, build);
   udp->udp_defn = defn;
-  udp->delay_expr =
-      PrimitiveDelayExpression({inst.delay, inst.delay_fall}, site, ctx, build);
+  udp->delay_expr = UdpDelayExpression(inst, site, ctx, build);
   // §37.3.3: where the instantiation was written.
   VpiRecordWrittenLocation(udp, inst.loc, ctx);
   return udp;
+}
+
+// §29.8 with §37.11: the udps the instance at `site` instantiates. An
+// instantiation writing a range, which the elaborator expanded into an
+// instance per element, is one udp array over them (§28.3.6), made once.
+void MakeInstanceUdps(const RtlirModule& mod, const PrimSite& site,
+                      const VpiUdpDefnOf& udp_defn_of, SimContext& ctx,
+                      const VpiAttachBuild& build) {
+  std::unordered_set<const ModuleItem*> arrays;
+  for (const RtlirUdpInst& inst : mod.udp_insts) {
+    VpiObject* defn = udp_defn_of(inst.decl);
+    if (inst.source_item->inst_range_left != nullptr) {
+      if (arrays.insert(inst.source_item).second) {
+        MakePrimitiveArray(
+            {*inst.source_item, UdpShape(*inst.decl), vpiUdpArray,
+             UdpDelayExpression(inst, site, ctx, build), defn},
+            site, ctx, build);
+      }
+      continue;
+    }
+    VpiObject* udp = MakeUdpObject(inst, site, defn, ctx, build);
+    VpiAttachAttributes(udp, VpiNodeAttributes(&mod, inst.source_item), false,
+                        ctx, build);
+  }
 }
 
 }  // namespace
@@ -293,7 +339,12 @@ void AttachPrimitives(const RtlirDesign* design, const VpiObjectMap& objects,
           // §28.3.6: an instantiation declaring a range is an
           // instance array.
           if (item->inst_range_left != nullptr) {
-            MakePrimitiveArray(*item, kSite, ctx, build);
+            const PrimShape kShape = ShapeOf(item->gate_kind);
+            MakePrimitiveArray(
+                {*item, kShape,
+                 kShape.type == vpiSwitch ? vpiSwitchArray : vpiGateArray,
+                 GateDelayExpression(*item, kSite, ctx, build)},
+                kSite, ctx, build);
             continue;
           }
           VpiObject* prim = MakePrimitiveObject(
@@ -306,13 +357,9 @@ void AttachPrimitives(const RtlirDesign* design, const VpiObjectMap& objects,
           VpiAttachAttributes(prim, VpiNodeAttributes(mod, item), false, ctx,
                               build);
         }
-        for (const RtlirUdpInst& inst : mod->udp_insts) {
-          VpiObject* udp = MakeUdpObject(
-              inst, {instance, prefix, objects, &mod->node_attrs, mod},
-              udp_defn_of(inst.decl), ctx, build);
-          VpiAttachAttributes(udp, VpiNodeAttributes(mod, inst.source_item),
-                              false, ctx, build);
-        }
+        MakeInstanceUdps(*mod,
+                         {instance, prefix, objects, &mod->node_attrs, mod},
+                         udp_defn_of, ctx, build);
       });
 }
 

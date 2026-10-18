@@ -394,8 +394,9 @@ VpiHandle VpiScopeNamedClockingBlock(VpiHandle scope, bool global);
 VpiHandle VpiScopeDefaultDisableIff(VpiHandle scope);
 
 // §37.5 and §37.11: the instance array `element` is an element of, for
-// `type` vpiInstanceArray of any kind and for vpiModuleArray a module array
-// alone. Null where it is an element of none.
+// `type` vpiInstanceArray of any kind, for vpiModuleArray a module array alone
+// and for vpiPrimitiveArray a gate, switch or udp array. Null where it is an
+// element of none.
 VpiHandle VpiInstanceArrayOf(VpiHandle element, int type);
 
 // §37.16: the object definitions the `nets` class groups - the net bit, the

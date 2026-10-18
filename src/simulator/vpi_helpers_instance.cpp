@@ -146,10 +146,13 @@ VpiHandle VpiInstanceArrayOf(VpiHandle element, int type) {
   // holding the element.
   if (!element->array_member) return nullptr;
   for (VpiObject* array : element->parent->children) {
-    const bool kKind = type == vpiModuleArray
-                           ? array->type == vpiModuleArray
-                           : VpiIsInstanceArrayType(array->type);
-    if (kKind &&
+    // §37.11: a primitive reaches the primitive array it belongs to as a
+    // module reaches its module array, and either reaches it as an instance
+    // array, the class both kinds are of.
+    bool kind = VpiIsInstanceArrayType(array->type);
+    if (type == vpiModuleArray) kind = array->type == vpiModuleArray;
+    if (type == vpiPrimitiveArray) kind = VpiIsPrimitiveArrayType(array->type);
+    if (kind &&
         std::ranges::find(array->children, element) != array->children.end()) {
       return array;
     }

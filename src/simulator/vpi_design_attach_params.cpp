@@ -1,8 +1,10 @@
+#include <cstddef>
 #include <string>
 #include <string_view>
 #include <unordered_map>
 #include <vector>
 
+#include "elaborator/elaborator_items_params.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_defparam.h"
 #include "parser/ast_module.h"
@@ -12,6 +14,7 @@
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_model_helpers2.h"
+#include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -27,6 +30,16 @@ struct ParamAttach {
   const VpiObjectMap& unit;
   const VpiAttachBuild& build;
   SimContext& ctx;
+};
+
+// What an instance array's param assigns are made with: the design whose
+// declarations write the overrides, the objects the run built, the run the
+// values are read in, and the model's allocation.
+struct ParamArrayAttach {
+  const RtlirDesign& design;
+  const VpiObjectMap& objects;
+  SimContext& ctx;
+  const VpiAttachBuild& build;
 };
 
 // The typespec `scope` declares under `name`, or null.
@@ -191,6 +204,56 @@ void AttachDefParams(const RtlirDesign* design, const VpiObjectMap& objects,
       });
 }
 
+// §37.11 with §23.10.2: the param assigns of the instance array `array`
+// whose leftmost element is `left`, one per parameter value assignment its
+// instantiation `item` writes, reaching through vpiLhs the parameter of `left`
+// it assigns, named or in the order OverridableParamNames binds an ordered
+// one, and through vpiRhs the value, written in the instance `prefix` names.
+// `.P()` assigns no value (§23.10.2.2) and makes none.
+void MakeArrayParamAssigns(VpiObject* array, const RtlirModuleInst& left,
+                           const ModuleItem& item, const std::string& prefix,
+                           const ParamArrayAttach& with) {
+  const std::vector<std::string_view> kOrdered =
+      OverridableParamNames(&ElementDeclNamed(with.design, left.module_name));
+  for (std::size_t k = 0; k < item.inst_params.size(); ++k) {
+    const auto& [name, value] = item.inst_params[k];
+    if (value == nullptr) continue;
+    VpiObject* made = with.build.alloc();
+    made->type = vpiParamAssign;
+    made->parent = array;
+    made->children.push_back(FindObjectForFlatName(
+        with.objects, VpiFlatName(VpiFlatName(prefix, left.inst_name),
+                                  name.empty() ? kOrdered[k] : name)));
+    made->rhs = VpiInstanceExpression(value, with.objects, prefix, with.ctx,
+                                      with.build);
+    array->children.push_back(made);
+  }
+}
+
+// §37.11: the param assigns of each module, interface and program array the
+// instance of `mod` that `prefix` names holds, made from the instantiation
+// its declaration writes for the array.
+void MakeInstanceArrayParamAssigns(const RtlirModule& mod,
+                                   const std::string& prefix,
+                                   const ParamArrayAttach& with) {
+  const ModuleDecl& decl = ElementDeclNamed(with.design, mod.name);
+  for (const RtlirModuleInst& left : mod.children) {
+    if (left.array.name.empty() || left.array.index != left.array.left) {
+      continue;
+    }
+    VpiObject* array = VpiInstanceArrayOf(
+        FindObjectForFlatName(with.objects,
+                              VpiFlatName(prefix, left.inst_name)),
+        vpiInstanceArray);
+    for (const ModuleItem* item : decl.items) {
+      if (item->kind == ModuleItemKind::kModuleInst &&
+          item->inst_name == left.array.name) {
+        MakeArrayParamAssigns(array, left, *item, prefix, with);
+      }
+    }
+  }
+}
+
 }  // namespace
 
 void AttachParameters(const RtlirDesign* design, const VpiObjectMap& objects,
@@ -217,6 +280,11 @@ void AttachParameters(const RtlirDesign* design, const VpiObjectMap& objects,
     }
   }
   AttachDefParams(design, objects, ctx, build);
+  const ParamArrayAttach kArrays{*design, objects, ctx, build};
+  WalkInstancePaths(design,
+                    [&](const RtlirModule* mod, const std::string& prefix) {
+                      MakeInstanceArrayParamAssigns(*mod, prefix, kArrays);
+                    });
 }
 
 }  // namespace delta

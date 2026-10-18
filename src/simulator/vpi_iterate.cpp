@@ -435,6 +435,11 @@ bool VpiIterateMatchesClass(int type, int obj_type, bool& matched) {
     case vpiNet:
       matched = VpiIsNetClassType(obj_type);
       return true;
+    // §37.11: an instance array's edge to the `instance` class reaches its
+    // elements, the module, interface or program instances the class groups.
+    case vpiInstance:
+      matched = VpiIsInstanceType(obj_type);
+      return true;
     // §37.10 with §37.28: the vpiParameter edge is drawn to the `parameters`
     // class, which groups the value parameter and the type parameter.
     case vpiParameter:
