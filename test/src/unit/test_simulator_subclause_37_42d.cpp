@@ -314,5 +314,25 @@ TEST_F(CallsWithinADesign, AFunctionBodysCallBuildsEachArgumentKind) {
   EXPECT_EQ(vpi_get(vpiConstType, g_args_seen[5]), vpiStringConst);
 }
 
+// §36.8.2: the compiletf of a call a child instance's function writes runs
+// before any instance is active, so the call it is given is one of its own,
+// whose arguments are built as the kind of expression each actual is but hold
+// no value, there being none to read yet.
+TEST_F(CallsWithinADesign, AChildsCompiletfBuildsArgumentsOfItsOwn) {
+  g_args_seen.clear();
+  g_arg_reads = 0;
+  s_vpi_systf_data data = {};
+  data.type = vpiSysTask;
+  data.tfname = VpiText("$kids");
+  data.compiletf = &ArgsCalltf;
+  ASSERT_NE(vpi_register_systf(&data), nullptr);
+  Run("module child; int r;\n"
+      "  function int g(); $kids(2); return 0; endfunction\n"
+      "endmodule\n"
+      "module top; child u (); endmodule\n");
+  ASSERT_EQ(g_args_seen.size(), 1U);
+  EXPECT_EQ(vpi_get(vpiType, g_args_seen[0]), vpiConstant);
+}
+
 }  // namespace
 }  // namespace delta
