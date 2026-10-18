@@ -2,12 +2,15 @@
 // run as the module is lowered, and the enumeration a variable or a parameter
 // is declared with, recorded beside it for §6.19.5's methods and casts.
 
+#include <algorithm>
+#include <cstdint>
 #include <string>
 #include <string_view>
 
 #include "common/arena.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
+#include "parser/ast_type.h"
 #include "simulator/block_enums.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
@@ -22,6 +25,26 @@ void Lowerer::RegisterEnumForCast(std::string_view name,
   ctx_.SetVariableEnumType(name, var.enum_type_name);
 }
 
+// §7.4.1: the width of one enumeration of the variable `v` declared with it,
+// the variable's width over the elements that packed dimensions after the
+// enumeration's body, and after the typedef name standing for it, make it a
+// packed array of. The elaborator sized the variable with the typedefs and
+// parameters at hand, so the counts divide that width rather than size the
+// element afresh. A variable naming an enumeration carries the enumeration
+// as `dtype` and its declared type as `written_type` (SetVariableTypeInfo in
+// src/elaborator/elaborator_decls.cpp).
+static uint32_t EnumWidthOfVariable(const RtlirVariable& v) {
+  uint32_t elements = std::max<uint32_t>(
+      1, EvalTypeWidth(*v.dtype) / EvalTypeWidth(EnumArrayElement(*v.dtype)));
+  uint32_t width = v.width / elements;
+  const DataType& written = *v.written_type;
+  if (written.kind != DataTypeKind::kNamed ||
+      written.packed_dim_left == nullptr) {
+    return width;
+  }
+  return width / std::max<uint32_t>(1, PackedDimProduct(written));
+}
+
 // The width of the enumeration the module declares under `name`, and whether
 // its base type is 4-state: a variable declared with it carries both, as the
 // elaborator computed them from the declared type; the design's typedef
@@ -32,14 +55,14 @@ static void SetModuleEnumShape(const RtlirModule* mod,
                                const RtlirDesign* design, EnumTypeInfo& info) {
   for (const auto& v : mod->variables) {
     if (v.enum_type_name != info.type_name) continue;
-    info.width = v.width;
+    info.width = EnumWidthOfVariable(v);
     info.is_4state = v.is_4state;
     return;
   }
   if (design == nullptr) return;
   auto it = design->type_enums.find(info.type_name);
   if (it == design->type_enums.end() || it->second == nullptr) return;
-  info.width = EvalTypeWidth(*it->second);
+  info.width = EvalTypeWidth(EnumArrayElement(*it->second));
   info.is_4state = Is4stateType(*it->second, TypedefMap{});
 }
 

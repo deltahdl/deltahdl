@@ -431,4 +431,62 @@ TEST(EnumMethodWithoutArgumentList, OnAPropertyAndChained) {
       "p=green pn=blue cn=red hnn=yellow\n");
 }
 
+// §7.4.1 admits an enumeration as a packed array's element and §7.4 lets an
+// unpacked array hold one, and a select of one element is of the enumeration,
+// so the methods answer for `v[1]`, `v[2]` and `arr[1]` from the element's
+// own value (#7317).
+TEST(EnumMethodOnAnArrayElement, OnPackedAndUnpackedElements) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module t;\n"
+          "  enum bit [1:0] {A, B, C} [3:0] v;\n"
+          "  typedef enum {P, Q, R} e_t;\n"
+          "  e_t arr [3];\n"
+          "  initial begin\n"
+          "    v[1] = B; v[2] = C; arr[1] = R;\n"
+          "    $display(\"%s %s %s %s\", v[1].name(), v[2].next().name(),\n"
+          "             arr[1].name(), arr[1].prev().name());\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "B A R Q\n");
+}
+
+// An element of a packed array of an enumeration is of the enumeration
+// wherever its type is asked: §6.24.2's $cast writes it only a member's
+// value, and §19.5.3 gives a coverpoint of it one automatic bin per named
+// constant. A select of an int array's element, and one bit of a scalar
+// enumeration's value, are of no enumeration: the cast writes 5, and the bit
+// gets the two bins of its 1-bit range (#7317).
+TEST(EnumMethodOnAnArrayElement, ElementIsOfTheEnumWhereverItsTypeIsAsked) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module top;\n"
+          "  enum bit [1:0] {A, B, C} [1:0] v;\n"
+          "  enum bit [1:0] {X, Y, Z} c;\n"
+          "  int ia [2];\n"
+          "  int ok1, ok2, ok3, n1, t1, n2, t2;\n"
+          "  covergroup ge; coverpoint v[0]; endgroup\n"
+          "  covergroup gb; coverpoint c[0]; endgroup\n"
+          "  ge e = new;\n"
+          "  gb b = new;\n"
+          "  initial begin\n"
+          "    ok1 = $cast(v[1], 2);\n"
+          "    ok2 = $cast(v[0], 3);\n"
+          "    ok3 = $cast(ia[0], 5);\n"
+          "    c = Y;\n"
+          "    e.sample(); b.sample();\n"
+          "    void'(e.get_inst_coverage(n1, t1));\n"
+          "    void'(b.get_inst_coverage(n2, t2));\n"
+          "    $display(\"%0d %0d %0d %h %0d %0d/%0d %0d/%0d\", ok1, ok2,\n"
+          "             ok3, v, ia[0], n1, t1, n2, t2);\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "1 0 1 8 5 1/3 1/2\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
 }  // namespace

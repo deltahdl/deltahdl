@@ -178,7 +178,7 @@ void RegisterDesignEnumTypes(const RtlirDesign* design, SimContext& ctx,
     }
     EnumTypeInfo info;
     info.type_name = name;
-    info.width = EvalTypeWidth(*dtype);
+    info.width = EvalTypeWidth(EnumArrayElement(*dtype));
     info.is_4state = Is4stateType(*dtype, TypedefMap{});
     for (const RtlirEnumMember& m :
          FoldEnumMembers(dtype->enum_members, design->unit_constants, arena)) {

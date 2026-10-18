@@ -536,6 +536,18 @@ static const EnumTypeInfo* EnumTypeOfCast(const Expr* e, SimContext& ctx) {
   return EnumTypeOfDeclaredType(type, {ctx.CurrentMethodClass(), {}}, ctx);
 }
 
+// §7.4.1 and §7.4: a select of an array of an enumeration, packed or
+// unpacked, is of the enumeration where it selects one whole element, `v[1]`
+// of `enum bit [1:0] {A, B, C} [3:0] v`; a select narrower or wider than
+// one, a bit of a scalar enumeration's value or a slice of several elements,
+// is of no enumeration.
+static const EnumTypeInfo* EnumTypeOfElement(const Expr* e, SimContext& ctx,
+                                             Arena& arena) {
+  const EnumTypeInfo* info = EnumTypeOfExpr(e->base, ctx, arena);
+  if (info == nullptr) return nullptr;
+  return EvalExpr(e, ctx, arena).width == info->width ? info : nullptr;
+}
+
 // The enumeration an expression carries, by the declaration behind it, as
 // deep as a chain of calls is written (`s.first().next().name()`); described
 // in evaluation.h.
@@ -544,6 +556,7 @@ const EnumTypeInfo* EnumTypeOfExpr(const Expr* e, SimContext& ctx,
   if (e == nullptr) return nullptr;
   if (e->kind == ExprKind::kIdentifier) return EnumTypeOfName(e, ctx);
   if (e->kind == ExprKind::kCast) return EnumTypeOfCast(e, ctx);
+  if (e->kind == ExprKind::kSelect) return EnumTypeOfElement(e, ctx, arena);
   if (e->kind == ExprKind::kMemberAccess)
     return EnumTypeOfMemberAccess(e, ctx, arena);
   if (e->kind != ExprKind::kCall || e->lhs == nullptr) return nullptr;

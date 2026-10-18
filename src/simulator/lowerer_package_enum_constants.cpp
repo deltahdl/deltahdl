@@ -62,9 +62,10 @@ static void RegisterPackageItemEnumConstants(const ModuleItem* item,
   // the type of a data declaration, and §7.2 as the type of a member of a
   // structure or union either writes, which §23.9 makes no scope of its own;
   // the constants are the package's in each case, and each enumeration is
-  // numbered on its own at the width of its own base type.
+  // numbered on its own at the width of its own base type, which packed
+  // dimensions after the body (§7.4.1) do not widen.
   ForEachEnumTypeOfItem(item, [&](std::string_view, const DataType& type) {
-    uint32_t width = EvalTypeWidth(type, {});
+    uint32_t width = EvalTypeWidth(EnumArrayElement(type), {});
     if (width == 0) width = 32;
     for (const auto& m : FoldEnumMembers(type.enum_members, values, arena)) {
       values[m.name] = m.value;

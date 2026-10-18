@@ -96,17 +96,20 @@ struct BlockEnumWalk {
     aliases[td->name] = *key;
   }
 
+  // §6.19 with §7.4.1: the members are as wide as the enumeration alone,
+  // and a declaration by the key is as wide as the packed array of it the
+  // dimensions after its body make.
   void Register(std::string_view key, const DataType& type) {
     EnumTypeInfo info;
     info.type_name = key;
-    info.width = EvalTypeWidth(type);
+    info.width = EvalTypeWidth(EnumArrayElement(type));
     info.is_4state = Is4stateType(type, TypedefMap{});
     for (const RtlirEnumMember& m :
          FoldEnumMembers(type.enum_members, scope, arena)) {
       info.members.push_back(EnumMemberInfoOf(m, info.width, ctx, arena));
     }
     ctx.RegisterEnumType(key, info);
-    ctx.RegisterTypeWidth(key, info.width);
+    ctx.RegisterTypeWidth(key, EvalTypeWidth(type));
     ctx.RegisterTypeKind(key, DataTypeKind::kEnum);
     ctx.RegisterTypeSigned(key, IsSignedType(type, TypedefMap{}));
   }
