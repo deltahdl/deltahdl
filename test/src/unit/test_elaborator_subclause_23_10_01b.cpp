@@ -540,4 +540,20 @@ TEST(DefparamElaboration, AnUnresolvedInstanceLeavesAnElementsDefparam) {
   ASSERT_NE(design, nullptr);
 }
 
+// §23.10.1 with §23.6: `c[1]` of a two-dimensional array of instances is no
+// instance, so a defparam through it reaches no parameter and is reported as
+// such; it was taken as the first element whose leftmost index is 1.
+TEST(DefparamElaboration, ASelectOfOneIndexNamesNoElementOfATwoDimArray) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module sub; parameter P = 1; endmodule\n"
+      "module top;\n"
+      "  sub c[1:0][2:0] ();\n"
+      "  defparam c[1].P = 5;\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(), "defparam target not found",
+                              4, "23.10.1"));
+}
+
 }  // namespace

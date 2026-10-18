@@ -238,15 +238,35 @@ inline void RecordGenBlockMember(std::vector<RtlirGenBlockMember>& members,
   members.push_back(std::move(member));
 }
 
+// One dimension of an instance array, the bounds its declaration wrote.
+struct InstArrayDim {
+  int64_t left = 0;
+  int64_t right = 0;
+
+  [[nodiscard]] int64_t Size() const {
+    return (left < right ? right - left : left - right) + 1;
+  }
+  // The index `from_left` places from the left bound.
+  [[nodiscard]] int64_t IndexFromLeft(int64_t from_left) const {
+    return left <= right ? left + from_left : left - from_left;
+  }
+};
+
 // §23.3.3.5 with §37.11: the instance array an instance is an element of -
-// the array's name as the source wrote it, its declared left and right
-// bounds, and the element's own index. An instance outside any array has an
-// empty name.
+// the array's name as the source wrote it, the declared bounds of its leftmost
+// dimension, and the element's own index in that dimension. An instance
+// outside any array has an empty name.
 struct InstArrayElement {
   std::string_view name;
   int64_t left = 0;
   int64_t right = 0;
   int64_t index = 0;
+  // §37.11 detail 2: every dimension, leftmost first.
+  std::vector<InstArrayDim> dims;
+  // §37.11 detail 1: the port connections the instantiation wrote to the
+  // array, before each element was given its share, in the order of the
+  // element's port bindings, null for a port it left unconnected.
+  std::vector<const Expr*> connections;
 };
 
 struct RtlirImport {

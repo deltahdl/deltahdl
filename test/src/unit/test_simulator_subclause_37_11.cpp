@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "fixture_vpi_run.h"
@@ -586,6 +587,66 @@ TEST_F(InstanceArraysOfARun, AUdpArrayIsAnObjectOverItsUdps) {
   }
   ASSERT_NE(lone, nullptr);
   EXPECT_EQ(vpi_handle(vpiPrimitiveArray, lone), nullptr);
+}
+
+// Detail 2: an array of instances of two dimensions is one module array over
+// all its elements, reaching a range per dimension, leftmost first, and its
+// leftmost dimension's bounds through vpiLeftRange and vpiRightRange.
+TEST_F(InstanceArraysOfARun, AModuleArrayReachesARangePerDimension) {
+  Run("module sub; endmodule\n"
+      "module top; sub u[1:0][2:4] (); endmodule\n");
+  vpiHandle it = vpi_iterate(vpiModuleArray, By("top"));
+  ASSERT_NE(it, nullptr);
+  vpiHandle u = vpi_scan(it);
+  ASSERT_NE(u, nullptr);
+  EXPECT_EQ(KindsOf(vpiModule, u).size(), 6U);
+  std::vector<std::pair<int, int>> bounds;
+  for (vpiHandle range : ObjectsOf(vpiRange, u)) {
+    bounds.emplace_back(IntOf(vpi_handle(vpiLeftRange, range)),
+                        IntOf(vpi_handle(vpiRightRange, range)));
+  }
+  EXPECT_EQ(bounds, (std::vector<std::pair<int, int>>{{1, 0}, {2, 4}}));
+  EXPECT_EQ(IntOf(vpi_handle(vpiLeftRange, u)), 1);
+  EXPECT_EQ(IntOf(vpi_handle(vpiRightRange, u)), 0);
+}
+
+// Detail 1: an instance array reaches through vpiExpr a vpiListOp operation
+// whose operands are the connections the instantiation wrote to the array, as
+// written rather than as each element's share; a port it left unconnected adds
+// none.
+TEST_F(InstanceArraysOfARun, AnInstanceArrayReachesTheConnectionsWritten) {
+  Run("module sub (input a, output o); assign o = a; endmodule\n"
+      "module top; logic w; wire [1:0] y, z;\n"
+      "  sub u[1:0] (.a(w), .o(y));\n"
+      "  sub v[1:0] (.a(), .o(z));\n"
+      "endmodule\n");
+  vpiHandle list = vpi_handle(vpiExpr, By("top.u"));
+  ASSERT_NE(list, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, list), vpiOperation);
+  EXPECT_EQ(vpi_get(vpiOpType, list), vpiListOp);
+  std::vector<std::string> operands;
+  for (vpiHandle operand : ObjectsOf(vpiOperand, list)) {
+    operands.emplace_back(vpi_get_str(vpiName, operand));
+  }
+  EXPECT_EQ(operands, (std::vector<std::string>{"w", "y"}));
+  vpiHandle unconnected = vpi_handle(vpiExpr, By("top.v"));
+  ASSERT_NE(unconnected, nullptr);
+  EXPECT_EQ(ObjectsOf(vpiOperand, unconnected).size(), 1U);
+}
+
+// §38.19: an index select of an instance array names an element alone, never
+// the operation of its connections or a param assign, so an index no element
+// of `s[2:1]` stands at selects nothing.
+TEST_F(InstanceArraysOfARun, AnIndexSelectOfAnInstanceArrayNamesAnElement) {
+  Run("module sub #(parameter int P = 1) (input a); endmodule\n"
+      "module top; logic w;\n"
+      "  sub #(.P(5)) s[2:1] (.a(w));\n"
+      "endmodule\n");
+  vpiHandle s = By("top.s");
+  ASSERT_NE(s, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle_by_index(s, 1)),
+            VpiObjectOf(By("top.s[1]")));
+  EXPECT_EQ(vpi_handle_by_index(s, 0), nullptr);
 }
 
 }  // namespace

@@ -27,12 +27,14 @@ bool PathStartsWith(const HierPath& path, const HierPath& prefix) {
 
 // Whether the instance `child` answers the step `step`: by its name, and for
 // a step carrying an instance select by the element of an instance array
-// (§23.6) the select names, which RtlirModuleInst::array records.
+// (§23.6) the select names, which RtlirModuleInst::array records. A step holds
+// one select, which names an element of a one-dimensional array alone: in an
+// array of more dimensions it names no instance.
 static bool ChildAnswersStep(const RtlirModuleInst& child,
                              const HierStep& step) {
   if (child.simple_inst_name != step.name) return false;
   if (!step.has_index) return true;
-  return !child.array.name.empty() && child.array.index == step.index;
+  return child.array.dims.size() == 1 && child.array.index == step.index;
 }
 
 // The instance `mod` holds as `step` inside exactly the generate block

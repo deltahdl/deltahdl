@@ -26,6 +26,7 @@
 #include "elaborator/elaborator_port_binding_internal.h"
 #include "elaborator/property_instance.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_scopes.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
@@ -463,18 +464,6 @@ bool ConcatElementsUniform(const Expr* conn, uint32_t total,
   return true;
 }
 
-// One dimension of an instance array, the bounds its declaration wrote.
-struct InstArrayDim {
-  int64_t left = 0;
-  int64_t right = 0;
-
-  [[nodiscard]] int64_t Size() const { return std::abs(left - right) + 1; }
-  // The index `from_left` places from the left bound.
-  [[nodiscard]] int64_t IndexFromLeft(int64_t from_left) const {
-    return left <= right ? left + from_left : left - from_left;
-  }
-};
-
 // §23.3.3.5 (printed page 748): where the instance at flat position
 // `position` of an array of `dims` stands in each dimension, counted from that
 // dimension's left bound. Position 0 is the instance at every dimension's right
@@ -570,25 +559,31 @@ Expr* DistributeInstanceConnection(const InstArrayDistribCtx& ctx,
 // element, each named by every index it stands at, `c[i0][i1]`, and carrying
 // its distributed port connections (§23.3.3.5). The resolved child module is
 // shared across copies; per-instance variable storage is created later under
-// each instance's prefix. §37.11: an element of a one-dimensional array records
-// the array it belongs to and its index, which its expanded name alone does
-// not say.
+// each instance's prefix. §37.11: each element records the array it belongs
+// to -- its dimensions, the connections the instantiation wrote, and the
+// element's index in the leftmost dimension -- which its expanded name alone
+// does not say.
 void PushInstanceArray(const InstArrayDistribCtx& ctx, RtlirModule* mod,
                        const RtlirModuleInst& base,
                        const std::vector<InstArrayDim>& dims) {
   int64_t total = 1;
   for (const InstArrayDim& dim : dims) total *= dim.Size();
+  InstArrayElement array{base.simple_inst_name, dims.front().left,
+                         dims.front().right};
+  array.dims = dims;
+  // A port the instantiation left unconnected was given a default it did not
+  // write, which is no connection of the list.
+  for (const RtlirPortBinding& b : base.port_bindings) {
+    array.connections.push_back(b.unconnected ? nullptr : b.connection);
+  }
   for (uint32_t p = 0; p < total; ++p) {
     const std::vector<int64_t> kFromLeft = FromLeftOffsets(dims, p);
     RtlirModuleInst copy = base;
+    copy.array = array;
+    copy.array.index = dims.front().IndexFromLeft(kFromLeft.front());
     std::string name(base.inst_name);
     for (std::size_t d = 0; d < dims.size(); ++d) {
-      const int64_t kIndex = dims[d].IndexFromLeft(kFromLeft[d]);
-      name += std::format("[{}]", kIndex);
-      if (dims.size() == 1) {
-        copy.array = {base.simple_inst_name, dims[d].left, dims[d].right,
-                      kIndex};
-      }
+      name += std::format("[{}]", dims[d].IndexFromLeft(kFromLeft[d]));
     }
     auto* buf = ctx.arena.AllocString(name.c_str(), name.size());
     copy.inst_name = std::string_view(buf, name.size());

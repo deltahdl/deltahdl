@@ -770,7 +770,7 @@ void VpiRecordWrittenLocation(VpiObject* obj, SourceLoc loc, SimContext& ctx);
 // §37.11: make each instance array of modules, interfaces or programs an
 // array object over its elements.
 void AttachInstanceArrays(const RtlirDesign* design,
-                          const VpiObjectMap& objects,
+                          const VpiObjectMap& objects, SimContext& ctx,
                           const VpiAttachBuild& build);
 
 // §37.36: the udp defn object made for a UDP declaration.

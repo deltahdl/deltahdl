@@ -76,11 +76,14 @@ inline VpiHandle VpiGenScopeOf(VpiHandle instance, const HierPath& path) {
 // Whether `child` is the sub-object an index select of `index` names (§38.19).
 // A range object describes a dimension (§37.22), an index constant locates
 // its holder (§37.17 details 13 and 18), a gen scope array's gen var is no
-// element of the array (§37.85), and an attribute is written on its holder
-// (§37.83), so no index selects any of them.
+// element of the array (§37.85), an attribute is written on its holder
+// (§37.83), and an instance array's operation of its connections and its
+// param assigns are what its instantiation wrote (§37.11), so no index selects
+// any of them.
 inline bool VpiIndexSelects(const VpiObject& child, int index) {
   return child.type != vpiRange && child.type != vpiConstant &&
          child.type != vpiGenVar && child.type != vpiAttribute &&
+         child.type != vpiOperation && child.type != vpiParamAssign &&
          child.index == index;
 }
 

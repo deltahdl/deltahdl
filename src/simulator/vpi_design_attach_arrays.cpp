@@ -1,3 +1,4 @@
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -5,6 +6,8 @@
 #include "common/packed_range.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
+#include "parser/ast_expr.h"
+#include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_design_attach_build.h"
@@ -24,19 +27,58 @@ int ArrayKindOf(int type) {
   return type == vpiProgram ? vpiProgramArray : 0;
 }
 
+// §37.11 detail 2: a range of `array`, sized and bounded as `range` is.
+void AddArrayRange(VpiObject* array, const PackedRange& range,
+                   const VpiAttachBuild& build) {
+  VpiObject* dim = build.alloc();
+  dim->type = vpiRange;
+  dim->parent = array;
+  dim->size = static_cast<int>(range.HighIndex() - range.LowIndex() + 1);
+  dim->left_range = VpiIntConstant(range.left, build);
+  dim->right_range = VpiIntConstant(range.right, build);
+  array->children.push_back(dim);
+}
+
+// Where the elements of an instance array stand: the scope's instance path
+// and the run their connections are read in.
+struct ArraySite {
+  const VpiObjectMap& objects;
+  const std::string& prefix;
+  SimContext& ctx;
+  const VpiAttachBuild& build;
+};
+
 // §37.11: the instance array `element` belongs to, held by the scope the
 // element stands in and made there the first time it is asked for: named
-// after the array, of the kind its elements make it, sized by its range and
-// reaching that range (detail 2) and its bounds.
+// after the array, of the kind its elements make it, sized by its leftmost
+// range, reaching every range leftmost first (detail 2) and that range's
+// bounds, and, through vpiExpr, a vpiListOp operation whose operands are the
+// connections the instantiation wrote to it (detail 1).
 VpiObject* ArrayOf(VpiObject* element, const InstArrayElement& array,
-                   const VpiAttachBuild& build) {
+                   const ArraySite& site) {
   VpiObject* holder = element->parent;
   const int kKind = ArrayKindOf(element->type);
   for (VpiObject* child : holder->children) {
     if (child->type == kKind && child->name == array.name) return child;
   }
-  return VpiMakeInstanceArray(holder, kKind, array.name,
-                              PackedRange{array.left, array.right}, build);
+  VpiObject* made =
+      VpiMakeInstanceArray(holder, kKind, array.name,
+                           PackedRange{array.left, array.right}, site.build);
+  for (std::size_t d = 1; d < array.dims.size(); ++d) {
+    AddArrayRange(made, PackedRange{array.dims[d].left, array.dims[d].right},
+                  site.build);
+  }
+  VpiObject* connections = site.build.alloc();
+  connections->type = vpiOperation;
+  connections->op_type = vpiListOp;
+  connections->parent = made;
+  for (const Expr* written : array.connections) {
+    VpiObject* operand = VpiInstanceExpression(
+        written, site.objects, site.prefix, site.ctx, site.build);
+    if (operand != nullptr) connections->children.push_back(operand);
+  }
+  made->children.push_back(connections);
+  return made;
 }
 
 }  // namespace
@@ -52,13 +94,7 @@ VpiObject* VpiMakeInstanceArray(VpiObject* holder, int kind,
   made->size = static_cast<int>(range.HighIndex() - range.LowIndex() + 1);
   made->left_range = VpiIntConstant(range.left, build);
   made->right_range = VpiIntConstant(range.right, build);
-  VpiObject* dim = build.alloc();
-  dim->type = vpiRange;
-  dim->parent = made;
-  dim->size = made->size;
-  dim->left_range = made->left_range;
-  dim->right_range = made->right_range;
-  made->children.push_back(dim);
+  AddArrayRange(made, range, build);
   holder->children.push_back(made);
   return made;
 }
@@ -72,7 +108,7 @@ void VpiAddArrayElement(VpiObject* array, VpiObject* element, int64_t index,
 }
 
 void AttachInstanceArrays(const RtlirDesign* design,
-                          const VpiObjectMap& objects,
+                          const VpiObjectMap& objects, SimContext& ctx,
                           const VpiAttachBuild& build) {
   // §37.11 with §37.5 detail 2 and §37.6 detail 1: an instance array of
   // modules, interfaces or programs is an object of its own, reaching its
@@ -90,8 +126,9 @@ void AttachInstanceArrays(const RtlirDesign* design,
               ArrayKindOf(element->type) == 0) {
             continue;
           }
-          VpiAddArrayElement(ArrayOf(element, inst.array, build), element,
-                             inst.array.index, build);
+          VpiAddArrayElement(
+              ArrayOf(element, inst.array, {objects, prefix, ctx, build}),
+              element, inst.array.index, build);
         }
       });
 }
