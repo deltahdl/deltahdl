@@ -1,15 +1,37 @@
 #include "simulator/vpi_typespec_shapes.h"
 
+#include <algorithm>
+#include <iterator>
+#include <optional>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 #include "elaborator/queue_dim.h"
+#include "parser/ast_type.h"
 #include "simulator/statement_assign_internal.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_object.h"
 
 namespace delta {
+namespace {
+
+// §7.8: the keyword types an associative array's index type may be written
+// as, which name no typedef.
+struct IndexKeyword {
+  std::string_view text;
+  DataTypeKind kind;
+};
+constexpr IndexKeyword kIndexKeywords[] = {
+    {"string", DataTypeKind::kString},     {"int", DataTypeKind::kInt},
+    {"integer", DataTypeKind::kInteger},   {"byte", DataTypeKind::kByte},
+    {"shortint", DataTypeKind::kShortint}, {"longint", DataTypeKind::kLongint},
+    {"bit", DataTypeKind::kBit},           {"logic", DataTypeKind::kLogic},
+    {"reg", DataTypeKind::kReg},           {"time", DataTypeKind::kTime},
+};
+
+}  // namespace
 
 VpiTypespecDim VpiUnpackedTypespecDim(const Expr* dim, SimContext& ctx) {
   VpiTypespecDim made{true, WrittenUnpackedDim(dim, ctx), vpiStaticArray,
@@ -22,6 +44,14 @@ VpiTypespecDim VpiUnpackedTypespecDim(const Expr* dim, SimContext& ctx) {
     made.array_type = vpiAssocArray;
   }
   return made;
+}
+
+std::optional<DataTypeKind> VpiAssocIndexKeywordKind(std::string_view written) {
+  const auto* keyword = std::find_if(
+      std::begin(kIndexKeywords), std::end(kIndexKeywords),
+      [written](const IndexKeyword& k) { return k.text == written; });
+  if (keyword == std::end(kIndexKeywords)) return std::nullopt;
+  return keyword->kind;
 }
 
 void VpiTypespecShapes::Shape(VpiObject* typespec,

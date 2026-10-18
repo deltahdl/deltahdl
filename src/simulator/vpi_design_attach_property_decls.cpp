@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <iterator>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -162,11 +163,27 @@ VpiObject* FormalPackedTypespec(const ModuleItem& decl, size_t index,
   return typespec;
 }
 
+// §37.25 detail 2 with §7.8: the typespec of the index type an associative
+// dimension of the formal `formal` writes as `written`: a keyword's own, left
+// for the array typespec to hang from itself, or the one a typedef of that
+// name declares where the property stands; none for the wildcard.
+VpiObject* FormalIndexTypespec(std::string_view written,
+                               const VpiObject* formal,
+                               const VpiPropertyDeclSite& at,
+                               const VpiAttachBuild& build) {
+  if (std::optional<DataTypeKind> kind = VpiAssocIndexKeywordKind(written)) {
+    VpiObject* typespec = build.alloc();
+    typespec->type = VpiTypespecKind(*kind);
+    return typespec;
+  }
+  return TypedefTypespec(formal->parent, written, at);
+}
+
 // §37.51 detail 3 with §37.25 detail 8: the typespec the formal `index` of
 // `decl` is declared with, hung from `formal`: its packed type's, or, where
 // the class-scoped typedef it names writes unpacked dimensions (§7.4.4), an
 // unnamed array typespec ranging over them whose element typespec is the
-// packed type's.
+// packed type's, an associative one reaching its index type's (detail 2).
 void MakeFormalTypespec(const ModuleItem& decl, size_t index, VpiObject* formal,
                         const VpiPropertyDeclSite& at,
                         const VpiAttachBuild& build) {
@@ -174,7 +191,11 @@ void MakeFormalTypespec(const ModuleItem& decl, size_t index, VpiObject* formal,
   if (typespec == nullptr) return;
   std::vector<VpiTypespecDim> dims;
   for (const Expr* dim : decl.prop_formal_unpacked_dims[index]) {
-    dims.push_back(VpiUnpackedTypespecDim(dim, at.ctx));
+    VpiTypespecDim made = VpiUnpackedTypespecDim(dim, at.ctx);
+    if (made.array_type == vpiAssocArray) {
+      made.index_typespec = FormalIndexTypespec(dim->text, formal, at, build);
+    }
+    dims.push_back(made);
   }
   VpiTypespecShapes shapes(build);
   formal->children.push_back(shapes.Unnamed(formal, dims, typespec));

@@ -1,6 +1,8 @@
 #pragma once
 
+#include <cstdint>
 #include <optional>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -8,6 +10,7 @@
 
 namespace delta {
 
+enum class DataTypeKind : uint8_t;
 class SimContext;
 struct Expr;
 struct VpiAttachBuild;
@@ -32,6 +35,11 @@ struct VpiTypespecDim {
 // otherwise static. An associative one's index typespec is left null for the
 // caller, which finds typespecs by name, to fill.
 VpiTypespecDim VpiUnpackedTypespecDim(const Expr* dim, SimContext& ctx);
+
+// §7.8: the kind of the keyword type `written` names, where an associative
+// array's index type is written as one of the keywords that may stand there;
+// none for a type name or the wildcard, which name no keyword.
+std::optional<DataTypeKind> VpiAssocIndexKeywordKind(std::string_view written);
 
 // §37.25 detail 8: the typespecs of types written as dimensions over another
 // type, each kept with the dimensions it was written with, so that a type

@@ -1,6 +1,5 @@
-#include <algorithm>
 #include <cstdint>
-#include <iterator>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -59,20 +58,6 @@ struct ScopeTypespecs {
   const TypespecsByName& outer;
   const std::vector<RtlirImport>& imports;
   const DesignTypespecs& design;
-};
-
-// §7.8: the keyword types an associative array's index type may be written
-// as, which name no typedef.
-struct IndexKeyword {
-  std::string_view text;
-  DataTypeKind kind;
-};
-constexpr IndexKeyword kIndexKeywords[] = {
-    {"string", DataTypeKind::kString},     {"int", DataTypeKind::kInt},
-    {"integer", DataTypeKind::kInteger},   {"byte", DataTypeKind::kByte},
-    {"shortint", DataTypeKind::kShortint}, {"longint", DataTypeKind::kLongint},
-    {"bit", DataTypeKind::kBit},           {"logic", DataTypeKind::kLogic},
-    {"reg", DataTypeKind::kReg},           {"time", DataTypeKind::kTime},
 };
 
 // Hangs `child` from `holder` where one was made.
@@ -218,12 +203,9 @@ class TypespecMaker {
   // dimension writes as `written`, a keyword's own or the one the name finds;
   // none for the wildcard.
   VpiObject* IndexTypespec(std::string_view written) {
-    const auto* keyword = std::find_if(
-        std::begin(kIndexKeywords), std::end(kIndexKeywords),
-        [written](const IndexKeyword& k) { return k.text == written; });
-    if (keyword != std::end(kIndexKeywords)) {
+    if (std::optional<DataTypeKind> kind = VpiAssocIndexKeywordKind(written)) {
       DataType type;
-      type.kind = keyword->kind;
+      type.kind = *kind;
       return Own(type, std::string_view{}, nullptr, std::string_view{});
     }
     DataType named;

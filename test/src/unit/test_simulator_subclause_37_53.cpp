@@ -373,6 +373,38 @@ TEST_F(SequenceDeclsOfARun, AFormalOfAClassesArrayTypedefIsAnArray) {
   EXPECT_EQ(kShape(Named(vpiPropFormalDecl, prop, "v")), kBits);
 }
 
+// Detail 2 with §37.25 detail 2 and §7.8: a formal of a class's typedef of
+// an associative array reaches an array typespec of that kind whose index
+// typespec is the index type's: a keyword's own, or the typespec the
+// compilation unit's typedef of that name declares (#7319).
+TEST_F(SequenceDeclsOfARun, AFormalOfAClassesAssocTypedefReachesItsIndex) {
+  Run("typedef int idx_t;\n"
+      "class D; typedef bit [2:0] m_t [int]; typedef logic n_t [idx_t];\n"
+      "endclass\n"
+      "module top; logic a;\n"
+      "  sequence s(D::m_t z, D::n_t n); a ##1 a; endsequence\n"
+      "endmodule\n");
+  vpiHandle seq = Named(vpiSequenceDecl, By("top"), "s");
+  ASSERT_NE(seq, nullptr);
+  vpiHandle z = vpi_handle(vpiTypespec, Named(vpiSeqFormalDecl, seq, "z"));
+  vpiHandle n = vpi_handle(vpiTypespec, Named(vpiSeqFormalDecl, seq, "n"));
+  ASSERT_NE(z, nullptr);
+  ASSERT_NE(n, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, z), vpiArrayTypespec);
+  EXPECT_EQ(vpi_get(vpiArrayType, z), vpiAssocArray);
+  vpiHandle index = vpi_handle(vpiIndexTypespec, z);
+  ASSERT_NE(index, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, index), vpiIntTypespec);
+  vpiHandle elem = vpi_handle(vpiElemTypespec, z);
+  ASSERT_NE(elem, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, elem), vpiBitTypespec);
+  EXPECT_EQ(vpi_get(vpiArrayType, n), vpiAssocArray);
+  vpiHandle named = vpi_handle(vpiIndexTypespec, n);
+  ASSERT_NE(named, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, named), vpiIntTypespec);
+  EXPECT_STREQ(vpi_get_str(vpiName, named), "idx_t");
+}
+
 // Detail 4: a local variable argument written as an output or an inout has
 // that direction (§16.8.2).
 TEST_F(SequenceDeclsOfARun, AnOutputAndAnInoutFormalHaveTheirDirections) {
