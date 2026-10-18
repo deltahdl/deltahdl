@@ -570,30 +570,54 @@ VpiObject* UnaryObject(const Expr* expr, const AssignBuild& build) {
                          {expr->lhs}, build);
 }
 
-// §11.12 with §37.57: the let decl a scope around the expression `names`
-// places, or the instance, declares under `name`, the innermost first; null
-// where none does.
+// §11.12 with §37.57: the let decl `scope` declares under `name`; null where
+// it declares none or there is no scope.
+VpiObject* LetDeclIn(const VpiObject* scope, std::string_view name) {
+  if (scope == nullptr) return nullptr;
+  for (VpiObject* child : scope->children) {
+    if (child->type == vpiLetDecl && child->name == name) return child;
+  }
+  return nullptr;
+}
+
+// §11.12 with §37.57: the let decl `name` names where `names` places it: one a
+// scope around the expression, or its instance, declares, the innermost
+// first; else one a package declares that an import of the module makes
+// visible, by its name or with a wildcard (§26.3); else one the compilation
+// unit declares (§3.12.1). Null where none is.
 VpiObject* LetDeclNamed(const AssignNames& names, std::string_view name) {
   for (const VpiObject* at = VpiScopeOrInstance(
            names.scope != nullptr ? names.scope : names.instance, names.objects,
            names.prefix);
        at != nullptr; at = VpiIsInstanceType(at->type) ? nullptr : at->parent) {
-    for (VpiObject* child : at->children) {
-      if (child->type == vpiLetDecl && child->name == name) return child;
-    }
+    if (VpiObject* let = LetDeclIn(at, name)) return let;
   }
-  return nullptr;
+  for (const RtlirImport& entry : names.imports) {
+    if (!entry.is_wildcard && entry.item_name != name) continue;
+    VpiObject* let = LetDeclIn(
+        FindObjectForFlatName(names.objects, entry.package_name), name);
+    if (let != nullptr) return let;
+  }
+  return LetDeclIn(FindObjectForFlatName(names.objects, "$unit"), name);
 }
 
-// §11.12 with §37.57: the let expr `expr` stands for where `name`, the name
-// it calls or is, names a let a scope around it declares: reaching the let
-// decl it instantiates and an argument per actual written, one written as
-// nothing, or as an expression not modelled, an empty argument (§37.42
-// detail 8), which detail 1 has stand for its formal's default; null where it
-// names no let.
-VpiObject* LetExprObject(const Expr* expr, std::string_view name,
+// §11.12 with §26.3: the let decl the call `call` names: its callee's name,
+// where it is written plain, or the let of the package a package path names,
+// `pk::f`; null where it names no let.
+VpiObject* CalledLetDecl(const Expr& call, const AssignNames& names) {
+  if (!call.callee.empty()) return LetDeclNamed(names, call.callee);
+  if (!VpiIsPackageScopedName(*call.lhs)) return nullptr;
+  return LetDeclIn(FindObjectForFlatName(names.objects, call.lhs->lhs->text),
+                   call.lhs->rhs->text);
+}
+
+// §11.12 with §37.57: the let expr `expr` stands for where it calls or is
+// the let `decl` declares: reaching that let decl and an argument per actual
+// written, one written as nothing, or as an expression not modelled, an empty
+// argument (§37.42 detail 8), which detail 1 has stand for its formal's
+// default; null where `decl` is none.
+VpiObject* LetExprObject(const Expr* expr, VpiObject* decl,
                          const AssignBuild& build) {
-  VpiObject* decl = LetDeclNamed(build.names, name);
   if (decl == nullptr) return nullptr;
   VpiObject* let = build.alloc();
   let->type = vpiLetExpr;
@@ -615,7 +639,8 @@ VpiObject* LetExprObject(const Expr* expr, std::string_view name,
 VpiObject* NamedObject(const Expr* expr, const AssignBuild& build) {
   VpiObject* named = Resolve(build.names, expr->text);
   if (named != nullptr) return named;
-  VpiObject* let = LetExprObject(expr, expr->text, build);
+  VpiObject* let =
+      LetExprObject(expr, LetDeclNamed(build.names, expr->text), build);
   return let != nullptr ? let : GenvarParameter(expr->text, build);
 }
 
@@ -664,7 +689,8 @@ VpiObject* ModelledExpression(const Expr* expr, const AssignBuild& build) {
       return SelectObject(expr, build);
     case ExprKind::kCall:
       // §11.12: a call naming a let is a use of it rather than a call.
-      if (VpiObject* let = LetExprObject(expr, expr->callee, build)) {
+      if (VpiObject* let =
+              LetExprObject(expr, CalledLetDecl(*expr, build.names), build)) {
         return let;
       }
       return CallObject(expr, build);
@@ -764,7 +790,8 @@ AssignBuild CallSiteBuild(const VpiObjectMap& objects, const VpiCallSite& site,
       build.alloc,
       &ctx,
       AssignNames{objects, site.prefix, gen,
-                  site.formals != nullptr ? site.formals : site.scope},
+                  site.formals != nullptr ? site.formals : site.scope,
+                  AssignNames::NoGenvars(), nullptr, site.mod.imports},
       VpiCalleesAt(site),
       build.keep,
       site.shape_call,

@@ -286,6 +286,23 @@ TEST(LetFormalDefault, NullHasNoneAndTheTypespecIsPassedOver) {
 // The lets of a run, built from the elaborated design.
 class LetsOfARun : public VpiDesignRun {
  protected:
+  // The right sides of the continuous assignments of `scope`, in order.
+  static std::vector<vpiHandle> AssignedRhs(vpiHandle scope) {
+    std::vector<vpiHandle> sides;
+    vpiHandle it = vpi_iterate(vpiContAssign, scope);
+    while (vpiHandle assign = it == nullptr ? nullptr : vpi_scan(it)) {
+      sides.push_back(vpi_handle(vpiRhs, assign));
+    }
+    return sides;
+  }
+
+  // The let decl the let expr `used` instantiates, null where `used` is no
+  // let expr.
+  static VpiObject* DeclOf(vpiHandle used) {
+    if (used == nullptr || vpi_get(vpiType, used) != vpiLetExpr) return nullptr;
+    return VpiObjectOf(vpi_handle(vpiLetDecl, used));
+  }
+
   // The kinds of what the vpiArgument iteration of `let_expr` reaches, in
   // the order reached.
   static std::vector<int> ArgumentKinds(vpiHandle let_expr) {
@@ -406,6 +423,52 @@ TEST_F(LetsOfARun, AGenerateBlocksLetIsALetDeclOfItsGenScope) {
   EXPECT_EQ(vpi_get(vpiType, used), vpiLetExpr);
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiLetDecl, used)),
             VpiObjectOf(Named(vpiLetDecl, g, "f")));
+}
+
+// §37.12 with §37.10 and §26.3: a let a package declares is a let decl of the
+// package, and a use of it is a let expr reaching it whether the module names
+// it through an explicit import, a wildcard import or the package's path; a
+// call of the module's own function beside them is still a func call (#7321).
+TEST_F(LetsOfARun, APackagesLetIsALetDeclOfThePackage) {
+  Run("package pk; let f(x) = x + 1; let h(x) = x - 1; endpackage\n"
+      "package qk; let q(x) = x; endpackage\n"
+      "module top; import pk::f; import qk::*;\n"
+      "  logic [3:0] a, w, v, z, s;\n"
+      "  function automatic int fn(int x); return x; endfunction\n"
+      "  assign w = f(a);\n"
+      "  assign v = pk::h(a);\n"
+      "  assign z = q(a);\n"
+      "  assign s = fn(a);\n"
+      "endmodule\n");
+  vpiHandle pk = By("pk");
+  ASSERT_NE(pk, nullptr);
+  std::vector<std::string> names = NamesOf(vpiLetDecl, pk);
+  std::ranges::sort(names);
+  EXPECT_EQ(names, (std::vector<std::string>{"f", "h"}));
+  vpiHandle qk = By("qk");
+  ASSERT_NE(qk, nullptr);
+  EXPECT_EQ(NamesOf(vpiLetDecl, qk), (std::vector<std::string>{"q"}));
+  const std::vector<vpiHandle> kSides = AssignedRhs(By("top"));
+  ASSERT_EQ(kSides.size(), 4U);
+  EXPECT_EQ(DeclOf(kSides[0]), VpiObjectOf(Named(vpiLetDecl, pk, "f")));
+  EXPECT_EQ(DeclOf(kSides[1]), VpiObjectOf(Named(vpiLetDecl, pk, "h")));
+  EXPECT_EQ(DeclOf(kSides[2]), VpiObjectOf(Named(vpiLetDecl, qk, "q")));
+  ASSERT_NE(kSides[3], nullptr);
+  EXPECT_EQ(vpi_get(vpiType, kSides[3]), vpiFuncCall);
+}
+
+// §37.12 with §3.12.1: a let the compilation unit declares is a let decl of
+// the unit's scope, $unit, which a unit declaring nothing else has too, and a
+// use of it in a module is a let expr reaching it (#7323).
+TEST_F(LetsOfARun, ACompilationUnitsLetIsALetDeclOfItsScope) {
+  Run("let g(y) = y * 2;\n"
+      "module top; logic [3:0] a, w; assign w = g(a); endmodule\n");
+  vpiHandle unit = Named(vpiPackage, nullptr, "$unit");
+  ASSERT_NE(unit, nullptr);
+  EXPECT_EQ(NamesOf(vpiLetDecl, unit), (std::vector<std::string>{"g"}));
+  const std::vector<vpiHandle> kSides = AssignedRhs(By("top"));
+  ASSERT_EQ(kSides.size(), 1U);
+  EXPECT_EQ(DeclOf(kSides[0]), VpiObjectOf(Named(vpiLetDecl, unit, "g")));
 }
 
 }  // namespace

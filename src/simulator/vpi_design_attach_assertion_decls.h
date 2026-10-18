@@ -81,6 +81,15 @@ VpiObject* VpiLetFormalNames(VpiObject* made, const ModuleItem& item,
 void VpiFillLetDecl(VpiObject* made, const ModuleItem& item,
                     const VpiStmtBuild& with);
 
+// §11.12 with §37.10 and §37.12: the let decls of the lets each package
+// declares, under the package, and of those the compilation unit declares,
+// under its scope where it has one (§3.12.1), each body's names found first
+// among its formals and then in the package or unit, whose objects `objects`
+// keys and whose operators' attributes the design keeps.
+void VpiAttachPackageAndUnitLets(const RtlirDesign& design,
+                                 const VpiObjectMap& objects, SimContext& ctx,
+                                 const VpiAttachBuild& build);
+
 // What a property or sequence instance names: `type`, vpiPropertyDecl or
 // vpiSequenceDecl, the kind of declaration; `name`, written through the
 // package path `package`, `pk::s`, where that is not empty; and `scope`, where

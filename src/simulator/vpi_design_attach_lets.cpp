@@ -1,11 +1,17 @@
 #include <cstddef>
 #include <string>
+#include <string_view>
+#include <vector>
 
+#include "elaborator/rtlir.h"
+#include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
+#include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_design_attach_assertion_decls.h"
 #include "simulator/vpi_design_attach_build.h"
+#include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_object.h"
 
 namespace delta {
@@ -15,6 +21,36 @@ namespace {
 // Hangs `child` from `holder` where one was made.
 void HangIfMade(VpiObject* holder, VpiObject* child) {
   if (child != nullptr) holder->children.push_back(child);
+}
+
+// The let decls of the lets among `items`, under `scope`, a package or the
+// compilation unit whose objects are keyed under `prefix`, each body's names
+// found first among its formals' stand-ins and then in `scope`.
+void AttachScopeLets(const std::vector<ModuleItem*>& items, VpiObject* scope,
+                     const std::string& prefix, const RtlirDesign& design,
+                     const VpiObjectMap& objects, SimContext& ctx,
+                     const VpiAttachBuild& build) {
+  static const std::vector<std::string_view> kNoGenBlocks;
+  for (const ModuleItem* item : items) {
+    if (item->kind != ModuleItemKind::kLetDecl) continue;
+    VpiObject* made = VpiMakeLetDecl(*item, scope, build);
+    const VpiExprNames kNames{objects,
+                              prefix,
+                              kNoGenBlocks,
+                              VpiLetFormalNames(made, *item, build),
+                              &design.node_attrs,
+                              nullptr};
+    const VpiStmtBuild kWith{build,
+                             [&](const Expr* expr) {
+                               return VpiGenBlockExpression(expr, kNames, ctx,
+                                                            build);
+                             },
+                             nullptr,
+                             nullptr,
+                             nullptr,
+                             nullptr};
+    VpiFillLetDecl(made, *item, kWith);
+  }
 }
 
 }  // namespace
@@ -58,6 +94,20 @@ void VpiFillLetDecl(VpiObject* made, const ModuleItem& item,
                with.expression(item.func_args[i].default_value));
   }
   HangIfMade(made, with.expression(item.init_expr));
+}
+
+void VpiAttachPackageAndUnitLets(const RtlirDesign& design,
+                                 const VpiObjectMap& objects, SimContext& ctx,
+                                 const VpiAttachBuild& build) {
+  for (const PackageDecl* pkg : design.packages) {
+    AttachScopeLets(pkg->items, FindObjectForFlatName(objects, pkg->name),
+                    std::string(pkg->name), design, objects, ctx, build);
+  }
+  VpiObject* unit = FindObjectForFlatName(objects, "$unit");
+  if (unit != nullptr) {
+    AttachScopeLets(design.cu_let_decls, unit, "$unit", design, objects, ctx,
+                    build);
+  }
 }
 
 }  // namespace delta

@@ -191,6 +191,9 @@ void VpiContext::AttachPackages(const RtlirDesign* design) {
   if (!design->compilation_units.empty()) return;
   // The compilation unit's data is keyed the same way, under "$unit". It is
   // part of no module either, and detail 5 names its objects "$unit::name".
+  // §37.12: a unit declaring lets is the scope of their let decls (§11.12),
+  // whatever else it declares.
+  if (!design->cu_let_decls.empty()) DesignObjectForFlatName(kUnitScope);
   auto unit = object_map_.find(kUnitScope);
   if (unit == object_map_.end()) return;
   MakePackageScope(unit->second, kUnitScope);
@@ -268,6 +271,9 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
     AttachVariableRanges(*design, object_map_, *sim_ctx_, kBuild);
     AttachModports(design, object_map_, *sim_ctx_, kBuild);
     const VpiCallBuild kCalls = CallBuild();
+    // §11.12: a package's and the compilation unit's lets are declared ahead
+    // of every expression naming one.
+    VpiAttachPackageAndUnitLets(*design, object_map_, *sim_ctx_, kBuild);
     // §37.51 and §37.53: a package's sequences and properties are built ahead
     // of the assertions instantiating them.
     AttachPackageAssertionItemDecls(

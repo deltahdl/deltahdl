@@ -527,14 +527,16 @@ VpiCalledSubroutine VpiCalleeSubroutine(const VpiCallSite& site,
   if (callee.kind == ExprKind::kIdentifier) {
     return VpiNamedSubroutine(site, callee.text);
   }
-  const bool kPackageScoped = callee.kind == ExprKind::kMemberAccess &&
-                              callee.is_scope_resolution &&
-                              callee.lhs != nullptr && callee.rhs != nullptr &&
-                              callee.lhs->kind == ExprKind::kIdentifier &&
-                              callee.rhs->kind == ExprKind::kIdentifier;
-  if (!kPackageScoped) return {};
+  if (!VpiIsPackageScopedName(callee)) return {};
   return VpiPackageSubroutine(site.design, callee.lhs->text, callee.rhs->text,
                               site.made);
+}
+
+bool VpiIsPackageScopedName(const Expr& name) {
+  return name.kind == ExprKind::kMemberAccess && name.is_scope_resolution &&
+         name.lhs != nullptr && name.rhs != nullptr &&
+         name.lhs->kind == ExprKind::kIdentifier &&
+         name.rhs->kind == ExprKind::kIdentifier;
 }
 
 VpiCalleeResolver VpiCalleesAt(const VpiCallSite& site) {

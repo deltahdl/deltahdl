@@ -274,6 +274,10 @@ VpiCalledSubroutine VpiNamedSubroutine(const VpiCallSite& site,
 VpiCalledSubroutine VpiCalleeSubroutine(const VpiCallSite& site,
                                         const Expr& callee);
 
+// §26.3: whether `name` is written through a package's path, `p::f`, both the
+// package's name and the item's a plain identifier.
+bool VpiIsPackageScopedName(const Expr& name);
+
 // §37.42: the task or function object a call's callee resolves to from where
 // the call is written, null where none was made.
 using VpiCalleeResolver = std::function<VpiObject*(const Expr& callee)>;
