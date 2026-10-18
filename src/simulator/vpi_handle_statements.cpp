@@ -92,11 +92,12 @@ static VpiHandle PropertySpecExpr(VpiHandle spec) {
 }
 
 // §37.53: the edges a sequence decl draws to its body and a seq formal decl
-// to its default value, and §37.54's from a sequence inst to its declaration.
+// to its default value, §37.54's from a sequence inst to its declaration, and
+// §37.57's from a let decl to its body.
 static bool TryResolveSequenceDeclRelation(int type, VpiHandle ref,
                                            VpiHandle& out) {
   if (ref->type != vpiSequenceInst && ref->type != vpiSequenceDecl &&
-      ref->type != vpiSeqFormalDecl) {
+      ref->type != vpiSeqFormalDecl && ref->type != vpiLetDecl) {
     return false;
   }
   if (ref->type == vpiSequenceInst) {
@@ -105,6 +106,8 @@ static bool TryResolveSequenceDeclRelation(int type, VpiHandle ref,
     return true;
   }
   if (type != vpiExpr) return false;
+  // §37.57: a let decl's body, as a formal's default, is its first expression
+  // child, its seq formal decls being none.
   out = ref->type == vpiSequenceDecl ? VpiSeqDeclBodyExpr(ref)
                                      : VpiSeqFormalInitExpr(ref);
   return true;

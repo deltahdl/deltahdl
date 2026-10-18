@@ -61,6 +61,26 @@ void VpiFillAssertionItemDeclBody(VpiObject* made, const ModuleItem& decl,
 VpiObject* VpiFormalNames(VpiObject* made, const ModuleItem& decl,
                           const SimContext& ctx, const VpiAttachBuild& build);
 
+// §11.12 with §37.12 and §37.57: the let decl the let declaration `item`
+// stands as, hung from `scope`, named after it, with a seq formal decl per
+// formal in the order declared. VpiFillLetDecl gives the formals their
+// defaults and the let decl its body.
+VpiObject* VpiMakeLetDecl(const ModuleItem& item, VpiObject* scope,
+                          const VpiAttachBuild& build);
+
+// §11.12 with §37.15: what the formals of the let `item`, which `made`
+// stands as, are where its body names them, held as VpiFormalNames holds a
+// sequence's: a ref obj named after each, bound to no actual, since §11.12
+// has each use of the let put its own actual in the formal's place.
+VpiObject* VpiLetFormalNames(VpiObject* made, const ModuleItem& item,
+                             const VpiAttachBuild& build);
+
+// §37.57: give `made`, the let decl VpiMakeLetDecl made for the let
+// declaration `item`, the default each formal declares and the body, built
+// through `with`.
+void VpiFillLetDecl(VpiObject* made, const ModuleItem& item,
+                    const VpiStmtBuild& with);
+
 // What a property or sequence instance names: `type`, vpiPropertyDecl or
 // vpiSequenceDecl, the kind of declaration; `name`, written through the
 // package path `package`, `pk::s`, where that is not empty; and `scope`, where

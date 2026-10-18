@@ -1,7 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <string>
 #include <vector>
 
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
@@ -279,5 +282,97 @@ TEST(LetFormalDefault, NullHasNoneAndTheTypespecIsPassedOver) {
   formal.children = {&typespec, &value};
   EXPECT_EQ(VpiLetFormalDefault(&formal), &value);
 }
+
+// The lets of a run, built from the elaborated design.
+class LetsOfARun : public VpiDesignRun {
+ protected:
+  // The kinds of what the vpiArgument iteration of `let_expr` reaches, in
+  // the order reached.
+  static std::vector<int> ArgumentKinds(vpiHandle let_expr) {
+    std::vector<int> kinds;
+    vpiHandle it = vpi_iterate(vpiArgument, let_expr);
+    while (vpiHandle arg = it == nullptr ? nullptr : vpi_scan(it)) {
+      kinds.push_back(vpi_get(vpiType, arg));
+    }
+    return kinds;
+  }
+};
+
+constexpr const char* kLets =
+    "module top; logic a, b, clk; logic [3:0] w; int r;\n"
+    "  let pick(x = 2, y) = x + y;\n"
+    "  let one = 1;\n"
+    "  covergroup cg @(posedge clk); coverpoint a; endgroup\n"
+    "  assign w = pick(a, b);\n"
+    "  initial r = pick(, b) + one;\n"
+    "endmodule\n";
+
+// §37.12 with the let decl of the figure: each let a module declares is a let
+// decl of its instance, named after it, reaching a seq formal decl per formal
+// in the order declared, each reaching the default it declares, if any, and
+// its body, in which a formal's name is a ref obj named after it and bound to
+// no actual, as in a sequence's body (§37.53); a covergroup beside the lets
+// is none (#7036).
+TEST_F(LetsOfARun, AModulesLetsAreLetDeclsOfItsInstance) {
+  Run(kLets);
+  vpiHandle top = By("top");
+  std::vector<std::string> names = NamesOf(vpiLetDecl, top);
+  std::ranges::sort(names);
+  EXPECT_EQ(names, (std::vector<std::string>{"one", "pick"}));
+  vpiHandle pick = Named(vpiLetDecl, top, "pick");
+  ASSERT_NE(pick, nullptr);
+  EXPECT_EQ(NamesOf(vpiSeqFormalDecl, pick),
+            (std::vector<std::string>{"x", "y"}));
+  vpiHandle x = vpi_handle(vpiExpr, Named(vpiSeqFormalDecl, pick, "x"));
+  ASSERT_NE(x, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, x), vpiConstant);
+  EXPECT_EQ(vpi_handle(vpiExpr, Named(vpiSeqFormalDecl, pick, "y")), nullptr);
+  vpiHandle body = vpi_handle(vpiExpr, pick);
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(vpi_get(vpiOpType, body), vpiAddOp);
+  const std::vector<vpiHandle> kOperands = OperandsOf(body);
+  ASSERT_EQ(kOperands.size(), 2U);
+  for (vpiHandle operand : kOperands) {
+    EXPECT_EQ(vpi_get(vpiType, operand), vpiRefObj);
+    EXPECT_EQ(vpi_handle(vpiActual, operand), nullptr);
+  }
+  EXPECT_STREQ(vpi_get_str(vpiName, kOperands[1]), "y");
+}
+
+// The let expr of the figure: a use of a let, called with arguments in a
+// continuous assignment or by its name alone in a procedure, is a let expr
+// reaching the let decl it instantiates and, through vpiArgument, an argument
+// per formal in the order declared, an omitted one its formal's default
+// (detail 1) (#7185).
+TEST_F(LetsOfARun, AUseOfALetIsALetExpr) {
+  Run(kLets);
+  vpiHandle top = By("top");
+  vpiHandle assigns = vpi_iterate(vpiContAssign, top);
+  vpiHandle assign = assigns == nullptr ? nullptr : vpi_scan(assigns);
+  ASSERT_NE(assign, nullptr);
+  vpiHandle called = vpi_handle(vpiRhs, assign);
+  ASSERT_NE(called, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, called), vpiLetExpr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiLetDecl, called)),
+            VpiObjectOf(Named(vpiLetDecl, top, "pick")));
+  EXPECT_EQ(NamesOf(vpiArgument, called), (std::vector<std::string>{"a", "b"}));
+  vpiHandle procs = vpi_iterate(vpiProcess, top);
+  vpiHandle proc = procs == nullptr ? nullptr : vpi_scan(procs);
+  ASSERT_NE(proc, nullptr);
+  vpiHandle sum = vpi_handle(vpiRhs, vpi_handle(vpiStmt, proc));
+  ASSERT_NE(sum, nullptr);
+  const std::vector<vpiHandle> kUses = OperandsOf(sum);
+  ASSERT_EQ(kUses.size(), 2U);
+  EXPECT_EQ(vpi_get(vpiType, kUses[0]), vpiLetExpr);
+  const std::vector<int> kPicked = ArgumentKinds(kUses[0]);
+  ASSERT_EQ(kPicked.size(), 2U);
+  EXPECT_EQ(kPicked[0], vpiConstant);
+  EXPECT_NE(kPicked[1], vpiConstant);
+  EXPECT_EQ(vpi_get(vpiType, kUses[1]), vpiLetExpr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiLetDecl, kUses[1])),
+            VpiObjectOf(Named(vpiLetDecl, top, "one")));
+  EXPECT_TRUE(ArgumentKinds(kUses[1]).empty());
+}
+
 }  // namespace
 }  // namespace delta

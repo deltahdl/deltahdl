@@ -570,11 +570,53 @@ VpiObject* UnaryObject(const Expr* expr, const AssignBuild& build) {
                          {expr->lhs}, build);
 }
 
-// The net, variable or parameter the simple name `expr` resolves to, or the
-// parameter a genvar it names stands as.
+// §11.12 with §37.57: the let decl a scope around the expression `names`
+// places, or the instance, declares under `name`, the innermost first; null
+// where none does.
+VpiObject* LetDeclNamed(const AssignNames& names, std::string_view name) {
+  for (const VpiObject* at = VpiScopeOrInstance(
+           names.scope != nullptr ? names.scope : names.instance, names.objects,
+           names.prefix);
+       at != nullptr; at = VpiIsInstanceType(at->type) ? nullptr : at->parent) {
+    for (VpiObject* child : at->children) {
+      if (child->type == vpiLetDecl && child->name == name) return child;
+    }
+  }
+  return nullptr;
+}
+
+// §11.12 with §37.57: the let expr `expr` stands for where `name`, the name
+// it calls or is, names a let a scope around it declares: reaching the let
+// decl it instantiates and an argument per actual written, one written as
+// nothing, or as an expression not modelled, an empty argument (§37.42
+// detail 8), which detail 1 has stand for its formal's default; null where it
+// names no let.
+VpiObject* LetExprObject(const Expr* expr, std::string_view name,
+                         const AssignBuild& build) {
+  VpiObject* decl = LetDeclNamed(build.names, name);
+  if (decl == nullptr) return nullptr;
+  VpiObject* let = build.alloc();
+  let->type = vpiLetExpr;
+  let->name = decl->name;
+  let->children.push_back(decl);
+  for (const Expr* arg : expr->args) {
+    VpiObject* actual = ExpressionObject(arg, build);
+    if (actual == nullptr) {
+      actual = build.alloc();
+      VpiMakeEmptyArgument(actual);
+    }
+    let->children.push_back(actual);
+  }
+  return let;
+}
+
+// The net, variable or parameter the simple name `expr` resolves to, the use
+// of a let it names (§11.12), or the parameter a genvar it names stands as.
 VpiObject* NamedObject(const Expr* expr, const AssignBuild& build) {
   VpiObject* named = Resolve(build.names, expr->text);
-  return named != nullptr ? named : GenvarParameter(expr->text, build);
+  if (named != nullptr) return named;
+  VpiObject* let = LetExprObject(expr, expr->text, build);
+  return let != nullptr ? let : GenvarParameter(expr->text, build);
 }
 
 // The object standing for one side of an assignment: the net or variable a
@@ -621,6 +663,11 @@ VpiObject* ModelledExpression(const Expr* expr, const AssignBuild& build) {
     case ExprKind::kSelect:
       return SelectObject(expr, build);
     case ExprKind::kCall:
+      // §11.12: a call naming a let is a use of it rather than a call.
+      if (VpiObject* let = LetExprObject(expr, expr->callee, build)) {
+        return let;
+      }
+      return CallObject(expr, build);
     case ExprKind::kSystemCall:
       return CallObject(expr, build);
     default:

@@ -574,6 +574,19 @@ bool IsSequenceDecl(const RtlirAssertionItemDecl& declared) {
   return declared.item->kind == ModuleItemKind::kSequenceDecl;
 }
 
+// §11.12 with §37.12 and §37.57: each let the instance declares is a let decl
+// of it, its body built with its formals' names found first. A covergroup,
+// which its module holds among its lets, is none.
+void AttachInstanceLetDecls(VpiObject* instance, const BodyWalk& walk) {
+  for (const ModuleItem* item : walk.mod.let_decls) {
+    if (item->kind != ModuleItemKind::kLetDecl) continue;
+    VpiObject* made = VpiMakeLetDecl(*item, instance, walk.build);
+    const BlockParent kParent{instance, instance->full_name, nullptr, nullptr,
+                              VpiLetFormalNames(made, *item, walk.build)};
+    VpiFillLetDecl(made, *item, StmtBuildAt(kParent, walk));
+  }
+}
+
 // The sequences and properties one instance declares, each in the generate
 // block instance writing it, walked with `instance_walk`: every one declared
 // before any body is built, a body instantiating sequences and properties
@@ -750,6 +763,8 @@ void AttachProcedures(const RtlirDesign* design, const VpiObjectMap& objects,
                  BodyWalk{*design, *mod, objects, prefix, calls, build});
         });
   };
+  // §11.12: a let is declared ahead of every expression naming it.
+  kWalk(AttachInstanceLetDecls);
   kWalk(AttachInstanceAssertionItemDecls);
   kWalk(AttachInstanceProcedures);
 }
