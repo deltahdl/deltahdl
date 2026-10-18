@@ -603,10 +603,13 @@ VpiObject* LetDeclNamed(const AssignNames& names, std::string_view name) {
 
 // §11.12 with §26.3: the let decl the call `call` names: its callee's name,
 // where it is written plain, or the let of the package a package path names,
-// `pk::f`; null where it names no let.
+// `pk::f`; null where it names no let, a call written with no callee of its
+// own, a constructor's among them, naming none.
 VpiObject* CalledLetDecl(const Expr& call, const AssignNames& names) {
   if (!call.callee.empty()) return LetDeclNamed(names, call.callee);
-  if (!VpiIsPackageScopedName(*call.lhs)) return nullptr;
+  if (call.lhs == nullptr || !VpiIsPackageScopedName(*call.lhs)) {
+    return nullptr;
+  }
   return LetDeclIn(FindObjectForFlatName(names.objects, call.lhs->lhs->text),
                    call.lhs->rhs->text);
 }
