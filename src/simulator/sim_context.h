@@ -6,16 +6,17 @@
 // VCD dump, the timescales, the file descriptors, the class objects and the
 // state each system task records.
 //
-// Four groups of it stand in headers of their own, included below. Two are
+// Five groups of it stand in headers of their own, included below. Three are
 // declared as base classes, so every call through a SimContext reads as it
 // did: simulator/sim_context_name_tables.h holds the tables keyed by a
 // declared name, simulator/sim_context_random_stability.h holds the §18.13
 // and §18.14 operations on a generator that lives on a ClassObject or a
 // Process, and simulator/sim_context_scope_stack.h holds the §23.9 scope
 // stack a subroutine call pushes. simulator/instance_prefix_override.h holds
-// the §32.4.3 override and its guard, which SimContext keeps as a member.
+// the §32.4.3 override and its guard, and simulator/sim_context_file_tables.h
+// the tables of the §21.3 file I/O tasks, both of which SimContext keeps as
+// members.
 
-#include <array>
 #include <cstdint>
 #include <cstdio>
 #include <memory>
@@ -43,6 +44,7 @@
 #include "simulator/net.h"
 #include "simulator/output_log.h"
 #include "simulator/scheduler.h"
+#include "simulator/sim_context_file_tables.h"
 #include "simulator/sim_context_name_tables.h"
 #include "simulator/sim_context_random_stability.h"
 #include "simulator/sim_context_scope_stack.h"
@@ -598,11 +600,11 @@ class SimContext : public DeclaredNameTables,
   bool FdEofDetected(uint32_t fd) const;
   // §21.3.4.1: what $ungetc pushed onto a descriptor not open for reading, for
   // $fgetc to return last-pushed first; a readable one's host stream holds it.
-  std::string& FdPushback(uint32_t fd) { return fd_pushback_[fd]; }
+  std::string& FdPushback(uint32_t fd) { return files_.pushback[fd]; }
   // §21.3.2: the $fmonitor tasks set up so far; CloseFile cancels a closed
   // descriptor's.
   std::vector<std::unique_ptr<FileMonitor>>& FileMonitors() {
-    return file_monitors_;
+    return files_.monitors;
   }
 
   SemaphoreObject* CreateSemaphore(std::string_view name, int32_t keys);
@@ -873,19 +875,7 @@ class SimContext : public DeclaredNameTables,
   TimeScale compunit_timescale_;
   std::unordered_map<std::string, TimeScale> scope_timescales_;
   std::vector<std::string> plus_args_;
-  std::unordered_map<uint32_t, FILE*> file_descriptors_;
-  // §21.3.4: descriptors whose open type permits reading ("r"/"r+" families).
-  std::unordered_set<uint32_t> readable_fds_;
-  // §21.3.7: most-recent-operation error per descriptor, keyed by the fd value
-  // as the operation received it -- so a failure on an invalid descriptor is
-  // still queryable through $ferror with that same value.
-  std::unordered_map<uint32_t, FileIoError> fileio_errors_;
-  std::unordered_set<uint32_t> fd_eof_detected_;
-  std::unordered_map<uint32_t, std::string> fd_pushback_;
-  std::vector<std::unique_ptr<FileMonitor>> file_monitors_;
-  // Bit i in mcd_channels_[i] tracks the file opened on channel i (1..30).
-  std::array<FILE*, 31> mcd_channels_ = {};
-  bool stdio_descriptors_ready_ = false;
+  SimFileTables files_;
   void EnsureStdioDescriptors();
 
   std::unordered_map<std::string_view, ArrayInfo> array_infos_;

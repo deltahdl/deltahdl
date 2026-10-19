@@ -22,6 +22,7 @@
 #include "simulator/scope.h"
 #include "simulator/scope_hier_name.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_file_tables.h"
 #include "simulator/sim_context_name_tables.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/sva_engine_queues.h"
@@ -223,7 +224,7 @@ void SimContext::CollectGarbage() {
   ClassGcMarker mark(class_objects_, live);
   MarkVariables(mark, *this, variables_);
   MarkStorage(mark, scope_stack_, static_frames_, this_stack_);
-  MarkProcesses(mark, scheduler_, monitor_caller_.get(), file_monitors_);
+  MarkProcesses(mark, scheduler_, monitor_caller_.get(), files_.monitors);
   MarkContainers(mark, {queues_, assoc_arrays_, mailboxes_, HeldMailboxes(),
                         class_types_});
   for (const auto& [handle, count] : scheduler_.PinnedHandles()) {

@@ -20,6 +20,7 @@
 #include "simulator/process.h"
 #include "simulator/scope.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_file_tables.h"
 #include "simulator/sim_context_name_tables.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/sync_objects.h"
@@ -324,14 +325,14 @@ std::string_view SimContext::GetVariableTag(std::string_view var_name) const {
 }
 
 void SimContext::EnsureStdioDescriptors() {
-  if (stdio_descriptors_ready_) return;
-  stdio_descriptors_ready_ = true;
+  if (files_.stdio_ready) return;
+  files_.stdio_ready = true;
   // STDIN/STDOUT/STDERR are pre-opened by §21.3.1 at the reserved fd values.
   // Channel 0 of an mcd points at the standard output (§21.3.1, LSB rule).
-  file_descriptors_[kStdinFd] = stdin;
-  file_descriptors_[kStdoutFd] = stdout;
-  file_descriptors_[kStderrFd] = stderr;
-  mcd_channels_[0] = stdout;
+  files_.descriptors[kStdinFd] = stdin;
+  files_.descriptors[kStdoutFd] = stdout;
+  files_.descriptors[kStderrFd] = stderr;
+  files_.mcd_channels[0] = stdout;
 }
 
 // §21.3.1 (printed page 667): a file that cannot be opened gives a zero mcd or
@@ -357,12 +358,12 @@ uint32_t SimContext::OpenFile(std::string_view filename,
   // Lowest free slot in 3..0x7FFFFFFF, so $fopen reuses channels closed earlier
   // (§21.3.1).
   uint32_t slot = 3;
-  while (file_descriptors_.count(kFdMsb | slot) != 0) ++slot;
+  while (files_.descriptors.count(kFdMsb | slot) != 0) ++slot;
   uint32_t fd = kFdMsb | slot;
-  file_descriptors_[fd] = fp;
+  files_.descriptors[fd] = fp;
   // §21.3.4: only the "r"/"r+" type families authorize reading. Every such
   // type string begins with 'r', so track readability by that leading letter.
-  if (!fmode.empty() && fmode.front() == 'r') readable_fds_.insert(fd);
+  if (!fmode.empty() && fmode.front() == 'r') files_.readable.insert(fd);
   return fd;
 }
 
@@ -371,14 +372,14 @@ uint32_t SimContext::OpenMcd(std::string_view filename) {
   // mcd LSB (bit 0) is reserved for stdout; MSB (bit 31) must remain clear.
   // §21.3.1 limits an implementation to channels 1..30 for output files.
   for (uint32_t bit = 1; bit < 31; ++bit) {
-    if (mcd_channels_[bit] == nullptr) {
+    if (files_.mcd_channels[bit] == nullptr) {
       std::string fname(filename);
       FILE* fp = std::fopen(fname.c_str(), "w");
       if (!fp) {
         RecordFailedOpen(*this);
         return 0;
       }
-      mcd_channels_[bit] = fp;
+      files_.mcd_channels[bit] = fp;
       return uint32_t{1} << bit;
     }
   }
@@ -402,7 +403,7 @@ void SimContext::CloseFile(uint32_t descriptor) {
   // ones on that descriptor; a multichannel descriptor's are those selecting
   // any channel it closes, which a later $fopen may hand to another file.
   bool is_fd = (descriptor & kFdMsb) != 0;
-  for (auto& monitor : file_monitors_) {
+  for (auto& monitor : files_.monitors) {
     if (WritesThroughClosed(monitor->descriptor, descriptor)) {
       monitor->cancelled = true;
     }
@@ -413,59 +414,59 @@ void SimContext::CloseFile(uint32_t descriptor) {
         descriptor == kStderrFd) {
       return;
     }
-    auto it = file_descriptors_.find(descriptor);
-    if (it == file_descriptors_.end()) return;
+    auto it = files_.descriptors.find(descriptor);
+    if (it == files_.descriptors.end()) return;
     std::fclose(it->second);
-    file_descriptors_.erase(it);
-    readable_fds_.erase(descriptor);
-    fileio_errors_.erase(descriptor);
-    fd_eof_detected_.erase(descriptor);
-    fd_pushback_.erase(descriptor);
+    files_.descriptors.erase(it);
+    files_.readable.erase(descriptor);
+    files_.errors.erase(descriptor);
+    files_.eof_detected.erase(descriptor);
+    files_.pushback.erase(descriptor);
     return;
   }
   // Multichannel descriptor: every bit set selects a channel to close.
   for (uint32_t bit = 1; bit < 31; ++bit) {
     if ((descriptor & (uint32_t{1} << bit)) == 0) continue;
-    if (mcd_channels_[bit] == nullptr) continue;
-    std::fclose(mcd_channels_[bit]);
-    mcd_channels_[bit] = nullptr;
+    if (files_.mcd_channels[bit] == nullptr) continue;
+    std::fclose(files_.mcd_channels[bit]);
+    files_.mcd_channels[bit] = nullptr;
   }
 }
 
 FILE* SimContext::GetFileHandle(uint32_t fd) {
   EnsureStdioDescriptors();
-  auto it = file_descriptors_.find(fd);
-  return (it != file_descriptors_.end()) ? it->second : nullptr;
+  auto it = files_.descriptors.find(fd);
+  return (it != files_.descriptors.end()) ? it->second : nullptr;
 }
 
 void SimContext::SetFileIoError(uint32_t fd, int32_t code, std::string msg) {
-  fileio_errors_[fd] = FileIoError{code, std::move(msg)};
+  files_.errors[fd] = FileIoError{code, std::move(msg)};
 }
 
-void SimContext::ClearFileIoError(uint32_t fd) { fileio_errors_.erase(fd); }
+void SimContext::ClearFileIoError(uint32_t fd) { files_.errors.erase(fd); }
 
 const FileIoError* SimContext::GetFileIoError(uint32_t fd) const {
-  auto it = fileio_errors_.find(fd);
-  return (it != fileio_errors_.end()) ? &it->second : nullptr;
+  auto it = files_.errors.find(fd);
+  return (it != files_.errors.end()) ? &it->second : nullptr;
 }
 
 void SimContext::SetFdEofDetected(uint32_t fd, bool detected) {
   if (detected) {
-    fd_eof_detected_.insert(fd);
+    files_.eof_detected.insert(fd);
   } else {
-    fd_eof_detected_.erase(fd);
+    files_.eof_detected.erase(fd);
   }
 }
 
 bool SimContext::FdEofDetected(uint32_t fd) const {
-  return fd_eof_detected_.count(fd) != 0;
+  return files_.eof_detected.count(fd) != 0;
 }
 
 bool SimContext::IsFdReadable(uint32_t fd) const {
   // §21.3.4: STDIN is pre-opened for reading; STDOUT/STDERR are append-only.
   if (fd == kStdinFd) return true;
   if (fd == kStdoutFd || fd == kStderrFd) return false;
-  return readable_fds_.count(fd) != 0;
+  return files_.readable.count(fd) != 0;
 }
 
 std::vector<FILE*> SimContext::GetMcdFiles(uint32_t mcd) {
@@ -473,7 +474,8 @@ std::vector<FILE*> SimContext::GetMcdFiles(uint32_t mcd) {
   std::vector<FILE*> result;
   for (uint32_t bit = 0; bit < 31; ++bit) {
     if ((mcd & (uint32_t{1} << bit)) == 0) continue;
-    if (mcd_channels_[bit] != nullptr) result.push_back(mcd_channels_[bit]);
+    if (files_.mcd_channels[bit] != nullptr)
+      result.push_back(files_.mcd_channels[bit]);
   }
   return result;
 }
