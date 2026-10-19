@@ -348,7 +348,11 @@ static bool TryResolveClockingRelation(int type, VpiHandle ref,
 // interface typespec, or an attribute.
 static bool TryResolveParentRelation(int type, VpiHandle ref, VpiHandle& out) {
   if (type != vpiParent) return false;
-  if (ref->type == vpiRefObj || ref->type == vpiPortBit) {
+  if (ref->type == vpiRefObj) {
+    out = VpiRefObjParent(ref);
+    return true;
+  }
+  if (ref->type == vpiPortBit) {
     out = ref->parent;
     return true;
   }

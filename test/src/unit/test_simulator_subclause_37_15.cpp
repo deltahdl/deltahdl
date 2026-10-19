@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <vector>
+
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
@@ -15,8 +18,8 @@ namespace {
 // instantiated object - for instance the lowConn of an interface port (§37.14
 // detail 5). Details 1, 2 are descriptive of when/what a ref obj is and carry
 // no own decision rule; the rule-bearing details (3-7) are observed below
-// against the production helpers and dispatch cases in vpi.cpp. The connection
-// relations (vpiHighConn/vpiLowConn) are shared with §37.14 and tested there.
+// against the production helpers and dispatch cases in vpi.cpp, and the ref
+// objs a design's ports make are read back from a run (RefObjsOfARun).
 
 class RefObjContext : public ::testing::Test {
  protected:
@@ -167,17 +170,18 @@ TEST_F(RefObjContext, DefNameForInterfaceArrayActual) {
 }
 
 // D7: vpiTypespec returns NULL for a ref obj whose actual is not a net,
-// variable, or part select; otherwise it returns the ref obj's typespec child.
+// variable, or part select; otherwise it returns the typespec that actual
+// holds, one of the concrete kinds §37.25 defines.
 TEST_F(RefObjContext, TypespecGatedOnActualKind) {
   VpiObject typespec;
-  typespec.type = vpiTypespec;
+  typespec.type = vpiLogicTypespec;
 
   VpiObject net;
   net.type = vpiNet;
+  net.children.push_back(&typespec);
   VpiObject net_ref;
   net_ref.type = vpiRefObj;
   net_ref.actual = &net;
-  net_ref.children.push_back(&typespec);
   EXPECT_EQ(VpiRefObjTypespec(&net_ref), &typespec);
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiTypespec, VpiHandleOf(&net_ref))),
             &typespec);
@@ -185,38 +189,38 @@ TEST_F(RefObjContext, TypespecGatedOnActualKind) {
   // A part-select actual also exposes the typespec.
   VpiObject part_select;
   part_select.type = vpiPartSelect;
+  part_select.children.push_back(&typespec);
   VpiObject ps_ref;
   ps_ref.type = vpiRefObj;
   ps_ref.actual = &part_select;
-  ps_ref.children.push_back(&typespec);
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiTypespec, VpiHandleOf(&ps_ref))),
             &typespec);
 
   // An interface actual is none of net/variable/part select -> NULL, even
-  // though a typespec child is present.
+  // though it holds a typespec.
   VpiObject iface;
   iface.type = vpiInterface;
+  iface.children.push_back(&typespec);
   VpiObject iface_ref;
   iface_ref.type = vpiRefObj;
   iface_ref.actual = &iface;
-  iface_ref.children.push_back(&typespec);
   EXPECT_EQ(VpiRefObjTypespec(&iface_ref), nullptr);
   EXPECT_EQ(vpi_handle(vpiTypespec, VpiHandleOf(&iface_ref)), nullptr);
 }
 
 // D7 (the variable arm, through the vpi_handle dispatch path): a ref obj whose
 // actual is a variable - the third kind the rule admits alongside net and part
-// select - exposes its typespec child.
+// select - exposes that variable's typespec.
 TEST_F(RefObjContext, TypespecExposedForVariableActual) {
   VpiObject typespec;
-  typespec.type = vpiTypespec;
+  typespec.type = vpiIntegerTypespec;
 
   VpiObject variable;
   variable.type = vpiIntegerVar;
+  variable.children.push_back(&typespec);
   VpiObject var_ref;
   var_ref.type = vpiRefObj;
   var_ref.actual = &variable;
-  var_ref.children.push_back(&typespec);
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiTypespec, VpiHandleOf(&var_ref))),
             &typespec);
 }
@@ -234,13 +238,10 @@ TEST_F(RefObjContext, GenericPropertyOffABoundRefObjIsUndefined) {
 }
 
 // D6 and D7: a ref obj bound to nothing has no actual to take a definition
-// name or a typespec from, so both are NULL even with a typespec child.
+// name or a typespec from, so both are NULL.
 TEST_F(RefObjContext, AnUnboundRefObjHasNoDefNameOrTypespec) {
-  VpiObject typespec;
-  typespec.type = vpiTypespec;
   VpiObject ref_obj;
   ref_obj.type = vpiRefObj;
-  ref_obj.children.push_back(&typespec);
 
   EXPECT_EQ(VpiRefObjDefName(&ref_obj), nullptr);
   EXPECT_EQ(VpiRefObjTypespec(&ref_obj), nullptr);
@@ -248,41 +249,223 @@ TEST_F(RefObjContext, AnUnboundRefObjHasNoDefNameOrTypespec) {
   EXPECT_EQ(vpi_handle(vpiTypespec, VpiHandleOf(&ref_obj)), nullptr);
 }
 
-// D7: every net and variable kind carries a typespec, so a ref obj bound to
-// any of them reaches its own typespec child.
+// D7: every kind the nets and variables classes group carries a typespec, a
+// net bit and a var bit among them, so a ref obj bound to any of them reaches
+// the typespec its actual holds.
 TEST_F(RefObjContext, EveryNetAndVariableActualExposesTheTypespec) {
   VpiObject typespec;
-  typespec.type = vpiTypespec;
-  for (int kind : {vpiStructNet, vpiUnionNet, vpiEnumNet, vpiIntegerNet,
-                   vpiTimeNet, vpiBitNet, vpiPackedArrayNet, vpiReg,
-                   vpiIntegerVar, vpiRealVar, vpiIntVar, vpiBitVar}) {
+  typespec.type = vpiLogicTypespec;
+  for (int kind :
+       {vpiStructNet, vpiUnionNet, vpiEnumNet, vpiIntegerNet, vpiTimeNet,
+        vpiBitNet, vpiPackedArrayNet, vpiNetArray, vpiNetBit, vpiReg,
+        vpiIntegerVar, vpiRealVar, vpiIntVar, vpiBitVar, vpiStructVar,
+        vpiEnumVar, vpiArrayVar, vpiVarBit}) {
     VpiObject actual;
     actual.type = kind;
+    actual.children.push_back(&typespec);
     VpiObject ref_obj;
     ref_obj.type = vpiRefObj;
     ref_obj.actual = &actual;
-    ref_obj.children.push_back(&typespec);
     EXPECT_EQ(VpiRefObjTypespec(&ref_obj), &typespec) << kind;
   }
 }
 
-// D7: the typespec reached is the ref obj's typespec child, found past any
-// child of another kind; a ref obj holding none reaches NULL.
+// D7: the typespec reached is the one the actual holds, found past any child
+// of another kind; an actual holding none reaches NULL.
 TEST_F(RefObjContext, TheTypespecIsFoundAmongOtherChildren) {
-  VpiObject net;
-  net.type = vpiNet;
   VpiObject index;
   index.type = vpiConstant;
   VpiObject typespec;
-  typespec.type = vpiTypespec;
+  typespec.type = vpiLogicTypespec;
+  VpiObject net;
+  net.type = vpiNet;
+  net.children = {&index, &typespec};
   VpiObject ref_obj;
   ref_obj.type = vpiRefObj;
   ref_obj.actual = &net;
-  ref_obj.children = {&index, &typespec};
   EXPECT_EQ(VpiRefObjTypespec(&ref_obj), &typespec);
 
-  ref_obj.children = {&index};
+  net.children = {&index};
   EXPECT_EQ(VpiRefObjTypespec(&ref_obj), nullptr);
+}
+
+// The ref objs of a run: those the clause's example makes passing an
+// interface and its modports through ports, with a port selecting a modport in
+// its declaration, a generic interface port, a port connected to an element
+// of an interface array and a ref port beside them.
+class RefObjsOfARun : public VpiDesignRun {
+ protected:
+  void SetUp() override {
+    VpiDesignRun::SetUp();
+    Run("interface simple (); logic req, gnt;\n"
+        "  modport target (input req, output gnt);\n"
+        "  modport initiator (input gnt, output req);\n"
+        "endinterface\n"
+        "module c1(simple s); endmodule\n"
+        "module child1(simple s); c1 c_1(s); c1 c_2(s.initiator); endmodule\n"
+        "module child2(simple s); endmodule\n"
+        "module child3(simple.target t); endmodule\n"
+        "module g(interface s); endmodule\n"
+        "module m(ref logic [2:0] r); endmodule\n"
+        "module top; simple i(); simple ia[2](); logic [2:0] a;\n"
+        "  child1 i1(i); child2 i2(i.initiator); child3 i3(i); g u4(i);\n"
+        "  child2 i5(ia[1]); m u1(a);\n"
+        "endmodule\n");
+  }
+
+  // The port `name` of the instance `inst`.
+  static vpiHandle PortOf(const char* inst, const char* name) {
+    return Named(vpiPort, By(inst), name);
+  }
+
+  // What the port `name` of `inst` reaches through `relation`.
+  static vpiHandle ConnOf(int relation, const char* inst, const char* name) {
+    vpiHandle port = PortOf(inst, name);
+    return port == nullptr ? nullptr : vpi_handle(relation, port);
+  }
+
+  // The modport `name` of the interface instance top.i.
+  static VpiObject* ModportOfI(const char* name) {
+    return VpiObjectOf(Named(vpiModport, By("top.i"), name));
+  }
+
+  // The objects of what `ref` reaches through `type`, in order.
+  static std::vector<VpiObject*> Reached(int type, vpiHandle ref) {
+    std::vector<VpiObject*> objects;
+    for (vpiHandle obj : ObjectsOf(type, ref)) {
+      objects.push_back(VpiObjectOf(obj));
+    }
+    return objects;
+  }
+};
+
+// §37.14 detail 5 with D1: an interface port's lower connection is the ref
+// obj its io decl holds, bound to the interface instance it is connected to,
+// or to the modport the connection or the port's declaration selects (#7050).
+TEST_F(RefObjsOfARun, AnInterfacePortsLowConnIsARefObjBoundToItsInterface) {
+  vpiHandle low = ConnOf(vpiLowConn, "top.i1", "s");
+  ASSERT_NE(low, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, low), vpiRefObj);
+  EXPECT_EQ(
+      VpiObjectOf(low),
+      VpiObjectOf(vpi_handle(vpiExpr, Named(vpiIODecl, By("top.i1"), "s"))));
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiActual, low)), VpiObjectOf(By("top.i")));
+  EXPECT_EQ(
+      VpiObjectOf(vpi_handle(vpiActual, ConnOf(vpiLowConn, "top.i2", "s"))),
+      ModportOfI("initiator"));
+  EXPECT_EQ(
+      VpiObjectOf(vpi_handle(vpiActual, ConnOf(vpiLowConn, "top.i3", "t"))),
+      ModportOfI("target"));
+}
+
+// D1 with D4's example: a ref port's lower connection is the ref obj its io
+// decl holds, bound to the variable connected to it, and the port keeps a
+// port bit per bit of that variable (#7051).
+TEST_F(RefObjsOfARun, ARefPortsLowConnIsTheRefObjOfItsIoDecl) {
+  vpiHandle low = ConnOf(vpiLowConn, "top.u1", "r");
+  ASSERT_NE(low, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, low), vpiRefObj);
+  EXPECT_EQ(
+      VpiObjectOf(low),
+      VpiObjectOf(vpi_handle(vpiExpr, Named(vpiIODecl, By("top.u1"), "r"))));
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiActual, low)), VpiObjectOf(By("top.a")));
+  EXPECT_EQ(ObjectsOf(vpiBit, PortOf("top.u1", "r")).size(), 3U);
+}
+
+// D2 and the example: the higher connection of an interface port is a ref
+// obj bound to the interface or modport written; within child1, the
+// connection s is a use of child1's own ref obj, and s.initiator a ref obj
+// that is a subelement of it (D4), bound to the modport (#7347).
+TEST_F(RefObjsOfARun, AnInterfacePortsHighConnIsARefObj) {
+  vpiHandle i1 = ConnOf(vpiHighConn, "top.i1", "s");
+  ASSERT_NE(i1, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, i1), vpiRefObj);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiActual, i1)), VpiObjectOf(By("top.i")));
+  vpiHandle i2 = ConnOf(vpiHighConn, "top.i2", "s");
+  ASSERT_NE(i2, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, i2), vpiRefObj);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiActual, i2)), ModportOfI("initiator"));
+  VpiObject* s = VpiObjectOf(ConnOf(vpiLowConn, "top.i1", "s"));
+  EXPECT_EQ(VpiObjectOf(ConnOf(vpiHighConn, "top.i1.c_1", "s")), s);
+  vpiHandle sub = ConnOf(vpiHighConn, "top.i1.c_2", "s");
+  ASSERT_NE(sub, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, sub), vpiRefObj);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiParent, sub)), s);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiActual, sub)), ModportOfI("initiator"));
+  EXPECT_EQ(
+      VpiObjectOf(vpi_handle(vpiActual, ConnOf(vpiLowConn, "top.i1.c_1", "s"))),
+      VpiObjectOf(By("top.i")));
+}
+
+// D2 with §23.3.2: a connection to an element of an array of interface
+// instances is a ref obj bound to that element, which the port's own ref obj
+// is bound to as well (#7348).
+TEST_F(RefObjsOfARun, AConnectionToAnInterfaceArrayElementIsARefObj) {
+  vpiHandle high = ConnOf(vpiHighConn, "top.i5", "s");
+  ASSERT_NE(high, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, high), vpiRefObj);
+  vpiHandle element = vpi_handle(vpiActual, high);
+  ASSERT_NE(element, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, element), vpiInterface);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, element), "top.ia[1]");
+  EXPECT_EQ(
+      VpiObjectOf(vpi_handle(vpiActual, ConnOf(vpiLowConn, "top.i5", "s"))),
+      VpiObjectOf(element));
+}
+
+// The figure: a ref obj reaches through vpiLowConn the port it is the lower
+// connection of, through vpiHighConn the ports it is the higher connection
+// of, and through vpiPortInst those and the ports a subelement of it connects
+// (#7052).
+TEST_F(RefObjsOfARun, ARefObjReachesThePortsItConnects) {
+  vpiHandle s = ConnOf(vpiLowConn, "top.i1", "s");
+  ASSERT_NE(s, nullptr);
+  VpiObject* own = VpiObjectOf(PortOf("top.i1", "s"));
+  VpiObject* c_1 = VpiObjectOf(PortOf("top.i1.c_1", "s"));
+  VpiObject* c_2 = VpiObjectOf(PortOf("top.i1.c_2", "s"));
+  EXPECT_EQ(Reached(vpiLowConn, s), std::vector<VpiObject*>{own});
+  EXPECT_EQ(Reached(vpiHighConn, s), std::vector<VpiObject*>{c_1});
+  EXPECT_EQ(Reached(vpiPortInst, s), (std::vector<VpiObject*>{c_1, c_2}));
+}
+
+// The figure with D4: vpiParent reaches only the ref obj a subelement selects
+// from, so the ref obj of a port, held by its io decl, has none (#7053).
+TEST_F(RefObjsOfARun, ARefObjOfAPortHasNoParent) {
+  EXPECT_EQ(vpi_handle(vpiParent, ConnOf(vpiLowConn, "top.i1", "s")), nullptr);
+  EXPECT_EQ(vpi_handle(vpiParent, ConnOf(vpiLowConn, "top.u1", "r")), nullptr);
+}
+
+// D5: the ref obj of a port declared with the interface keyword refers to a
+// generic interface, that of one naming its interface to one that is not, and
+// that of a ref port to no interface at all (#7054).
+TEST_F(RefObjsOfARun, VpiGenericFollowsThePortsDeclaration) {
+  EXPECT_EQ(vpi_get(vpiGeneric, ConnOf(vpiLowConn, "top.u4", "s")), 1);
+  EXPECT_EQ(vpi_get(vpiGeneric, ConnOf(vpiLowConn, "top.i1", "s")), 0);
+  EXPECT_EQ(vpi_get(vpiGeneric, ConnOf(vpiLowConn, "top.u1", "r")),
+            vpiUndefined);
+}
+
+// D6: a ref obj bound to an interface reports the interface's definition
+// name, not the instance's, and one bound to a modport the modport's name
+// (#7055).
+TEST_F(RefObjsOfARun, VpiDefNameIsTheInterfacesDefinitionOrTheModport) {
+  EXPECT_STREQ(vpi_get_str(vpiDefName, ConnOf(vpiLowConn, "top.i1", "s")),
+               "simple");
+  EXPECT_STREQ(vpi_get_str(vpiDefName, ConnOf(vpiLowConn, "top.i2", "s")),
+               "initiator");
+}
+
+// The figure with D7: a ref obj bound to a variable reaches that variable's
+// typespec, and one bound to an interface none (#7056).
+TEST_F(RefObjsOfARun, VpiTypespecIsTheVariablesForAVariableActual) {
+  vpiHandle typespec =
+      vpi_handle(vpiTypespec, ConnOf(vpiLowConn, "top.u1", "r"));
+  ASSERT_NE(typespec, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, typespec), vpiLogicTypespec);
+  EXPECT_EQ(VpiObjectOf(typespec),
+            VpiObjectOf(vpi_handle(vpiTypespec, By("top.a"))));
+  EXPECT_EQ(vpi_handle(vpiTypespec, ConnOf(vpiLowConn, "top.i1", "s")),
+            nullptr);
 }
 
 }  // namespace

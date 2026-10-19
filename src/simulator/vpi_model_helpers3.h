@@ -286,8 +286,18 @@ const char* VpiRefObjDefName(VpiHandle ref_obj);
 
 // §37.15 detail 7: the vpiTypespec relation returns NULL for a ref obj whose
 // vpiActual is not a net, variable, or part select; otherwise it returns the
-// ref obj's typespec child.
+// typespec of that actual.
 VpiHandle VpiRefObjTypespec(VpiHandle ref_obj);
+
+// §37.15 (figure) with detail 4: vpiParent of a ref obj, the ref obj it is a
+// subelement of, and NULL for any other.
+VpiHandle VpiRefObjParent(VpiHandle ref_obj);
+
+// §37.15 (figure): whether `type` is one of the three relations a ref obj
+// iterates its ports through - vpiLowConn, vpiHighConn and vpiPortInst - and
+// the ports it reaches through `type`.
+bool VpiIsRefObjPortRelation(int type);
+std::vector<VpiHandle> VpiRefObjPorts(int type, VpiHandle ref_obj);
 
 // ===========================================================================
 // §37.16 Nets. The VPI net object model, the net counterpart of §37.17's
@@ -368,10 +378,11 @@ std::vector<VpiHandle> VpiNetPorts(VpiHandle net);
 // of whose bits it reaches is left out.
 std::vector<VpiHandle> VpiNetPortInsts(VpiHandle net);
 
-// §37.39 (figure) and §37.16 details 6 and 7: whether `type` asked of `ref` is
-// one of a module path's three path-term relations or a net's two port
-// relations, whose objects are terms and ports rather than children whose own
-// type is the relation's; and the objects it reaches.
+// §37.39 (figure), §37.16 details 6 and 7 and §37.15 (figure): whether `type`
+// asked of `ref` is one of a module path's three path-term relations, a net's
+// two port relations or a ref obj's three, whose objects are terms and ports
+// rather than children whose own type is the relation's; and the objects it
+// reaches.
 bool VpiIsTermOrPortRelation(int type, VpiHandle ref);
 std::vector<VpiHandle> VpiTermOrPortObjects(int type, VpiHandle ref);
 

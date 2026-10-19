@@ -394,13 +394,16 @@ void VpiContext::AttachDesignPorts(const RtlirDesign* design) {
                                       kAlloc);
           }
           // A port written as an expression stands for no declaration of its
-          // own; port_expr_decls holds those it names.
+          // own; port_expr_decls holds those it names. An interface port's
+          // ref obj is bound once its connection is known (§37.15).
           if (port.port_expr == nullptr) {
             MakeModuleIoDecl(
                 {port.name, port.direction, port.name, port.is_interface_port},
                 module,
-                FindObjectForFlatName(object_map_,
-                                      VpiFlatName(prefix, port.name)),
+                port.is_interface_port
+                    ? nullptr
+                    : FindObjectForFlatName(object_map_,
+                                            VpiFlatName(prefix, port.name)),
                 kAlloc, name_pool_);
           }
         }

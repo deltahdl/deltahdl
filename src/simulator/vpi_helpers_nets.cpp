@@ -235,7 +235,7 @@ VpiHandle VpiIoDeclRightRange(const std::vector<VpiArrayDimension>& dims) {
 }
 
 // ===========================================================================
-// §37.14 Ports and §37.15 Reference objects.
+// §37.14 Ports.
 // ===========================================================================
 
 bool VpiIsValidPortType(int port_type) {
@@ -312,66 +312,6 @@ int VpiPortSize(bool is_null_port, int port_width) {
   // §37.14 detail 11: a null port has size 0; otherwise the size is the port's
   // bit width.
   return is_null_port ? 0 : port_width;
-}
-
-int VpiRefObjGeneric(bool refers_to_interface, bool is_generic_interface) {
-  // §37.15 detail 5: a ref obj that refers to an interface reports whether that
-  // interface is generic; any other ref obj reports vpiUndefined.
-  if (!refers_to_interface) return vpiUndefined;
-  return is_generic_interface ? 1 : 0;
-}
-
-// §37.15 detail 6: the actual kinds whose definition/modport name a ref obj's
-// vpiDefName reports - an interface, an interface array, or a modport.
-static bool VpiRefObjActualIsInterfaceOrModport(int actual_type) {
-  return actual_type == vpiInterface || actual_type == vpiInterfaceArray ||
-         actual_type == vpiModport;
-}
-
-const char* VpiRefObjDefName(VpiHandle ref_obj) {
-  // §37.15 detail 6: when the ref obj's actual is an interface or modport, its
-  // definition name (or the modport name) is reported; otherwise there is none.
-  if (!ref_obj->actual) return nullptr;
-  if (!VpiRefObjActualIsInterfaceOrModport(ref_obj->actual->type)) {
-    return nullptr;
-  }
-  return ref_obj->actual->name.data();
-}
-
-// §37.15 detail 7: the actual kinds that carry a typespec - a net, a variable,
-// or a part select. A ref obj bound to any of these exposes vpiTypespec; bound
-// to anything else (an interface, modport, named event, ...) it does not.
-static bool VpiRefObjActualHasTypespec(int actual_type) {
-  switch (actual_type) {
-    case vpiNet:  // == kVpiNet, the net family head
-    case vpiStructNet:
-    case vpiUnionNet:
-    case vpiEnumNet:
-    case vpiIntegerNet:
-    case vpiTimeNet:
-    case vpiBitNet:
-    case vpiPackedArrayNet:
-    case vpiReg:  // == vpiLogicVar, the variable family head
-    case vpiIntegerVar:
-    case vpiRealVar:
-    case vpiIntVar:
-    case vpiBitVar:
-    case vpiPartSelect:
-      return true;
-    default:
-      return false;
-  }
-}
-
-VpiHandle VpiRefObjTypespec(VpiHandle ref_obj) {
-  // §37.15 detail 7: NULL unless the ref obj's actual is a net, variable, or
-  // part select; in that case the ref obj's own typespec child is returned.
-  if (!ref_obj->actual) return nullptr;
-  if (!VpiRefObjActualHasTypespec(ref_obj->actual->type)) return nullptr;
-  for (auto* child : ref_obj->children) {
-    if (child->type == vpiTypespec) return child;
-  }
-  return nullptr;
 }
 
 // ===========================================================================

@@ -1,6 +1,7 @@
 #include <ranges>
 #include <vector>
 
+#include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers3.h"
@@ -178,11 +179,13 @@ bool VpiIsTermOrPortRelation(int type, VpiHandle ref) {
     return type == vpiModPathIn || type == vpiModPathOut ||
            type == vpiModDataPathIn;
   }
+  if (ref->type == vpiRefObj) return VpiIsRefObjPortRelation(type);
   return VpiIsNetsType(ref->type) && (type == vpiPorts || type == vpiPortInst);
 }
 
 std::vector<VpiHandle> VpiTermOrPortObjects(int type, VpiHandle ref) {
   if (ref->type == vpiModPath) return VpiModPathTerms(type, ref);
+  if (ref->type == vpiRefObj) return VpiRefObjPorts(type, ref);
   return type == vpiPorts ? VpiNetPorts(ref) : VpiNetPortInsts(ref);
 }
 
