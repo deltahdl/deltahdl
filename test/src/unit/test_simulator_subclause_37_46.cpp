@@ -414,5 +414,19 @@ TEST_F(NetDriversAndLoadsOfARun, PrimTermsForcesAndComplexPortsDriveAndLoad) {
   EXPECT_FALSE(Holds(KindsOf(vpiDriver, By("top.trinet")), vpiPort));
 }
 
+// A force whose expression is an operation loads every net among its operands
+// at any depth, once each however often it is read and none for a constant,
+// and one whose target is a bit of a vector net drives that net (#7170).
+TEST_F(NetDriversAndLoadsOfARun, AForceReachesTheNetsThroughOperandsAndBits) {
+  Run("module top; wire n, m, k; wire [1:0] v;\n"
+      "  initial begin force n = m & k & 1'b1; force v[1] = m & m; end\n"
+      "endmodule\n");
+  EXPECT_TRUE(Holds(KindsOf(vpiLoad, By("top.k")), vpiForce));
+  const std::vector<int> kLoadsOfM = KindsOf(vpiLoad, By("top.m"));
+  EXPECT_EQ(std::ranges::count(kLoadsOfM, vpiForce), 2);
+  EXPECT_TRUE(Holds(KindsOf(vpiDriver, By("top.v")), vpiForce));
+  EXPECT_FALSE(Holds(KindsOf(vpiLoad, By("top.v")), vpiForce));
+}
+
 }  // namespace
 }  // namespace delta
