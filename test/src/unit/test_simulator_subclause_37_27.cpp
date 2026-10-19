@@ -2,6 +2,7 @@
 
 #include <vector>
 
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
@@ -225,6 +226,62 @@ TEST(NamedEventModel, ANamedEventWithNoTypespecReachesNone) {
   EXPECT_EQ(vpi_handle(vpiTypespec, VpiHandleOf(&event)), nullptr);
 
   SetGlobalVpiContext(nullptr);
+}
+
+// §37.27 against a design read and run whole.
+class NamedEventsOfARun : public VpiDesignRun {
+ protected:
+  // The type of what `relation` reaches from `ref`, 0 for nothing.
+  static int KindOf(int relation, vpiHandle ref) {
+    vpiHandle reached = ref == nullptr ? nullptr : vpi_handle(relation, ref);
+    return reached == nullptr ? 0 : vpi_get(vpiType, reached);
+  }
+};
+
+constexpr const char* kEvents =
+    "module top;\n"
+    "  event e, f, g;\n"
+    "  event ea [2];\n"
+    "  initial @e;\n"
+    "  initial @(e or f);\n"
+    "  initial @(g or e);\n"
+    "  initial begin @f; end\n"
+    "  initial begin #1 -> f; end\n"
+    "endmodule\n";
+
+// §37.27 (figure): a named event reaches an event typespec, and a named event
+// array an array typespec whose elements are of that type (#7102, #7105).
+TEST_F(NamedEventsOfARun, AnEventAndAnEventArrayReachTheirTypespecs) {
+  Run(kEvents);
+  EXPECT_EQ(KindOf(vpiTypespec, By("top.e")), vpiEventTypespec);
+  vpiHandle array = vpi_handle(vpiTypespec, By("top.ea"));
+  ASSERT_NE(array, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, array), vpiArrayTypespec);
+  EXPECT_EQ(KindOf(vpiElemTypespec, array), vpiEventTypespec);
+}
+
+// §37.27 (figure): an element of a named event array is a named event, which
+// vpi_handle_by_index reaches and which reaches the array through vpiParent
+// (#7103, #7104).
+TEST_F(NamedEventsOfARun, AnEventArraysElementsAreNamedEvents) {
+  Run(kEvents);
+  vpiHandle array = By("top.ea");
+  ASSERT_NE(array, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, array), vpiNamedEventArray);
+  vpiHandle element = vpi_handle_by_index(array, 1);
+  ASSERT_NE(element, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, element), vpiNamedEvent);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiParent, element)), VpiObjectOf(array));
+}
+
+// §37.27 detail 1: vpiWaitingProcesses reaches the thread of each process an
+// event control holds waiting on the event, one waiting on it among others
+// included, and none that has since been woken: `@(e or f)` and `@f` resume
+// when f is triggered, and `@e` and `@(g or e)` wait on (#7106).
+TEST_F(NamedEventsOfARun, AnEventReachesTheThreadsWaitingOnIt) {
+  Run(kEvents);
+  EXPECT_EQ(ObjectsOf(vpiWaitingProcesses, By("top.e")).size(), 2U);
+  EXPECT_TRUE(ObjectsOf(vpiWaitingProcesses, By("top.f")).empty());
 }
 
 }  // namespace

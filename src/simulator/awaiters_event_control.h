@@ -410,6 +410,7 @@ struct EventAwaiter {
     // the same signal (e.g. `posedge clk or negedge clk`).
     auto consumed = std::make_shared<bool>(false);
     if (proc) proc->woken_by = EventExpr{};
+    if (proc) proc->waiting_on_events.clear();
     for (const auto& ev : events) {
       if (!ev.signal) continue;
       // §9.4.2.4: a sequence instance is one operand among the others, its
@@ -432,13 +433,17 @@ struct EventAwaiter {
       }
       if (var->is_event) {
         AttachEventVarWatcher(var, ev, h, ResumeTarget{ctx, proc}, consumed);
+        if (proc) proc->waiting_on_events.push_back(var);
         continue;
       }
       AttachEdgeVarWatcher(var, ev, h, ResumeTarget{ctx, proc}, consumed);
     }
   }
 
-  void await_resume() const noexcept {}
+  // §37.27 detail 1: a resumed process waits on no event any longer.
+  void await_resume() const noexcept {
+    if (Process* proc = ctx.CurrentProcess()) proc->waiting_on_events.clear();
+  }
 
   static bool CheckEdge(const Variable* var, Edge edge) {
     if (edge == Edge::kNone) {

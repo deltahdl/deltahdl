@@ -77,6 +77,15 @@ void VpiRefreshSyncClassObject(
     VpiObject& obj, SimContext& ctx, const std::function<VpiObject*()>& alloc,
     const std::function<VpiObject*(Process*)>& thread_of);
 
+// §37.33 details 3 and 4 and §37.27 detail 1: bring `obj` up to date with
+// what the run `ctx` holds waiting on it: a class obj as
+// VpiRefreshSyncClassObject does, and a named event with the thread
+// `thread_of` gives for each process an event control holds waiting on it;
+// nothing for any other object.
+void VpiRefreshWaitedOn(VpiObject& obj, SimContext& ctx,
+                        const std::function<VpiObject*()>& alloc,
+                        const std::function<VpiObject*(Process*)>& thread_of);
+
 // The storage of the value the property `name` of `obj` holds now: a ref
 // cell's where one stands (§13.5.2), the object's own, or the class's where
 // the property is static (§8.9); null where none holds one.

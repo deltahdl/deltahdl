@@ -416,6 +416,27 @@ void VpiRefreshSyncClassObject(
   }
 }
 
+void VpiRefreshWaitedOn(VpiObject& obj, SimContext& ctx,
+                        const std::function<VpiObject*()>& alloc,
+                        const std::function<VpiObject*(Process*)>& thread_of) {
+  if (obj.type == vpiClassObj) {
+    VpiRefreshSyncClassObject(obj, ctx, alloc, thread_of);
+    return;
+  }
+  if (obj.type != vpiNamedEvent || obj.var == nullptr) return;
+  // §37.27 detail 1: the thread of each process, static or dynamic, an event
+  // control holds waiting on the event now.
+  std::erase_if(obj.children, [](const VpiObject* child) {
+    return child->type == vpiThread;
+  });
+  for (Process* proc : ctx.GetScheduler().Threads()) {
+    const auto& waits = proc->waiting_on_events;
+    if (proc->active && std::ranges::find(waits, obj.var) != waits.end()) {
+      obj.children.push_back(thread_of(proc));
+    }
+  }
+}
+
 VpiHandle VpiContext::ClassObjectOf(VpiObject& class_var) {
   if (class_var.var == nullptr || sim_ctx_ == nullptr) {
     return class_var.referenced_object;

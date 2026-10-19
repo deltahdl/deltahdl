@@ -23,6 +23,7 @@ bool VpiHasAccessByIndex(int type) {
     case vpiGateArray:
     case vpiSwitchArray:
     case vpiUdpArray:
+    case vpiNamedEventArray:  // §37.27: an event array indexes its events
       return true;
     // §37.16 (figure): the `nets` class draws access by index, so a net of
     // every kind it groups indexes its bits or, an array net, its nets.

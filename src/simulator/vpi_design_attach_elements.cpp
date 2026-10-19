@@ -124,14 +124,14 @@ void RecordDimensionIndices(VpiObject& array,
 // detail 7 with §37.29: an element of an array of virtual interfaces is a
 // virtual interface var, which the run made a reg like every element. §37.17
 // (printed page 1025) makes an element of an array of any other built-in type
-// a variable of that type, an int var of `int a[4]`. An element of a
-// structure, union or event array keeps the reg the run made it, which its
-// bits are indexed as (VarBitDims).
+// a variable of that type, an int var of `int a[4]`, and §37.27 an element of
+// an event array a named event. An element of a structure or union array
+// keeps the reg the run made it, which its bits are indexed as (VarBitDims).
 int DeclaredElementType(const RtlirVariable& var) {
   if (!var.class_type_name.empty()) return vpiClassVar;
   const int kKind = VpiDataTypeVariableKind(var.decl_kind);
-  const bool kKept = kKind == kVpiReg || kKind == vpiStructVar ||
-                     kKind == vpiUnionVar || kKind == vpiNamedEvent;
+  const bool kKept =
+      kKind == kVpiReg || kKind == vpiStructVar || kKind == vpiUnionVar;
   return kKept ? 0 : kKind;
 }
 

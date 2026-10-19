@@ -836,10 +836,10 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref, int compatibility_mode) {
   // §37.44: a thread that started since the last iteration is one of the run's
   // threads too, so the objects are brought up to date before this one answers.
   RefreshRunObjects();
-  // §37.33 details 3 and 4: so are a mailbox's messages and the processes
-  // waiting on a mailbox or a semaphore.
-  if (ref != nullptr && ref->type == vpiClassObj && sim_ctx_ != nullptr) {
-    VpiRefreshSyncClassObject(
+  // §37.33 details 3 and 4 and §37.27 detail 1: so are a mailbox's messages
+  // and the processes waiting on a mailbox, a semaphore or a named event.
+  if (ref != nullptr && sim_ctx_ != nullptr) {
+    VpiRefreshWaitedOn(
         *ref, *sim_ctx_, [this] { return AllocObject(); },
         [this](auto* proc) { return ThreadObjectFor(proc); });
   }

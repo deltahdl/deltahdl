@@ -124,6 +124,10 @@ struct Process {
   // §37.33 detail 3: the semaphore or mailbox the process is parked on, which
   // vpiWaitingProcesses reports it waiting on; null while it waits on none.
   const void* waiting_on_sync = nullptr;
+  // §37.27 detail 1: the named events the event control the process is
+  // suspended at waits on, which vpiWaitingProcesses of each reports it
+  // waiting on; empty while it waits at none.
+  std::vector<const void*> waiting_on_events;
 
   uint32_t program_block_id = 0;
 
