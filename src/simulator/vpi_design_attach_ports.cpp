@@ -105,6 +105,16 @@ VpiObject* MakeRefObj(std::string_view name, std::string full_name,
   return ref_obj;
 }
 
+// Where a connection is written: the instance `writer` holding the
+// instantiation, the names its expressions resolve by, and what a run builds
+// with.
+struct ConnectionSite {
+  VpiHandle writer;
+  const VpiExprNames& names;
+  SimContext& ctx;
+  const VpiAttachBuild& build;
+};
+
 // The name the interface instance `head` writes is keyed under: its
 // identifier, or an element of an array of interface instances, `ia[1]`, by
 // the array's name and the element's index, as the elaborator names it
@@ -121,30 +131,28 @@ std::string InstanceNameOf(const Expr* head) {
 }
 
 // §37.15 detail 2 and its example: the higher connection `conn` of an
-// interface or modport port, written in `writer` where `names` resolve, is a
-// ref obj. Where it names an interface port of `writer`, `s`, it is a use of
+// interface or modport port, written at `site`, is a
+// ref obj. Where it names an interface port of the writer, `s`, it is a use of
 // that port's ref obj; where it names an interface instance, `i`, or an
 // element of an array of them, `ia[1]`, a ref obj bound to that instance; and
 // where it selects a modport of either, `s.initiator`, a ref obj bound to the
 // modport that is a subelement of the first (detail 4). Null for a connection
 // of any other shape or that selects no modport, a hierarchical name, each
 // left the expression it is.
-VpiObject* InterfaceHighConn(const Expr* conn, VpiHandle writer,
-                             const VpiExprNames& names, SimContext& ctx,
-                             const VpiAttachBuild& build) {
+VpiObject* InterfaceHighConn(const Expr* conn, const ConnectionSite& site) {
   const bool kSelects = conn->kind == ExprKind::kMemberAccess;
   const Expr* head = kSelects ? conn->lhs : conn;
   const std::string kName = InstanceNameOf(head);
   if (kName.empty()) return nullptr;
-  VpiObject* base = PortRefObj(writer, kName);
+  VpiObject* base = PortRefObj(site.writer, kName);
   if (base == nullptr) {
     VpiObject* instance =
         head->kind == ExprKind::kIdentifier
-            ? VpiGenBlockExpression(head, names, ctx, build)
-            : FindObjectForFlatName(names.objects,
-                                    VpiFlatName(names.prefix, kName));
-    base = MakeRefObj(kName, VpiScopedFullName(writer, kName), writer, instance,
-                      build);
+            ? VpiGenBlockExpression(head, site.names, site.ctx, site.build)
+            : FindObjectForFlatName(site.names.objects,
+                                    VpiFlatName(site.names.prefix, kName));
+    base = MakeRefObj(kName, VpiScopedFullName(site.writer, kName), site.writer,
+                      instance, site.build);
   }
   if (!kSelects) return base;
   const std::string_view kMember = conn->rhs->text;
@@ -152,7 +160,7 @@ VpiObject* InterfaceHighConn(const Expr* conn, VpiHandle writer,
   if (modport == nullptr) return nullptr;
   return MakeRefObj(kName + "." + std::string(kMember),
                     base->full_name + "." + std::string(kMember), base, modport,
-                    build);
+                    site.build);
 }
 
 // §37.15 example: the ref obj of the interface or modport port `port` of
@@ -169,26 +177,25 @@ void BindPortRefObj(VpiHandle module, const RtlirPort& port, VpiHandle high) {
 }
 
 // §37.14 detail 3 with §37.15: the higher connection of `port`, the port
-// `binding` connects in `inst`, written in `writer`. For an interface or
+// `binding` connects in `inst`, written at `site`. For an interface or
 // modport port whose connection is one it is a ref obj (InterfaceHighConn),
 // through which the port's own ref obj is bound; otherwise it is the
 // expression the instantiation wrote, which a ref port's ref obj is bound to,
 // as D4's example binds r to a.
 VpiObject* HighConnOf(const RtlirModuleInst& inst,
                       const RtlirPortBinding& binding, VpiObject* port,
-                      VpiHandle writer, const VpiExprNames& names,
-                      SimContext& ctx, const VpiAttachBuild& build) {
+                      const ConnectionSite& site) {
   const RtlirPort& declared = *std::ranges::find(
       inst.resolved->ports, binding.port_name, &RtlirPort::name);
-  VpiObject* high =
-      declared.is_interface_port
-          ? InterfaceHighConn(binding.connection, writer, names, ctx, build)
-          : nullptr;
+  VpiObject* high = declared.is_interface_port
+                        ? InterfaceHighConn(binding.connection, site)
+                        : nullptr;
   if (high != nullptr) {
     BindPortRefObj(port->parent, declared, high);
     return high;
   }
-  high = VpiGenBlockExpression(binding.connection, names, ctx, build);
+  high = VpiGenBlockExpression(binding.connection, site.names, site.ctx,
+                               site.build);
   VpiObject* ref_obj = declared.direction == Direction::kRef
                            ? PortRefObj(port->parent, declared.name)
                            : nullptr;
@@ -218,7 +225,7 @@ void ConnectPorts(const RtlirModuleInst& inst, VpiHandle writer,
     port->high_conn =
         binding.unconnected
             ? nullptr
-            : HighConnOf(inst, binding, port, writer, names, ctx, build);
+            : HighConnOf(inst, binding, port, {writer, names, ctx, build});
     port->conn_by_name = inst.ports_by_name && !binding.unconnected;
   }
   ConnectLowConns(module, kInstance, objects, build);

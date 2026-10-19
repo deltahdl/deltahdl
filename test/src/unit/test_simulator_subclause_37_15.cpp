@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <vector>
 
 #include "fixture_vpi_run.h"
@@ -306,8 +307,9 @@ class RefObjsOfARun : public VpiDesignRun {
         "module child2(simple s); endmodule\n"
         "module child3(simple.target t); endmodule\n"
         "module g(interface s); endmodule\n"
-        "module m(ref logic [2:0] r); endmodule\n"
-        "module top; simple i(); simple ia[2](); logic [2:0] a;\n"
+        "typedef logic [2:0] t3;\n"
+        "module m(ref t3 r); endmodule\n"
+        "module top; simple i(); simple ia[2](); t3 a;\n"
         "  child1 i1(i); child2 i2(i.initiator); child3 i3(i); g u4(i);\n"
         "  child2 i5(ia[1]); m u1(a);\n"
         "endmodule\n");
@@ -329,12 +331,14 @@ class RefObjsOfARun : public VpiDesignRun {
     return VpiObjectOf(Named(vpiModport, By("top.i"), name));
   }
 
-  // The objects of what `ref` reaches through `type`, in order.
+  // The objects of what `ref` reaches through `type`, in no order the clause
+  // gives, so sorted.
   static std::vector<VpiObject*> Reached(int type, vpiHandle ref) {
     std::vector<VpiObject*> objects;
     for (vpiHandle obj : ObjectsOf(type, ref)) {
       objects.push_back(VpiObjectOf(obj));
     }
+    std::ranges::sort(objects);
     return objects;
   }
 };
@@ -425,7 +429,9 @@ TEST_F(RefObjsOfARun, ARefObjReachesThePortsItConnects) {
   VpiObject* c_2 = VpiObjectOf(PortOf("top.i1.c_2", "s"));
   EXPECT_EQ(Reached(vpiLowConn, s), std::vector<VpiObject*>{own});
   EXPECT_EQ(Reached(vpiHighConn, s), std::vector<VpiObject*>{c_1});
-  EXPECT_EQ(Reached(vpiPortInst, s), (std::vector<VpiObject*>{c_1, c_2}));
+  std::vector<VpiObject*> both{c_1, c_2};
+  std::ranges::sort(both);
+  EXPECT_EQ(Reached(vpiPortInst, s), both);
 }
 
 // The figure with D4: vpiParent reaches only the ref obj a subelement selects
@@ -456,12 +462,11 @@ TEST_F(RefObjsOfARun, VpiDefNameIsTheInterfacesDefinitionOrTheModport) {
 }
 
 // The figure with D7: a ref obj bound to a variable reaches that variable's
-// typespec, and one bound to an interface none (#7056).
+// typespec, here its typedef's, and one bound to an interface none (#7056).
 TEST_F(RefObjsOfARun, VpiTypespecIsTheVariablesForAVariableActual) {
   vpiHandle typespec =
       vpi_handle(vpiTypespec, ConnOf(vpiLowConn, "top.u1", "r"));
   ASSERT_NE(typespec, nullptr);
-  EXPECT_EQ(vpi_get(vpiType, typespec), vpiLogicTypespec);
   EXPECT_EQ(VpiObjectOf(typespec),
             VpiObjectOf(vpi_handle(vpiTypespec, By("top.a"))));
   EXPECT_EQ(vpi_handle(vpiTypespec, ConnOf(vpiLowConn, "top.i1", "s")),

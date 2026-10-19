@@ -195,6 +195,16 @@ void MakeModuleIoDecl(const RtlirIoDecl& decl, VpiHandle module,
   module->children.push_back(io_decl);
 }
 
+// The net or variable the io decl of the port `port` reaches through vpiExpr,
+// under the instance `prefix` names; none for an interface port, whose ref obj
+// is bound once its connection is known (§37.15).
+VpiObject* PortIoDeclItem(
+    const std::unordered_map<std::string_view, VpiObject*>& objects,
+    const std::string& prefix, const RtlirPort& port) {
+  if (port.is_interface_port) return nullptr;
+  return FindObjectForFlatName(objects, VpiFlatName(prefix, port.name));
+}
+
 // The net or variable the io decl of `decl` reaches through vpiExpr, under the
 // instance `prefix` names; null where the declaration's expression is no single
 // name (§37.13).
@@ -394,17 +404,12 @@ void VpiContext::AttachDesignPorts(const RtlirDesign* design) {
                                       kAlloc);
           }
           // A port written as an expression stands for no declaration of its
-          // own; port_expr_decls holds those it names. An interface port's
-          // ref obj is bound once its connection is known (§37.15).
+          // own; port_expr_decls holds those it names.
           if (port.port_expr == nullptr) {
             MakeModuleIoDecl(
                 {port.name, port.direction, port.name, port.is_interface_port},
-                module,
-                port.is_interface_port
-                    ? nullptr
-                    : FindObjectForFlatName(object_map_,
-                                            VpiFlatName(prefix, port.name)),
-                kAlloc, name_pool_);
+                module, PortIoDeclItem(object_map_, prefix, port), kAlloc,
+                name_pool_);
           }
         }
         for (const RtlirIoDecl& decl : mod->port_expr_decls) {

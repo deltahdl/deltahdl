@@ -37,23 +37,28 @@ bool UsesRefObj(VpiHandle expr, VpiHandle ref_obj) {
   return false;
 }
 
-// The ports of the instances `scope` holds, reaching into the generate blocks
-// it holds, whose higher connection is `ref_obj` itself or, where `subelements`
-// is set, a use of it.
+// The ports of `instance` whose higher connection is `ref_obj` itself or,
+// where `subelements` is set, a use of it.
+void CollectInstanceHighConnPorts(VpiHandle instance, VpiHandle ref_obj,
+                                  bool subelements,
+                                  std::vector<VpiHandle>& out) {
+  for (VpiHandle port : instance->children) {
+    if (port->type != kVpiPort) continue;
+    const bool kConnects = subelements ? UsesRefObj(port->high_conn, ref_obj)
+                                       : port->high_conn == ref_obj;
+    if (kConnects) out.push_back(port);
+  }
+}
+
+// The same of the instances `scope` holds, reaching into the generate blocks
+// it holds.
 void CollectHighConnPorts(VpiHandle scope, VpiHandle ref_obj, bool subelements,
                           std::vector<VpiHandle>& out) {
   for (VpiHandle child : scope->children) {
     if (child->type == vpiGenScope || child->type == vpiGenScopeArray) {
       CollectHighConnPorts(child, ref_obj, subelements, out);
-      continue;
-    }
-    if (!VpiIsInstanceType(child->type)) continue;
-    for (VpiHandle port : child->children) {
-      if (port->type != kVpiPort || port->high_conn == nullptr) continue;
-      if (port->high_conn == ref_obj ||
-          (subelements && UsesRefObj(port->high_conn, ref_obj))) {
-        out.push_back(port);
-      }
+    } else if (VpiIsInstanceType(child->type)) {
+      CollectInstanceHighConnPorts(child, ref_obj, subelements, out);
     }
   }
 }
