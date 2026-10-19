@@ -323,6 +323,22 @@ TEST_F(ConstraintsOfARun, OnlyAClassObjsConstraintReachesAParent) {
   EXPECT_EQ(vpi_handle(vpiParent, VpiHandleOf(&loose)), nullptr);
 }
 
+// §37.34 detail 5 with §18.5.1: a constraint an extern prototype declares
+// holds the items the external constraint block completing it writes, in
+// order (#7135).
+TEST_F(ConstraintsOfARun, AnExternConstraintHoldsItsBlocksItems) {
+  Run("module top;\n"
+      "  class C; rand int x; extern constraint e; endclass\n"
+      "  constraint C::e { x != 3; x < 9; }\n"
+      "endmodule\n");
+  vpiHandle e = Named(vpiConstraint, Named(vpiClassDefn, By("top"), "C"), "e");
+  ASSERT_NE(e, nullptr);
+  const std::vector<vpiHandle> kItems = ObjectsOf(vpiConstraintItem, e);
+  ASSERT_EQ(kItems.size(), 2U);
+  EXPECT_EQ(vpi_get(vpiOpType, kItems[0]), vpiNeqOp);
+  EXPECT_EQ(vpi_get(vpiOpType, kItems[1]), vpiLtOp);
+}
+
 // §37.34 with §18.5.2: the pure constraint an abstract class declares is the
 // virtual one, an obligation every non-abstract class extending it fulfils,
 // and the constraint fulfilling it, like any other, is not (#7134).

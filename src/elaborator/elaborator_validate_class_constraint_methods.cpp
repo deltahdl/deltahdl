@@ -662,6 +662,10 @@ static void CompleteOneExternalConstraint(ClassDecl* cls,
     AppendAll(m->constraint_soft_exprs, body->constraint_soft_exprs);
     AppendAll(m->constraint_soft_dist_refs, body->constraint_soft_dist_refs);
     AppendAll(m->constraint_unique_refs, body->constraint_unique_refs);
+    // §37.34 detail 5: the items of the completed constraint, in the order
+    // its external block writes them.
+    AppendAll(m->constraint_items, body->constraint_items);
+    m->constraint_items_parsed = body->constraint_items_parsed;
   }
 }
 
