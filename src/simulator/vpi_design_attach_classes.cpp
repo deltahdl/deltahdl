@@ -244,10 +244,26 @@ int PropertyKind(const DataType& type, const RtlirDesign& design,
   return VpiDataTypeVariableKind(kFound->second);
 }
 
+// §37.25 detail 11: the type parameter of the class `owner` was made for
+// that `type` names, which, unresolved in the class defn, stands as the
+// typespec of a property declared with it; null where it names none.
+VpiObject* NamedTypeParameter(const MadeClassDefn& owner,
+                              const DataType& type) {
+  if (type.kind != DataTypeKind::kNamed || !type.scope_name.empty()) {
+    return nullptr;
+  }
+  const auto kFound = std::ranges::find_if(
+      owner.defn->children, [&type](const VpiObject* child) {
+        return child->type == vpiTypeParameter && child->name == type.type_name;
+      });
+  return kFound == owner.defn->children.end() ? nullptr : *kFound;
+}
+
 // §37.31 detail 1 with §37.17: the variable a property of the class stands
 // as, static or automatic, of the kind its type takes, and where it declares
 // unpacked dimensions, whose indices the caller records, a named event array
-// for an array of events (§37.27) and an array var for any other.
+// for an array of events (§37.27) and an array var for any other. One declared
+// with a type parameter of the class reaches it as its typespec.
 // Detail 25 full-names a static property through its class defn, and gives an
 // automatic one no full name.
 VpiObject* MakeProperty(const MadeClassDefn& owner, const ClassMember& member,
@@ -266,6 +282,9 @@ VpiObject* MakeProperty(const MadeClassDefn& owner, const ClassMember& member,
                                           owner.defn->full_name, member.name);
   var->parent = owner.defn;
   var->visibility = DeclaredVisibility(member);
+  if (VpiObject* param = NamedTypeParameter(owner, member.data_type)) {
+    var->children.push_back(param);
+  }
   owner.defn->children.push_back(var);
   return var;
 }

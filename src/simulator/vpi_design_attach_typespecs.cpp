@@ -18,6 +18,7 @@
 #include "parser/ast_type.h"
 #include "simulator/instance_prefix_override.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/variable.h"
 #include "simulator/vpi_design_attach_build.h"
@@ -475,11 +476,46 @@ void MakeGenBlockTypespecs(const RtlirModule& mod, VpiObject* instance,
   }
 }
 
+// §8.23: the name the run registers the class of `defn` under, a nested
+// class's through the classes holding it, as "Outer::Inner".
+std::string RunClassName(const VpiObject* defn) {
+  std::string name(defn->name);
+  for (const VpiObject* at = defn->parent;
+       at != nullptr && at->type == vpiClassDefn; at = at->parent) {
+    name = std::string(at->name) + "::" + name;
+  }
+  return name;
+}
+
+// §6.19 with §8.23: the members of each enumeration a typedef among
+// `typedefs` of the class of `defn` writes, under the typedef's name, as the
+// run resolved them under "Class::name" when it lowered the class.
+std::unordered_map<std::string_view, std::vector<RtlirEnumMember>> ClassEnums(
+    const std::vector<ModuleItem*>& typedefs, const VpiObject* defn,
+    const SimContext& ctx) {
+  std::unordered_map<std::string_view, std::vector<RtlirEnumMember>> enums;
+  const std::string kClass = RunClassName(defn);
+  for (const ModuleItem* item : typedefs) {
+    const EnumTypeInfo* info =
+        ctx.FindEnumType(kClass + "::" + std::string(item->name));
+    if (info == nullptr) continue;
+    std::vector<RtlirEnumMember>& members = enums[item->name];
+    for (const EnumMemberInfo& member : info->members) {
+      RtlirEnumMember constant;
+      constant.name = member.name;
+      constant.value = static_cast<int64_t>(member.value);
+      members.push_back(constant);
+    }
+  }
+  return enums;
+}
+
 // §37.31: the typedefs the class `decl` declares are typespecs its class defn
 // `defn` reaches through vpiTypedef, full-named through the class as its
-// methods are (§37.41 detail 5), and found under `prefix`, the key of the
-// scope declaring the class. A body's `localparam type`, which the parser
-// carries as a typedef, is a parameter of the class (detail 7) instead.
+// methods are (§37.41 detail 5), an enumeration's with its constants, and
+// found under `prefix`, the key of the scope declaring the class. A body's
+// `localparam type`, which the parser carries as a typedef, is a parameter of
+// the class (detail 7) instead.
 void MakeClassTypespecs(const ClassDecl& decl, VpiObject* defn,
                         const std::string& prefix,
                         const DesignTypespecs& design,
@@ -492,8 +528,9 @@ void MakeClassTypespecs(const ClassDecl& decl, VpiObject* defn,
     }
   }
   const std::vector<RtlirImport> kNoImports;
+  const auto kEnums = ClassEnums(typedefs, defn, design.ctx);
   const TypespecsByName kMade = MakeTypespecs(
-      typedefs, {defn, prefix, nullptr, answered, kNoImports, design});
+      typedefs, {defn, prefix, &kEnums, answered, kNoImports, design});
   for (const auto& [name, typespec] : kMade) {
     typespec->full_name = defn->full_name + "::" + std::string(name);
   }

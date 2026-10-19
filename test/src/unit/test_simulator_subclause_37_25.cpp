@@ -431,6 +431,15 @@ class TypespecsOfARun : public VpiDesignRun {
     vpiHandle reached = vpi_handle(relation, ref);
     return reached == nullptr ? 0 : vpi_get(vpiType, reached);
   }
+
+  // The values of the enum consts `typespec` reaches, in declaration order.
+  static std::vector<int> EnumConstValuesOf(vpiHandle typespec) {
+    std::vector<int> values;
+    for (vpiHandle constant : ObjectsOf(vpiEnumConst, typespec)) {
+      values.push_back(ValueOf(constant));
+    }
+    return values;
+  }
 };
 
 // Detail 1: a typedef of another typedef is a typespec of the aliased one's
@@ -813,6 +822,74 @@ TEST_F(TypespecsOfARun, AnEnumElementOfATypedefReachesItsConstants) {
             (std::vector<std::string>{"A", "B"}));
   EXPECT_EQ(vpi_get_str(vpiName, unpacked), nullptr);
   EXPECT_EQ(vpi_get_str(vpiName, packed), nullptr);
+}
+
+// The figure with detail 3 and §7.3.2: a tagged union's void member reaches a
+// void typespec, and its other members the typespecs of their own types
+// (#7085).
+TEST_F(TypespecsOfARun, ATaggedUnionsVoidMemberReachesAVoidTypespec) {
+  Run("module top;\n"
+      "  typedef union tagged { void Invalid; int Valid; } vint;\n"
+      "endmodule\n");
+  vpiHandle vint = Named(vpiTypedef, By("top"), "vint");
+  ASSERT_NE(vint, nullptr);
+  EXPECT_EQ(KindReached(vpiTypespec, Named(vpiTypespecMember, vint, "Invalid")),
+            vpiVoidTypespec);
+  EXPECT_EQ(KindReached(vpiTypespec, Named(vpiTypespecMember, vint, "Valid")),
+            vpiIntTypespec);
+}
+
+// §37.31 with the figure: an enum typedef a class declares reaches its enum
+// consts with their values, whether the class is a module's, nested in
+// another (§8.23) or the compilation unit's, beside a typedef of another type
+// (#7343).
+TEST_F(TypespecsOfARun, AClassesEnumTypedefReachesItsConstants) {
+  Run("class U; typedef enum {X = 4, Y} u_t; endclass\n"
+      "module top;\n"
+      "  class C;\n"
+      "    typedef int i_t; typedef enum {A, B = 5, D} e_t;\n"
+      "    class N; typedef enum {P = 2, Q} n_t; endclass\n"
+      "  endclass\n"
+      "endmodule\n");
+  vpiHandle c = Named(vpiClassDefn, By("top"), "C");
+  ASSERT_NE(c, nullptr);
+  EXPECT_EQ(EnumConstValuesOf(Named(vpiTypedef, c, "e_t")),
+            (std::vector<int>{0, 5, 6}));
+  vpiHandle n = Named(vpiInternalScope, c, "N");
+  ASSERT_NE(n, nullptr);
+  EXPECT_EQ(EnumConstValuesOf(Named(vpiTypedef, n, "n_t")),
+            (std::vector<int>{2, 3}));
+  vpiHandle u = Named(vpiClassDefn, nullptr, "U");
+  ASSERT_NE(u, nullptr);
+  EXPECT_EQ(EnumConstValuesOf(Named(vpiTypedef, u, "u_t")),
+            (std::vector<int>{4, 5}));
+}
+
+// Detail 11 with §37.31: in a class defn, where its type parameters stay
+// unresolved, a property declared with one reaches the type parameter itself
+// as its typespec, and one declared with any other type does not (#7100).
+TEST_F(TypespecsOfARun, AClassPropertyOfATypeParameterReachesIt) {
+  Run("package pk; typedef int t; endpackage\n"
+      "module top;\n"
+      "  class C #(type S = bit, type T = int);\n"
+      "    typedef int i_t; T x; S y; int z; pk::t w; i_t v;\n"
+      "  endclass\n"
+      "endmodule\n");
+  vpiHandle c = Named(vpiClassDefn, By("top"), "C");
+  ASSERT_NE(c, nullptr);
+  vpiHandle x = vpi_handle(vpiTypespec, Named(vpiVariables, c, "x"));
+  ASSERT_NE(x, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, x), vpiTypeParameter);
+  EXPECT_STREQ(vpi_get_str(vpiName, x), "T");
+  vpiHandle y = vpi_handle(vpiTypespec, Named(vpiVariables, c, "y"));
+  ASSERT_NE(y, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, y), "S");
+  EXPECT_NE(KindReached(vpiTypespec, Named(vpiVariables, c, "z")),
+            vpiTypeParameter);
+  EXPECT_NE(KindReached(vpiTypespec, Named(vpiVariables, c, "w")),
+            vpiTypeParameter);
+  EXPECT_NE(KindReached(vpiTypespec, Named(vpiVariables, c, "v")),
+            vpiTypeParameter);
 }
 
 }  // namespace
