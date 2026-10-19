@@ -554,17 +554,49 @@ TEST_F(PortsOfARun, APortsTypeFollowsItsFormal) {
 
 // §37.14 (figure) with detail 8: a port written .name(expr) is explicitly
 // named, and one written as a bare name is not (#7046). The first, having no
-// declaration of its own, reaches no typespec yet (#7344).
+// declaration of its own, reaches the typespec of the type the declaration its
+// expression names wrote (#7344).
 TEST_F(PortsOfARun, APortWrittenWithItsOwnNameIsExplicitlyNamed) {
-  Run("module sub(.p(a), b); input a; input b; endmodule\n"
-      "module top; wire w, v; sub u(.p(w), .b(v)); endmodule\n");
+  Run("module sub(.q(c), .p(a), b); input c; input [3:0] a; input b;\n"
+      "endmodule\n"
+      "module top; wire [3:0] w; wire v; sub u(.q(v), .p(w), .b(v));\n"
+      "endmodule\n");
   vpiHandle p = PortOfU("p");
   vpiHandle b = PortOfU("b");
   ASSERT_NE(p, nullptr);
   ASSERT_NE(b, nullptr);
   EXPECT_EQ(vpi_get(vpiExplicitName, p), 1);
   EXPECT_EQ(vpi_get(vpiExplicitName, b), 0);
-  EXPECT_EQ(vpi_handle(vpiTypespec, p), nullptr);
+  vpiHandle typespec = vpi_handle(vpiTypespec, p);
+  ASSERT_NE(typespec, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, typespec), vpiLogicTypespec);
+  const std::vector<vpiHandle> kRanges = ObjectsOf(vpiRange, typespec);
+  ASSERT_EQ(kRanges.size(), 1U);
+  EXPECT_EQ(vpi_get(vpiSize, kRanges[0]), 4);
+}
+
+// §37.14 (figure) with §23.2.2.2: a port whose expression is a select, a
+// concatenation or the name of an object the module body declares reaches a
+// logic typespec of the expression's width, one of no range for a single bit
+// (#7345).
+TEST_F(PortsOfARun, APortWrittenAsAnExpressionReachesATypespecOfItsWidth) {
+  Run("module sub(output .p(r[3:1]), output .q(r[0]), output .c({x, y}),\n"
+      "           output .s(v));\n"
+      "  logic [7:0] r; logic x; logic [1:0] y; logic [2:0] v;\n"
+      "endmodule\n"
+      "module top; wire [2:0] a, c, d; wire b;\n"
+      "  sub u(.p(a), .q(b), .c(c), .s(d));\n"
+      "endmodule\n");
+  for (const auto& [name, size] : std::vector<std::pair<const char*, int>>{
+           {"p", 3}, {"q", 0}, {"c", 3}, {"s", 3}}) {
+    ASSERT_NE(PortOfU(name), nullptr) << name;
+    vpiHandle typespec = vpi_handle(vpiTypespec, PortOfU(name));
+    ASSERT_NE(typespec, nullptr) << name;
+    EXPECT_EQ(vpi_get(vpiType, typespec), vpiLogicTypespec) << name;
+    const std::vector<vpiHandle> kRanges = ObjectsOf(vpiRange, typespec);
+    ASSERT_EQ(kRanges.size(), size == 0 ? 0U : 1U) << name;
+    if (size != 0) EXPECT_EQ(vpi_get(vpiSize, kRanges[0]), size) << name;
+  }
 }
 
 // §37.14 (figure): a port connected through a named list, .a(w) or .*, is

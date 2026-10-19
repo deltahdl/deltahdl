@@ -143,8 +143,15 @@ class TypespecMaker {
   // type it draws no typespec for.
   VpiObject* Of(const DataType& type, const std::vector<Expr*>& unpacked,
                 std::string_view name, VpiObject* parent) {
-    const std::vector<VpiTypespecDim> kDims = DimsOf(type, unpacked);
-    if (type.kind == DataTypeKind::kNamed && kDims.empty()) {
+    return Shaped(type, DimsOf(type, unpacked), name, parent);
+  }
+
+  // As Of, with the dimensions written over `type` already drawn as `dims`,
+  // outermost first.
+  VpiObject* Shaped(const DataType& type,
+                    const std::vector<VpiTypespecDim>& dims,
+                    std::string_view name, VpiObject* parent) {
+    if (type.kind == DataTypeKind::kNamed && dims.empty()) {
       const NamedTypespec kNamed = Named(type, name, parent);
       if (!kNamed.declared || name.empty()) return kNamed.typespec;
       VpiObject* alias = Alloc(name, parent);
@@ -153,14 +160,14 @@ class TypespecMaker {
       at_.design.shapes.Share(alias, kNamed.typespec);
       return alias;
     }
-    if (kDims.empty()) return Own(type, name, parent, name);
+    if (dims.empty()) return Own(type, name, parent, name);
     VpiObject* typespec = Alloc(name, parent);
     VpiObject* base =
         type.kind == DataTypeKind::kNamed
             ? Named(type, std::string_view{}, typespec).typespec
             : Own(ElementOf(type), std::string_view{}, typespec, name);
     if (base == nullptr) return nullptr;
-    at_.design.shapes.Shape(typespec, kDims, base);
+    at_.design.shapes.Shape(typespec, dims, base);
     return typespec;
   }
 
@@ -473,16 +480,43 @@ void RelateVariableTypespecs(const RtlirModule& mod,
   }
 }
 
+// §37.14 (figure) with §23.2.2.1 and §23.2.2.2: the typespec of `port`, of
+// the module `decl` declares, written as an expression, made by `maker` and
+// hung from the port's object `object`. Where the expression is the name of an
+// object a body port declaration declares, it is the type that declaration
+// wrote; otherwise a logic vector of the expression's width and signedness
+// (§11.5.1, §11.4.12), one of no range for a single bit.
+VpiObject* ExprPortTypespec(const RtlirPort& port, const ModuleDecl& decl,
+                            TypespecMaker& maker, VpiObject* object) {
+  if (port.port_expr->kind == ExprKind::kIdentifier) {
+    for (const PortDecl& named : decl.port_expr_objects) {
+      if (named.name != port.port_expr->text) continue;
+      return maker.Of(named.data_type, named.unpacked_dims, std::string_view{},
+                      object);
+    }
+  }
+  DataType vector;
+  vector.kind = DataTypeKind::kLogic;
+  vector.is_signed = port.is_signed;
+  std::vector<VpiTypespecDim> dims;
+  if (port.width > 1) {
+    dims.push_back({false, PackedRange::Implicit(port.width), 0, nullptr});
+  }
+  return maker.Shaped(vector, dims, std::string_view{}, object);
+}
+
 // §37.14 (figure): relates each port of `at.scope`, an instance of `mod`, the
 // module `decl` declares, to the typespec of the type its declaration wrote
 // with the unpacked dimensions it wrote, found among the typedefs the instance
 // declares, a type parameter's name standing for the type it has there, and
-// those beyond it `at` holds. A port written as an expression, or of an
-// interface, has no declaration of its own to read a type from.
+// those beyond it `at` holds; and a port written as an expression to the
+// typespec ExprPortTypespec makes for it. A port of an interface has no
+// declaration of its own to read a type from.
 void RelatePortTypespecs(const RtlirModule& mod, const ModuleDecl& decl,
                          const ScopeTypespecs& at) {
   TypespecsByName local;
   std::unordered_map<const DataType*, VpiObject*> ports;
+  std::vector<VpiObject*> expr_ports;
   for (VpiObject* child : at.scope->children) {
     if (child->type == vpiTypeParameter) {
       local[child->name] = child->param_typespec;
@@ -490,7 +524,9 @@ void RelatePortTypespecs(const RtlirModule& mod, const ModuleDecl& decl,
       local[child->name] = child;
     } else if (child->type == vpiPort) {
       const RtlirPort& port = mod.ports[child->index];
-      if (port.port_expr == nullptr && !port.is_interface_port) {
+      if (port.port_expr != nullptr) {
+        expr_ports.push_back(child);
+      } else if (!port.is_interface_port) {
         ports[port.declared_type] = child;
       }
     }
@@ -501,6 +537,10 @@ void RelatePortTypespecs(const RtlirModule& mod, const ModuleDecl& decl,
     if (it == ports.end()) continue;
     HangIfMade(it->second, maker.Of(written.data_type, written.unpacked_dims,
                                     std::string_view{}, it->second));
+  }
+  for (VpiObject* object : expr_ports) {
+    HangIfMade(object,
+               ExprPortTypespec(mod.ports[object->index], decl, maker, object));
   }
 }
 
