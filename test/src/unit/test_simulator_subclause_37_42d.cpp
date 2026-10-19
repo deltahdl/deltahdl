@@ -327,9 +327,9 @@ TEST_F(CallsWithinADesign, AFunctionBodysCallBuildsEachArgumentKind) {
 // §36.8.2: the compiletf of a call written in a module two instances hold
 // runs before either is active, when no one statement of the model is the
 // call, so the call it is given builds each argument of its own as the kind of
-// expression its actual is (§37.58, §37.59): a name a package import makes
-// visible the package's variable itself, an omitted argument a null operation
-// and null a null constant (detail 8).
+// expression its actual is (§37.58, §37.59): a name of a variable the
+// compilation unit declares that variable itself (§3.12.1), an omitted
+// argument a null operation and null a null constant (detail 8).
 TEST_F(CallsWithinADesign, ATwoInstanceCallsCompiletfBuildsItsOwnArguments) {
   g_args_seen.clear();
   g_arg_reads = 0;
@@ -338,11 +338,11 @@ TEST_F(CallsWithinADesign, ATwoInstanceCallsCompiletfBuildsItsOwnArguments) {
   data.tfname = VpiText("$kinds");
   data.compiletf = &ArgsCalltf;
   ASSERT_NE(vpi_register_systf(&data), nullptr);
-  Run("package pk; int v; endpackage\n"
-      "module child; import pk::*; int a;\n"
+  Run("int gv;\n"
+      "module child; int a;\n"
       "  function int f(int x); return x; endfunction\n"
       "  function int g();\n"
-      "    $kinds(v, f(1), $clog2(4), 1, '1, 1.5, \"s\", a + 1, , null);\n"
+      "    $kinds(gv, f(1), $clog2(4), 1, '1, 1.5, \"s\", a + 1, , null);\n"
       "    return 0;\n"
       "  endfunction\n"
       "endmodule\n"
@@ -355,7 +355,7 @@ TEST_F(CallsWithinADesign, ATwoInstanceCallsCompiletfBuildsItsOwnArguments) {
                                      vpiConstant, vpiOperation, vpiOperation,
                                      vpiConstant}));
   ASSERT_EQ(g_args_seen.size(), 10U);
-  EXPECT_STREQ(vpi_get_str(vpiName, g_args_seen[0]), "v");
+  EXPECT_STREQ(vpi_get_str(vpiName, g_args_seen[0]), "gv");
   EXPECT_EQ(vpi_get(vpiConstType, g_args_seen[3]), vpiIntConst);
   EXPECT_EQ(vpi_get(vpiConstType, g_args_seen[5]), vpiRealConst);
   EXPECT_EQ(vpi_get(vpiConstType, g_args_seen[6]), vpiStringConst);
