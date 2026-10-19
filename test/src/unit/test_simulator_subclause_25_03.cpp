@@ -54,4 +54,23 @@ TEST(InterfacePortHierRefSim, PortJoinsAnInstanceAnotherModuleDeclares) {
             "x=9\n");
 }
 
+// §25.3 with §27.4: a module may pass its interface port on to an instance a
+// generate block of it holds, which passes it on again. The value the
+// innermost instance writes through its port is the one the interface the
+// outermost port is connected to holds (#7351).
+TEST(InterfacePortIntoGenerateBlockSim,
+     PortReachesTheInterfaceThroughTheBlock) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("interface ifc; logic [7:0] a = 1; endinterface\n"
+                       "module leaf(ifc p); initial p.a = 9; endmodule\n"
+                       "module mid(ifc p); leaf l(p); endmodule\n"
+                       "module outer(ifc p); if (1) begin : gb mid m(p); end\n"
+                       "endmodule\n"
+                       "module top; ifc i(); outer o(i);\n"
+                       "  initial #1 $display(\"x=%0d\", i.a);\n"
+                       "endmodule\n",
+                       f),
+            "x=9\n");
+}
+
 }  // namespace

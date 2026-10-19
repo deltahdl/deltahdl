@@ -298,32 +298,10 @@ TEST_F(RefObjContext, TheTypespecIsFoundAmongOtherChildren) {
   EXPECT_EQ(VpiRefObjTypespec(&ref_obj), nullptr);
 }
 
-// The ref objs of a run: those the clause's example makes passing an
-// interface and its modports through ports, with a port selecting a modport in
-// its declaration, a generic interface port, a port connected to an element
-// of an interface array and a ref port beside them.
-class RefObjsOfARun : public VpiDesignRun {
+// What the ports of a run reach: the helpers the fixtures below read a
+// design's ref objs with.
+class RefObjRun : public VpiDesignRun {
  protected:
-  void SetUp() override {
-    VpiDesignRun::SetUp();
-    Run("interface simple (); logic req, gnt;\n"
-        "  modport target (input req, output gnt);\n"
-        "  modport initiator (input gnt, output req);\n"
-        "endinterface\n"
-        "module c1(simple s); endmodule\n"
-        "module child1(simple s); c1 c_1(s); c1 c_2(s.initiator); endmodule\n"
-        "module child2(simple s); endmodule\n"
-        "module child3(simple.target t); endmodule\n"
-        "module g(interface s); endmodule\n"
-        "typedef logic [2:0] t3;\n"
-        "module m(ref logic [2:0] r, ref t3 q); endmodule\n"
-        "module top; simple i(); simple ia[2](); logic [2:0] a; t3 b;\n"
-        "  child1 i1(i); child2 i2(i.initiator); child3 i3(i); g u4(i);\n"
-        "  child2 i5(ia[1]); m u1(a, b);\n"
-        "  if (1) begin : gb child2 i6(i); end\n"
-        "endmodule\n");
-  }
-
   // The port `name` of the instance `inst`.
   static vpiHandle PortOf(const char* inst, const char* name) {
     return Named(vpiPort, By(inst), name);
@@ -349,6 +327,33 @@ class RefObjsOfARun : public VpiDesignRun {
     }
     std::ranges::sort(objects);
     return objects;
+  }
+};
+
+// The ref objs of a run: those the clause's example makes passing an
+// interface and its modports through ports, with a port selecting a modport in
+// its declaration, a generic interface port, a port connected to an element
+// of an interface array and a ref port beside them.
+class RefObjsOfARun : public RefObjRun {
+ protected:
+  void SetUp() override {
+    RefObjRun::SetUp();
+    Run("interface simple (); logic req, gnt;\n"
+        "  modport target (input req, output gnt);\n"
+        "  modport initiator (input gnt, output req);\n"
+        "endinterface\n"
+        "module c1(simple s); endmodule\n"
+        "module child1(simple s); c1 c_1(s); c1 c_2(s.initiator); endmodule\n"
+        "module child2(simple s); endmodule\n"
+        "module child3(simple.target t); endmodule\n"
+        "module g(interface s); endmodule\n"
+        "typedef logic [2:0] t3;\n"
+        "module m(ref logic [2:0] r, ref t3 q); endmodule\n"
+        "module top; simple i(); simple ia[2](); logic [2:0] a; t3 b;\n"
+        "  child1 i1(i); child2 i2(i.initiator); child3 i3(i); g u4(i);\n"
+        "  child2 i5(ia[1]); m u1(a, b);\n"
+        "  if (1) begin : gb child2 i6(i); end\n"
+        "endmodule\n");
   }
 };
 
@@ -494,11 +499,38 @@ TEST_F(RefObjsOfARun, VpiTypespecIsTheVariablesForAVariableActual) {
 }
 
 // The ref objs of a run in which a module passes its interface port down to an
-// instance a generate block of it holds, which passes it on to one of its own.
-class RefObjsThroughAGenerateBlock : public RefObjsOfARun {
+// instance a generate block of it holds.
+class RefObjsThroughAGenerateBlock : public RefObjRun {
  protected:
   void SetUp() override {
-    VpiDesignRun::SetUp();
+    RefObjRun::SetUp();
+    Run("interface simple; logic req, gnt; endinterface\n"
+        "module c1(simple s); endmodule\n"
+        "module child4(simple s); if (1) begin : gb c1 c_g(s); end\n"
+        "endmodule\n"
+        "module top; simple i(); child4 i7(i); endmodule\n");
+  }
+};
+
+// §25.3 with §27.4 and D2: an interface port passed into a generate block is
+// the higher connection of the port it reaches there, whose own ref obj is
+// bound to the interface the module is connected to (#7351).
+TEST_F(RefObjsThroughAGenerateBlock, AnInterfacePortReachesThePortInTheBlock) {
+  vpiHandle s = ConnOf(vpiLowConn, "top.i7", "s");
+  ASSERT_NE(s, nullptr);
+  EXPECT_EQ(VpiObjectOf(ConnOf(vpiHighConn, "top.i7.gb.c_g", "s")),
+            VpiObjectOf(s));
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiActual,
+                                   ConnOf(vpiLowConn, "top.i7.gb.c_g", "s"))),
+            VpiObjectOf(By("top.i")));
+}
+
+// The ref objs of a run in which the instance a generate block holds passes
+// the interface port it was given on to an instance of its own.
+class RefObjsBelowAGenerateBlock : public RefObjRun {
+ protected:
+  void SetUp() override {
+    RefObjRun::SetUp();
     Run("interface simple; logic req, gnt; endinterface\n"
         "module c1(simple s); endmodule\n"
         "module child1(simple s); c1 c_1(s); endmodule\n"
@@ -508,19 +540,11 @@ class RefObjsThroughAGenerateBlock : public RefObjsOfARun {
   }
 };
 
-// §25.3 with §27.4 and D2: an interface port passed into a generate block is
-// the higher connection of the port it reaches there, and of the one that
-// instance passes it on to, each port's own ref obj bound to the interface the
-// module is connected to (#7351).
-TEST_F(RefObjsThroughAGenerateBlock, AnInterfacePortReachesThePortsBelowIt) {
-  vpiHandle s = ConnOf(vpiLowConn, "top.i7", "s");
-  ASSERT_NE(s, nullptr);
-  EXPECT_EQ(VpiObjectOf(ConnOf(vpiHighConn, "top.i7.gb.c_g", "s")),
-            VpiObjectOf(s));
+// §25.3 with D2: the port an instance in a generate block passes on is the
+// higher connection of the port of its own instance (#7351).
+TEST_F(RefObjsBelowAGenerateBlock, AnInterfacePortReachesThePortBelowTheBlock) {
   vpiHandle inner = ConnOf(vpiLowConn, "top.i7.gb.c_g", "s");
   ASSERT_NE(inner, nullptr);
-  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiActual, inner)),
-            VpiObjectOf(By("top.i")));
   EXPECT_EQ(VpiObjectOf(ConnOf(vpiHighConn, "top.i7.gb.c_g.c_1", "s")),
             VpiObjectOf(inner));
 }
