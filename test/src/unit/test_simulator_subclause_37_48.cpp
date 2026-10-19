@@ -282,8 +282,9 @@ class ClockingBlocksOfARun : public VpiDesignRun {
 // Details 2 and 3: a clocking block named through a virtual interface var,
 // vif.cb, is a clocking block whose prefix is the var, and stands for the
 // block of the interface instance the var holds now, or for none while it
-// holds none (#7175). The tasks waiting on them are never called, so neither
-// wait runs through a null interface.
+// holds none (#7175); a member of the interface that is no clocking block,
+// vif.clk, stays a reference the var prefixes. The tasks waiting on them are
+// never called, so no wait runs through a null interface.
 TEST_F(ClockingBlocksOfARun,
        AVirtualInterfacesClockingBlockHasPrefixAndActual) {
   Run("interface bus(input logic clk);\n"
@@ -293,6 +294,7 @@ TEST_F(ClockingBlocksOfARun,
       "  initial vif = b;\n"
       "  task wait_bound; @(vif.cb); endtask\n"
       "  task wait_unbound; @(vu.cb); endtask\n"
+      "  task wait_signal; @(vif.clk); endtask\n"
       "endmodule\n");
   ASSERT_NE(Named(vpiTaskFunc, By("top"), "wait_bound"), nullptr);
   vpiHandle control = ControlOf("wait_bound");
@@ -310,6 +312,9 @@ TEST_F(ClockingBlocksOfARun,
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiPrefix, unbound)),
             VpiObjectOf(By("top.vu")));
   EXPECT_EQ(vpi_handle(vpiActual, unbound), nullptr);
+  vpiHandle signal = vpi_handle(vpiCondition, ControlOf("wait_signal"));
+  ASSERT_NE(signal, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, signal), vpiRefObj);
 }
 
 // A module's default clocking block is reached from it as a clocking block and

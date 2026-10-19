@@ -101,10 +101,11 @@ VpiObject* PrefixedClockingBlockActual(
       by_name(std::string(ctx.VirtualInterfaceBinding(vif)));
   if (instance == nullptr) return nullptr;
   const std::string_view kMember = block.name.substr(block.name.rfind('.') + 1);
-  for (VpiObject* child : instance->children) {
-    if (child->type == vpiClockingBlock && child->name == kMember) return child;
-  }
-  return nullptr;
+  auto found = std::ranges::find_if(
+      instance->children, [kMember](const VpiObject* child) {
+        return child->type == vpiClockingBlock && child->name == kMember;
+      });
+  return found != instance->children.end() ? *found : nullptr;
 }
 
 }  // namespace
