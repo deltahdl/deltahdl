@@ -147,6 +147,12 @@ void VpiAttachClassSpecializations(const VpiClassDefnObjects& defns,
   }
 }
 
+const std::vector<VpiObject*>& VpiClassDefnList(int type,
+                                                const VpiObject& defn) {
+  return type == vpiDerivedClasses ? defn.derived_classes
+                                   : defn.specializations;
+}
+
 VpiObject* VpiSpecializationTypespec(const VpiObject& defn,
                                      std::string_view name) {
   const auto kFound =

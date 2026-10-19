@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <string_view>
+#include <vector>
 
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_object.h"
@@ -31,6 +32,12 @@ struct Expr;
 void VpiAttachClassSpecializations(const VpiClassDefnObjects& defns,
                                    SimContext& ctx,
                                    const VpiAttachBuild& build);
+
+// §37.31 detail 5 and §37.32 detail 10: the list the class defn `defn` keeps
+// apart from its children that the iteration `type` reaches, its derived
+// classes for vpiDerivedClasses and else its class specializations.
+const std::vector<VpiObject*>& VpiClassDefnList(int type,
+                                                const VpiObject& defn);
 
 // §37.32 detail 1: the class specialization typespec of the class type named
 // `name` among those the class defn `defn` holds; null for none.

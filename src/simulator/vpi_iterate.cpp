@@ -3,6 +3,7 @@
 #include <cstdarg>
 #include <vector>
 
+#include "simulator/vpi_class_typespecs.h"
 #include "simulator/vpi_user.h"
 // §37.10 detail 3: the package/interface/program instance kinds are defined in
 // the SystemVerilog VPI header alongside the §37.10 vpiInstance relation.
@@ -769,8 +770,7 @@ bool DispatchRefSpecialMode(int type, VpiHandle ref,
     return true;
   }
   if (modes.class_derived) {
-    iter->children =
-        type == vpiDerivedClasses ? ref->derived_classes : ref->specializations;
+    iter->children = VpiClassDefnList(type, *ref);
     return true;
   }
   if (modes.constr_foreach_loopvars || modes.foreach_stmt_loopvars) {

@@ -256,6 +256,26 @@ int MessageConstType(const MailboxMessageType& type) {
   }
 }
 
+// §37.32 detail 1: the typespec of the class obj `made` of an object of the
+// class `type`, whose class defn is `defn`: the class specialization it was
+// created as, whose typespec the defn holds where the run held the
+// specialization when the defn was made, and otherwise one made with `build`
+// for it, reaching the defn where there is one.
+VpiObject* ClassObjTypespec(const ClassTypeInfo& type, VpiObject* defn,
+                            VpiObject* made, const VpiAttachBuild& build) {
+  if (defn != nullptr) {
+    if (VpiObject* held = VpiSpecializationTypespec(*defn, type.name)) {
+      return held;
+    }
+  }
+  VpiObject* typespec = build.alloc();
+  typespec->type = vpiClassTypespec;
+  typespec->name = build.keep(std::string(type.name));
+  typespec->parent = made;
+  if (defn != nullptr) typespec->children.push_back(defn);
+  return typespec;
+}
+
 }  // namespace
 
 VpiObject* VpiMakeObjectParameter(VpiObject* holder, const ClassDecl& decl,
@@ -311,21 +331,8 @@ VpiObject* VpiMakeClassObject(ClassObject& obj, const VpiClassObjDefn& of,
   made->alloc_scheme = VpiAllocSchemeFor(VpiAllocKind::kDynamic);
   made->obj_id = static_cast<int64_t>(obj.handle);
   if (obj.type == nullptr) return made;
-  VpiObject* defn = of.defn_of(*obj.type);
-  // §37.32 detail 1: the type of a class obj is the class specialization it
-  // was created as, whose typespec its class defn holds where the run held the
-  // specialization when the defn was made.
-  VpiObject* typespec = defn != nullptr
-                            ? VpiSpecializationTypespec(*defn, obj.type->name)
-                            : nullptr;
-  if (typespec == nullptr) {
-    typespec = build.alloc();
-    typespec->type = vpiClassTypespec;
-    typespec->name = build.keep(std::string(obj.type->name));
-    typespec->parent = made;
-    if (defn != nullptr) typespec->children.push_back(defn);
-  }
-  made->children.push_back(typespec);
+  made->children.push_back(
+      ClassObjTypespec(*obj.type, of.defn_of(*obj.type), made, build));
   // §37.33 detail 8: the parameters the class typespec the object was created
   // with gives values to, port list and body alike.
   const ClassTypespecInfo kTypespec = VpiClassTypespecOf(obj.type);
