@@ -73,6 +73,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 
 - [Verifying through CI](verifying-through-ci.md) — keep local work to what CI has no way to perform; a build, a test binary or a probe of a defect is pushed and read from the run.
 - [Reading a CI run](reading-a-ci-run.md) — `gh run list --limit 1` before pushing, `gh run view --log-failed` after.
+- [Per-line coverage from CI artifacts](per-line-coverage-from-ci-artifacts.md) — the coverage log counts misses per file; read the missed lines from the run's coverage-simulator and profdata-unit-shard artifacts with a local llvm-cov.
 - [Fetching a failed job's log](fetching-a-failed-job-log.md) — when `--log-failed` breaks off or comes back empty, fetch each failed job through `gh api --allow-escape-sequences .../actions/jobs/<id>/logs`.
 - [gh run list --commit takes a full SHA](gh-run-list-commit-takes-a-full-sha.md) — pass `$(git rev-parse HEAD)`; a short SHA lists no run, and a watcher waiting on it never ends.
 - [Watching a run in the background](watching-a-run-in-the-background.md) — a background shell or a Monitor, never a foreground `gh run watch`, and `--interval 60`: the 3-second default trips the rate limit.
