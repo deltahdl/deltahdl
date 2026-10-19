@@ -1,3 +1,5 @@
+#include "simulator/vpi_design_attach_typespecs.h"
+
 #include <algorithm>
 #include <cstdint>
 #include <optional>
@@ -23,8 +25,10 @@
 #include "simulator/variable.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_walk.h"
+#include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_typespec_shapes.h"
+#include "simulator/vpi_user.h"
 
 namespace delta {
 
@@ -444,6 +448,37 @@ void RelateVariableTypespecs(const RtlirModule& mod,
   }
 }
 
+// §37.14 (figure): relates each port of `at.scope`, an instance of `mod`, the
+// module `decl` declares, to the typespec of the type its declaration wrote
+// with the unpacked dimensions it wrote, found among the typedefs the instance
+// declares, a type parameter's name standing for the type it has there, and
+// those beyond it `at` holds. A port written as an expression, or of an
+// interface, has no declaration of its own to read a type from.
+void RelatePortTypespecs(const RtlirModule& mod, const ModuleDecl& decl,
+                         const ScopeTypespecs& at) {
+  TypespecsByName local;
+  std::unordered_map<const DataType*, VpiObject*> ports;
+  for (VpiObject* child : at.scope->children) {
+    if (child->type == vpiTypeParameter) {
+      local[child->name] = child->param_typespec;
+    } else if (VpiIsTypespecType(child->type)) {
+      local[child->name] = child;
+    } else if (child->type == vpiPort) {
+      const RtlirPort& port = mod.ports[child->index];
+      if (port.port_expr == nullptr && !port.is_interface_port) {
+        ports[port.declared_type] = child;
+      }
+    }
+  }
+  TypespecMaker maker(at, local);
+  for (const PortDecl& written : decl.ports) {
+    auto it = ports.find(&written.data_type);
+    if (it == ports.end()) continue;
+    HangIfMade(it->second, maker.Of(written.data_type, written.unpacked_dims,
+                                    std::string_view{}, it->second));
+  }
+}
+
 // §37.10 detail 1: a package is an instance too, whose typedefs are its
 // typespecs, answered in `answered` under the package's name and "::" for a
 // scope that imports them (§26.3) to reach.
@@ -595,6 +630,29 @@ VpiObjectMap AttachTypespecs(const RtlirDesign* design,
     MakeClassTypespecs(*key.first, defn, key.second, kDesign, answered);
   }
   return answered;
+}
+
+void AttachPortTypespecs(const RtlirDesign* design, const VpiObjectMap& objects,
+                         const VpiObjectMap& outer,
+                         const VpiClassDefnObjects& classes, SimContext& ctx,
+                         const VpiAttachBuild& build) {
+  // §37.14 (figure): a port reaches the typespec of its type through
+  // vpiTypespec, which reached nothing for every port.
+  VpiTypespecShapes shapes(build);
+  const DesignTypespecs kDesign{build, ctx, shapes, classes, objects};
+  WalkInstanceObjects(
+      design, objects,
+      [&](const RtlirModule* mod, const std::string& prefix,
+          VpiObject* instance) {
+        const ModuleDecl* decl =
+            ElementNamed(*design->compilation_unit, mod->name);
+        if (decl == nullptr) return;
+        InstancePrefixOverride in_instance(ctx.InstancePrefixOverride(),
+                                           prefix.empty() ? "" : prefix + ".");
+        RelatePortTypespecs(
+            *mod, *decl,
+            {instance, prefix, &mod->enum_types, outer, mod->imports, kDesign});
+      });
 }
 
 }  // namespace delta

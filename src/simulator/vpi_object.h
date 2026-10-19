@@ -644,16 +644,16 @@ struct VpiObject {
   // §37.28: the parameter / param assign figure properties and designated
   // relation targets that the generic child-by-type walk cannot serve.
   // `local_param` backs the parameter's vpiLocalParam Boolean (whether it is a
-  // localparam). `conn_by_name` backs a param assign's vpiConnByName Boolean
-  // (whether the override connects by name). `param_default` is the vpiExpr
-  // target - a value parameter's default value expression or a type parameter's
-  // default typespec (detail 3). `param_typespec` is a type parameter's
-  // vpiTypespec target - the typespec it resolved to at the end of elaboration,
-  // kept without typedef-alias resolution (detail 2). `explicit_param_range`
-  // records whether a value parameter was declared with an explicit range; when
-  // false, vpiLeftRange and vpiRightRange both report a null handle (detail 5).
-  // `param_left_range` and `param_right_range` hold the range-bound expressions
-  // for a parameter that does have an explicit range.
+  // localparam). `conn_by_name` backs vpiConnByName, whether a param assign's
+  // override or a port (§37.14) connects by name. `param_default` is the
+  // vpiExpr target - a value parameter's default value expression or a type
+  // parameter's default typespec (detail 3). `param_typespec` is a type
+  // parameter's vpiTypespec target - the typespec it resolved to at the end of
+  // elaboration, kept without typedef-alias resolution (detail 2).
+  // `explicit_param_range` records whether a value parameter was declared with
+  // an explicit range; when false, vpiLeftRange and vpiRightRange both report a
+  // null handle (detail 5). `param_left_range` and `param_right_range` hold the
+  // range-bound expressions for a parameter that does have an explicit range.
   bool local_param = false;
   bool conn_by_name = false;
   VpiObject* param_default = nullptr;

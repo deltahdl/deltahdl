@@ -419,6 +419,7 @@ static void BuildBoundPortBindings(const ModuleItem* item,
   const auto& child_ports = resolved->ports;
   const bool kIsOrdered =
       !item->inst_ports.empty() && item->inst_ports[0].first.empty();
+  inst.ports_by_name = !kIsOrdered;
   for (size_t i = 0; i < item->inst_ports.size(); ++i) {
     const auto& [port_name, conn_expr] = item->inst_ports[i];
     RtlirPortBinding binding;

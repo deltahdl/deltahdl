@@ -3,6 +3,7 @@
 #include <deque>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -533,5 +534,111 @@ TEST_F(PortContext, APortBitReachesItsPortThroughParent) {
   bit.parent = &port;
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiParent, VpiHandleOf(&bit))), &port);
 }
+
+// Detail 1: a port's type follows its formal, an interface port for one of an
+// interface type, a modport port for one naming a modport too, and a port for
+// any other (#7045). An interface port reaches no typespec, no interface
+// typespec being built (#7120).
+TEST_F(PortsOfARun, APortsTypeFollowsItsFormal) {
+  Run("interface bus; logic d; modport mp(input d); endinterface\n"
+      "module sub(bus b, bus.mp m, input logic a); endmodule\n"
+      "module top; bus i(); sub u(.b(i), .m(i), .a(1'b0)); endmodule\n");
+  for (const auto& [name, type] : std::vector<std::pair<const char*, int>>{
+           {"b", vpiInterfacePort}, {"m", vpiModportPort}, {"a", vpiPort}}) {
+    vpiHandle port = PortOfU(name);
+    ASSERT_NE(port, nullptr) << name;
+    EXPECT_EQ(vpi_get(vpiPortType, port), type) << name;
+  }
+  EXPECT_EQ(vpi_handle(vpiTypespec, PortOfU("b")), nullptr);
+}
+
+// §37.14 (figure) with detail 8: a port written .name(expr) is explicitly
+// named, and one written as a bare name is not (#7046). The first, having no
+// declaration of its own, reaches no typespec yet (#7344).
+TEST_F(PortsOfARun, APortWrittenWithItsOwnNameIsExplicitlyNamed) {
+  Run("module sub(.p(a), b); input a; input b; endmodule\n"
+      "module top; wire w, v; sub u(.p(w), .b(v)); endmodule\n");
+  vpiHandle p = PortOfU("p");
+  vpiHandle b = PortOfU("b");
+  ASSERT_NE(p, nullptr);
+  ASSERT_NE(b, nullptr);
+  EXPECT_EQ(vpi_get(vpiExplicitName, p), 1);
+  EXPECT_EQ(vpi_get(vpiExplicitName, b), 0);
+  EXPECT_EQ(vpi_handle(vpiTypespec, p), nullptr);
+}
+
+// §37.14 (figure): a port connected through a named list, .a(w) or .*, is
+// connected by name; one connected through an ordered list, or left
+// unconnected, is not (#7047).
+TEST_F(PortsOfARun, APortConnectedByNameSaysSo) {
+  Run("module sub(input logic a, input logic b); endmodule\n"
+      "module top; logic a, b;\n"
+      "  sub u(.a(a), .b()); sub v(a, b); sub z(.*);\n"
+      "endmodule\n");
+  const std::vector<std::tuple<const char*, const char*, int>> kExpected{
+      {"top.u", "a", 1}, {"top.u", "b", 0}, {"top.v", "a", 0},
+      {"top.v", "b", 0}, {"top.z", "a", 1}, {"top.z", "b", 1}};
+  for (const auto& [inst, name, by_name] : kExpected) {
+    vpiHandle port = Named(vpiPort, By(inst), name);
+    ASSERT_NE(port, nullptr) << inst << "." << name;
+    EXPECT_EQ(vpi_get(vpiConnByName, port), by_name) << inst << "." << name;
+  }
+}
+
+// §37.14 (figure) with §37.13 detail 1: a port passed by reference has the
+// direction vpiRef (#7049).
+TEST_F(PortsOfARun, ARefPortsDirectionIsRef) {
+  Run("module sub(ref int r, input int i); endmodule\n"
+      "module top; int x, y; sub u(.r(x), .i(y)); endmodule\n");
+  vpiHandle r = PortOfU("r");
+  vpiHandle i = PortOfU("i");
+  ASSERT_NE(r, nullptr);
+  ASSERT_NE(i, nullptr);
+  EXPECT_EQ(vpi_get(vpiDirection, r), vpiRef);
+  EXPECT_EQ(vpi_get(vpiDirection, i), vpiInput);
+}
+
+// The kind of the typespec `port` reaches, 0 for none.
+int TypespecKindOf(vpiHandle port) {
+  vpiHandle typespec = vpi_handle(vpiTypespec, port);
+  return typespec == nullptr ? 0 : vpi_get(vpiType, typespec);
+}
+
+// §37.14 (figure): a port reaches the typespec of the type it was declared
+// with: a typedef's, the compilation unit's or its module's own, a keyword's,
+// the array typespec of its unpacked dimensions, and the one a type parameter
+// has in the instance, its packed dimensions evaluated there (#7048).
+TEST_F(PortsOfARun, APortReachesTheTypespecOfItsType) {
+  Run("typedef logic [3:0] nib_t;\n"
+      "module sub #(parameter W = 2, parameter type T = int)\n"
+      "  (input nib_t a, input int b, input logic [1:0] c [2],\n"
+      "   output byte d, input e, input logic [W-1:0] f, input T g);\n"
+      "endmodule\n"
+      "module loc(h); typedef bit [5:0] six_t; input six_t h; endmodule\n"
+      "module top; nib_t w; int x; logic [1:0] y [2]; byte z; wire q;\n"
+      "  logic [3:0] r; shortint s; bit [5:0] t;\n"
+      "  sub #(.W(4), .T(shortint)) u(w, x, y, z, q, r, s);\n"
+      "  loc l(t);\n"
+      "endmodule\n");
+  vpiHandle a = vpi_handle(vpiTypespec, PortOfU("a"));
+  ASSERT_NE(a, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, a), "nib_t");
+  EXPECT_EQ(TypespecKindOf(PortOfU("b")), vpiIntTypespec);
+  EXPECT_EQ(TypespecKindOf(PortOfU("c")), vpiArrayTypespec);
+  EXPECT_EQ(TypespecKindOf(PortOfU("d")), vpiByteTypespec);
+  EXPECT_EQ(TypespecKindOf(PortOfU("e")), vpiLogicTypespec);
+  EXPECT_EQ(vpi_handle_by_index(PortOfU("e"), 0), nullptr);
+  vpiHandle f = vpi_handle(vpiTypespec, PortOfU("f"));
+  ASSERT_NE(f, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, f), vpiLogicTypespec);
+  const std::vector<vpiHandle> kRanges = ObjectsOf(vpiRange, f);
+  ASSERT_EQ(kRanges.size(), 1U);
+  EXPECT_EQ(vpi_get(vpiSize, kRanges[0]), 4);
+  EXPECT_EQ(TypespecKindOf(PortOfU("g")), vpiShortIntTypespec);
+  vpiHandle h = vpi_handle(vpiTypespec, Named(vpiPort, By("top.l"), "h"));
+  ASSERT_NE(h, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, h), "six_t");
+}
+
 }  // namespace
 }  // namespace delta

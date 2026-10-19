@@ -65,7 +65,8 @@ void ConnectLowConns(VpiHandle module, const std::string& instance,
 // instance holding the instantiation, and its lower connection the instance's
 // own net or variable of the port's name. A port the instantiation leaves
 // unconnected reaches no higher connection, though the elaborator supplies its
-// default, a pull or 'z in its place.
+// default, a pull or 'z in its place. A port a named list connects, .a(w) or
+// .*, is connected by name (§37.14).
 void ConnectPorts(const RtlirModuleInst& inst, const VpiExprNames& names,
                   SimContext& ctx, const VpiAttachBuild& build) {
   const VpiObjectMap& objects = names.objects;
@@ -79,6 +80,7 @@ void ConnectPorts(const RtlirModuleInst& inst, const VpiExprNames& names,
         binding.unconnected
             ? nullptr
             : VpiGenBlockExpression(binding.connection, names, ctx, build);
+    port->conn_by_name = inst.ports_by_name && !binding.unconnected;
   }
   ConnectLowConns(module, kInstance, objects, build);
 }

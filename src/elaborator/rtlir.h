@@ -97,6 +97,7 @@ struct RtlirPort {
   NetType net_type = NetType::kNone;
   bool is_interconnect = false;
   bool is_interface_port = false;
+  bool is_explicit_named = false;  // §23.2.2: written .name(expr).
   std::string_view interface_type_name;
   // §23.2.2.4: the default value of an input port, which an instantiation that
   // leaves the port unconnected takes as its connection. Null for every other
@@ -631,7 +632,8 @@ struct RtlirModuleInst {
   std::vector<RtlirPortBinding> port_bindings;
   std::vector<ResolvedAttribute> attrs;
   bool is_bound = false;
-  InstArrayElement array;  // the instance array it belongs to, if any
+  bool ports_by_name = false;  // §23.3.2.2 to §23.3.2.4: no ordered list.
+  InstArrayElement array;      // the instance array it belongs to, if any
   // §23.4: this instance's module, program or interface was declared inside
   // the instantiating module, so the outer name space is visible to the inner
   // module; one merely instantiated here meets the §23.9 module boundary.

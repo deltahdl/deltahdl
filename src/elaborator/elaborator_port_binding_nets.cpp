@@ -367,6 +367,7 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
       inst, item, parent_mod,
       inst.resolved->unconnected_drive != NetType::kWire,
       !item->inst_ports.empty() && item->inst_ports[0].first.empty()};
+  inst.ports_by_name = !kScope.is_ordered;
 
   for (size_t i = 0; i < item->inst_ports.size(); ++i) {
     if (!BindExplicitPort(kScope, i)) break;

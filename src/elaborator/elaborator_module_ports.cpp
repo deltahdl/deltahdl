@@ -398,6 +398,7 @@ static RtlirPort BuildRtlirPortBase(const PortDecl& port, bool port_is_var,
                                     DiagEngine& diag) {
   RtlirPort rp;
   rp.name = port.name;
+  rp.is_explicit_named = port.is_explicit_named;
   // §5.12: the attributes written on the port, folded against the module's
   // parameters.
   rp.attrs = ResolveAttributes(port.attrs, diag, scope);

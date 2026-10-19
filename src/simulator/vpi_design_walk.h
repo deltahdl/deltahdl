@@ -15,6 +15,7 @@
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_internal.h"
+#include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -77,14 +78,16 @@ inline VpiHandle VpiGenScopeOf(VpiHandle instance, const HierPath& path) {
 // A range object describes a dimension (§37.22), an index constant locates
 // its holder (§37.17 details 13 and 18), a gen scope array's gen var is no
 // element of the array (§37.85), an attribute is written on its holder
-// (§37.83), and an instance array's operation of its connections and its
-// param assigns are what its instantiation wrote (§37.11), so no index selects
-// any of them. One index names no element of an instance array of more
-// dimensions (§38.19), whose elements §38.20's indices name.
+// (§37.83), a typespec is the type of its holder (§37.14, §37.17), and an
+// instance array's operation of its connections and its param assigns are
+// what its instantiation wrote (§37.11), so no index selects any of them. One
+// index names no element of an instance array of more dimensions (§38.19),
+// whose elements §38.20's indices name.
 inline bool VpiIndexSelects(const VpiObject& child, int index) {
   return child.type != vpiRange && child.type != vpiConstant &&
          child.type != vpiGenVar && child.type != vpiAttribute &&
-         child.type != vpiOperation && child.type != vpiParamAssign &&
+         !VpiIsTypespecType(child.type) && child.type != vpiOperation &&
+         child.type != vpiParamAssign &&
          child.instance_facts.array_indices.size() <= 1 && child.index == index;
 }
 

@@ -30,6 +30,7 @@
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_design_attach_build.h"
+#include "simulator/vpi_design_attach_typespecs.h"
 #include "simulator/vpi_design_viewports.h"
 #include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_globals.h"
@@ -124,9 +125,9 @@ VpiHandle VpiContext::DesignObjectForFlatName(std::string_view flat_name) {
 
 namespace {
 
-// §37.14: the vpiDirection a declared port reports. A port declared with no
-// direction, and §13's ref direction, which the diagram's port has no value
-// for, report none.
+// §37.14: the vpiDirection a declared port reports, vpiRef for one passed by
+// reference as §37.13 detail 1 has its io decl report. A port declared with no
+// direction reports none.
 int VpiPortDirectionOf(Direction direction) {
   switch (direction) {
     case Direction::kInput:
@@ -135,6 +136,8 @@ int VpiPortDirectionOf(Direction direction) {
       return kVpiOutput;
     case Direction::kInout:
       return kVpiInout;
+    case Direction::kRef:
+      return vpiRef;
     default:
       return 0;
   }
@@ -144,7 +147,9 @@ int VpiPortDirectionOf(Direction direction) {
 // relation reaches. `index` is the position the module declared it in, which
 // detail 9 has vpiPortIndex report and which starts at zero, and `size` is the
 // width detail 6 has vpiScalar and vpiVector read -- whether the port itself is
-// one bit wide or wider, whatever is connected to it.
+// one bit wide or wider, whatever is connected to it. Detail 1 has its type
+// follow the formal, a modport port's naming a modport of its interface, and
+// detail 8 has it say whether it was written with a name of its own.
 void FillPortObject(VpiObject* obj, const RtlirPort& port, int index,
                     VpiHandle module, std::deque<std::string>& names) {
   obj->type = kVpiPort;
@@ -153,6 +158,9 @@ void FillPortObject(VpiObject* obj, const RtlirPort& port, int index,
   obj->index = index;
   obj->size = static_cast<int>(port.width);
   obj->direction = VpiPortDirectionOf(port.direction);
+  obj->port_type = VpiPortTypeFromFormal(
+      port.is_interface_port, !port.declared_type->modport_name.empty());
+  obj->explicit_name = port.is_explicit_named;
   obj->parent = module;
   module->children.push_back(obj);
 }
@@ -409,6 +417,8 @@ void VpiContext::AttachDesignPorts(const RtlirDesign* design) {
   VpiShapeDeferredCalls(design, object_map_, deferred, CallBuild(), kBuild);
   // §37.83: the attributes each port is written with.
   AttachPortAttributes(design, object_map_, *sim_ctx_, kBuild);
+  AttachPortTypespecs(design, object_map_, call_objects_.unit_typespecs,
+                      call_objects_.classes, *sim_ctx_, kBuild);
 }
 
 namespace {

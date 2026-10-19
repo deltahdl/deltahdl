@@ -528,7 +528,8 @@ int VpiGetSimplePropertyA(int property, VpiHandle obj, bool& handled) {
     case vpiLocalParam:
       return VpiBool(obj->local_param || VpiIsGenScopeLocalParam(obj));
     // §37.28: a param assign reports whether the override connects by name (as
-    // opposed to by position) through the vpiConnByName Boolean property.
+    // opposed to by position) through the vpiConnByName Boolean property, and
+    // §37.14 a port whether the instantiation connects it by name.
     case vpiConnByName:
       return VpiBool(obj->conn_by_name);
     // §37.3.7: declared lifetime as a Boolean (0 static, 1 non-static). A
