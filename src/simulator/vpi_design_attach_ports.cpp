@@ -218,7 +218,7 @@ void ConnectPorts(const RtlirModuleInst& inst, VpiHandle writer,
                   const VpiAttachBuild& build) {
   const VpiObjectMap& objects = names.objects;
   const std::string kInstance = VpiFlatName(names.prefix, inst.inst_name);
-  VpiHandle module = FindObjectForFlatName(objects, kInstance);
+  VpiHandle module = VpiChildInstanceObject(objects, writer, kInstance, inst);
   if (module == nullptr) return;
   for (const RtlirPortBinding& binding : inst.port_bindings) {
     VpiObject* port = PortNamed(module, binding.port_name);

@@ -493,5 +493,37 @@ TEST_F(RefObjsOfARun, VpiTypespecIsTheVariablesForAVariableActual) {
             nullptr);
 }
 
+// The ref objs of a run in which a module passes its interface port down to an
+// instance a generate block of it holds, which passes it on to one of its own.
+class RefObjsThroughAGenerateBlock : public RefObjsOfARun {
+ protected:
+  void SetUp() override {
+    VpiDesignRun::SetUp();
+    Run("interface simple; logic req, gnt; endinterface\n"
+        "module c1(simple s); endmodule\n"
+        "module child1(simple s); c1 c_1(s); endmodule\n"
+        "module child4(simple s); if (1) begin : gb child1 c_g(s); end\n"
+        "endmodule\n"
+        "module top; simple i(); child4 i7(i); endmodule\n");
+  }
+};
+
+// §25.3 with §27.4 and D2: an interface port passed into a generate block is
+// the higher connection of the port it reaches there, and of the one that
+// instance passes it on to, each port's own ref obj bound to the interface the
+// module is connected to (#7351).
+TEST_F(RefObjsThroughAGenerateBlock, AnInterfacePortReachesThePortsBelowIt) {
+  vpiHandle s = ConnOf(vpiLowConn, "top.i7", "s");
+  ASSERT_NE(s, nullptr);
+  EXPECT_EQ(VpiObjectOf(ConnOf(vpiHighConn, "top.i7.gb.c_g", "s")),
+            VpiObjectOf(s));
+  vpiHandle inner = ConnOf(vpiLowConn, "top.i7.gb.c_g", "s");
+  ASSERT_NE(inner, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiActual, inner)),
+            VpiObjectOf(By("top.i")));
+  EXPECT_EQ(VpiObjectOf(ConnOf(vpiHighConn, "top.i7.gb.c_g.c_1", "s")),
+            VpiObjectOf(inner));
+}
+
 }  // namespace
 }  // namespace delta

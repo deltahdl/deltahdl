@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -194,11 +195,32 @@ void WalkInstancePaths(const RtlirDesign* design, Visit visit) {
   }
 }
 
+// The object the run built for `child`, the instance keyed under `path` that
+// the scope `parent` holds. §23.6 with §37.85: an instance a generate block
+// holds is moved under the block's gen scope and named as written
+// (AttachGenBlockInstances), and only the first component of a flat name is
+// kept among `objects`, so below another instance its path, `i7.gb_c_g`, and
+// the paths of the instances inside it name nothing once it has moved. Each is
+// then found under its parent's object instead.
+inline VpiHandle VpiChildInstanceObject(
+    const std::unordered_map<std::string_view, VpiObject*>& objects,
+    VpiHandle parent, const std::string& path, const RtlirModuleInst& child) {
+  if (VpiHandle flat = FindObjectForFlatName(objects, path)) return flat;
+  VpiHandle scope =
+      parent == nullptr ? nullptr : VpiGenScopeOf(parent, child.gen_block_path);
+  return scope == nullptr ? nullptr
+                          : ChildNamed(scope, child.gen_block_path.empty()
+                                                  ? child.inst_name
+                                                  : child.simple_inst_name);
+}
+
 // The same walk, visiting each scope with the object the run built for its
 // instance among `objects`, which the first top is keyed under by its own
 // name; a design with no top is passed over. The walk runs once
 // VpiContext::AttachInstanceObjects and VpiContext::AttachTopModules have made
-// an object for every instance it visits.
+// an object for every instance it visits. Each instance's object is found
+// before its parent is visited, and through its parent's
+// (VpiChildInstanceObject).
 template <typename Visit>
 void WalkInstanceObjects(
     const RtlirDesign* design,
@@ -208,12 +230,24 @@ void WalkInstanceObjects(
       design->top_modules.front() == nullptr) {
     return;
   }
-  const std::string kFirstTop(design->top_modules.front()->name);
-  WalkInstancePaths(design, [&](const RtlirModule* mod,
-                                const std::string& prefix) {
-    visit(mod, prefix,
-          FindObjectForFlatName(objects, prefix.empty() ? kFirstTop : prefix));
-  });
+  std::vector<std::tuple<const RtlirModule*, std::string, VpiHandle>> work;
+  work.reserve(design->top_modules.size());
+  for (auto* top : design->top_modules) {
+    const bool kFirst = top == design->top_modules.front();
+    work.emplace_back(top, kFirst ? std::string() : std::string(top->name),
+                      FindObjectForFlatName(objects, top->name));
+  }
+  while (!work.empty()) {
+    auto [mod, prefix, object] = std::move(work.back());
+    work.pop_back();
+    if (mod == nullptr) continue;
+    for (const auto& child : mod->children) {
+      std::string path = VpiFlatName(prefix, child.inst_name);
+      VpiHandle found = VpiChildInstanceObject(objects, object, path, child);
+      work.emplace_back(child.resolved, std::move(path), found);
+    }
+    visit(mod, prefix, object);
+  }
 }
 
 }  // namespace delta
