@@ -337,14 +337,15 @@ void RewriteInstancePath(RtlirPortBinding& binding, const std::string& path,
   binding.connection = copy;
 }
 
-// §23.8: whether the first of `steps` is the name of the module `decl`
-// itself rather than of an instance it holds, as `top` is in `top.i` written
-// in top, which names the module the reference is written in.
-bool StartsAtOwnModule(const ModuleDecl* decl,
-                       const std::vector<ActualPathStep>& steps) {
+// §23.8: the index of the first of `steps` naming an instance held by the
+// module `decl`: 1 where the first step is the name of the module itself
+// rather than of an instance it holds, as `top` is in `top.i` written in top,
+// and 0 otherwise.
+size_t FirstInstanceStep(const ModuleDecl* decl,
+                         const std::vector<ActualPathStep>& steps) {
   const ActualPathStep& first = steps.front();
-  return !first.indexed && first.name == decl->name &&
-         FindInstanceItem(decl, first.name) == nullptr;
+  if (first.indexed || first.name != decl->name) return 0;
+  return FindInstanceItem(decl, first.name) == nullptr ? 1 : 0;
 }
 
 // §25.3 with §23.6: resolves the interface port actual `steps` names, step
@@ -357,8 +358,7 @@ void ResolveInstancePath(RtlirPortBinding& binding,
                          const InterfaceActualScope& scope) {
   const ModuleDecl* decl = scope.parent;
   std::string path;
-  for (size_t k = StartsAtOwnModule(decl, steps) ? 1 : 0; k < steps.size();
-       ++k) {
+  for (size_t k = FirstInstanceStep(decl, steps); k < steps.size(); ++k) {
     const ModuleItem* item = FindInstanceItem(decl, steps[k].name);
     decl = item == nullptr ? nullptr : scope.find_module(item->inst_module);
     if (decl == nullptr) return;
