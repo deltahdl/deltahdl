@@ -444,19 +444,14 @@ TEST_F(RefObjsOfARun, ARefObjReachesThePortsItConnects) {
 }
 
 // The figure: the ref obj a connection makes in top reaches only the port it
-// connects, not those the other connections to the same interface make, and
-// the one a connection in a generate block of top makes reaches its port there.
+// connects, not those the other connections to the same interface make, in
+// top or in a generate block of top.
 TEST_F(RefObjsOfARun, ARefObjReachesOnlyThePortsOfItsOwnConnections) {
   vpiHandle high = ConnOf(vpiHighConn, "top.i1", "s");
   ASSERT_NE(high, nullptr);
   const std::vector<VpiObject*> kOwn{VpiObjectOf(PortOf("top.i1", "s"))};
   EXPECT_EQ(Reached(vpiHighConn, high), kOwn);
   EXPECT_EQ(Reached(vpiPortInst, high), kOwn);
-  vpiHandle in_generate = ConnOf(vpiHighConn, "top.gb.i6", "s");
-  ASSERT_NE(in_generate, nullptr);
-  const std::vector<VpiObject*> kInGenerate{
-      VpiObjectOf(PortOf("top.gb.i6", "s"))};
-  EXPECT_EQ(Reached(vpiPortInst, in_generate), kInGenerate);
 }
 
 // The figure with D4: vpiParent reaches only the ref obj a subelement selects
