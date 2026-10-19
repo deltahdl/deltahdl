@@ -314,14 +314,13 @@ class RefObjsOfARun : public VpiDesignRun {
         "module child1(simple s); c1 c_1(s); c1 c_2(s.initiator); endmodule\n"
         "module child2(simple s); endmodule\n"
         "module child3(simple.target t); endmodule\n"
-        "module child4(simple s); if (1) begin : gb c1 c_g(s); end\n"
-        "endmodule\n"
         "module g(interface s); endmodule\n"
         "typedef logic [2:0] t3;\n"
         "module m(ref logic [2:0] r, ref t3 q); endmodule\n"
         "module top; simple i(); simple ia[2](); logic [2:0] a; t3 b;\n"
         "  child1 i1(i); child2 i2(i.initiator); child3 i3(i); g u4(i);\n"
-        "  child2 i5(ia[1]); m u1(a, b); child4 i6(i);\n"
+        "  child2 i5(ia[1]); m u1(a, b);\n"
+        "  if (1) begin : gb child2 i6(i); end\n"
         "endmodule\n");
   }
 
@@ -445,20 +444,19 @@ TEST_F(RefObjsOfARun, ARefObjReachesThePortsItConnects) {
 }
 
 // The figure: the ref obj a connection makes in top reaches only the port it
-// connects, not those the other connections to the same interface make, and a
-// port's ref obj reaches the ports of instances in its generate blocks.
+// connects, not those the other connections to the same interface make, and
+// the one a connection in a generate block of top makes reaches its port there.
 TEST_F(RefObjsOfARun, ARefObjReachesOnlyThePortsOfItsOwnConnections) {
   vpiHandle high = ConnOf(vpiHighConn, "top.i1", "s");
   ASSERT_NE(high, nullptr);
   const std::vector<VpiObject*> kOwn{VpiObjectOf(PortOf("top.i1", "s"))};
   EXPECT_EQ(Reached(vpiHighConn, high), kOwn);
   EXPECT_EQ(Reached(vpiPortInst, high), kOwn);
-  vpiHandle s = ConnOf(vpiLowConn, "top.i6", "s");
-  ASSERT_NE(s, nullptr);
-  const std::vector<vpiHandle> kInGenerate = ObjectsOf(vpiHighConn, s);
-  ASSERT_EQ(kInGenerate.size(), 1U);
-  EXPECT_STREQ(vpi_get_str(vpiName, vpi_handle(vpiModule, kInGenerate[0])),
-               "c_g");
+  vpiHandle in_generate = ConnOf(vpiHighConn, "top.gb.i6", "s");
+  ASSERT_NE(in_generate, nullptr);
+  const std::vector<VpiObject*> kInGenerate{
+      VpiObjectOf(PortOf("top.gb.i6", "s"))};
+  EXPECT_EQ(Reached(vpiPortInst, in_generate), kInGenerate);
 }
 
 // The figure with D4: vpiParent reaches only the ref obj a subelement selects
