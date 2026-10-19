@@ -160,26 +160,16 @@ std::string StoredKey(const RtlirModule& mod,
   return std::string(param.gen_block_prefix) + std::string(param.name);
 }
 
-// §23.6 with §27.4: `flat` in the place of `stand_in`, the scope the block's
-// own name for the instance, `g.d2`, made before the instance moved under the
-// block. The run keys what the instance declares under that name as well,
-// `g.d2.v` beside `g_d2.v` (AliasChildObjectsUnderPath in lowerer_child.cpp),
-// and the attach made a scope for each component of it. What `stand_in` holds
-// that `flat` does not becomes `flat`'s, and `stand_in` leaves the scope, so
-// the name reaches the one instance, ports and all.
-void AbsorbStandIn(VpiObject* flat, VpiObject* stand_in) {
-  for (VpiObject* child : stand_in->children) {
-    if (ChildNamed(flat, child->name) != nullptr) continue;
-    child->parent = flat;
-    flat->children.push_back(child);
-  }
-  std::erase(stand_in->parent->children, stand_in);
-}
-
 // §23.6 with §27.4 and §37.85: the instance `flat` a generate block instance
 // holds, which the run keys under a flattened name, `g_d2`, moved under the
 // block's gen scope `scope` and named as the source wrote it, `d2`, with what
-// it holds full-named through it.
+// it holds full-named through it. The run keys what the instance declares
+// under the block's own path as well, `g.d2.v` beside `g_d2.v`
+// (AliasChildObjectsUnderPath in lowerer_child.cpp), and the attach made a
+// scope for each component of such a key, so the block's scope may already
+// hold a stand-in `d2`. Everything the stand-in holds the instance holds under
+// its own key, so the stand-in leaves the scope, and the name reaches the one
+// instance, ports and all.
 void MoveIntoGenScope(VpiObject* flat, VpiObject* scope, std::string_view name,
                       const VpiNameKeeper& keep) {
   const std::string kFrom = flat->full_name;
@@ -187,9 +177,7 @@ void MoveIntoGenScope(VpiObject* flat, VpiObject* scope, std::string_view name,
   flat->parent = scope;
   flat->name = keep(std::string(name));
   Refullname(flat, kFrom, scope->full_name + "." + std::string(name));
-  if (VpiObject* stand_in = ChildNamed(scope, name)) {
-    AbsorbStandIn(flat, stand_in);
-  }
+  std::erase(scope->children, ChildNamed(scope, name));
   scope->children.push_back(flat);
 }
 
