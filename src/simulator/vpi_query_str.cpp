@@ -540,9 +540,9 @@ static const char* VpiConfigStr(VpiHandle obj) {
 static const char* VpiDecompileStr(VpiHandle obj) {
   // §37.17 detail 28: a variable decompiles to the name an expression would
   // write it by, built when it is first asked for.
-  if ((VpiIsVariablesType(obj->type) || obj->type == vpiRegBit) &&
-      obj->decompile.empty()) {
-    obj->decompile = VpiVariableDecompileOf(obj);
+  if (VpiIsVariablesType(obj->type) || obj->type == vpiRegBit) {
+    if (obj->decompile.empty()) obj->decompile = VpiVariableDecompileOf(obj);
+    return obj->decompile.c_str();
   }
   if (!VpiIsExprType(obj->type) && obj->type != vpiSysTaskCall) return nullptr;
   return obj->decompile.empty() ? nullptr : obj->decompile.c_str();
