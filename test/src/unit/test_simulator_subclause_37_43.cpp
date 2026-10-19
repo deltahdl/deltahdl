@@ -151,6 +151,7 @@ TEST(FrameModel, ThreadEdgeIsConsistentWithThreadFrameEdge) {
   thread.type = vpiThread;
   VpiObject frame;
   frame.type = vpiFrame;
+  frame.active = true;
 
   thread.children = {&frame};
   frame.children = {&thread};

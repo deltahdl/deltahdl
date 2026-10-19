@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -11,6 +12,7 @@
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_data_structs.h"
 #include "simulator/vpi_design_attach.h"
+#include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_object.h"
@@ -52,6 +54,21 @@ VpiHandle VpiContext::ThreadObjectFor(Process* proc) {
   // which end with it.
   obj->body = VpiStmtObjectFor(stmt_objects_, proc->origin, proc->inst_prefix);
   run_objects_[proc] = obj;
+  // §37.44 (vpiParent): the thread that forked this one, made an object as
+  // well, so a thread reached through its frame reaches it; the link is the
+  // one RefreshThreadObjects makes.
+  if (sim_ctx_ != nullptr) {
+    for (Process* forking : sim_ctx_->GetScheduler().Threads()) {
+      if (std::ranges::find(forking->children, proc) ==
+          forking->children.end()) {
+        continue;
+      }
+      VpiHandle parent = ThreadObjectFor(forking);
+      obj->parent = parent;
+      parent->children.push_back(obj);
+      break;
+    }
+  }
   // §37.3.8: a thread is one of the transient objects callbacks can follow
   // through its life, and cbStartOfThread is the one that
   // reports its beginning. This is where the thread becomes an object of the

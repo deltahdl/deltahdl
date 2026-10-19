@@ -923,8 +923,6 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
   // helper documents the §37.x details for the relations it serves. When one
   // matches, its (possibly null) result is the answer; otherwise the lookup
   // falls through to the generic traversal.
-  // §37.44: a thread reaches the threads around it as the run now holds them.
-  if (ref->type == vpiThread) RefreshThreadObjects();
   // §37.48 detail 3: what a block a virtual interface var prefixes is now.
   VpiRefreshPrefixedClockingBlock(type, *ref, sim_ctx_,
                                   [this](const std::string& scope) {

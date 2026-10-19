@@ -805,6 +805,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/vpi_helpers_ref_objs.cpp
     simulator/vpi_helpers_scopes.cpp
     simulator/vpi_helpers_statements.cpp
+    simulator/vpi_helpers_threads.cpp
     simulator/vpi_helpers_timing_controls.cpp
     simulator/vpi_helpers_typespecs.cpp
     simulator/vpi_helpers_variables.cpp
