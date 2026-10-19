@@ -324,6 +324,45 @@ TEST_F(CallsWithinADesign, AFunctionBodysCallBuildsEachArgumentKind) {
   EXPECT_EQ(vpi_get(vpiConstType, g_args_seen[5]), vpiStringConst);
 }
 
+// §36.8.2: the compiletf of a call written in a module two instances hold
+// runs before either is active, when no one statement of the model is the
+// call, so the call it is given builds each argument of its own as the kind of
+// expression its actual is (§37.58, §37.59): a name a package import makes
+// visible the package's variable itself, an omitted argument a null operation
+// and null a null constant (detail 8).
+TEST_F(CallsWithinADesign, ATwoInstanceCallsCompiletfBuildsItsOwnArguments) {
+  g_args_seen.clear();
+  g_arg_reads = 0;
+  s_vpi_systf_data data = {};
+  data.type = vpiSysTask;
+  data.tfname = VpiText("$kinds");
+  data.compiletf = &ArgsCalltf;
+  ASSERT_NE(vpi_register_systf(&data), nullptr);
+  Run("package pk; int v; endpackage\n"
+      "module child; import pk::*; int a;\n"
+      "  function int f(int x); return x; endfunction\n"
+      "  function int g();\n"
+      "    $kinds(v, f(1), $clog2(4), 1, '1, 1.5, \"s\", a + 1, , null);\n"
+      "    return 0;\n"
+      "  endfunction\n"
+      "endmodule\n"
+      "module top; child u1 (), u2 (); endmodule\n");
+  std::vector<int> kinds;
+  kinds.reserve(g_args_seen.size());
+  for (vpiHandle arg : g_args_seen) kinds.push_back(vpi_get(vpiType, arg));
+  EXPECT_EQ(kinds, (std::vector<int>{vpiRefObj, vpiFuncCall, vpiSysFuncCall,
+                                     vpiConstant, vpiConstant, vpiConstant,
+                                     vpiConstant, vpiOperation, vpiOperation,
+                                     vpiConstant}));
+  ASSERT_EQ(g_args_seen.size(), 10U);
+  EXPECT_STREQ(vpi_get_str(vpiName, g_args_seen[0]), "v");
+  EXPECT_EQ(vpi_get(vpiConstType, g_args_seen[3]), vpiIntConst);
+  EXPECT_EQ(vpi_get(vpiConstType, g_args_seen[5]), vpiRealConst);
+  EXPECT_EQ(vpi_get(vpiConstType, g_args_seen[6]), vpiStringConst);
+  EXPECT_EQ(vpi_get(vpiOpType, g_args_seen[8]), vpiNullOp);
+  EXPECT_EQ(vpi_get(vpiConstType, g_args_seen[9]), vpiNullConst);
+}
+
 // §36.8.2: the compiletf of a call a child instance's function writes runs
 // before any instance is active, and the call it is given, the statement of
 // the one instance writing it, hangs arguments of its own built as the kind of
