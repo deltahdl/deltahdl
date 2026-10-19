@@ -510,9 +510,8 @@ TEST_F(CallStatementsInAScope, ACallThroughAVirtualInterfaceIsATaskCall) {
 }
 
 // §35.5 with §37.42: a call of a function imported through DPI is a func
-// call, and a call of an imported task a task call, though no task or function
-// object stands for either (#5785). The calls never run, so the
-// run calls no foreign code.
+// call, and a call of an imported task a task call (#5785). The calls never
+// run, so the run calls no foreign code.
 TEST_F(CallStatementsInAScope, ACallOfADpiImportIsACall) {
   Run("module top;\n"
       "  import \"DPI-C\" function int c_f(int a);\n"

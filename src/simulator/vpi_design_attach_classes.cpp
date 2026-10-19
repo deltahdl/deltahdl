@@ -16,6 +16,7 @@
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_walk.h"
+#include "simulator/vpi_method_contents.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_object.h"
@@ -294,10 +295,11 @@ VpiObject* MakeProperty(const MadeClassDefn& owner, const ClassMember& member,
 // §37.31 detail 1 with §37.41: the task or function a method the class
 // declares stands as, a method of the class defn full-named through it
 // (detail 5), with the visibility it was declared with, virtual where it
-// was declared virtual or pure virtual (§8.20, §8.21), and automatic, the
-// one lifetime §8.6 gives a method.
+// was declared virtual or pure virtual (§8.20, §8.21), automatic, the one
+// lifetime §8.6 gives a method, and holding what any task or function holds.
 void MakeMethod(const MadeClassDefn& owner, const ClassMember& member,
-                SimContext& ctx, const VpiAttachBuild& build) {
+                const RtlirDesign& design, SimContext& ctx,
+                const VpiAttachBuild& build) {
   const ModuleItem* item = member.method;
   if (item == nullptr) return;
   VpiObject* method = build.alloc();
@@ -312,6 +314,13 @@ void MakeMethod(const MadeClassDefn& owner, const ClassMember& member,
   // §37.3.3: where the method was written.
   VpiRecordWrittenLocation(method, item->loc, ctx);
   owner.defn->children.push_back(method);
+  // A width a module's class writes reads the parameters of the instance, as
+  // the module's own tasks and functions do.
+  const bool kInstance = owner.mod != nullptr && !owner.prefix.empty();
+  VpiMakeMethodContents(
+      method, *item,
+      {design, owner.mod, owner.package, kInstance ? owner.prefix + "." : ""},
+      ctx, build);
 }
 
 // §37.31 detail 7 with §37.28: the parameter `name` of the class `owner` was
@@ -371,7 +380,7 @@ std::vector<ClassVarProperty> MakeMembers(
   for (const ClassMember* member : owner.decl->members) {
     if (member == nullptr) continue;
     if (member->kind == ClassMemberKind::kMethod) {
-      MakeMethod(owner, *member, ctx, build);
+      MakeMethod(owner, *member, design, ctx, build);
     } else if (member->kind == ClassMemberKind::kProperty &&
                !member->is_param) {
       VpiObject* var = MakeProperty(owner, *member, design, made, build);

@@ -20,6 +20,7 @@
 #include "simulator/vpi_declared_shape.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_walk.h"
+#include "simulator/vpi_method_contents.h"
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
@@ -55,9 +56,47 @@ struct SubroutineBuild {
   VpiSubroutineObjects& made;
 };
 
+// Whether `item` declares a task or function, or imports one through DPI
+// (§35.5.4).
 bool IsSubroutine(const ModuleItem* item) {
   return item->kind == ModuleItemKind::kTaskDecl ||
-         item->kind == ModuleItemKind::kFunctionDecl;
+         item->kind == ModuleItemKind::kFunctionDecl ||
+         item->kind == ModuleItemKind::kDpiImport;
+}
+
+// Whether the task or function `item` declares or imports is a task.
+bool IsTask(const ModuleItem& item) {
+  return item.kind == ModuleItemKind::kTaskDecl || item.dpi_is_task;
+}
+
+// §37.41 details 6 to 10: marks `tf` as the task or function the DPI import
+// or export declaration `decl` names, imported or exported, pure or context as
+// an import declares it (§35.5.1.3), of the flavor its specification string
+// names, and linking to the C name it writes or, where it writes none, to its
+// own name (§35.5.4).
+void MarkDpi(VpiObject* tf, const ModuleItem& decl) {
+  tf->is_dpi = true;
+  tf->dpi_export = decl.kind == ModuleItemKind::kDpiExport;
+  tf->dpi_pure = decl.dpi_is_pure;
+  tf->dpi_context = decl.dpi_is_context;
+  tf->is_dpi_c = decl.dpi_spec_string == "DPI-C";
+  tf->dpi_c_identifier =
+      std::string(decl.dpi_c_name.empty() ? decl.name : decl.dpi_c_name);
+}
+
+// §35.7: marks as exported each task or function of `scope` that an export
+// declaration among `items` names, an export naming one its own scope
+// declares.
+void MarkDpiExports(VpiObject* scope, const std::vector<ModuleItem*>& items) {
+  if (scope == nullptr) return;
+  for (const ModuleItem* item : items) {
+    if (item->kind != ModuleItemKind::kDpiExport) continue;
+    for (VpiObject* child : scope->children) {
+      const bool kTaskFunc =
+          child->type == vpiTask || child->type == vpiFunction;
+      if (kTaskFunc && child->name == item->name) MarkDpi(child, *item);
+    }
+  }
 }
 
 // §8.24: whether `item` is the body of a method written outside its class,
@@ -215,10 +254,7 @@ void MakeReturnVariable(VpiObject* tf, const ModuleItem& item,
                         const SubroutineScope& where,
                         const SubroutineBuild& sb) {
   const DataType& type = item.return_type;
-  if (item.kind != ModuleItemKind::kFunctionDecl ||
-      type.kind == DataTypeKind::kVoid) {
-    return;
-  }
+  if (IsTask(item) || type.kind == DataTypeKind::kVoid) return;
   VpiObject* ret = sb.build.alloc();
   ret->type = DeclaredVariableKind(type, !item.return_array_dims.empty(), where,
                                    sb.design);
@@ -277,11 +313,12 @@ void MakeBodyVariables(VpiObject* tf, const ModuleItem& item,
 VpiObject* MakeSubroutine(const SubroutineScope& where, const ModuleItem* item,
                           const SubroutineBuild& sb) {
   VpiObject* tf = sb.build.alloc();
-  tf->type = item->kind == ModuleItemKind::kTaskDecl ? vpiTask : vpiFunction;
+  tf->type = IsTask(*item) ? vpiTask : vpiFunction;
   tf->name = sb.build.keep(std::string(item->name));
   tf->full_name = VpiScopedFullName(where.scope, item->name);
   tf->parent = where.scope;
   tf->automatic = item->is_automatic || (where.automatic && !item->is_static);
+  if (item->kind == ModuleItemKind::kDpiImport) MarkDpi(tf, *item);
   if (where.scope != nullptr) where.scope->children.push_back(tf);
   sb.made[{item, where.key}] = tf;
   // §37.3.3: where the task or function was written.
@@ -315,6 +352,10 @@ void MakeScopeSubroutines(const SubroutineBuild& sb, const RtlirModule& mod,
     MakeSubroutine({block, block->full_name, kAutomatic, &mod, kParams},
                    sub.decl, sb);
   }
+  for (const ModuleItem* item : mod.dpi_import_decls) {
+    MakeSubroutine({scope, prefix, kAutomatic, &mod, kParams}, item, sb);
+  }
+  MarkDpiExports(scope, mod.dpi_export_decls);
 }
 
 // The tasks and functions each module instance declares.
@@ -346,6 +387,7 @@ void MakePackageSubroutines(const SubroutineBuild& sb,
         MakeSubroutine(kWhere, item, sb);
       }
     }
+    MarkDpiExports(kWhere.scope, pkg->items);
   }
 }
 
@@ -362,6 +404,16 @@ void MakeUnitSubroutines(const SubroutineBuild& sb,
     if (!item->method_class.empty()) continue;
     MakeSubroutine(kWhere, item, sb)->in_compilation_unit = true;
   }
+  if (sb.design.compilation_unit == nullptr) return;
+  // §35.5.4: what the unit imports through DPI, which its list of functions
+  // leaves out.
+  const std::vector<ModuleItem*>& items = sb.design.compilation_unit->cu_items;
+  for (const ModuleItem* item : items) {
+    if (item->kind == ModuleItemKind::kDpiImport) {
+      MakeSubroutine(kWhere, item, sb)->in_compilation_unit = true;
+    }
+  }
+  MarkDpiExports(kWhere.scope, items);
 }
 
 // The task or function `decls` declare under `name`, null where they declare
@@ -380,6 +432,19 @@ const ModuleItem* DpiImportNamed(const RtlirModule& mod,
                                  std::string_view name) {
   for (const ModuleItem* item : mod.dpi_import_decls) {
     if (item->name == name) return item;
+  }
+  return nullptr;
+}
+
+// §35.5.4: the task or function the compilation unit of `design` imports
+// through DPI under `name`, null for none.
+const ModuleItem* UnitDpiImportNamed(const RtlirDesign& design,
+                                     std::string_view name) {
+  if (design.compilation_unit == nullptr) return nullptr;
+  for (const ModuleItem* item : design.compilation_unit->cu_items) {
+    if (item->kind == ModuleItemKind::kDpiImport && item->name == name) {
+      return item;
+    }
   }
   return nullptr;
 }
@@ -448,6 +513,28 @@ VpiSubroutineObjects AttachSubroutines(const RtlirDesign& design,
   MakePackageSubroutines(kBuild, objects);
   MakeUnitSubroutines(kBuild, objects);
   return made;
+}
+
+void VpiMakeMethodContents(VpiObject* method, const ModuleItem& item,
+                           const VpiMethodScope& where, SimContext& ctx,
+                           const VpiAttachBuild& build) {
+  const PackageDecl* package = nullptr;
+  for (const PackageDecl* decl : where.design.packages) {
+    if (decl->name == where.package) package = decl;
+  }
+  // A method is reached through its class defn, so nothing files it among the
+  // tasks and functions a call finds by declaration.
+  VpiSubroutineObjects unfiled;
+  const SubroutineBuild kBuild{where.design, ctx, build, unfiled};
+  const SubroutineScope kWhere{method->parent, "",           true,
+                               where.mod,      where.params, package};
+  InstancePrefixOverride scope(ctx.InstancePrefixOverride(), where.params);
+  MakeIoDecls(method, item, kWhere, kBuild);
+  MakeReturnVariable(method, item, kWhere, kBuild);
+  MakeBodyVariables(
+      method,
+      item.out_of_block_body != nullptr ? *item.out_of_block_body : item,
+      kWhere, kBuild);
 }
 
 VpiCalledSubroutine VpiPackageSubroutine(const RtlirDesign& design,
@@ -552,19 +639,26 @@ VpiCalledSubroutine VpiNamedSubroutine(const VpiCallSite& site,
           SubroutineNamed(site.design.cu_function_decls, name)) {
     return Called(found, "$unit", site.made);
   }
+  if (const ModuleItem* found = UnitDpiImportNamed(site.design, name)) {
+    return Called(found, "$unit", site.made);
+  }
   for (const RtlirImport& entry : site.mod.imports) {
     if (!entry.is_wildcard && entry.item_name != name) continue;
     called =
         VpiPackageSubroutine(site.design, entry.package_name, name, site.made);
     if (called.decl != nullptr) return called;
   }
+  // §35.5.4: a task or function the module imports through DPI.
+  if (const ModuleItem* found = DpiImportNamed(site.mod, name)) {
+    return Called(found, site.prefix, site.made);
+  }
   // A generate block's task or function written where no block enclosing the
-  // call declares it still says what kind of call names it, and so does a
-  // task or function the module imports through DPI (§35.5), which no task or
-  // function object stands for.
-  const ModuleItem* local = SubroutineNamed(site.mod.function_decls, name);
-  if (local == nullptr) local = DpiImportNamed(site.mod, name);
-  if (local != nullptr) return {local, nullptr};
+  // call declares it still says what kind of call names it, though no task or
+  // function object stands for it there.
+  if (const ModuleItem* local =
+          SubroutineNamed(site.mod.function_decls, name)) {
+    return {local, nullptr};
+  }
   return EnclosingSubroutine(site, name);
 }
 

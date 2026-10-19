@@ -631,6 +631,140 @@ TEST_F(TaskFuncsOfARun, ACompilationUnitFunctionIsTheUnits) {
   EXPECT_EQ(vpi_handle_by_name(VpiText("f"), unit), nullptr);
 }
 
+// #7153: a task or function imported through DPI (§35.5) is a task or
+// function of the module declaring the import, holding the io decls and the
+// return variable its prototype declares, and the object a call of it
+// reaches...
+TEST_F(TaskFuncsOfARun, ADpiImportIsATaskOrFunctionOfItsModule) {
+  Run("module top;\n"
+      "  import \"DPI-C\" function int c_f(input int a);\n"
+      "  import \"DPI-C\" task c_t();\n"
+      "  initial if (0) begin : b void'(c_f(1)); end\n"
+      "endmodule\n");
+  vpiHandle f = Named(vpiTaskFunc, By("top"), "c_f");
+  ASSERT_NE(f, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, f), vpiFunction);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, f), "top.c_f");
+  EXPECT_EQ(NamesOf(vpiIODecl, f), (std::vector<std::string>{"a"}));
+  EXPECT_EQ(vpi_get(vpiType, vpi_handle(vpiReturn, f)), vpiIntVar);
+  EXPECT_EQ(vpi_get(vpiSize, f), 32);
+  vpiHandle t = Named(vpiTaskFunc, By("top"), "c_t");
+  ASSERT_NE(t, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, t), vpiTask);
+  EXPECT_EQ(vpi_handle(vpiReturn, t), nullptr);
+  const std::vector<vpiHandle> kCalls = ObjectsOf(vpiFuncCall, By("top.b"));
+  ASSERT_EQ(kCalls.size(), 1U);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiFunction, kCalls[0])), VpiObjectOf(f));
+}
+
+// ...and one a package or the compilation unit imports is the package's or
+// the unit's, which a module's call of it reaches.
+TEST_F(TaskFuncsOfARun, ADpiImportOfAPackageOrTheUnitIsTheirs) {
+  Run("int n = 0;\n"
+      "import \"DPI-C\" function int u_f();\n"
+      "package p; import \"DPI-C\" function int p_f(); endpackage\n"
+      "module top; initial if (0) begin : b void'(u_f()); end endmodule\n");
+  vpiHandle p_f = Named(vpiTaskFunc, By("p"), "p_f");
+  ASSERT_NE(p_f, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, p_f), "p::p_f");
+  vpiHandle unit = Named(vpiPackage, nullptr, "$unit");
+  ASSERT_NE(unit, nullptr);
+  vpiHandle u_f = Named(vpiTaskFunc, unit, "u_f");
+  ASSERT_NE(u_f, nullptr);
+  EXPECT_EQ(vpi_get(vpiAccessType, u_f), vpiDPIImportAcc);
+  const std::vector<vpiHandle> kCalls = ObjectsOf(vpiFuncCall, By("top.b"));
+  ASSERT_EQ(kCalls.size(), 1U);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiFunction, kCalls[0])), VpiObjectOf(u_f));
+}
+
+// #7152, details 6 to 10: an import reports vpiDPIImportAcc, pure or context
+// as declared, the DPI flavor its specification string names and the C name
+// it links to, written or defaulted to its own (§35.5.4); an exported function
+// reports vpiDPIExportAcc and its export's C name (§35.7); a function neither
+// imported nor exported reports none of them.
+TEST_F(TaskFuncsOfARun, ADpiTaskOrFunctionReportsItsDpiProperties) {
+  Run("module top;\n"
+      "  import \"DPI-C\" pure function int p_f(int a);\n"
+      "  import \"DPI-C\" context c_name = function int c_f();\n"
+      "  import \"DPI\" task d_t();\n"
+      "  function int e_f(); return 1; endfunction\n"
+      "  export \"DPI-C\" e_name = function e_f;\n"
+      "  function int s_f(); return 1; endfunction\n"
+      "endmodule\n");
+  vpiHandle p_f = Named(vpiTaskFunc, By("top"), "p_f");
+  vpiHandle c_f = Named(vpiTaskFunc, By("top"), "c_f");
+  vpiHandle d_t = Named(vpiTaskFunc, By("top"), "d_t");
+  vpiHandle e_f = Named(vpiTaskFunc, By("top"), "e_f");
+  vpiHandle s_f = Named(vpiTaskFunc, By("top"), "s_f");
+  ASSERT_NE(p_f, nullptr);
+  ASSERT_NE(c_f, nullptr);
+  ASSERT_NE(d_t, nullptr);
+  EXPECT_EQ(vpi_get(vpiAccessType, p_f), vpiDPIImportAcc);
+  EXPECT_EQ(vpi_get(vpiDPIPure, p_f), 1);
+  EXPECT_EQ(vpi_get(vpiDPIContext, p_f), 0);
+  EXPECT_EQ(vpi_get(vpiDPICStr, p_f), vpiDPIC);
+  EXPECT_STREQ(vpi_get_str(vpiDPICIdentifier, p_f), "p_f");
+  EXPECT_EQ(vpi_get(vpiDPIPure, c_f), 0);
+  EXPECT_EQ(vpi_get(vpiDPIContext, c_f), 1);
+  EXPECT_STREQ(vpi_get_str(vpiDPICIdentifier, c_f), "c_name");
+  EXPECT_EQ(vpi_get(vpiDPICStr, d_t), vpiDPI);
+  EXPECT_EQ(vpi_get(vpiAccessType, e_f), vpiDPIExportAcc);
+  EXPECT_EQ(vpi_get(vpiDPICStr, e_f), vpiDPIC);
+  EXPECT_STREQ(vpi_get_str(vpiDPICIdentifier, e_f), "e_name");
+  EXPECT_NE(vpi_get(vpiAccessType, s_f), vpiDPIImportAcc);
+  EXPECT_NE(vpi_get(vpiAccessType, s_f), vpiDPIExportAcc);
+  EXPECT_EQ(vpi_get_str(vpiDPICIdentifier, s_f), nullptr);
+}
+
+// #7151, details 1 to 3 and 12 with the figure: a class's method holds the io
+// decls its arguments declare and, a function, the variable it returns
+// through, with the size, sign, function type and return range any function
+// has; a task returns through none.
+TEST_F(TaskFuncsOfARun, AMethodHoldsItsIoDeclsAndReturnVariable) {
+  Run("module top;\n"
+      "  class C;\n"
+      "    function logic signed [7:0] m(int a, output bit b);\n"
+      "      return a; endfunction\n"
+      "    task t(input int x); endtask\n"
+      "  endclass\n"
+      "endmodule\n");
+  vpiHandle c = Named(vpiClassDefn, By("top"), "C");
+  ASSERT_NE(c, nullptr);
+  vpiHandle m = Named(vpiMethods, c, "m");
+  ASSERT_NE(m, nullptr);
+  EXPECT_EQ(NamesOf(vpiIODecl, m), (std::vector<std::string>{"a", "b"}));
+  EXPECT_EQ(vpi_get(vpiDirection, Named(vpiIODecl, m, "b")), vpiOutput);
+  vpiHandle ret = vpi_handle(vpiReturn, m);
+  ASSERT_NE(ret, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, ret), vpiLogicVar);
+  EXPECT_STREQ(vpi_get_str(vpiName, ret), "m");
+  EXPECT_EQ(vpi_get(vpiSize, m), 8);
+  EXPECT_EQ(vpi_get(vpiSigned, m), 1);
+  EXPECT_EQ(vpi_get(vpiFuncType, m), vpiSizedSignedFunc);
+  EXPECT_EQ(BoundOf(vpiLeftRange, m), 7);
+  vpiHandle t = Named(vpiMethods, c, "t");
+  ASSERT_NE(t, nullptr);
+  EXPECT_EQ(NamesOf(vpiIODecl, t), (std::vector<std::string>{"x"}));
+  EXPECT_EQ(vpi_handle(vpiReturn, t), nullptr);
+}
+
+// ...a method of a package's class names the package's types (§26.3), and an
+// extern method holds the variables the body written outside its class
+// declares (§8.24).
+TEST_F(TaskFuncsOfARun, AMethodNamesItsPackagesTypesAndItsBodysVariables) {
+  Run("package pk; typedef int t;\n"
+      "  class D; extern function t e(t k); endclass\n"
+      "  function t D::e(t k); int loc; return k; endfunction\n"
+      "endpackage\n"
+      "module top; endmodule\n");
+  vpiHandle e = Named(vpiMethods, Named(vpiClassDefn, By("pk"), "D"), "e");
+  ASSERT_NE(e, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, vpi_handle(vpiReturn, e)), vpiIntVar);
+  EXPECT_EQ(vpi_get(vpiType, vpi_handle(vpiExpr, Named(vpiIODecl, e, "k"))),
+            vpiIntVar);
+  EXPECT_EQ(VariableKindOf(e, "loc"), vpiIntVar);
+}
+
 // §37.41 detail 4 and (figure): no object is no method, nor is a function with
 // no parent; and a function returning a byte, short int, long int or integer
 // is signed (§6.11), where no object is not.
