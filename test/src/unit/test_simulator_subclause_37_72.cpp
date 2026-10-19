@@ -498,10 +498,9 @@ TEST_F(CaseStatementsOfARun, AStructurePatternIsAnAssignmentPatternOperation) {
 }
 
 // The tagged pattern -> typespec arrow: a tagged pattern reaches the typespec
-// of the member it is tagged with, int's for V and a bit typespec for the
-// bit [3:0] W; none for the void N, which has no typespec yet (#7085), nor
-// where the case expression reaches no typespec, a select of an array (#7019)
-// (#7271).
+// of the member it is tagged with, int's for V, a bit typespec for the
+// bit [3:0] W and a void typespec for the void N (§37.25); none where the
+// case expression reaches no typespec, a select of an array (#7019) (#7271).
 TEST_F(CaseStatementsOfARun, ATaggedPatternReachesItsMembersTypespec) {
   Run("module top;\n"
       "  typedef union tagged { int V; bit [3:0] W; void N; } u_t;\n"
@@ -523,7 +522,8 @@ TEST_F(CaseStatementsOfARun, ATaggedPatternReachesItsMembersTypespec) {
     vpiHandle typespec = vpi_handle(vpiTypespec, conditions[0]);
     kinds.push_back(typespec == nullptr ? 0 : vpi_get(vpiType, typespec));
   }
-  EXPECT_EQ(kinds, (std::vector<int>{vpiIntTypespec, vpiBitTypespec, 0}));
+  EXPECT_EQ(kinds, (std::vector<int>{vpiIntTypespec, vpiBitTypespec,
+                                     vpiVoidTypespec}));
   const std::vector<std::vector<vpiHandle>> kSelected = ItemConditions(1);
   ASSERT_EQ(kSelected.size(), 1U);
   ASSERT_EQ(kSelected[0].size(), 1U);

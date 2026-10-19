@@ -482,7 +482,7 @@ std::string RunClassName(const VpiObject* defn) {
   std::string name(defn->name);
   for (const VpiObject* at = defn->parent;
        at != nullptr && at->type == vpiClassDefn; at = at->parent) {
-    name = std::string(at->name) + "::" + name;
+    name.insert(0, "::").insert(0, at->name);
   }
   return name;
 }
