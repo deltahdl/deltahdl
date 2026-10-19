@@ -273,10 +273,9 @@ TEST_F(ClockingBlock, HelpersGuardOnObjectKind) {
 // elaborated design rather than by hand (#4956).
 class ClockingBlocksOfARun : public VpiDesignRun {
  protected:
-  // The condition of the event control the body of top's task `name` is.
-  static vpiHandle EventOf(const char* name) {
-    vpiHandle task = Named(vpiTaskFunc, By("top"), name);
-    return vpi_handle(vpiCondition, vpi_handle(vpiStmt, task));
+  // The event control the body of top's task `name` is.
+  static vpiHandle ControlOf(const char* name) {
+    return vpi_handle(vpiStmt, Named(vpiTaskFunc, By("top"), name));
   }
 };
 
@@ -295,14 +294,18 @@ TEST_F(ClockingBlocksOfARun,
       "  task wait_bound; @(vif.cb); endtask\n"
       "  task wait_unbound; @(vu.cb); endtask\n"
       "endmodule\n");
-  vpiHandle bound = EventOf("wait_bound");
+  ASSERT_NE(Named(vpiTaskFunc, By("top"), "wait_bound"), nullptr);
+  vpiHandle control = ControlOf("wait_bound");
+  ASSERT_NE(control, nullptr);
+  ASSERT_EQ(vpi_get(vpiType, control), vpiEventControl);
+  vpiHandle bound = vpi_handle(vpiCondition, control);
   ASSERT_NE(bound, nullptr);
   EXPECT_EQ(vpi_get(vpiType, bound), vpiClockingBlock);
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiPrefix, bound)),
             VpiObjectOf(By("top.vif")));
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiActual, bound)),
             VpiObjectOf(Named(vpiClockingBlock, By("top.b"), "cb")));
-  vpiHandle unbound = EventOf("wait_unbound");
+  vpiHandle unbound = vpi_handle(vpiCondition, ControlOf("wait_unbound"));
   ASSERT_NE(unbound, nullptr);
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiPrefix, unbound)),
             VpiObjectOf(By("top.vu")));

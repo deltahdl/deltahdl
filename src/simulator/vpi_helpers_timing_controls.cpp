@@ -52,11 +52,13 @@ VpiHandle VpiEventControlConditionExpr(VpiHandle event_control) {
   // the first child whose own type is one of those kinds, never the
   // vpiCondition relation tag itself, which is why the generic child walk
   // cannot serve it. The guarded body is a statement child and is skipped by
-  // this scan. Null when no condition operand is attached.
+  // this scan. §37.48 detail 2 adds a clocking block standing for the
+  // expression that names it through a virtual interface, "@(vif.cb)". Null
+  // when no condition operand is attached.
   if (!event_control) return nullptr;
   for (auto* child : event_control->children) {
     if (VpiIsOperandObject(child) || child->type == vpiSequenceInst ||
-        child->type == vpiNamedEvent) {
+        child->type == vpiNamedEvent || child->type == vpiClockingBlock) {
       return child;
     }
   }
