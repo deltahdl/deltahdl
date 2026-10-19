@@ -88,7 +88,11 @@ VpiObject* VpiVirtualInterfaceClockingBlock(
   return block;
 }
 
-VpiObject* VpiPrefixedClockingBlockActual(
+namespace {
+
+// The clocking block `block`, which a virtual interface var prefixes, stands
+// for now in the run `ctx` (VpiRefreshPrefixedClockingBlock).
+VpiObject* PrefixedClockingBlockActual(
     const VpiObject& block, SimContext& ctx,
     const std::function<VpiObject*(const std::string&)>& by_name) {
   Variable* vif = block.prefix->var;
@@ -101,6 +105,18 @@ VpiObject* VpiPrefixedClockingBlockActual(
     if (child->type == vpiClockingBlock && child->name == kMember) return child;
   }
   return nullptr;
+}
+
+}  // namespace
+
+void VpiRefreshPrefixedClockingBlock(
+    int type, VpiObject& ref, SimContext* ctx,
+    const std::function<VpiObject*(const std::string&)>& by_name) {
+  if (type != vpiActual || ref.type != vpiClockingBlock ||
+      ref.prefix == nullptr || ctx == nullptr) {
+    return;
+  }
+  ref.actual = PrefixedClockingBlockActual(ref, *ctx, by_name);
 }
 
 }  // namespace delta

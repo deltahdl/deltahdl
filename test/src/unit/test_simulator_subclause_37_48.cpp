@@ -1,8 +1,5 @@
 #include <gtest/gtest.h>
 
-#include <cstddef>
-#include <vector>
-
 #include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_constants.h"
@@ -276,18 +273,18 @@ TEST_F(ClockingBlock, HelpersGuardOnObjectKind) {
 // elaborated design rather than by hand (#4956).
 class ClockingBlocksOfARun : public VpiDesignRun {
  protected:
-  // The condition of the event control the procedure `index` of top runs.
-  static vpiHandle EventOf(std::size_t index) {
-    const std::vector<vpiHandle> kProcs = ObjectsOf(vpiProcess, By("top"));
-    if (kProcs.size() <= index) return nullptr;
-    return vpi_handle(vpiCondition, vpi_handle(vpiStmt, kProcs[index]));
+  // The condition of the event control the body of top's task `name` is.
+  static vpiHandle EventOf(const char* name) {
+    vpiHandle task = Named(vpiTaskFunc, By("top"), name);
+    return vpi_handle(vpiCondition, vpi_handle(vpiStmt, task));
   }
 };
 
 // Details 2 and 3: a clocking block named through a virtual interface var,
 // vif.cb, is a clocking block whose prefix is the var, and stands for the
 // block of the interface instance the var holds now, or for none while it
-// holds none (#7175).
+// holds none (#7175). The tasks waiting on them are never called, so neither
+// wait runs through a null interface.
 TEST_F(ClockingBlocksOfARun,
        AVirtualInterfacesClockingBlockHasPrefixAndActual) {
   Run("interface bus(input logic clk);\n"
@@ -295,17 +292,17 @@ TEST_F(ClockingBlocksOfARun,
       "endinterface\n"
       "module top; logic clk; bus b(clk); virtual bus vif, vu;\n"
       "  initial vif = b;\n"
-      "  initial @(vif.cb);\n"
-      "  initial @(vu.cb);\n"
+      "  task wait_bound; @(vif.cb); endtask\n"
+      "  task wait_unbound; @(vu.cb); endtask\n"
       "endmodule\n");
-  vpiHandle bound = EventOf(1);
+  vpiHandle bound = EventOf("wait_bound");
   ASSERT_NE(bound, nullptr);
   EXPECT_EQ(vpi_get(vpiType, bound), vpiClockingBlock);
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiPrefix, bound)),
             VpiObjectOf(By("top.vif")));
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiActual, bound)),
             VpiObjectOf(Named(vpiClockingBlock, By("top.b"), "cb")));
-  vpiHandle unbound = EventOf(2);
+  vpiHandle unbound = EventOf("wait_unbound");
   ASSERT_NE(unbound, nullptr);
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiPrefix, unbound)),
             VpiObjectOf(By("top.vu")));

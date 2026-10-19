@@ -19,12 +19,13 @@ VpiObject* VpiVirtualInterfaceClockingBlock(
     VpiObject* holder, std::string_view written,
     const std::function<VpiObject*()>& alloc, const VpiNameKeeper& keep);
 
-// §37.48 detail 3: what the clocking block `block`, prefixed by a virtual
-// interface var, stands for now: the block of its name the interface instance
-// the var holds in the run `ctx` declares, that instance found by its name
-// through `by_name`; null while the var holds none.
-VpiObject* VpiPrefixedClockingBlockActual(
-    const VpiObject& block, SimContext& ctx,
+// §37.48 detail 3: where `type` is vpiActual and `ref` a clocking block a
+// virtual interface var prefixes, sets its actual to what it stands for now:
+// the block of its name the interface instance the var holds in the run `ctx`
+// declares, that instance found by its name through `by_name`, and null while
+// the var holds none. Leaves any other object, or one with no run, as it is.
+void VpiRefreshPrefixedClockingBlock(
+    int type, VpiObject& ref, SimContext* ctx,
     const std::function<VpiObject*(const std::string&)>& by_name);
 
 }  // namespace delta
