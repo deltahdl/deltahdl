@@ -1,7 +1,6 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
-#include <string>
 #include <vector>
 
 #include "fixture_vpi_run.h"
@@ -434,23 +433,11 @@ TEST_F(RefObjsOfARun, AConnectionToAnInterfaceArrayElementIsARefObj) {
 
 // D2 with §27.4: a connection written in a generate block of top to an
 // interface instance is a ref obj bound to that instance, as one written in
-// top itself is (#7352).
+// top itself is, and the block's name for the instance reaches the one
+// instance that holds its ports (#7352).
 TEST_F(RefObjsOfARun, AConnectionInAGenerateBlockIsARefObj) {
   vpiHandle inst = By("top.gb.i6");
   ASSERT_NE(inst, nullptr);
-  std::string seen;
-  for (const VpiObject* at :
-       {VpiObjectOf(inst), VpiObjectOf(inst)->parent, VpiObjectOf(By("top"))}) {
-    if (at == nullptr) continue;
-    seen +=
-        std::string(at->full_name) + " type " + std::to_string(at->type) + ":";
-    for (const VpiObject* child : at->children) {
-      seen +=
-          " " + std::string(child->name) + "/" + std::to_string(child->type);
-    }
-    seen += "\n";
-  }
-  ADD_FAILURE() << seen;
   vpiHandle port = PortOf("top.gb.i6", "s");
   ASSERT_NE(port, nullptr);
   EXPECT_NE(vpi_handle(vpiLowConn, port), nullptr);
@@ -576,6 +563,39 @@ TEST_F(RefObjsBelowAGenerateBlock, AnInterfacePortReachesThePortBelowTheBlock) {
   ASSERT_NE(inner, nullptr);
   EXPECT_EQ(VpiObjectOf(ConnOf(vpiHighConn, "top.i7.gb.c_g.c_1", "s")),
             VpiObjectOf(inner));
+}
+
+// The ref objs of a run in which connections name their interface, and a
+// modport of it, through hierarchical names.
+class RefObjsOfHierarchicalConnections : public RefObjRun {
+ protected:
+  void SetUp() override {
+    RefObjRun::SetUp();
+    Run("interface simple; logic req, gnt;\n"
+        "  modport initiator (input gnt, output req);\n"
+        "endinterface\n"
+        "module child2(simple s); endmodule\n"
+        "module top; simple i(); child2 i7(top.i);\n"
+        "  child2 i8(top.i.initiator);\n"
+        "endmodule\n");
+  }
+};
+
+// D2 with §23.6: a connection naming its interface through a hierarchical
+// name is a ref obj bound to that interface, and one naming a modport of it a
+// ref obj bound to the modport, a subelement of one bound to the interface
+// (D4) (#7350).
+TEST_F(RefObjsOfHierarchicalConnections, AHierarchicalConnectionIsARefObj) {
+  vpiHandle high = ConnOf(vpiHighConn, "top.i7", "s");
+  ASSERT_NE(high, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, high), vpiRefObj);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiActual, high)), VpiObjectOf(By("top.i")));
+  vpiHandle sub = ConnOf(vpiHighConn, "top.i8", "s");
+  ASSERT_NE(sub, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, sub), vpiRefObj);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiActual, sub)), ModportOfI("initiator"));
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiActual, vpi_handle(vpiParent, sub))),
+            VpiObjectOf(By("top.i")));
 }
 
 }  // namespace
