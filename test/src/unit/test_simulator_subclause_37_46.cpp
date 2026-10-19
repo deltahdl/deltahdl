@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <vector>
 
+#include "fixture_vpi_run.h"
 #include "helpers_vpi_driver_load_iter.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_constants.h"
@@ -27,6 +29,8 @@ namespace {
 // Figure (net drivers): vpiDriver on a net reaches every net-driver kind - a
 // port, a force, a delay terminal, a continuous assignment, a single bit of
 // one, and a primitive terminal - while skipping children that are not drivers.
+// A force drives the net its target names and a prim term the net an output
+// terminal connects.
 // The net case differs from a variable (§37.21): an assignment statement loads
 // a net but does not drive it, so it is excluded from the driver iteration
 // here.
@@ -58,6 +62,8 @@ TEST(NetDriversAndLoads, DriverIterationReachesEveryNetDriverKind) {
   net.children = {&port,        &force,           &delay_term,
                   &cont_assign, &cont_assign_bit, &prim_term,
                   &assign_stmt, &unrelated};
+  force.lhs = &net;
+  prim_term.direction = vpiOutput;
 
   std::vector<VpiHandle> drivers =
       CollectVpiIteration(ctx, ctx.Iterate(vpiDriver, &net));
@@ -76,7 +82,8 @@ TEST(NetDriversAndLoads, DriverIterationReachesEveryNetDriverKind) {
 // terminal, an assignment statement, a force, a continuous assignment, a single
 // bit of one, and a primitive terminal. A plain port that merely drives the net
 // (no complex expression) is not a load, so it is left out even though it is a
-// child of the net.
+// child of the net. A force loads the net its expression reads and a prim term
+// the net an input terminal connects.
 TEST(NetDriversAndLoads, LoadIterationReachesNetLoadKindsExcludingPlainPort) {
   VpiContext ctx;
 
@@ -102,6 +109,8 @@ TEST(NetDriversAndLoads, LoadIterationReachesNetLoadKindsExcludingPlainPort) {
   net.type = vpiNet;
   net.children = {&delay_term,      &assign_stmt, &force,      &cont_assign,
                   &cont_assign_bit, &prim_term,   &driver_port};
+  force.rhs = &net;
+  prim_term.direction = vpiInput;
 
   std::vector<VpiHandle> loads =
       CollectVpiIteration(ctx, ctx.Iterate(vpiLoad, &net));
@@ -347,7 +356,8 @@ TEST(NetDriversAndLoads, ALoadIterationPassesOverTheNetsBits) {
 }
 
 // §37.46 (figure): the net bit is one of the nets the driver and load edges
-// are drawn from, so it reaches the net drivers and net loads it holds.
+// are drawn from, so it reaches the net drivers and net loads it holds, a
+// force naming it and reading it both.
 TEST(NetDriversAndLoads, ANetBitReachesItsNetDriversAndLoads) {
   VpiContext ctx;
   VpiObject force;
@@ -357,6 +367,8 @@ TEST(NetDriversAndLoads, ANetBitReachesItsNetDriversAndLoads) {
   VpiObject bit;
   bit.type = vpiNetBit;
   bit.children = {&force, &assign_stmt};
+  force.lhs = &bit;
+  force.rhs = &bit;
   std::vector<VpiHandle> drivers =
       CollectVpiIteration(ctx, ctx.Iterate(vpiDriver, &bit));
   ASSERT_EQ(drivers.size(), 1u);
@@ -365,6 +377,40 @@ TEST(NetDriversAndLoads, ANetBitReachesItsNetDriversAndLoads) {
       CollectVpiIteration(ctx, ctx.Iterate(vpiLoad, &bit));
   ASSERT_EQ(loads.size(), 2u);
   EXPECT_TRUE(VpiIterationContains(loads, &assign_stmt));
+}
+
+// The drivers and loads of the nets of a run: a primitive's terminals, a
+// force and a port connected to a complex expression, each hung on the nets it
+// connects, names or reads.
+class NetDriversAndLoadsOfARun : public VpiDesignRun {
+ protected:
+  // Whether `kinds` holds `kind`.
+  static bool Holds(const std::vector<int>& kinds, int kind) {
+    return std::ranges::find(kinds, kind) != kinds.end();
+  }
+};
+
+// A prim term drives the net its output terminal connects and loads the nets
+// its input terminals connect (#7169); a force drives the net its target names
+// and loads the nets its expression reads (#7170); and detail 1: a port
+// connected to a complex expression loads the nets the expression reads
+// (#7171).
+TEST_F(NetDriversAndLoadsOfARun, PrimTermsForcesAndComplexPortsDriveAndLoad) {
+  Run("module ram(input a, input b); endmodule\n"
+      "module top; wire y, a, b, trinet, n, m;\n"
+      "  and g(y, a, b);\n"
+      "  ram r0(a, !trinet);\n"
+      "  initial force n = m;\n"
+      "endmodule\n");
+  EXPECT_TRUE(Holds(KindsOf(vpiDriver, By("top.y")), vpiPrimTerm));
+  EXPECT_FALSE(Holds(KindsOf(vpiLoad, By("top.y")), vpiPrimTerm));
+  EXPECT_TRUE(Holds(KindsOf(vpiLoad, By("top.a")), vpiPrimTerm));
+  EXPECT_FALSE(Holds(KindsOf(vpiDriver, By("top.a")), vpiPrimTerm));
+  EXPECT_TRUE(Holds(KindsOf(vpiDriver, By("top.n")), vpiForce));
+  EXPECT_FALSE(Holds(KindsOf(vpiLoad, By("top.n")), vpiForce));
+  EXPECT_TRUE(Holds(KindsOf(vpiLoad, By("top.m")), vpiForce));
+  EXPECT_TRUE(Holds(KindsOf(vpiLoad, By("top.trinet")), vpiPort));
+  EXPECT_FALSE(Holds(KindsOf(vpiDriver, By("top.trinet")), vpiPort));
 }
 
 }  // namespace

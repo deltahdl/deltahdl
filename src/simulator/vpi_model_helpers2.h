@@ -675,6 +675,19 @@ bool VpiIsNetLoadType(int type);
 // port) (§37.14).
 bool VpiPortIsComplexExpressionLoad(VpiHandle port);
 
+// §37.46: whether `child`, an object hung among the net `net`'s children, is
+// among the net's drivers (`want_driver`) or its loads: a prim term by the
+// direction of its terminal (§37.35), a force by whether its target names the
+// net or its expression reads it (§37.79), a port by detail 1, and any other
+// object by its kind.
+bool VpiIsNetDriverOrLoad(VpiHandle child, VpiHandle net, bool want_driver);
+
+// §37.46: hang `holder`, a prim term, a force or a port, among the children
+// of each net the expression object `expr` names, itself, a bit of it or an
+// operand of it at any depth, which is where a net's driver and load
+// iterations look for it; once per net.
+void VpiHangOnNetsNamed(VpiHandle holder, VpiHandle expr);
+
 // §37.26 (figure): the four object kinds the Structures-and-unions figure
 // models - a structure or union declared as a variable, and a structure or
 // union declared as a net. Used to recognise an entire structure/union object.

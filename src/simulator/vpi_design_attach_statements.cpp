@@ -688,6 +688,11 @@ void VpiFillStmt(VpiObject* obj, const Stmt& stmt, const VpiStmtBuild& with) {
       // the expression an assign or force drives it with.
       obj->lhs = with.expression(stmt.lhs);
       obj->rhs = with.expression(stmt.rhs);
+      // §37.46: a force drives the nets it names and loads those it reads.
+      if (stmt.kind == StmtKind::kForce) {
+        VpiHangOnNetsNamed(obj, obj->lhs);
+        VpiHangOnNetsNamed(obj, obj->rhs);
+      }
       return;
     case StmtKind::kCase:
       FillCase(obj, stmt, with);

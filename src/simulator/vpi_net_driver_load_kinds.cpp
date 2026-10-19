@@ -1,4 +1,8 @@
+#include <algorithm>
+
+#include "simulator/vpi_constants.h"
 #include "simulator/vpi_model_helpers2.h"
+#include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -67,6 +71,50 @@ bool VpiIsConcatenationExpression(const VpiObject* expr) {
 }
 
 }  // namespace
+
+namespace {
+
+// Whether the expression object `expr` names the net `net`, itself or a bit of
+// it, or reads it among its operands at any depth.
+bool NamesNet(const VpiObject* expr, const VpiObject* net) {
+  if (expr == nullptr) return false;
+  if (expr == net || expr->parent == net) return true;
+  return expr->type == vpiOperation &&
+         std::ranges::any_of(expr->children, [net](const VpiObject* operand) {
+           return NamesNet(operand, net);
+         });
+}
+
+}  // namespace
+
+bool VpiIsNetDriverOrLoad(VpiHandle child, VpiHandle net, bool want_driver) {
+  if (child->type == vpiPrimTerm) {
+    return child->direction == kVpiInout ||
+           child->direction == (want_driver ? kVpiOutput : kVpiInput);
+  }
+  if (child->type == vpiForce) {
+    return NamesNet(want_driver ? child->lhs : child->rhs, net);
+  }
+  if (VpiIsPortsType(child->type)) {
+    return VpiPortIsComplexExpressionLoad(child) != want_driver;
+  }
+  return want_driver ? VpiIsNetDriverType(child->type)
+                     : VpiIsNetLoadType(child->type);
+}
+
+void VpiHangOnNetsNamed(VpiHandle holder, VpiHandle expr) {
+  if (expr == nullptr) return;
+  VpiObject* net = VpiIsNetsType(expr->type) ? expr : nullptr;
+  if (expr->type == vpiNetBit) net = expr->parent;
+  if (net != nullptr) {
+    if (std::ranges::find(net->children, holder) == net->children.end()) {
+      net->children.push_back(holder);
+    }
+    return;
+  }
+  if (expr->type != vpiOperation) return;
+  for (VpiObject* operand : expr->children) VpiHangOnNetsNamed(holder, operand);
+}
 
 bool VpiPortIsComplexExpressionLoad(VpiHandle port) {
   // §37.46 detail 1: a complex expression on an input port - an operation other

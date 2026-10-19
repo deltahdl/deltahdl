@@ -53,12 +53,7 @@ void CollectNetDriversOrLoads(VpiObject* node, bool want_driver,
   if (want_driver && !VpiNetDriverIterationSupported(VpiNetTypeOf(node)))
     return;
   for (auto* child : node->children) {
-    if (want_driver) {
-      if (VpiIsNetDriverType(child->type)) iter->children.push_back(child);
-    } else if (VpiIsPortsType(child->type)) {
-      if (VpiPortIsComplexExpressionLoad(child))
-        iter->children.push_back(child);
-    } else if (VpiIsNetLoadType(child->type)) {
+    if (VpiIsNetDriverOrLoad(child, node, want_driver)) {
       iter->children.push_back(child);
     }
   }

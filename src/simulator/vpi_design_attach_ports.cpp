@@ -15,6 +15,7 @@
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_walk.h"
+#include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
@@ -236,6 +237,11 @@ void ConnectPorts(const RtlirModuleInst& inst, VpiHandle writer,
             ? nullptr
             : HighConnOf(inst, binding, port, {writer, names, ctx, build});
     port->conn_by_name = inst.ports_by_name && !binding.unconnected;
+    // §37.46 detail 1: a port a complex expression connects loads the nets
+    // the expression reads.
+    if (VpiPortIsComplexExpressionLoad(port)) {
+      VpiHangOnNetsNamed(port, port->high_conn);
+    }
   }
   ConnectLowConns(module, kInstance, objects, build);
 }

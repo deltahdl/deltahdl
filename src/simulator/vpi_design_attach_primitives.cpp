@@ -17,6 +17,7 @@
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_walk.h"
+#include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_source_delay.h"
 #include "simulator/vpi_user.h"
@@ -165,6 +166,8 @@ VpiObject* MakePrimitiveObject(const PrimShape& shape, std::string_view name,
     term->direction = TerminalDirection(shape, i, kCount);
     if (term->direction == kVpiInput) ++inputs;
     if (terminals[i] != nullptr) term->children.push_back(terminals[i]);
+    // §37.46: the term is a driver or a load of the net it connects.
+    VpiHangOnNetsNamed(term, terminals[i]);
     prim->children.push_back(term);
   }
   prim->size = inputs;

@@ -81,8 +81,10 @@ inline VpiHandle VpiGenScopeOf(VpiHandle instance, const HierPath& path) {
 // element of the array (§37.85), an attribute is written on its holder
 // (§37.83), a typespec is the type of its holder (§37.14, §37.17), and an
 // instance array's operation of its connections and its param assigns are
-// what its instantiation wrote (§37.11), and a var select is a select of an
-// array var whose index varies (§37.19), so no index selects any of them. One
+// what its instantiation wrote (§37.11), a var select is a select of an
+// array var whose index varies (§37.19), and a prim term or a force hangs
+// among a net's children as its driver or load (§37.46), so no index selects
+// any of them. One
 // index names no element of an instance array of more dimensions (§38.19),
 // whose elements §38.20's indices name.
 inline bool VpiIndexSelects(const VpiObject& child, int index) {
@@ -90,6 +92,7 @@ inline bool VpiIndexSelects(const VpiObject& child, int index) {
          child.type != vpiGenVar && child.type != vpiAttribute &&
          !VpiIsTypespecType(child.type) && child.type != vpiOperation &&
          child.type != vpiParamAssign && child.type != vpiVarSelect &&
+         child.type != vpiPrimTerm && child.type != vpiForce &&
          child.instance_facts.array_indices.size() <= 1 && child.index == index;
 }
 
