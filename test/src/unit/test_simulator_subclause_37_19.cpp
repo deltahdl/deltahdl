@@ -262,6 +262,27 @@ TEST_F(VarSelectsOfARun, ASelectThroughAVarSelectIsAVarSelect) {
   EXPECT_EQ(BinOf(select), "1");
 }
 
+// §37.19 (figure): a var select is named by its array and the index it was
+// written with, and reaches the typespec of the element it selects (#7018,
+// #7019); a select through it is named through it, and the one it selects
+// through reaches the typespec of the subarray.
+TEST_F(VarSelectsOfARun, AVarSelectIsNamedAndReachesItsElementTypespec) {
+  Run(TwoDimensional("0", 1));
+  vpiHandle select = Select();
+  ASSERT_NE(select, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, select), "m[i][0]");
+  EXPECT_STREQ(vpi_get_str(vpiFullName, select), "top.m[i][0]");
+  vpiHandle of_element = vpi_handle(vpiTypespec, select);
+  ASSERT_NE(of_element, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, of_element), vpiLogicTypespec);
+  vpiHandle outer = vpi_handle(vpiParent, select);
+  ASSERT_NE(outer, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, outer), "m[i]");
+  vpiHandle of_subarray = vpi_handle(vpiTypespec, outer);
+  ASSERT_NE(of_subarray, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, of_subarray), vpiArrayTypespec);
+}
+
 // §11.5.1: an outer index outside the array leaves the select no element, and
 // it reads x...
 TEST_F(VarSelectsOfARun, ASelectThroughAnOutOfRangeVarSelectReadsX) {

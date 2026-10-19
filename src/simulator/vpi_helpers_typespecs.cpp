@@ -1,3 +1,4 @@
+#include <cstddef>
 #include <vector>
 
 #include "simulator/sv_vpi_user.h"
@@ -192,7 +193,25 @@ static VpiHandle VpiTypespecKey(VpiHandle typespec) {
   return nullptr;
 }
 
+// §37.19 (figure): the typespec of the element a var select selects: its
+// array var's typespec unwound through vpiElemTypespec once per select from
+// the array down to it (§37.25 detail 8); null where the array reaches none.
+static VpiHandle VpiVarSelectTypespec(VpiHandle select) {
+  std::size_t depth = 0;
+  VpiHandle array = select;
+  for (; array->type == vpiVarSelect; array = array->parent) ++depth;
+  VpiHandle typespec = VpiTypespecKey(array);
+  for (; typespec != nullptr && depth > 0; --depth) {
+    typespec = typespec->inner_typespec;
+  }
+  return typespec;
+}
+
 bool TryResolveTypespecRelation(int type, VpiHandle ref, VpiHandle& out) {
+  if (ref->type == vpiVarSelect && type == vpiTypespec) {
+    out = VpiVarSelectTypespec(ref);
+    return true;
+  }
   if (ref->type == vpiTypespecMember && type == vpiExpr) {
     out = VpiTypespecMemberDefaultExpr(ref);
     return true;

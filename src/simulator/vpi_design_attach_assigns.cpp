@@ -196,6 +196,17 @@ int ElementSize(const VpiObject& array) {
   return 0;
 }
 
+// §37.58 and §37.19: name the select `select` after its parent `base` and the
+// index `index` it was written with, `a[i]`, and full-name it through `base`.
+void NameSelect(VpiObject* select, const VpiObject& base, const Expr* index,
+                const AssignBuild& build) {
+  const std::string kSuffix = "[" + VpiExprDecompile(index) + "]";
+  select->name = build.keep(std::string(base.name) + kSuffix);
+  select->full_name =
+      (base.full_name.empty() ? std::string(base.name) : base.full_name) +
+      kSuffix;
+}
+
 // §37.19: a select of an element of the array var `base` whose index is not a
 // constant: a var select reaching the array through vpiParent and the
 // expression the source wrote through vpiIndex. Which element it stands for is
@@ -212,6 +223,7 @@ VpiObject* VarSelectObject(VpiObject* base, const Expr* index,
   VpiObject* select = build.alloc();
   select->type = vpiVarSelect;
   select->parent = base;
+  NameSelect(select, *base, index, build);
   select->index_expr = ExpressionObject(index, build);
   if (select->index_expr != nullptr) {
     select->children.push_back(select->index_expr);
@@ -345,12 +357,7 @@ VpiObject* BitSelectObject(const Expr* expr, const AssignBuild& build) {
     select->parent = base;
     select->size = 1;
     select->index_expr = ExpressionObject(expr->index, build);
-    // §37.58: named by its parent and the index it was written with.
-    const std::string kSuffix = "[" + VpiExprDecompile(expr->index) + "]";
-    select->name = build.keep(std::string(base->name) + kSuffix);
-    select->full_name =
-        (base->full_name.empty() ? std::string(base->name) : base->full_name) +
-        kSuffix;
+    NameSelect(select, *base, expr->index, build);
     return select;
   }
   if (!base->packed_dims.empty() || base->select_dim) {
