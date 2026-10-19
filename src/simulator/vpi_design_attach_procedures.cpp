@@ -97,8 +97,12 @@ std::string BlockVariableRunKey(std::string_view name, const Stmt& stmt,
     }
   }
   if (scopes.empty()) return {};
+  // A body walked with no generate block names around it, such as that of a
+  // task or function the instance declares, carries no prefixes at all.
   const std::string kGen =
-      walk.gen_prefixes->empty() ? "" : std::string(walk.gen_prefixes->back());
+      walk.gen_prefixes == nullptr || walk.gen_prefixes->empty()
+          ? ""
+          : std::string(walk.gen_prefixes->back());
   return VpiFlatName(walk.prefix, kGen + scopes + std::string(name));
 }
 
