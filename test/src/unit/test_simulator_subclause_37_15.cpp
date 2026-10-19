@@ -431,6 +431,21 @@ TEST_F(RefObjsOfARun, AConnectionToAnInterfaceArrayElementIsARefObj) {
       VpiObjectOf(element));
 }
 
+// D2 with §27.4: a connection written in a generate block of top to an
+// interface instance is a ref obj bound to that instance, as one written in
+// top itself is (#7352).
+TEST_F(RefObjsOfARun, AConnectionInAGenerateBlockIsARefObj) {
+  vpiHandle inst = By("top.gb.i6");
+  ASSERT_NE(inst, nullptr);
+  vpiHandle port = PortOf("top.gb.i6", "s");
+  ASSERT_NE(port, nullptr);
+  EXPECT_NE(vpi_handle(vpiLowConn, port), nullptr);
+  vpiHandle high = vpi_handle(vpiHighConn, port);
+  ASSERT_NE(high, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, high), vpiRefObj);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiActual, high)), VpiObjectOf(By("top.i")));
+}
+
 // The figure: a ref obj reaches through vpiLowConn the port it is the lower
 // connection of, through vpiHighConn the ports it is the higher connection
 // of, and through vpiPortInst those and the ports a subelement of it connects
