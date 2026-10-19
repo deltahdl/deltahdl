@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <string>
 #include <vector>
 
 #include "fixture_vpi_run.h"
@@ -437,6 +438,19 @@ TEST_F(RefObjsOfARun, AConnectionToAnInterfaceArrayElementIsARefObj) {
 TEST_F(RefObjsOfARun, AConnectionInAGenerateBlockIsARefObj) {
   vpiHandle inst = By("top.gb.i6");
   ASSERT_NE(inst, nullptr);
+  std::string seen;
+  for (const VpiObject* at :
+       {VpiObjectOf(inst), VpiObjectOf(inst)->parent, VpiObjectOf(By("top"))}) {
+    if (at == nullptr) continue;
+    seen +=
+        std::string(at->full_name) + " type " + std::to_string(at->type) + ":";
+    for (const VpiObject* child : at->children) {
+      seen +=
+          " " + std::string(child->name) + "/" + std::to_string(child->type);
+    }
+    seen += "\n";
+  }
+  ADD_FAILURE() << seen;
   vpiHandle port = PortOf("top.gb.i6", "s");
   ASSERT_NE(port, nullptr);
   EXPECT_NE(vpi_handle(vpiLowConn, port), nullptr);
