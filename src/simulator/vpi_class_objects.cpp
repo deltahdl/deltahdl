@@ -30,6 +30,7 @@
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_pool_keeper.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -418,14 +419,10 @@ VpiHandle VpiContext::ClassObjectOf(VpiObject& class_var) {
   if (sync == nullptr) return nullptr;
   VpiObject*& made = run_objects_[sync];
   if (made == nullptr) {
-    made = VpiMakeSyncClassObject(kHandle,
-                                  sem != nullptr ? "semaphore" : "mailbox",
-                                  {[this] { return AllocObject(); },
-                                   [this](std::string name) {
-                                     name_pool_.push_back(std::move(name));
-                                     return std::string_view(name_pool_.back());
-                                   },
-                                   sim_ctx_->GetArena()});
+    made = VpiMakeSyncClassObject(
+        kHandle, sem != nullptr ? "semaphore" : "mailbox",
+        {[this] { return AllocObject(); }, VpiPoolKeeper(name_pool_),
+         sim_ctx_->GetArena()});
   }
   return made;
 }
@@ -453,11 +450,8 @@ VpiHandle VpiContext::MadeClassObject(ClassObject& obj) {
     // §37.42: the calls the object's constraints write, shaped once it is.
     std::vector<VpiDeferredCall> deferred;
     const VpiAttachBuild kBuild{[this] { return AllocObject(); },
-                                [this](std::string name) {
-                                  name_pool_.push_back(std::move(name));
-                                  return std::string_view(name_pool_.back());
-                                },
-                                sim_ctx_->GetArena(), &deferred};
+                                VpiPoolKeeper(name_pool_), sim_ctx_->GetArena(),
+                                &deferred};
     // A class whose defn was not made finds its callees among the
     // compilation unit's declarations alone.
     made = VpiMakeClassObject(

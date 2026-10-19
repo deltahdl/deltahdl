@@ -6,7 +6,6 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
-#include <utility>
 #include <vector>
 
 #include "common/envelope_viewport.h"
@@ -30,6 +29,7 @@
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_pool_keeper.h"
 
 namespace delta {
 
@@ -171,13 +171,10 @@ VpiHandle VpiContext::HandleByIndex(int index, VpiHandle parent) {
   // queue, dynamic or associative array lives in the run's store of the array
   // and is made when first selected (§37.17).
   if ((parent->queue != nullptr || parent->assoc != nullptr) && sim_ctx_) {
-    return VpiCollectionElement(*parent, index,
-                                {[this] { return AllocObject(); },
-                                 [this](std::string name) {
-                                   name_pool_.push_back(std::move(name));
-                                   return std::string_view(name_pool_.back());
-                                 },
-                                 sim_ctx_->GetArena()});
+    return VpiCollectionElement(
+        *parent, index,
+        {[this] { return AllocObject(); }, VpiPoolKeeper(name_pool_),
+         sim_ctx_->GetArena()});
   }
   for (auto* child : parent->children) {
     if (VpiIndexSelects(*child, index)) return child;

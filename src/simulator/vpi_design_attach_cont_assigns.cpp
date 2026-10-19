@@ -22,6 +22,7 @@
 #include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_expr_scope.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_pool_keeper.h"
 #include "simulator/vpi_source_delay.h"
 #include "simulator/vpi_user.h"
 
@@ -181,11 +182,7 @@ void VpiContext::AttachContinuousAssignments(const RtlirDesign* design,
   }
   const std::string kFirstTop(design->top_modules.front()->name);
   const VpiAttachBuild kAttach{[this] { return AllocObject(); },
-                               [this](std::string name) {
-                                 name_pool_.push_back(std::move(name));
-                                 return std::string_view(name_pool_.back());
-                               },
-                               sim_ctx_->GetArena()};
+                               VpiPoolKeeper(name_pool_), sim_ctx_->GetArena()};
   WalkInstancePaths(
       design, [&](const RtlirModule* mod, const std::string& prefix) {
         VpiHandle scope = FindObjectForFlatName(

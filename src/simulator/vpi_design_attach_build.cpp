@@ -1,7 +1,11 @@
 #include "simulator/vpi_design_attach_build.h"
 
 #include <cstdint>
+#include <deque>
 #include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
 
 #include "common/arena.h"
 #include "common/packed_range.h"
@@ -16,6 +20,7 @@
 #include "simulator/sv_vpi_user.h"
 #include "simulator/variable.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_pool_keeper.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -44,6 +49,13 @@ PackedRange EvaluatedRange(Expr* left, Expr* right, SimContext& ctx) {
 
 PackedRange VpiEvaluatedRange(Expr* left, Expr* right, SimContext& ctx) {
   return EvaluatedRange(left, right, ctx);
+}
+
+VpiNameKeeper VpiPoolKeeper(std::deque<std::string>& pool) {
+  return [&pool](std::string name) {
+    pool.push_back(std::move(name));
+    return std::string_view(pool.back());
+  };
 }
 
 VpiObject* VpiIntConstant(int64_t value, const VpiAttachBuild& build) {

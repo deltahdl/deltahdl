@@ -7,7 +7,6 @@
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
-#include <utility>
 #include <vector>
 
 #include "common/diagnostic.h"
@@ -38,6 +37,7 @@
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_pool_keeper.h"
 #include "simulator/vpi_source_delay.h"
 #include "simulator/vpi_user.h"
 
@@ -395,10 +395,7 @@ void VpiContext::AttachDesignPorts(const RtlirDesign* design) {
   if (design == nullptr) return;
 
   const std::function<VpiObject*()> kAlloc = [this] { return AllocObject(); };
-  const VpiNameKeeper kKeep = [this](std::string name) {
-    name_pool_.push_back(std::move(name));
-    return std::string_view(name_pool_.back());
-  };
+  const VpiNameKeeper kKeep = VpiPoolKeeper(name_pool_);
   // §37.5: a top module reaches its ports as any instance does, keyed under
   // its own name since AttachTopModules made its object.
   WalkInstanceObjects(

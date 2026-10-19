@@ -2,7 +2,6 @@
 #include <cstddef>
 #include <string>
 #include <string_view>
-#include <utility>
 #include <vector>
 
 #include "common/source_loc.h"
@@ -27,6 +26,7 @@
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_pool_keeper.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -306,11 +306,8 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
     // until every task, function and class defn they may reach is made.
     std::vector<VpiDeferredCall> deferred;
     const VpiAttachBuild kBuild{[this] { return AllocObject(); },
-                                [this](std::string name) {
-                                  name_pool_.push_back(std::move(name));
-                                  return std::string_view(name_pool_.back());
-                                },
-                                sim_ctx_->GetArena(), &deferred};
+                                VpiPoolKeeper(name_pool_), sim_ctx_->GetArena(),
+                                &deferred};
     // The scopes the passes below hang a generate block's objects from are
     // the gen scopes this makes.
     AttachGenScopes(design, object_map_, kBuild);
@@ -372,10 +369,7 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
     VpiShapeDeferredCalls(design, object_map_, deferred, kCalls, kBuild);
   }
   AttachGenBlockStorage(design, object_map_);
-  AttachGenBlockInstances(design, object_map_, [this](std::string name) {
-    name_pool_.push_back(std::move(name));
-    return std::string_view(name_pool_.back());
-  });
+  AttachGenBlockInstances(design, object_map_, VpiPoolKeeper(name_pool_));
 }
 
 void AttachModports(const RtlirDesign* design, const VpiObjectMap& objects,

@@ -34,6 +34,7 @@
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_pool_keeper.h"
 #include "simulator/vpi_source_delay.h"
 
 namespace delta {
@@ -582,11 +583,7 @@ void VpiContext::AttachTimingChecks(SimContext& sim_ctx) {
   SpecifyManager* specify = sim_ctx.GetSpecifyManager();
   if (specify == nullptr) return;
   const VpiAttachBuild kBuild{[this] { return AllocObject(); },
-                              [this](std::string name) {
-                                name_pool_.push_back(std::move(name));
-                                return std::string_view(name_pool_.back());
-                              },
-                              sim_ctx.GetArena()};
+                              VpiPoolKeeper(name_pool_), sim_ctx.GetArena()};
 
   for (const TimingCheckEntry& check : specify->GetTimingChecks()) {
     // §31.1 puts a timing check inside a specify block inside a module
