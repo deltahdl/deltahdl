@@ -1,13 +1,6 @@
-#include <dlfcn.h>
-#include <execinfo.h>
 #include <gtest/gtest.h>
 
 #include <algorithm>
-#include <csignal>
-#include <cstdint>
-#include <cstdio>
-#include <cstdlib>
-#include <string>
 #include <vector>
 
 #include "fixture_vpi_run.h"
@@ -505,36 +498,12 @@ TEST_F(RefObjsOfARun, VpiTypespecIsTheVariablesForAVariableActual) {
             nullptr);
 }
 
-// A probe of #7351: where the run of the design below crashes, printed as the
-// frames of the crash through addr2line.
-extern "C" void PrintCrashFrames(int /*signal*/) {
-  void* frames[64];
-  const int kCount = backtrace(frames, 64);
-  for (int k = 0; k < kCount; ++k) {
-    Dl_info info{};
-    if (dladdr(frames[k], &info) == 0 || info.dli_fname == nullptr) continue;
-    const auto kOffset = reinterpret_cast<std::uintptr_t>(frames[k]) -
-                         reinterpret_cast<std::uintptr_t>(info.dli_fbase);
-    char address[32];
-    std::snprintf(address, sizeof(address), "%#jx",
-                  static_cast<std::uintmax_t>(kOffset - 1));
-    const std::string kCommand = "addr2line -f -C -e " +
-                                 std::string(info.dli_fname) + " " + address +
-                                 " 1>&2";
-    std::fprintf(stderr, "frame %d:\n", k);
-    std::fflush(stderr);
-    std::system(kCommand.c_str());
-  }
-  std::_Exit(1);
-}
-
 // The ref objs of a run in which a module passes its interface port down to an
 // instance a generate block of it holds.
 class RefObjsThroughAGenerateBlock : public RefObjRun {
  protected:
   void SetUp() override {
     RefObjRun::SetUp();
-    std::signal(SIGSEGV, PrintCrashFrames);
     Run("interface simple; logic req, gnt; endinterface\n"
         "module c1(simple s); endmodule\n"
         "module child4(simple s); if (1) begin : gb c1 c_g(s); end\n"

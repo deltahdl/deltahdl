@@ -394,20 +394,22 @@ using InstanceDeclVisit =
 
 // Visits each instance of the design whose module, interface or program
 // `unit` declares, `ctx`'s instance prefix set to the instance's own so that
-// the dimensions its declarations write evaluate there.
+// the dimensions its declarations write evaluate there. An instance a
+// generate block below another instance holds is found once it has moved under
+// the block's gen scope as well (WalkInstanceObjects).
 void WalkInstanceDecls(const RtlirDesign* design, const CompilationUnit& unit,
                        const VpiObjectMap& objects, SimContext& ctx,
                        const InstanceDeclVisit& visit) {
-  WalkInstancePaths(
-      design, [&](const RtlirModule* mod, const std::string& prefix) {
-        VpiObject* instance = FindObjectForFlatName(
-            objects, prefix.empty() ? std::string(mod->name) : prefix);
-        const ModuleDecl* decl = ElementNamed(unit, mod->name);
-        if (decl == nullptr) return;
-        InstancePrefixOverride in_instance(ctx.InstancePrefixOverride(),
-                                           prefix.empty() ? "" : prefix + ".");
-        visit(*mod, prefix, instance, *decl);
-      });
+  WalkInstanceObjects(design, objects,
+                      [&](const RtlirModule* mod, const std::string& prefix,
+                          VpiObject* instance) {
+                        const ModuleDecl* decl = ElementNamed(unit, mod->name);
+                        if (decl == nullptr) return;
+                        InstancePrefixOverride in_instance(
+                            ctx.InstancePrefixOverride(),
+                            prefix.empty() ? "" : prefix + ".");
+                        visit(*mod, prefix, instance, *decl);
+                      });
 }
 
 // §37.17: the typespec of the typedef a variable declared with the type
