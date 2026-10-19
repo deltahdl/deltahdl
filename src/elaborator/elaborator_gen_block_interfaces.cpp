@@ -337,15 +337,28 @@ void RewriteInstancePath(RtlirPortBinding& binding, const std::string& path,
   binding.connection = copy;
 }
 
+// §23.8: whether the first of `steps` is the name of the module `decl`
+// itself rather than of an instance it holds, as `top` is in `top.i` written
+// in top, which names the module the reference is written in.
+bool StartsAtOwnModule(const ModuleDecl* decl,
+                       const std::vector<ActualPathStep>& steps) {
+  const ActualPathStep& first = steps.front();
+  return !first.indexed && first.name == decl->name &&
+         FindInstanceItem(decl, first.name) == nullptr;
+}
+
 // §25.3 with §23.6: resolves the interface port actual `steps` names, step
 // by step from the module `scope.parent`, through module instances to an
-// interface instance.
+// interface instance. A path starting at the module's own name (§23.8) is
+// resolved from the module itself, and its own interface instance, `top.i`,
+// is rewritten to the name the module holds it under, `i`.
 void ResolveInstancePath(RtlirPortBinding& binding,
                          const std::vector<ActualPathStep>& steps,
                          const InterfaceActualScope& scope) {
   const ModuleDecl* decl = scope.parent;
   std::string path;
-  for (size_t k = 0; k < steps.size(); ++k) {
+  for (size_t k = StartsAtOwnModule(decl, steps) ? 1 : 0; k < steps.size();
+       ++k) {
     const ModuleItem* item = FindInstanceItem(decl, steps[k].name);
     decl = item == nullptr ? nullptr : scope.find_module(item->inst_module);
     if (decl == nullptr) return;
