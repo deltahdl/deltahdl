@@ -138,6 +138,10 @@ struct Net {
   std::optional<ContAssignDelays> delay;
   std::optional<Logic4Vec> pending_value;
   uint64_t delay_generation = 0;
+  // §37.45 details 1 and 2: the value a module path transition ending at this
+  // net carries across its delay while the delay runs, which the input delay
+  // term on the net reads ahead of the net; empty while none is running.
+  std::optional<Logic4Vec> pending_path_value;
 
   // Whether a MOS or CMOS switch reads the net as its data input, which makes
   // Resolve record a change of the net's strength

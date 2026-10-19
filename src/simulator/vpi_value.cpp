@@ -27,6 +27,7 @@
 #include "simulator/vpi_collection_elements.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
+#include "simulator/vpi_delay_devices.h"
 #include "simulator/vpi_expr_values.h"
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers1.h"
@@ -465,6 +466,20 @@ void VpiContext::GetValue(VpiHandle obj, s_vpi_value* value) {
     ++obj->side_effect_count;
   }
   if (GetValueIsRefused(obj, value, last_error_)) return;
+  // §37.45 details 1 and 2: a delay term reads the value on its side of the
+  // delay. The input term's is the value a module path transition still
+  // carries across the delay where one runs on its net, and otherwise the
+  // net's as it stands; the output term's is the net's past the delay.
+  if (obj->type == vpiDelayTerm && obj->term_net != nullptr) {
+    const Net* run_net = obj->term_net->net;
+    if (obj->parent->in_term == obj && run_net != nullptr &&
+        run_net->pending_path_value) {
+      DispatchValueByFormat(*run_net->pending_path_value, value, value_pools_);
+      return;
+    }
+    GetValue(VpiDelayTermValueNet(*obj), value);
+    return;
+  }
   // §37.19 with §11.5.1: a var select reads the element its index names now,
   // and the default of its elements' type where the index names none.
   if (obj->type == vpiVarSelect) {

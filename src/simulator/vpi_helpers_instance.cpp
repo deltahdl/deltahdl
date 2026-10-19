@@ -23,6 +23,7 @@
 #include "simulator/vpi_alloc_scheme.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
+#include "simulator/vpi_delay_devices.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_internal.h"
@@ -327,6 +328,18 @@ static std::string_view SpecifyEntryScope(std::string_view inst_prefix,
   return inst_prefix;
 }
 
+// §30.4: the net a module path's output terminal `dst_port` names in the
+// module `module` declaring the path, or null where it names a variable or
+// nothing the module holds, there being then no net for a delay device to sit
+// on.
+static VpiHandle ModulePathOutputNet(VpiHandle module,
+                                     std::string_view dst_port) {
+  for (VpiHandle child : module->children) {
+    if (VpiIsNetsType(child->type) && child->name == dst_port) return child;
+  }
+  return nullptr;
+}
+
 void VpiContext::AttachModulePathDelays(SimContext& sim_ctx) {
   // §38.10: vpi_get_delays() retrieves an object's delays or pulse limits. A
   // module path is one of the four kinds of
@@ -380,6 +393,10 @@ void VpiContext::AttachModulePathDelays(SimContext& sim_ctx) {
       info.max_error = info.error;
       obj->delays.push_back(info);
     }
+    // §37.45: a module path's delay is one of the three a delay device stands
+    // for, and it sits on the net the path's output terminal names.
+    VpiPlaceDelayDevice(obj, ModulePathOutputNet(module, path.dst_port), module,
+                        vpiModPathDelay, [this] { return AllocObject(); });
   }
 }
 

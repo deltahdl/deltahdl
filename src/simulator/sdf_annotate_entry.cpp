@@ -35,6 +35,8 @@
 #include "simulator/specify.h"
 #include "simulator/specify_path_delay.h"
 #include "simulator/specify_sdf.h"
+#include "simulator/vpi_context.h"
+#include "simulator/vpi_globals.h"
 
 namespace delta {
 
@@ -599,6 +601,13 @@ void AnnotateSdfInterconnectEntry(const SdfInterconnect& ic,
   }
 
   SdfInterconnectOutcome outcome = mgr.AnnotateSdfInterconnect(ann);
+  // §37.45: an intermodule path delay and a module input port delay are each
+  // one a delay device stands for, so the VPI model places one where the entry
+  // annotated it. A NETDELAY delays a whole net, none of the three kinds of
+  // delay Annex K.2 gives a device.
+  if (outcome.annotated && ic.kind != SdfInterconnectKind::kNetdelay) {
+    GetGlobalVpiContext().PlaceSdfDelayDevice(ann.source, ann.load);
+  }
   for (auto& warning : outcome.warnings) {
     result.warnings.push_back(std::move(warning));
   }

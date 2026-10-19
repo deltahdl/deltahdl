@@ -95,6 +95,14 @@ bool VpiIsNetDriverOrLoad(VpiHandle child, VpiHandle net, bool want_driver) {
   if (child->type == vpiForce) {
     return NamesNet(want_driver ? child->lhs : child->rhs, net);
   }
+  // §37.45 details 1 and 2: of the two terms a delay device places on a net,
+  // the input term takes the value the net's drivers give and the output term
+  // passes it on to its loads once the delay has passed, so the one is a load
+  // of the net and the other a driver.
+  if (child->type == vpiDelayTerm && child->parent != nullptr &&
+      child->parent->type == vpiDelayDevice) {
+    return (child->parent->out_term == child) == want_driver;
+  }
   if (VpiIsPortsType(child->type)) {
     return VpiPortIsComplexExpressionLoad(child) != want_driver;
   }

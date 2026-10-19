@@ -49,11 +49,14 @@ void CollectVariableDriversOrLoads(VpiObject* node, bool want_driver,
 // expression on an input (detail 1).
 void CollectNetDriversOrLoads(VpiObject* node, bool want_driver,
                               VpiObject* iter) {
+  // §37.45: a delay term placed on a net reaches that net's drivers and loads,
+  // less the two terms of its own device, which stand between them.
+  VpiObject* net = node->term_net != nullptr ? node->term_net : node;
   // §37.16 detail 11: a part of a nettype net has no driver iteration.
-  if (want_driver && !VpiNetDriverIterationSupported(VpiNetTypeOf(node)))
-    return;
-  for (auto* child : node->children) {
-    if (VpiIsNetDriverOrLoad(child, node, want_driver)) {
+  if (want_driver && !VpiNetDriverIterationSupported(VpiNetTypeOf(net))) return;
+  for (auto* child : net->children) {
+    if (net != node && child->parent == node->parent) continue;
+    if (VpiIsNetDriverOrLoad(child, net, want_driver)) {
       iter->children.push_back(child);
     }
   }

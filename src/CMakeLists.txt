@@ -755,6 +755,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/vpi_compatibility.cpp
     simulator/vpi_constraint_relations.cpp
     simulator/vpi_control.cpp
+    simulator/vpi_delay_devices.cpp
     simulator/vpi_delays_side_effects.cpp
     simulator/vpi_design_attach.cpp
     simulator/vpi_design_attach_frames.cpp

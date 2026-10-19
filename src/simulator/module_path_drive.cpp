@@ -29,6 +29,7 @@
 #include "simulator/evaluation.h"
 #include "simulator/exec_task.h"
 #include "simulator/module_path_delay.h"
+#include "simulator/net.h"
 #include "simulator/sim_context.h"
 #include "simulator/specify.h"
 #include "simulator/specify_path_delay.h"
@@ -167,10 +168,38 @@ static ExecTask FilterModulePathPulse(const ModulePathDrive& drive,
   co_return StmtResult::kDone;
 }
 
+namespace {
+
+// §37.45 details 1 and 2: the destination net's record of the value a
+// transition is carrying across its delay, held from the transition's start,
+// moved with each new value the driver wants, and cleared when it ends, so the
+// input delay term on the net reads it ahead of the net.
+class PendingPathValue {
+ public:
+  PendingPathValue(Net* net, const Logic4Vec& v) : net_(net) { Hold(v); }
+  PendingPathValue(const PendingPathValue&) = delete;
+  PendingPathValue& operator=(const PendingPathValue&) = delete;
+  PendingPathValue(PendingPathValue&&) = delete;
+  PendingPathValue& operator=(PendingPathValue&&) = delete;
+  ~PendingPathValue() {
+    if (net_ != nullptr) net_->pending_path_value.reset();
+  }
+
+  void Hold(const Logic4Vec& v) const {
+    if (net_ != nullptr) net_->pending_path_value = v;
+  }
+
+ private:
+  Net* net_;
+};
+
+}  // namespace
+
 ExecTask RunModulePathTransition(const ModulePathDrive& drive,
                                  const Logic4Vec& old_val, Logic4Vec& val,
                                  bool* committed) {
   SimContext& ctx = drive.ctx;
+  const PendingPathValue kPending(ctx.FindNet(drive.output), val);
   ModulePathTransitionDelay lead = ResolveTransitionDelay(drive, old_val, val);
   SimTime scheduled = ctx.CurrentTime();
   SimTime target = scheduled + SimTime{lead.ticks};
@@ -196,6 +225,7 @@ ExecTask RunModulePathTransition(const ModulePathDrive& drive,
       // The driver wants a different value than the one pending, so the pending
       // transition is dropped and the new one takes its own delay.
       val = next;
+      kPending.Hold(val);
       lead = ResolveTransitionDelay(drive, old_val, val);
       target = ctx.CurrentTime() + SimTime{lead.ticks};
       continue;

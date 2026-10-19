@@ -724,14 +724,15 @@ struct VpiObject {
   // for a check that was written without a notifier.
   VpiObject* tchk_notifier = nullptr;
 
-  // §37.45: the two delay terminals a delay device reaches. vpiInTerm denotes
-  // the input delay term and vpiOutTerm the output delay term. Each is a delay
-  // term object, whose own type (vpiDelayTerm) differs from the relation enum
-  // (vpiInTerm / vpiOutTerm), so - as with the timing-check terms above - they
-  // are held as designated pointers rather than found by a type match. Null by
-  // default.
+  // §37.45: a delay device's input and output terms, which vpiInTerm and
+  // vpiOutTerm reach although their own type is vpiDelayTerm; the net a term
+  // sits on, whose drivers and loads its vpiDriver and vpiLoad reach; and the
+  // module path, intermodule path or port whose delay a device places there,
+  // which tells one device of a net from another. Null by default.
   VpiObject* in_term = nullptr;
   VpiObject* out_term = nullptr;
+  VpiObject* term_net = nullptr;
+  VpiObject* delay_source = nullptr;
 
   // §37.79: the left- and right-hand side expressions of a procedural
   // continuous assignment family object - an assign statement, a force, a
@@ -744,10 +745,8 @@ struct VpiObject {
   VpiObject* lhs = nullptr;
   VpiObject* rhs = nullptr;
 
-  // §37.45: the vpiDelayType integer property carried by a delay device and by
-  // a delay term. It names the kind of delay (for example a module-path or
-  // timing delay). Zero by default, which is what every object that is not a
-  // delay device or delay term reports.
+  // §37.45: vpiDelayType of a delay device and of its terms, one of Annex K.2's
+  // vpiModPathDelay, vpiInterModPathDelay and vpiMIPDelay; zero for any other.
   int delay_type = 0;
 
   // §37.38 detail 1 / §37.75 detail 1: the variable a foreach constraint or

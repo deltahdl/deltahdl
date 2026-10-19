@@ -39,9 +39,11 @@ class VpiContext {
 
   // §37.14: the ports each module instance declares, off the design, where a
   // port's direction and declared order live. §37.37: the intermodule paths
-  // running between the ports two instances connect to one signal.
+  // running between the ports two instances connect to one signal. §37.45: the
+  // delay device an annotated SDF INTERCONNECT or (`source` empty) PORT places.
   void AttachDesignPorts(const RtlirDesign* design);
   void AttachDesignInterModPaths(const RtlirDesign* design);
+  void PlaceSdfDelayDevice(std::string_view source, std::string_view load);
   void AttachTopModules(const RtlirDesign* design);
 
   void SetScheduler(Scheduler* sched) { scheduler_ = sched; }
@@ -432,17 +434,15 @@ class VpiContext {
   // where the descriptor named no channel.
   PLI_INT32 McdPrintf(PLI_UINT32 mcd, std::string_view text);
 
-  // §38.30: write already-formatted text to both the output channel of the tool
-  // that invoked the PLI application and the current tool log file. Unlike
-  // McdPrintf() there is no descriptor: the destination is always the tool's
-  // own output channel and log file (the §38.5 buffers), so the same text is
-  // appended to each. Returns the number of characters written.
+  // §38.30: write already-formatted text to the output channel of the tool that
+  // invoked the PLI application and to its current log file, the §38.5 buffers,
+  // appending the same text to each; unlike McdPrintf() it takes no descriptor.
+  // Returns the number of characters written.
   PLI_INT32 Printf(std::string_view text);
 
-  // Support hooks for the mcd-flush model. The writer feeds buffered text onto
-  // a single channel (the one set bit naming the file); the accessors report
-  // what is still pending on a channel and what a flush has committed; the
-  // failure hook forces the next flush down its nonzero return.
+  // Hooks for the mcd-flush model: the writer feeds buffered text onto the one
+  // channel a set bit names, the accessors report what is pending on a channel
+  // and what a flush has committed, and the failure hook fails the next flush.
   void WriteMcdChannel(PLI_UINT32 channel, std::string_view text);
   const std::string& McdChannelBuffer(PLI_UINT32 channel) const {
     auto it = channels_.mcd_channel_buffers.find(channel);

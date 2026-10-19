@@ -22,6 +22,7 @@
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_data_structs.h"
+#include "simulator/vpi_delay_devices.h"
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers3.h"
@@ -607,6 +608,10 @@ void VpiContext::PutDelays(VpiHandle obj, s_vpi_delay* delay_p) {
   // A run key is set only by a run, which is there to file the delays with.
   if (obj->type == vpiContAssign && !obj->run_key.empty()) {
     AnnotateContAssignDelays(*obj, *sim_ctx_);
+  }
+  // §37.45: an intermodule path's delay is one a delay device stands for.
+  if (obj->type == vpiInterModPath) {
+    VpiPlaceInterModPathDevice(obj, [this] { return AllocObject(); });
   }
 }
 
