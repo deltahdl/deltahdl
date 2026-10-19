@@ -109,6 +109,8 @@ int VpiTypespecKind(DataTypeKind kind) {
       return vpiChandleTypespec;
     case DataTypeKind::kVoid:
       return vpiVoidTypespec;
+    case DataTypeKind::kVirtualInterface:
+      return vpiInterfaceTypespec;
     default:
       return 0;
   }

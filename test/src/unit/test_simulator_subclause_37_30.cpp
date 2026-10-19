@@ -1,5 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
@@ -181,6 +186,94 @@ TEST_F(InterfaceTypespec, ParamAssignIterationOfParameterlessInterfaceIsNull) {
   iface_ts.children = {&unrelated};
 
   EXPECT_EQ(vpi_iterate(vpiParamAssign, VpiHandleOf(&iface_ts)), nullptr);
+}
+
+// §37.30 against designs read and run whole.
+class InterfaceTypespecsOfARun : public VpiDesignRun {
+ protected:
+  // The integer value of `obj`, -1 where nothing is written.
+  static int IntValueOf(vpiHandle obj) {
+    s_vpi_value value = {};
+    value.format = vpiIntVal;
+    value.value.integer = -1;
+    if (obj != nullptr) vpi_get_value(obj, &value);
+    return value.value.integer;
+  }
+
+  // The name each param assign `typespec` reaches assigns, with the kind of
+  // what it assigns, in the order reached.
+  static std::vector<std::pair<std::string, int>> Assigned(vpiHandle typespec) {
+    std::vector<std::pair<std::string, int>> assigned;
+    for (vpiHandle assign : ObjectsOf(vpiParamAssign, typespec)) {
+      vpiHandle rhs = vpi_handle(vpiRhs, assign);
+      assigned.emplace_back(vpi_get_str(vpiName, vpi_handle(vpiLhs, assign)),
+                            rhs == nullptr ? 0 : vpi_get(vpiType, rhs));
+    }
+    return assigned;
+  }
+};
+
+constexpr const char* kSBus =
+    "interface SBus #(parameter WIDTH = 8, parameter type T = logic);\n"
+    "  logic req, grant;\n"
+    "  logic [WIDTH-1:0] addr, data;\n"
+    "  modport phy(input addr, inout data);\n"
+    "endinterface\n"
+    "module top;\n"
+    "  parameter SIZE = 4;\n"
+    "  typedef virtual SBus#(16) SB16;\n"
+    "  typedef virtual SBus#(32).phy SBphy [1:SIZE];\n"
+    "  typedef virtual SBus#(.T(byte)) SBbyte;\n"
+    "  SBus #(16) bus();\n"
+    "endmodule\n";
+
+// §37.30 detail 3: a typedef of a virtual interface is an interface typespec
+// named after the typedef, reporting the interface's name, assigning the
+// parameter value it writes, 16, and reaching no parent (details 1 and 2), and
+// vpiTypedef of the module reaches it beside the array typedef (#7120).
+TEST_F(InterfaceTypespecsOfARun,
+       AVirtualInterfaceTypedefIsAnInterfaceTypespec) {
+  Run(kSBus);
+  vpiHandle sb16 = Named(vpiTypedef, By("top"), "SB16");
+  ASSERT_NE(sb16, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, sb16), vpiInterfaceTypespec);
+  EXPECT_STREQ(vpi_get_str(vpiDefName, sb16), "SBus");
+  EXPECT_EQ(vpi_get(vpiIsModPort, sb16), 0);
+  EXPECT_EQ(vpi_handle(vpiParent, sb16), nullptr);
+  const std::vector<vpiHandle> kAssigns = ObjectsOf(vpiParamAssign, sb16);
+  ASSERT_EQ(kAssigns.size(), 1U);
+  EXPECT_STREQ(vpi_get_str(vpiName, vpi_handle(vpiLhs, kAssigns[0])), "WIDTH");
+  EXPECT_EQ(IntValueOf(vpi_handle(vpiRhs, kAssigns[0])), 16);
+  EXPECT_NE(Named(vpiTypedef, By("top"), "SBphy"), nullptr);
+}
+
+// §37.30 details 1 to 3: SBphy is an array typespec whose element is the
+// typespec of the modport phy, reporting the modport's name and reaching
+// through vpiParent an interface typespec of SBus, which assigns 32 (#7120).
+TEST_F(InterfaceTypespecsOfARun, AModportTypespecReachesItsInterfaces) {
+  Run(kSBus);
+  vpiHandle phy_array = Named(vpiTypedef, By("top"), "SBphy");
+  ASSERT_NE(phy_array, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, phy_array), vpiArrayTypespec);
+  vpiHandle phy = vpi_handle(vpiElemTypespec, phy_array);
+  ASSERT_NE(phy, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, phy), vpiInterfaceTypespec);
+  EXPECT_STREQ(vpi_get_str(vpiDefName, phy), "phy");
+  EXPECT_EQ(vpi_get(vpiIsModPort, phy), 1);
+  vpiHandle sbus = vpi_handle(vpiParent, phy);
+  ASSERT_NE(sbus, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiDefName, sbus), "SBus");
+  const std::vector<vpiHandle> kAssigns = ObjectsOf(vpiParamAssign, sbus);
+  ASSERT_EQ(kAssigns.size(), 1U);
+  EXPECT_EQ(IntValueOf(vpi_handle(vpiRhs, kAssigns[0])), 32);
+}
+
+// §37.30 detail 3: a type given a type parameter by name is assigned as the
+// typespec of that type (#7120).
+TEST_F(InterfaceTypespecsOfARun, ATypeGivenByNameIsAssignedItsTypespec) {
+  Run(kSBus);
+  EXPECT_EQ(Assigned(Named(vpiTypedef, By("top"), "SBbyte")),
+            (std::vector<std::pair<std::string, int>>{{"T", vpiByteTypespec}}));
 }
 
 }  // namespace

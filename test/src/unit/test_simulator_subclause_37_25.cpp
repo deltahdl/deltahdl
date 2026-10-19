@@ -765,14 +765,13 @@ TEST_F(TypespecsOfARun, AnEnumWithDimsAfterItsBodyIsAPackedArrayOfIt) {
             (std::vector<int>{2}));
 }
 
-// A typedef of a type the run draws no typespec for, a virtual interface's
-// until #7120 gives it one, written plain or with unpacked dimensions of its
-// own, hangs nothing from its scope, and the typedefs declared after it still
-// reach theirs.
+// A typedef of a type the run draws no typespec for, a type parameter's,
+// written plain or with unpacked dimensions of its own, hangs nothing from its
+// scope, and the typedefs declared after it still reach theirs.
 TEST_F(TypespecsOfARun, ATypedefWithNoTypespecLeavesTheOthersInPlace) {
-  Run("interface bus_a; endinterface\n"
-      "module top;\n"
-      "  typedef virtual bus_a vbus; typedef virtual bus_a vbus_arr [2];\n"
+  Run("module top;\n"
+      "  parameter type T = int;\n"
+      "  typedef T alias_t; typedef T alias_arr [2];\n"
       "  typedef bit [2:0] tri_t [4];\n"
       "endmodule\n");
   vpiHandle tri = Named(vpiTypedef, By("top"), "tri_t");

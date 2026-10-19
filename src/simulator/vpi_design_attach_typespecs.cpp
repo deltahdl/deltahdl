@@ -1,6 +1,7 @@
 #include "simulator/vpi_design_attach_typespecs.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <optional>
@@ -12,6 +13,7 @@
 #include "common/arena.h"
 #include "common/packed_range.h"
 #include "common/types.h"
+#include "elaborator/elaborator_items_params.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
 #include "parser/ast_class.h"
@@ -49,6 +51,9 @@ struct DesignTypespecs {
   VpiTypespecShapes& shapes;
   const VpiClassDefnObjects& classes;
   const VpiObjectMap& objects;
+  // §37.30: the compilation unit, whose interfaces an interface typespec's
+  // parameter values are assigned to.
+  const CompilationUnit& unit;
 };
 
 // What making one scope's typespecs reads: the scope object they hang from,
@@ -117,6 +122,17 @@ DataType ElementOf(const DataType& type) {
     element.extra_packed_dims.clear();
   }
   return element;
+}
+
+// The module, interface or program `unit` declares under `name`.
+const ModuleDecl* ElementNamed(const CompilationUnit& unit,
+                               std::string_view name) {
+  for (const auto* list : {&unit.modules, &unit.interfaces, &unit.programs}) {
+    for (const ModuleDecl* decl : *list) {
+      if (decl->name == name) return decl;
+    }
+  }
+  return nullptr;
 }
 
 // The typespec a named type finds, and whether it is one a typedef declares,
@@ -275,6 +291,8 @@ class TypespecMaker {
       FillEnum(typespec, type, typedef_name);
     } else if (kKind == vpiStructTypespec || kKind == vpiUnionTypespec) {
       FillAggregate(typespec, type);
+    } else if (kKind == vpiInterfaceTypespec) {
+      FillInterface(typespec, type);
     } else if (!name.empty()) {
       typespec->aliased =
           Own(type, std::string_view{}, typespec, std::string_view{});
@@ -307,6 +325,55 @@ class TypespecMaker {
     base.packed_dim_right = type.packed_dim_right;
     base.type_name = type.enum_base_name;
     typespec->inner_typespec = Of(base, {}, std::string_view{}, typespec);
+  }
+
+  // §37.30: an interface typespec of the interface the virtual interface type
+  // `type` names, reporting its name through vpiDefName (detail 1) and
+  // reaching a param assign per parameter value `type` writes (detail 3); for
+  // a type naming a modport, the modport's typespec, reporting the modport's
+  // name and reaching such an interface typespec through vpiParent (detail 2).
+  void FillInterface(VpiObject* typespec, const DataType& type) {
+    VpiObject* of_interface = typespec;
+    if (!type.modport_name.empty()) {
+      typespec->def_name = std::string(type.modport_name);
+      typespec->is_modport = true;
+      of_interface = Alloc(std::string_view{}, nullptr);
+      of_interface->type = vpiInterfaceTypespec;
+      typespec->parent = of_interface;
+    }
+    of_interface->def_name = std::string(type.type_name);
+    const ModuleDecl* decl = ElementNamed(at_.design.unit, type.type_name);
+    const std::vector<std::string_view> kOrdered =
+        decl == nullptr ? std::vector<std::string_view>{}
+                        : OverridableParamNames(decl);
+    for (std::size_t i = 0; i < type.type_params.size(); ++i) {
+      MakeInterfaceParamAssign(of_interface, type.type_params[i],
+                               i < kOrdered.size() ? kOrdered[i] : "");
+    }
+  }
+
+  // §37.30 detail 3: the param assign of `typespec` the value or type `actual`
+  // gives the parameter it names, or else `ordered`, the one at its place:
+  // reaching through vpiLhs a parameter of that name and through vpiRhs the
+  // expression a value writes or the typespec of a type.
+  void MakeInterfaceParamAssign(VpiObject* typespec, const DataType& actual,
+                                std::string_view ordered) {
+    VpiObject* assign = build_.alloc();
+    assign->type = vpiParamAssign;
+    assign->parent = typespec;
+    VpiObject* param = build_.alloc();
+    param->type =
+        actual.type_ref_expr != nullptr ? vpiParameter : vpiTypeParameter;
+    param->name = build_.keep(std::string(
+        actual.param_arg_name.empty() ? ordered : actual.param_arg_name));
+    param->parent = assign;
+    assign->children.push_back(param);
+    assign->rhs =
+        actual.type_ref_expr != nullptr
+            ? VpiInstanceExpression(actual.type_ref_expr, at_.design.objects,
+                                    at_.prefix, at_.design.ctx, build_)
+            : Of(actual, {}, std::string_view{}, assign);
+    typespec->children.push_back(assign);
   }
 
   // §37.25 and §37.26: a struct or union typespec's vpiPacked, vpiTagged and
@@ -373,17 +440,6 @@ TypespecsByName MakeTypespecs(const std::vector<ModuleItem*>& items,
     made[item->name] = typespec;
   }
   return made;
-}
-
-// The module, interface or program `unit` declares under `name`.
-const ModuleDecl* ElementNamed(const CompilationUnit& unit,
-                               std::string_view name) {
-  for (const auto* list : {&unit.modules, &unit.interfaces, &unit.programs}) {
-    for (const ModuleDecl* decl : *list) {
-      if (decl->name == name) return decl;
-    }
-  }
-  return nullptr;
 }
 
 // One instance of `mod` at `prefix`: its object and the module, interface or
@@ -673,7 +729,7 @@ VpiObjectMap AttachTypespecs(const RtlirDesign* design,
   if (design->compilation_unit == nullptr) return {};
   const CompilationUnit& unit = *design->compilation_unit;
   VpiTypespecShapes shapes(build);
-  const DesignTypespecs kDesign{build, ctx, shapes, classes, objects};
+  const DesignTypespecs kDesign{build, ctx, shapes, classes, objects, unit};
   auto unit_scope = objects.find("$unit");
   const TypespecsByName kNone;
   const std::vector<RtlirImport> kNoImports;
@@ -709,7 +765,8 @@ void AttachPortTypespecs(const RtlirDesign* design, const VpiObjectMap& objects,
   // §37.14 (figure): a port reaches the typespec of its type through
   // vpiTypespec, which reached nothing for every port.
   VpiTypespecShapes shapes(build);
-  const DesignTypespecs kDesign{build, ctx, shapes, calls.classes, objects};
+  const DesignTypespecs kDesign{
+      build, ctx, shapes, calls.classes, objects, *design->compilation_unit};
   WalkInstanceDecls(design, *design->compilation_unit, objects, ctx,
                     [&](const RtlirModule& mod, const std::string& prefix,
                         VpiObject* instance, const ModuleDecl& decl) {
