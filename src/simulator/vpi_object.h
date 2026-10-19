@@ -11,6 +11,7 @@
 #include "common/envelope_viewport.h"
 #include "common/packed_range.h"
 #include "simulator/vpi_constants.h"
+#include "simulator/vpi_decl_facts.h"
 #include "simulator/vpi_instance_facts.h"
 #include "simulator/vpi_user.h"
 
@@ -681,10 +682,7 @@ struct VpiObject {
   // because the base declares none of them, so no other relation reaches them.
   std::vector<VpiObject*> derived_classes;
 
-  // §37.17 detail 24 and §37.41 detail 4: the visibility a class member was
-  // declared with, vpiLocalVis or vpiProtectedVis, and 0 for one declared
-  // with neither.
-  int visibility = 0;
+  VpiDeclFacts decl_facts;  // §37.17 and §37.41: see VpiDeclFacts.
 
   // §37.33 detail 1: a class object's identifier, reported through
   // vpi_get(vpiObjId). It is a 64-bit value guaranteed unique among all live

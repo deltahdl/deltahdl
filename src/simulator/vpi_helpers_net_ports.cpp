@@ -4,6 +4,7 @@
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_model_helpers1.h"
+#include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
@@ -180,7 +181,10 @@ bool VpiIsTermOrPortRelation(int type, VpiHandle ref) {
            type == vpiModDataPathIn;
   }
   if (ref->type == vpiRefObj) return VpiIsRefObjPortRelation(type);
-  return VpiIsNetsType(ref->type) && (type == vpiPorts || type == vpiPortInst);
+  // §37.17 (printed page 1025) draws the port relations from a variable as
+  // §37.16 draws them from a net.
+  return (VpiIsNetsType(ref->type) || VpiIsVariablesType(ref->type)) &&
+         (type == vpiPorts || type == vpiPortInst);
 }
 
 std::vector<VpiHandle> VpiTermOrPortObjects(int type, VpiHandle ref) {

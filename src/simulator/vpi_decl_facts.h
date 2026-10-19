@@ -1,0 +1,22 @@
+#pragma once
+
+namespace delta {
+
+struct VpiObject;
+
+// §37.17 and §37.41: what the declaration of a variable or of a task or
+// function says of it that the model reports as properties beside its kind.
+struct VpiDeclFacts {
+  // §37.17 detail 24 and §37.41 detail 4: the visibility a class member was
+  // declared with, vpiLocalVis or vpiProtectedVis, and 0 for one declared
+  // with neither.
+  int visibility = 0;
+  // §37.17 (printed page 1025) with §6.20.6: whether a variable was declared
+  // const, which vpi_get(vpiConstantVariable) reports.
+  bool constant_variable = false;
+  // §37.17 detail 8: the expression a variable's declaration initializes it
+  // with, reached through vpiExpr; null where it writes none.
+  VpiObject* init_expr = nullptr;
+};
+
+}  // namespace delta

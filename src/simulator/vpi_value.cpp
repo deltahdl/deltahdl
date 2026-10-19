@@ -160,6 +160,15 @@ static bool GetValueIsRefused(VpiHandle obj, s_vpi_value* value,
         "class definition handle has no accessible value");
     return true;
   }
+  // §37.17 detail 11: an array var, a class var and a virtual interface var
+  // have no value property, so reading one is refused as well.
+  if (VpiIsVariablesType(obj->type) &&
+      !VpiVariableHasValueProperty(obj->type, true)) {
+    RecordVpiError(error,
+                   "vpi_get_value(): an array, class or virtual interface "
+                   "variable has no value");
+    return true;
+  }
   // §37.26 detail 1: the value of an entire unpacked structure or unpacked
   // union is not accessible through vpi_get_value(). Such an aggregate holds no
   // single scalar or vector value to hand back, so the read is refused, an
@@ -519,6 +528,16 @@ static bool PutValueTargetIsRejected(VpiHandle obj, s_vpi_error_info& error) {
         error,
         "vpi_put_value(): a variable or event handle obtained from a "
         "class definition handle has no accessible value");
+    return true;
+  }
+
+  // §37.17 detail 11: nor can an array var, a class var or a virtual
+  // interface var, which have no value property.
+  if (VpiIsVariablesType(obj->type) &&
+      !VpiVariableHasValueProperty(obj->type, true)) {
+    RecordVpiError(error,
+                   "vpi_put_value(): an array, class or virtual interface "
+                   "variable has no value");
     return true;
   }
 

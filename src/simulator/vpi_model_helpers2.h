@@ -225,8 +225,7 @@ bool VpiVariableIsArrayMember(VpiHandle var);
 bool VpiVariableIsStructUnionMember(VpiHandle var);
 
 // §37.17 detail 8: a variable's initialization expression, reached through
-// vpiExpr (modeled as the variable's first child). Null when the variable has
-// no initialization expression.
+// vpiExpr. Null when the variable has no initialization expression.
 VpiHandle VpiVariableInitExpr(VpiHandle var);
 
 // §37.17 detail 14: whether the cbSizeChange callback is applicable to a
@@ -326,6 +325,16 @@ bool VpiIsRandTypeValue(int value);
 // currently active for randomization.
 bool VpiIsRandomized(bool active_for_randomization);
 
+// §37.17 details 15 and 22: the randomization type `obj` reports through
+// vpiRandType: a typespec member's or a class property's as declared,
+// vpiNotRand for any other variable, and 0 for an object of any other kind.
+int VpiRandTypeOf(VpiHandle obj);
+
+// §37.17 detail 16 with §18.8: whether the variable `var` is a random variable
+// rand_mode() has not turned off, on the object it is a property of or, for a
+// static one, on its class.
+bool VpiVariableIsRandomized(VpiHandle var);
+
 // §37.17 detail 21: vpiArrayType is one of vpiStaticArray, vpiDynamicArray,
 // vpiAssocArray, vpiQueueArray.
 bool VpiIsArrayTypeValue(int value);
@@ -390,6 +399,11 @@ std::string VpiClassMemberFullName(bool is_static, std::string_view scope_path,
                                    std::string_view class_defn,
                                    std::string_view member);
 
+// §37.17 detail 25: whether `obj` is a non-static data member of a class,
+// reached through a class object or through its class defn, which has no
+// vpiFullName.
+bool VpiIsNonStaticClassDataMember(VpiHandle obj);
+
 // §37.17 detail 26: a candidate vpiParent prefix object, in prefix order
 // (rightmost/innermost first). A prefix qualifies when it is a
 // struct/union/class variable, a struct/union member or class data member, or
@@ -441,6 +455,10 @@ struct VpiVariableNameParts {
 // §37.17 detail 28: vpiName - the leaf member with its own index/slice but none
 // of its struct/union/class-var prefixes.
 std::string VpiVariableName(const VpiVariableNameParts& parts);
+
+// §37.17 detail 28: the vpiDecompile of the variable or var bit `var`: its
+// name joined to the names of the struct and union vars it is a member of.
+std::string VpiVariableDecompileOf(VpiHandle var);
 
 // §37.17 detail 28: vpiDecompile - the prefixes joined to the member (and its
 // index/slice) without the top-level scope, so it resolves for any

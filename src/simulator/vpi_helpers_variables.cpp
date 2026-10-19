@@ -2,8 +2,10 @@
 #include <cstdarg>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
+#include "simulator/class_object.h"
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_user.h"
 // §37.10 detail 3: the package/interface/program instance kinds are defined in
@@ -288,10 +290,10 @@ bool VpiVarSelectConstantSelect(const VpiVarSelectConstantSelectQuery& query) {
 
 VpiHandle VpiVariableInitExpr(VpiHandle var) {
   // §37.17 detail 8: when a variable has an initialization expression, it is
-  // reached through vpiExpr - modeled as the variable's first child. A variable
-  // with no initialization expression has none.
-  if (!var || var->children.empty()) return nullptr;
-  return var->children.front();
+  // reached through vpiExpr; its declaration's facts hold it
+  // (AttachVariableInitializers). A variable with no initialization
+  // expression has none.
+  return var != nullptr ? var->decl_facts.init_expr : nullptr;
 }
 
 bool VpiSizeChangeCallbackApplies(int array_type, bool is_string_var) {
@@ -453,6 +455,26 @@ bool VpiIsRandomized(bool active_for_randomization) {
   return active_for_randomization;
 }
 
+int VpiRandTypeOf(VpiHandle obj) {
+  if (obj->rand_type != 0 || !VpiIsVariablesType(obj->type)) {
+    return obj->rand_type;
+  }
+  return vpiNotRand;
+}
+
+bool VpiVariableIsRandomized(VpiHandle var) {
+  if (var->rand_type != vpiRand && var->rand_type != vpiRandC) return false;
+  const ClassObject* holder = var->property_of;
+  if (holder == nullptr) return VpiIsRandomized(true);
+  // §18.8: every random variable is active until rand_mode() turns it off,
+  // and a static one's state is its class's, shared by every object.
+  const auto& states = var->automatic || holder->type == nullptr
+                           ? holder->rand_active
+                           : holder->type->static_rand_active;
+  const auto kState = states.find(std::string(var->name));
+  return VpiIsRandomized(kState == states.end() || kState->second);
+}
+
 bool VpiIsArrayTypeValue(int value) {
   // §37.17 detail 21: the four array-type values.
   return value == vpiStaticArray || value == vpiDynamicArray ||
@@ -513,13 +535,16 @@ int VpiVariableVisibility(bool is_class_member, int declared_visibility) {
 }
 
 int VpiObjectVisibility(VpiHandle obj) {
+  // §37.33 detail 6: a property reached through a class object is a member of
+  // the object's class as much as one reached through the class defn is.
   const bool kClassMember =
-      obj->parent != nullptr && obj->parent->type == vpiClassDefn;
+      (obj->parent != nullptr && obj->parent->type == vpiClassDefn) ||
+      obj->property_of != nullptr;
   if (VpiIsClassMethodType(obj->type)) {
-    return VpiTaskFuncVisibility(kClassMember, obj->visibility);
+    return VpiTaskFuncVisibility(kClassMember, obj->decl_facts.visibility);
   }
   if (VpiIsVariablesType(obj->type)) {
-    return VpiVariableVisibility(kClassMember, obj->visibility);
+    return VpiVariableVisibility(kClassMember, obj->decl_facts.visibility);
   }
   return vpiUndefined;
 }
@@ -583,6 +608,15 @@ std::string VpiClassMemberFullName(bool is_static, std::string_view scope_path,
   return result;
 }
 
+bool VpiIsNonStaticClassDataMember(VpiHandle obj) {
+  if (!VpiIsVariablesType(obj->type)) return false;
+  // A class object's property is automatic unless declared static; a class
+  // defn's static property alone carries the full name its defn gives it.
+  if (obj->property_of != nullptr) return obj->automatic;
+  return obj->parent != nullptr && obj->parent->type == vpiClassDefn &&
+         obj->full_name.empty();
+}
+
 VpiHandle VpiVariableParent(const std::vector<VpiParentPrefix>& prefixes) {
   // §37.17 detail 26: scan the prefixes rightmost to leftmost and return the
   // first one that qualifies; NULL when none does.
@@ -622,6 +656,22 @@ std::string VpiVariableDecompile(const VpiVariableNameParts& parts) {
   }
   result += parts.member + parts.index_suffix;
   return result;
+}
+
+std::string VpiVariableDecompileOf(VpiHandle var) {
+  // A var bit carries its own index in its name, and is a bit of a variable
+  // whose holders prefix it.
+  const VpiObject* named = var->type == vpiRegBit ? var->parent : var;
+  VpiVariableNameParts parts;
+  parts.member = std::string(var->name);
+  for (const VpiObject* holder = named->parent;
+       holder != nullptr &&
+       (holder->type == vpiStructVar || holder->type == vpiUnionVar);
+       holder = holder->parent) {
+    parts.member_prefixes.insert(parts.member_prefixes.begin(),
+                                 std::string(holder->name));
+  }
+  return VpiVariableDecompile(parts);
 }
 
 std::string VpiVariableFullName(const VpiVariableNameParts& parts) {

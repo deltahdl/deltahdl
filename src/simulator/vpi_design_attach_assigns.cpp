@@ -185,11 +185,27 @@ std::vector<const Expr*> Operands(const Expr* first,
   return operands;
 }
 
+// The width in bits of an element of the array var `array`, read off the
+// first element it holds, through its subarrays; 0 where it holds none.
+int ElementSize(const VpiObject& array) {
+  for (const VpiObject* child : array.children) {
+    if (!child->array_member) continue;
+    return VpiIsArrayVarType(child->type) ? ElementSize(*child) : child->size;
+  }
+  return 0;
+}
+
 // §37.19: a select of an element of the array var `base` whose index is not a
 // constant: a var select reaching the array through vpiParent and the
 // expression the source wrote through vpiIndex. Which element it stands for is
 // not fixed before the run, so it holds none, and its value is the one of the
 // element its index selects when the value is read or written (vpi_value.cpp).
+// §37.17 with §37.19 (printed pages 1025 and 1030): an array var reaches the
+// var selects of it, so a select of the array itself, rather than one through
+// another var select, is among the array's children. §37.17 detail 5: a
+// select through another reaches the indices of both, its own first and then
+// outward, and detail 10: one that selects an element is as many bits wide as
+// the element is.
 VpiObject* VarSelectObject(VpiObject* base, const Expr* index,
                            const AssignBuild& build) {
   VpiObject* select = build.alloc();
@@ -198,6 +214,18 @@ VpiObject* VarSelectObject(VpiObject* base, const Expr* index,
   select->index_expr = ExpressionObject(index, build);
   if (select->index_expr != nullptr) {
     select->children.push_back(select->index_expr);
+  }
+  const VpiObject* array = base;
+  std::size_t depth = 1;
+  for (; array->type == vpiVarSelect; array = array->parent) ++depth;
+  if (base->type == vpiVarSelect) {
+    select->children.insert(select->children.end(), base->children.begin(),
+                            base->children.end());
+  } else {
+    base->children.push_back(select);
+  }
+  if (depth == array->array_dim_indices.size()) {
+    select->size = ElementSize(*array);
   }
   return select;
 }

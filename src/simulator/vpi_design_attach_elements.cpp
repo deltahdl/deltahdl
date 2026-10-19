@@ -8,8 +8,8 @@
 #include "common/packed_range.h"
 #include "common/types.h"
 #include "elaborator/rtlir.h"
-#include "parser/ast_type.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_constants.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_object.h"
@@ -84,6 +84,10 @@ void AttachLevel(const ArrayLevel& level, std::size_t depth,
       if (element == nullptr) continue;
       Adopt(element, level, index, attach.build);
       if (attach.element_type != 0) element->type = attach.element_type;
+      // §37.17 detail 20: the array answers vpiScalar and vpiVector as its
+      // element does (RecordVariableFacts), so the element answers alike.
+      element->decl_scalar = attach.array.decl_scalar;
+      element->decl_vector = attach.array.decl_vector;
       continue;
     }
     VpiObject* subarray = attach.build.alloc();
@@ -118,12 +122,17 @@ void RecordDimensionIndices(VpiObject& array,
 // it, zero where the run's object for the element says it. §37.17 with
 // §37.33: an element of an array of class handles is a class var, and §37.12
 // detail 7 with §37.29: an element of an array of virtual interfaces is a
-// virtual interface var, which the run made a reg like every element.
+// virtual interface var, which the run made a reg like every element. §37.17
+// (printed page 1025) makes an element of an array of any other built-in type
+// a variable of that type, an int var of `int a[4]`. An element of a
+// structure, union or event array keeps the reg the run made it, which its
+// bits are indexed as (VarBitDims).
 int DeclaredElementType(const RtlirVariable& var) {
   if (!var.class_type_name.empty()) return vpiClassVar;
-  return var.decl_kind == DataTypeKind::kVirtualInterface
-             ? vpiVirtualInterfaceVar
-             : 0;
+  const int kKind = VpiDataTypeVariableKind(var.decl_kind);
+  const bool kKept = kKind == kVpiReg || kKind == vpiStructVar ||
+                     kKind == vpiUnionVar || kKind == vpiNamedEvent;
+  return kKept ? 0 : kKind;
 }
 
 // Whether `var` is an array var whose every unpacked dimension is fixed, the

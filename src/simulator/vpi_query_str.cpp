@@ -23,6 +23,7 @@
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers1.h"
+#include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
@@ -537,6 +538,12 @@ static const char* VpiConfigStr(VpiHandle obj) {
 // other object kind, and one that stored no decompiled form, yields null rather
 // than an empty string.
 static const char* VpiDecompileStr(VpiHandle obj) {
+  // §37.17 detail 28: a variable decompiles to the name an expression would
+  // write it by, built when it is first asked for.
+  if ((VpiIsVariablesType(obj->type) || obj->type == vpiRegBit) &&
+      obj->decompile.empty()) {
+    obj->decompile = VpiVariableDecompileOf(obj);
+  }
   if (!VpiIsExprType(obj->type) && obj->type != vpiSysTaskCall) return nullptr;
   return obj->decompile.empty() ? nullptr : obj->decompile.c_str();
 }
@@ -589,7 +596,9 @@ static const char* VpiGetStrRawProperty(int property, VpiHandle obj) {
     // - yields null rather than an empty string.
     case vpiDefFile:
       return VpiDefFileStr(obj);
+    // §37.17 detail 25: a non-static class data member has no full name.
     case kVpiFullName:
+      if (VpiIsNonStaticClassDataMember(obj)) return nullptr;
       return obj->full_name.empty() ? obj->name.data() : obj->full_name.c_str();
     // §37.41 detail 10: vpiDPICIdentifier reports the C linkage name of a "DPI"
     // or "DPI-C" task or function. An object that carries no such name yields

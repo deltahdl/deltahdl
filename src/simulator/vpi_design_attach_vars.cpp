@@ -1,3 +1,5 @@
+#include "simulator/vpi_design_attach_vars.h"
+
 #include <string>
 
 #include "elaborator/rtlir.h"
@@ -8,6 +10,7 @@
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_declared_shape.h"
+#include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_object.h"
@@ -97,6 +100,9 @@ void RecordAggregateFacts(VpiObject* obj, const std::string& key,
     obj->type = info->is_union ? vpiUnionVar : vpiStructVar;
   }
   if (obj->type != vpiStructVar && obj->type != vpiUnionVar) return;
+  // §37.26: whether it is packed, which vpiPacked reports and which leaves
+  // its value accessible (detail 1).
+  obj->packed = info->is_packed;
   if (!info->is_packed) obj->size = static_cast<int>(info->fields.size());
 }
 
@@ -134,6 +140,22 @@ void VpiContext::AttachVariableFacts(const RtlirDesign* design) {
           const std::string kKey = VpiFlatName(prefix, var.name);
           VpiHandle obj = FindObjectForFlatName(object_map_, kKey);
           if (obj != nullptr) RecordVariableFacts(obj, var, kKey, ctx);
+        }
+      });
+}
+
+void AttachVariableInitializers(const RtlirDesign& design,
+                                const VpiObjectMap& objects, SimContext& ctx,
+                                const VpiAttachBuild& build) {
+  WalkInstancePaths(
+      &design, [&](const RtlirModule* mod, const std::string& prefix) {
+        for (const RtlirVariable& var : mod->variables) {
+          if (var.init_expr == nullptr) continue;
+          VpiObject* obj =
+              FindObjectForFlatName(objects, VpiFlatName(prefix, var.name));
+          if (obj == nullptr) continue;
+          obj->decl_facts.init_expr =
+              VpiInstanceExpression(var.init_expr, objects, prefix, ctx, build);
         }
       });
 }

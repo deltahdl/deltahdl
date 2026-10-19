@@ -21,6 +21,7 @@
 #include "simulator/vpi_design_attach_assertion_decls.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_attach_interface_tf_decls.h"
+#include "simulator/vpi_design_attach_vars.h"
 #include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_instance_facts.h"
 #include "simulator/vpi_model_helpers1.h"
@@ -347,6 +348,7 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
     call_objects_.subroutines =
         AttachSubroutines(*design, object_map_, *sim_ctx_, kBuild);
     AttachVariableRanges(*design, object_map_, *sim_ctx_, kBuild);
+    AttachVariableInitializers(*design, object_map_, *sim_ctx_, kBuild);
     AttachModports(design, object_map_, *sim_ctx_, kBuild);
     // An interface tf decl reaches the task or function a module defines for
     // it, so the subroutines come first.

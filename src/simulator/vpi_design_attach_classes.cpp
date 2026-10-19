@@ -12,6 +12,7 @@
 #include "parser/ast_type.h"
 #include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_class_objects.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_walk.h"
@@ -281,7 +282,8 @@ VpiObject* MakeProperty(const MadeClassDefn& owner, const ClassMember& member,
   var->full_name = VpiClassMemberFullName(member.is_static, "",
                                           owner.defn->full_name, member.name);
   var->parent = owner.defn;
-  var->visibility = DeclaredVisibility(member);
+  var->decl_facts.visibility = DeclaredVisibility(member);
+  VpiRecordPropertyDecl(*var, member);
   if (VpiObject* param = NamedTypeParameter(owner, member.data_type)) {
     var->children.push_back(param);
   }
@@ -304,7 +306,7 @@ void MakeMethod(const MadeClassDefn& owner, const ClassMember& member,
   method->name = build.keep(std::string(item->name));
   method->full_name = owner.defn->full_name + "::" + std::string(item->name);
   method->parent = owner.defn;
-  method->visibility = DeclaredVisibility(member);
+  method->decl_facts.visibility = DeclaredVisibility(member);
   method->is_virtual = member.is_virtual || member.is_pure_virtual;
   method->automatic = true;
   // §37.3.3: where the method was written.

@@ -311,7 +311,12 @@ void RecordVariableObjectKinds(
         for (const RtlirVariable& var : VpiDeclaredVariables(*mod)) {
           VpiHandle obj =
               FindObjectForFlatName(objects, VpiFlatName(prefix, var.name));
-          if (obj != nullptr) obj->type = VpiVariableObjectKind(var);
+          if (obj == nullptr) continue;
+          obj->type = VpiVariableObjectKind(var);
+          // §37.17 (printed page 1025) with §6.20.6: a variable declared
+          // const is a constant variable.
+          obj->decl_facts.constant_variable =
+              var.written_type != nullptr && var.written_type->is_const;
         }
       });
 }

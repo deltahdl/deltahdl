@@ -117,10 +117,11 @@ VpiObject* MakePropertyVariable(VpiObject* holder, ClassObject& obj,
   var->alloc_scheme = VpiAllocSchemeFor(
       member.is_static ? VpiAllocKind::kOther : VpiAllocKind::kDynamic);
   if (member.is_local) {
-    var->visibility = vpiLocalVis;
+    var->decl_facts.visibility = vpiLocalVis;
   } else if (member.is_protected) {
-    var->visibility = vpiProtectedVis;
+    var->decl_facts.visibility = vpiProtectedVis;
   }
+  VpiRecordPropertyDecl(*var, member);
   var->property_of = &obj;
   if (member.data_type.kind == DataTypeKind::kVirtualInterface &&
       !member.unpacked_dims.empty()) {
@@ -278,6 +279,16 @@ int MessageConstType(const MailboxMessageType& type) {
 }
 
 }  // namespace
+
+void VpiRecordPropertyDecl(VpiObject& var, const ClassMember& member) {
+  if (member.is_randc) {
+    var.rand_type = vpiRandC;
+  } else {
+    var.rand_type = member.is_rand ? vpiRand : vpiNotRand;
+  }
+  var.decl_facts.constant_variable =
+      member.is_const || member.data_type.is_const;
+}
 
 Logic4Vec* VpiHeldPropertyValue(ClassObject& obj, std::string_view name) {
   std::string key(name);

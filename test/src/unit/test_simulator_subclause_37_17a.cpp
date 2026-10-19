@@ -199,14 +199,17 @@ TEST(VariableModel, LeftRightRangeNullForNoMembersOrEmptyRange) {
 }
 
 // D8: a variable's initialization expression is reached through vpiExpr; a
-// variable with no initialization expression has none.
+// variable with no initialization expression has none, whatever children it
+// holds.
 TEST(VariableModel, InitializationExpressionReachedThroughExpr) {
   VpiObject init;
   VpiObject var;
-  var.children.push_back(&init);
+  var.decl_facts.init_expr = &init;
   EXPECT_EQ(VpiVariableInitExpr(&var), &init);
 
+  VpiObject typespec;
   VpiObject uninitialized;
+  uninitialized.children.push_back(&typespec);
   EXPECT_EQ(VpiVariableInitExpr(&uninitialized), nullptr);
   EXPECT_EQ(VpiVariableInitExpr(nullptr), nullptr);
 }

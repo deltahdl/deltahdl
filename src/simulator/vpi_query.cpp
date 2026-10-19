@@ -349,9 +349,18 @@ int VpiGetTypeRestricted(int property, VpiHandle obj, bool& handled) {
     // array; zero for any other.
     case vpiArrayType:
       return obj->array_type;
-    // §37.25: whether a typespec member is rand or randc; zero for any other.
+    // §37.25 and §37.17 details 15, 16 and 22: whether a typespec member or a
+    // variable is rand or randc, and whether a random variable is active.
     case vpiRandType:
-      return obj->rand_type;
+      return VpiRandTypeOf(obj);
+    case vpiIsRandomized:
+      return VpiBool(VpiVariableIsRandomized(obj));
+    // §37.17 detail 17 and (printed page 1025): whether a variable is a member
+    // of a structure or union variable, and whether it was declared const.
+    case vpiStructUnionMember:
+      return VpiBool(VpiVariableIsStructUnionMember(obj));
+    case vpiConstantVariable:
+      return VpiBool(obj->decl_facts.constant_variable);
     // §37.16: the kind of net a net was declared.
     case vpiNetType:
       return VpiNetTypeOf(obj);

@@ -1,9 +1,11 @@
 #include <algorithm>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
 
 #include "common/arena.h"
+#include "common/packed_range.h"
 #include "common/types.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast_class.h"
@@ -15,7 +17,9 @@
 #include "simulator/variable.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_design_attach_build.h"
+#include "simulator/vpi_design_attach_vars.h"
 #include "simulator/vpi_design_walk.h"
+#include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -129,9 +133,9 @@ namespace {
 // has (§37.17), and its value is the field's bits of the holder's value, a
 // copy that a read refreshes and a write is copied back from, read as a real
 // where the field is one.
-void MakeMember(VpiObject* holder, const StructFieldInfo& field,
-                const RtlirDesign& design, const RtlirModule& mod,
-                const VpiAttachBuild& build) {
+VpiObject* MakeMember(VpiObject* holder, const StructFieldInfo& field,
+                      const RtlirDesign& design, const RtlirModule& mod,
+                      const VpiAttachBuild& build) {
   VpiObject* member = build.alloc();
   if (holder->type == vpiStructNet || holder->type == vpiUnionNet) {
     member->type = kVpiNet;
@@ -144,6 +148,14 @@ void MakeMember(VpiObject* holder, const StructFieldInfo& field,
   member->name = build.keep(std::string(field.name));
   member->full_name = holder->full_name + "." + std::string(field.name);
   member->decl_signed = field.is_signed;
+  // §37.17 detail 20: a member is a scalar or a vector as a variable of its
+  // field's type is, a bit or logic field wider than one bit having a packed
+  // dimension.
+  VpiScalarVectorQuery shape;
+  shape.var_type = member->type;
+  shape.has_packed_dimension = field.width > 1;
+  member->decl_scalar = VpiVariableScalar(shape);
+  member->decl_vector = VpiVariableVector(shape);
   auto* storage = build.arena.Create<Variable>();
   storage->value = MakeLogic4Vec(build.arena, field.width);
   storage->value.is_signed = field.is_signed;
@@ -154,6 +166,28 @@ void MakeMember(VpiObject* holder, const StructFieldInfo& field,
   member->member_of = holder;
   member->member_offset = field.bit_offset;
   holder->children.push_back(member);
+  return member;
+}
+
+// §37.17 detail 12 with §7.4.1: the dimensions the bits of `member`, of the
+// field `field`, are indexed by: a bit or logic member's packed ones, the
+// outermost as the layout records it over its elements' own [n-1:0], and a
+// packed structure's or union's implicit [n-1:0] (§7.2.1). None for a net's
+// member, a member of one bit, an unpacked array or dynamic member, or one of
+// any other type.
+std::optional<PackedDims> MemberBitDims(const VpiObject& member,
+                                        const StructFieldInfo& field) {
+  const bool kVector = member.type == kVpiReg || member.type == vpiBitVar;
+  const bool kPacked = field.nested != nullptr && field.nested->is_packed;
+  if (!VpiIsVariablesType(member.type) || field.width <= 1 ||
+      field.elem_count != 0 || field.is_dynamic || (!kVector && !kPacked)) {
+    return std::nullopt;
+  }
+  if (kVector && field.packed_elem_width != 0) {
+    return PackedDims{PackedRange{field.packed_left, field.packed_right},
+                      PackedRange::Implicit(field.packed_elem_width)};
+  }
+  return PackedDims{PackedRange::Implicit(field.width)};
 }
 
 // What the members of one instance are made from: its module, the objects
@@ -167,11 +201,42 @@ struct MemberSite {
   const VpiAttachBuild& build;
 };
 
-// The member per field of the layout `info` gives `holder`.
+// The member per field of the layout `info` gives `holder`. §37.17 detail 28's
+// example names `str1.inner1.j1`: a member of a structure or union type has a
+// member per field of its own, each read from and written back to the storage
+// of the outermost structure, at its offset there, as each member's bits are
+// (detail 12).
 void MakeMembers(VpiObject* holder, const StructTypeInfo& info,
                  const MemberSite& site) {
   for (const StructFieldInfo& field : info.fields) {
-    MakeMember(holder, field, site.design, site.mod, site.build);
+    VpiObject* member =
+        MakeMember(holder, field, site.design, site.mod, site.build);
+    if (holder->member_of != nullptr) {
+      member->member_of = holder->member_of;
+      member->member_offset += holder->member_offset;
+    }
+    if (field.nested != nullptr) MakeMembers(member, *field.nested, site);
+    if (const std::optional<PackedDims> kDims = MemberBitDims(*member, field)) {
+      VpiMakeMemberBits(*member, *kDims, site.build);
+    }
+  }
+}
+
+// §37.17 detail 26: an element of an array of structures or unions is a
+// struct or union var of its own, `spa[9][12]`, with a member per field of
+// the array's layout, each reached through the element. The leaves of the
+// array the elements pass made are those elements.
+void MakeElementMembers(VpiObject* array, const StructTypeInfo& info,
+                        const MemberSite& site) {
+  for (VpiObject* element : array->children) {
+    if (!element->array_member) continue;
+    if (VpiIsArrayVarType(element->type)) {
+      MakeElementMembers(element, info, site);
+    } else if (element->var != nullptr) {
+      element->type = info.is_union ? vpiUnionVar : vpiStructVar;
+      element->packed = info.is_packed;
+      MakeMembers(element, info, site);
+    }
   }
 }
 
@@ -185,12 +250,14 @@ void AttachVariableMembers(const MemberSite& site) {
   for (const RtlirVariable& var : site.mod.variables) {
     const std::string kKey = VpiFlatName(site.prefix, var.name);
     VpiObject* holder = FindObjectForFlatName(site.objects, kKey);
-    if (holder == nullptr || holder->var == nullptr ||
-        (holder->type != vpiStructVar && holder->type != vpiUnionVar)) {
-      continue;
-    }
     const StructTypeInfo* info = site.ctx.GetVariableStructType(kKey);
-    if (info != nullptr) MakeMembers(holder, *info, site);
+    if (holder == nullptr || info == nullptr) continue;
+    if (VpiIsArrayVarType(holder->type)) {
+      MakeElementMembers(holder, *info, site);
+    } else if (holder->var != nullptr &&
+               (holder->type == vpiStructVar || holder->type == vpiUnionVar)) {
+      MakeMembers(holder, *info, site);
+    }
   }
 }
 

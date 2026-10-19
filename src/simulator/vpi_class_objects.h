@@ -14,9 +14,15 @@
 namespace delta {
 
 class SimContext;
+struct ClassMember;
 struct ClassObject;
 struct ClassTypeInfo;
 struct Process;
+
+// §37.17 details 15 and 22 with §18.4 and §6.20.6: records on `var`, the
+// variable the class property `member` stands as, whether it was declared
+// rand, randc or neither, and whether it was declared const.
+void VpiRecordPropertyDecl(VpiObject& var, const ClassMember& member);
 
 // What a class obj is made with besides its object: the class defn each class
 // of the object's chain stands as, null for none (§37.32), and where the calls

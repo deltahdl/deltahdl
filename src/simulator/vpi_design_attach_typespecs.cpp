@@ -449,19 +449,25 @@ struct InstanceTypespecs {
   // type `written` and the unpacked dimensions `dims`, to the typespec of the
   // typedef that type names, if any, or, where it writes unpacked dimensions
   // of its own, to an unnamed array typespec of them over that one (§37.25
-  // detail 8).
+  // detail 8). A variable of a type no name stands for, `int x`, relates to a
+  // typespec of its own kind, which §37.25 detail 1 leaves unnamed.
   void Relate(std::string_view name, const DataType* written,
               const std::vector<Expr*>* dims) const {
     VpiObject* typespec = DeclaredTypespec(written, local, unit);
     VpiObject* obj =
         FindObjectForFlatName(objects, VpiFlatName(at.prefix, name));
-    if (typespec == nullptr || obj == nullptr) return;
-    if (dims != nullptr) {
-      TypespecMaker maker(at, local);
+    if (obj == nullptr || written == nullptr) return;
+    TypespecMaker maker(at, local);
+    if (written->kind != DataTypeKind::kNamed &&
+        VpiIsVariablesType(obj->type)) {
+      static const std::vector<Expr*> kNoDims;
+      typespec = maker.Of(*written, dims != nullptr ? *dims : kNoDims,
+                          std::string_view{}, obj);
+    } else if (typespec != nullptr && dims != nullptr) {
       typespec =
           at.design.shapes.Unnamed(obj, maker.DimsOf({}, *dims), typespec);
     }
-    obj->children.push_back(typespec);
+    if (typespec != nullptr) obj->children.push_back(typespec);
   }
 };
 

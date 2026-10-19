@@ -15,6 +15,7 @@
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_design_attach_build.h"
+#include "simulator/vpi_design_attach_vars.h"
 #include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
@@ -241,6 +242,17 @@ void AttachVectorBits(const RtlirDesign* design, const VpiObjectMap& objects,
           MakeVectorBits(target, build);
         }
       });
+}
+
+void VpiMakeMemberBits(VpiObject& member, const PackedDims& dims,
+                       const VpiAttachBuild& build) {
+  const std::size_t kFirst = member.children.size();
+  MakeVectorBits({&member, vpiRegBit, dims}, build);
+  for (std::size_t k = kFirst; k < member.children.size(); ++k) {
+    VpiObject* bit = member.children[k];
+    bit->var = member.member_of->var;
+    bit->bit_offset += static_cast<int>(member.member_offset);
+  }
 }
 
 VpiObject* VpiBitAtOffset(const VpiObject& root, int64_t offset) {

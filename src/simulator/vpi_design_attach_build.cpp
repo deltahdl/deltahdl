@@ -127,6 +127,12 @@ PackedDims WrittenPackedDims(const DataType* type, SimContext& ctx) {
 std::optional<PackedDims> DeclaredPackedDims(const DataType* type,
                                              uint32_t width, SimContext& ctx) {
   PackedDims dims = WrittenPackedDims(type, ctx);
+  // §6.18: a typedef name stands for its type, `t3 a` under
+  // `typedef logic [2:0] t3;` for `logic [2:0] a`, so the range the typedef
+  // was declared with is the variable's.
+  if (dims.empty() && type != nullptr && type->kind == DataTypeKind::kNamed) {
+    if (auto range = ctx.FindTypeRange(type->type_name)) dims.push_back(*range);
+  }
   if (dims.empty()) return std::nullopt;
   const int64_t kSpan = PackedDimsWidth(dims);
   if (kSpan == width) return dims;

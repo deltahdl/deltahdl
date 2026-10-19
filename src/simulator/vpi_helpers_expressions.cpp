@@ -22,8 +22,13 @@ bool VpiIsExprObject(VpiHandle obj) {
 namespace {
 
 // §37.58 for a bit select, §37.16 and §37.17 detail 13 for a net bit and a var
-// bit: the bit's index, and the object it is a bit of.
+// bit: the bit's index, and the object it is a bit of. §37.17 detail 5: a var
+// select's own index too.
 bool TryResolveBitRelation(int type, VpiHandle ref, VpiHandle& out) {
+  if (ref->type == vpiVarSelect && type == vpiIndex) {
+    out = ref->index_expr;
+    return true;
+  }
   if (ref->type != vpiBitSelect && ref->type != vpiNetBit &&
       ref->type != vpiRegBit) {
     return false;
@@ -67,12 +72,21 @@ bool TryResolvePrimTermExpr(int type, VpiHandle ref, VpiHandle& out) {
   return true;
 }
 
+// §37.17 detail 8: the expression a variable's declaration initializes it
+// with; a variable declared with none is left to the relations below.
+bool TryResolveVariableInit(int type, VpiHandle ref, VpiHandle& out) {
+  if (type != vpiExpr || VpiVariableInitExpr(ref) == nullptr) return false;
+  out = VpiVariableInitExpr(ref);
+  return true;
+}
+
 }  // namespace
 
 bool TryResolveSelectRelation(int type, VpiHandle ref, VpiHandle& out) {
   if (TryResolveBitRelation(type, ref, out) ||
       TryResolveRangeBounds(type, ref, out) ||
-      TryResolvePrimTermExpr(type, ref, out)) {
+      TryResolvePrimTermExpr(type, ref, out) ||
+      TryResolveVariableInit(type, ref, out)) {
     return true;
   }
   if (ref->type == vpiPartSelect) {
