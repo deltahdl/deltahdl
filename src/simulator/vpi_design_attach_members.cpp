@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -150,10 +151,12 @@ VpiObject* MakeMember(VpiObject* holder, const StructFieldInfo& field,
   member->decl_signed = field.is_signed;
   // §37.17 detail 20: a member is a scalar or a vector as a variable of its
   // field's type is, a bit or logic field wider than one bit having a packed
-  // dimension.
+  // dimension, and one declared as an unpacked array answers as its element.
   VpiScalarVectorQuery shape;
   shape.var_type = member->type;
-  shape.has_packed_dimension = field.width > 1;
+  shape.has_packed_dimension =
+      (field.elem_count != 0 ? field.width / field.elem_count : field.width) >
+      1;
   member->decl_scalar = VpiVariableScalar(shape);
   member->decl_vector = VpiVariableVector(shape);
   auto* storage = build.arena.Create<Variable>();
@@ -190,6 +193,49 @@ std::optional<PackedDims> MemberBitDims(const VpiObject& member,
   return PackedDims{PackedRange::Implicit(field.width)};
 }
 
+// §37.17 details 2, 18 and 26: a member `array` of the field `field`, declared
+// with an unpacked dimension, made the array var it is, with an element per
+// index of the dimension, left index first, each a variable of the member's
+// type that the array's members are, carrying its index and holding its bits
+// of the outermost structure, where the layout puts the leftmost element in
+// the most significant ones.
+void MakeMemberElements(VpiObject* array, const StructFieldInfo& field,
+                        const VpiAttachBuild& build) {
+  const int kElementType = array->type;
+  const uint32_t kWidth = field.width / field.elem_count;
+  array->type = vpiArrayVar;
+  array->array_type = vpiStaticArray;
+  array->size = static_cast<int>(field.elem_count);
+  std::vector<int>& indices = array->array_dim_indices.emplace_back();
+  const int64_t kStep = field.elem_left <= field.elem_right ? 1 : -1;
+  for (uint32_t position = 0; position < field.elem_count; ++position) {
+    const int64_t kIndex = field.elem_left + (kStep * position);
+    const std::string kSuffix = "[" + std::to_string(kIndex) + "]";
+    VpiObject* element = build.alloc();
+    element->type = kElementType;
+    element->parent = array;
+    element->name = build.keep(std::string(array->name) + kSuffix);
+    element->full_name = array->full_name + kSuffix;
+    element->array_member = true;
+    element->index = static_cast<int>(kIndex);
+    element->index_expr = VpiIntConstant(kIndex, build);
+    element->children.push_back(element->index_expr);
+    element->decl_signed = array->decl_signed;
+    element->decl_scalar = array->decl_scalar;
+    element->decl_vector = array->decl_vector;
+    auto* storage = build.arena.Create<Variable>();
+    storage->value = MakeLogic4Vec(build.arena, kWidth);
+    storage->value.is_signed = field.is_signed;
+    element->var = storage;
+    element->size = static_cast<int>(kWidth);
+    element->member_of = array->member_of;
+    element->member_offset =
+        array->member_offset + ((field.elem_count - 1 - position) * kWidth);
+    array->children.push_back(element);
+    indices.push_back(static_cast<int>(kIndex));
+  }
+}
+
 // What the members of one instance are made from: its module, the objects
 // keyed under its name `prefix`, and what a run builds with.
 struct MemberSite {
@@ -215,7 +261,11 @@ void MakeMembers(VpiObject* holder, const StructTypeInfo& info,
       member->member_of = holder->member_of;
       member->member_offset += holder->member_offset;
     }
-    if (field.nested != nullptr) MakeMembers(member, *field.nested, site);
+    if (field.elem_count != 0 && VpiIsVariablesType(member->type)) {
+      MakeMemberElements(member, field, site.build);
+    } else if (field.nested != nullptr) {
+      MakeMembers(member, *field.nested, site);
+    }
     if (const std::optional<PackedDims> kDims = MemberBitDims(*member, field)) {
       VpiMakeMemberBits(*member, *kDims, site.build);
     }

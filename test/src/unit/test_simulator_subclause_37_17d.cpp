@@ -313,5 +313,24 @@ TEST_F(VariablesOfARun, AVariableDecompilesToItsPrefixedName) {
       "str1.v[2]");
 }
 
+// D2, D18 and D26: a member of a structure declared with an unpacked dimension
+// is an array var, with an element per index that is a variable of the
+// member's type holding its bits of the structure (#7357).
+TEST_F(VariablesOfARun, AnUnpackedArrayMemberIsAnArrayVar) {
+  Run("module top; struct { logic [3:0] a[2]; int n; } s;\n"
+      "  initial begin s.a[0] = 4'h3; s.a[1] = 4'h9; end\n"
+      "endmodule\n");
+  vpiHandle a = By("top.s.a");
+  ASSERT_NE(a, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, a), vpiArrayVar);
+  EXPECT_EQ(vpi_get(vpiSize, a), 2);
+  vpiHandle first = vpi_handle_by_index(a, 0);
+  ASSERT_NE(first, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, first), vpiReg);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiParent, first)), VpiObjectOf(a));
+  EXPECT_EQ(IntOf(first), 3);
+  EXPECT_EQ(IntOf(vpi_handle_by_index(a, 1)), 9);
+}
+
 }  // namespace
 }  // namespace delta

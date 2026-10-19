@@ -763,13 +763,13 @@ TEST_F(PropertyExprsOfARun, ADeclarationsBodyReachesItsFormalAsARefObj) {
 
 // Detail 3 with §37.58: a strong sequence written over an operand that stands
 // for no object is no sequence expr, so no strength is set on one. A member of
-// a structure declared as an unpacked array, s.a, has no elements yet (#7357),
-// so a select of one stands for none; the same sequence over a net is the
-// strong operation it writes.
+// a structure declared with two unpacked dimensions, s.a, has no elements yet
+// (#7358), so a select of one stands for none; the same sequence over a net is
+// the strong operation it writes.
 TEST_F(PropertyExprsOfARun, AStrongSequenceOverAnOperandOfNoObjectIsNone) {
   Run("module top; logic clk, b;\n"
-      "  struct { logic a[2]; } s;\n"
-      "  k1: assert property (@(posedge clk) strong(s.a[0] ##1 b));\n"
+      "  struct { logic a[2][2]; } s;\n"
+      "  k1: assert property (@(posedge clk) strong(s.a[1][0] ##1 b));\n"
       "  k2: assert property (@(posedge clk) strong(b ##1 b));\n"
       "endmodule\n");
   vpiHandle assertion = Named(vpiAssertion, By("top"), "k1");
