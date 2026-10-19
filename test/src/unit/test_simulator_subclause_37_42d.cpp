@@ -243,10 +243,22 @@ TEST_F(CallsWithinADesign, AnIncrementStepsEachTimeItIsRead) {
   EXPECT_EQ(ValueAfterReads(kIncrementArgument, 2), 7);
 }
 
-// A call the body of a package's task writes, run from an instance, finds no
-// object the model holds under that instance, the package's statements being
-// kept under the package, so the call it runs with is one of its own. A system
-// task's is unnamed all the same, being a statement (§37.60 detail 1), an
+// Detail 3: a call the body of a package's task writes, run from an instance,
+// is the call statement the model holds under the package, which the
+// package's statements are kept under rather than under the instance running
+// them (#7340)...
+TEST_F(CallsWithinADesign, APackageTaskBodysCallIsThePackagesStatement) {
+  ASSERT_NE(RegisterArgs(0), nullptr);
+  Run("package pk; task t; $args(); endtask endpackage\n"
+      "module top; initial pk::t(); endmodule\n");
+  ASSERT_NE(g_invoked_call, nullptr);
+  vpiHandle task = Named(vpiTaskFunc, By("pk"), "t");
+  ASSERT_NE(task, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiStmt, task)),
+            VpiObjectOf(g_invoked_call));
+}
+
+// ...and is unnamed, being a system task's statement (§37.60 detail 1), an
 // argument it omits is a null operation and null passed to it is a null
 // constant (detail 8)...
 TEST_F(CallsWithinADesign, ATaskBodysSystemTaskCallIsUnnamed) {
@@ -277,10 +289,10 @@ TEST_F(CallsWithinADesign, ATaskBodysSystemFunctionCallIsNamed) {
   EXPECT_STREQ(vpi_get_str(vpiName, g_invoked_call), "$peek");
 }
 
-// A call the body of a package's function writes, which finds no object of
-// the instance running it either, builds each argument as the kind of
-// expression its actual is (§37.58, §37.59), both when its compiletf runs,
-// which reads no value (§36.8.2), and when its calltf does (§36.8.3).
+// A call the body of a package's function writes, the package's statement as
+// well, builds each argument as the kind of expression its actual is (§37.58,
+// §37.59), both when its compiletf runs, which reads no value (§36.8.2), and
+// when its calltf does (§36.8.3).
 TEST_F(CallsWithinADesign, AFunctionBodysCallBuildsEachArgumentKind) {
   g_args_seen.clear();
   g_arg_reads = 0;
@@ -313,9 +325,9 @@ TEST_F(CallsWithinADesign, AFunctionBodysCallBuildsEachArgumentKind) {
 }
 
 // §36.8.2: the compiletf of a call a child instance's function writes runs
-// before any instance is active, so the call it is given is one of its own,
-// whose arguments are built as the kind of expression each actual is but hold
-// no value, there being none to read yet.
+// before any instance is active, and the call it is given, the statement of
+// the one instance writing it, hangs arguments of its own built as the kind of
+// expression each actual is, holding no value, there being none to read yet.
 TEST_F(CallsWithinADesign, AChildsCompiletfBuildsArgumentsOfItsOwn) {
   g_args_seen.clear();
   g_arg_reads = 0;
