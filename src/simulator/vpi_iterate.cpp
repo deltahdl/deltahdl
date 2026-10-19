@@ -33,9 +33,7 @@ namespace {
 void CollectVariableDriversOrLoads(VpiObject* node, bool want_driver,
                                    bool descend, VpiObject* iter) {
   for (auto* child : node->children) {
-    bool is_target = want_driver ? VpiIsVariableDriverType(child->type)
-                                 : VpiIsVariableLoadType(child->type);
-    if (is_target) {
+    if (VpiIsVariableDriverOrLoad(*child, *node, want_driver)) {
       iter->children.push_back(child);
     } else if (descend && VpiIsVariableSelectOrMemberType(child->type)) {
       CollectVariableDriversOrLoads(child, want_driver, descend, iter);

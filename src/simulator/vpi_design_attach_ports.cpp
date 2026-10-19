@@ -78,6 +78,11 @@ void ConnectLowConns(VpiHandle module, const std::string& instance,
     // The port bits stay those of the instance's own net or variable.
     VpiObject* ref_obj = PortRefObj(module, port->name);
     if (ref_obj != nullptr) port->low_conn = ref_obj;
+    // §37.21: an input port drives the variable inside the instance it
+    // connects to.
+    if (port->direction == vpiInput) {
+      VpiHangOnVariablesNamed(port, port->low_conn);
+    }
   }
 }
 
@@ -241,6 +246,10 @@ void ConnectPorts(const RtlirModuleInst& inst, VpiHandle writer,
     // the expression reads.
     if (VpiPortIsComplexExpressionLoad(port)) {
       VpiHangOnNetsNamed(port, port->high_conn);
+    }
+    // §37.21: an output port drives the variables its connection names.
+    if (port->direction == vpiOutput) {
+      VpiHangOnVariablesNamed(port, port->high_conn);
     }
   }
   ConnectLowConns(module, kInstance, objects, build);

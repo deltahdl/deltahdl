@@ -21,6 +21,7 @@
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_expr_scope.h"
+#include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_pool_keeper.h"
 #include "simulator/vpi_source_delay.h"
@@ -141,6 +142,9 @@ void MakeContinuousAssignment(const RtlirContAssign& ca, VpiObject* scope,
     obj->run_key = (prefix.empty() ? "" : prefix + ".") + std::string(names[0]);
   }
   HangOn(obj, names, build.names);
+  // §37.21 detail 1: a member it writes, `s.a`, is written by no name of the
+  // scope, and makes it a driver of the variable holding the member.
+  VpiHangOnVariablesNamed(obj, obj->lhs);
   names.clear();
   CollectReads(rhs, names);
   HangOn(obj, names, build.names);

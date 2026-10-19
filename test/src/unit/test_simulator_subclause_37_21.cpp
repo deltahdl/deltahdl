@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <vector>
 
+#include "fixture_vpi_run.h"
 #include "helpers_vpi_driver_load_iter.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
@@ -27,8 +29,8 @@ namespace {
 
 // Figure: vpiDriver on a variable reaches every kind of driver object - a port,
 // a force, a continuous assignment, a single bit of a continuous assignment,
-// and a procedural assignment statement - while skipping children that are
-// neither.
+// and a procedural assignment statement, each one whose target is the
+// variable - while skipping children that are neither.
 TEST(VariableDriversAndLoads, DriverIterationReachesEveryDriverKind) {
   VpiContext ctx;
 
@@ -50,6 +52,9 @@ TEST(VariableDriversAndLoads, DriverIterationReachesEveryDriverKind) {
   var.children = {&port,        &unrelated,       &force,
                   &cont_assign, &cont_assign_bit, &assign_stmt};
 
+  force.lhs = &var;
+  cont_assign.lhs = &var;
+  assign_stmt.lhs = &var;
   std::vector<VpiHandle> drivers =
       CollectVpiIteration(ctx, ctx.Iterate(vpiDriver, &var));
   ASSERT_EQ(drivers.size(), 5u);
@@ -83,6 +88,9 @@ TEST(VariableDriversAndLoads, LoadIterationExcludesPorts) {
   var.type = vpiLogicVar;
   var.children = {&port, &force, &cont_assign, &cont_assign_bit, &assign_stmt};
 
+  force.rhs = &var;
+  cont_assign.rhs = &var;
+  assign_stmt.rhs = &var;
   std::vector<VpiHandle> loads =
       CollectVpiIteration(ctx, ctx.Iterate(vpiLoad, &var));
   ASSERT_EQ(loads.size(), 4u);
@@ -121,6 +129,9 @@ TEST(VariableDriversAndLoads, AggregateDriverIncludesSelectsAndMembers) {
   struct_var.type = vpiStructVar;
   struct_var.children = {&whole_driver, &part_select, &member};
 
+  whole_driver.lhs = &struct_var;
+  select_driver.lhs = &part_select;
+  member_driver.lhs = &member;
   std::vector<VpiHandle> drivers =
       CollectVpiIteration(ctx, ctx.Iterate(vpiDriver, &struct_var));
   ASSERT_EQ(drivers.size(), 3u);
@@ -150,6 +161,8 @@ TEST(VariableDriversAndLoads, AggregateLoadIncludesNestedMembersNotPorts) {
   class_var.type = vpiClassVar;
   class_var.children = {&whole_load, &member};
 
+  member_load.rhs = &member;
+  whole_load.rhs = &class_var;
   std::vector<VpiHandle> loads =
       CollectVpiIteration(ctx, ctx.Iterate(vpiLoad, &class_var));
   ASSERT_EQ(loads.size(), 2u);
@@ -178,6 +191,8 @@ TEST(VariableDriversAndLoads, NonAggregateVariableDoesNotDescend) {
   var.type = vpiLogicVar;
   var.children = {&direct_driver, &bit_select};
 
+  direct_driver.lhs = &var;
+  select_driver.lhs = &bit_select;
   std::vector<VpiHandle> drivers =
       CollectVpiIteration(ctx, ctx.Iterate(vpiDriver, &var));
   ASSERT_EQ(drivers.size(), 1u);
@@ -212,6 +227,8 @@ TEST(VariableDriversAndLoads, UnionDriverDescendsThroughNestedAggregateMember) {
   union_var.type = vpiUnionVar;
   union_var.children = {&whole_driver, &struct_member};
 
+  whole_driver.lhs = &union_var;
+  deep_driver.lhs = &inner_member;
   std::vector<VpiHandle> drivers =
       CollectVpiIteration(ctx, ctx.Iterate(vpiDriver, &union_var));
   ASSERT_EQ(drivers.size(), 2u);
@@ -242,6 +259,8 @@ TEST(VariableDriversAndLoads, ArrayDriverIncludesTheDriverOfAPortionOfIt) {
   array.type = vpiArrayVar;
   array.children = {&whole_driver, &select};
 
+  whole_driver.lhs = &array;
+  element_driver.lhs = &select;
   std::vector<VpiHandle> drivers =
       CollectVpiIteration(ctx, ctx.Iterate(vpiDriver, &array));
   ASSERT_EQ(drivers.size(), 2u);
@@ -268,11 +287,111 @@ TEST(VariableDriversAndLoads, PackedArrayLoadIncludesAPartSelectsLoad) {
   vector.type = vpiPackedArrayVar;
   vector.children = {&whole_load, &part_select};
 
+  whole_load.rhs = &vector;
+  portion_load.rhs = &part_select;
   std::vector<VpiHandle> loads =
       CollectVpiIteration(ctx, ctx.Iterate(vpiLoad, &vector));
   ASSERT_EQ(loads.size(), 2u);
   EXPECT_TRUE(VpiIterationContains(loads, &whole_load));
   EXPECT_TRUE(VpiIterationContains(loads, &portion_load));
+}
+
+// Figure: an assignment hung on both what it writes and what it reads drives
+// only the first and loads only the second, the side naming a variable
+// deciding which it is, through a concatenation it writes and an operation it
+// reads alike (#7021).
+TEST(VariableDriversAndLoads, AnAssignmentDrivesItsTargetAndLoadsWhatItReads) {
+  VpiContext ctx;
+
+  VpiObject target;
+  target.type = vpiLogicVar;
+  VpiObject other;
+  other.type = vpiLogicVar;
+  VpiObject read;
+  read.type = vpiLogicVar;
+  VpiObject concat;
+  concat.type = vpiOperation;
+  concat.children = {&other, &target};
+  VpiObject negation;
+  negation.type = vpiOperation;
+  negation.children = {&read};
+  VpiObject cont_assign;
+  cont_assign.type = vpiContAssign;
+  cont_assign.lhs = &concat;
+  cont_assign.rhs = &negation;
+  target.children = {&cont_assign};
+  read.children = {&cont_assign};
+
+  EXPECT_TRUE(CollectVpiIteration(ctx, ctx.Iterate(vpiDriver, &read)).empty());
+  EXPECT_TRUE(CollectVpiIteration(ctx, ctx.Iterate(vpiLoad, &target)).empty());
+  EXPECT_EQ(CollectVpiIteration(ctx, ctx.Iterate(vpiDriver, &target)).size(),
+            1u);
+  EXPECT_EQ(CollectVpiIteration(ctx, ctx.Iterate(vpiLoad, &read)).size(), 1u);
+}
+
+// §37.21 against a design read and run whole.
+class VariableDriversOfARun : public VpiDesignRun {
+ protected:
+  // The kinds of the objects `ref` reaches through `type`, in ascending
+  // order, since the iteration fixes none.
+  static std::vector<int> KindsOf(int type, vpiHandle ref) {
+    std::vector<int> kinds;
+    vpiHandle it = ref == nullptr ? nullptr : vpi_iterate(type, ref);
+    if (it == nullptr) return kinds;
+    while (vpiHandle obj = vpi_scan(it)) kinds.push_back(vpi_get(vpiType, obj));
+    std::ranges::sort(kinds);
+    return kinds;
+  }
+
+  static constexpr const char* kDesign =
+      "module m(input logic i, output logic o);\n"
+      "  assign o = i;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  typedef struct packed { logic a; logic b; } s_t;\n"
+      "  s_t s;\n"
+      "  logic v, a, f, g, p, q;\n"
+      "  assign v = a;\n"
+      "  assign s.a = 1'b1;\n"
+      "  m u(.i(p), .o(q));\n"
+      "  initial begin\n"
+      "    assign f = a;\n"
+      "    force g = v | a;\n"
+      "  end\n"
+      "endmodule\n";
+};
+
+// Figure: `assign v = a` drives v and loads a, and is no load of v and no
+// driver of a (#7021); `force g = v | a` loads both through its operation.
+TEST_F(VariableDriversOfARun, AContinuousAssignmentDrivesOnlyItsTarget) {
+  Run(kDesign);
+  EXPECT_EQ(KindsOf(vpiDriver, By("top.v")), std::vector<int>{vpiContAssign});
+  EXPECT_EQ(KindsOf(vpiLoad, By("top.v")), std::vector<int>{vpiForce});
+  EXPECT_EQ(KindsOf(vpiDriver, By("top.a")), std::vector<int>{});
+  EXPECT_EQ(KindsOf(vpiLoad, By("top.a")),
+            (std::vector<int>{vpiAssignStmt, vpiContAssign, vpiForce}));
+}
+
+// Figure: a procedural assign and a force drive the variables they write
+// (#7022).
+TEST_F(VariableDriversOfARun, AnAssignStmtAndAForceDriveTheirTargets) {
+  Run(kDesign);
+  EXPECT_EQ(KindsOf(vpiDriver, By("top.f")), std::vector<int>{vpiAssignStmt});
+  EXPECT_EQ(KindsOf(vpiDriver, By("top.g")), std::vector<int>{vpiForce});
+}
+
+// Figure: an input port drives the variable inside its instance, and an
+// output port the variable its connection names (#7023).
+TEST_F(VariableDriversOfARun, APortDrivesTheVariableItConnects) {
+  Run(kDesign);
+  EXPECT_EQ(KindsOf(vpiDriver, By("top.u.i")), std::vector<int>{vpiPort});
+  EXPECT_EQ(KindsOf(vpiDriver, By("top.q")), std::vector<int>{vpiPort});
+}
+
+// Detail 1: `assign s.a = 1'b1` drives the structure variable s (#7024).
+TEST_F(VariableDriversOfARun, AnAssignmentToAMemberDrivesTheStructure) {
+  Run(kDesign);
+  EXPECT_EQ(KindsOf(vpiDriver, By("top.s")), std::vector<int>{vpiContAssign});
 }
 
 }  // namespace

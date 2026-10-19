@@ -693,6 +693,12 @@ void VpiFillStmt(VpiObject* obj, const Stmt& stmt, const VpiStmtBuild& with) {
         VpiHangOnNetsNamed(obj, obj->lhs);
         VpiHangOnNetsNamed(obj, obj->rhs);
       }
+      // §37.21: an assign or a force drives the variables it names and loads
+      // those it reads.
+      if (stmt.kind == StmtKind::kAssign || stmt.kind == StmtKind::kForce) {
+        VpiHangOnVariablesNamed(obj, obj->lhs);
+        VpiHangOnVariablesNamed(obj, obj->rhs);
+      }
       return;
     case StmtKind::kCase:
       FillCase(obj, stmt, with);

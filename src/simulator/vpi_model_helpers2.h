@@ -650,6 +650,20 @@ bool VpiIsVariableDriverType(int type);
 // continuous assignment (whole or single bit). A port appears only as a driver.
 bool VpiIsVariableLoadType(int type);
 
+// §37.21: whether `child`, an object hung among the variable `var`'s children,
+// is among the variable's drivers (`want_driver`) or its loads: a port always
+// a driver, and an assignment, a procedural assign or a force by whether its
+// target writes `var` or a part of it, or its expression reads it.
+bool VpiIsVariableDriverOrLoad(const VpiObject& child, const VpiObject& var,
+                               bool want_driver);
+
+// §37.21: hang `holder`, a continuous assignment, a procedural assign, a force
+// or a port, among the children of each variable the expression object `expr`
+// names, itself or a part of it, or as an operand of it at any depth, which is
+// where a variable's driver and load iterations look for it; once per
+// variable.
+void VpiHangOnVariablesNamed(VpiHandle holder, VpiHandle expr);
+
 // ===========================================================================
 // §37.46 Net drivers and loads. The vpiDriver and vpiLoad edges relate a net to
 // the objects that drive it and the objects that load (read) it. As in §37.21 a
