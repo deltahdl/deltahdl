@@ -5,7 +5,8 @@
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
-// The §37.44 thread helpers, apart from the statement helpers of
+// The §37.44 thread helpers, and the relations of §37.43's frames to what the
+// run records of them, apart from the statement helpers of
 // vpi_helpers_statements.cpp, which stood at the size the
 // assert-no-oversized-source-files job fails at.
 
@@ -56,6 +57,30 @@ bool VpiTryResolveThreadRelation(int type, VpiHandle ref, VpiHandle& out) {
   if (type == vpiParent) out = VpiThreadParent(ref);
   if (type == vpiOrigin) out = VpiThreadOrigin(ref);
   if (type == vpiFrame) out = VpiThreadFrame(ref);
+  return true;
+}
+
+// ===========================================================================
+// §37.43 Frames.
+// ===========================================================================
+
+bool VpiTryResolveFrameRelation(int type, VpiHandle ref, VpiHandle& out) {
+  if (ref->type != vpiFrame || (type != vpiParent && type != vpiOrigin &&
+                                type != vpiStmt && type != vpiThread)) {
+    return false;
+  }
+  if (type == vpiParent) out = VpiFrameParent(ref);
+  if (type == vpiOrigin) out = VpiFrameOrigin(ref);
+  if (type == vpiStmt) out = VpiFrameStmt(ref);
+  if (type == vpiThread) out = VpiFrameThread(ref);
+  return true;
+}
+
+bool VpiCollectFrameAutomatics(int type, VpiHandle ref, VpiHandle iter) {
+  if (type != vpiAutomatics || ref->type != vpiFrame) return false;
+  for (VpiHandle automatic : VpiFrameAutomatics(ref)) {
+    iter->children.push_back(automatic);
+  }
   return true;
 }
 

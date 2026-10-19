@@ -528,7 +528,7 @@ void ExecClassMethod(ClassMethodTarget target, const Expr* expr,
   }
   // §8.10: a static method has no `this`, its caller's included.
   if (method->is_static_method) ctx.PushThis(nullptr);
-  ExecFunctionBody(method, ret_var, ctx, arena);
+  ExecFunctionBody(method, expr, ret_var, ctx, arena);
   if (method->is_static_method) ctx.PopThis();
   out = CallResult(is_void, ret_var, arena);
 }
@@ -768,9 +768,9 @@ static bool TryDispatchMethodOrLet(const Expr* expr, SimContext& ctx,
   return false;
 }
 
-static void RunFunctionBody(const ModuleItem* func,
-                            std::string_view inst_prefix, Variable* ret_var,
-                            SimContext& ctx, Arena& arena) {
+static void RunFunctionBody(const SubroutineTarget& target, const Expr* call,
+                            Variable* ret_var, SimContext& ctx, Arena& arena) {
+  const ModuleItem* func = target.func;
   // §20.17.2: a function body is a calling context on the $stacktrace chain,
   // so record its frame just as task calls do (see PushTaskCallScope).
   ctx.PushFuncName(func->name);
@@ -781,7 +781,7 @@ static void RunFunctionBody(const ModuleItem* func,
   ctx.PushActiveNamedScope(func->name);
   SampleAtBlockEvent(func->name, true, ctx, arena);
   ctx.EnterFunction();
-  ExecFunctionBodyInCallee(func, inst_prefix, ret_var, ctx, arena);
+  ExecFunctionBodyInCallee(target, call, ret_var, ctx, arena);
   ctx.ExitFunction();
   SampleAtBlockEvent(func->name, false, ctx, arena);
   ctx.PopActiveNamedScope();
@@ -852,7 +852,7 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
     ret_var->is_real = DeclaredTypeIsReal(func->return_type, ctx);
   }
 
-  RunFunctionBody(func, target.inst_prefix, ret_var, ctx, arena);
+  RunFunctionBody(target, expr, ret_var, ctx, arena);
   WritebackInCaller(func, expr, ctx, arena);
   result = CallResult(is_void, ret_var, arena);
 

@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <string>
 #include <vector>
 
 #include "common/arena.h"
@@ -82,59 +83,44 @@ TEST(FrameModel, ParentRelationIsNullForRootAndNonFrameParents) {
 }
 
 // detail 6 (vpiOrigin): a frame reaches the elaboration-hierarchy point it was
-// activated from. The net case covers a frame activated for a nettype's
+// activated from, which the activation recorded among its facts apart from its
+// children. The net case covers a frame activated for a nettype's
 // user-defined resolution function. None is reported when no origin is
-// attached.
+// recorded.
 TEST(FrameModel, OriginRelationReachesTheActivationPoint) {
-  VpiObject scope;
-  scope.type = vpiScope;
+  VpiObject call;
+  call.type = vpiTaskCall;
 
   VpiObject frame;
   frame.type = vpiFrame;
-  frame.children = {&scope};
-  EXPECT_EQ(VpiFrameOrigin(&frame), &scope);
+  frame.frame_facts.origin = &call;
+  EXPECT_EQ(VpiFrameOrigin(&frame), &call);
 
   VpiObject resolved_net;
   resolved_net.type = vpiNet;
   VpiObject resolution_frame;
   resolution_frame.type = vpiFrame;
-  resolution_frame.children = {&resolved_net};
+  resolution_frame.frame_facts.origin = &resolved_net;
   EXPECT_EQ(VpiFrameOrigin(&resolution_frame), &resolved_net);
 
   VpiObject bare;
   bare.type = vpiFrame;
+  bare.children = {&call};
   EXPECT_EQ(VpiFrameOrigin(&bare), nullptr);
   EXPECT_EQ(VpiFrameOrigin(nullptr), nullptr);
 }
 
-// detail 6: the origin kinds the diagram draws - a scope, a task or function
-// call (including the system and method forms), or a net or net array - are
-// accepted as frame origins; a plain statement is not an origin.
-TEST(FrameModel, OriginKindsCoverScopesCallsAndNets) {
-  EXPECT_TRUE(VpiIsFrameOriginType(vpiScope));
-  EXPECT_TRUE(VpiIsFrameOriginType(vpiTaskCall));
-  EXPECT_TRUE(VpiIsFrameOriginType(vpiFuncCall));
-  EXPECT_TRUE(VpiIsFrameOriginType(vpiSysTaskCall));
-  EXPECT_TRUE(VpiIsFrameOriginType(vpiSysFuncCall));
-  EXPECT_TRUE(VpiIsFrameOriginType(vpiMethodTaskCall));
-  EXPECT_TRUE(VpiIsFrameOriginType(vpiMethodFuncCall));
-  EXPECT_TRUE(VpiIsFrameOriginType(vpiNet));
-  EXPECT_TRUE(VpiIsFrameOriginType(vpiNetArray));
-
-  EXPECT_FALSE(VpiIsFrameOriginType(vpiStmt));
-  EXPECT_FALSE(VpiIsFrameOriginType(vpiThread));
-}
-
 // details 4 and 5 (frame-to-stmt transition): a frame reaches the active
 // statement within it (for a parent frame, the statement whose execution
-// activated the child frame). None is reported when no statement is attached.
+// activated the child frame), which the run records among its facts. None is
+// reported when no statement is recorded.
 TEST(FrameModel, StmtTransitionReachesTheActiveStatement) {
   VpiObject stmt;
-  stmt.type = vpiStmt;
+  stmt.type = vpiAssignment;
 
   VpiObject frame;
   frame.type = vpiFrame;
-  frame.children = {&stmt};
+  frame.frame_facts.stmt = &stmt;
   EXPECT_EQ(VpiFrameStmt(&frame), &stmt);
 
   VpiObject bare;
@@ -154,7 +140,7 @@ TEST(FrameModel, ThreadEdgeIsConsistentWithThreadFrameEdge) {
   frame.active = true;
 
   thread.children = {&frame};
-  frame.children = {&thread};
+  frame.parent = &thread;
 
   EXPECT_EQ(VpiFrameThread(&frame), &thread);
   EXPECT_EQ(VpiThreadFrame(&thread), &frame);
@@ -166,23 +152,34 @@ TEST(FrameModel, ThreadEdgeIsConsistentWithThreadFrameEdge) {
 }
 
 // detail 1 (vpiAutomatics): the iteration yields the frame's locally declared
-// automatic objects - its automatic variables, named events, and named event
-// arrays - in order, skipping the frame's origin scope and active statement.
+// automatic objects - the automatic variables, named events, and named event
+// arrays the task or function its origin calls declares - in order, skipping
+// that subroutine's statements and the variables it declares static.
 TEST(FrameModel, AutomaticsYieldLocalAutomaticObjects) {
-  VpiObject scope;
-  scope.type = vpiScope;
   VpiObject stmt;
-  stmt.type = vpiStmt;
+  stmt.type = vpiAssignment;
   VpiObject var;
   var.type = vpiLogicVar;
+  var.automatic = true;
+  VpiObject kept;
+  kept.type = vpiIntVar;
   VpiObject ev;
   ev.type = vpiNamedEvent;
+  ev.automatic = true;
   VpiObject ev_array;
   ev_array.type = vpiNamedEventArray;
+  ev_array.automatic = true;
+
+  VpiObject task;
+  task.type = vpiTask;
+  task.children = {&var, &stmt, &kept, &ev, &ev_array};
+  VpiObject call;
+  call.type = vpiTaskCall;
+  call.tf_decl = &task;
 
   VpiObject frame;
   frame.type = vpiFrame;
-  frame.children = {&scope, &var, &stmt, &ev, &ev_array};
+  frame.frame_facts.origin = &call;
 
   std::vector<VpiHandle> automatics = VpiFrameAutomatics(&frame);
   ASSERT_EQ(automatics.size(), 3u);
@@ -191,11 +188,15 @@ TEST(FrameModel, AutomaticsYieldLocalAutomaticObjects) {
   EXPECT_EQ(automatics[2], &ev_array);
 }
 
-// detail 1 edge: a frame that declares no automatic objects, and a null handle,
-// iterate to none.
+// detail 1 edge: a frame with no origin, one whose origin calls no task or
+// function the design declares, and a null handle, iterate to none.
 TEST(FrameModel, AutomaticsEmptyForNullAndNone) {
   VpiObject frame;
   frame.type = vpiFrame;
+  EXPECT_TRUE(VpiFrameAutomatics(&frame).empty());
+  VpiObject net;
+  net.type = vpiNet;
+  frame.frame_facts.origin = &net;
   EXPECT_TRUE(VpiFrameAutomatics(&frame).empty());
   EXPECT_TRUE(VpiFrameAutomatics(nullptr).empty());
 }
@@ -511,27 +512,244 @@ TEST_F(FrameModelInARun, EachTaskEnableStartsAndEndsAFrame) {
   EXPECT_EQ(g_frames_ended, 3);
 }
 
-// §37.43 details 4 to 6 and the frame--thread edge: a frame's origin,
-// statement and thread are its first children of those kinds, passing over
-// children of other kinds; a frame whose chain of frames ends below no thread
-// has none.
-TEST(FrameModel, AFramesRelationsPassOverOtherChildren) {
-  VpiObject stmt;
-  stmt.type = vpiStmt;
-  VpiObject call;
-  call.type = vpiTaskCall;
+// The frame--thread edge: a frame whose chain of frames ends below no thread
+// belongs to none, whatever thread its children hold.
+TEST(FrameModel, AFrameBelowNoThreadHasNone) {
+  VpiObject thread;
+  thread.type = vpiThread;
   VpiObject module;
   module.type = vpiModule;
+  VpiObject outer;
+  outer.type = vpiFrame;
+  outer.parent = &module;
   VpiObject frame;
   frame.type = vpiFrame;
-  frame.parent = &module;
-  frame.children = {&stmt, &call};
-  EXPECT_EQ(VpiFrameOrigin(&frame), &call);
-  VpiObject frame2;
-  frame2.type = vpiFrame;
-  frame2.children = {&call, &stmt};
-  EXPECT_EQ(VpiFrameStmt(&frame2), &stmt);
+  frame.parent = &outer;
+  frame.children = {&thread};
   EXPECT_EQ(VpiFrameThread(&frame), nullptr);
+}
+
+// -----------------------------------------------------------------------------
+// §37.43 details 1 and 4 to 6 and the frame--thread edge, in a run: what an
+// application reaches from the frame a run activated, through vpi_handle() and
+// vpi_iterate(), rather than through the helpers on frames built by hand.
+// -----------------------------------------------------------------------------
+
+// What the application saw from the frame active where it was called.
+struct FrameSeen {
+  bool found = false;
+  int origin_type = 0;
+  std::string origin_callee;
+  bool stmt_is_the_call = false;
+  std::vector<std::string> automatics;
+  int parent_type = 0;
+  bool parent_stmt_is_origin = false;
+  bool thread_found = false;
+  bool parent_shares_thread = false;
+};
+FrameSeen g_seen;
+
+std::string CalleeName(vpiHandle call) {
+  vpiHandle callee = vpi_handle(vpiTask, call);
+  if (callee == nullptr) callee = vpi_handle(vpiFunction, call);
+  return callee == nullptr ? "" : vpi_get_str(vpiName, callee);
+}
+
+PLI_INT32 LookAtFrameCalltf(PLI_BYTE8*) {
+  g_seen = {};
+  vpiHandle frame = vpi_handle(vpiFrame, nullptr);
+  if (frame == nullptr) return 0;
+  g_seen.found = true;
+  vpiHandle origin = vpi_handle(vpiOrigin, frame);
+  if (origin != nullptr) {
+    g_seen.origin_type = vpi_get(vpiType, origin);
+    g_seen.origin_callee = CalleeName(origin);
+  }
+  g_seen.stmt_is_the_call =
+      vpi_compare_objects(vpi_handle(vpiStmt, frame),
+                          vpi_handle(vpiSysTfCall, nullptr)) != 0;
+  vpiHandle it = vpi_iterate(vpiAutomatics, frame);
+  while (vpiHandle object = it == nullptr ? nullptr : vpi_scan(it)) {
+    g_seen.automatics.emplace_back(vpi_get_str(vpiName, object));
+  }
+  vpiHandle thread = vpi_handle(vpiThread, frame);
+  g_seen.thread_found = thread != nullptr;
+  vpiHandle parent = vpi_handle(vpiParent, frame);
+  if (parent == nullptr) return 0;
+  g_seen.parent_type = vpi_get(vpiType, parent);
+  g_seen.parent_stmt_is_origin =
+      origin != nullptr &&
+      vpi_compare_objects(vpi_handle(vpiStmt, parent), origin) != 0;
+  g_seen.parent_shares_thread =
+      thread != nullptr &&
+      vpi_compare_objects(vpi_handle(vpiThread, parent), thread) != 0;
+  return 0;
+}
+
+void RegisterFrameLook() {
+  g_seen = {};
+  s_vpi_systf_data data = {};
+  data.type = vpiSysTask;
+  data.tfname = VpiText("$look");
+  data.calltf = &LookAtFrameCalltf;
+  ASSERT_NE(vpi_register_systf(&data), nullptr);
+}
+
+// Detail 6: the frame a task enable activated was activated from that task
+// call, and detail 4: the statement active in it is the one running now, the
+// call the application was invoked from. Detail 1: its automatics are the
+// variables and named events the task declares, without the one it declares
+// static.
+TEST_F(FrameModelInARun, ATaskFrameReachesItsCallStatementAndAutomatics) {
+  RegisterFrameLook();
+
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  task automatic tk();\n"
+      "    int x;\n"
+      "    static int s;\n"
+      "    logic [3:0] y;\n"
+      "    event e;\n"
+      "    $look;\n"
+      "  endtask\n"
+      "  initial tk();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  ASSERT_TRUE(g_seen.found);
+  EXPECT_EQ(g_seen.origin_type, vpiTaskCall);
+  EXPECT_EQ(g_seen.origin_callee, "tk");
+  EXPECT_TRUE(g_seen.stmt_is_the_call);
+  EXPECT_EQ(g_seen.automatics, (std::vector<std::string>{"x", "y", "e"}));
+  EXPECT_TRUE(g_seen.thread_found);
+  EXPECT_EQ(g_seen.parent_type, 0);
+}
+
+// Detail 6 for a function: the frame a function call activated was activated
+// from that call, written within an expression rather than as a statement.
+TEST_F(FrameModelInARun, AFunctionFrameReachesTheCallInItsExpression) {
+  RegisterFrameLook();
+
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int r;\n"
+      "  function automatic int one();\n"
+      "    $look;\n"
+      "    return 1;\n"
+      "  endfunction\n"
+      "  initial r = 2 + one();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  ASSERT_TRUE(g_seen.found);
+  EXPECT_EQ(g_seen.origin_type, vpiFuncCall);
+  EXPECT_EQ(g_seen.origin_callee, "one");
+}
+
+// Detail 5: a frame activated from another reaches it through vpiParent, and
+// the statement of that parent frame is the one whose execution activated the
+// child, the call the child's vpiOrigin reaches. The frame--thread edge: a
+// frame nested in another belongs to the thread the outer one does.
+TEST_F(FrameModelInARun, ANestedFrameReachesItsParentAndTheirThread) {
+  RegisterFrameLook();
+
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  task automatic inner();\n"
+      "    $look;\n"
+      "  endtask\n"
+      "  task automatic outer();\n"
+      "    #1;\n"
+      "    inner();\n"
+      "  endtask\n"
+      "  initial outer();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  ASSERT_TRUE(g_seen.found);
+  EXPECT_EQ(g_seen.origin_callee, "inner");
+  EXPECT_EQ(g_seen.parent_type, vpiFrame);
+  EXPECT_TRUE(g_seen.parent_stmt_is_origin);
+  EXPECT_TRUE(g_seen.thread_found);
+  EXPECT_TRUE(g_seen.parent_shares_thread);
+}
+
+// What the application found of the lifetimes of block variables.
+int g_x_automatic = -1;
+int g_s_automatic = -1;
+int g_z_automatic = -1;
+bool g_x_callback_placed = true;
+
+PLI_INT32 NoValueChange(p_cb_data) { return 0; }
+
+int AutomaticOf(const char* name) {
+  vpiHandle var = vpi_handle_by_name(VpiText(name), nullptr);
+  return var == nullptr ? -1 : vpi_get(vpiAutomatic, var);
+}
+
+PLI_INT32 LookAtLifetimesCalltf(PLI_BYTE8*) {
+  g_x_automatic = AutomaticOf("t.b.x");
+  g_s_automatic = AutomaticOf("t.b.s");
+  g_z_automatic = AutomaticOf("t.tk.c.z");
+  s_vpi_time time = {};
+  time.type = vpiSimTime;
+  s_vpi_value value = {};
+  value.format = vpiIntVal;
+  s_cb_data data = {};
+  data.reason = cbValueChange;
+  data.cb_rtn = &NoValueChange;
+  data.obj = vpi_handle_by_name(VpiText("t.b.x"), nullptr);
+  data.time = &time;
+  data.value = &value;
+  g_x_callback_placed =
+      data.obj == nullptr || vpi_register_cb(&data) != nullptr;
+  return 0;
+}
+
+// Detail 2 with §6.21: a variable a block declares automatic, and one a block
+// in an automatic task declares with no lifetime, are automatic variables, on
+// which no value change callback is placed; one declared static is not.
+TEST_F(FrameModelInARun, ABlocksAutomaticVariablesAreAutomatic) {
+  g_x_automatic = g_s_automatic = g_z_automatic = -1;
+  g_x_callback_placed = true;
+  s_vpi_systf_data data = {};
+  data.type = vpiSysTask;
+  data.tfname = VpiText("$lifetimes");
+  data.calltf = &LookAtLifetimesCalltf;
+  ASSERT_NE(vpi_register_systf(&data), nullptr);
+
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  task automatic tk();\n"
+      "    begin : c\n"
+      "      int z;\n"
+      "      z = 1;\n"
+      "    end\n"
+      "  endtask\n"
+      "  initial begin : b\n"
+      "    automatic int x;\n"
+      "    static int s;\n"
+      "    $lifetimes;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  EXPECT_EQ(g_x_automatic, 1);
+  EXPECT_EQ(g_s_automatic, 0);
+  EXPECT_EQ(g_z_automatic, 1);
+  EXPECT_FALSE(g_x_callback_placed);
 }
 
 }  // namespace

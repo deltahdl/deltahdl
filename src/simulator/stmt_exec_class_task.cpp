@@ -23,7 +23,7 @@ ExecTask ExecInstanceTaskCall(const InstanceMethodInfo& call, const Expr* expr,
                               SimContext& ctx, Arena& arena) {
   // §37.44 detail 1: entering the task method activates a frame in the
   // thread, left when the task completes however long it runs.
-  VpiActiveFrameScope frame;
+  VpiActiveFrameScope frame(expr);
   StmtResult outcome = StmtResult::kDone;
   for (auto* s : call.method->func_body_stmts) {
     auto result = co_await ExecStmt(s, ctx, arena);

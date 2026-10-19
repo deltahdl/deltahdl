@@ -804,27 +804,6 @@ void VpiCollectTfCallArguments(VpiHandle call, VpiHandle iter) {
 // §37.43 Frames (shared with §37.44's frame--thread edge and vpiActive).
 // ===========================================================================
 
-bool VpiIsFrameOriginType(int type) {
-  // §37.43 detail 6: the vpiOrigin of a frame is the elaboration-hierarchy
-  // point it was activated from. The diagram draws that as a scope, a task or
-  // function call (including the system and method forms), or a net or net
-  // array - the last covering a frame activated for a nettype's user-defined
-  // resolution function, whose net is of whichever kind the `nets` class of
-  // §37.16 groups the nettype's data type makes it.
-  switch (type) {
-    case vpiScope:
-    case vpiTaskCall:
-    case vpiFuncCall:
-    case vpiSysTaskCall:
-    case vpiSysFuncCall:
-    case vpiMethodTaskCall:
-    case vpiMethodFuncCall:
-      return true;
-    default:
-      return VpiIsNetsType(type);
-  }
-}
-
 VpiHandle VpiFrameParent(VpiHandle frame) {
   // §37.43 detail 5: vpiParent reaches the frame from which this child frame
   // was activated, through the parent link when that parent is itself a frame.
@@ -836,39 +815,28 @@ VpiHandle VpiFrameParent(VpiHandle frame) {
 
 VpiHandle VpiFrameOrigin(VpiHandle frame) {
   // §37.43 detail 6: the elaboration-hierarchy point a frame was activated
-  // from, modeled as its first origin-kind child.
-  if (!frame) return nullptr;
-  for (auto* child : frame->children) {
-    if (VpiIsFrameOriginType(child->type)) return child;
-  }
-  return nullptr;
+  // from, which the activation recorded (ActivateFrame).
+  return frame != nullptr ? frame->frame_facts.origin : nullptr;
 }
 
 VpiHandle VpiFrameStmt(VpiHandle frame) {
   // §37.43 details 4 and 5: the frame-to-stmt transition. For the active frame
   // this is the currently active statement within it; for a parent frame it is
   // the atomic statement or scope whose execution activated the child frame.
-  // Either way it is modeled as the frame's first statement child.
-  if (!frame) return nullptr;
-  for (auto* child : frame->children) {
-    if (child->type == vpiStmt) return child;
-  }
-  return nullptr;
+  // Either way it is the statement that ran in the frame last, which the run
+  // records as each one begins (VpiContext::NoteStmtExecuting).
+  return frame != nullptr ? frame->frame_facts.stmt : nullptr;
 }
 
 VpiHandle VpiFrameThread(VpiHandle frame) {
   // §37.43 (frame--thread edge): the thread a frame belongs to, the reverse of
-  // §37.44's VpiThreadFrame. Modeled as the frame's first thread child.
+  // §37.44's VpiThreadFrame. The thread holds the frame, and making the two
+  // each other's child would put a cycle in the object graph that
+  // ReleaseHandleSubtree walks. §37.43 detail 5 leaves the way up: a frame was
+  // activated from the frame above it and the outermost of a call chain from
+  // the thread itself, so the chain of parents ends at the thread this frame
+  // belongs to.
   if (!frame) return nullptr;
-  for (auto* child : frame->children) {
-    if (child->type == vpiThread) return child;
-  }
-  // A frame a run activated has no thread child: the thread holds the frame,
-  // and making the two each other's child would put a cycle in the object
-  // graph that ReleaseHandleSubtree walks. §37.43 detail 5 leaves the way up:
-  // a frame was activated from the frame above it and the outermost of a call
-  // chain from the thread itself, so the chain of parents ends at the thread
-  // this frame belongs to.
   VpiHandle up = frame;
   while (up->parent != nullptr && up->parent->type == vpiFrame) {
     up = up->parent;
@@ -880,18 +848,22 @@ VpiHandle VpiFrameThread(VpiHandle frame) {
 std::vector<VpiHandle> VpiFrameAutomatics(VpiHandle frame) {
   // §37.43 detail 1: the vpiAutomatics relation yields a frame's locally
   // declared automatic objects - its variables, named events, and named event
-  // arrays - in order. A null handle yields none.
+  // arrays - in order. A frame is an activation of the task or function its
+  // origin calls, so they are the automatic ones that subroutine declares. A
+  // null handle, and a frame activated from no call of a subroutine the model
+  // holds, yield none.
   std::vector<VpiHandle> automatics;
-  if (!frame) return automatics;
-  for (auto* child : frame->children) {
+  VpiHandle origin = VpiFrameOrigin(frame);
+  if (origin == nullptr || origin->tf_decl == nullptr) return automatics;
+  for (auto* child : origin->tf_decl->children) {
     // §37.4.1: the diagram draws the variables node as the `variables` class,
     // which groups the object definitions inside its enclosure rather than
     // being an object of its own, so the automatics are objects of those kinds
     // (§37.17) alongside named events and named event arrays.
-    if (VpiIsVariablesType(child->type) || child->type == vpiNamedEvent ||
-        child->type == vpiNamedEventArray) {
-      automatics.push_back(child);
-    }
+    const bool kDeclared = VpiIsVariablesType(child->type) ||
+                           child->type == vpiNamedEvent ||
+                           child->type == vpiNamedEventArray;
+    if (kDeclared && child->automatic) automatics.push_back(child);
   }
   return automatics;
 }

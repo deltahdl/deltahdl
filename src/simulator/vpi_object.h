@@ -12,6 +12,7 @@
 #include "common/packed_range.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_decl_facts.h"
+#include "simulator/vpi_frame_facts.h"
 #include "simulator/vpi_instance_facts.h"
 #include "simulator/vpi_user.h"
 
@@ -396,7 +397,6 @@ struct VpiObject {
   // final process), or an always_type left unset, carries none of those and so
   // has no always type to report. Zero (no always type) by default.
   int always_type = 0;
-
   // §37.63: the statement a process runs, and for a statement of a run's
   // procedure body the process it runs in; vpiStmt and vpiProcess read them
   // where the run set them. A run hangs a body from the scope it stands in,
@@ -683,7 +683,8 @@ struct VpiObject {
   // because the base declares none of them, so no other relation reaches them.
   std::vector<VpiObject*> derived_classes;
 
-  VpiDeclFacts decl_facts;  // §37.17 and §37.41: see VpiDeclFacts.
+  VpiDeclFacts decl_facts;    // §37.17 and §37.41: see VpiDeclFacts.
+  VpiFrameFacts frame_facts;  // §37.43: see VpiFrameFacts.
 
   // §37.33 detail 1: a class object's identifier, reported through
   // vpi_get(vpiObjId). It is a 64-bit value guaranteed unique among all live

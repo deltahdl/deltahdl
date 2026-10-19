@@ -102,9 +102,20 @@ std::string BlockVariableRunKey(std::string_view name, const Stmt& stmt,
   return VpiFlatName(walk.prefix, kGen + scopes + std::string(name));
 }
 
+// §6.21: whether `scope` stands in a task or function declared automatic, in
+// which a variable a block declares with no lifetime of its own is automatic.
+bool InAutomaticSubroutine(const VpiObject* scope) {
+  for (; scope != nullptr; scope = scope->parent) {
+    if (VpiIsTaskFuncType(scope->type)) return scope->automatic;
+  }
+  return false;
+}
+
 // §37.12 (figure): the variables a block declares hang from it, each named
-// under the block's path and keyed as the run keys its storage. A block
-// parameter is a block item declaration but no variable.
+// under the block's path and keyed as the run keys its storage, and automatic
+// where it is declared so or declared with no lifetime in an automatic task or
+// function (§6.21), which §37.43 details 2 and 3 read. A block parameter is a
+// block item declaration but no variable.
 void MakeBlockVariables(VpiObject* block, const Stmt& stmt,
                         const std::string& path, const BlockParent& parent,
                         const BodyWalk& walk) {
@@ -112,6 +123,8 @@ void MakeBlockVariables(VpiObject* block, const Stmt& stmt,
     if (item->kind != StmtKind::kVarDecl || item->var_is_param) continue;
     VpiObject* var = walk.build.alloc();
     var->type = BlockVariableKind(*item, walk);
+    var->automatic = item->var_is_automatic ||
+                     (!item->var_is_static && InAutomaticSubroutine(block));
     var->parent = block;
     var->name = walk.build.keep(std::string(item->var_name));
     var->full_name = path + "." + std::string(item->var_name);
@@ -261,10 +274,11 @@ void MakeWithClause(VpiObject* call, std::string_view method, const Expr& expr,
 // in `parent`, says it is: its kind, its name, what a method is applied to
 // (detail 2), the subroutine it calls, whether that is user-defined, the
 // systf of a registered system task or function, its arguments and its with
-// clause (detail 1). A system task or function call is recorded as the call a
-// run's invocation of a registered one stands as (detail 3), under the call
-// written and the instance writing it, whether a statement or an expression
-// writes it.
+// clause (detail 1). The call is recorded under the call written and the
+// instance writing it, whether a statement or an expression writes it: as the
+// call a run's invocation of a registered system task or function stands as
+// (detail 3), and as what the frame of a subroutine it enters was activated
+// from (§37.43 detail 6).
 void FillCall(VpiObject* call, const CallShape& shape, const Expr& called,
               const BlockParent& parent, const BodyWalk& walk) {
   call->type = shape.type;
@@ -287,9 +301,7 @@ void FillCall(VpiObject* call, const CallShape& shape, const Expr& called,
   call->user_systf = shape.systf;
   MakeCallArguments(call, called, parent, walk);
   MakeWithClause(call, shape.name, called, parent, walk);
-  if (shape.type == vpiSysTaskCall || shape.type == vpiSysFuncCall) {
-    walk.calls.sites[{&called, walk.prefix}] = call;
-  }
+  walk.calls.sites[{&called, walk.prefix}] = call;
 }
 
 // §37.42 with §37.60: the call statement `stmt` stands as, null for a

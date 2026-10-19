@@ -654,9 +654,9 @@ struct VpiRegisteredSystf {
   int sysfunctype = 0;
 };
 
-// §37.42 detail 3: the model's object for each call statement of a run, keyed
-// by the call the statement writes and the flat name of the instance writing
-// it, since every instance of a module carries the one parsed call.
+// §37.42 detail 3 and §37.43 detail 6: the model's object for each call of a
+// run, keyed by the call written and the flat name of the instance writing it,
+// since every instance of a module carries the one parsed call.
 using VpiCallSiteObjects =
     std::map<std::pair<const Expr*, std::string>, VpiObject*>;
 

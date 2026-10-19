@@ -524,7 +524,7 @@ static InlineTaskDisable HandleInlineTaskDisable(const ModuleItem* func,
 // the task was disabled.
 static ExecTask ExecInlineTaskBody(const ModuleItem* func, const Expr* expr,
                                    SimContext& ctx, Arena& arena) {
-  VpiActiveFrameScope frame;  // §37.44 detail 1, as in ExecFunctionBody.
+  VpiActiveFrameScope frame(expr);  // §37.44 detail 1, as in ExecFunctionBody.
   bool has_name = !func->name.empty();
   for (auto* s : func->func_body_stmts) {
     auto result = co_await ExecStmt(s, ctx, arena);
@@ -934,8 +934,8 @@ ExecTask ExecStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     return ExecTask::Immediate(StmtResult::kDone);
   }
   // §38.36.1.1: a cbStmt placed on the statement is called just before it
-  // executes.
-  GetGlobalVpiContext().DispatchStmtCallbacks(stmt, ctx.ActiveInstancePrefix());
+  // executes, and §37.43 detail 4 makes it the active frame's statement.
+  GetGlobalVpiContext().NoteStmtExecuting(stmt, ctx.ActiveInstancePrefix());
   // Named begin/end and fork blocks push their own label scope (ExecBlock /
   // ExecFork); every other labeled statement gets the scope wrapper here.
   if (!stmt->label.empty() && stmt->kind != StmtKind::kBlock &&

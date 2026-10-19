@@ -199,6 +199,7 @@ bool TryResolveProcessAndStmtRelation(int type, VpiHandle ref, VpiHandle& out) {
          TryResolveForAndBodyStmtRelation(type, ref, out) ||
          TryResolveStmtProcessRelation(type, ref, out) ||
          VpiTryResolveThreadRelation(type, ref, out) ||
+         VpiTryResolveFrameRelation(type, ref, out) ||
          TryResolveUserSystfRelation(type, ref, out);
 }
 

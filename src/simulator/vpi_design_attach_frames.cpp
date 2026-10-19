@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <iterator>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -33,6 +34,18 @@ VpiObject* VpiStmtObjectFor(const VpiStmtObjects& stmts, const Stmt* stmt,
   if (found == stmts.end()) found = stmts.lower_bound({stmt, std::string()});
   if (found == stmts.end() || found->first.first != stmt) return nullptr;
   return found->second;
+}
+
+VpiObject* VpiCallSiteObjectFor(const VpiCallSiteObjects& sites,
+                                const Expr* call_site, std::string prefix) {
+  if (!prefix.empty()) prefix.pop_back();
+  auto exact = sites.find({call_site, prefix});
+  if (exact != sites.end()) return exact->second;
+  auto first = sites.lower_bound({call_site, std::string()});
+  if (first == sites.end() || first->first.first != call_site) return nullptr;
+  auto next = std::next(first);
+  const bool kOnly = next == sites.end() || next->first.first != call_site;
+  return kOnly ? first->second : nullptr;
 }
 
 namespace {
@@ -159,7 +172,7 @@ VpiHandle VpiContext::ActiveFrame() const {
   return found == active_frames_.end() ? nullptr : found->second;
 }
 
-VpiHandle VpiContext::ActivateFrame(const void*& thread) {
+VpiHandle VpiContext::ActivateFrame(const void*& thread, const Expr* call) {
   // §36.6: a run holding no PLI application has no design attached and nothing
   // to reach a frame through, so it pays nothing for this.
   if (sim_ctx_ == nullptr) return nullptr;
@@ -196,6 +209,12 @@ VpiHandle VpiContext::ActivateFrame(const void*& thread) {
   // activation is a frame's life of its own, so its object is live again.
   frame->released = false;
   frame->active = true;
+  // §37.43 detail 6: the frame was activated from the call entering it, and
+  // details 4 and 5: no statement has run in it yet (NoteStmtExecuting).
+  frame->frame_facts = {
+      .origin = VpiCallSiteObjectFor(call_site_objects_, call,
+                                     sim_ctx_->ActiveInstancePrefix()),
+      .stmt = nullptr};
   active_frames_[thread] = frame;
   // §37.3.8: a frame is a transient object too, and cbStartOfFrame reports the
   // beginning of one. Detail 4 of §37.43 has at most one frame active at a time
@@ -224,8 +243,8 @@ void VpiContext::RestoreActiveFrame(VpiHandle previous, const void* thread) {
   if (active != nullptr) active->active = true;
 }
 
-VpiActiveFrameScope::VpiActiveFrameScope()
-    : outer_(GetGlobalVpiContext().ActivateFrame(thread_)) {}
+VpiActiveFrameScope::VpiActiveFrameScope(const Expr* call)
+    : outer_(GetGlobalVpiContext().ActivateFrame(thread_, call)) {}
 
 VpiActiveFrameScope::~VpiActiveFrameScope() {
   GetGlobalVpiContext().RestoreActiveFrame(outer_, thread_);

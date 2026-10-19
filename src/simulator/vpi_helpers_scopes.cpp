@@ -5,6 +5,7 @@
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers1.h"
+#include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -157,6 +158,7 @@ bool VpiCollectNestedObjects(int type, VpiHandle ref, VpiHandle iter) {
     return true;
   }
   if (CollectAssertionParts(type, ref, iter)) return true;
+  if (VpiCollectFrameAutomatics(type, ref, iter)) return true;
   // The `stmt` class §37.60 fills is a grouping (§37.4.1), so the iteration
   // reaches the statements the block holds, each of the kind it is, in the
   // order written, and none of the block's variables.

@@ -151,9 +151,8 @@ void BindActualsInCaller(const ModuleItem* func, const Expr* expr,
                          SimContext& ctx, Arena& arena);
 void WritebackInCaller(const ModuleItem* func, const Expr* expr,
                        SimContext& ctx, Arena& arena);
-void ExecFunctionBodyInCallee(const ModuleItem* func,
-                              std::string_view inst_prefix, Variable* ret_var,
-                              SimContext& ctx, Arena& arena);
+void ExecFunctionBodyInCallee(const SubroutineTarget& target, const Expr* call,
+                              Variable* ret_var, SimContext& ctx, Arena& arena);
 
 // §23.7 (printed pages 757-758): a dotted name whose first component names a
 // function, `f.x` or `p::f.x`, is the static variable `x` of that function.

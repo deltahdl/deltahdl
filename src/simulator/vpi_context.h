@@ -241,9 +241,9 @@ class VpiContext {
   // §38.36: deliver the one registration `cb_handle` names, once for a
   // simulation-time reason; answers 1 where it was delivered.
   int DeliverCallback(VpiHandle cb_handle);
-  // §38.36.1.1: call back the cbStmt callbacks placed on the model's object
-  // for `stmt`, run in the instance `prefix` names, as it is about to execute.
-  void DispatchStmtCallbacks(const Stmt* stmt, std::string prefix);
+  // §37.43 detail 4 and §38.36.1.1: `stmt`, run in the instance `prefix` names,
+  // is the active frame's statement now, and its cbStmt callbacks are called.
+  void NoteStmtExecuting(const Stmt* stmt, std::string prefix);
   // §38.36.1: what the run tells the simulation-event callbacks of, each
   // costing nothing where none of its reason is registered: a process created
   // or ended, an object constructed or reclaimed, a variable `stmt` in the
@@ -742,9 +742,9 @@ class VpiContext {
   VpiHandle ClassObjectOf(VpiObject& class_var);
 
   // §37.43 detail 4: activate the frame of a subroutine the run has just
-  // entered, answering with the frame that was active, and put that one back
-  // when the subroutine returns. Written beside the rest of it.
-  VpiHandle ActivateFrame(const void*& thread);
+  // entered through `call`, answering with the frame that was active, and put
+  // that one back when the subroutine returns. Written beside the rest of it.
+  VpiHandle ActivateFrame(const void*& thread, const Expr* call);
   void RestoreActiveFrame(VpiHandle previous, const void* thread);
 
   // §36.10.1: a callback may also be registered for the occurrence of an error.
@@ -848,8 +848,8 @@ class VpiContext {
   // §37.42 detail 3: the system task or function call currently invoking a PLI
   // application, returned by vpi_handle(vpiSysTfCall, NULL).
   VpiHandle current_systf_call_ = nullptr;
-  // §37.42 detail 3: the model's call statements, which an invocation of a
-  // registered system task stands as where it was made from one of them.
+  // §37.42 detail 3 and §37.43 detail 6: the model's calls, which a registered
+  // system task's invocation stands as and a subroutine's frame was entered by.
   VpiCallSiteObjects call_site_objects_;
   // §38.36.1.1: the model's statements, keyed as the call statements are, and
   // whether a cbStmt has been registered, before which none is looked up.

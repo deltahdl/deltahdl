@@ -1,8 +1,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
-#include <iterator>
-#include <map>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -25,6 +23,7 @@
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_select_indexes.h"
+#include "simulator/vpi_stmt_objects.h"
 #include "simulator/vpi_user.h"
 
 // The object a system task or function call stands as while a PLI application
@@ -264,27 +263,6 @@ void AppendSystfCallArguments(VpiObject* call, const Expr& call_site,
   }
 }
 
-// §37.42 detail 3: the model's object for the call statement `call_site`
-// written in the instance `prefix` names; null where the model holds no
-// statement making the call there, the call then standing up an object of its
-// own. Another instance's statement is that instance's call, not this one. A
-// run names an instance with a dot after it and the model without. A body a
-// package or the compilation unit declares runs in whichever instance calls
-// it, and its statements are kept under the package's name or `$unit` alone
-// (AttachPackageSubroutineBodies), so a call site the model holds under one
-// scope only is that statement wherever it runs.
-VpiObject* CallSiteObject(const VpiCallSiteObjects& sites,
-                          const Expr* call_site, std::string prefix) {
-  if (!prefix.empty()) prefix.pop_back();
-  auto exact = sites.find({call_site, prefix});
-  if (exact != sites.end()) return exact->second;
-  auto first = sites.lower_bound({call_site, std::string()});
-  if (first == sites.end() || first->first.first != call_site) return nullptr;
-  auto next = std::next(first);
-  const bool kOnly = next == sites.end() || next->first.first != call_site;
-  return kOnly ? first->second : nullptr;
-}
-
 }  // namespace
 
 // §37.42: the object standing for one system task or system function call,
@@ -305,8 +283,8 @@ VpiHandle VpiContext::MakeSystfCallObject(const s_vpi_systf_data& data,
   // statement for, such as one written in a task's body, stands up an object
   // of its own. Each invocation hangs its own arguments and value storage on
   // the call.
-  VpiObject* call =
-      CallSiteObject(call_site_objects_, call_site, ctx.ActiveInstancePrefix());
+  VpiObject* call = VpiCallSiteObjectFor(call_site_objects_, call_site,
+                                         ctx.ActiveInstancePrefix());
   if (call == nullptr) {
     call = AllocObject();
     // A registration is refused without a name (RegisterSystf). A system task
@@ -372,8 +350,8 @@ void VpiContext::NoteTimeFormatCall(const Expr* call_site, SimContext& ctx) {
   // Detail 1 reserves NULL for a run where $timeformat() has not been called.
   // The call the format came from is the most recent, a later one replacing it
   // as it replaces the format.
-  VpiObject* call =
-      CallSiteObject(call_site_objects_, call_site, ctx.ActiveInstancePrefix());
+  VpiObject* call = VpiCallSiteObjectFor(call_site_objects_, call_site,
+                                         ctx.ActiveInstancePrefix());
   if (call == nullptr) {
     call = AllocObject();
     call->type = vpiSysTaskCall;

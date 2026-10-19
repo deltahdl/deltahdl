@@ -652,7 +652,7 @@ static void ConstructLevel(const ClassTypeInfo* info,
     // it meanwhile, is constructed.
     c.ctx.EnterSubroutineScope(info->package);
     Variable dummy;
-    ExecFunctionBody(ctor, &dummy, c.ctx, c.arena);
+    ExecFunctionBody(ctor, nullptr, &dummy, c.ctx, c.arena);
     WritebackLevelFormals(ctor, actuals, c.ctx, c.arena);
   }
   c.ctx.PopMethodClass();

@@ -550,11 +550,12 @@ void WritebackInCaller(const ModuleItem* func, const Expr* expr,
 // made while the actuals of an enclosing call are being read, `u1.tk(u2.f(1))`,
 // where the caller's instance is in force through BindActualsInCaller. A
 // function never suspends, so the override is scoped over the body.
-void ExecFunctionBodyInCallee(const ModuleItem* func,
-                              std::string_view inst_prefix, Variable* ret_var,
-                              SimContext& ctx, Arena& arena) {
-  InstancePrefixOverride in_callee(ctx.InstancePrefixOverride(), inst_prefix);
-  ExecFunctionBody(func, ret_var, ctx, arena);
+void ExecFunctionBodyInCallee(const SubroutineTarget& target, const Expr* call,
+                              Variable* ret_var, SimContext& ctx,
+                              Arena& arena) {
+  InstancePrefixOverride in_callee(ctx.InstancePrefixOverride(),
+                                   target.inst_prefix);
+  ExecFunctionBody(target.func, call, ret_var, ctx, arena);
 }
 
 }  // namespace delta

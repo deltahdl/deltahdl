@@ -742,10 +742,17 @@ void VpiContext::Deliver(s_cb_data data) {
   current_callback_reason_ = saved_reason;
 }
 
-void VpiContext::DispatchStmtCallbacks(const Stmt* stmt, std::string prefix) {
-  if (!stmt_callbacks_registered_) return;
+void VpiContext::NoteStmtExecuting(const Stmt* stmt, std::string prefix) {
+  // §37.43 detail 4: the statement beginning in a frame is the one active
+  // within it, and stays the one detail 5 reports once the statement has
+  // activated a frame of its own, until the next one in this frame begins.
+  VpiHandle frame = sim_ctx_ != nullptr ? ActiveFrame() : nullptr;
+  if (frame == nullptr && !stmt_callbacks_registered_) return;
   VpiObject* obj = VpiStmtObjectFor(stmt_objects_, stmt, std::move(prefix));
-  if (obj != nullptr) DispatchCallbacks(cbStmt, obj);
+  if (frame != nullptr) frame->frame_facts.stmt = obj;
+  if (stmt_callbacks_registered_ && obj != nullptr) {
+    DispatchCallbacks(cbStmt, obj);
+  }
 }
 
 void VpiContext::NoteThreadCreated(Process* proc) {

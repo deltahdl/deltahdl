@@ -22,13 +22,6 @@ namespace delta {
 // IEEE Std 1800-2017 or earlier (detail 7).
 // ===========================================================================
 
-// §37.43 (vpiOrigin targets / detail 6): the object kinds a frame's vpiOrigin
-// can reach - the point in the elaboration hierarchy from which the frame was
-// activated. The diagram draws these as a scope, a (system/method) task or
-// function call, or a net or net array. The net and net-array cases cover a
-// frame activated for a nettype's user-defined resolution function.
-bool VpiIsFrameOriginType(int type);
-
 // §37.43 (vpiParent -> frame / detail 5): the frame from which this child frame
 // was activated, reached up the parent chain when that parent is itself a
 // frame. Null for a null handle, a root frame with no parent, or a non-frame
@@ -36,26 +29,26 @@ bool VpiIsFrameOriginType(int type);
 VpiHandle VpiFrameParent(VpiHandle frame);
 
 // §37.43 (vpiOrigin / detail 6): the elaboration-hierarchy point a frame was
-// activated from, modeled as the frame's first origin-kind child (see
-// VpiIsFrameOriginType). Null for a null handle or a frame with no origin.
+// activated from, as its activation recorded it in its frame facts. Null for a
+// null handle or a frame with no origin.
 VpiHandle VpiFrameOrigin(VpiHandle frame);
 
 // §37.43 (frame to stmt transition / details 4 and 5): the statement reached
 // from a frame. For the active frame this is the currently active statement
 // within it; for a parent frame it is the atomic statement or scope whose
-// execution activated the child frame. Modeled as the frame's first statement
-// child. Null for a null handle or a frame with no statement attached.
+// execution activated the child frame. Read from its frame facts. Null for a
+// null handle or a frame no statement has run in.
 VpiHandle VpiFrameStmt(VpiHandle frame);
 
 // §37.43 (frame--thread edge): the thread a frame belongs to. This is the
 // reverse of §37.44's VpiThreadFrame, which reaches the active frame from the
-// thread; here the frame reaches its thread, modeled as its first thread child.
-// Null for a null handle or a frame with no thread attached.
+// thread; here the frame reaches its thread, at the top of its chain of parent
+// frames. Null for a null handle or a frame whose chain ends below no thread.
 VpiHandle VpiFrameThread(VpiHandle frame);
 
 // §37.43 (vpiAutomatics / detail 1): the automatic objects a frame locally
-// declares - its automatic variables, named events, and named event arrays, in
-// order. A null handle yields none.
+// declares - the automatic variables, named events, and named event arrays of
+// the task or function its origin calls, in order. A null handle yields none.
 std::vector<VpiHandle> VpiFrameAutomatics(VpiHandle frame);
 
 // ===========================================================================
@@ -88,6 +81,17 @@ VpiHandle VpiThreadFrame(VpiHandle thread);
 // designated link rather than a child of the relation's type; false for any
 // other relation or object, `out` then left as it was.
 bool VpiTryResolveThreadRelation(int type, VpiHandle ref, VpiHandle& out);
+
+// §37.43: a frame's vpiParent, vpiOrigin and vpiThread relations and its frame
+// to stmt transition, each a designated link rather than a child of the
+// relation's type; false for any other relation or object, `out` then left as
+// it was.
+bool VpiTryResolveFrameRelation(int type, VpiHandle ref, VpiHandle& out);
+
+// §37.43 detail 1: puts in `iter` what vpi_iterate(vpiAutomatics, ref) yields
+// where `ref` is a frame, and answers whether it was one; false, `iter` left
+// as it was, for any other relation or object.
+bool VpiCollectFrameAutomatics(int type, VpiHandle ref, VpiHandle iter);
 
 // §37.44 (thread one-to-many thread): the threads spawned by this thread, as
 // the iteration over its thread children yields them, in order. A null handle

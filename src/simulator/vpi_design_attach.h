@@ -3,6 +3,7 @@
 namespace delta {
 
 class SimContext;
+struct Expr;
 struct RtlirDesign;
 struct VpiObject;
 
@@ -42,10 +43,12 @@ void AttachDesignToPliApplications(const RtlirDesign* design, SimContext& ctx);
 //
 // Detail 4 is what it is for: a thread has at most one active frame at a time,
 // and vpi_handle(vpiFrame, NULL) answers it. Nothing in the tool ever made a
-// frame active, so that routine answered null under every design.
+// frame active, so that routine answered null under every design. `call` is
+// the call entering the subroutine, what detail 6 has the frame's vpiOrigin
+// reach; null where the body is entered through no call the design writes.
 class VpiActiveFrameScope {
  public:
-  VpiActiveFrameScope();
+  explicit VpiActiveFrameScope(const Expr* call);
   ~VpiActiveFrameScope();
 
   VpiActiveFrameScope(const VpiActiveFrameScope&) = delete;
