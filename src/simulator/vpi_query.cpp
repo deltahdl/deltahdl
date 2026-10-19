@@ -316,6 +316,10 @@ int VpiGetInstanceTime(int property, VpiHandle obj) {
   return property == vpiTimeUnit ? obj->time_unit : obj->time_precision;
 }
 
+// Maps a stored Boolean flag onto the 1/0 a VPI integer property reports. Used
+// by the property switches so the per-case arms stay branch-free.
+int VpiBool(bool flag) { return flag ? 1 : 0; }
+
 // Handles the integer properties whose value depends on the object kind (each
 // drawn only on certain kinds, reporting vpiUndefined/0 otherwise). On a match
 // sets handled=true and returns the property value; otherwise leaves handled
@@ -416,10 +420,6 @@ int VpiGetTypeRestricted(int property, VpiHandle obj, bool& handled) {
       return 0;
   }
 }
-
-// Maps a stored Boolean flag onto the 1/0 a VPI integer property reports. Used
-// by the simple-property switch so the per-case arms stay branch-free.
-int VpiBool(bool flag) { return flag ? 1 : 0; }
 
 // §37.63 detail 1: a process reports which always-procedure kind it is, but
 // only when always_type is one of
