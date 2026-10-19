@@ -4,6 +4,7 @@
 
 #include "elaborator/elaborator_gen_block_interfaces.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <format>
@@ -11,6 +12,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
@@ -337,28 +339,44 @@ void RewriteInstancePath(RtlirPortBinding& binding, const std::string& path,
   binding.connection = copy;
 }
 
-// §23.8: the index of the first of `steps` naming an instance held by the
-// module `decl`: 1 where the first step is the name of the module itself
-// rather than of an instance it holds, as `top` is in `top.i` written in top,
-// and 0 otherwise.
-size_t FirstInstanceStep(const ModuleDecl* decl,
-                         const std::vector<ActualPathStep>& steps) {
+// Where an interface port actual's path is resolved from: the module `decl`
+// whose instances its step `step` onward name, and the stored name's start.
+struct PathStart {
+  const ModuleDecl* decl;
+  size_t step;
+  std::string path;
+};
+
+// §23.6 with §23.8: a path whose first step names no instance of the module
+// `scope.parent` starts at the module itself where that step is its own name,
+// `top.i` written in top, the rewritten name relative to it as any other, and
+// at a top-level module where the step is a top's name, `top.i` written in a
+// module under top, the rewritten name then kept whole, `top.i`, a full path
+// the simulator resolves from the design's root
+// (Lowerer::ConnectedInstancePath).
+PathStart StartOfPath(const InterfaceActualScope& scope,
+                      const std::vector<ActualPathStep>& steps) {
   const ActualPathStep& first = steps.front();
-  if (first.indexed || first.name != decl->name) return 0;
-  return FindInstanceItem(decl, first.name) == nullptr ? 1 : 0;
+  if (first.indexed || FindInstanceItem(scope.parent, first.name) != nullptr) {
+    return {scope.parent, 0, {}};
+  }
+  if (first.name == scope.parent->name) return {scope.parent, 1, {}};
+  auto top = std::ranges::find(scope.tops, first.name, &ModuleDecl::name);
+  if (top == scope.tops.end()) return {scope.parent, 0, {}};
+  return {*top, 1, std::string(first.name) + "."};
 }
 
 // §25.3 with §23.6: resolves the interface port actual `steps` names, step
-// by step from the module `scope.parent`, through module instances to an
-// interface instance. A path starting at the module's own name (§23.8) is
-// resolved from the module itself, and its own interface instance, `top.i`,
-// is rewritten to the name the module holds it under, `i`.
+// by step from the module `scope.parent`, or from the module or top-level
+// module its first step names (StartOfPath), through module instances to an
+// interface instance.
 void ResolveInstancePath(RtlirPortBinding& binding,
                          const std::vector<ActualPathStep>& steps,
                          const InterfaceActualScope& scope) {
-  const ModuleDecl* decl = scope.parent;
-  std::string path;
-  for (size_t k = FirstInstanceStep(decl, steps); k < steps.size(); ++k) {
+  PathStart start = StartOfPath(scope, steps);
+  const ModuleDecl* decl = start.decl;
+  std::string path = std::move(start.path);
+  for (size_t k = start.step; k < steps.size(); ++k) {
     const ModuleItem* item = FindInstanceItem(decl, steps[k].name);
     decl = item == nullptr ? nullptr : scope.find_module(item->inst_module);
     if (decl == nullptr) return;

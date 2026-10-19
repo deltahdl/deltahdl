@@ -551,6 +551,7 @@ RtlirDesign* Elaborator::ElaborateTops(
   design->compilation_unit = unit_;
   design->compilation_units = units_.units;
   design->top_decls.assign(top_decls.begin(), top_decls.end());
+  top_decls_ = design->top_decls;
   ResetPendingElaboration();
   // §13.4.3 with §20.10.1: a folded constant function's severity tasks.
   ConstFuncSeverityGuard severity_guard(diag_, arena_);

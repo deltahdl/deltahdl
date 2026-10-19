@@ -69,6 +69,22 @@ TEST(InterfacePortHierRefSim, PortJoinsTheInstanceNamedFromTheModule) {
             "x=9\n");
 }
 
+// §25.3 with §23.6: an interface port connected in a module below the top
+// through a full path from the top, `top.i`, shares the top's instance's
+// members, so the value written through the port is the one top reads
+// (#7354).
+TEST(InterfacePortHierRefSim, PortJoinsTheInstanceNamedFromTheTop) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("interface ifc; logic [7:0] a = 1; endinterface\n"
+                       "module writer(ifc p); initial p.a = 9; endmodule\n"
+                       "module mid; writer w(top.i); endmodule\n"
+                       "module top; ifc i(); mid m();\n"
+                       "  initial #1 $display(\"x=%0d\", i.a);\n"
+                       "endmodule\n",
+                       f),
+            "x=9\n");
+}
+
 // §25.3 with §27.4: a module may pass its interface port on to an instance a
 // generate block of it holds, which passes it on again. The value the
 // innermost instance writes through its port is the one the interface the

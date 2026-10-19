@@ -397,6 +397,7 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
       [&](std::string_view name) { return FindModuleInScope(name); };
   const ScopeMap kParams = BuildParamScope(parent_mod);
   const InterfaceActualScope kActualScope{module_decl_path_.back(),
+                                          top_decls_,
                                           kFindModule,
                                           interface_inst_types_,
                                           kParams,

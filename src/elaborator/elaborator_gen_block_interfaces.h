@@ -61,11 +61,13 @@ void RegisterGenerateBlockInterfaces(
     InterfaceInstTypes& table, Arena& arena);
 
 // What resolving an interface port's actual needs: the declaration of the
-// module the actual is written in, a lookup of an instance's module or
-// interface by its name, the module's interface instance table, its
-// parameters, which fold the index of a loop block's path, and where to report.
+// module the actual is written in, the design's top-level modules, which a
+// full path starts at (§23.6), a lookup of an instance's module or interface
+// by its name, the module's interface instance table, its parameters, which
+// fold the index of a loop block's path, and where to report.
 struct InterfaceActualScope {
   const ModuleDecl* parent;
+  const std::vector<const ModuleDecl*>& tops;
   const std::function<const ModuleDecl*(std::string_view)>& find_module;
   InterfaceInstTypes& table;
   const ScopeMap& params;
@@ -88,7 +90,8 @@ void ResolveGenBlockInterfaceActuals(RtlirModuleInst& inst,
 // §25.3 with §23.6: rewrites each interface port actual of `inst` that names,
 // through module instances, an interface instance one of them declares, `h.i`
 // or a modport of it, `h.i.mp`, to the instance's path as one name, `h.i`,
-// entered into the table, under which the simulator keys that instance too.
+// entered into the table, under which the simulator keys that instance too;
+// a full path from a top-level module, `top.h.i`, is kept whole.
 // An actual whose path resolves through an arrayed instance, `h[0].i`, is
 // reported and its binding marked refused.
 void ResolveInstancePathActuals(RtlirModuleInst& inst,

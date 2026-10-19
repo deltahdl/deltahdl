@@ -323,6 +323,20 @@ TEST(InterfacePortHierRef, PathFromTheModulesOwnNameIsConnected) {
              "endmodule\n"));
 }
 
+// §25.3 with §23.6: the reference may be a full path from a top-level module
+// written in a module below it, `top.i` in mid, reaching the top's own
+// interface instance, a modport of it, `top.i.mp`, or an interface instance a
+// module instance of the top holds, `top.h.i` (#7354).
+TEST(InterfacePortHierRef, FullPathFromATopModuleIsConnected) {
+  EXPECT_TRUE(
+      ElabOk("interface ifc; logic a; modport mp(input a); endinterface\n"
+             "module user(ifc p); endmodule\n"
+             "module holder; ifc i(); endmodule\n"
+             "module mid; user u1(top.i); user u2(top.i.mp);\n"
+             "  user u3(top.h.i); endmodule\n"
+             "module top; ifc i(); holder h(); mid m(); endmodule\n"));
+}
+
 // §25.3 requires the reference to land on an interface instance: a path
 // ending at a module instance, `h.k`, or at an array of interface instances,
 // `h.ia`, connects no instance, and nor does a name past a modport,

@@ -253,7 +253,7 @@ static void BindPortToInstance(const std::string& port_key,
 // where `name` is an interface port of that instance, passed down a level,
 // the instance connected to the port in turn.
 std::string Lowerer::ConnectedInstanceKey(std::string_view name) const {
-  std::string key = inst_prefix_ + std::string(name);
+  std::string key = ConnectedInstancePath(name);
   std::string_view through_port = ctx_.FindInterfacePortInstance(key);
   return through_port.empty() ? key : std::string(through_port);
 }
@@ -473,7 +473,7 @@ void Lowerer::AliasInterfacePortTo(const RtlirModuleInst& inst,
   RegisterModportExpressions(*port, binding.connection, ifc, port_key,
                              instance_key);
   std::string port_prefix = port_key + ".";
-  std::string conn_prefix = inst_prefix_ + instance + ".";
+  std::string conn_prefix = ConnectedInstancePath(instance) + ".";
   AliasVariableMembers(ifc, port_prefix, conn_prefix, ctx_, arena_);
   DrivePathDelayedMembers(inst, binding.port_name, ifc, port_prefix, instance);
   // A net shares one storage between its net-map entry (driver resolution)

@@ -404,6 +404,7 @@ class Lowerer {
                                const RtlirModule* ifc,
                                const std::string& port_prefix,
                                const std::string& instance);
+  std::string ConnectedInstancePath(std::string_view name) const;
   std::string ConnectedInstanceKey(std::string_view name) const;
   const RtlirModule* ConnectedInterface(const RtlirPort& port, const Expr* conn,
                                         std::string& instance) const;

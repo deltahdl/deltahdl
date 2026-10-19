@@ -327,6 +327,21 @@ void Lowerer::LowerAliases(const RtlirModule* mod) {
 // instance's are under its path, so `int x` in t1 and in t2 are t1's x and
 // t2.x. Keyed alike, the second top's x replaced the first's in the one table
 // both were written to, and each read the other's value.
+// §23.6: the path of the interface instance `name` an interface port's
+// actual names. The elaborator rewrites the actual to the instance's path
+// from the module it is written in, `h.i`, keyed under the instance being
+// lowered, or keeps a full path from a top-level module whole, `top.i`
+// written in a module under top (ResolveInstancePathActuals), which is keyed
+// from the design's root as any path starting at a top's name is.
+std::string Lowerer::ConnectedInstancePath(std::string_view name) const {
+  std::string local = inst_prefix_ + std::string(name);
+  std::string_view head = name.substr(0, name.find('.'));
+  bool rooted = head.size() < name.size() &&
+                (ctx_.IsTopModule(head) || ctx_.IsParallelTop(head)) &&
+                ctx_.FindInstanceType(local).empty();
+  return rooted ? ctx_.RootedStorageKey(name) : local;
+}
+
 void Lowerer::LowerParallelTop(const RtlirModule* mod) {
   ctx_.RegisterParallelTop(mod->name);
   RtlirModuleInst inst;

@@ -672,6 +672,9 @@ class ElaboratorData {
   // read while defparams are applied and while the unresolved ones are
   // reported, both of which run outside every module.
   std::vector<RtlirModule*> defparam_top_roots_;
+  // §23.6: the declarations of the design's top-level modules, which a full
+  // path in an interface port's actual starts at.
+  std::vector<const ModuleDecl*> top_decls_;
 
   std::unordered_map<std::string_view, const ModuleItem*>
       deferred_subroutine_map_;
