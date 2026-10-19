@@ -195,14 +195,29 @@ void DescribeValueParameter(VpiObject& obj, const RtlirParamDecl& param,
   }
 }
 
-// §37.28: the scope a parameter of `param`'s generate block stands in, the
-// block's gen scope (§37.85), keyed under `at.prefix`; `at.scope` for one of
-// the instance itself.
-VpiObject* ParameterScope(const RtlirParamDecl& param, const ParamScope& at) {
-  std::string_view block = param.gen_block_prefix;
-  if (block.empty()) return at.scope;
-  if (block.ends_with('.')) block.remove_suffix(1);
-  return FindObjectForFlatName(at.objects, VpiFlatName(at.prefix, block));
+// The gen scope named `name` among the children of `scope`, null for none.
+VpiObject* GenScopeNamed(const VpiObject& scope, std::string_view name) {
+  const auto kFound =
+      std::ranges::find_if(scope.children, [name](const VpiObject* child) {
+        return child->type == vpiGenScope && child->name == name;
+      });
+  return kFound == scope.children.end() ? nullptr : *kFound;
+}
+
+// §37.28 with §37.85: the scope `param` stands in below the instance
+// `scope`: the gen scope of the generate block it was declared in, reached
+// through the blocks its prefix names, outermost first, or the instance
+// itself; null where a block has no gen scope.
+VpiObject* ParameterScope(const RtlirParamDecl& param, VpiObject* scope) {
+  std::string_view rest = param.gen_block_prefix;
+  while (scope != nullptr && !rest.empty()) {
+    const std::size_t kDot = rest.find('.');
+    const std::string_view kStep = rest.substr(0, kDot);
+    rest = kDot == std::string_view::npos ? std::string_view{}
+                                          : rest.substr(kDot + 1);
+    scope = GenScopeNamed(*scope, kStep);
+  }
+  return scope;
 }
 
 // The parameters of the instance `at` describes, an instance of `mod`, each
@@ -212,7 +227,7 @@ void AttachScopeParameters(const RtlirModule* mod, const ParamScope& at,
                            const ParamAttach& with) {
   for (const RtlirParamDecl& param : mod->params) {
     if (param.is_type_param) {
-      if (VpiObject* holder = ParameterScope(param, at)) {
+      if (VpiObject* holder = ParameterScope(param, at.scope)) {
         MakeTypeParameter(holder, param,
                           param.gen_block_prefix.empty()
                               ? DeclaredDefaultType(at.decl, param.name)
@@ -362,6 +377,23 @@ void MakeArrayParamAssigns(VpiObject* array, const RtlirModuleInst& left,
   }
 }
 
+// What holds the param assigns of the instantiation `left` makes, and the
+// name the instantiation is written under: for an element of an instance
+// array, the array (§37.11) and its name, and otherwise the instance itself.
+struct ParamAssignHolder {
+  VpiObject* holder;
+  std::string_view written;
+};
+
+ParamAssignHolder HolderOf(const RtlirModuleInst& left,
+                           const std::string& prefix,
+                           const VpiObjectMap& objects) {
+  VpiObject* instance =
+      FindObjectForFlatName(objects, VpiFlatName(prefix, left.inst_name));
+  if (left.array.name.empty()) return {instance, left.inst_name};
+  return {VpiInstanceArrayOf(instance, vpiInstanceArray), left.array.name};
+}
+
 // §37.11 and §37.28: the param assigns of each instance, and of each module,
 // interface and program array, the instance of `mod` that `prefix` names
 // holds, made from the instantiation its declaration writes for it.
@@ -370,18 +402,15 @@ void MakeInstanceArrayParamAssigns(const RtlirModule& mod,
                                    const ParamArrayAttach& with) {
   const ModuleDecl& decl = ElementDeclNamed(with.design, mod.name);
   for (const RtlirModuleInst& left : mod.children) {
-    const bool kArray = !left.array.name.empty();
-    if (kArray && left.array.index != left.array.left) continue;
-    VpiObject* instance = FindObjectForFlatName(
-        with.objects, VpiFlatName(prefix, left.inst_name));
-    VpiObject* holder =
-        kArray ? VpiInstanceArrayOf(instance, vpiInstanceArray) : instance;
-    if (holder == nullptr) continue;
-    const std::string_view kWritten = kArray ? left.array.name : left.inst_name;
+    if (!left.array.name.empty() && left.array.index != left.array.left) {
+      continue;
+    }
+    const ParamAssignHolder kAt = HolderOf(left, prefix, with.objects);
+    if (kAt.holder == nullptr) continue;
     for (const ModuleItem* item : decl.items) {
       if (item->kind == ModuleItemKind::kModuleInst &&
-          item->inst_name == kWritten) {
-        MakeArrayParamAssigns(holder, left, *item, prefix, with);
+          item->inst_name == kAt.written) {
+        MakeArrayParamAssigns(kAt.holder, left, *item, prefix, with);
       }
     }
   }
