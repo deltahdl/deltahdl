@@ -345,6 +345,135 @@ static VpiHandle ModulePathOutputNet(VpiHandle module,
   return nullptr;
 }
 
+// §37.39 and §37.40 (figures): the vpiEdge a path or tchk term reports - the
+// edge identifier its path or timing check event was written with (§30.4.2,
+// §31.5), `edge` being either edge, and none where it was written without one.
+static int VpiEventEdgeOf(SpecifyEdge edge) {
+  switch (edge) {
+    case SpecifyEdge::kPosedge:
+      return vpiPosedge;
+    case SpecifyEdge::kNegedge:
+      return vpiNegedge;
+    case SpecifyEdge::kEdge:
+      return vpiAnyEdge;
+    default:
+      return vpiNoEdge;
+  }
+}
+
+// A.7.3 with A.7.5.2: the expression a path's or timing check's terminal
+// stands for - the signal it names, a member of the interface port it names
+// it through where it names one, selected as the terminal was written.
+static const Expr* TerminalExpression(const SpecifyTerminal& terminal,
+                                      Arena& arena) {
+  auto* signal = arena.Create<Expr>();
+  signal->kind = ExprKind::kIdentifier;
+  signal->text = terminal.name;
+  if (!terminal.interface_name.empty()) {
+    auto* port = arena.Create<Expr>();
+    port->kind = ExprKind::kIdentifier;
+    port->text = terminal.interface_name;
+    auto* member = arena.Create<Expr>();
+    member->kind = ExprKind::kMemberAccess;
+    member->lhs = port;
+    member->rhs = signal;
+    signal = member;
+  }
+  if (terminal.range_kind == SpecifyRangeKind::kNone) return signal;
+  auto* select = arena.Create<Expr>();
+  select->kind = ExprKind::kSelect;
+  select->base = signal;
+  select->index = terminal.range_left;
+  if (terminal.range_kind != SpecifyRangeKind::kBitSelect) {
+    select->index_end = terminal.range_right;
+  }
+  select->is_part_select_plus =
+      terminal.range_kind == SpecifyRangeKind::kPlusIndexed;
+  select->is_part_select_minus =
+      terminal.range_kind == SpecifyRangeKind::kMinusIndexed;
+  return select;
+}
+
+// The object an expression a specify block writes stands for in the instance
+// declaring it.
+using WrittenExpression = std::function<VpiObject*(const Expr*)>;
+
+// The expressions a specify entry of the instance at `inst_prefix` writes, as
+// VpiInstanceExpression makes them, the names resolving in that instance:
+// keyed under its prefix without the closing `.`, and the first top's under
+// none.
+static WrittenExpression ExpressionsIn(std::string_view inst_prefix,
+                                       const VpiObjectMap& objects,
+                                       SimContext& ctx,
+                                       const VpiAttachBuild& build) {
+  return [prefix = std::string(SpecifyEntryScope(inst_prefix, "")), &objects,
+          &ctx, &build](const Expr* expr) {
+    return VpiInstanceExpression(expr, objects, prefix, ctx, build);
+  };
+}
+
+// §37.39 (figure): a path term of the module path `path`, reporting the
+// direction `direction` and the edge `edge`, standing for the terminal
+// written as `expr`.
+static VpiObject* AddPathTerm(VpiObject* path, int direction, int edge,
+                              VpiObject* expr, const VpiAttachBuild& build) {
+  VpiObject* term = build.alloc();
+  term->type = vpiPathTerm;
+  term->direction = direction;
+  term->edge = edge;
+  term->term_expr = expr;
+  term->parent = path;
+  path->children.push_back(term);
+  return term;
+}
+
+// §30.4.5: the polarity a polarity operator gives a path, as vpiPolarity and
+// vpiDataPolarity report it, unknown where none was written.
+static int VpiPolarityOf(SpecifyPolarity polarity) {
+  switch (polarity) {
+    case SpecifyPolarity::kPositive:
+      return vpiPositive;
+    case SpecifyPolarity::kNegative:
+      return vpiNegative;
+    default:
+      return vpiUnknown;
+  }
+}
+
+// §37.39 (figure): what the declaration of `path` wrote it as - a parallel or
+// full connection (§30.4.6), the polarity of its operator and of its data
+// source (§30.4.3, §30.4.5), whether it is an ifnone path (§30.4.4.4) and the
+// condition it was written under (§30.4.4) - and its terms: the source and
+// destination this path joins and an edge-sensitive path's data source, each
+// expression as `expr` makes it.
+static void FillModPath(VpiObject* obj, const PathDelay& path,
+                        const WrittenExpression& expr,
+                        const VpiAttachBuild& build) {
+  const SpecifyPathDecl& decl = *path.decl;
+  obj->path_type =
+      decl.path_kind == SpecifyPathKind::kFull ? vpiPathFull : vpiPathParallel;
+  obj->polarity = VpiPolarityOf(decl.polarity);
+  obj->data_polarity = VpiPolarityOf(decl.dst_polarity);
+  obj->mod_path_has_if_none = decl.is_ifnone;
+  obj->written_condition = expr(decl.condition);
+  if (path.src_index < decl.src_ports.size()) {
+    AddPathTerm(
+        obj, vpiInput, VpiEventEdgeOf(decl.edge),
+        expr(TerminalExpression(decl.src_ports[path.src_index], build.arena)),
+        build);
+  }
+  if (path.dst_index < decl.dst_ports.size()) {
+    AddPathTerm(
+        obj, vpiOutput, vpiNoEdge,
+        expr(TerminalExpression(decl.dst_ports[path.dst_index], build.arena)),
+        build);
+  }
+  if (decl.data_source != nullptr) {
+    AddPathTerm(obj, vpiInput, vpiNoEdge, expr(decl.data_source), build)
+        ->data_path_term = true;
+  }
+}
+
 void VpiContext::AttachModulePathDelays(SimContext& sim_ctx) {
   // §38.10: vpi_get_delays() retrieves an object's delays or pulse limits. A
   // module path is one of the four kinds of
@@ -355,6 +484,8 @@ void VpiContext::AttachModulePathDelays(SimContext& sim_ctx) {
   // an object of its own making to retrieve.
   SpecifyManager* specify = sim_ctx.GetSpecifyManager();
   if (specify == nullptr) return;
+  const VpiAttachBuild kBuild{[this] { return AllocObject(); },
+                              VpiPoolKeeper(name_pool_), sim_ctx.GetArena()};
 
   for (const PathDelay& path : specify->GetPathDelays()) {
     // §30.3 puts a specify block inside a module declaration, so the paths it
@@ -402,6 +533,13 @@ void VpiContext::AttachModulePathDelays(SimContext& sim_ctx) {
     // for, and it sits on the net the path's output terminal names.
     VpiPlaceDelayDevice(obj, ModulePathOutputNet(module, path.dst_port), module,
                         vpiModPathDelay, [this] { return AllocObject(); });
+    // A path §32's SDF annotation added was declared by no source, so it has
+    // nothing written to make.
+    if (path.decl != nullptr) {
+      FillModPath(obj, path,
+                  ExpressionsIn(path.inst_prefix, object_map_, sim_ctx, kBuild),
+                  kBuild);
+    }
   }
 }
 
@@ -437,20 +575,6 @@ static int VpiTchkTypeOf(TimingCheckKind kind) {
   }
 }
 
-// §37.40 (figure): the vpiEdge an event term reports - the edge control its
-// timing_check_event was written with, and none where it was written without
-// one.
-static int VpiTchkTermEdgeOf(SpecifyEdge edge) {
-  switch (edge) {
-    case SpecifyEdge::kPosedge:
-      return vpiPosedge;
-    case SpecifyEdge::kNegedge:
-      return vpiNegedge;
-    default:
-      return vpiNoEdge;
-  }
-}
-
 // §37.40 (figure): one of the check's two event terms - the tchk term the
 // vpiTchkRefTerm and vpiTchkDataTerm relations reach. Its own properties are
 // the event's: the edge it was written with (vpiEdge) and the signal it names.
@@ -460,7 +584,7 @@ static VpiObject* MakeTchkTerm(VpiObject* term, std::string_view signal,
   term->type = vpiTchkTerm;
   names.emplace_back(signal);
   term->name = names.back();
-  term->edge = VpiTchkTermEdgeOf(edge);
+  term->edge = VpiEventEdgeOf(edge);
   term->parent = tchk;
   tchk->children.push_back(term);
   return term;
@@ -486,39 +610,6 @@ static void AddTchkLimit(VpiObject* tchk, uint64_t ticks) {
   tchk->delays.push_back(limit);
 }
 
-// A.7.3 with A.7.5.2: the expression a timing check's terminal stands for -
-// the signal it names, a member of the interface port it names it through
-// where it names one, selected as the terminal was written.
-static const Expr* TerminalExpression(const SpecifyTerminal& terminal,
-                                      Arena& arena) {
-  auto* signal = arena.Create<Expr>();
-  signal->kind = ExprKind::kIdentifier;
-  signal->text = terminal.name;
-  if (!terminal.interface_name.empty()) {
-    auto* port = arena.Create<Expr>();
-    port->kind = ExprKind::kIdentifier;
-    port->text = terminal.interface_name;
-    auto* member = arena.Create<Expr>();
-    member->kind = ExprKind::kMemberAccess;
-    member->lhs = port;
-    member->rhs = signal;
-    signal = member;
-  }
-  if (terminal.range_kind == SpecifyRangeKind::kNone) return signal;
-  auto* select = arena.Create<Expr>();
-  select->kind = ExprKind::kSelect;
-  select->base = signal;
-  select->index = terminal.range_left;
-  if (terminal.range_kind != SpecifyRangeKind::kBitSelect) {
-    select->index_end = terminal.range_right;
-  }
-  select->is_part_select_plus =
-      terminal.range_kind == SpecifyRangeKind::kPlusIndexed;
-  select->is_part_select_minus =
-      terminal.range_kind == SpecifyRangeKind::kMinusIndexed;
-  return select;
-}
-
 // A.7.5.2: the expression a delayed_reference or delayed_data stands for, the
 // signal `name` selected by `index` where one was written; none where the
 // check names none.
@@ -532,18 +623,14 @@ static const Expr* DelayedSignalExpression(std::string_view name, Expr* index,
   return TerminalExpression(terminal, arena);
 }
 
-// The object an expression a timing check writes stands for in the instance
-// declaring the check.
-using TchkExpression = std::function<VpiObject*(const Expr*)>;
-
 // §37.40 (figure): the signal the event of `term` names and the `&&&`
 // condition it was written with (§31.7), as `expr` makes them.
 static void FillTchkTerm(VpiObject* term, const SpecifyTerminal& terminal,
-                         const Expr* condition, const TchkExpression& expr,
+                         const Expr* condition, const WrittenExpression& expr,
                          Arena& arena) {
   if (term == nullptr) return;
-  term->tchk_term_expr = expr(TerminalExpression(terminal, arena));
-  term->tchk_term_condition = expr(condition);
+  term->term_expr = expr(TerminalExpression(terminal, arena));
+  term->written_condition = expr(condition);
 }
 
 // §37.40 detail 2: the arguments of the check `tchk` that `decl` declares, in
@@ -553,7 +640,7 @@ static void FillTchkTerm(VpiObject* term, const SpecifyTerminal& terminal,
 // writes behind the notifier - each argument but an event as `expr` makes it.
 // An argument the declaration left out has none.
 static void FillTchkArguments(VpiObject* tchk, const TimingCheckDecl& decl,
-                              const TchkExpression& expr, Arena& arena) {
+                              const WrittenExpression& expr, Arena& arena) {
   VpiObject* first = tchk->tchk_ref_term;
   VpiObject* second = tchk->tchk_data_term;
   FillTchkTerm(first, decl.ref_terminal, decl.ref_condition, expr, arena);
@@ -631,13 +718,10 @@ void VpiContext::AttachTimingChecks(SimContext& sim_ctx) {
     // A check §32.9's $sdf_annotate registered was declared by no source, so
     // it has no arguments written to make.
     if (check.decl == nullptr) continue;
-    // The names the check writes resolve in the instance declaring it, keyed
-    // under its prefix without the closing `.`, and the first top's under none.
-    const std::string kPrefix(SpecifyEntryScope(check.inst_prefix, ""));
-    const TchkExpression kExpression = [&](const Expr* expr) {
-      return VpiInstanceExpression(expr, object_map_, kPrefix, sim_ctx, kBuild);
-    };
-    FillTchkArguments(obj, *check.decl, kExpression, sim_ctx.GetArena());
+    FillTchkArguments(
+        obj, *check.decl,
+        ExpressionsIn(check.inst_prefix, object_map_, sim_ctx, kBuild),
+        sim_ctx.GetArena());
   }
 }
 

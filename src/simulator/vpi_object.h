@@ -703,13 +703,14 @@ struct VpiObject {
 
   // §37.40 detail 1: the terms vpiTchkRefTerm and vpiTchkDataTerm reach, the
   // reference or controlled reference event and the data event, null for a
-  // check with none; and (figure) a tchk term's expression and the `&&&`
-  // condition vpiCondition reaches, null for an event written without one.
-  // Each is designated, its own type not being the relation's.
+  // check with none; and (§37.39, §37.40 figures) a path or tchk term's
+  // expression, and the condition vpiCondition reaches, a tchk term's `&&&`
+  // one or a module path's if one, null for one written without one. Each is
+  // designated, its own type not being the relation's.
   VpiObject* tchk_ref_term = nullptr;
   VpiObject* tchk_data_term = nullptr;
-  VpiObject* tchk_term_expr = nullptr;
-  VpiObject* tchk_term_condition = nullptr;
+  VpiObject* term_expr = nullptr;
+  VpiObject* written_condition = nullptr;
   // §37.40 detail 2: a timing check's arguments as written, which its vpiExpr
   // iteration returns - its event terms and every other argument's expression.
   std::vector<VpiObject*> tchk_arguments;

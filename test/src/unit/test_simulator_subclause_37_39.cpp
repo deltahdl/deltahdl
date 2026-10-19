@@ -1,6 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <string>
+#include <utility>
+#include <vector>
+
 #include "common/arena.h"
+#include "fixture_vpi_run.h"
 #include "simulator/scheduler.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_constants.h"
@@ -192,6 +197,153 @@ TEST_F(ModulePathModel, ARelationWithNoTermOfItsRoleReachesNone) {
   EXPECT_EQ(vpi_iterate(vpiModPathIn, VpiHandleOf(&path)), nullptr);
   EXPECT_EQ(vpi_iterate(vpiModDataPathIn, VpiHandleOf(&path)), nullptr);
   EXPECT_NE(vpi_iterate(vpiModPathOut, VpiHandleOf(&path)), nullptr);
+}
+
+// -----------------------------------------------------------------------------
+// §37.39 against a design. Each module path a specify block declares is built
+// with what the declaration wrote: its terms, its condition and the kind and
+// polarities of the path. No pass built any of them, so every term relation
+// of a declared path reached nothing and every property read zero.
+// -----------------------------------------------------------------------------
+
+class ModulePathsOfARun : public VpiDesignRun {};
+
+// The name an object reports, or the empty string where it reports none.
+std::string NameOf(vpiHandle obj) {
+  if (obj == nullptr) return std::string();
+  const char* name = vpi_get_str(vpiName, obj);
+  return name == nullptr ? std::string() : std::string(name);
+}
+
+// What each term `relation` reaches from `path` was written as: the name of
+// its expression with the edge it reports. A term that does not lead back to
+// `path` through vpiModPath is reported under no name.
+std::vector<std::pair<std::string, int>> TermsOf(int relation, vpiHandle path) {
+  std::vector<std::pair<std::string, int>> terms;
+  vpiHandle it = vpi_iterate(relation, path);
+  if (it == nullptr) return terms;
+  while (vpiHandle term = vpi_scan(it)) {
+    const bool kOwn = vpi_compare_objects(vpi_handle(vpiModPath, term), path);
+    terms.emplace_back(kOwn ? NameOf(vpi_handle(vpiExpr, term)) : "",
+                       vpi_get(vpiEdge, term));
+  }
+  return terms;
+}
+
+using Term = std::pair<std::string, int>;
+
+// §37.39 (figure) with §30.4.3: an edge-sensitive path's input term is the
+// terminal written before the operator, carrying the edge it was written
+// with, its output term the terminal after it, and its data path term the
+// data source expression. A full connection (§30.4.6) declares a path from
+// each source to each destination, each with the terms it joins, and has no
+// data path term.
+TEST_F(ModulePathsOfARun, APathsTermsAreWhatItWasWrittenWith) {
+  Run("module m(input clk, input d, input a, input b, output q, "
+      "output y);\n"
+      "  specify\n"
+      "    (posedge clk => (q +: d)) = 2;\n"
+      "    (a, b *> y) = 1;\n"
+      "  endspecify\n"
+      "endmodule\n"
+      "module top; reg clk, d, a, b; wire q, y; m m1(clk, d, a, b, q, y); "
+      "endmodule\n");
+  const std::vector<vpiHandle> kPaths = ObjectsOf(vpiModPath, By("top.m1"));
+  ASSERT_EQ(kPaths.size(), 3u);
+  EXPECT_EQ(TermsOf(vpiModPathIn, kPaths[0]),
+            (std::vector<Term>{{"clk", vpiPosedge}}));
+  EXPECT_EQ(TermsOf(vpiModPathOut, kPaths[0]),
+            (std::vector<Term>{{"q", vpiNoEdge}}));
+  EXPECT_EQ(TermsOf(vpiModDataPathIn, kPaths[0]),
+            (std::vector<Term>{{"d", vpiNoEdge}}));
+
+  EXPECT_EQ(TermsOf(vpiModPathIn, kPaths[1]),
+            (std::vector<Term>{{"a", vpiNoEdge}}));
+  EXPECT_EQ(TermsOf(vpiModPathIn, kPaths[2]),
+            (std::vector<Term>{{"b", vpiNoEdge}}));
+  for (vpiHandle full : {kPaths[1], kPaths[2]}) {
+    EXPECT_EQ(TermsOf(vpiModPathOut, full),
+              (std::vector<Term>{{"y", vpiNoEdge}}));
+    EXPECT_TRUE(TermsOf(vpiModDataPathIn, full).empty());
+  }
+}
+
+// §37.39 (figure): a path term reports the direction of the terminal it
+// stands for, an input for the source and the data source and an output for
+// the destination. A source written with `edge` is sensitive to either edge
+// (§30.4.3).
+TEST_F(ModulePathsOfARun, APathTermReportsItsDirection) {
+  Run("module m(input clk, input d, output q);\n"
+      "  specify\n"
+      "    (negedge clk => (q -: d)) = 2;\n"
+      "    (edge clk => (q : d)) = 3;\n"
+      "  endspecify\n"
+      "endmodule\n"
+      "module top; reg clk, d; wire q; m m1(clk, d, q); endmodule\n");
+  const std::vector<vpiHandle> kPaths = ObjectsOf(vpiModPath, By("top.m1"));
+  ASSERT_EQ(kPaths.size(), 2u);
+  EXPECT_EQ(TermsOf(vpiModPathIn, kPaths[0]),
+            (std::vector<Term>{{"clk", vpiNegedge}}));
+  EXPECT_EQ(TermsOf(vpiModPathIn, kPaths[1]),
+            (std::vector<Term>{{"clk", vpiAnyEdge}}));
+  for (const int kRelation : {vpiModPathIn, vpiModDataPathIn}) {
+    const std::vector<vpiHandle> kTerms = ObjectsOf(kRelation, kPaths[0]);
+    ASSERT_EQ(kTerms.size(), 1u);
+    EXPECT_EQ(vpi_get(kVpiDirection, kTerms[0]), kVpiInput);
+  }
+  const std::vector<vpiHandle> kOut = ObjectsOf(vpiModPathOut, kPaths[0]);
+  ASSERT_EQ(kOut.size(), 1u);
+  EXPECT_EQ(vpi_get(kVpiDirection, kOut[0]), kVpiOutput);
+}
+
+// §37.39 (figure) with §30.4.4: a state-dependent path reaches through
+// vpiCondition the condition it was written under. An ifnone path has none
+// and says through vpiModPathHasIfNone that it is one, and an unconditional
+// path has neither.
+TEST_F(ModulePathsOfARun, AStateDependentPathReachesItsCondition) {
+  Run("module m(input s, input a, output y, output z);\n"
+      "  specify\n"
+      "    if (s) (a => y) = 1;\n"
+      "    ifnone (a => y) = 2;\n"
+      "    (a => z) = 3;\n"
+      "  endspecify\n"
+      "endmodule\n"
+      "module top; reg s, a; wire y, z; m m1(s, a, y, z); endmodule\n");
+  const std::vector<vpiHandle> kPaths = ObjectsOf(vpiModPath, By("top.m1"));
+  ASSERT_EQ(kPaths.size(), 3u);
+  EXPECT_EQ(NameOf(vpi_handle(vpiCondition, kPaths[0])), "s");
+  EXPECT_EQ(vpi_get(vpiModPathHasIfNone, kPaths[0]), 0);
+  EXPECT_EQ(vpi_handle(vpiCondition, kPaths[1]), nullptr);
+  EXPECT_EQ(vpi_get(vpiModPathHasIfNone, kPaths[1]), 1);
+  EXPECT_EQ(vpi_handle(vpiCondition, kPaths[2]), nullptr);
+  EXPECT_EQ(vpi_get(vpiModPathHasIfNone, kPaths[2]), 0);
+}
+
+// §37.39 (figure) with §30.4.5 and §30.4.6: a path reports through
+// vpiPathType whether it was written as a parallel or a full connection, and
+// through vpiPolarity the polarity its operator was written with, unknown
+// where it was written with none. vpiDataPolarity is the polarity written
+// before an edge-sensitive path's data source (§30.4.3).
+TEST_F(ModulePathsOfARun, AModulePathReportsHowItWasWritten) {
+  Run("module m(input clk, input d, input a, input b, output q, "
+      "output y, output z);\n"
+      "  specify\n"
+      "    (a +=> y) = 1;\n"
+      "    (b -*> z) = 1;\n"
+      "    (posedge clk => (q -: d)) = 1;\n"
+      "  endspecify\n"
+      "endmodule\n"
+      "module top; reg clk, d, a, b; wire q, y, z; "
+      "m m1(clk, d, a, b, q, y, z); endmodule\n");
+  const std::vector<vpiHandle> kPaths = ObjectsOf(vpiModPath, By("top.m1"));
+  ASSERT_EQ(kPaths.size(), 3u);
+  EXPECT_EQ(vpi_get(vpiPathType, kPaths[0]), vpiPathParallel);
+  EXPECT_EQ(vpi_get(vpiPolarity, kPaths[0]), vpiPositive);
+  EXPECT_EQ(vpi_get(vpiPathType, kPaths[1]), vpiPathFull);
+  EXPECT_EQ(vpi_get(vpiPolarity, kPaths[1]), vpiNegative);
+  EXPECT_EQ(vpi_get(vpiPathType, kPaths[2]), vpiPathParallel);
+  EXPECT_EQ(vpi_get(vpiPolarity, kPaths[2]), vpiUnknown);
+  EXPECT_EQ(vpi_get(vpiDataPolarity, kPaths[2]), vpiNegative);
 }
 
 }  // namespace

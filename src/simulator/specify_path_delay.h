@@ -82,6 +82,13 @@ struct PathDelay {
   // §37.3.3: where the path declaration was written; invalid on a path no
   // declaration made.
   SourceLoc loc;
+  // §37.39: the declaration this path came from, with the positions of the
+  // source and destination it joins among the terminals the declaration
+  // lists, which a full connection writes several of (§30.4.6); null on a
+  // path no declaration made.
+  const SpecifyPathDecl* decl = nullptr;
+  std::size_t src_index = 0;
+  std::size_t dst_index = 0;
 
   uint64_t reject_limit[12] = {};
   uint64_t error_limit[12] = {};

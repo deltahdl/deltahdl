@@ -735,11 +735,11 @@ bool TryResolvePrefixWithRelation(int type, VpiHandle ref, VpiHandle& out) {
   return TryResolveCalledTfRelation(type, ref, out);
 }
 
-// §37.40/§37.45/§37.39: a timing check's terms and notifier and a tchk term's
-// expression and condition, a delay device's in/out terms, and a foreach
-// constraint/statement's array variable.
+// §37.40/§37.45/§37.39: a timing check's terms and notifier, a path's
+// condition and its or a check's terms' expressions, a delay device's in/out
+// terms, and a foreach constraint/statement's array variable.
 bool TryResolveTimingTermRelation(int type, VpiHandle ref, VpiHandle& out) {
-  if (TryResolveTchkRelation(type, ref, out)) return true;
+  if (TryResolveSpecifyRelation(type, ref, out)) return true;
   if (type == vpiInTerm && ref->type == vpiDelayDevice) {
     out = ref->in_term;
     return true;

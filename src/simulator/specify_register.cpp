@@ -114,6 +114,9 @@ PathDelay BuildPathDelayFromDecl(const SpecifyPathDecl& decl, SimContext& ctx,
   pd.delay_count = static_cast<uint8_t>(count == 0 ? 1 : count);
   pd.source_delays.assign(decl.delays.begin(), decl.delays.end());
   pd.loc = decl.loc;
+  pd.decl = &decl;
+  pd.src_index = src_index;
+  pd.dst_index = dst_index;
 
   for (std::size_t i = 0; i < count; ++i) {
     // §30.5.1: a single value is the typical delay; a colon-separated
