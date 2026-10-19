@@ -11,6 +11,7 @@
 #include "simulator/evaluation.h"
 #include "simulator/process.h"
 #include "simulator/sim_context.h"
+#include "simulator/statement_assign.h"
 #include "simulator/variable.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_expr_scope.h"
@@ -27,7 +28,11 @@ Logic4Vec VpiEvaluateExpressionObject(const VpiObject& obj, SimContext& sim) {
   stand_in.inst_prefix = scope.inst_prefix;
   stand_in.gen_prefixes = scope.gen_prefixes;
   const CallerStandIn kStandIn(&stand_in, sim);
-  return EvalExpr(scope.expr, sim, sim.GetArena());
+  if (scope.context_width == 0)
+    return EvalExpr(scope.expr, sim, sim.GetArena());
+  return ResizeToWidth(
+      EvalExpr(scope.expr, sim, sim.GetArena(), scope.context_width),
+      scope.context_width, sim.GetArena());
 }
 
 namespace {

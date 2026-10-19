@@ -440,5 +440,44 @@ TEST_F(ContinuousAssignmentsOfARun, AVectorAssignmentHasAValueAndBits) {
   EXPECT_EQ(g_bit_changes, 1);
 }
 
+// §37.47 with §11.6.1 and §10.7: the value a continuous assignment drives is
+// its right-hand side evaluated at the width of its left side, so a sum keeps
+// the carry an eight-bit target widens it to and loses the bit a three-bit
+// target truncates, and the bits above the operands' own width read it
+// (#7359).
+TEST_F(ContinuousAssignmentsOfARun, AnAssignmentsValueHasItsLeftSidesWidth) {
+  Run("module top; logic [3:0] a = 4'hF, b = 4'h1, c = 4'hE;\n"
+      "  wire [7:0] y; wire [2:0] z;\n"
+      "  assign y = a + b;\n"
+      "  assign z = c + b;\n"
+      "endmodule\n");
+  vpiHandle y = nullptr;
+  vpiHandle z = nullptr;
+  vpiHandle it =
+      vpi_iterate(vpiContAssign, vpi_handle_by_name(VpiText("top"), nullptr));
+  ASSERT_NE(it, nullptr);
+  while (vpiHandle assign = vpi_scan(it)) {
+    const std::string kLhs = vpi_get_str(vpiName, vpi_handle(vpiLhs, assign));
+    if (kLhs == "y") {
+      y = assign;
+    } else {
+      z = assign;
+    }
+  }
+  ASSERT_NE(y, nullptr);
+  ASSERT_NE(z, nullptr);
+  EXPECT_EQ(IntValueOf(y), 16);
+  EXPECT_EQ(IntValueOf(z), 7);
+  // The bits of y's assignment at offsets 4 to 7, read as a number.
+  int high = 0;
+  vpiHandle bit_it = vpi_iterate(vpiBit, y);
+  ASSERT_NE(bit_it, nullptr);
+  while (vpiHandle bit = vpi_scan(bit_it)) {
+    const int kOffset = vpi_get(vpiOffset, bit);
+    if (kOffset >= 4) high |= IntValueOf(bit) << (kOffset - 4);
+  }
+  EXPECT_EQ(high, 1);
+}
+
 }  // namespace
 }  // namespace delta

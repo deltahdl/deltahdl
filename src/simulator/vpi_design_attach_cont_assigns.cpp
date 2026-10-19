@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <initializer_list>
 #include <memory>
 #include <set>
@@ -117,10 +118,10 @@ void MakeContinuousAssignment(const RtlirContAssign& ca, VpiObject* scope,
   scope->children.push_back(obj);
   obj->lhs = ExpressionObject(lhs, build);
   obj->rhs = AssignedExpressionObject(rhs, obj->lhs, build);
-  obj->expr_scope = std::make_shared<const VpiExprScope>(
-      VpiExprScope{rhs, VpiFlatName(build.names.prefix, ""),
-                   std::vector<std::string>(build.names.gen.begin(),
-                                            build.names.gen.end())});
+  obj->expr_scope = std::make_shared<const VpiExprScope>(VpiExprScope{
+      rhs, VpiFlatName(build.names.prefix, ""),
+      std::vector<std::string>(build.names.gen.begin(), build.names.gen.end()),
+      obj->lhs != nullptr ? static_cast<uint32_t>(obj->lhs->size) : 0U});
   MakeContAssignBits(obj, build);
 
   if (build.sim != nullptr) {

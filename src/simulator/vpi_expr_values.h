@@ -12,7 +12,8 @@ struct VpiObject;
 // for an expression, an operation, a call or a continuous assignment (its
 // expr_scope records where): the expression evaluated where the source wrote
 // it, by a stand-in process of the instance and generate blocks it stands in,
-// as a process running there would read its names.
+// as a process running there would read its names, and for an assignment at
+// the width of the left side it drives.
 Logic4Vec VpiEvaluateExpressionObject(const VpiObject& obj, SimContext& sim);
 
 // §37.47 detail 2: watch the continuous assignment or cont assign bit `obj`,
