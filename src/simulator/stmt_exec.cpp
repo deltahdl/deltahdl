@@ -338,6 +338,7 @@ static void SpawnForkChild(const Stmt* s, SimContext& ctx, Arena& arena,
                            Process* spawning_proc, const ForkRendezvous& rdv) {
   if (rdv.parent_wfs) rdv.parent_wfs->remaining++;
   auto* p = CreateForkChildProcess(ctx, arena, spawning_proc);
+  p->origin = s;
   p->fork_release = [&ctx, rdv]() { DrainForkChild(ctx, rdv); };
   p->coro = ForkChildCoroutine(s, ctx, arena, p).Release();
 

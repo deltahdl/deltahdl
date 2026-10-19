@@ -909,26 +909,42 @@ VpiHandle VpiThreadParent(VpiHandle thread) {
 }
 
 VpiHandle VpiThreadOrigin(VpiHandle thread) {
-  // §37.44 (vpiOrigin -> stmt): the originating statement of a thread, modeled
-  // as its first statement child. Null when the handle is null or no origin
-  // statement is attached.
-  if (!thread) return nullptr;
-  for (auto* child : thread->children) {
-    if (child->type == vpiStmt) return child;
-  }
-  return nullptr;
+  // §37.44 (vpiOrigin -> stmt): the statement a thread was started from, held
+  // apart from its children (ThreadObjectFor). Null when the handle is null or
+  // the thread was started from no statement the model holds.
+  return thread != nullptr ? thread->body : nullptr;
 }
 
 VpiHandle VpiThreadFrame(VpiHandle thread) {
-  // §37.44 (frame -- thread / detail 1): the frame currently active in the
-  // thread, modeled as its first frame child. As tasks and functions are
-  // entered new frames are activated, but at most one is active at a time, so a
-  // single frame is reported. Null for a null handle or a thread with no frame.
-  if (!thread) return nullptr;
-  for (auto* child : thread->children) {
-    if (child->type == vpiFrame) return child;
+  // §37.44 (frame -- thread) with §37.43 detail 4: the frame active in the
+  // thread now. The outermost frame of its call chain hangs from the thread
+  // and each frame activated from another from that one (ActivateFrame), and
+  // every frame of the chain still running is active, so the frame active now
+  // is the innermost of them; none once every frame of the chain has ended.
+  VpiHandle active = nullptr;
+  for (VpiHandle at = thread; at != nullptr;) {
+    VpiHandle next = nullptr;
+    for (auto* child : at->children) {
+      if (child->type == vpiFrame && child->active) next = child;
+    }
+    if (next != nullptr) active = next;
+    at = next;
   }
-  return nullptr;
+  return active;
+}
+
+bool VpiTryResolveThreadRelation(int type, VpiHandle ref, VpiHandle& out) {
+  if (ref->type != vpiThread) return false;
+  if (type == vpiParent) {
+    out = VpiThreadParent(ref);
+  } else if (type == vpiOrigin) {
+    out = VpiThreadOrigin(ref);
+  } else if (type == vpiFrame) {
+    out = VpiThreadFrame(ref);
+  } else {
+    return false;
+  }
+  return true;
 }
 
 std::vector<VpiHandle> VpiThreadThreads(VpiHandle thread) {

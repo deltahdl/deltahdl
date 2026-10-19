@@ -475,6 +475,7 @@ void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program,
                        : Region::kActive;
   p->is_reactive = from_program;
   p->inst_prefix = inst_prefix_;
+  p->origin = proc.body;
   // §16.5: the process carries a concurrent assertion's property, so it is
   // evaluated in the Observed region on the sampled values of the variables the
   // property names.

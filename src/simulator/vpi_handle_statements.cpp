@@ -198,6 +198,7 @@ bool TryResolveProcessAndStmtRelation(int type, VpiHandle ref, VpiHandle& out) {
          TryResolveClockedSeqRelation(type, ref, out) ||
          TryResolveForAndBodyStmtRelation(type, ref, out) ||
          TryResolveStmtProcessRelation(type, ref, out) ||
+         VpiTryResolveThreadRelation(type, ref, out) ||
          TryResolveUserSystfRelation(type, ref, out);
 }
 

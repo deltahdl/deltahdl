@@ -141,6 +141,9 @@ struct Process {
   // global clocking tick answers it, which §20.11's Kill aborts; nullptr for
   // every other process.
   const Stmt* future_gclk_attempt_of = nullptr;
+  // §37.44: the statement the process was started from, the body of its
+  // procedure or the fork branch it runs; null for one no statement starts.
+  const Stmt* origin = nullptr;
 
   WaitForkState wait_fork_state;
 

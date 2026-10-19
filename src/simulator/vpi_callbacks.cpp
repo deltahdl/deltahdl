@@ -30,6 +30,7 @@
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_stmt_objects.h"
 
 namespace delta {
 
@@ -279,20 +280,6 @@ void WatchObjectChanges(VpiContext& vpi, VpiObject* obj) {
     if (kValues) vpi.DispatchCallbacks(cbValueChange, obj);
     return false;
   });
-}
-
-// The model's object for the statement `stmt` run in the instance `prefix`
-// names, among `stmts`: one a run names with a dot after it and the model
-// without, and found under any instance writing it where the model keyed it
-// under another name; null where the model holds none.
-VpiObject* StmtObjectFor(const VpiStmtObjects& stmts, const Stmt* stmt,
-                         std::string prefix) {
-  if (stmt == nullptr) return nullptr;
-  if (!prefix.empty() && prefix.back() == '.') prefix.pop_back();
-  auto found = stmts.find({stmt, prefix});
-  if (found == stmts.end()) found = stmts.lower_bound({stmt, std::string()});
-  if (found == stmts.end() || found->first.first != stmt) return nullptr;
-  return found->second;
 }
 
 // §38.36.2: the delay a simulation-time callback's time gives, in ticks of
@@ -757,7 +744,7 @@ void VpiContext::Deliver(s_cb_data data) {
 
 void VpiContext::DispatchStmtCallbacks(const Stmt* stmt, std::string prefix) {
   if (!stmt_callbacks_registered_) return;
-  VpiObject* obj = StmtObjectFor(stmt_objects_, stmt, std::move(prefix));
+  VpiObject* obj = VpiStmtObjectFor(stmt_objects_, stmt, std::move(prefix));
   if (obj != nullptr) DispatchCallbacks(cbStmt, obj);
 }
 
@@ -777,7 +764,8 @@ void VpiContext::NoteObjectCreated(ClassObject& obj) {
 void VpiContext::NoteForce(int reason, const Variable* var, const Stmt* stmt,
                            std::string prefix) {
   if (!HasCallbackFor(callbacks_, reason)) return;
-  VpiObject* stmt_obj = StmtObjectFor(stmt_objects_, stmt, std::move(prefix));
+  VpiObject* stmt_obj =
+      VpiStmtObjectFor(stmt_objects_, stmt, std::move(prefix));
   const size_t kCount = callbacks_.size();
   for (size_t i = 0; i < kCount; ++i) {
     if (callbacks_[i].reason != reason || callbacks_[i].cb_rtn == nullptr) {

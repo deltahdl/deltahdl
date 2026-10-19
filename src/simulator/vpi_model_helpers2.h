@@ -72,17 +72,22 @@ std::vector<VpiHandle> VpiFrameAutomatics(VpiHandle frame);
 // that is not a thread.
 VpiHandle VpiThreadParent(VpiHandle thread);
 
-// §37.44 (vpiOrigin -> stmt): the statement a thread originated from, modeled
-// as the thread's first statement child. Null for a null handle or a thread
-// with no origin statement attached.
+// §37.44 (vpiOrigin -> stmt): the statement a thread originated from, held
+// apart from its children. Null for a null handle or a thread started from no
+// statement the model holds.
 VpiHandle VpiThreadOrigin(VpiHandle thread);
 
 // §37.44 (frame -- thread / detail 1): the active frame of a thread. As a
 // thread descends a call chain of tasks and functions a new frame is activated
 // for each one entered, and at most one is active at a time (§37.43); this
-// returns that frame, modeled as the thread's first frame child. Null for a
-// null handle or a thread with no frame attached.
+// returns that frame, the innermost active frame of the chain hung from the
+// thread. Null for a null handle or a thread with no frame active.
 VpiHandle VpiThreadFrame(VpiHandle thread);
+
+// §37.44: a thread's vpiParent, vpiOrigin and vpiFrame relations, each a
+// designated link rather than a child of the relation's type; false for any
+// other relation or object, `out` then left as it was.
+bool VpiTryResolveThreadRelation(int type, VpiHandle ref, VpiHandle& out);
 
 // §37.44 (thread one-to-many thread): the threads spawned by this thread, as
 // the iteration over its thread children yields them, in order. A null handle

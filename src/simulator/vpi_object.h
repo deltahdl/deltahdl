@@ -403,6 +403,7 @@ struct VpiObject {
   // where a name finds it, rather than from the process. §37.52: for a case
   // property item, the property it branches to, apart from its conditions;
   // §37.53: for a sequence decl, its body, apart from its variables.
+  // §37.44: for a thread, the statement it was started from (vpiOrigin).
   VpiObject* body = nullptr;
   VpiObject* process = nullptr;
   // §37.55: an assertion's fail action, reached through vpiElseStmt, where a

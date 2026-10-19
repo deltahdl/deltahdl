@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <utility>
 #include <vector>
 
 #include "fixture_simulator.h"
@@ -68,15 +69,16 @@ TEST(ThreadModel, ParentRelationIsNullForRootAndNonThreadParents) {
   EXPECT_EQ(VpiThreadParent(&thread_in_module), nullptr);
 }
 
-// vpiOrigin -> stmt: a thread reaches its originating statement, and reports
-// none when no origin statement is attached or the handle is null.
+// vpiOrigin -> stmt: a thread reaches the statement it was started from, held
+// apart from its children, and reports none when it was started from none or
+// the handle is null.
 TEST(ThreadModel, OriginRelationReachesTheOriginatingStatement) {
   VpiObject origin;
-  origin.type = vpiStmt;
+  origin.type = vpiBegin;
 
   VpiObject thread;
   thread.type = vpiThread;
-  thread.children = {&origin};
+  thread.body = &origin;
   EXPECT_EQ(VpiThreadOrigin(&thread), &origin);
 
   VpiObject bare;
@@ -85,19 +87,26 @@ TEST(ThreadModel, OriginRelationReachesTheOriginatingStatement) {
   EXPECT_EQ(VpiThreadOrigin(nullptr), nullptr);
 }
 
-// frame -- thread (detail 1): a thread reaches its active frame. Only the frame
-// child is reported, even when other children (here the origin statement) are
-// present alongside it.
+// frame -- thread with §37.43 detail 4: a thread reaches the frame active in
+// it now, the innermost active frame of its call chain, passing over a frame
+// that has ended, and none when no frame is active.
 TEST(ThreadModel, FrameRelationReachesTheActiveFrame) {
-  VpiObject origin;
-  origin.type = vpiStmt;
-  VpiObject frame;
-  frame.type = vpiFrame;
+  VpiObject inner;
+  inner.type = vpiFrame;
+  VpiObject outer;
+  outer.type = vpiFrame;
+  outer.active = true;
+  outer.children = {&inner};
 
   VpiObject thread;
   thread.type = vpiThread;
-  thread.children = {&origin, &frame};
-  EXPECT_EQ(VpiThreadFrame(&thread), &frame);
+  thread.children = {&outer};
+  EXPECT_EQ(VpiThreadFrame(&thread), &outer);
+  inner.active = true;
+  EXPECT_EQ(VpiThreadFrame(&thread), &inner);
+  inner.active = false;
+  outer.active = false;
+  EXPECT_EQ(VpiThreadFrame(&thread), nullptr);
 
   VpiObject bare;
   bare.type = vpiThread;
@@ -242,17 +251,83 @@ TEST_F(ThreadModelInARun, AForkBranchReachesTheThreadThatSpawnedIt) {
   EXPECT_EQ(g_spawned_total, 2);
 }
 
-// §37.44 (vpiOrigin -> stmt): a thread's origin is its first statement child,
-// past children of other kinds.
-TEST(ThreadModel, AThreadsOriginPassesOverOtherChildren) {
+// §37.44 (vpiOrigin -> stmt): a thread's origin is the statement it was
+// started from, which it holds apart from its children, so a statement among
+// them is no origin.
+TEST(ThreadModel, AThreadsOriginIsNoneOfItsChildren) {
   VpiObject frame;
   frame.type = vpiFrame;
   VpiObject stmt;
-  stmt.type = vpiStmt;
+  stmt.type = vpiBegin;
   VpiObject thread;
   thread.type = vpiThread;
   thread.children = {&frame, &stmt};
-  EXPECT_EQ(VpiThreadOrigin(&thread), &stmt);
+  EXPECT_EQ(VpiThreadOrigin(&thread), nullptr);
+}
+
+// What an application read of the thread a task, called in a fork branch,
+// runs in: from inside the task and again once the task has returned.
+vpiHandle g_task_frame = nullptr;
+vpiHandle g_task_thread = nullptr;
+vpiHandle g_thread_frame = nullptr;
+vpiHandle g_thread_parent = nullptr;
+vpiHandle g_thread_origin = nullptr;
+vpiHandle g_parent_origin = nullptr;
+bool g_no_frame_after = false;
+
+PLI_INT32 InsideTaskCalltf(PLI_BYTE8*) {
+  g_task_frame = vpi_handle(vpiFrame, nullptr);
+  g_task_thread = vpi_handle(vpiThread, g_task_frame);
+  g_thread_frame = vpi_handle(vpiFrame, g_task_thread);
+  g_thread_parent = vpi_handle(vpiParent, g_task_thread);
+  g_thread_origin = vpi_handle(vpiOrigin, g_task_thread);
+  g_parent_origin = g_thread_parent == nullptr
+                        ? nullptr
+                        : vpi_handle(vpiOrigin, g_thread_parent);
+  return 0;
+}
+
+PLI_INT32 AfterTaskCalltf(PLI_BYTE8*) {
+  g_no_frame_after = g_task_thread != nullptr &&
+                     vpi_handle(vpiFrame, g_task_thread) == nullptr;
+  return 0;
+}
+
+// §37.44: a fork branch's thread reaches the thread that forked it through
+// vpiParent (#7165), the statement it was started from through vpiOrigin, the
+// branch's block, as the forking thread reaches the fork (#7166), and through
+// vpiFrame the frame active in it now: the task's while the task runs, and
+// none once it has returned (§37.43 detail 4) (#7167).
+TEST_F(ThreadModelInARun, AForkBranchsThreadReachesItsParentOriginAndFrame) {
+  for (const auto& [name, calltf] : {std::pair{"$inside", &InsideTaskCalltf},
+                                     std::pair{"$after", &AfterTaskCalltf}}) {
+    s_vpi_systf_data data = {};
+    data.type = vpiSysTask;
+    data.tfname = VpiText(name);
+    data.calltf = calltf;
+    ASSERT_NE(vpi_register_systf(&data), nullptr);
+  }
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  task automatic sub; $inside; endtask\n"
+      "  initial fork\n"
+      "    begin sub(); $after; end\n"
+      "  join\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  ASSERT_NE(g_task_thread, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, g_task_thread), vpiThread);
+  EXPECT_EQ(g_thread_frame, g_task_frame);
+  ASSERT_NE(g_thread_parent, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, g_thread_parent), vpiThread);
+  ASSERT_NE(g_thread_origin, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, g_thread_origin), vpiBegin);
+  ASSERT_NE(g_parent_origin, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, g_parent_origin), vpiFork);
+  EXPECT_TRUE(g_no_frame_after);
 }
 
 }  // namespace

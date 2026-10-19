@@ -1,3 +1,4 @@
+#include <string>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -13,6 +14,7 @@
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_stmt_objects.h"
 #include "simulator/vpi_user.h"
 
 // The threads and frames of a run (§37.43, §37.44): the objects the model
@@ -20,6 +22,16 @@
 // and the ends of their lives, which release their handles (§37.2.2).
 
 namespace delta {
+
+VpiObject* VpiStmtObjectFor(const VpiStmtObjects& stmts, const Stmt* stmt,
+                            std::string prefix) {
+  if (stmt == nullptr) return nullptr;
+  if (!prefix.empty() && prefix.back() == '.') prefix.pop_back();
+  auto found = stmts.find({stmt, prefix});
+  if (found == stmts.end()) found = stmts.lower_bound({stmt, std::string()});
+  if (found == stmts.end() || found->first.first != stmt) return nullptr;
+  return found->second;
+}
 
 VpiHandle VpiContext::ThreadObjectFor(Process* proc) {
   if (proc == nullptr) return nullptr;
@@ -35,6 +47,10 @@ VpiHandle VpiContext::ThreadObjectFor(Process* proc) {
   // §37.3.7: a thread has the lifetime of the thread it is.
   obj->alloc_scheme = VpiAllocSchemeFor(VpiAllocKind::kFrameOrThread);
   obj->active = proc->active;
+  // §37.44 (vpiOrigin): the statement the thread was started from, the body
+  // of its procedure or the fork branch it runs, held apart from its children,
+  // which end with it.
+  obj->body = VpiStmtObjectFor(stmt_objects_, proc->origin, proc->inst_prefix);
   run_objects_[proc] = obj;
   // §37.3.8: a thread is one of the transient objects callbacks can follow
   // through its life, and cbStartOfThread is the one that
