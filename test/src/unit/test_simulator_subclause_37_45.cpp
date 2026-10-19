@@ -134,6 +134,7 @@ TEST_F(DelayTerminals, ModuleRelationReachesEnclosingModule) {
 TEST_F(DelayTerminals, DriverFromATerminalReachesTheNetDriverKinds) {
   VpiObject prim_term;
   prim_term.type = vpiPrimTerm;  // a net driver, not a variable driver
+  prim_term.direction = vpiOutput;
   VpiObject assign_stmt;
   assign_stmt.type = vpiAssignStmt;  // a variable driver, not a net driver
 

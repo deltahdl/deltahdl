@@ -276,6 +276,7 @@ TEST(NetDriversAndLoads, InputPortWithoutHighConnectionIsNotLoad) {
   VpiObject net;
   net.type = vpiNet;
   net.children = {&port, &force};
+  force.rhs = &net;
 
   std::vector<VpiHandle> loads =
       CollectVpiIteration(ctx, ctx.Iterate(vpiLoad, &net));
