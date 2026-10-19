@@ -446,6 +446,40 @@ TEST_F(UdpDefnsOfARun, ASequentialUdpReachesItsInitial) {
             nullptr);
 }
 
+// §37.36 (figure) with §29.3.3 and §37.63: a UDP's initial runs a blocking
+// assignment of the bit its output starts at to its output reg, x where the
+// initial statement writes x (#7368).
+TEST_F(UdpDefnsOfARun, AUdpsInitialAssignsItsOutput) {
+  Run("primitive zero(q, d);\n"
+      "  output reg q; input d;\n"
+      "  initial q = 1'b0;\n"
+      "  table 0 : ? : 0; 1 : ? : 1; endtable\n"
+      "endprimitive\n"
+      "primitive unknown(q, d);\n"
+      "  output reg q; input d;\n"
+      "  initial q = 1'bx;\n"
+      "  table 0 : ? : 0; 1 : ? : 1; endtable\n"
+      "endprimitive\n"
+      "module top; reg d; wire a, b;\n"
+      "  zero z(a, d); unknown u(b, d);\n"
+      "endmodule\n");
+  vpiHandle zero = vpi_handle(
+      vpiStmt, vpi_handle(vpiInitial, Named(vpiUdpDefn, nullptr, "zero")));
+  ASSERT_NE(zero, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, zero), vpiAssignment);
+  EXPECT_EQ(vpi_get(vpiBlocking, zero), 1);
+  EXPECT_STREQ(vpi_get_str(vpiName, vpi_handle(vpiLhs, zero)), "q");
+  s_vpi_value value = {};
+  value.format = vpiBinStrVal;
+  vpi_get_value(vpi_handle(vpiRhs, zero), &value);
+  EXPECT_STREQ(value.value.str, "0");
+  vpiHandle unknown = vpi_handle(
+      vpiStmt, vpi_handle(vpiInitial, Named(vpiUdpDefn, nullptr, "unknown")));
+  ASSERT_NE(unknown, nullptr);
+  vpi_get_value(vpi_handle(vpiRhs, unknown), &value);
+  EXPECT_STREQ(value.value.str, "x");
+}
+
 constexpr std::string_view kUdpKey = "udp-exchange-key";
 
 // §37.36 with §37.3.6: a UDP declared in a decryption envelope is protected

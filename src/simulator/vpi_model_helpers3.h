@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <deque>
+#include <functional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -697,6 +698,16 @@ std::vector<const UdpDecl*> VpiDesignUdpDecls(const RtlirDesign* design);
 // for a combinational one.
 void VpiFillUdpDefnObject(VpiObject* obj, const UdpDecl& decl,
                           std::deque<std::string>& names);
+
+// §37.36 (figure) with §29.3.3 and §37.63: the statement the initial
+// `initial` of the UDP `decl` runs, a blocking assignment to the UDP's output
+// reg, an object named after it, of the bit its output starts at, a binary
+// constant that is x where the declaration's initial value is no literal 0 or
+// 1. Each object is made by `alloc`, the reg's name kept in `names` and the
+// constant's value in `arena`.
+VpiObject* VpiUdpInitialStatement(const UdpDecl& decl, VpiObject* initial,
+                                  const std::function<VpiObject*()>& alloc,
+                                  std::deque<std::string>& names, Arena& arena);
 
 // §37.36 (figure): fill in one of the udp defn's table entries, which reports
 // how many symbol entries its row holds through vpiSize and, by detail 1, the

@@ -646,6 +646,9 @@ void VpiContext::AttachUdpDefns(const RtlirDesign* design) {
       auto* initial = AllocObject();
       initial->type = vpiInitial;
       initial->parent = defn;
+      initial->body = VpiUdpInitialStatement(
+          *decl, initial, [this] { return AllocObject(); }, name_pool_,
+          sim_ctx_->GetArena());
       defn->children.push_back(initial);
     }
   }

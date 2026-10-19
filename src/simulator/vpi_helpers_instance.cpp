@@ -348,6 +348,36 @@ static std::string DecompiledUdpRow(const UdpTableRow& row) {
   return text;
 }
 
+VpiObject* VpiUdpInitialStatement(const UdpDecl& decl, VpiObject* initial,
+                                  const std::function<VpiObject*()>& alloc,
+                                  std::deque<std::string>& names,
+                                  Arena& arena) {
+  VpiObject* assign = alloc();
+  assign->type = vpiAssignment;
+  assign->blocking = true;
+  assign->parent = initial;
+  VpiObject* lhs = alloc();
+  lhs->type = kVpiReg;
+  names.emplace_back(decl.output_name);
+  lhs->name = names.back();
+  lhs->size = 1;
+  lhs->parent = assign;
+  VpiObject* rhs = alloc();
+  rhs->type = vpiConstant;
+  rhs->const_type = vpiBinaryConst;
+  rhs->size = 1;
+  rhs->parent = assign;
+  auto* bit = arena.Create<Variable>();
+  const char kBit = decl.initial_value;
+  bit->value = kBit == '0' || kBit == '1'
+                   ? MakeLogic4VecVal(arena, 1, kBit == '1' ? 1 : 0)
+                   : MakeAllX(arena, 1);
+  rhs->var = bit;
+  assign->lhs = lhs;
+  assign->rhs = rhs;
+  return assign;
+}
+
 void VpiFillUdpTableEntryObject(VpiObject* obj, const UdpTableRow& row,
                                 VpiObject* defn, Arena& arena) {
   obj->type = vpiTableEntry;
