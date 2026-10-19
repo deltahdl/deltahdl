@@ -8,6 +8,8 @@ metadata:
   modified: 2026-10-19T20:49:49.957Z
 ---
 
+# Per-line coverage from CI artifacts
+
 The assert-coverage job prints `llvm-cov report`, a missed-line count per
 file, and names no line. When a push raises TOTAL and the file holding the
 new misses is known, read the lines from the run's own artifacts rather than
