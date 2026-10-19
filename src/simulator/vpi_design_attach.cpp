@@ -295,6 +295,18 @@ int VpiVariableObjectKind(const RtlirVariable& var) {
   return VpiDataTypeVariableKind(var.decl_kind);
 }
 
+// §25.9: the interface the virtual interface variable `var` refers to an
+// instance of, as the design declares it; null for any other variable.
+const RtlirModule* VifInterfaceOf(const RtlirDesign& design,
+                                  const RtlirVariable& var) {
+  if (var.written_type == nullptr ||
+      var.written_type->kind != DataTypeKind::kVirtualInterface) {
+    return nullptr;
+  }
+  const auto kFound = design.all_modules.find(var.written_type->type_name);
+  return kFound != design.all_modules.end() ? kFound->second : nullptr;
+}
+
 // §36.12.1 Table 36-10: tell each object the run built for a variable which
 // kind of variable it is. VpiContext::Attach stamps every one of them vpiReg,
 // which rows 3, 4 and 7 rule out: a design's array variables were vpiRegArray
@@ -317,6 +329,7 @@ void RecordVariableObjectKinds(
           // const is a constant variable.
           obj->decl_facts.constant_variable =
               var.written_type != nullptr && var.written_type->is_const;
+          obj->decl_facts.vif_interface = VifInterfaceOf(*design, var);
         }
       });
 }

@@ -25,6 +25,7 @@
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_design_attach_assigns_internal.h"
 #include "simulator/vpi_design_attach_build.h"
+#include "simulator/vpi_design_prefixed_refs.h"
 #include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_expr_decompile.h"
 #include "simulator/vpi_expr_scope.h"
@@ -590,6 +591,10 @@ VpiObject* HierarchicalObject(const Expr* expr, const AssignBuild& build) {
   const std::string_view kFirst =
       std::string_view(dotted).substr(0, dotted.find('.'));
   if (VpiObject* holder = Resolve(build.names, kFirst)) {
+    if (VpiObject* block = VpiVirtualInterfaceClockingBlock(
+            holder, dotted, build.alloc, build.keep)) {
+      return block;
+    }
     if (VpiIsDynamicPrefixHolderType(holder->type)) {
       return VpiPrefixedReference(holder, dotted, build.alloc, build.keep);
     }

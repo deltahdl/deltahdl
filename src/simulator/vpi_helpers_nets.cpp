@@ -103,6 +103,9 @@ VpiHandle VpiClockingBlockPrefix(VpiHandle block) {
   // walk cannot serve this transition: vpiPrefix and vpiVirtualInterfaceVar are
   // different type tags, so the prefix child is only found here.
   if (!block || block->type != vpiClockingBlock) return nullptr;
+  // One an expression names through the var holds it as its prefix
+  // (VpiVirtualInterfaceClockingBlock).
+  if (block->prefix != nullptr) return block->prefix;
   for (auto* child : block->children) {
     if (child->type == vpiVirtualInterfaceVar) return child;
   }
@@ -118,6 +121,9 @@ VpiHandle VpiClockingBlockActual(VpiHandle block) {
   // clocking block's vpiActual is NULL as well, regardless of any resolved
   // actual.
   if (!block || block->type != vpiClockingBlock) return nullptr;
+  // One an expression names through the var holds what the run's binding of
+  // the var makes it now (VpiPrefixedClockingBlockActual).
+  if (block->prefix != nullptr) return block->actual;
   VpiHandle prefix = VpiClockingBlockPrefix(block);
   if (prefix && prefix->actual == nullptr) return nullptr;
   return block->actual;

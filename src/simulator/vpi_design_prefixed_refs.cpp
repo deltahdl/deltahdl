@@ -1,8 +1,16 @@
+#include "simulator/vpi_design_prefixed_refs.h"
+
+#include <algorithm>
+#include <cstddef>
 #include <functional>
 #include <string>
 #include <string_view>
 
+#include "elaborator/rtlir.h"
+#include "parser/ast_module.h"
+#include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/variable.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_object.h"
 
@@ -55,6 +63,44 @@ VpiObject* VpiPrefixedReference(VpiObject* holder, std::string_view written,
   ref->name = keep(std::string(written));
   ref->prefix = holder;
   return ref;
+}
+
+VpiObject* VpiVirtualInterfaceClockingBlock(
+    VpiObject* holder, std::string_view written,
+    const std::function<VpiObject*()>& alloc, const VpiNameKeeper& keep) {
+  const RtlirModule* iface = holder->decl_facts.vif_interface;
+  const std::size_t kDot = written.find('.');
+  if (holder->type != vpiVirtualInterfaceVar || iface == nullptr ||
+      kDot == std::string_view::npos) {
+    return nullptr;
+  }
+  const std::string_view kMember = written.substr(kDot + 1);
+  if (std::ranges::none_of(iface->clocking_blocks,
+                           [kMember](const ModuleItem* declared) {
+                             return declared->name == kMember;
+                           })) {
+    return nullptr;
+  }
+  VpiObject* block = alloc();
+  block->type = vpiClockingBlock;
+  block->name = keep(std::string(written));
+  block->prefix = holder;
+  return block;
+}
+
+VpiObject* VpiPrefixedClockingBlockActual(
+    const VpiObject& block, SimContext& ctx,
+    const std::function<VpiObject*(const std::string&)>& by_name) {
+  Variable* vif = block.prefix->var;
+  if (vif == nullptr || !ctx.VirtualInterfaceIsBound(vif)) return nullptr;
+  const VpiObject* instance =
+      by_name(std::string(ctx.VirtualInterfaceBinding(vif)));
+  if (instance == nullptr) return nullptr;
+  const std::string_view kMember = block.name.substr(block.name.rfind('.') + 1);
+  for (VpiObject* child : instance->children) {
+    if (child->type == vpiClockingBlock && child->name == kMember) return child;
+  }
+  return nullptr;
 }
 
 }  // namespace delta

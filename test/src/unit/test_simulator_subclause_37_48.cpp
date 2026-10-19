@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
+#include <vector>
+
 #include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_constants.h"
@@ -271,7 +274,43 @@ TEST_F(ClockingBlock, HelpersGuardOnObjectKind) {
 
 // The clocking blocks of a run: those a design declares, built from the
 // elaborated design rather than by hand (#4956).
-class ClockingBlocksOfARun : public VpiDesignRun {};
+class ClockingBlocksOfARun : public VpiDesignRun {
+ protected:
+  // The condition of the event control the procedure `index` of top runs.
+  static vpiHandle EventOf(std::size_t index) {
+    const std::vector<vpiHandle> kProcs = ObjectsOf(vpiProcess, By("top"));
+    if (kProcs.size() <= index) return nullptr;
+    return vpi_handle(vpiCondition, vpi_handle(vpiStmt, kProcs[index]));
+  }
+};
+
+// Details 2 and 3: a clocking block named through a virtual interface var,
+// vif.cb, is a clocking block whose prefix is the var, and stands for the
+// block of the interface instance the var holds now, or for none while it
+// holds none (#7175).
+TEST_F(ClockingBlocksOfARun,
+       AVirtualInterfacesClockingBlockHasPrefixAndActual) {
+  Run("interface bus(input logic clk);\n"
+      "  clocking cb @(posedge clk); endclocking\n"
+      "endinterface\n"
+      "module top; logic clk; bus b(clk); virtual bus vif, vu;\n"
+      "  initial vif = b;\n"
+      "  initial @(vif.cb);\n"
+      "  initial @(vu.cb);\n"
+      "endmodule\n");
+  vpiHandle bound = EventOf(1);
+  ASSERT_NE(bound, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, bound), vpiClockingBlock);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiPrefix, bound)),
+            VpiObjectOf(By("top.vif")));
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiActual, bound)),
+            VpiObjectOf(Named(vpiClockingBlock, By("top.b"), "cb")));
+  vpiHandle unbound = EventOf(2);
+  ASSERT_NE(unbound, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiPrefix, unbound)),
+            VpiObjectOf(By("top.vu")));
+  EXPECT_EQ(vpi_handle(vpiActual, unbound), nullptr);
+}
 
 // A module's default clocking block is reached from it as a clocking block and
 // as its default clocking, named as declared and reaching its clocking event.

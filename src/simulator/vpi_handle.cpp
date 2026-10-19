@@ -22,6 +22,7 @@
 #include "simulator/vpi_constraint_relations.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_data_structs.h"
+#include "simulator/vpi_design_prefixed_refs.h"
 #include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_io_decl_stand_in.h"
@@ -922,6 +923,13 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
   // helper documents the §37.x details for the relations it serves. When one
   // matches, its (possibly null) result is the answer; otherwise the lookup
   // falls through to the generic traversal.
+  // §37.48 detail 3: what a block a virtual interface var prefixes is now.
+  if (type == vpiActual && ref->type == vpiClockingBlock && ref->prefix) {
+    ref->actual = VpiPrefixedClockingBlockActual(
+        *ref, *sim_ctx_, [this](const std::string& scope) {
+          return HandleByName(scope.c_str(), nullptr);
+        });
+  }
   VpiHandle designated = nullptr;
   const auto kClassObjectOf = [this](VpiObject& var) {
     return ClassObjectOf(var);
