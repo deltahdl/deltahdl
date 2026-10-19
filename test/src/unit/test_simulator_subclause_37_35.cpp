@@ -608,6 +608,7 @@ std::vector<PLI_UINT32> DelaysOf(vpiHandle prim, int count) {
   delay.time_type = vpiSimTime;
   vpi_get_delays(prim, &delay);
   std::vector<PLI_UINT32> ticks;
+  ticks.reserve(da.size());
   for (const s_vpi_time& time : da) ticks.push_back(time.low);
   return ticks;
 }
@@ -618,12 +619,12 @@ std::vector<PLI_UINT32> DelaysOf(vpiHandle prim, int count) {
 // written; a UDP its rise and a fall that is the rise where none was written
 // (#7139).
 TEST_F(PrimitivesOfARun, APrimitiveReportsItsWrittenDelays) {
-  Run("`timescale 1ns/1ns\n"
-      "primitive inv_udp(o, a);\n"
+  Run("primitive inv_udp(o, a);\n"
       "  output o; input a;\n"
       "  table 0 : 1; 1 : 0; endtable\n"
       "endprimitive\n"
-      "module top; wire y, z, w; logic a;\n"
+      "module top; timeunit 1ns; timeprecision 1ns;\n"
+      "  wire y, z, w; logic a;\n"
       "  and #(3, 5) g(y, a, a);\n"
       "  bufif1 #(2, 4, 6) h(z, a, a);\n"
       "  inv_udp #7 u(w, a);\n"
@@ -642,8 +643,8 @@ TEST_F(PrimitivesOfARun, APrimitiveReportsItsWrittenDelays) {
 // §37.35 with §28.3.6: each element of an instance array of gates reports the
 // delays the array was written with.
 TEST_F(PrimitivesOfARun, AnArrayElementReportsTheArraysDelays) {
-  Run("`timescale 1ns/1ns\n"
-      "module top; wire [1:0] y; logic [1:0] a;\n"
+  Run("module top; timeunit 1ns; timeprecision 1ns;\n"
+      "  wire [1:0] y; logic [1:0] a;\n"
       "  not #(4, 6) g[1:0] (y, a);\n"
       "endmodule\n");
   EXPECT_EQ(DelaysOf(Named(vpiPrimitive, By("top"), "g[0]"), 3),
