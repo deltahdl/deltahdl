@@ -1,15 +1,28 @@
 #include <gtest/gtest.h>
 
+#include <deque>
+#include <memory>
+#include <string>
+#include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
+#include "common/diagnostic.h"
+#include "common/source_mgr.h"
 #include "common/types.h"
+#include "fixture_vpi_run.h"
 #include "parser/ast_class.h"
 #include "simulator/class_object.h"
+#include "simulator/scheduler.h"
+#include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_class_objects.h"
 #include "simulator/vpi_context.h"
+#include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_pool_keeper.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -292,6 +305,182 @@ TEST(ClassTypespec, SpecializationTypespecCarriesItsResolvedParameterValues) {
   EXPECT_EQ(ts.param_assigns[1].name, "depth");
   EXPECT_TRUE(ts.param_assigns[1].has_bound_value);
   EXPECT_EQ(ts.param_assigns[1].bound_value.ToUint64(), 8u);
+}
+
+// §37.32 against designs read and run whole.
+class ClassTypespecsOfARun : public VpiDesignRun {
+ protected:
+  // The integer value of `obj`, -1 where nothing is written.
+  static int IntValueOf(vpiHandle obj) {
+    s_vpi_value value = {};
+    value.format = vpiIntVal;
+    value.value.integer = -1;
+    if (obj != nullptr) vpi_get_value(obj, &value);
+    return value.value.integer;
+  }
+
+  // The class specialization typespec `defn` reaches through
+  // vpiClassTypespec whose parameter `name` holds `value`, null for none.
+  static vpiHandle SpecializationWith(vpiHandle defn, std::string_view name,
+                                      int value) {
+    for (vpiHandle typespec : ObjectsOf(vpiClassTypespec, defn)) {
+      if (IntValueOf(Named(vpiParameter, typespec, name)) == value) {
+        return typespec;
+      }
+    }
+    return nullptr;
+  }
+
+  // The value each param assign `typespec` reaches assigns, by the name of
+  // the parameter it assigns, in the order reached; -1 for none.
+  static std::vector<std::pair<std::string, int>> AssignedValues(
+      vpiHandle typespec) {
+    std::vector<std::pair<std::string, int>> assigned;
+    for (vpiHandle assign : ObjectsOf(vpiParamAssign, typespec)) {
+      vpiHandle lhs = vpi_handle(vpiLhs, assign);
+      assigned.emplace_back(lhs == nullptr ? "" : vpi_get_str(vpiName, lhs),
+                            IntValueOf(vpi_handle(vpiRhs, assign)));
+    }
+    return assigned;
+  }
+};
+
+constexpr const char* kSpecializations =
+    "module top;\n"
+    "  class B #(int W = 4, int V = 2);\n"
+    "    rand int x;\n"
+    "    event e;\n"
+    "    constraint c { x > 0; }\n"
+    "    task t; endtask\n"
+    "  endclass\n"
+    "  class D extends B #(8); endclass\n"
+    "  class E extends B #(.V(5)); endclass\n"
+    "  D d = new;\n"
+    "  E en = new;\n"
+    "  B #(3) b3 = new;\n"
+    "  mailbox m = new;\n"
+    "  semaphore s = new;\n"
+    "endmodule\n";
+
+// §37.32 details 1 and 10: a class defn reaches through vpiClassTypespec the
+// class specializations of its class, each reaching the defn and reporting a
+// user-defined class type (#7126, #7127).
+TEST_F(ClassTypespecsOfARun, ADefnReachesItsSpecializations) {
+  Run(kSpecializations);
+  vpiHandle b = Named(vpiClassDefn, By("top"), "B");
+  ASSERT_NE(b, nullptr);
+  vpiHandle three = SpecializationWith(b, "W", 3);
+  vpiHandle eight = SpecializationWith(b, "W", 8);
+  ASSERT_NE(three, nullptr);
+  ASSERT_NE(eight, nullptr);
+  EXPECT_NE(three, eight);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiClassDefn, three)), VpiObjectOf(b));
+  EXPECT_EQ(vpi_get(vpiClassType, three), vpiUserDefinedClass);
+  EXPECT_NE(vpi_get_str(vpiName, three), nullptr);
+}
+
+// §37.32 details 3, 5, 8 and 12: a specialization's typespec reaches the
+// variables, methods, constraints and named events of its class, the methods
+// alone being its internal scopes, and its parameters with the values the
+// specialization gives them, each assigned by a param assign (#7125, #7128).
+TEST_F(ClassTypespecsOfARun, ASpecializationReachesItsMembers) {
+  Run(kSpecializations);
+  vpiHandle three =
+      SpecializationWith(Named(vpiClassDefn, By("top"), "B"), "W", 3);
+  ASSERT_NE(three, nullptr);
+  EXPECT_EQ(NamesOf(vpiVariables, three), (std::vector<std::string>{"x"}));
+  EXPECT_EQ(NamesOf(vpiMethods, three), (std::vector<std::string>{"t"}));
+  EXPECT_EQ(NamesOf(vpiConstraint, three), (std::vector<std::string>{"c"}));
+  EXPECT_EQ(NamesOf(vpiNamedEvent, three), (std::vector<std::string>{"e"}));
+  EXPECT_EQ(NamesOf(vpiInternalScope, three), (std::vector<std::string>{"t"}));
+  EXPECT_EQ(IntValueOf(Named(vpiParameter, three, "V")), 2);
+  EXPECT_EQ(AssignedValues(three),
+            (std::vector<std::pair<std::string, int>>{{"W", 3}, {"V", 2}}));
+}
+
+// §37.32 details 1 and 9 with §37.33: a class obj's typespec is the class
+// specialization it was created as, which extends the specialization of its
+// base, itself extending none; a lexical typespec has no members (detail 2)
+// (#7125).
+TEST_F(ClassTypespecsOfARun, AClassObjsTypespecExtendsItsBasesSpecialization) {
+  Run(kSpecializations);
+  vpiHandle obj = vpi_handle(vpiClassObj, By("top.d"));
+  ASSERT_NE(obj, nullptr);
+  vpiHandle typespec = vpi_handle(vpiClassTypespec, obj);
+  ASSERT_NE(typespec, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiClassDefn, typespec)),
+            VpiObjectOf(Named(vpiClassDefn, By("top"), "D")));
+  vpiHandle base = vpi_handle(vpiExtends, typespec);
+  ASSERT_NE(base, nullptr);
+  EXPECT_EQ(IntValueOf(Named(vpiParameter, base, "W")), 8);
+  EXPECT_EQ(vpi_handle(vpiExtends, base), nullptr);
+  vpiHandle lexical =
+      vpi_handle(vpiClassTypespec,
+                 vpi_handle(vpiExtends, Named(vpiClassDefn, By("top"), "D")));
+  ASSERT_NE(lexical, nullptr);
+  EXPECT_TRUE(NamesOf(vpiVariables, lexical).empty());
+}
+
+// §37.32 detail 3: the typespec an extends clause writes is a lexical
+// construct, whose param assigns reach the expression the clause gives each
+// parameter, by place or by name, and else the parameter's default (#7128).
+TEST_F(ClassTypespecsOfARun, AnExtendsClausesTypespecAssignsWhatItWrites) {
+  Run(kSpecializations);
+  const auto kWritten = [](const char* derived) {
+    return AssignedValues(vpi_handle(
+        vpiClassTypespec,
+        vpi_handle(vpiExtends, Named(vpiClassDefn, By("top"), derived))));
+  };
+  EXPECT_EQ(kWritten("D"),
+            (std::vector<std::pair<std::string, int>>{{"W", 8}, {"V", 2}}));
+  EXPECT_EQ(kWritten("E"),
+            (std::vector<std::pair<std::string, int>>{{"W", 4}, {"V", 5}}));
+}
+
+// §37.32: the typespec of a mailbox's and a semaphore's class obj reports the
+// built-in class it stands for (#7126).
+TEST_F(ClassTypespecsOfARun, ABuiltInClassReportsItsClassType) {
+  Run(kSpecializations);
+  const auto kTypeOf = [](const char* var) {
+    return vpi_get(vpiClassType, vpi_handle(vpiClassTypespec,
+                                            vpi_handle(vpiClassObj, By(var))));
+  };
+  EXPECT_EQ(kTypeOf("top.m"), vpiMailboxClass);
+  EXPECT_EQ(kTypeOf("top.s"), vpiSemaphoreClass);
+}
+
+// §37.32 detail 1 with §37.33: a class obj of a class no class defn stands
+// for still holds a typespec of its class, reaching no defn.
+TEST(ClassObjTypespec, AClassWithNoDefnHasATypespecOfItsOwn) {
+  SourceManager mgr;
+  Arena arena;
+  Scheduler scheduler{arena};
+  DiagEngine diag{mgr};
+  SimContext ctx{scheduler, arena, diag};
+  ClassDecl decl;
+  decl.name = "C";
+  ClassTypeInfo type;
+  type.name = "C";
+  type.decl = &decl;
+  ClassObject obj;
+  obj.type = &type;
+  std::vector<std::unique_ptr<VpiObject>> pool;
+  std::deque<std::string> names;
+  const VpiAttachBuild kBuild{[&pool] {
+                                pool.push_back(std::make_unique<VpiObject>());
+                                return pool.back().get();
+                              },
+                              VpiPoolKeeper(names), arena};
+  const VpiClassCallSite kSite;
+  const VpiClassObjDefn kOf{
+      [](const ClassTypeInfo&) -> VpiObject* { return nullptr; },
+      [&kSite](const VpiObject*) -> const VpiClassCallSite& { return kSite; }};
+  VpiObject* made = VpiMakeClassObject(obj, kOf, {}, ctx, kBuild);
+  ASSERT_FALSE(made->children.empty());
+  const VpiObject* typespec = made->children.front();
+  EXPECT_EQ(typespec->type, vpiClassTypespec);
+  EXPECT_EQ(typespec->name, "C");
+  EXPECT_TRUE(typespec->children.empty());
 }
 
 }  // namespace

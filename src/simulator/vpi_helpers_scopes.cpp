@@ -42,13 +42,20 @@ bool VpiIsStmtThatIsNoScope(VpiHandle obj) {
   return VpiIsStmtOrCaseItem(obj) && !VpiIsScopeObject(obj);
 }
 
+// §37.32: a class typespec's own class defn, its first child, and the class
+// typespec it extends are objects it relates to, not scopes it holds.
+bool IsClassTypespecRelation(const VpiObject& scope, const VpiObject& child) {
+  return scope.type == vpiClassTypespec &&
+         (&child == scope.children.front() || child.type == vpiClassTypespec);
+}
+
 // §37.12 (figure): the scopes `scope` holds, reached through vpiInternalScope:
 // each child that is a scope, and the scopes nested in a child statement that
 // is none, which stands in the scope without nesting them in a scope of its
 // own.
 void CollectInternalScopes(VpiHandle scope, VpiHandle iter) {
   for (VpiObject* child : scope->children) {
-    if (VpiIsScopeObject(child)) {
+    if (VpiIsScopeObject(child) && !IsClassTypespecRelation(*scope, *child)) {
       iter->children.push_back(child);
     } else if (VpiIsStmtThatIsNoScope(child)) {
       CollectInternalScopes(child, iter);

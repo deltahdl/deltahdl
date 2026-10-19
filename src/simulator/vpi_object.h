@@ -682,6 +682,8 @@ struct VpiObject {
   // vpiDerivedClasses iteration returns. They are kept apart from the children
   // because the base declares none of them, so no other relation reaches them.
   std::vector<VpiObject*> derived_classes;
+  // §37.32 detail 10: likewise the class specializations of a class defn.
+  std::vector<VpiObject*> specializations;
 
   VpiDeclFacts decl_facts;    // §37.17 and §37.41: see VpiDeclFacts.
   VpiFrameFacts frame_facts;  // §37.43: see VpiFrameFacts.

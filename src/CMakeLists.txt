@@ -751,6 +751,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/vpi_assertion_control.cpp
     simulator/vpi_callbacks.cpp
     simulator/vpi_class_objects.cpp
+    simulator/vpi_class_typespecs.cpp
     simulator/vpi_collection_elements.cpp
     simulator/vpi_compatibility.cpp
     simulator/vpi_constraint_relations.cpp

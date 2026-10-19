@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "common/envelope_viewport.h"
+#include "simulator/vpi_class_typespecs.h"
 #include "simulator/vpi_user.h"
 
 // §37.10 detail 3: the package/interface/program instance kinds are defined in
@@ -561,6 +562,11 @@ bool TryResolvePrimitiveRelation(int type, VpiHandle ref, VpiHandle& out) {
 // The traversal is left alone where no child is a typespec, so an object
 // carrying the class name as its own type is still reached the way it was.
 bool TryResolveTypespecClassRelation(int type, VpiHandle ref, VpiHandle& out) {
+  // §37.32 detail 9: a class typespec reaches the one it extends.
+  if (type == vpiExtends && ref->type == vpiClassTypespec) {
+    out = VpiClassTypespecBase(*ref);
+    return true;
+  }
   if (type != vpiTypespec) return false;
   for (auto* child : ref->children) {
     if (!VpiIsTypespecType(child->type)) continue;

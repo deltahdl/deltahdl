@@ -2,6 +2,7 @@
 #include <cstdarg>
 #include <optional>
 
+#include "simulator/vpi_class_typespecs.h"
 #include "simulator/vpi_coverage.h"
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_io_decl_stand_in.h"
@@ -692,6 +693,9 @@ int VpiGetSimplePropertyB(int property, VpiHandle obj, bool& handled) {
     // §37.34: the distribution kind a dist item carries, as an int property.
     case vpiDistType:
       return obj->dist_type;
+    // §37.32: the kind of class a class typespec stands for.
+    case vpiClassType:
+      return obj->type == vpiClassTypespec ? VpiClassTypeOf(*obj) : 0;
     // §37.26 (figure): a structure or union object reports whether it is packed
     // as the vpiPacked Boolean property (TRUE for a packed aggregate). Any
     // object not declared packed reports FALSE.

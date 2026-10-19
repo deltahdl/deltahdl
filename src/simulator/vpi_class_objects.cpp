@@ -23,6 +23,7 @@
 #include "simulator/sync_objects.h"
 #include "simulator/variable.h"
 #include "simulator/vpi_alloc_scheme.h"
+#include "simulator/vpi_class_typespecs.h"
 #include "simulator/vpi_collection_elements.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_design_attach_build.h"
@@ -241,30 +242,6 @@ void RelateObjectMethods(VpiObject* holder,
   }
 }
 
-// §37.33 detail 8 with §37.28: the parameter `param` of the class `decl`,
-// under the class obj `holder`, local where it was declared so: a type
-// parameter, which has no value, or a value parameter holding the value
-// `assign` binds it to, which every value parameter of a class the run holds
-// has (InitClassParams in lowerer_class.cpp).
-void MakeObjectParameter(VpiObject* holder, const ClassDecl& decl,
-                         const ClassTypespecParam& param,
-                         const ClassTypespecParamAssign& assign,
-                         const VpiAttachBuild& build) {
-  VpiObject* made = build.alloc();
-  const bool kType = decl.type_param_names.contains(param.name);
-  made->type = kType ? vpiTypeParameter : vpiParameter;
-  made->name = build.keep(std::string(param.name));
-  made->parent = holder;
-  made->local_param = param.is_local_param;
-  if (!kType) {
-    auto* storage = build.arena.Create<Variable>();
-    storage->value = assign.bound_value;
-    made->var = storage;
-    made->size = static_cast<int>(assign.bound_value.width);
-  }
-  holder->children.push_back(made);
-}
-
 // §37.33 detail 4 with §15.4.5: the kind of constant a message is, as the
 // kind of the value the mailbox placed says, a parameterized mailbox's among
 // them (§15.4.9): a literal's value carries no string mark of its own.
@@ -280,6 +257,26 @@ int MessageConstType(const MailboxMessageType& type) {
 }
 
 }  // namespace
+
+VpiObject* VpiMakeObjectParameter(VpiObject* holder, const ClassDecl& decl,
+                                  const ClassTypespecParam& param,
+                                  const ClassTypespecParamAssign& assign,
+                                  const VpiAttachBuild& build) {
+  VpiObject* made = build.alloc();
+  const bool kType = decl.type_param_names.contains(param.name);
+  made->type = kType ? vpiTypeParameter : vpiParameter;
+  made->name = build.keep(std::string(param.name));
+  made->parent = holder;
+  made->local_param = param.is_local_param;
+  if (!kType) {
+    auto* storage = build.arena.Create<Variable>();
+    storage->value = assign.bound_value;
+    made->var = storage;
+    made->size = static_cast<int>(assign.bound_value.width);
+  }
+  holder->children.push_back(made);
+  return made;
+}
 
 void VpiRecordPropertyDecl(VpiObject& var, const ClassMember& member) {
   if (member.is_randc) {
@@ -314,19 +311,27 @@ VpiObject* VpiMakeClassObject(ClassObject& obj, const VpiClassObjDefn& of,
   made->alloc_scheme = VpiAllocSchemeFor(VpiAllocKind::kDynamic);
   made->obj_id = static_cast<int64_t>(obj.handle);
   if (obj.type == nullptr) return made;
-  VpiObject* typespec = build.alloc();
-  typespec->type = vpiClassTypespec;
-  typespec->name = build.keep(std::string(obj.type->name));
-  typespec->parent = made;
   VpiObject* defn = of.defn_of(*obj.type);
-  if (defn != nullptr) typespec->children.push_back(defn);
+  // §37.32 detail 1: the type of a class obj is the class specialization it
+  // was created as, whose typespec its class defn holds where the run held the
+  // specialization when the defn was made.
+  VpiObject* typespec = defn != nullptr
+                            ? VpiSpecializationTypespec(*defn, obj.type->name)
+                            : nullptr;
+  if (typespec == nullptr) {
+    typespec = build.alloc();
+    typespec->type = vpiClassTypespec;
+    typespec->name = build.keep(std::string(obj.type->name));
+    typespec->parent = made;
+    if (defn != nullptr) typespec->children.push_back(defn);
+  }
   made->children.push_back(typespec);
   // §37.33 detail 8: the parameters the class typespec the object was created
   // with gives values to, port list and body alike.
   const ClassTypespecInfo kTypespec = VpiClassTypespecOf(obj.type);
   for (std::size_t i = 0; i < kTypespec.params.size(); ++i) {
-    MakeObjectParameter(made, *obj.type->decl, kTypespec.params[i],
-                        kTypespec.param_assigns[i], build);
+    VpiMakeObjectParameter(made, *obj.type->decl, kTypespec.params[i],
+                           kTypespec.param_assigns[i], build);
   }
   std::vector<ChainClass> chain;
   for (const ClassTypeInfo* cls : ClassChain(obj.type)) {

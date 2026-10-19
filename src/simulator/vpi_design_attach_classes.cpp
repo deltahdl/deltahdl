@@ -13,6 +13,7 @@
 #include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_class_objects.h"
+#include "simulator/vpi_class_typespecs.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_walk.h"
@@ -204,12 +205,14 @@ void MakeExtends(const MadeClassDefn& derived,
   static const std::vector<std::string_view> kNoGenBlocks;
   // §37.42: a call an argument makes stands in the derived class.
   const VpiCallStand kStand{derived.defn, derived.mod, derived.package};
+  const auto kExpression = [&](const Expr* expr) {
+    return VpiGenBlockExpression(expr,
+                                 {objects, derived.prefix, kNoGenBlocks,
+                                  nullptr, derived.attrs, &kStand},
+                                 ctx, build);
+  };
   for (const Expr* arg : derived.decl->extends_args) {
-    VpiObject* obj =
-        VpiGenBlockExpression(arg,
-                              {objects, derived.prefix, kNoGenBlocks, nullptr,
-                               derived.attrs, &kStand},
-                              ctx, build);
+    VpiObject* obj = kExpression(arg);
     if (obj == nullptr) continue;
     obj->parent = extends;
     extends->children.push_back(obj);
@@ -218,6 +221,10 @@ void MakeExtends(const MadeClassDefn& derived,
   if (base == nullptr) return;
   typespec->children.push_back(base);
   base->derived_classes.push_back(derived.defn);
+  // §37.32 detail 3: the parameter values the clause gives the base.
+  const auto kBase = std::ranges::find(made, base, &MadeClassDefn::defn);
+  VpiMakeExtendsParamAssigns(typespec, *derived.decl, *kBase->decl, kExpression,
+                             build);
 }
 
 // §37.17 detail 24 and §37.41 detail 4: the visibility `member` was declared
@@ -529,6 +536,7 @@ VpiClassDefnObjects AttachClassDefinitions(const RtlirDesign* design,
         property.var, WrittenClassType(property.member->data_type, *design),
         defns, property.owner->prefix, build);
   }
+  VpiAttachClassSpecializations(defns, ctx, build);
   return defns;
 }
 

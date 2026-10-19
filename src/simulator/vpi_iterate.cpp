@@ -233,15 +233,16 @@ void ComputeDriverLoadModes(int type, VpiHandle ref, VpiIterateModes& m) {
 // vpiArgument reaches the constructor-chaining expressions.
 void ComputeClassModes(int type, VpiHandle ref, VpiIterateModes& m) {
   m.class_methods = ref &&
-                    (ref->type == vpiClassDefn || ref->type == vpiClassObj) &&
+                    (ref->type == vpiClassDefn || ref->type == vpiClassObj ||
+                     ref->type == vpiClassTypespec) &&
                     type == vpiMethods;
   m.class_obj_waiting =
       ref && ref->type == vpiClassObj && type == vpiWaitingProcesses;
   m.class_obj_messages = ref && ref->type == vpiClassObj && type == vpiMessages;
   m.class_constraint =
       ref && ref->type == vpiClassDefn && type == vpiConstraint;
-  m.class_derived =
-      ref && ref->type == vpiClassDefn && type == vpiDerivedClasses;
+  m.class_derived = ref && ref->type == vpiClassDefn &&
+                    (type == vpiDerivedClasses || type == vpiClassTypespec);
   m.extends_argument = ref && ref->type == vpiExtends && type == vpiArgument;
 }
 
@@ -768,7 +769,8 @@ bool DispatchRefSpecialMode(int type, VpiHandle ref,
     return true;
   }
   if (modes.class_derived) {
-    iter->children = ref->derived_classes;
+    iter->children =
+        type == vpiDerivedClasses ? ref->derived_classes : ref->specializations;
     return true;
   }
   if (modes.constr_foreach_loopvars || modes.foreach_stmt_loopvars) {

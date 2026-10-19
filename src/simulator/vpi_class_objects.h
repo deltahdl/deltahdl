@@ -14,9 +14,12 @@
 namespace delta {
 
 class SimContext;
+struct ClassDecl;
 struct ClassMember;
 struct ClassObject;
 struct ClassTypeInfo;
+struct ClassTypespecParam;
+struct ClassTypespecParamAssign;
 struct Process;
 
 // §37.17 details 15 and 22 with §18.4 and §6.20.6: records on `var`, the
@@ -32,6 +35,17 @@ struct VpiClassObjDefn {
   std::function<VpiObject*(const ClassTypeInfo& cls)> defn_of;
   std::function<const VpiClassCallSite&(const VpiObject* defn)> calls;
 };
+
+// §37.33 detail 8 with §37.28: the parameter `param` of the class `decl`,
+// made with `build` under `holder`, a class obj or a class specialization's
+// typespec (§37.32), local where it was declared so: a type parameter, which
+// has no value, or a value parameter holding the value `assign` binds it to,
+// which every value parameter of a class the run holds has (InitClassParams in
+// lowerer_class.cpp). Answers the parameter made.
+VpiObject* VpiMakeObjectParameter(VpiObject* holder, const ClassDecl& decl,
+                                  const ClassTypespecParam& param,
+                                  const ClassTypespecParamAssign& assign,
+                                  const VpiAttachBuild& build);
 
 // §37.33 details 1, 5, 6 and 8: the class obj standing for the run's class
 // object `obj`, made with `build`: its vpiObjId is the object's handle, it
