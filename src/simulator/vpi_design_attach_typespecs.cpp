@@ -633,13 +633,12 @@ VpiObjectMap AttachTypespecs(const RtlirDesign* design,
 }
 
 void AttachPortTypespecs(const RtlirDesign* design, const VpiObjectMap& objects,
-                         const VpiObjectMap& outer,
-                         const VpiClassDefnObjects& classes, SimContext& ctx,
+                         const VpiCallObjects& calls, SimContext& ctx,
                          const VpiAttachBuild& build) {
   // §37.14 (figure): a port reaches the typespec of its type through
   // vpiTypespec, which reached nothing for every port.
   VpiTypespecShapes shapes(build);
-  const DesignTypespecs kDesign{build, ctx, shapes, classes, objects};
+  const DesignTypespecs kDesign{build, ctx, shapes, calls.classes, objects};
   WalkInstanceObjects(
       design, objects,
       [&](const RtlirModule* mod, const std::string& prefix,
@@ -649,9 +648,9 @@ void AttachPortTypespecs(const RtlirDesign* design, const VpiObjectMap& objects,
         if (decl == nullptr) return;
         InstancePrefixOverride in_instance(ctx.InstancePrefixOverride(),
                                            prefix.empty() ? "" : prefix + ".");
-        RelatePortTypespecs(
-            *mod, *decl,
-            {instance, prefix, &mod->enum_types, outer, mod->imports, kDesign});
+        RelatePortTypespecs(*mod, *decl,
+                            {instance, prefix, &mod->enum_types,
+                             calls.unit_typespecs, mod->imports, kDesign});
       });
 }
 

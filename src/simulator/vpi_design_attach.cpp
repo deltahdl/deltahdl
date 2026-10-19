@@ -417,8 +417,7 @@ void VpiContext::AttachDesignPorts(const RtlirDesign* design) {
   VpiShapeDeferredCalls(design, object_map_, deferred, CallBuild(), kBuild);
   // §37.83: the attributes each port is written with.
   AttachPortAttributes(design, object_map_, *sim_ctx_, kBuild);
-  AttachPortTypespecs(design, object_map_, call_objects_.unit_typespecs,
-                      call_objects_.classes, *sim_ctx_, kBuild);
+  AttachPortTypespecs(design, object_map_, call_objects_, *sim_ctx_, kBuild);
 }
 
 namespace {

@@ -588,7 +588,7 @@ TEST_F(PortsOfARun, APortConnectedByNameSaysSo) {
 // §37.14 (figure) with §37.13 detail 1: a port passed by reference has the
 // direction vpiRef (#7049).
 TEST_F(PortsOfARun, ARefPortsDirectionIsRef) {
-  Run("module sub(ref int r, input int i); endmodule\n"
+  Run("module sub(ref int r, input var int i); endmodule\n"
       "module top; int x, y; sub u(.r(x), .i(y)); endmodule\n");
   vpiHandle r = PortOfU("r");
   vpiHandle i = PortOfU("i");
@@ -611,8 +611,8 @@ int TypespecKindOf(vpiHandle port) {
 TEST_F(PortsOfARun, APortReachesTheTypespecOfItsType) {
   Run("typedef logic [3:0] nib_t;\n"
       "module sub #(parameter W = 2, parameter type T = int)\n"
-      "  (input nib_t a, input int b, input logic [1:0] c [2],\n"
-      "   output byte d, input e, input logic [W-1:0] f, input T g);\n"
+      "  (input nib_t a, input var int b, input logic [1:0] c [2],\n"
+      "   output byte d, input e, input logic [W-1:0] f, input var T g);\n"
       "endmodule\n"
       "module loc(h); typedef bit [5:0] six_t; input six_t h; endmodule\n"
       "module top; nib_t w; int x; logic [1:0] y [2]; byte z; wire q;\n"
