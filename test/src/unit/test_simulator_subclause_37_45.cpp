@@ -319,6 +319,24 @@ TEST_F(DelayDevicesOfARun, NoPathPlacesNoDevice) {
   EXPECT_TRUE(TermsOf(vpiDriver, y).empty());
 }
 
+// §30.4.1 lets a module path end on a variable, which is no net for a device
+// to sit on: the cell still holds its path, and the net its output port drives
+// above holds no delay term on either side.
+TEST_F(DelayDevicesOfARun, APathIntoAVariablePlacesNoDevice) {
+  Run("module m(input a, output reg y);\n"
+      "  always @(a) y = a;\n"
+      "  specify (a => y) = 3; endspecify\n"
+      "endmodule\n"
+      "module top; wire p, q; m u(p, q); endmodule\n");
+  vpiHandle u = By("top.u");
+  ASSERT_NE(u, nullptr);
+  EXPECT_NE(vpi_iterate(vpiModPath, u), nullptr);
+  vpiHandle q = By("top.q");
+  ASSERT_NE(q, nullptr);
+  EXPECT_TRUE(TermsOf(vpiLoad, q).empty());
+  EXPECT_TRUE(TermsOf(vpiDriver, q).empty());
+}
+
 // An intermodule path given a delay with vpi_put_delays places a device of
 // vpiDelayType vpiInterModPathDelay on the net its two ports share, in the
 // module holding that net; before the put the net holds no delay term, and a
