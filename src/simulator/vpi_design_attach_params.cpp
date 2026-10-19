@@ -1,9 +1,12 @@
+#include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <unordered_map>
 #include <vector>
 
+#include "common/packed_range.h"
 #include "elaborator/elaborator_items_params.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_defparam.h"
@@ -11,6 +14,7 @@
 #include "parser/ast_specify.h"
 #include "parser/ast_type.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/variable.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_model_helpers2.h"
@@ -30,6 +34,16 @@ struct ParamAttach {
   const VpiObjectMap& unit;
   const VpiAttachBuild& build;
   SimContext& ctx;
+};
+
+// Where the parameters of one instance stand: the instance's own object, the
+// path it is keyed under among `objects`, and the declaration it is of, which
+// a type parameter's default is read from (§37.28 detail 3).
+struct ParamScope {
+  VpiObject* scope;
+  const std::string& prefix;
+  const VpiObjectMap& objects;
+  const ModuleDecl& decl;
 };
 
 // What an instance array's param assigns are made with: the design whose
@@ -82,7 +96,7 @@ VpiObject* TypeParameterTypespec(const DataType& type, VpiObject* scope,
 // has no value and so no storage, and nothing else makes an object for it.
 // §37.3.3: it stands where its declaration was written.
 void MakeTypeParameter(VpiObject* scope, const RtlirParamDecl& param,
-                       const ParamAttach& with) {
+                       const DataType* default_type, const ParamAttach& with) {
   const VpiAttachBuild& build = with.build;
   VpiObject* obj = build.alloc();
   obj->type = vpiTypeParameter;
@@ -94,32 +108,127 @@ void MakeTypeParameter(VpiObject* scope, const RtlirParamDecl& param,
     obj->param_typespec =
         TypeParameterTypespec(*param.resolved_type, scope, with.unit, build);
   }
+  // §37.28 detail 3: vpiExpr reaches the typespec of the default type.
+  if (default_type != nullptr) {
+    obj->param_default =
+        TypeParameterTypespec(*default_type, scope, with.unit, build);
+  }
   VpiRecordWrittenLocation(obj, param.loc, with.ctx);
   scope->children.push_back(obj);
 }
 
-// The parameters of the instance at `prefix`, an instance of `mod`, each made
-// the kind of parameter object it is and given the position its declaration
-// was written at.
-void AttachScopeParameters(const RtlirModule* mod, const std::string& prefix,
-                           const VpiObjectMap& objects,
+// §37.28 detail 3: the default type the type parameter `name` of `decl` was
+// declared with, in its parameter port list or among its items; null where it
+// was written with none or in a generate block.
+const DataType* DeclaredDefaultType(const ModuleDecl& decl,
+                                    std::string_view name) {
+  for (std::size_t i = 0; i < decl.params.size(); ++i) {
+    if (decl.params[i].first != name || i >= decl.param_types.size()) continue;
+    const DataType& type = decl.param_types[i];
+    return type.kind == DataTypeKind::kImplicit ? nullptr : &type;
+  }
+  for (const ModuleItem* item : decl.items) {
+    if (item->kind == ModuleItemKind::kParamDecl && item->name == name) {
+      return &item->typedef_type;
+    }
+  }
+  return nullptr;
+}
+
+// §37.28 (figure, vpiConstType): the kind of constant the value of `param`
+// is, as a literal's is (§37.58): a real, a string, or else an integral one.
+int ParameterConstType(const RtlirParamDecl& param) {
+  if (param.decl_is_real || param.is_real_value) return vpiRealConst;
+  return param.is_string_value ? vpiStringConst : vpiIntConst;
+}
+
+// §37.28 (figure, vpiTypespec) with §6.20.2: the typespec of the type the
+// value parameter `param`, whose object `obj` holds its value, has: the type
+// it was declared with, or, declared with none, the type of its final value,
+// a real, a string, or a logic vector as wide as the value; with the range it
+// was declared with, or the value's own for an integral one declared with
+// none.
+VpiObject* ParameterTypespec(const RtlirParamDecl& param, const VpiObject& obj,
+                             VpiObject* scope, const ParamAttach& with) {
+  const bool kWritten = param.decl_type != nullptr && !param.decl_type_implicit;
+  DataType inferred;
+  inferred.kind = ParameterConstType(param) == vpiRealConst
+                      ? DataTypeKind::kReal
+                  : param.is_string_value ? DataTypeKind::kString
+                                          : DataTypeKind::kLogic;
+  VpiObject* typespec = TypeParameterTypespec(
+      kWritten ? *param.decl_type : inferred, scope, with.unit, with.build);
+  if (typespec == nullptr || typespec->type != vpiLogicTypespec ||
+      (kWritten && param.decl_type->kind == DataTypeKind::kNamed)) {
+    return typespec;
+  }
+  const int64_t kWidth = obj.var != nullptr ? obj.var->value.width : 1;
+  if (param.has_decl_range_bounds) {
+    typespec->children.push_back(VpiRangeObject(
+        typespec, PackedRange{param.decl_range_left, param.decl_range_right},
+        with.build));
+  } else if (!kWritten && kWidth > 1) {
+    typespec->children.push_back(
+        VpiRangeObject(typespec, PackedRange{kWidth - 1, 0}, with.build));
+  }
+  return typespec;
+}
+
+// §37.28 details 3 and 5 and the figure: the value parameter `param`, standing
+// as `obj` in `at`: the kind of constant its value is, the range it was
+// declared with, the expression its default writes, and the typespec of its
+// type.
+void DescribeValueParameter(VpiObject& obj, const RtlirParamDecl& param,
+                            const ParamScope& at, const ParamAttach& with) {
+  obj.const_type = ParameterConstType(param);
+  if (param.has_decl_range_bounds) {
+    obj.explicit_param_range = true;
+    obj.param_left_range = VpiIntConstant(param.decl_range_left, with.build);
+    obj.param_right_range = VpiIntConstant(param.decl_range_right, with.build);
+  }
+  if (param.default_value != nullptr) {
+    obj.param_default = VpiInstanceExpression(param.default_value, at.objects,
+                                              at.prefix, with.ctx, with.build);
+  }
+  if (VpiObject* typespec = ParameterTypespec(param, obj, at.scope, with)) {
+    obj.children.push_back(typespec);
+  }
+}
+
+// §37.28: the scope a parameter of `param`'s generate block stands in, the
+// block's gen scope (§37.85), keyed under `at.prefix`; `at.scope` for one of
+// the instance itself.
+VpiObject* ParameterScope(const RtlirParamDecl& param, const ParamScope& at) {
+  std::string_view block = param.gen_block_prefix;
+  if (block.empty()) return at.scope;
+  if (block.ends_with('.')) block.remove_suffix(1);
+  return FindObjectForFlatName(at.objects, VpiFlatName(at.prefix, block));
+}
+
+// The parameters of the instance `at` describes, an instance of `mod`, each
+// made the kind of parameter object it is and given the position its
+// declaration was written at.
+void AttachScopeParameters(const RtlirModule* mod, const ParamScope& at,
                            const ParamAttach& with) {
-  VpiObject* scope = FindObjectForFlatName(
-      objects, prefix.empty() ? std::string(mod->name) : prefix);
   for (const RtlirParamDecl& param : mod->params) {
     if (param.is_type_param) {
-      if (scope != nullptr && param.gen_block_prefix.empty()) {
-        MakeTypeParameter(scope, param, with);
+      if (VpiObject* holder = ParameterScope(param, at)) {
+        MakeTypeParameter(holder, param,
+                          param.gen_block_prefix.empty()
+                              ? DeclaredDefaultType(at.decl, param.name)
+                              : nullptr,
+                          with);
       }
       continue;
     }
     VpiObject* obj = FindObjectForFlatName(
-        objects, VpiFlatName(prefix, std::string(param.gen_block_prefix) +
-                                         std::string(param.name)));
+        at.objects, VpiFlatName(at.prefix, std::string(param.gen_block_prefix) +
+                                               std::string(param.name)));
     if (obj == nullptr) continue;
     obj->type = vpiParameter;
     obj->local_param = param.is_localparam;
     VpiRecordWrittenLocation(obj, param.loc, with.ctx);
+    DescribeValueParameter(*obj, param, at, with);
   }
 }
 
@@ -162,7 +271,7 @@ void AttachPackageParameters(const PackageDecl& pkg, VpiObject& scope,
       param.is_localparam = true;
       param.is_type_param = true;
       param.resolved_type = &item->typedef_type;
-      MakeTypeParameter(&scope, param, with);
+      MakeTypeParameter(&scope, param, &item->typedef_type, with);
       continue;
     }
     for (VpiObject* child : scope.children) {
@@ -204,6 +313,24 @@ void AttachDefParams(const RtlirDesign* design, const VpiObjectMap& objects,
       });
 }
 
+// §37.28 detail 4: the parameter `name` of the instance keyed under
+// `instance` among `objects`: a value parameter's object, keyed under its
+// name, or else a type parameter the instance holds; null for none.
+VpiObject* InstanceParameter(const std::string& instance, std::string_view name,
+                             const VpiObjectMap& objects) {
+  if (VpiObject* value =
+          FindObjectForFlatName(objects, VpiFlatName(instance, name))) {
+    return value;
+  }
+  VpiObject* scope = FindObjectForFlatName(objects, instance);
+  if (scope == nullptr) return nullptr;
+  const auto kFound =
+      std::ranges::find_if(scope->children, [name](const VpiObject* child) {
+        return child->type == vpiTypeParameter && child->name == name;
+      });
+  return kFound == scope->children.end() ? nullptr : *kFound;
+}
+
 // §37.11 with §23.10.2: the param assigns of the instance array `array`
 // whose leftmost element is `left`, one per parameter value assignment its
 // instantiation `item` writes, reaching through vpiLhs the parameter of `left`
@@ -221,34 +348,40 @@ void MakeArrayParamAssigns(VpiObject* array, const RtlirModuleInst& left,
     VpiObject* made = with.build.alloc();
     made->type = vpiParamAssign;
     made->parent = array;
-    made->children.push_back(FindObjectForFlatName(
-        with.objects, VpiFlatName(VpiFlatName(prefix, left.inst_name),
-                                  name.empty() ? kOrdered[k] : name)));
+    // §37.28 (figure, vpiConnByName): whether the assignment names its
+    // parameter.
+    made->conn_by_name = !name.empty();
+    if (VpiObject* lhs = InstanceParameter(VpiFlatName(prefix, left.inst_name),
+                                           name.empty() ? kOrdered[k] : name,
+                                           with.objects)) {
+      made->children.push_back(lhs);
+    }
     made->rhs = VpiInstanceExpression(value, with.objects, prefix, with.ctx,
                                       with.build);
     array->children.push_back(made);
   }
 }
 
-// §37.11: the param assigns of each module, interface and program array the
-// instance of `mod` that `prefix` names holds, made from the instantiation
-// its declaration writes for the array.
+// §37.11 and §37.28: the param assigns of each instance, and of each module,
+// interface and program array, the instance of `mod` that `prefix` names
+// holds, made from the instantiation its declaration writes for it.
 void MakeInstanceArrayParamAssigns(const RtlirModule& mod,
                                    const std::string& prefix,
                                    const ParamArrayAttach& with) {
   const ModuleDecl& decl = ElementDeclNamed(with.design, mod.name);
   for (const RtlirModuleInst& left : mod.children) {
-    if (left.array.name.empty() || left.array.index != left.array.left) {
-      continue;
-    }
-    VpiObject* array = VpiInstanceArrayOf(
-        FindObjectForFlatName(with.objects,
-                              VpiFlatName(prefix, left.inst_name)),
-        vpiInstanceArray);
+    const bool kArray = !left.array.name.empty();
+    if (kArray && left.array.index != left.array.left) continue;
+    VpiObject* instance = FindObjectForFlatName(
+        with.objects, VpiFlatName(prefix, left.inst_name));
+    VpiObject* holder =
+        kArray ? VpiInstanceArrayOf(instance, vpiInstanceArray) : instance;
+    if (holder == nullptr) continue;
+    const std::string_view kWritten = kArray ? left.array.name : left.inst_name;
     for (const ModuleItem* item : decl.items) {
       if (item->kind == ModuleItemKind::kModuleInst &&
-          item->inst_name == left.array.name) {
-        MakeArrayParamAssigns(array, left, *item, prefix, with);
+          item->inst_name == kWritten) {
+        MakeArrayParamAssigns(holder, left, *item, prefix, with);
       }
     }
   }
@@ -267,11 +400,15 @@ void AttachParameters(const RtlirDesign* design, const VpiObjectMap& objects,
   // and no type parameter reached a typespec.
   if (design == nullptr) return;
   const ParamAttach kWith{unit_typespecs, build, ctx};
-  WalkInstancePaths(design,
-                    [&](const RtlirModule* mod, const std::string& prefix) {
-                      AttachScopeParameters(mod, prefix, objects, kWith);
-                      AttachScopeSpecParams(mod, prefix, objects);
-                    });
+  WalkInstancePaths(
+      design, [&](const RtlirModule* mod, const std::string& prefix) {
+        VpiObject* scope = FindObjectForFlatName(
+            objects, prefix.empty() ? std::string(mod->name) : prefix);
+        AttachScopeParameters(
+            mod, {scope, prefix, objects, ElementDeclNamed(*design, mod->name)},
+            kWith);
+        AttachScopeSpecParams(mod, prefix, objects);
+      });
   for (const PackageDecl* pkg : design->packages) {
     if (pkg == nullptr) continue;
     VpiObject* scope = FindObjectForFlatName(objects, pkg->name);

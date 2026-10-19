@@ -2,6 +2,7 @@
 
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <vector>
 
 #include "common/arena.h"
@@ -463,6 +464,119 @@ TEST_F(Parameter, NoObjectOrAnotherKindHasNoLhsOrRange) {
   VpiObject constant;
   constant.type = vpiConstant;
   EXPECT_EQ(VpiParameterRightRange(&constant), nullptr);
+}
+
+// The integer value of `obj`, -1 where nothing is written.
+int IntValueOf(vpiHandle obj) {
+  s_vpi_value value = {};
+  value.format = vpiIntVal;
+  value.value.integer = -1;
+  if (obj != nullptr) vpi_get_value(obj, &value);
+  return value.value.integer;
+}
+
+// The type of what `relation` reaches from `ref`, 0 for nothing.
+int KindOf(int relation, vpiHandle ref) {
+  vpiHandle reached = ref == nullptr ? nullptr : vpi_handle(relation, ref);
+  return reached == nullptr ? 0 : vpi_get(vpiType, reached);
+}
+
+constexpr const char* kDescribed =
+    "module m #(parameter int W = 2, parameter type T = int) (); endmodule\n"
+    "module top;\n"
+    "  parameter int P = 5;\n"
+    "  parameter logic [7:0] R = 8'h3c;\n"
+    "  parameter real F = 1.5;\n"
+    "  parameter string S = \"hi\";\n"
+    "  parameter Q = 9;\n"
+    "  parameter type D = byte;\n"
+    "  m #(.W(4)) u();\n"
+    "  m #(6) v();\n"
+    "  if (1) begin : g\n"
+    "    parameter type GT = bit;\n"
+    "  end\n"
+    "endmodule\n";
+
+vpiHandle In(const char* scope, const char* name) {
+  return ChildOf(vpiParameter, vpi_handle_by_name(VpiText(scope), nullptr),
+                 name);
+}
+
+// §37.28 (figure): a value parameter reports through vpiConstType the kind
+// of constant its value is (#7110).
+TEST_F(ParametersOfARun, AValueParameterReportsItsConstType) {
+  Run(kDescribed);
+  EXPECT_EQ(vpi_get(vpiConstType, In("top", "P")), vpiIntConst);
+  EXPECT_EQ(vpi_get(vpiConstType, In("top", "F")), vpiRealConst);
+  EXPECT_EQ(vpi_get(vpiConstType, In("top", "S")), vpiStringConst);
+}
+
+// §37.28 detail 5: a parameter declared with a range reaches its bounds, and
+// one declared with none reaches nothing (#7111).
+TEST_F(ParametersOfARun, AParameterWithARangeReachesItsBounds) {
+  Run(kDescribed);
+  EXPECT_EQ(IntValueOf(vpi_handle(vpiLeftRange, In("top", "R"))), 7);
+  EXPECT_EQ(IntValueOf(vpi_handle(vpiRightRange, In("top", "R"))), 0);
+  EXPECT_EQ(vpi_handle(vpiLeftRange, In("top", "P")), nullptr);
+}
+
+// §37.28 detail 3: vpiExpr of a value parameter reaches its default
+// expression, an override notwithstanding, and of a type parameter the
+// typespec of its default type (#7112, #7113).
+TEST_F(ParametersOfARun, AParameterReachesItsDefault) {
+  Run(kDescribed);
+  EXPECT_EQ(IntValueOf(vpi_handle(vpiExpr, In("top", "P"))), 5);
+  EXPECT_EQ(IntValueOf(vpi_handle(vpiExpr, In("top.u", "W"))), 2);
+  EXPECT_EQ(KindOf(vpiExpr, In("top", "D")), vpiByteTypespec);
+  EXPECT_EQ(KindOf(vpiExpr, In("top.u", "T")), vpiIntTypespec);
+}
+
+// §37.28 (figure) with §6.20.2: a value parameter reaches the typespec of the
+// type it was declared with, with the range it was declared with, and one
+// declared with no type the type of its value (#7109).
+TEST_F(ParametersOfARun, AValueParameterReachesItsTypespec) {
+  Run(kDescribed);
+  EXPECT_EQ(KindOf(vpiTypespec, In("top", "P")), vpiIntTypespec);
+  EXPECT_EQ(KindOf(vpiTypespec, In("top", "F")), vpiRealTypespec);
+  EXPECT_EQ(KindOf(vpiTypespec, In("top", "S")), vpiStringTypespec);
+  vpiHandle of_r = vpi_handle(vpiTypespec, In("top", "R"));
+  ASSERT_NE(of_r, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, of_r), vpiLogicTypespec);
+  vpiHandle ranges = vpi_iterate(vpiRange, of_r);
+  ASSERT_NE(ranges, nullptr);
+  EXPECT_EQ(IntValueOf(vpi_handle(vpiLeftRange, vpi_scan(ranges))), 7);
+  vpiHandle of_q = vpi_handle(vpiTypespec, In("top", "Q"));
+  ASSERT_NE(of_q, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, of_q), vpiLogicTypespec);
+  EXPECT_NE(vpi_iterate(vpiRange, of_q), nullptr);
+}
+
+// §37.28: a type parameter declared in a generate block is a type parameter
+// of the block's gen scope (#7108).
+TEST_F(ParametersOfARun, AGenerateBlocksTypeParameterIsItsOwn) {
+  Run(kDescribed);
+  vpiHandle gt = In("top.g", "GT");
+  ASSERT_NE(gt, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, gt), vpiTypeParameter);
+  EXPECT_EQ(KindOf(vpiTypespec, gt), vpiBitTypespec);
+}
+
+// §37.28 detail 4 and the figure: an instance holds a param assign per value
+// its parameter value assignment gives, reaching the parameter it assigns
+// and the value, and saying whether it names the parameter (#7114).
+TEST_F(ParametersOfARun, AnInstanceHoldsItsParamAssigns) {
+  Run(kDescribed);
+  for (const auto& [scope, value, by_name] :
+       {std::tuple{"top.u", 4, 1}, std::tuple{"top.v", 6, 0}}) {
+    vpiHandle it = vpi_iterate(vpiParamAssign,
+                               vpi_handle_by_name(VpiText(scope), nullptr));
+    ASSERT_NE(it, nullptr) << scope;
+    vpiHandle assign = vpi_scan(it);
+    ASSERT_NE(assign, nullptr) << scope;
+    EXPECT_STREQ(vpi_get_str(vpiName, vpi_handle(vpiLhs, assign)), "W");
+    EXPECT_EQ(IntValueOf(vpi_handle(vpiRhs, assign)), value) << scope;
+    EXPECT_EQ(vpi_get(vpiConnByName, assign), by_name) << scope;
+  }
 }
 
 }  // namespace
