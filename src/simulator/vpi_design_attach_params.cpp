@@ -128,12 +128,11 @@ const DataType* DeclaredDefaultType(const ModuleDecl& decl,
     const DataType& type = decl.param_types[i];
     return type.kind == DataTypeKind::kImplicit ? nullptr : &type;
   }
-  for (const ModuleItem* item : decl.items) {
-    if (item->kind == ModuleItemKind::kParamDecl && item->name == name) {
-      return &item->typedef_type;
-    }
-  }
-  return nullptr;
+  const auto kItem =
+      std::ranges::find_if(decl.items, [name](const ModuleItem* item) {
+        return item->kind == ModuleItemKind::kParamDecl && item->name == name;
+      });
+  return kItem == decl.items.end() ? nullptr : &(*kItem)->typedef_type;
 }
 
 // §37.28 (figure, vpiConstType): the kind of constant the value of `param`
@@ -324,19 +323,17 @@ void AttachDefParams(const RtlirDesign* design, const VpiObjectMap& objects,
 }
 
 // §37.28 detail 4: the parameter `name` of the instance keyed under
-// `instance` among `objects`: a value parameter's object, keyed under its
-// name, or else a type parameter the instance holds; null for none.
+// `instance` among `objects`, a value or a type parameter it holds; null for
+// none.
 VpiObject* InstanceParameter(const std::string& instance, std::string_view name,
                              const VpiObjectMap& objects) {
-  if (VpiObject* value =
-          FindObjectForFlatName(objects, VpiFlatName(instance, name))) {
-    return value;
-  }
   VpiObject* scope = FindObjectForFlatName(objects, instance);
   if (scope == nullptr) return nullptr;
   const auto kFound =
       std::ranges::find_if(scope->children, [name](const VpiObject* child) {
-        return child->type == vpiTypeParameter && child->name == name;
+        const bool kParameter =
+            child->type == vpiParameter || child->type == vpiTypeParameter;
+        return kParameter && child->name == name;
       });
   return kFound == scope->children.end() ? nullptr : *kFound;
 }
