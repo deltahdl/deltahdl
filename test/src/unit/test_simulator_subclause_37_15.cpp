@@ -565,5 +565,41 @@ TEST_F(RefObjsBelowAGenerateBlock, AnInterfacePortReachesThePortBelowTheBlock) {
             VpiObjectOf(inner));
 }
 
+// The ref objs of a run whose connections name the interface by a full path
+// from the top (§23.6): `top.i` and `top.i.initiator` written in top itself,
+// and `top.i` written in a module below it.
+class RefObjsOfFullPathConnections : public RefObjRun {
+ protected:
+  void SetUp() override {
+    RefObjRun::SetUp();
+    Run("interface simple (); logic req, gnt;\n"
+        "  modport initiator (input gnt, output req);\n"
+        "endinterface\n"
+        "module child(simple s); endmodule\n"
+        "module mid; child i3(top.i); endmodule\n"
+        "module top; simple i();\n"
+        "  child i1(top.i); child i2(top.i.initiator); mid md();\n"
+        "endmodule\n");
+  }
+};
+
+// D2 with §23.6: a connection naming the interface by a full path from the
+// top, in top or in a module below it, is a ref obj bound to the instance the
+// path reaches, or to the modport it selects (#7350).
+TEST_F(RefObjsOfFullPathConnections, AFullPathConnectionIsARefObj) {
+  for (const char* inst : {"top.i1", "top.md.i3"}) {
+    vpiHandle high = ConnOf(vpiHighConn, inst, "s");
+    ASSERT_NE(high, nullptr) << inst;
+    EXPECT_EQ(vpi_get(vpiType, high), vpiRefObj) << inst;
+    EXPECT_EQ(VpiObjectOf(vpi_handle(vpiActual, high)),
+              VpiObjectOf(By("top.i")))
+        << inst;
+  }
+  vpiHandle i2 = ConnOf(vpiHighConn, "top.i2", "s");
+  ASSERT_NE(i2, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, i2), vpiRefObj);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiActual, i2)), ModportOfI("initiator"));
+}
+
 }  // namespace
 }  // namespace delta

@@ -137,9 +137,11 @@ std::string InstanceNameOf(const Expr* head) {
 // that port's ref obj; where it names an interface instance, `i`, or an
 // element of an array of them, `ia[1]`, a ref obj bound to that instance; and
 // where it selects a modport of either, `s.initiator`, a ref obj bound to the
-// modport that is a subelement of the first (detail 4). Null for a connection
-// of any other shape or that selects no modport, a hierarchical name, each
-// left the expression it is.
+// modport that is a subelement of the first (detail 4). §23.6: an instance
+// named by a path the elaborator keeps whole, `top.i` written in a module
+// below top, is found by that path from the design's root once the writer's
+// scope reaches nothing by it. Null for a connection of any other shape or
+// that selects no modport, each left the expression it is.
 VpiObject* InterfaceHighConn(const Expr* conn, const ConnectionSite& site) {
   const bool kSelects = conn->kind == ExprKind::kMemberAccess;
   const Expr* head = kSelects ? conn->lhs : conn;
@@ -150,8 +152,14 @@ VpiObject* InterfaceHighConn(const Expr* conn, const ConnectionSite& site) {
     VpiObject* instance =
         head->kind == ExprKind::kIdentifier
             ? VpiGenBlockExpression(head, site.names, site.ctx, site.build)
-            : FindObjectForFlatName(site.names.objects,
-                                    VpiFlatName(site.names.prefix, kName));
+            : nullptr;
+    if (instance == nullptr) {
+      instance = FindObjectForFlatName(site.names.objects,
+                                       VpiFlatName(site.names.prefix, kName));
+    }
+    if (instance == nullptr) {
+      instance = FindObjectForFlatName(site.names.objects, kName);
+    }
     base = MakeRefObj(kName, VpiScopedFullName(site.writer, kName), site.writer,
                       instance, site.build);
   }
