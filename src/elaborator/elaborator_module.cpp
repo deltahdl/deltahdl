@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstdint>
 #include <cstdlib>
 #include <format>
@@ -95,6 +96,23 @@ static bool ExplicitPortExprSigned(const Expr* expr, const RtlirModule* mod) {
   return false;
 }
 
+// §11.4.12 and §11.5.1: whether an explicit port expression is 4-state. A
+// select is of the object it selects from, and a concatenation is 4-state
+// where any of its operands is; a name is of the variable it names, and a net
+// or anything else the module declares no variable for is taken as 4-state.
+static bool ExplicitPortExprIs4state(const Expr* expr, const RtlirModule* mod) {
+  while (expr->kind == ExprKind::kSelect) expr = expr->base;
+  if (expr->kind == ExprKind::kConcatenation) {
+    return std::ranges::any_of(expr->elements, [&](const Expr* el) {
+      return ExplicitPortExprIs4state(el, mod);
+    });
+  }
+  for (const auto& v : mod->variables) {
+    if (v.name == expr->text) return v.is_4state;
+  }
+  return true;
+}
+
 // §23.2.2.3: apply the self-determined type of each explicitly named port's
 // connection expression to the resolved port. The referenced declarations live
 // in the module body, so this runs after the items have been elaborated.
@@ -115,7 +133,9 @@ static void ResolveExplicitPortTypes(const ModuleDecl* decl, RtlirModule* mod,
       if (rp.name != src.name) continue;
       rp.port_expr = src.port_expr;
       if (w == 0) break;
-      rp.type_kind = DataTypeKind::kLogic;
+      rp.type_kind = ExplicitPortExprIs4state(src.port_expr, mod)
+                         ? DataTypeKind::kLogic
+                         : DataTypeKind::kBit;
       rp.width = w;
       rp.is_signed = ExplicitPortExprSigned(src.port_expr, mod);
       break;

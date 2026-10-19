@@ -672,5 +672,26 @@ TEST_F(PortsOfARun, APortReachesTheTypespecOfItsType) {
   EXPECT_STREQ(vpi_get_str(vpiName, h), "six_t");
 }
 
+// §37.14 (figure) with §11.4.12 and §11.5.1: a port whose expression reads
+// only 2-state variables reaches a bit typespec, and one that reads a net or a
+// 4-state variable a logic one (#7346).
+TEST_F(PortsOfARun, APortOverTwoStateObjectsReachesABitTypespec) {
+  Run("module sub(output .p({x, y}), output .q(n[1:0]), output .s(y[1]),\n"
+      "           output .t({x, v}));\n"
+      "  bit x; bit [1:0] y; wire [2:0] n; logic [2:0] v;\n"
+      "endmodule\n"
+      "module top; wire [2:0] a; wire [1:0] b; wire c; wire [3:0] d;\n"
+      "  sub u(.p(a), .q(b), .s(c), .t(d));\n"
+      "endmodule\n");
+  for (const auto& [name, kind] :
+       std::vector<std::pair<const char*, int>>{{"p", vpiBitTypespec},
+                                                {"q", vpiLogicTypespec},
+                                                {"s", vpiBitTypespec},
+                                                {"t", vpiLogicTypespec}}) {
+    ASSERT_NE(PortOfU(name), nullptr) << name;
+    EXPECT_EQ(TypespecKindOf(PortOfU(name)), kind) << name;
+  }
+}
+
 }  // namespace
 }  // namespace delta

@@ -484,8 +484,9 @@ void RelateVariableTypespecs(const RtlirModule& mod,
 // the module `decl` declares, written as an expression, made by `maker` and
 // hung from the port's object `object`. Where the expression is the name of an
 // object a body port declaration declares, it is the type that declaration
-// wrote; otherwise a logic vector of the expression's width and signedness
-// (§11.5.1, §11.4.12), one of no range for a single bit.
+// wrote; otherwise a vector of the expression's width and signedness, bit
+// where the port's type is bit and logic otherwise (§11.5.1, §11.4.12), one of
+// no range for a single bit.
 VpiObject* ExprPortTypespec(const RtlirPort& port, const ModuleDecl& decl,
                             TypespecMaker& maker, VpiObject* object) {
   if (port.port_expr->kind == ExprKind::kIdentifier) {
@@ -496,7 +497,8 @@ VpiObject* ExprPortTypespec(const RtlirPort& port, const ModuleDecl& decl,
     }
   }
   DataType vector;
-  vector.kind = DataTypeKind::kLogic;
+  vector.kind = port.type_kind == DataTypeKind::kBit ? DataTypeKind::kBit
+                                                     : DataTypeKind::kLogic;
   vector.is_signed = port.is_signed;
   std::vector<VpiTypespecDim> dims;
   if (port.width > 1) {

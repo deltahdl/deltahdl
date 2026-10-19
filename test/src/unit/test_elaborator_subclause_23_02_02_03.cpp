@@ -92,6 +92,26 @@ TEST(PortKindDataTypeDirection, ExplicitPortTakesExpressionDataType) {
   EXPECT_EQ(ports[1].width, 6u);
 }
 
+// §23.2.2.3 with §11.4.12: an explicitly named port over a concatenation of
+// 2-state variables takes the 2-state type the concatenation has, and one
+// reading a 4-state operand the 4-state type (#7346).
+TEST(PortKindDataTypeDirection, ExplicitPortOverTwoStateObjectsIsBit) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m(output .p({x, y}), output .q({x, z}));\n"
+      "  bit x; bit [1:0] y; logic z;\n"
+      "endmodule",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto& ports = design->top_modules[0]->ports;
+  ASSERT_EQ(ports.size(), 2u);
+  EXPECT_EQ(ports[0].type_kind, DataTypeKind::kBit);
+  EXPECT_EQ(ports[0].width, 3u);
+  EXPECT_EQ(ports[1].type_kind, DataTypeKind::kLogic);
+  EXPECT_EQ(ports[1].width, 2u);
+}
+
 TEST(PortKindDataTypeDirection, VarFirstPortDefaultedToInoutIsRejected) {
   // §23.2.2.3 (LRM example mh4): a first port declared only with var omits the
   // direction, which defaults to inout. An inout port may not carry a variable
