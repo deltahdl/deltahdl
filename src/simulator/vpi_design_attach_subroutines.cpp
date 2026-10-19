@@ -6,6 +6,7 @@
 
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
+#include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -57,6 +58,17 @@ struct SubroutineBuild {
 bool IsSubroutine(const ModuleItem* item) {
   return item->kind == ModuleItemKind::kTaskDecl ||
          item->kind == ModuleItemKind::kFunctionDecl;
+}
+
+// §8.24: whether `item` is the body of a method written outside its class,
+// `C::name`, for a class `mod` declares. It defines a method of the class
+// (§37.31 detail 1) and declares no task or function of the module. A body a
+// module writes for a task of an interface port, `a.name` (§25.7.3), is the
+// module's own.
+bool DefinesClassMethod(const RtlirModule& mod, const ModuleItem* item) {
+  return std::ranges::any_of(mod.class_decls, [item](const ClassDecl* decl) {
+    return decl->name == item->method_class;
+  });
 }
 
 // Whether `item` is a task or function one of `mod`'s generate blocks
@@ -293,7 +305,9 @@ void MakeScopeSubroutines(const SubroutineBuild& sb, const RtlirModule& mod,
   const bool kAutomatic = ElementDeclNamed(sb.design, mod.name).is_automatic;
   const std::string kParams = prefix.empty() ? "" : prefix + ".";
   for (const ModuleItem* item : mod.function_decls) {
-    if (DeclaredInGenerateBlock(mod, item)) continue;
+    if (DeclaredInGenerateBlock(mod, item) || DefinesClassMethod(mod, item)) {
+      continue;
+    }
     MakeSubroutine({scope, prefix, kAutomatic, &mod, kParams}, item, sb);
   }
   for (const RtlirGenBlockSubroutine& sub : mod.gen_block_subroutines) {
@@ -326,7 +340,11 @@ void MakePackageSubroutines(const SubroutineBuild& sb,
                                  "",
                                  pkg};
     for (const ModuleItem* item : pkg->items) {
-      if (IsSubroutine(item)) MakeSubroutine(kWhere, item, sb);
+      // §8.24: a package names no interface port, so a body written `C::name`
+      // in it is a method of its class C.
+      if (IsSubroutine(item) && item->method_class.empty()) {
+        MakeSubroutine(kWhere, item, sb);
+      }
     }
   }
 }
@@ -340,6 +358,8 @@ void MakeUnitSubroutines(const SubroutineBuild& sb,
   const SubroutineScope kWhere{unit == objects.end() ? nullptr : unit->second,
                                "$unit", false, nullptr, ""};
   for (const ModuleItem* item : sb.design.cu_function_decls) {
+    // §8.24: as in a package, a body written `C::name` is a method of C.
+    if (!item->method_class.empty()) continue;
     MakeSubroutine(kWhere, item, sb)->in_compilation_unit = true;
   }
 }

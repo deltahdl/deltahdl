@@ -113,6 +113,30 @@ void MakeUnitClassDefns(const RtlirDesign& design, const VpiObjectMap& objects,
   }
 }
 
+// §37.31 with §8.23: the class defns of the classes the classes `made` holds
+// declare, each hung from the defn of the class declaring it, which reaches
+// it through vpiInternalScope, full-named through that class as its members
+// are (§37.10 detail 5), and standing where that class does. None is a class
+// of the compilation unit's own, which a NULL reference reaches. A class
+// nested in a nested class is made in turn, as `made` grows.
+void MakeNestedClassDefns(const VpiAttachBuild& build,
+                          std::vector<MadeClassDefn>& made) {
+  for (std::size_t i = 0; i < made.size(); ++i) {
+    for (const ClassMember* member : made[i].decl->members) {
+      if (member->kind != ClassMemberKind::kClassDecl) continue;
+      const MadeClassDefn kOuter = made[i];
+      MakeClassDefn(kOuter.defn, member->nested_class, kOuter.prefix, build,
+                    made);
+      MadeClassDefn& nested = made.back();
+      nested.defn->full_name =
+          kOuter.defn->full_name + "::" + std::string(nested.decl->name);
+      nested.attrs = kOuter.attrs;
+      nested.mod = kOuter.mod;
+      nested.package = kOuter.package;
+    }
+  }
+}
+
 // The package a qualified class name such as `pkg::Base` names, and the class
 // it names in it; an unqualified name names no package.
 struct ClassReference {
@@ -221,18 +245,22 @@ int PropertyKind(const DataType& type, const RtlirDesign& design,
 }
 
 // §37.31 detail 1 with §37.17: the variable a property of the class stands
-// as, static or automatic, of the kind its type takes and an array var where
-// it declares unpacked dimensions, whose indices the caller records.
+// as, static or automatic, of the kind its type takes, and where it declares
+// unpacked dimensions, whose indices the caller records, a named event array
+// for an array of events (§37.27) and an array var for any other.
 // Detail 25 full-names a static property through its class defn, and gives an
 // automatic one no full name.
 VpiObject* MakeProperty(const MadeClassDefn& owner, const ClassMember& member,
                         const RtlirDesign& design,
                         const std::vector<MadeClassDefn>& made,
                         const VpiAttachBuild& build) {
+  const int kKind = PropertyKind(member.data_type, design, made);
   VpiObject* var = build.alloc();
-  var->type = member.unpacked_dims.empty()
-                  ? PropertyKind(member.data_type, design, made)
-                  : vpiArrayVar;
+  if (member.unpacked_dims.empty()) {
+    var->type = kKind;
+  } else {
+    var->type = kKind == vpiNamedEvent ? vpiNamedEventArray : vpiArrayVar;
+  }
   var->name = build.keep(std::string(member.name));
   var->full_name = VpiClassMemberFullName(member.is_static, "",
                                           owner.defn->full_name, member.name);
@@ -263,6 +291,44 @@ void MakeMethod(const MadeClassDefn& owner, const ClassMember& member,
   // §37.3.3: where the method was written.
   VpiRecordWrittenLocation(method, item->loc, ctx);
   owner.defn->children.push_back(method);
+}
+
+// §37.31 detail 7 with §37.28: the parameter `name` of the class `owner` was
+// made for, hung from its class defn and full-named through it as its methods
+// are (§37.41 detail 5), a type parameter where `type` says so, and reporting
+// vpiLocalParam as `local` says.
+void MakeParameter(const MadeClassDefn& owner, std::string_view name, bool type,
+                   bool local, const VpiAttachBuild& build) {
+  VpiObject* param = build.alloc();
+  param->type = type ? vpiTypeParameter : vpiParameter;
+  param->name = build.keep(std::string(name));
+  param->full_name = owner.defn->full_name + "::" + std::string(name);
+  param->parent = owner.defn;
+  param->local_param = local;
+  owner.defn->children.push_back(param);
+}
+
+// §37.31 detail 7: the parameters of the class `owner` was made for, those of
+// its parameter port list, local where the list declares them localparam, and
+// then those its body declares, every one of them local. A body's type
+// parameter is one the parser carries as a typedef where it is a localparam,
+// and as a parameter member of no data type where it is not.
+void MakeParameters(const MadeClassDefn& owner, const VpiAttachBuild& build) {
+  const ClassDecl& decl = *owner.decl;
+  for (const auto& param : decl.params) {
+    MakeParameter(owner, param.first,
+                  decl.type_param_names.contains(param.first),
+                  decl.localparam_port_names.contains(param.first), build);
+  }
+  for (const ClassMember* member : decl.members) {
+    if (member->kind == ClassMemberKind::kProperty && member->is_param) {
+      MakeParameter(owner, member->name,
+                    member->data_type.kind == DataTypeKind::kVoid, true, build);
+    } else if (member->kind == ClassMemberKind::kTypedef &&
+               member->typedef_item->is_localparam) {
+      MakeParameter(owner, member->name, true, true, build);
+    }
+  }
 }
 
 // A property made as a class var, which reaches the class typespec it was
@@ -401,12 +467,14 @@ VpiClassDefnObjects AttachClassDefinitions(const RtlirDesign* design,
   MakeInstanceClassDefns(*design, objects, build, made);
   MakePackageClassDefns(*design, objects, build, made);
   MakeUnitClassDefns(*design, objects, build, made);
+  MakeNestedClassDefns(build, made);
   for (const MadeClassDefn& owner : made) {
     // §37.3.3: where the class was written.
     VpiRecordWrittenLocation(owner.defn, owner.decl->range.start, ctx);
     // §37.83: the attributes the class is written with.
     VpiAttachAttributes(owner.defn, VpiNodeAttributes(owner.attrs, owner.decl),
                         false, ctx, build);
+    MakeParameters(owner, build);
     const std::vector<ClassVarProperty> kOwnClassVars =
         MakeMembers(owner, *design, made, ctx, build);
     class_vars.insert(class_vars.end(), kOwnClassVars.begin(),

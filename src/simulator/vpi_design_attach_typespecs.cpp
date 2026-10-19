@@ -11,6 +11,7 @@
 #include "common/types.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
+#include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -474,6 +475,30 @@ void MakeGenBlockTypespecs(const RtlirModule& mod, VpiObject* instance,
   }
 }
 
+// §37.31: the typedefs the class `decl` declares are typespecs its class defn
+// `defn` reaches through vpiTypedef, full-named through the class as its
+// methods are (§37.41 detail 5), and found under `prefix`, the key of the
+// scope declaring the class. A body's `localparam type`, which the parser
+// carries as a typedef, is a parameter of the class (detail 7) instead.
+void MakeClassTypespecs(const ClassDecl& decl, VpiObject* defn,
+                        const std::string& prefix,
+                        const DesignTypespecs& design,
+                        const VpiObjectMap& answered) {
+  std::vector<ModuleItem*> typedefs;
+  for (const ClassMember* member : decl.members) {
+    if (member->kind == ClassMemberKind::kTypedef &&
+        !member->typedef_item->is_localparam) {
+      typedefs.push_back(member->typedef_item);
+    }
+  }
+  const std::vector<RtlirImport> kNoImports;
+  const TypespecsByName kMade = MakeTypespecs(
+      typedefs, {defn, prefix, nullptr, answered, kNoImports, design});
+  for (const auto& [name, typespec] : kMade) {
+    typespec->full_name = defn->full_name + "::" + std::string(name);
+  }
+}
+
 }  // namespace
 
 VpiObject* VpiImportedTypespec(std::string_view name,
@@ -529,6 +554,9 @@ VpiObjectMap AttachTypespecs(const RtlirDesign* design,
         MakeGenBlockTypespecs(*mod, scope, prefix, kDesign, answered);
         RelateVariableTypespecs(*mod, {kLocal, kUnit, objects, kAt});
       });
+  for (const auto& [key, defn] : classes) {
+    MakeClassTypespecs(*key.first, defn, key.second, kDesign, answered);
+  }
   return answered;
 }
 

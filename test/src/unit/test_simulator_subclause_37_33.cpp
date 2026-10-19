@@ -508,6 +508,19 @@ TEST_F(ClassObjectsOfARun, AClassVarReachesTheObjectItsValueNames) {
   EXPECT_EQ(vpi_get64(vpiObjId, z), 0);
 }
 
+// (#7121) A class obj's array of events is a named event array of it, and no
+// variable of it.
+TEST_F(ClassObjectsOfARun, AClassObjsEventArrayIsANamedEventArray) {
+  Run("module top;\n"
+      "  class A; event ea[2]; int ia[2]; endclass\n"
+      "  A a = new;\n"
+      "endmodule\n");
+  vpiHandle obj = vpi_handle(vpiClassObj, By("top.a"));
+  ASSERT_NE(obj, nullptr);
+  EXPECT_EQ(NamesOf(vpiNamedEventArray, obj), std::vector<std::string>{"ea"});
+  EXPECT_EQ(NamesOf(vpiVariables, obj), std::vector<std::string>{"ia"});
+}
+
 // Detail 6: a class obj's variables are the object's properties, so a value
 // put to one is the property's value, and a static property's is every
 // object's of the class (§8.9).

@@ -38,10 +38,14 @@ namespace {
 
 // §37.17 with §8.3: the kind of variable a property declared as `member` is,
 // a class var where its type names a class the run knows, a package's through
-// its scope by the "p::P" key the run holds it under (§26.3), and an array var
-// where it declares unpacked dimensions.
+// its scope by the "p::P" key the run holds it under (§26.3), and where it
+// declares unpacked dimensions, a named event array for an array of events
+// (§37.33 with §37.27) and an array var for any other.
 int PropertyVariableKind(const ClassMember& member, SimContext& ctx) {
-  if (!member.unpacked_dims.empty()) return vpiArrayVar;
+  if (!member.unpacked_dims.empty()) {
+    return member.data_type.kind == DataTypeKind::kEvent ? vpiNamedEventArray
+                                                         : vpiArrayVar;
+  }
   const DataType& type = member.data_type;
   const std::string kKey =
       type.scope_name.empty()

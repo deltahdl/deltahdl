@@ -461,10 +461,117 @@ TEST_F(ClassDefinitionsOfARun, AVirtualMethodReportsVpiVirtual) {
   EXPECT_EQ(vpi_get(vpiVirtual, Named(vpiMethods, defn, "id")), 0);
 }
 
+// (#7124) A class defn reaches the typespecs of its typedefs through
+// vpiTypedef, each full-named through the class, and none for a body's
+// localparam type, which is a parameter of the class (detail 7).
+TEST_F(ClassDefinitionsOfARun, AClassDefnIteratesItsTypedefs) {
+  Run("module top; class C; typedef int T; localparam type U = byte;\n"
+      "  typedef logic [3:0] N; int x; endclass endmodule\n");
+  vpiHandle defn = DefnIn(By("top"), "C");
+  EXPECT_EQ(NamesOf(vpiTypedef, defn), (std::vector<std::string>{"T", "N"}));
+  vpiHandle t = Named(vpiTypedef, defn, "T");
+  ASSERT_NE(t, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, t), vpiIntTypespec);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, t), "top.C::T");
+}
+
+// Detail 7 (#7122): a class defn iterates the parameters of its parameter
+// port list, local where the list declares them localparam, and then those
+// of its body, every one of them local, type parameters among them.
+TEST_F(ClassDefinitionsOfARun, AClassDefnIteratesItsParameters) {
+  Run("module top; class C #(int W = 4, type T = int, localparam int L = 2);\n"
+      "  parameter int P = 1; localparam type U = T; int x; endclass\n"
+      "  class D; parameter type V = byte; endclass endmodule\n");
+  vpiHandle c = DefnIn(By("top"), "C");
+  EXPECT_EQ(NamesOf(vpiParameter, c),
+            (std::vector<std::string>{"W", "T", "L", "P", "U"}));
+  const auto kTypeOf = [&](std::string_view name) {
+    return vpi_get(vpiType, Named(vpiParameter, c, name));
+  };
+  const auto kLocalOf = [&](std::string_view name) {
+    return vpi_get(vpiLocalParam, Named(vpiParameter, c, name));
+  };
+  EXPECT_EQ(kTypeOf("W"), vpiParameter);
+  EXPECT_EQ(kTypeOf("T"), vpiTypeParameter);
+  EXPECT_EQ(kTypeOf("P"), vpiParameter);
+  EXPECT_EQ(kTypeOf("U"), vpiTypeParameter);
+  EXPECT_EQ(kLocalOf("W"), 0);
+  EXPECT_EQ(kLocalOf("T"), 0);
+  EXPECT_EQ(kLocalOf("L"), 1);
+  EXPECT_EQ(kLocalOf("P"), 1);
+  EXPECT_EQ(kLocalOf("U"), 1);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, Named(vpiParameter, c, "W")),
+               "top.C::W");
+  vpiHandle v = Named(vpiParameter, DefnIn(By("top"), "D"), "V");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, v), vpiTypeParameter);
+  EXPECT_EQ(vpi_get(vpiLocalParam, v), 1);
+}
+
+// Detail 1 (#7121): a class's array of events is a named event array of its
+// defn, and no variable of it, beside its event and its array of ints.
+TEST_F(ClassDefinitionsOfARun, AClassDefnIteratesItsNamedEventArrays) {
+  Run("module top; class C; event e; event ea[2]; int ia[2]; endclass\n"
+      "endmodule\n");
+  vpiHandle defn = DefnIn(By("top"), "C");
+  EXPECT_EQ(NamesOf(vpiNamedEventArray, defn), std::vector<std::string>{"ea"});
+  EXPECT_EQ(NamesOf(vpiNamedEvent, defn), std::vector<std::string>{"e"});
+  EXPECT_EQ(NamesOf(vpiVariables, defn), std::vector<std::string>{"ia"});
+}
+
+// (#7342) A class declared in a class is a class defn the outer one reaches
+// through vpiInternalScope, full-named through it, with its own members, and
+// none a NULL reference reaches for a class of the compilation unit.
+TEST_F(ClassDefinitionsOfARun, ANestedClassIsAnInternalScopeOfItsClass) {
+  Run("class U; class UN; endclass endclass\n"
+      "module top; class C; class N; int k; class M; endclass endclass\n"
+      "  int x; endclass endmodule\n");
+  vpiHandle c = DefnIn(By("top"), "C");
+  EXPECT_EQ(NamesOf(vpiInternalScope, c), std::vector<std::string>{"N"});
+  vpiHandle n = Named(vpiInternalScope, c, "N");
+  ASSERT_NE(n, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, n), vpiClassDefn);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, n), "top.C::N");
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiScope, n)), VpiObjectOf(c));
+  EXPECT_EQ(NamesOf(vpiVariables, n), std::vector<std::string>{"k"});
+  vpiHandle m = Named(vpiInternalScope, n, "M");
+  ASSERT_NE(m, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, m), "top.C::N::M");
+  EXPECT_EQ(NamesOf(vpiClassDefn, nullptr), std::vector<std::string>{"U"});
+}
+
 // §37.31 detail 2: a named event array a class defn hands back is one of the
 // value-bearing objects the value-access restriction is about.
 TEST(ClassDefnValueAccess, ANamedEventArrayIsValueBearing) {
   EXPECT_TRUE(VpiIsClassMemberValueType(vpiNamedEventArray));
+}
+
+// Detail 1 with §8.24 (#7341): a method body written outside its class is a
+// method of the class, and no task of the module or package it is written in,
+// beside a task the scope declares of its own.
+TEST_F(ClassDefinitionsOfARun, AnOutOfBlockMethodIsNoTaskOfItsScope) {
+  Run("package pk; class P; extern task pout(); endclass\n"
+      "  task P::pout(); endtask task pt; endtask endpackage\n"
+      "module top; class C; extern task outside(); endclass\n"
+      "  task C::outside(); endtask task own; endtask endmodule\n");
+  EXPECT_EQ(NamesOf(vpiTaskFunc, By("top")), std::vector<std::string>{"own"});
+  EXPECT_EQ(NamesOf(vpiMethods, DefnIn(By("top"), "C")),
+            std::vector<std::string>{"outside"});
+  EXPECT_EQ(NamesOf(vpiTaskFunc, By("pk")), std::vector<std::string>{"pt"});
+}
+
+// ...nor of the compilation unit, for a class the unit declares.
+TEST_F(ClassDefinitionsOfARun, AnOutOfBlockMethodIsNoTaskOfTheUnit) {
+  Run("int g;\n"
+      "class U; extern task uout(); endclass\n"
+      "task U::uout(); endtask\n"
+      "task ut; endtask\n"
+      "module top; endmodule\n");
+  vpiHandle it = vpi_iterate(vpiPackage, nullptr);
+  ASSERT_NE(it, nullptr);
+  vpiHandle unit = vpi_scan(it);
+  vpi_release_handle(it);
+  EXPECT_EQ(NamesOf(vpiTaskFunc, unit), std::vector<std::string>{"ut"});
 }
 }  // namespace
 }  // namespace delta
