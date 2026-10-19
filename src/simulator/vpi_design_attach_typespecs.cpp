@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -378,6 +379,30 @@ const ModuleDecl* ElementNamed(const CompilationUnit& unit,
   return nullptr;
 }
 
+// One instance of `mod` at `prefix`: its object and the module, interface or
+// program the compilation unit declares it from.
+using InstanceDeclVisit =
+    std::function<void(const RtlirModule& mod, const std::string& prefix,
+                       VpiObject* instance, const ModuleDecl& decl)>;
+
+// Visits each instance of the design whose module, interface or program
+// `unit` declares, `ctx`'s instance prefix set to the instance's own so that
+// the dimensions its declarations write evaluate there.
+void WalkInstanceDecls(const RtlirDesign* design, const CompilationUnit& unit,
+                       const VpiObjectMap& objects, SimContext& ctx,
+                       const InstanceDeclVisit& visit) {
+  WalkInstancePaths(
+      design, [&](const RtlirModule* mod, const std::string& prefix) {
+        VpiObject* instance = FindObjectForFlatName(
+            objects, prefix.empty() ? std::string(mod->name) : prefix);
+        const ModuleDecl* decl = ElementNamed(unit, mod->name);
+        if (decl == nullptr) return;
+        InstancePrefixOverride in_instance(ctx.InstancePrefixOverride(),
+                                           prefix.empty() ? "" : prefix + ".");
+        visit(*mod, prefix, instance, *decl);
+      });
+}
+
 // §37.17: the typespec of the typedef a variable declared with the type
 // `written` was declared with, its own scope's or else the compilation unit's;
 // null where its type names no typedef either declares.
@@ -612,19 +637,15 @@ VpiObjectMap AttachTypespecs(const RtlirDesign* design,
   for (const PackageDecl* pkg : design->packages) {
     AnswerPackageTypespecs(*pkg, objects, kDesign, answered);
   }
-  WalkInstancePaths(
-      design, [&](const RtlirModule* mod, const std::string& prefix) {
-        VpiObject* scope = FindObjectForFlatName(
-            objects, prefix.empty() ? std::string(mod->name) : prefix);
-        const ModuleDecl* decl = ElementNamed(unit, mod->name);
-        if (decl == nullptr) return;
-        InstancePrefixOverride in_instance(ctx.InstancePrefixOverride(),
-                                           prefix.empty() ? "" : prefix + ".");
-        const ScopeTypespecs kAt{scope,    prefix,       &mod->enum_types,
-                                 answered, mod->imports, kDesign};
-        const TypespecsByName kLocal = MakeTypespecs(decl->items, kAt);
-        MakeGenBlockTypespecs(*mod, scope, prefix, kDesign, answered);
-        RelateVariableTypespecs(*mod, {kLocal, kUnit, objects, kAt});
+  WalkInstanceDecls(
+      design, unit, objects, ctx,
+      [&](const RtlirModule& mod, const std::string& prefix, VpiObject* scope,
+          const ModuleDecl& decl) {
+        const ScopeTypespecs kAt{scope,    prefix,      &mod.enum_types,
+                                 answered, mod.imports, kDesign};
+        const TypespecsByName kLocal = MakeTypespecs(decl.items, kAt);
+        MakeGenBlockTypespecs(mod, scope, prefix, kDesign, answered);
+        RelateVariableTypespecs(mod, {kLocal, kUnit, objects, kAt});
       });
   for (const auto& [key, defn] : classes) {
     MakeClassTypespecs(*key.first, defn, key.second, kDesign, answered);
@@ -639,19 +660,14 @@ void AttachPortTypespecs(const RtlirDesign* design, const VpiObjectMap& objects,
   // vpiTypespec, which reached nothing for every port.
   VpiTypespecShapes shapes(build);
   const DesignTypespecs kDesign{build, ctx, shapes, calls.classes, objects};
-  WalkInstanceObjects(
-      design, objects,
-      [&](const RtlirModule* mod, const std::string& prefix,
-          VpiObject* instance) {
-        const ModuleDecl* decl =
-            ElementNamed(*design->compilation_unit, mod->name);
-        if (decl == nullptr) return;
-        InstancePrefixOverride in_instance(ctx.InstancePrefixOverride(),
-                                           prefix.empty() ? "" : prefix + ".");
-        RelatePortTypespecs(*mod, *decl,
-                            {instance, prefix, &mod->enum_types,
-                             calls.unit_typespecs, mod->imports, kDesign});
-      });
+  WalkInstanceDecls(design, *design->compilation_unit, objects, ctx,
+                    [&](const RtlirModule& mod, const std::string& prefix,
+                        VpiObject* instance, const ModuleDecl& decl) {
+                      RelatePortTypespecs(
+                          mod, decl,
+                          {instance, prefix, &mod.enum_types,
+                           calls.unit_typespecs, mod.imports, kDesign});
+                    });
 }
 
 }  // namespace delta
