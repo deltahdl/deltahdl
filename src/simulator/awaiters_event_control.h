@@ -317,6 +317,8 @@ struct EventAwaiter {
     auto* proc = target.proc;
     const Expr* iff_cond = ev.iff_condition;
     const bool kAfterObserved = target.after_observed;
+    // §37.27 detail 1: the process waits on the event until it resumes.
+    if (proc) proc->waiting_on_events.push_back(var);
     var->AddWatcher([h, iff_cond, woke = ev, proc, ctx_ptr, consumed,
                      kAfterObserved]() mutable {
       if (proc && !proc->active) return true;
@@ -409,8 +411,7 @@ struct EventAwaiter {
     // that the first to fire retires the rest, even when several operands name
     // the same signal (e.g. `posedge clk or negedge clk`).
     auto consumed = std::make_shared<bool>(false);
-    if (proc) proc->woken_by = EventExpr{};
-    if (proc) proc->waiting_on_events.clear();
+    ForgetWaits(proc);
     for (const auto& ev : events) {
       if (!ev.signal) continue;
       // §9.4.2.4: a sequence instance is one operand among the others, its
@@ -433,11 +434,18 @@ struct EventAwaiter {
       }
       if (var->is_event) {
         AttachEventVarWatcher(var, ev, h, ResumeTarget{ctx, proc}, consumed);
-        if (proc) proc->waiting_on_events.push_back(var);
         continue;
       }
       AttachEdgeVarWatcher(var, ev, h, ResumeTarget{ctx, proc}, consumed);
     }
+  }
+
+  // What `proc` last woke on and the events it waited on, forgotten as it
+  // suspends again (§37.27 detail 1).
+  static void ForgetWaits(Process* proc) {
+    if (proc == nullptr) return;
+    proc->woken_by = EventExpr{};
+    proc->waiting_on_events.clear();
   }
 
   // §37.27 detail 1: a resumed process waits on no event any longer.

@@ -514,8 +514,12 @@ struct InstanceTypespecs {
         FindObjectForFlatName(objects, VpiFlatName(at.prefix, name));
     if (obj == nullptr || written == nullptr) return;
     TypespecMaker maker(at, local);
-    if (written->kind != DataTypeKind::kNamed &&
-        VpiIsVariablesType(obj->type)) {
+    // §37.27: a named event and an event array reach theirs as a variable
+    // does.
+    const bool kTyped = VpiIsVariablesType(obj->type) ||
+                        obj->type == vpiNamedEvent ||
+                        obj->type == vpiNamedEventArray;
+    if (written->kind != DataTypeKind::kNamed && kTyped) {
       static const std::vector<Expr*> kNoDims;
       typespec = maker.Of(*written, dims != nullptr ? *dims : kNoDims,
                           std::string_view{}, obj);
