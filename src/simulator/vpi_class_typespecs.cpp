@@ -112,9 +112,9 @@ VpiObject* DefnOfClass(const VpiClassDefnObjects& defns,
   const auto kOwn = defns.find({type.decl, std::string(scope)});
   if (kOwn != defns.end()) return kOwn->second;
   const auto kFirst = defns.lower_bound({type.decl, std::string()});
-  return kFirst != defns.end() && kFirst->first.first == type.decl
-             ? kFirst->second
-             : nullptr;
+  const bool kOfDecl =
+      kFirst != defns.end() && kFirst->first.first == type.decl;
+  return kOfDecl ? kFirst->second : nullptr;
 }
 
 // The built-in classes §37.32's vpiClassType names, by the name each is
