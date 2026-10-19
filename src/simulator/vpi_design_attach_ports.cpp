@@ -85,10 +85,11 @@ void ConnectLowConns(VpiHandle module, const std::string& instance,
 VpiObject* ModportNamed(VpiHandle target, std::string_view name) {
   if (target == nullptr) return nullptr;
   VpiHandle iface = target->type == vpiModport ? target->parent : target;
-  for (VpiObject* child : iface->children) {
-    if (child->type == vpiModport && child->name == name) return child;
-  }
-  return nullptr;
+  const auto kFound =
+      std::ranges::find_if(iface->children, [&](VpiHandle child) {
+        return child->type == vpiModport && child->name == name;
+      });
+  return kFound == iface->children.end() ? nullptr : *kFound;
 }
 
 // A ref obj named `name` and `full_name`, held by `parent` and bound to
