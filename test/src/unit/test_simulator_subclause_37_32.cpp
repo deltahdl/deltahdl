@@ -437,6 +437,41 @@ TEST_F(ClassTypespecsOfARun, AnExtendsClausesTypespecAssignsWhatItWrites) {
             (std::vector<std::pair<std::string, int>>{{"W", 4}, {"V", 5}}));
 }
 
+// §37.32 detail 1: the type of a variable no class defn contains is a class
+// specialization, so a module's class var reaches the typespec of the one it
+// was declared as, with its class's members (#7372).
+TEST_F(ClassTypespecsOfARun, AModulesClassVarIsOfItsSpecialization) {
+  Run(kSpecializations);
+  vpiHandle typespec = vpi_handle(vpiClassTypespec, By("top.b3"));
+  ASSERT_NE(typespec, nullptr);
+  EXPECT_EQ(IntValueOf(Named(vpiParameter, typespec, "W")), 3);
+  EXPECT_EQ(NamesOf(vpiVariables, typespec), (std::vector<std::string>{"x"}));
+}
+
+// §37.32 detail 3: a type an extends clause gives a type parameter, or the
+// default type one was declared with, is assigned as a typespec of that type
+// (#7371).
+TEST_F(ClassTypespecsOfARun, AnExtendsClausesTypeIsAssignedItsTypespec) {
+  Run("module top;\n"
+      "  class B2 #(type T = int, int N = 1); endclass\n"
+      "  class F extends B2 #(byte); endclass\n"
+      "  class G extends B2; endclass\n"
+      "endmodule\n");
+  const auto kAssigned = [](const char* derived) {
+    std::vector<int> kinds;
+    vpiHandle typespec = vpi_handle(
+        vpiClassTypespec,
+        vpi_handle(vpiExtends, Named(vpiClassDefn, By("top"), derived)));
+    for (vpiHandle assign : ObjectsOf(vpiParamAssign, typespec)) {
+      vpiHandle rhs = vpi_handle(vpiRhs, assign);
+      kinds.push_back(rhs == nullptr ? 0 : vpi_get(vpiType, rhs));
+    }
+    return kinds;
+  };
+  EXPECT_EQ(kAssigned("F"), (std::vector<int>{vpiByteTypespec, vpiConstant}));
+  EXPECT_EQ(kAssigned("G"), (std::vector<int>{vpiIntTypespec, vpiConstant}));
+}
+
 // §37.32: the typespec of a mailbox's and a semaphore's class obj reports the
 // built-in class it stands for (#7126).
 TEST_F(ClassTypespecsOfARun, ABuiltInClassReportsItsClassType) {

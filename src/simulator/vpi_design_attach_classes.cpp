@@ -452,20 +452,26 @@ VpiObject* VpiNamedClassDefn(const VpiClassDefnObjects& defns,
 
 namespace {
 
-// §37.33 detail 5: the class typespec the class var `var` was declared with,
-// the class type written `written`, reaching the class defn VpiNamedClassDefn
-// finds for it from the scope keyed under `prefix`.
+// §37.33 detail 5 and §37.32 detail 1: the class typespec the class var
+// `var` was declared with, the class type written `written`, whose class defn
+// is `defn`: the typespec of the class specialization `specialization` names,
+// where `defn` holds one, the type of a variable no class defn contains being
+// a specialization; and otherwise one of its own, reaching `defn`.
 void AttachDeclaredClassTypespec(VpiObject* var, std::string_view written,
-                                 const VpiClassDefnObjects& defns,
-                                 const std::string& prefix,
+                                 VpiObject* defn,
+                                 std::string_view specialization,
                                  const VpiAttachBuild& build) {
+  VpiObject* held = nullptr;
+  if (defn != nullptr) held = VpiSpecializationTypespec(*defn, specialization);
+  if (held != nullptr) {
+    var->children.push_back(held);
+    return;
+  }
   VpiObject* typespec = build.alloc();
   typespec->type = vpiClassTypespec;
   typespec->name = build.keep(std::string(SplitClassReference(written).name));
   typespec->parent = var;
-  if (VpiObject* defn = VpiNamedClassDefn(defns, written, prefix)) {
-    typespec->children.push_back(defn);
-  }
+  if (defn != nullptr) typespec->children.push_back(defn);
   var->children.push_back(typespec);
 }
 
@@ -532,9 +538,11 @@ VpiClassDefnObjects AttachClassDefinitions(const RtlirDesign* design,
   // from the scope declaring the class whose property it is. None was made,
   // so vpiClassTypespec of such a property was null.
   for (const ClassVarProperty& property : class_vars) {
+    const std::string kWritten =
+        WrittenClassType(property.member->data_type, *design);
     AttachDeclaredClassTypespec(
-        property.var, WrittenClassType(property.member->data_type, *design),
-        defns, property.owner->prefix, build);
+        property.var, kWritten,
+        VpiNamedClassDefn(defns, kWritten, property.owner->prefix), {}, build);
   }
   VpiAttachClassSpecializations(defns, ctx, build);
   return defns;
@@ -542,7 +550,7 @@ VpiClassDefnObjects AttachClassDefinitions(const RtlirDesign* design,
 
 void AttachClassVarTypespecs(const RtlirDesign* design,
                              const VpiObjectMap& objects,
-                             const VpiClassDefnObjects& defns,
+                             const VpiClassDefnObjects& defns, SimContext& ctx,
                              const VpiAttachBuild& build) {
   // §37.33 detail 5: a class var reaches the class typespec it was declared
   // with, whatever class the object it references was created as. None was
@@ -553,8 +561,10 @@ void AttachClassVarTypespecs(const RtlirDesign* design,
           VpiObject* obj =
               FindObjectForFlatName(objects, VpiFlatName(prefix, var.name));
           if (obj == nullptr || obj->type != vpiClassVar) continue;
-          AttachDeclaredClassTypespec(obj, var.class_type_name, defns, prefix,
-                                      build);
+          AttachDeclaredClassTypespec(
+              obj, var.class_type_name,
+              VpiNamedClassDefn(defns, var.class_type_name, prefix),
+              ctx.GetVariableClassType(VpiFlatName(prefix, var.name)), build);
         }
       });
 }

@@ -341,7 +341,8 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
                      *sim_ctx_, kBuild);
     AttachAttributes(design, object_map_, *sim_ctx_, kBuild);
     call_objects_.design = design;
-    AttachClassVarTypespecs(design, object_map_, call_objects_.classes, kBuild);
+    AttachClassVarTypespecs(design, object_map_, call_objects_.classes,
+                            *sim_ctx_, kBuild);
     call_objects_.subroutines =
         AttachSubroutines(*design, object_map_, *sim_ctx_, kBuild);
     AttachVariableRanges(*design, object_map_, *sim_ctx_, kBuild);

@@ -117,6 +117,35 @@ VpiObject* DefnOfClass(const VpiClassDefnObjects& defns,
   return kOfDecl ? kFirst->second : nullptr;
 }
 
+// §37.32 detail 3: a typespec of the type `type` writes as a keyword, of that
+// keyword's kind; null for a type written as a name, whose typespec is made
+// after the class defns are (#7374).
+VpiObject* KeywordTypespec(const DataType& type, const VpiAttachBuild& build) {
+  const int kKind = VpiTypespecKind(type.kind);
+  if (kKind == 0) return nullptr;
+  VpiObject* typespec = build.alloc();
+  typespec->type = kKind;
+  return typespec;
+}
+
+// §37.32 detail 3: what a lexical typespec's param assign reaches through
+// vpiRhs: the expression `actual` writes for a value parameter, or the
+// typespec of the type it writes for a type parameter; where it writes none,
+// the default expression `declared` of a value parameter, or the typespec of
+// the default type `declared_type` of a type parameter.
+VpiObject* AssignedValue(
+    const DataType* actual, const Expr* declared, const DataType* declared_type,
+    const std::function<VpiObject*(const Expr*)>& expression,
+    const VpiAttachBuild& build) {
+  if (actual != nullptr) {
+    return actual->type_ref_expr != nullptr ? expression(actual->type_ref_expr)
+                                            : KeywordTypespec(*actual, build);
+  }
+  if (declared != nullptr) return expression(declared);
+  if (declared_type == nullptr) return nullptr;
+  return KeywordTypespec(*declared_type, build);
+}
+
 // The built-in classes §37.32's vpiClassType names, by the name each is
 // declared with in the std package (§15.3, §15.4, §9.7).
 constexpr std::array<std::pair<std::string_view, int>, 3> kBuiltinClasses{{
@@ -166,7 +195,8 @@ void VpiMakeExtendsParamAssigns(
     const VpiAttachBuild& build) {
   const VpiObject& base_defn = *typespec->children.front();
   std::size_t ordered = 0;
-  for (const auto& [name, declared] : base.params) {
+  for (std::size_t i = 0; i < base.params.size(); ++i) {
+    const auto& [name, declared] = base.params[i];
     if (base.localparam_port_names.contains(name)) continue;
     const DataType* actual =
         WrittenActual(derived.base_class_type_params, name, ordered++);
@@ -176,8 +206,10 @@ void VpiMakeExtendsParamAssigns(
     assign->type = vpiParamAssign;
     assign->parent = typespec;
     assign->children.push_back(param);
-    const Expr* value = actual != nullptr ? actual->type_ref_expr : declared;
-    assign->rhs = value != nullptr ? expression(value) : nullptr;
+    assign->rhs = AssignedValue(
+        actual, declared,
+        i < base.param_types.size() ? &base.param_types[i] : nullptr,
+        expression, build);
     typespec->children.push_back(assign);
   }
 }

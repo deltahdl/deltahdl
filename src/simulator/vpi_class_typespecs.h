@@ -50,8 +50,9 @@ VpiObject* VpiSpecializationTypespec(const VpiObject& defn,
 // one per parameter of `base`'s parameter port list a value may be given,
 // reaching it through vpiLhs and, through vpiRhs, the expression `expression`
 // makes of the value the clause gives it, by name or in order, or else of the
-// default it was declared with. A type the clause gives, or a type
-// parameter's default, has no expression and is reached by none.
+// default it was declared with; for a type parameter, a typespec of the type
+// the clause gives, or of its default type, where that is written as a
+// keyword (a named type's is #7374).
 void VpiMakeExtendsParamAssigns(
     VpiObject* typespec, const ClassDecl& derived, const ClassDecl& base,
     const std::function<VpiObject*(const Expr*)>& expression,

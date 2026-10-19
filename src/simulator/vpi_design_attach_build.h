@@ -343,12 +343,14 @@ VpiObjectMap AttachTypespecs(const RtlirDesign* design,
                              const VpiClassDefnObjects& classes,
                              SimContext& ctx, const VpiAttachBuild& build);
 
-// §37.33 detail 5: give each class var an instance declares the class typespec
-// of the class it was declared with, reaching that class's defn among `defns`
-// where one was made.
+// §37.33 detail 5 and §37.32 detail 1: give each class var an instance
+// declares the class typespec of the class it was declared with: the typespec
+// of the class specialization the run `ctx` gave it, which that class's defn
+// among `defns` holds, and otherwise one reaching that defn where one was
+// made.
 void AttachClassVarTypespecs(const RtlirDesign* design,
                              const VpiObjectMap& objects,
-                             const VpiClassDefnObjects& defns,
+                             const VpiClassDefnObjects& defns, SimContext& ctx,
                              const VpiAttachBuild& build);
 
 // §37.17 details 4 and 6, §37.22: give each variable of the design its range
