@@ -402,6 +402,72 @@ TEST_F(TimingChecksOfARun, EveryLimitOfACheckIsADelay) {
   EXPECT_TRUE(DelaysOf(width, 2).empty());
 }
 
+// Whether vpi_get_delays refuses to read `count` delays off `tchk`.
+bool RefusesDelays(vpiHandle tchk, int count) {
+  s_vpi_time times[2] = {};
+  s_vpi_delay delays = {};
+  delays.da = times;
+  delays.no_of_delays = count;
+  delays.time_type = vpiSimTime;
+  vpi_get_delays(tchk, &delays);
+  s_vpi_error_info info = {};
+  return vpi_chk_error(&info) != 0;
+}
+
+// §37.40 (figure) with §38.10: a $nochange is written with no limit, its two
+// edge offsets being none (§31.4.6), so vpi_get_delays refuses every count
+// for it, none included, while a check of one limit is read with one alone.
+TEST_F(TimingChecksOfARun, ANochangeHasNoDelaysToRead) {
+  Run("module m(input clk, input d);\n"
+      "  specify\n"
+      "    $nochange(posedge clk, d, 2, 3);\n"
+      "    $hold(posedge clk, d, 5);\n"
+      "  endspecify\n"
+      "endmodule\n"
+      "module top; reg clk, d; m m1(clk, d); endmodule\n");
+  vpiHandle nochange = CheckOfType(vpiNoChange, By("top.m1"));
+  ASSERT_NE(nochange, nullptr);
+  EXPECT_TRUE(RefusesDelays(nochange, 0));
+  EXPECT_TRUE(RefusesDelays(nochange, 1));
+  EXPECT_TRUE(RefusesDelays(nochange, 2));
+  vpiHandle hold = CheckOfType(vpiHold, By("top.m1"));
+  ASSERT_NE(hold, nullptr);
+  EXPECT_TRUE(RefusesDelays(hold, 0));
+  EXPECT_FALSE(RefusesDelays(hold, 1));
+}
+
+// The vpiEdge of the term `relation` reaches off `tchk`; -1 for none.
+int EdgeOf(int relation, vpiHandle tchk) {
+  vpiHandle term = vpi_handle(relation, tchk);
+  return term == nullptr ? -1 : vpi_get(vpiEdge, term);
+}
+
+// §37.40 (figure) with §31.5: a tchk term whose event was written with an
+// edge-control specifier reports through vpiEdge the transitions its list
+// names and no others, one vpiEdge bit each, a z standing for x; an event
+// written with a bare edge names every transition.
+TEST_F(TimingChecksOfARun, ATchkTermReportsTheTransitionsItsEventLists) {
+  Run("module m(input clk, input d);\n"
+      "  specify\n"
+      "    $setup(d, edge [01, 0x] clk, 1);\n"
+      "    $hold(edge [10, z0] clk, edge d, 1);\n"
+      "    $width(edge [x1, 1x] clk, 2);\n"
+      "  endspecify\n"
+      "endmodule\n"
+      "module top; reg clk, d; m m1(clk, d); endmodule\n");
+  vpiHandle setup = CheckOfType(vpiSetup, By("top.m1"));
+  ASSERT_NE(setup, nullptr);
+  EXPECT_EQ(EdgeOf(vpiTchkRefTerm, setup), vpiEdge01 | vpiEdge0x);
+  EXPECT_EQ(EdgeOf(vpiTchkDataTerm, setup), vpiNoEdge);
+  vpiHandle hold = CheckOfType(vpiHold, By("top.m1"));
+  ASSERT_NE(hold, nullptr);
+  EXPECT_EQ(EdgeOf(vpiTchkRefTerm, hold), vpiEdge10 | vpiEdgex0);
+  EXPECT_EQ(EdgeOf(vpiTchkDataTerm, hold), vpiAnyEdge);
+  vpiHandle width = CheckOfType(vpiWidth, By("top.m1"));
+  ASSERT_NE(width, nullptr);
+  EXPECT_EQ(EdgeOf(vpiTchkRefTerm, width), vpiEdgex1 | vpiEdge1x);
+}
+
 // What `tchk`'s vpiExpr iteration returns, in order: the type of each, with
 // the name it reports, or for a constant the value it holds.
 std::vector<std::pair<int, std::string>> ArgumentsOf(vpiHandle tchk) {

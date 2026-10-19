@@ -330,7 +330,9 @@ bool VpiNoOfDelaysLegal(int type, int n, size_t available) {
   // §37.47 with §10.3.3: a continuous assignment's delays are a gate's, a
   // rise, a fall and a turn-off.
   if (type == vpiContAssign) return n == 2 || n == 3;
-  if (type == vpiTchk) return n == static_cast<int>(available);
+  // §37.40: a timing check's delays are its limits, and a check written with
+  // none, a $nochange, has none to read, so no count is legal for it.
+  if (type == vpiTchk) return available > 0 && n == static_cast<int>(available);
   // §37.68: a delay control waits one delay.
   if (type == vpiDelayControl) return n == 1;
   return false;

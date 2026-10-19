@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <cstdarg>
 #include <cstdint>
@@ -575,28 +576,68 @@ static int VpiTchkTypeOf(TimingCheckKind kind) {
   }
 }
 
+// §31.5: one transition an edge_descriptor names, its levels as
+// TimingCheckEntry folds them to '0', '1' and 'x', and the vpiEdge bit
+// Annex K.2 gives it.
+struct VpiEdgeTransition {
+  char from;
+  char to;
+  int bit;
+};
+
+constexpr std::array<VpiEdgeTransition, 6> kVpiEdgeTransitions = {{
+    {'0', '1', vpiEdge01},
+    {'1', '0', vpiEdge10},
+    {'0', 'x', vpiEdge0x},
+    {'x', '1', vpiEdgex1},
+    {'1', 'x', vpiEdge1x},
+    {'x', '0', vpiEdgex0},
+}};
+
+// §37.40 (figure) with §31.5: the vpiEdge of a timing check event written with
+// `edge` and, where it wrote an edge_control_specifier, the transitions
+// `descriptors` lists - those transitions alone, one bit each, rather than
+// every edge a bare `edge` names.
+static int VpiTchkEventEdgeOf(
+    SpecifyEdge edge, const std::vector<std::pair<char, char>>& descriptors) {
+  if (descriptors.empty()) return VpiEventEdgeOf(edge);
+  int mask = vpiNoEdge;
+  for (const auto& [from, to] : descriptors) {
+    for (const VpiEdgeTransition& transition : kVpiEdgeTransitions) {
+      if (transition.from == from && transition.to == to)
+        mask |= transition.bit;
+    }
+  }
+  return mask;
+}
+
 // §37.40 (figure): one of the check's two event terms - the tchk term the
 // vpiTchkRefTerm and vpiTchkDataTerm relations reach. Its own properties are
 // the event's: the edge it was written with (vpiEdge) and the signal it names.
 static VpiObject* MakeTchkTerm(VpiObject* term, std::string_view signal,
-                               SpecifyEdge edge, VpiObject* tchk,
+                               int edge, VpiObject* tchk,
                                std::deque<std::string>& names) {
   term->type = vpiTchkTerm;
   names.emplace_back(signal);
   term->name = names.back();
-  term->edge = VpiEventEdgeOf(edge);
+  term->edge = edge;
   term->parent = tchk;
   tchk->children.push_back(term);
   return term;
 }
 
-// §31.2: whether a check of `kind` is written with two timing_check_limits, a
-// $setuphold's setup and hold limits, a $recrem's recovery and removal limits
-// and a $fullskew's two. $width's threshold and $nochange's edge offsets are
-// no limits (§31.4.4, §31.4.6), so every other check has one.
-static bool HasTwoLimits(TimingCheckKind kind) {
+// §31.2: how many timing_check_limits a check of `kind` is written with - two
+// for a $setuphold's setup and hold limits, a $recrem's recovery and removal
+// limits and a $fullskew's two, none for a $nochange, whose edge offsets are
+// no limits (§31.4.6, A.7.5.1), and one for every other check, $width's
+// threshold being no limit either (§31.4.4).
+static int LimitCountOf(TimingCheckKind kind) {
+  if (kind == TimingCheckKind::kNochange) return 0;
   return kind == TimingCheckKind::kSetuphold ||
-         kind == TimingCheckKind::kRecrem || kind == TimingCheckKind::kFullskew;
+                 kind == TimingCheckKind::kRecrem ||
+                 kind == TimingCheckKind::kFullskew
+             ? 2
+             : 1;
 }
 
 // §37.40 (figure): one limit of the check `tchk`, `ticks` long, which
@@ -696,16 +737,21 @@ void VpiContext::AttachTimingChecks(SimContext& sim_ctx) {
 
     // §37.40 (figure): "-> limit", retrieved with vpi_get_delays(), which
     // §38.10 has read as many delays as the check has limits.
-    AddTchkLimit(obj, check.limit);
-    if (HasTwoLimits(check.kind)) AddTchkLimit(obj, check.limit2);
+    const int kLimits = LimitCountOf(check.kind);
+    if (kLimits > 0) AddTchkLimit(obj, check.limit);
+    if (kLimits > 1) AddTchkLimit(obj, check.limit2);
 
-    obj->tchk_ref_term = MakeTchkTerm(AllocObject(), check.ref_signal,
-                                      check.ref_edge, obj, name_pool_);
+    obj->tchk_ref_term = MakeTchkTerm(
+        AllocObject(), check.ref_signal,
+        VpiTchkEventEdgeOf(check.ref_edge, check.ref_edge_descriptors), obj,
+        name_pool_);
     // Detail 1: the data term denotes the data_event where the check has one; a
     // check written without one has no data signal and so no term.
     if (!check.data_signal.empty()) {
-      obj->tchk_data_term = MakeTchkTerm(AllocObject(), check.data_signal,
-                                         check.data_edge, obj, name_pool_);
+      obj->tchk_data_term = MakeTchkTerm(
+          AllocObject(), check.data_signal,
+          VpiTchkEventEdgeOf(check.data_edge, check.data_edge_descriptors), obj,
+          name_pool_);
     }
 
     // §37.40 (figure): the notifier the check toggles, which is a register of
