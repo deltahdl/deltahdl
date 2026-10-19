@@ -49,16 +49,13 @@ VpiHandle VpiThreadFrame(VpiHandle thread) {
 }
 
 bool VpiTryResolveThreadRelation(int type, VpiHandle ref, VpiHandle& out) {
-  if (ref->type != vpiThread) return false;
-  if (type == vpiParent) {
-    out = VpiThreadParent(ref);
-  } else if (type == vpiOrigin) {
-    out = VpiThreadOrigin(ref);
-  } else if (type == vpiFrame) {
-    out = VpiThreadFrame(ref);
-  } else {
+  if (ref->type != vpiThread ||
+      (type != vpiParent && type != vpiOrigin && type != vpiFrame)) {
     return false;
   }
+  if (type == vpiParent) out = VpiThreadParent(ref);
+  if (type == vpiOrigin) out = VpiThreadOrigin(ref);
+  if (type == vpiFrame) out = VpiThreadFrame(ref);
   return true;
 }
 

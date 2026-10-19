@@ -68,17 +68,16 @@ VpiHandle VpiContext::ThreadObjectFor(Process* proc) {
   // well, so a thread reached through its frame reaches it; the link is the
   // one RefreshThreadObjects makes.
   if (sim_ctx_ != nullptr) {
-    for (Process* forking : sim_ctx_->GetScheduler().Threads()) {
-      if (std::ranges::find(forking->children, proc) ==
-          forking->children.end()) {
-        continue;
-      }
+    const std::vector<Process*>& threads = sim_ctx_->GetScheduler().Threads();
+    auto forking = std::ranges::find_if(threads, [proc](const Process* p) {
+      return std::ranges::find(p->children, proc) != p->children.end();
+    });
+    if (forking != threads.end()) {
       g_making_forking_thread = true;
-      VpiHandle parent = ThreadObjectFor(forking);
+      VpiHandle parent = ThreadObjectFor(*forking);
       g_making_forking_thread = !kBeginning;
       obj->parent = parent;
       parent->children.push_back(obj);
-      break;
     }
   }
   // §37.3.8: a thread is one of the transient objects callbacks can follow
@@ -121,17 +120,13 @@ void VpiContext::RefreshRunObjects() {
 void VpiContext::RefreshThreadObjects() {
   if (sim_ctx_ == nullptr) return;
   for (Process* proc : sim_ctx_->GetScheduler().Threads()) {
-    VpiHandle obj = ThreadObjectFor(proc);
+    ThreadObjectFor(proc);
     // §37.44 (thread one-to-many thread): the threads this one spawned, which
-    // detail 1 counts as threads, being branches of a fork. They hang off the
-    // parent as its thread children, which is where VpiThreadThreads reads them
-    // and where VpiThreadParent reads the link back.
-    for (Process* child : proc->children) {
-      VpiHandle child_obj = ThreadObjectFor(child);
-      if (child_obj->parent != nullptr) continue;
-      child_obj->parent = obj;
-      obj->children.push_back(child_obj);
-    }
+    // detail 1 counts as threads, being branches of a fork. Each hangs off this
+    // one as its thread child as ThreadObjectFor makes it, which is where
+    // VpiThreadThreads reads them and where VpiThreadParent reads the link
+    // back.
+    for (Process* child : proc->children) ThreadObjectFor(child);
   }
 }
 
