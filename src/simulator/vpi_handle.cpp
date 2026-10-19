@@ -914,10 +914,12 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
   // matches, its (possibly null) result is the answer; otherwise the lookup
   // falls through to the generic traversal.
   // §37.48 detail 3: what a block a virtual interface var prefixes is now.
-  VpiRefreshPrefixedClockingBlock(type, *ref, sim_ctx_,
-                                  [this](const std::string& scope) {
-                                    return HandleByName(scope.c_str(), nullptr);
-                                  });
+  // §37.29: what a virtual interface var refers to now.
+  const auto kByName = [this](const std::string& scope) {
+    return HandleByName(scope.c_str(), nullptr);
+  };
+  VpiRefreshPrefixedClockingBlock(type, *ref, sim_ctx_, kByName);
+  VpiRefreshVirtualInterfaceActual(type, *ref, sim_ctx_, kByName);
   VpiHandle designated = nullptr;
   const auto kClassObjectOf = [this](VpiObject& var) {
     return ClassObjectOf(var);

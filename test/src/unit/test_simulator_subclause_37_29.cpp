@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
@@ -304,6 +305,81 @@ TEST_F(VirtualInterface, ExprPassesOverAChildOfAnotherKind) {
   vif.children = {&typespec, &iface};
 
   EXPECT_EQ(VpiVirtualInterfaceExpr(&vif), &iface);
+}
+
+// §37.29 against a design read and run whole.
+class VirtualInterfaceVarsOfARun : public VpiDesignRun {
+ protected:
+  // The virtual interface var `name` the class obj top.c holds.
+  static vpiHandle ObjectsVar(const char* name) {
+    return Named(vpiVirtualInterfaceVar, vpi_handle(vpiClassObj, By("top.c")),
+                 name);
+  }
+};
+
+constexpr const char* kVirtualInterfaces =
+    "interface SBus; logic req; modport phy(input req); endinterface\n"
+    "class C;\n"
+    "  virtual SBus cv;\n"
+    "  virtual SBus.phy cp;\n"
+    "  function new(virtual SBus b); cv = b; endfunction\n"
+    "endclass\n"
+    "module top;\n"
+    "  SBus bus();\n"
+    "  virtual SBus v = bus;\n"
+    "  virtual SBus.phy p;\n"
+    "  virtual SBus w;\n"
+    "  C c;\n"
+    "  initial begin w = bus; c = new(bus); end\n"
+    "endmodule\n";
+
+// §37.29 with §37.30: a module's virtual interface var reaches through
+// vpiTypespec the interface typespec of the type it was declared with, a
+// modport's for one naming a modport (#7115).
+TEST_F(VirtualInterfaceVarsOfARun, AVarReachesItsInterfaceTypespec) {
+  Run(kVirtualInterfaces);
+  vpiHandle of_v = vpi_handle(vpiTypespec, By("top.v"));
+  ASSERT_NE(of_v, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, of_v), vpiInterfaceTypespec);
+  EXPECT_STREQ(vpi_get_str(vpiDefName, of_v), "SBus");
+  vpiHandle of_p = vpi_handle(vpiTypespec, By("top.p"));
+  ASSERT_NE(of_p, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiDefName, of_p), "phy");
+  EXPECT_EQ(vpi_get(vpiIsModPort, of_p), 1);
+}
+
+// §37.29: a virtual interface var of a modport's type reports vpiIsModPort
+// TRUE, in a module and in a class obj alike, and one of an interface's
+// FALSE (#7117).
+TEST_F(VirtualInterfaceVarsOfARun, AVarOfAModportTypeIsAModport) {
+  Run(kVirtualInterfaces);
+  EXPECT_EQ(vpi_get(vpiIsModPort, By("top.p")), 1);
+  EXPECT_EQ(vpi_get(vpiIsModPort, By("top.v")), 0);
+  EXPECT_EQ(vpi_get(vpiIsModPort, ObjectsVar("cp")), 1);
+  EXPECT_EQ(vpi_get(vpiIsModPort, ObjectsVar("cv")), 0);
+}
+
+// §37.29 detail 1: vpiExpr reaches the interface instance a declaration
+// assigns, and nothing for one it assigns none (#7118).
+TEST_F(VirtualInterfaceVarsOfARun, AnInitializedVarReachesItsInstance) {
+  Run(kVirtualInterfaces);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, By("top.v"))),
+            VpiObjectOf(By("top.bus")));
+  EXPECT_EQ(vpi_handle(vpiExpr, By("top.w")), nullptr);
+}
+
+// §37.29 example 2: vpiActual reaches the interface instance a var refers to
+// once it is assigned one, in a module and in a class obj, and nothing for one
+// never assigned (#7116).
+TEST_F(VirtualInterfaceVarsOfARun, AnAssignedVarReachesWhatItRefersTo) {
+  Run(kVirtualInterfaces);
+  vpiHandle bus = By("top.bus");
+  ASSERT_NE(bus, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiActual, By("top.w"))), VpiObjectOf(bus));
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiActual, By("top.v"))), VpiObjectOf(bus));
+  EXPECT_EQ(vpi_handle(vpiActual, By("top.p")), nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiActual, ObjectsVar("cv"))),
+            VpiObjectOf(bus));
 }
 
 }  // namespace

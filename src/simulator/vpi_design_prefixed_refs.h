@@ -19,6 +19,15 @@ VpiObject* VpiVirtualInterfaceClockingBlock(
     VpiObject* holder, std::string_view written,
     const std::function<VpiObject*()>& alloc, const VpiNameKeeper& keep);
 
+// §37.29: where `type` is vpiActual and `ref` a virtual interface var holding
+// a value in the run `ctx`, sets its actual to what it refers to now: the
+// interface instance the handle it holds names, found by its name through
+// `by_name`, and null while it holds none. Leaves any other object, or one with
+// no run or no value, as it is.
+void VpiRefreshVirtualInterfaceActual(
+    int type, VpiObject& ref, SimContext* ctx,
+    const std::function<VpiObject*(const std::string&)>& by_name);
+
 // §37.48 detail 3: where `type` is vpiActual and `ref` a clocking block a
 // virtual interface var prefixes, sets its actual to what it stands for now:
 // the block of its name the interface instance the var holds in the run `ctx`

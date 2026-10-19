@@ -54,6 +54,12 @@ VpiHandle VpiVirtualInterfaceExpr(VpiHandle var) {
   // so a child of an interface-expr kind that fails the detail-2 constraint is
   // not an interface expr and is not handed back.
   if (!var || var->type != vpiVirtualInterfaceVar) return nullptr;
+  // The declaration's own assignment, where it wrote one.
+  VpiObject* init = var->decl_facts.init_expr;
+  if (init != nullptr && VpiIsInterfaceExprType(init->type) &&
+      VpiInterfaceExprIsValid(init)) {
+    return init;
+  }
   for (auto* child : var->children) {
     if (VpiIsInterfaceExprType(child->type) && VpiInterfaceExprIsValid(child)) {
       return child;

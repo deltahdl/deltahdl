@@ -110,6 +110,18 @@ VpiObject* PrefixedClockingBlockActual(
 
 }  // namespace
 
+void VpiRefreshVirtualInterfaceActual(
+    int type, VpiObject& ref, SimContext* ctx,
+    const std::function<VpiObject*(const std::string&)>& by_name) {
+  if (type != vpiActual || ref.type != vpiVirtualInterfaceVar ||
+      ref.var == nullptr || ctx == nullptr) {
+    return;
+  }
+  const std::string_view kScope =
+      ctx->VirtualInterfaceScope(ref.var->value.ToUint64());
+  ref.actual = kScope.empty() ? nullptr : by_name(std::string(kScope));
+}
+
 void VpiRefreshPrefixedClockingBlock(
     int type, VpiObject& ref, SimContext* ctx,
     const std::function<VpiObject*(const std::string&)>& by_name) {

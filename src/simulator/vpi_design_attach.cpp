@@ -330,6 +330,9 @@ void RecordVariableObjectKinds(
           obj->decl_facts.constant_variable =
               var.written_type != nullptr && var.written_type->is_const;
           obj->decl_facts.vif_interface = VifInterfaceOf(*design, var);
+          // §37.29: a virtual interface var of a modport's type is a modport.
+          obj->is_modport = var.written_type != nullptr &&
+                            !var.written_type->modport_name.empty();
         }
       });
 }

@@ -306,6 +306,8 @@ void VpiRecordPropertyDecl(VpiObject& var, const ClassMember& member) {
   }
   var.decl_facts.constant_variable =
       member.is_const || member.data_type.is_const;
+  // §37.29: a virtual interface property of a modport's type is a modport.
+  var.is_modport = !member.data_type.modport_name.empty();
 }
 
 Logic4Vec* VpiHeldPropertyValue(ClassObject& obj, std::string_view name) {
