@@ -3,6 +3,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_scheduler.h"
 
 using namespace delta;
 
@@ -83,6 +84,22 @@ TEST(InterfacePortHierRefSim, PortJoinsTheInstanceNamedFromTheTop) {
                        "endmodule\n",
                        f),
             "x=9\n");
+}
+
+// §25.3 with §23.6: a module below the first top-level module may connect an
+// interface port to an instance of a later top through a full path from that
+// top, `t2.i`, which shares that instance's members, so the value written
+// through the port is the one t2's instance holds (#7355).
+TEST(InterfacePortHierRefSim, PortJoinsAnInstanceOfALaterTop) {
+  SimFixture f;
+  auto* design = ElaborateSrcAllTops(
+      "interface ifc; logic [7:0] a = 1; endinterface\n"
+      "module writer(ifc p); initial p.a = 9; endmodule\n"
+      "module mid; writer w(t2.i); endmodule\n"
+      "module t1; mid m(); endmodule\n"
+      "module t2; ifc i(); endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"t2.i.a", 9u}});
 }
 
 // §25.3 with §27.4: a module may pass its interface port on to an instance a

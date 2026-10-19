@@ -353,6 +353,34 @@ void Lowerer::LowerParallelTop(const RtlirModule* mod) {
   LowerChildInstance(inst);
 }
 
+// §23.6 with §25.3: an interface port's actual may be a full path into a later
+// top-level module, `t2.i` written in a module under the first top. The port
+// is joined to that instance's storage as its own instance is lowered
+// (AliasInterfacePortTo), and the later tops are lowered only after the first
+// top's whole hierarchy, so such a top is lowered here, ahead of its turn,
+// and Lower passes over it then. An instance of that name in the module the
+// actual is written in takes the name first, as in ConnectedInstancePath.
+void Lowerer::LowerTopNamedBy(const Expr* conn) {
+  while (conn != nullptr && conn->kind == ExprKind::kMemberAccess) {
+    conn = conn->lhs;
+  }
+  if (conn == nullptr || conn->kind != ExprKind::kIdentifier) return;
+  std::string_view name = conn->text.substr(0, conn->text.find('.'));
+  const auto& tops = design_->top_modules;
+  auto top = std::ranges::find(tops, name, &RtlirModule::name);
+  if (name.size() == conn->text.size() || top == tops.end() ||
+      top == tops.begin() || ctx_.IsParallelTop(name) ||
+      !ctx_.FindInstanceType(inst_prefix_ + std::string(name)).empty()) {
+    return;
+  }
+  std::string saved_prefix = std::exchange(inst_prefix_, std::string());
+  const RtlirModule* saved_parent = port_parent_;
+  LowerParallelTop(*top);
+  inst_prefix_ = std::move(saved_prefix);
+  port_parent_ = saved_parent;
+  ctx_.SetLoweringInstancePrefix(inst_prefix_);
+}
+
 // The level RegisterChildInstancePath names `child` by: its name as written,
 // carrying the index of the element when it is one of an array of instances.
 // §23.3.3.5 names each element `u[1]`, and PushInstanceArray
@@ -599,6 +627,9 @@ std::vector<const ClassDecl*> Lowerer::RegisterChildClasses(
 }
 
 void Lowerer::LowerChildInstance(const RtlirModuleInst& child) {
+  for (const RtlirPortBinding& binding : child.port_bindings) {
+    LowerTopNamedBy(binding.connection);
+  }
   auto saved_prefix = inst_prefix_;
   auto child_prefix = inst_prefix_ + std::string(child.inst_name) + ".";
   std::string child_path =

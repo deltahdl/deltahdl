@@ -869,7 +869,9 @@ void Lowerer::Lower(const RtlirDesign* design) {
   RegisterFreeCuFunctions(design, ctx_, arena_);
   RegisterDesignScopeDpiImports(design, ctx_);
   // §23.6: a path from a parallel hierarchy starts at a top's name, the first
-  // top's here and a later top's as an instance's (LowerParallelTop).
+  // top's here and a later top's as an instance's (LowerParallelTop), which
+  // an interface port's actual naming it may have lowered already
+  // (LowerTopNamedBy).
   const auto& tops = design->top_modules;
   if (!tops.empty()) ctx_.RegisterTopModule(tops.front()->name);
   // §26.2 with §6.21: the packages' and the unit's objects exist before the
@@ -878,7 +880,7 @@ void Lowerer::Lower(const RtlirDesign* design) {
   for (auto* mod : tops) {
     if (mod == tops.front()) {
       LowerModule(mod);
-    } else {
+    } else if (!ctx_.IsParallelTop(mod->name)) {
       LowerParallelTop(mod);
     }
   }

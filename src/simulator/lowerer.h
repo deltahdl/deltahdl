@@ -108,6 +108,9 @@ class Lowerer {
   // A top-level module after the first, lowered as an instance of its own
   // name so its declarations are its own. Defined in lowerer_child.cpp.
   void LowerParallelTop(const RtlirModule* mod);
+  // The later top an actual, `t2.i`, names a full path from, lowered ahead of
+  // its turn. Defined in lowerer_child.cpp.
+  void LowerTopNamedBy(const Expr* conn);
   void LowerParams(const RtlirModule* mod);
   // §6.20: the storage of the one parameter `p`, keyed under `full`, the name
   // the instance's processes read it by.
