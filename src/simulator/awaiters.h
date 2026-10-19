@@ -100,6 +100,8 @@ struct NamedEventAwaiter {
     auto* var = event != nullptr ? event : ctx.FindVariable(event_name);
     if (!var) return;
     auto* proc = ctx.CurrentProcess();
+    // §37.27 detail 1: the process waits on the event until it resumes.
+    if (proc) proc->waiting_on_events.assign(1, var);
     auto* ctx_ptr = &ctx;
     var->AddWatcher([h, proc, ctx_ptr]() mutable {
       // §9.7: a suspended process is desensitized to the event it waits on, so
@@ -118,7 +120,9 @@ struct NamedEventAwaiter {
     });
   }
 
-  void await_resume() const noexcept {}
+  void await_resume() const noexcept {
+    if (Process* proc = ctx.CurrentProcess()) proc->waiting_on_events.clear();
+  }
 };
 
 // Drops from `names` every name that designates no object, leaving a process's

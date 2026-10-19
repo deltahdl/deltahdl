@@ -103,9 +103,10 @@ bool VpiIsArrayVar(int unpacked_range_count) {
 
 bool VpiVariableIsArrayMember(VpiHandle var) {
   // §37.17 detail 2: a variable is an array member when its vpiParent prefix is
-  // an array variable.
+  // an array variable, and §37.27 a named event when it is a named event array.
   return var != nullptr && var->parent != nullptr &&
-         VpiIsArrayVarType(var->parent->type);
+         (VpiIsArrayVarType(var->parent->type) ||
+          var->parent->type == vpiNamedEventArray);
 }
 
 bool VpiVariableIsStructUnionMember(VpiHandle var) {
