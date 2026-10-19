@@ -198,15 +198,16 @@ std::optional<PackedDims> MemberBitDims(const VpiObject& member,
 
 // What the elements of a member declared with unpacked dimensions are made
 // of: its dimensions, outermost first, the kind and width of one element, the
-// number of elements, and the outermost structure's storage the elements read
-// their bits of, at the member's offset there.
+// number of elements, the outermost structure whose storage the elements read
+// their bits of, at the member's offset there, and what a run builds with.
 struct MemberArrayShape {
   std::vector<PackedRange> dims;
   int element_type = 0;
   uint32_t element_width = 0;
   uint32_t count = 1;
-  const VpiObject* root = nullptr;
+  VpiObject* root = nullptr;
   uint32_t offset = 0;
+  const VpiAttachBuild* build = nullptr;
 };
 
 // §37.17 details 2, 18 and 26: the members of `level`, the array var or
@@ -219,7 +220,8 @@ struct MemberArrayShape {
 // made so far.
 void MakeMemberLevel(VpiObject* level, const MemberArrayShape& shape,
                      std::size_t depth, const std::vector<int64_t>& outer,
-                     uint32_t& position, const VpiAttachBuild& build) {
+                     uint32_t& position) {
+  const VpiAttachBuild& build = *shape.build;
   const PackedRange& dim = shape.dims[depth];
   const bool kInnermost = depth + 1 == shape.dims.size();
   const int64_t kStep = dim.left <= dim.right ? 1 : -1;
@@ -260,7 +262,7 @@ void MakeMemberLevel(VpiObject* level, const MemberArrayShape& shape,
       element->decl_signed = level->decl_signed;
       std::vector<int64_t> inner{index};
       inner.insert(inner.end(), outer.begin(), outer.end());
-      MakeMemberLevel(element, shape, depth + 1, inner, position, build);
+      MakeMemberLevel(element, shape, depth + 1, inner, position);
     }
     level->children.push_back(element);
     indices.push_back(static_cast<int>(index));
@@ -283,6 +285,7 @@ void MakeMemberElements(VpiObject* array, const StructFieldInfo& field,
   shape.element_width = field.width / shape.count;
   shape.root = array->member_of;
   shape.offset = array->member_offset;
+  shape.build = &build;
   // §37.17 detail 20: an array var answers vpiScalar and vpiVector as its
   // element does.
   VpiScalarVectorQuery element;
@@ -295,7 +298,7 @@ void MakeMemberElements(VpiObject* array, const StructFieldInfo& field,
   array->size = static_cast<int>(shape.dims.front().HighIndex() -
                                  shape.dims.front().LowIndex() + 1);
   uint32_t position = 0;
-  MakeMemberLevel(array, shape, 0, {}, position, build);
+  MakeMemberLevel(array, shape, 0, {}, position);
 }
 
 // §7.4.2: the unpacked dimensions the member of the field `field` writes,
