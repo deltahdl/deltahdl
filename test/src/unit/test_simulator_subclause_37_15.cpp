@@ -565,38 +565,5 @@ TEST_F(RefObjsBelowAGenerateBlock, AnInterfacePortReachesThePortBelowTheBlock) {
             VpiObjectOf(inner));
 }
 
-// The ref objs of a run in which connections name their interface, and a
-// modport of it, through hierarchical names.
-class RefObjsOfHierarchicalConnections : public RefObjRun {
- protected:
-  void SetUp() override {
-    RefObjRun::SetUp();
-    Run("interface simple; logic req, gnt;\n"
-        "  modport initiator (input gnt, output req);\n"
-        "endinterface\n"
-        "module child2(simple s); endmodule\n"
-        "module top; simple i(); child2 i7(top.i);\n"
-        "  child2 i8(top.i.initiator);\n"
-        "endmodule\n");
-  }
-};
-
-// D2 with §23.6: a connection naming its interface through a hierarchical
-// name is a ref obj bound to that interface, and one naming a modport of it a
-// ref obj bound to the modport, a subelement of one bound to the interface
-// (D4) (#7350).
-TEST_F(RefObjsOfHierarchicalConnections, AHierarchicalConnectionIsARefObj) {
-  vpiHandle high = ConnOf(vpiHighConn, "top.i7", "s");
-  ASSERT_NE(high, nullptr);
-  EXPECT_EQ(vpi_get(vpiType, high), vpiRefObj);
-  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiActual, high)), VpiObjectOf(By("top.i")));
-  vpiHandle sub = ConnOf(vpiHighConn, "top.i8", "s");
-  ASSERT_NE(sub, nullptr);
-  EXPECT_EQ(vpi_get(vpiType, sub), vpiRefObj);
-  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiActual, sub)), ModportOfI("initiator"));
-  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiActual, vpi_handle(vpiParent, sub))),
-            VpiObjectOf(By("top.i")));
-}
-
 }  // namespace
 }  // namespace delta

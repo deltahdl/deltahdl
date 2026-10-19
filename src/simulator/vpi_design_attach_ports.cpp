@@ -15,7 +15,6 @@
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_walk.h"
-#include "simulator/vpi_expr_decompile.h"
 #include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
@@ -132,41 +131,20 @@ std::string InstanceNameOf(const Expr* head) {
                   : std::string();
 }
 
-// §37.15 detail 2 with §23.6: the higher connection `conn`, written at
-// `site`, that names an interface through a hierarchical name, `top.i`, is a
-// ref obj bound to the interface instance the name reaches; one naming a
-// modport of it, `top.i.initiator`, a ref obj bound to the modport that is a
-// subelement of one bound to the instance (detail 4). Null where the name
-// reaches neither.
-VpiObject* HierarchicalHighConn(const Expr* conn, const ConnectionSite& site) {
-  VpiObject* named =
-      VpiGenBlockExpression(conn, site.names, site.ctx, site.build);
-  const bool kModport = named != nullptr && named->type == vpiModport;
-  VpiObject* instance = kModport ? named->parent : named;
-  if (instance == nullptr || instance->type != vpiInterface) return nullptr;
-  const std::string kName = VpiExprDecompile(kModport ? conn->lhs : conn);
-  VpiObject* base =
-      MakeRefObj(kName, instance->full_name, site.writer, instance, site.build);
-  if (!kModport) return base;
-  return MakeRefObj(kName + "." + std::string(named->name), named->full_name,
-                    base, named, site.build);
-}
-
 // §37.15 detail 2 and its example: the higher connection `conn` of an
 // interface or modport port, written at `site`, is a
 // ref obj. Where it names an interface port of the writer, `s`, it is a use of
 // that port's ref obj; where it names an interface instance, `i`, or an
 // element of an array of them, `ia[1]`, a ref obj bound to that instance; and
 // where it selects a modport of either, `s.initiator`, a ref obj bound to the
-// modport that is a subelement of the first (detail 4). A hierarchical name is
-// resolved as a whole (HierarchicalHighConn). Null for a connection of any
-// other shape, left the expression it is.
+// modport that is a subelement of the first (detail 4). Null for a connection
+// of any other shape or that selects no modport, a hierarchical name, each
+// left the expression it is.
 VpiObject* InterfaceHighConn(const Expr* conn, const ConnectionSite& site) {
   const bool kSelects = conn->kind == ExprKind::kMemberAccess;
   const Expr* head = kSelects ? conn->lhs : conn;
   const std::string kName = InstanceNameOf(head);
-  if (kName.empty())
-    return kSelects ? HierarchicalHighConn(conn, site) : nullptr;
+  if (kName.empty()) return nullptr;
   VpiObject* base = PortRefObj(site.writer, kName);
   if (base == nullptr) {
     VpiObject* instance =
@@ -180,7 +158,7 @@ VpiObject* InterfaceHighConn(const Expr* conn, const ConnectionSite& site) {
   if (!kSelects) return base;
   const std::string_view kMember = conn->rhs->text;
   VpiObject* modport = ModportNamed(base->actual, kMember);
-  if (modport == nullptr) return HierarchicalHighConn(conn, site);
+  if (modport == nullptr) return nullptr;
   return MakeRefObj(kName + "." + std::string(kMember),
                     base->full_name + "." + std::string(kMember), base, modport,
                     site.build);
