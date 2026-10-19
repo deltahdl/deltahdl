@@ -93,9 +93,9 @@ const DataType* WrittenActual(const std::vector<DataType>& actuals,
 VpiObject* DefnParameter(const VpiObject& defn, std::string_view name) {
   const auto kFound =
       std::ranges::find_if(defn.children, [name](const VpiObject* child) {
-        return (child->type == vpiParameter ||
-                child->type == vpiTypeParameter) &&
-               child->name == name;
+        const bool kParameter =
+            child->type == vpiParameter || child->type == vpiTypeParameter;
+        return kParameter && child->name == name;
       });
   return kFound == defn.children.end() ? nullptr : *kFound;
 }
