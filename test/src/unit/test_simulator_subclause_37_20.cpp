@@ -2,6 +2,7 @@
 
 #include <vector>
 
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
@@ -162,6 +163,31 @@ TEST(MemoryPublic, IsMemoryDistinguishesARegArrayFromAnyOtherArray) {
   EXPECT_EQ(vpi_get(vpiIsMemory, VpiHandleOf(&not_an_array)), 0);
 
   SetGlobalVpiContext(nullptr);
+}
+
+// §37.20 against a design read and run whole.
+class MemoriesOfARun : public VpiDesignRun {};
+
+// Detail 1 with §37.17 detail 18: a word a reg array's vpiMemoryWord iteration
+// reaches answers vpiIndex with the index that selects it, the declared one
+// rather than its position (#7020).
+TEST_F(MemoriesOfARun, AMemoryWordReachesItsIndex) {
+  Run("module top;\n"
+      "  reg [7:0] mem [4:7];\n"
+      "endmodule\n");
+  vpiHandle it = vpi_iterate(vpiMemoryWord, By("top.mem"));
+  ASSERT_NE(it, nullptr);
+  vpi_scan(it);
+  vpi_scan(it);
+  vpiHandle word = vpi_scan(it);
+  ASSERT_NE(word, nullptr);
+  vpi_free_object(it);
+  vpiHandle index = vpi_handle(vpiIndex, word);
+  ASSERT_NE(index, nullptr);
+  s_vpi_value value = {};
+  value.format = vpiIntVal;
+  vpi_get_value(index, &value);
+  EXPECT_EQ(value.value.integer, 6);
 }
 
 }  // namespace

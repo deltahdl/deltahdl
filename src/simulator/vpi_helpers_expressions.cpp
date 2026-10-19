@@ -23,9 +23,12 @@ namespace {
 
 // §37.58 for a bit select, §37.16 and §37.17 detail 13 for a net bit and a var
 // bit: the bit's index, and the object it is a bit of. §37.17 detail 5: a var
-// select's own index too.
+// select's own index too, and detail 18 with §37.20: an element's of an array
+// var, a memory word's among them, the index that selects it out of its
+// array.
 bool TryResolveBitRelation(int type, VpiHandle ref, VpiHandle& out) {
-  if (ref->type == vpiVarSelect && type == vpiIndex) {
+  const bool kElement = ref->array_member && VpiIsVariablesType(ref->type);
+  if ((ref->type == vpiVarSelect || kElement) && type == vpiIndex) {
     out = ref->index_expr;
     return true;
   }
