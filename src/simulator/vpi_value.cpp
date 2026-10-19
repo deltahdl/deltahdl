@@ -14,10 +14,8 @@
 #include "common/packed_range.h"
 #include "common/types.h"
 #include "simulator/class_object.h"
-#include "simulator/deferred_caller.h"
 #include "simulator/evaluation.h"
 #include "simulator/net.h"
-#include "simulator/process.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
@@ -29,7 +27,7 @@
 #include "simulator/vpi_collection_elements.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
-#include "simulator/vpi_expr_scope.h"
+#include "simulator/vpi_expr_values.h"
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers2.h"
@@ -339,22 +337,6 @@ static const PackedRange* VaryingSelectDim(const VpiObject& obj) {
   return obj.select_dim.has_value() ? &*obj.select_dim : nullptr;
 }
 
-// §37.3.5 with §38.15: the value of `obj`, which holds no storage but stands
-// for an expression, an operation or a call (ExpressionObject records its
-// scope): the expression evaluated where the source wrote it, by a stand-in
-// process of the instance and generate blocks it stands in, as a process
-// running there would read its names.
-static Logic4Vec EvaluateExpressionObject(const VpiObject& obj,
-                                          SimContext& sim) {
-  const VpiExprScope& scope = *obj.expr_scope;
-  Process stand_in;
-  stand_in.stand_in = true;
-  stand_in.inst_prefix = scope.inst_prefix;
-  stand_in.gen_prefixes = scope.gen_prefixes;
-  const CallerStandIn kStandIn(&stand_in, sim);
-  return EvalExpr(scope.expr, sim, sim.GetArena());
-}
-
 // The index a varying select's index expression now holds: the value of the
 // variable or net it names, or of the expression it is, an index holding no
 // storage being one; none where it holds an x or z bit (§11.5.1).
@@ -370,7 +352,7 @@ static std::optional<int64_t> VaryingIndex(const VpiObject& obj,
     VpiRefreshElementCopy(index);
     held = index.var->value;
   } else {
-    held = EvaluateExpressionObject(index, *sim);
+    held = VpiEvaluateExpressionObject(index, *sim);
   }
   if (!held.IsKnown()) return std::nullopt;
   return SelectBoundValue(held);
@@ -501,8 +483,15 @@ void VpiContext::GetValue(VpiHandle obj, s_vpi_value* value) {
     // §37.3.5 with §38.15: an operation or a call holds no storage; its value
     // is its expression's, evaluated now. Any other object without storage
     // gives none, and the caller's buffer is left as it was.
-    if (obj->expr_scope != nullptr) {
-      DispatchValueByFormat(EvaluateExpressionObject(*obj, *sim_ctx_), value,
+    // §37.47: a cont assign bit's value is its one bit of the assignment's.
+    if (obj->expr_scope != nullptr && obj->type == vpiContAssignBit) {
+      std::vector<Logic4Word> words;
+      DispatchIntegerFormat(
+          SliceOfValue(VpiEvaluateExpressionObject(*obj, *sim_ctx_),
+                       obj->bit_offset, 1, words),
+          value, value_pools_);
+    } else if (obj->expr_scope != nullptr) {
+      DispatchValueByFormat(VpiEvaluateExpressionObject(*obj, *sim_ctx_), value,
                             value_pools_);
     }
     return;

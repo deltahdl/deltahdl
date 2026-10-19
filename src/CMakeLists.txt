@@ -781,6 +781,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/vpi_design_attach_ports.cpp
     simulator/vpi_design_attach_primitives.cpp
     simulator/vpi_design_prefixed_refs.cpp
+    simulator/vpi_expr_values.cpp
     simulator/vpi_design_op_types.cpp
     simulator/vpi_design_cast_typespec.cpp
     simulator/vpi_design_expr_sizes.cpp

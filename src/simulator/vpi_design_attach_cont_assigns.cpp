@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <initializer_list>
+#include <memory>
 #include <set>
 #include <string>
 #include <string_view>
@@ -18,6 +19,7 @@
 #include "simulator/vpi_design_attach_assigns_internal.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_walk.h"
+#include "simulator/vpi_expr_scope.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_source_delay.h"
 #include "simulator/vpi_user.h"
@@ -73,8 +75,29 @@ void HangOn(VpiObject* assign, const std::vector<std::string_view>& found,
   }
 }
 
+// §37.47 details 1 and 3: the cont assign bits of the vector continuous
+// assignment `assign`, one per bit of what it drives, each a scalar reporting
+// its offset from the least significant bit, whose value is that bit of the
+// assignment's.
+void MakeContAssignBits(VpiObject* assign, const AssignBuild& build) {
+  const int kWidth = assign->lhs != nullptr ? assign->lhs->size : 0;
+  for (int offset = 0; kWidth > 1 && offset < kWidth; ++offset) {
+    VpiObject* bit = build.alloc();
+    bit->type = vpiContAssignBit;
+    bit->parent = assign;
+    bit->index = -1;
+    bit->offset = offset;
+    bit->bit_offset = offset;
+    bit->size = 1;
+    bit->expr_scope = assign->expr_scope;
+    assign->children.push_back(bit);
+  }
+}
+
 // §37.47: the continuous assignment `ca` stands for, in `scope`, with its two
-// sides; and §37.46: a driver of what it writes and a load of what it reads.
+// sides, whose value is that of its right-hand side evaluated where it stands,
+// and its bits; and §37.46: a driver of what it writes and a load of what it
+// reads.
 void MakeContinuousAssignment(const RtlirContAssign& ca, VpiObject* scope,
                               const AssignBuild& build) {
   const ModuleItem* item = ca.source_item;
@@ -94,6 +117,11 @@ void MakeContinuousAssignment(const RtlirContAssign& ca, VpiObject* scope,
   scope->children.push_back(obj);
   obj->lhs = ExpressionObject(lhs, build);
   obj->rhs = AssignedExpressionObject(rhs, obj->lhs, build);
+  obj->expr_scope = std::make_shared<const VpiExprScope>(
+      VpiExprScope{rhs, VpiFlatName(build.names.prefix, ""),
+                   std::vector<std::string>(build.names.gen.begin(),
+                                            build.names.gen.end())});
+  MakeContAssignBits(obj, build);
 
   if (build.sim != nullptr) {
     VpiFillContAssignDelays(obj, ca, VpiFlatName(build.names.prefix, ""),

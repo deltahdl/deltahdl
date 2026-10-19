@@ -398,8 +398,9 @@ bool VpiIterateMatchesEdgeMode(VpiHandle obj, int type, VpiHandle ref,
     *matched = VpiIsCaseItemConditionType(obj->type) && !obj->written_as_stmt;
     return true;
   }
-  // §37.14, §37.16, §37.17 detail 12: vpiBit reaches a port's, a net's and a
-  // variable's bits; no object's own type is the relation's.
+  // §37.14, §37.16, §37.17 detail 12 and §37.47: vpiBit reaches a port's, a
+  // net's, a variable's and a continuous assignment's bits; no object's own
+  // type is the relation's.
   if (type == vpiBit) {
     *matched = VpiIsBitObjectType(obj->type);
     return true;

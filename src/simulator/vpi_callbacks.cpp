@@ -24,6 +24,7 @@
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_data_structs.h"
+#include "simulator/vpi_expr_values.h"
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers2.h"
@@ -368,6 +369,7 @@ VpiHandle VpiContext::RegisterCb(s_cb_data* data) {
   if ((data->reason == cbValueChange || data->reason == cbSizeChange) &&
       data->obj != nullptr) {
     WatchObjectChanges(*this, VpiObjectOf(data->obj));
+    VpiWatchContAssignChanges(*this, VpiObjectOf(data->obj), sim_ctx_);
   }
   if (data->reason == cbStmt) stmt_callbacks_registered_ = true;
   if (scheduler_ != nullptr &&

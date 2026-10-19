@@ -194,6 +194,52 @@ TEST_F(ContinuousAssignment, TheEdgesStayDistinctAndReportNoneWhenAbsent) {
 
 // A design run with a PLI application registered, its continuous assignments
 // read back once the run is over.
+// How many times the value change callbacks $watchca places on top's
+// continuous assignment and on that assignment's bit 3 have been called back.
+int g_assign_changes = 0;
+int g_bit_changes = 0;
+vpiHandle g_bit_callback = nullptr;
+
+PLI_INT32 CountAssignChange(p_cb_data /*data*/) {
+  ++g_assign_changes;
+  return 0;
+}
+
+PLI_INT32 CountBitChange(p_cb_data /*data*/) {
+  ++g_bit_changes;
+  return 0;
+}
+
+// $unwatchbit: take the callback on the bit away, so a later change of the
+// assignment finds none placed on the bit.
+PLI_INT32 UnwatchBitCalltf(PLI_BYTE8* /*user_data*/) {
+  vpi_remove_cb(g_bit_callback);
+  return 0;
+}
+
+// $watchca: place a value change callback on the first continuous assignment
+// top reaches and one on its bit at offset 3.
+PLI_INT32 WatchAssignCalltf(PLI_BYTE8* /*user_data*/) {
+  vpiHandle it =
+      vpi_iterate(vpiContAssign, vpi_handle_by_name(VpiText("top"), nullptr));
+  vpiHandle assign = it == nullptr ? nullptr : vpi_scan(it);
+  if (assign == nullptr) return 0;
+  vpi_release_handle(it);
+  s_cb_data cb = {};
+  cb.reason = cbValueChange;
+  cb.obj = assign;
+  cb.cb_rtn = &CountAssignChange;
+  vpi_register_cb(&cb);
+  vpiHandle bits = vpi_iterate(vpiBit, assign);
+  while (vpiHandle bit = bits == nullptr ? nullptr : vpi_scan(bits)) {
+    if (vpi_get(vpiOffset, bit) != 3) continue;
+    cb.obj = bit;
+    cb.cb_rtn = &CountBitChange;
+    g_bit_callback = vpi_register_cb(&cb);
+  }
+  return 0;
+}
+
 class ContinuousAssignmentsOfARun : public VpiDesignRun {
  protected:
   // How many objects of `type` `ref` reaches.
@@ -217,6 +263,23 @@ class ContinuousAssignmentsOfARun : public VpiDesignRun {
     return found;
   }
 };
+
+// The value of `obj` read as an integer.
+int IntValueOf(vpiHandle obj) {
+  s_vpi_value value = {};
+  value.format = vpiIntVal;
+  vpi_get_value(obj, &value);
+  return value.value.integer;
+}
+
+constexpr const char* kVectorAssignment =
+    "module top; logic [3:0] a, b; wire [3:0] y;\n"
+    "  assign y = a ^ b;\n"
+    "  initial begin\n"
+    "    a = 4'b0011; b = 4'b0101; $watchca;\n"
+    "    #5 a = 4'b1111; #5 a = 4'b1111; $unwatchbit; #5 a = 4'b0000;\n"
+    "  end\n"
+    "endmodule\n";
 
 constexpr const char* kTwoAssignments =
     "module top;\n"
@@ -336,6 +399,45 @@ TEST_F(ContinuousAssignmentsOfARun,
   EXPECT_EQ(
       CountOf(vpiDriver, vpi_handle_by_name(VpiText("top.gb[1].y"), nullptr)),
       1);
+}
+
+// §37.47: a continuous assignment's value is that of its right-hand side,
+// read as the run now holds it (#7173). Detail 1 and 3: a vector assignment
+// has a cont assign bit per bit, each a scalar reaching the assignment as its
+// parent, reporting its offset from the least significant bit and holding that
+// bit of the assignment's value (#7172). Detail 2: a value change callback
+// placed on the assignment is called back as its value changes, and not for a
+// write that leaves it as it was, and one placed on a bit as that bit changes
+// (#7174).
+TEST_F(ContinuousAssignmentsOfARun, AVectorAssignmentHasAValueAndBits) {
+  g_assign_changes = 0;
+  g_bit_changes = 0;
+  s_vpi_systf_data data = {};
+  data.type = vpiSysTask;
+  data.tfname = VpiText("$watchca");
+  data.calltf = &WatchAssignCalltf;
+  ASSERT_NE(vpi_register_systf(&data), nullptr);
+  data.tfname = VpiText("$unwatchbit");
+  data.calltf = &UnwatchBitCalltf;
+  ASSERT_NE(vpi_register_systf(&data), nullptr);
+  Run(kVectorAssignment);
+  vpiHandle assign = AssignStatementOfTop();
+  ASSERT_NE(assign, nullptr);
+  EXPECT_EQ(IntValueOf(assign), 0b0101);
+  std::vector<vpiHandle> bits;
+  vpiHandle it = vpi_iterate(vpiBit, assign);
+  ASSERT_NE(it, nullptr);
+  while (vpiHandle bit = vpi_scan(it)) bits.push_back(bit);
+  ASSERT_EQ(bits.size(), 4U);
+  for (vpiHandle bit : bits) {
+    EXPECT_EQ(vpi_get(vpiType, bit), vpiContAssignBit);
+    EXPECT_EQ(vpi_get(vpiSize, bit), 1);
+    EXPECT_EQ(VpiObjectOf(vpi_handle(vpiParent, bit)), VpiObjectOf(assign));
+    const int kOffset = vpi_get(vpiOffset, bit);
+    EXPECT_EQ(IntValueOf(bit), (0b0101 >> kOffset) & 1) << kOffset;
+  }
+  EXPECT_EQ(g_assign_changes, 2);
+  EXPECT_EQ(g_bit_changes, 1);
 }
 
 }  // namespace

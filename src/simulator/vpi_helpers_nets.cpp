@@ -786,7 +786,8 @@ bool VpiIsNetClassType(int type) {
 }
 
 bool VpiIsBitObjectType(int type) {
-  return type == vpiPortBit || type == vpiNetBit || type == vpiRegBit;
+  return type == vpiPortBit || type == vpiNetBit || type == vpiRegBit ||
+         type == vpiContAssignBit;
 }
 
 // §37.39 (figure): which of a module path's three term relations reaches this
