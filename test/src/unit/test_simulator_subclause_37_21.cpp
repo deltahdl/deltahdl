@@ -344,7 +344,7 @@ class VariableDriversOfARun : public VpiDesignRun {
   }
 
   static constexpr const char* kDesign =
-      "module m(input logic i, output logic o);\n"
+      "module m(input var logic i, output logic o);\n"
       "  assign o = i;\n"
       "endmodule\n"
       "module top;\n"
@@ -381,7 +381,8 @@ TEST_F(VariableDriversOfARun, AnAssignStmtAndAForceDriveTheirTargets) {
 }
 
 // Figure: an input port drives the variable inside its instance, and an
-// output port the variable its connection names (#7023).
+// output port the variable its connection names (#7023). The input is
+// declared `var`, since an input of a data type alone is a net (§23.2.2.3).
 TEST_F(VariableDriversOfARun, APortDrivesTheVariableItConnects) {
   Run(kDesign);
   EXPECT_EQ(KindsOf(vpiDriver, By("top.u.i")), std::vector<int>{vpiPort});
