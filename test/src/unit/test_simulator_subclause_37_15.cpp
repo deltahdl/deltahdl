@@ -308,10 +308,10 @@ class RefObjsOfARun : public VpiDesignRun {
         "module child3(simple.target t); endmodule\n"
         "module g(interface s); endmodule\n"
         "typedef logic [2:0] t3;\n"
-        "module m(ref t3 r); endmodule\n"
-        "module top; simple i(); simple ia[2](); t3 a;\n"
+        "module m(ref logic [2:0] r, ref t3 q); endmodule\n"
+        "module top; simple i(); simple ia[2](); logic [2:0] a; t3 b;\n"
         "  child1 i1(i); child2 i2(i.initiator); child3 i3(i); g u4(i);\n"
-        "  child2 i5(ia[1]); m u1(a);\n"
+        "  child2 i5(ia[1]); m u1(a, b);\n"
         "endmodule\n");
   }
 
@@ -465,10 +465,10 @@ TEST_F(RefObjsOfARun, VpiDefNameIsTheInterfacesDefinitionOrTheModport) {
 // typespec, here its typedef's, and one bound to an interface none (#7056).
 TEST_F(RefObjsOfARun, VpiTypespecIsTheVariablesForAVariableActual) {
   vpiHandle typespec =
-      vpi_handle(vpiTypespec, ConnOf(vpiLowConn, "top.u1", "r"));
+      vpi_handle(vpiTypespec, ConnOf(vpiLowConn, "top.u1", "q"));
   ASSERT_NE(typespec, nullptr);
   EXPECT_EQ(VpiObjectOf(typespec),
-            VpiObjectOf(vpi_handle(vpiTypespec, By("top.a"))));
+            VpiObjectOf(vpi_handle(vpiTypespec, By("top.b"))));
   EXPECT_EQ(vpi_handle(vpiTypespec, ConnOf(vpiLowConn, "top.i1", "s")),
             nullptr);
 }
