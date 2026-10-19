@@ -353,6 +353,17 @@ void Lowerer::LowerParallelTop(const RtlirModule* mod) {
   LowerChildInstance(inst);
 }
 
+// The name an actual's instance is written by: `i`, or `top.i` as the
+// elaborator stores a full path whole (ResolveInstancePathActuals), the
+// modport of `i.mp` aside; empty for an actual of any other shape.
+static std::string_view ActualHeadName(const Expr* conn) {
+  while (conn != nullptr && conn->kind == ExprKind::kMemberAccess) {
+    conn = conn->lhs;
+  }
+  if (conn == nullptr || conn->kind != ExprKind::kIdentifier) return {};
+  return conn->text;
+}
+
 // §23.6 with §25.3: an interface port's actual may be a full path into a later
 // top-level module, `t2.i` written in a module under the first top. The port
 // is joined to that instance's storage as its own instance is lowered
@@ -361,15 +372,12 @@ void Lowerer::LowerParallelTop(const RtlirModule* mod) {
 // and Lower passes over it then. An instance of that name in the module the
 // actual is written in takes the name first, as in ConnectedInstancePath.
 void Lowerer::LowerTopNamedBy(const Expr* conn) {
-  while (conn != nullptr && conn->kind == ExprKind::kMemberAccess) {
-    conn = conn->lhs;
-  }
-  if (conn == nullptr || conn->kind != ExprKind::kIdentifier) return;
-  std::string_view name = conn->text.substr(0, conn->text.find('.'));
+  std::string_view text = ActualHeadName(conn);
+  std::string_view name = text.substr(0, text.find('.'));
   const auto& tops = design_->top_modules;
   auto top = std::ranges::find(tops, name, &RtlirModule::name);
-  if (name.size() == conn->text.size() || top == tops.end() ||
-      top == tops.begin() || ctx_.IsParallelTop(name) ||
+  if (name.size() == text.size() || top == tops.end() || top == tops.begin() ||
+      ctx_.IsParallelTop(name) ||
       !ctx_.FindInstanceType(inst_prefix_ + std::string(name)).empty()) {
     return;
   }
@@ -539,26 +547,81 @@ static const RtlirModuleInst* UnplacedInterfaceActual(
   return nullptr;
 }
 
+// §23.6: the full paths from a top-level module, `top.i` or `top.h.i`, that
+// the actuals of `inst` and of every instance below it name, each keyed from
+// the design's root as ConnectedInstancePath keys it.
+static void CollectFullPathActuals(const RtlirModuleInst& inst,
+                                   const SimContext& ctx,
+                                   std::vector<std::string>& paths) {
+  for (const RtlirPortBinding& binding : inst.port_bindings) {
+    std::string_view text = ActualHeadName(binding.connection);
+    std::string_view head = text.substr(0, text.find('.'));
+    if (head.size() < text.size() &&
+        (ctx.IsTopModule(head) || ctx.IsParallelTop(head))) {
+      paths.push_back(ctx.RootedStorageKey(text));
+    }
+  }
+  if (inst.resolved == nullptr) return;
+  for (const RtlirModuleInst& child : inst.resolved->children) {
+    CollectFullPathActuals(child, ctx, paths);
+  }
+}
+
+// The sibling one of `paths` names where that sibling is not yet placed: the
+// instance itself, the `i` of `top.i` among the instances top holds, or the
+// instance holding it, the `h` of `top.h.i`. The siblings are the instances
+// the module keyed `prefix` holds.
+static const RtlirModuleInst* UnplacedPathTarget(
+    const std::vector<std::string>& paths, const std::string& prefix,
+    const std::vector<RtlirModuleInst>& siblings,
+    const std::vector<bool>& placed, size_t& index) {
+  for (const std::string& path : paths) {
+    if (!path.starts_with(prefix)) continue;
+    std::string_view rest = std::string_view(path).substr(prefix.size());
+    std::string_view name = rest.substr(0, rest.find('.'));
+    for (index = 0; index < siblings.size(); ++index) {
+      const RtlirModuleInst& sibling = siblings[index];
+      if (!placed[index] && sibling.resolved != nullptr &&
+          sibling.inst_name == name) {
+        return &sibling;
+      }
+    }
+  }
+  return nullptr;
+}
+
 // §25.3: an interface port is joined to the storage of the interface instance
 // its actual names (Lowerer::TryAliasInterfacePort), which exists once that
 // instance is lowered, and the port is bound as soon as its own instance is.
 // An interface instance is therefore lowered ahead of a sibling written before
 // it that connects to it, and so is a module instance declaring one a sibling
-// written before it connects to by `h.i`; every other instance keeps its
+// written before it connects to by `h.i`. So is an instance a full path from
+// a top-level module names, `top.i` or `top.h.i`, from an actual anywhere
+// below a sibling written before it (§23.6); every other instance keeps its
 // place.
 void Lowerer::LowerChildModules(const RtlirModule* mod) {
   const std::vector<RtlirModuleInst>& children = mod->children;
   std::vector<bool> placed(children.size(), false);
   for (size_t i = 0; i < children.size(); ++i) {
     if (placed[i] || children[i].resolved == nullptr) continue;
+    // Placed now, so a path from below it naming the instance itself,
+    // `top.m.j` under m, never lowers it ahead of itself.
+    placed[i] = true;
+    std::vector<std::string> paths;
+    CollectFullPathActuals(children[i], ctx_, paths);
     size_t index = 0;
-    while (const RtlirModuleInst* ifc =
-               UnplacedInterfaceActual(children[i], children, placed, index)) {
+    for (;;) {
+      const RtlirModuleInst* ahead =
+          UnplacedInterfaceActual(children[i], children, placed, index);
+      if (ahead == nullptr) {
+        ahead =
+            UnplacedPathTarget(paths, inst_prefix_, children, placed, index);
+      }
+      if (ahead == nullptr) break;
       placed[index] = true;
       port_parent_ = mod;
-      LowerChildInstance(*ifc);
+      LowerChildInstance(*ahead);
     }
-    placed[i] = true;
     port_parent_ = mod;
     LowerChildInstance(children[i]);
   }

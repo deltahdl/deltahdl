@@ -86,6 +86,22 @@ TEST(InterfacePortHierRefSim, PortJoinsTheInstanceNamedFromTheTop) {
             "x=9\n");
 }
 
+// §25.3 with §23.6: the instance a full path from the top names, `top.i`, is
+// joined to the port below the top whichever of the two the top declares
+// first, so with `mid m();` written ahead of `ifc i();` the value written
+// through the port is still the one top reads (#7356).
+TEST(InterfacePortHierRefSim, PortJoinsAnInstanceTheTopDeclaresLater) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("interface ifc; logic [7:0] a = 1; endinterface\n"
+                       "module writer(ifc p); initial p.a = 9; endmodule\n"
+                       "module mid; writer w(top.i); endmodule\n"
+                       "module top; mid m(); ifc i();\n"
+                       "  initial #1 $display(\"x=%0d\", i.a);\n"
+                       "endmodule\n",
+                       f),
+            "x=9\n");
+}
+
 // §25.3 with §23.6: a module below the first top-level module may connect an
 // interface port to an instance of a later top through a full path from that
 // top, `t2.i`, which shares that instance's members, so the value written
