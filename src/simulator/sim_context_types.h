@@ -121,6 +121,10 @@ struct StructFieldInfo {
   uint32_t elem_count = 0;
   int64_t elem_left = 0;
   int64_t elem_right = 0;
+  // §7.4.2: the unpacked dimensions the member's declaration writes, outermost
+  // first, of whatever number; null for a member the layout was given none
+  // for. The elements above are recorded for one dimension alone.
+  const std::vector<Expr*>* unpacked_dims = nullptr;
   // §7.2.2: the member's default value as its declaration writes it, which a
   // variable of the structure takes where it has no initializer of its own;
   // null for a member written with none.

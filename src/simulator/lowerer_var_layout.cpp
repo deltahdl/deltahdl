@@ -102,6 +102,7 @@ static StructTypeInfo* BuildStructTypeInfo(const DataType* dtype,
     if (!m.type_name.empty()) fi.type_name = NestedLayoutName(m, arena);
     if (UnpackedMemberBounds(m, &fi.elem_left, &fi.elem_right))
       fi.elem_count = UnpackedMemberCount(m);
+    if (!m.unpacked_dims.empty()) fi.unpacked_dims = &m.unpacked_dims;
     fi.default_expr = m.init_expr;
     RecordOuterPackedDim(m, fi);
     RecordDeclRange(m, fi);

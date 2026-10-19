@@ -1,8 +1,10 @@
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
@@ -10,6 +12,7 @@
 #include "common/types.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast_class.h"
+#include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
 #include "simulator/sim_context.h"
@@ -151,12 +154,11 @@ VpiObject* MakeMember(VpiObject* holder, const StructFieldInfo& field,
   member->decl_signed = field.is_signed;
   // §37.17 detail 20: a member is a scalar or a vector as a variable of its
   // field's type is, a bit or logic field wider than one bit having a packed
-  // dimension, and one declared as an unpacked array answers as its element.
+  // dimension; one declared as an unpacked array answers as its element
+  // (MakeMemberElements).
   VpiScalarVectorQuery shape;
   shape.var_type = member->type;
-  shape.has_packed_dimension =
-      (field.elem_count != 0 ? field.width / field.elem_count : field.width) >
-      1;
+  shape.has_packed_dimension = field.width > 1;
   member->decl_scalar = VpiVariableScalar(shape);
   member->decl_vector = VpiVariableVector(shape);
   auto* storage = build.arena.Create<Variable>();
@@ -183,7 +185,8 @@ std::optional<PackedDims> MemberBitDims(const VpiObject& member,
   const bool kVector = member.type == kVpiReg || member.type == vpiBitVar;
   const bool kPacked = field.nested != nullptr && field.nested->is_packed;
   if (!VpiIsVariablesType(member.type) || field.width <= 1 ||
-      field.elem_count != 0 || field.is_dynamic || (!kVector && !kPacked)) {
+      field.unpacked_dims != nullptr || field.is_dynamic ||
+      (!kVector && !kPacked)) {
     return std::nullopt;
   }
   if (kVector && field.packed_elem_width != 0) {
@@ -193,47 +196,121 @@ std::optional<PackedDims> MemberBitDims(const VpiObject& member,
   return PackedDims{PackedRange::Implicit(field.width)};
 }
 
-// §37.17 details 2, 18 and 26: a member `array` of the field `field`, declared
-// with an unpacked dimension, made the array var it is, with an element per
-// index of the dimension, left index first, each a variable of the member's
-// type that the array's members are, carrying its index and holding its bits
-// of the outermost structure, where the layout puts the leftmost element in
-// the most significant ones.
+// What the elements of a member declared with unpacked dimensions are made
+// of: its dimensions, outermost first, the kind and width of one element, the
+// number of elements, and the outermost structure's storage the elements read
+// their bits of, at the member's offset there.
+struct MemberArrayShape {
+  std::vector<PackedRange> dims;
+  int element_type = 0;
+  uint32_t element_width = 0;
+  uint32_t count = 1;
+  const VpiObject* root = nullptr;
+  uint32_t offset = 0;
+};
+
+// §37.17 details 2, 18 and 26: the members of `level`, the array var or
+// subarray of the member `shape` describes at dimension `depth`: one per
+// index, left index first, carrying its index and those `outer` that select
+// `level`, innermost first. At the last dimension each is a variable of the
+// member's type holding its bits of the outermost structure, where the layout
+// puts the element written first in the most significant ones; at every other
+// it is a subarray, an array var of its own. `position` counts the elements
+// made so far.
+void MakeMemberLevel(VpiObject* level, const MemberArrayShape& shape,
+                     std::size_t depth, const std::vector<int64_t>& outer,
+                     uint32_t& position, const VpiAttachBuild& build) {
+  const PackedRange& dim = shape.dims[depth];
+  const bool kInnermost = depth + 1 == shape.dims.size();
+  const int64_t kStep = dim.left <= dim.right ? 1 : -1;
+  std::vector<int>& indices = level->array_dim_indices.emplace_back();
+  for (int64_t index = dim.left;; index += kStep) {
+    const std::string kSuffix = "[" + std::to_string(index) + "]";
+    VpiObject* element = build.alloc();
+    element->parent = level;
+    element->name = build.keep(std::string(level->name) + kSuffix);
+    element->full_name = level->full_name + kSuffix;
+    element->array_member = true;
+    element->index = static_cast<int>(index);
+    element->index_expr = VpiIntConstant(index, build);
+    element->children.push_back(element->index_expr);
+    for (int64_t outer_index : outer) {
+      element->children.push_back(VpiIntConstant(outer_index, build));
+    }
+    if (kInnermost) {
+      element->type = shape.element_type;
+      element->decl_signed = level->decl_signed;
+      element->decl_scalar = level->decl_scalar;
+      element->decl_vector = level->decl_vector;
+      auto* storage = build.arena.Create<Variable>();
+      storage->value = MakeLogic4Vec(build.arena, shape.element_width);
+      storage->value.is_signed = level->decl_signed;
+      element->var = storage;
+      element->size = static_cast<int>(shape.element_width);
+      element->member_of = shape.root;
+      element->member_offset =
+          shape.offset + ((shape.count - 1 - position++) * shape.element_width);
+    } else {
+      element->type = vpiArrayVar;
+      element->array_type = vpiStaticArray;
+      element->size = static_cast<int>(shape.dims[depth + 1].HighIndex() -
+                                       shape.dims[depth + 1].LowIndex() + 1);
+      element->decl_scalar = level->decl_scalar;
+      element->decl_vector = level->decl_vector;
+      element->decl_signed = level->decl_signed;
+      std::vector<int64_t> inner{index};
+      inner.insert(inner.end(), outer.begin(), outer.end());
+      MakeMemberLevel(element, shape, depth + 1, inner, position, build);
+    }
+    level->children.push_back(element);
+    indices.push_back(static_cast<int>(index));
+    if (index == dim.right) break;
+  }
+}
+
+// §37.17 details 2, 18 and 26: the member `array` of the field `field`,
+// declared with the unpacked dimensions `dims`, made the array var it is,
+// with its subarrays and elements (MakeMemberLevel).
 void MakeMemberElements(VpiObject* array, const StructFieldInfo& field,
+                        std::vector<PackedRange> dims,
                         const VpiAttachBuild& build) {
-  const int kElementType = array->type;
-  const uint32_t kWidth = field.width / field.elem_count;
+  MemberArrayShape shape;
+  shape.dims = std::move(dims);
+  for (const PackedRange& dim : shape.dims) {
+    shape.count *= static_cast<uint32_t>(dim.HighIndex() - dim.LowIndex() + 1);
+  }
+  shape.element_type = array->type;
+  shape.element_width = field.width / shape.count;
+  shape.root = array->member_of;
+  shape.offset = array->member_offset;
+  // §37.17 detail 20: an array var answers vpiScalar and vpiVector as its
+  // element does.
+  VpiScalarVectorQuery element;
+  element.var_type = shape.element_type;
+  element.has_packed_dimension = shape.element_width > 1;
+  array->decl_scalar = VpiVariableScalar(element);
+  array->decl_vector = VpiVariableVector(element);
   array->type = vpiArrayVar;
   array->array_type = vpiStaticArray;
-  array->size = static_cast<int>(field.elem_count);
-  std::vector<int>& indices = array->array_dim_indices.emplace_back();
-  const int64_t kStep = field.elem_left <= field.elem_right ? 1 : -1;
-  for (uint32_t position = 0; position < field.elem_count; ++position) {
-    const int64_t kIndex = field.elem_left + (kStep * position);
-    const std::string kSuffix = "[" + std::to_string(kIndex) + "]";
-    VpiObject* element = build.alloc();
-    element->type = kElementType;
-    element->parent = array;
-    element->name = build.keep(std::string(array->name) + kSuffix);
-    element->full_name = array->full_name + kSuffix;
-    element->array_member = true;
-    element->index = static_cast<int>(kIndex);
-    element->index_expr = VpiIntConstant(kIndex, build);
-    element->children.push_back(element->index_expr);
-    element->decl_signed = array->decl_signed;
-    element->decl_scalar = array->decl_scalar;
-    element->decl_vector = array->decl_vector;
-    auto* storage = build.arena.Create<Variable>();
-    storage->value = MakeLogic4Vec(build.arena, kWidth);
-    storage->value.is_signed = field.is_signed;
-    element->var = storage;
-    element->size = static_cast<int>(kWidth);
-    element->member_of = array->member_of;
-    element->member_offset =
-        array->member_offset + ((field.elem_count - 1 - position) * kWidth);
-    array->children.push_back(element);
-    indices.push_back(static_cast<int>(kIndex));
+  array->size = static_cast<int>(shape.dims.front().HighIndex() -
+                                 shape.dims.front().LowIndex() + 1);
+  uint32_t position = 0;
+  MakeMemberLevel(array, shape, 0, {}, position, build);
+}
+
+// §7.4.2: the unpacked dimensions the member of the field `field` writes,
+// each evaluated in the scope `ctx` has set; none where it writes none or
+// where one is not a fixed range or size.
+std::vector<PackedRange> MemberUnpackedDims(const StructFieldInfo& field,
+                                            SimContext& ctx) {
+  std::vector<PackedRange> dims;
+  if (field.unpacked_dims == nullptr || field.is_dynamic) return dims;
+  for (const Expr* dim : *field.unpacked_dims) {
+    std::optional<PackedRange> range = WrittenUnpackedDim(dim, ctx);
+    if (!range) return {};
+    dims.push_back(*range);
   }
+  return dims;
 }
 
 // What the members of one instance are made from: its module, the objects
@@ -261,8 +338,9 @@ void MakeMembers(VpiObject* holder, const StructTypeInfo& info,
       member->member_of = holder->member_of;
       member->member_offset += holder->member_offset;
     }
-    if (field.elem_count != 0 && VpiIsVariablesType(member->type)) {
-      MakeMemberElements(member, field, site.build);
+    std::vector<PackedRange> dims = MemberUnpackedDims(field, site.ctx);
+    if (!dims.empty() && VpiIsVariablesType(member->type)) {
+      MakeMemberElements(member, field, std::move(dims), site.build);
     } else if (field.nested != nullptr) {
       MakeMembers(member, *field.nested, site);
     }

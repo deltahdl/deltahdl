@@ -332,5 +332,26 @@ TEST_F(VariablesOfARun, AnUnpackedArrayMemberIsAnArrayVar) {
   EXPECT_EQ(IntOf(vpi_handle_by_index(a, 1)), 9);
 }
 
+// D2, D18 and D26: a member of a structure declared with two unpacked
+// dimensions is an array var whose subarrays are array vars of their own, each
+// holding an element per index of the second dimension (#7358).
+TEST_F(VariablesOfARun, AMultidimensionalArrayMemberHasSubarrays) {
+  Run("module top; struct { logic [3:0] a[2][3]; } s; endmodule\n");
+  vpiHandle a = By("top.s.a");
+  ASSERT_NE(a, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, a), vpiArrayVar);
+  EXPECT_EQ(vpi_get(vpiSize, a), 2);
+  vpiHandle row = vpi_handle_by_index(a, 1);
+  ASSERT_NE(row, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, row), vpiArrayVar);
+  EXPECT_EQ(vpi_get(vpiSize, row), 3);
+  PLI_INT32 indices[] = {1, 2};
+  vpiHandle element = vpi_handle_by_multi_index(a, 2, indices);
+  ASSERT_NE(element, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, element), vpiReg);
+  EXPECT_EQ(vpi_get(vpiSize, element), 4);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiParent, element)), VpiObjectOf(row));
+}
+
 }  // namespace
 }  // namespace delta
