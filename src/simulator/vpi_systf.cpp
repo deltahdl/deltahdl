@@ -282,14 +282,13 @@ bool VpiIsPrimitiveType(int type) {
   // a dotted enclosure - holding the gate, switch and udp object definitions,
   // and §37.4.1 makes such an enclosure a grouping rather than an object of its
   // own. So vpiPrimitive is the name of the group and these are the kinds an
-  // object grouped by it actually has; §37.36 detail 2's sequential and
-  // combinational UDPs are the two forms the udp definition takes.
+  // object grouped by it actually has. §37.36 detail 2's vpiSeqPrim and
+  // vpiCombPrim are values of a udp's vpiPrimType, not object types: as
+  // object types their numbers are the iterator's and the io decl's.
   switch (type) {
     case vpiGate:
     case vpiSwitch:
     case vpiUdp:
-    case vpiSeqPrim:
-    case vpiCombPrim:
       return true;
     default:
       return false;

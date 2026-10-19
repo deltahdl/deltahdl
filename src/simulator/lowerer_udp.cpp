@@ -29,6 +29,7 @@
 #include "elaborator/rtlir_primitives.h"
 #include "elaborator/sensitivity.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 #include "simulator/awaiters.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
@@ -152,6 +153,9 @@ struct UdpOutputDriver {
   char committed = 0;
   char pending = 0;
   uint64_t generation = 0;
+  // The instance's evaluator, kept beside the driver rather than in the
+  // process's frame so that a VPI put (§38.34) can set its state.
+  UdpEvalState* state = nullptr;
 };
 
 static UdpOutputDriver MakeUdpOutputDriver(const RtlirUdpInst& inst,
@@ -214,6 +218,17 @@ static void CommitUdpOutput(const Expr* terminal, UdpOutputDriver* drv,
   // decay process where this update leaves the net with only high-impedance
   // drivers.
   drv->net->Resolve(arena, &ctx.GetScheduler());
+}
+
+// §37.35 detail 2 with §38.34: a value put to a sequential primitive through
+// VPI is its state, which §29.5 makes its output, from now: the output
+// terminal takes it with no delay, overtaking a change still pending.
+static void PutUdpState(const Expr* terminal, UdpOutputDriver* drv, char bit,
+                        SimContext& ctx, Arena& arena) {
+  drv->state->SetOutput(bit);
+  ++drv->generation;
+  drv->pending = 0;
+  CommitUdpOutput(terminal, drv, bit, ctx, arena);
 }
 
 // How long a transition to `out` waits before it reaches the output terminal.
@@ -339,7 +354,7 @@ static SimCoroutine MakeUdpInstCoroutine(const RtlirUdpInst* inst,
   // of a sequential primitive the current output value, so a UdpEvalState built
   // per evaluation would match every row against the initial value §29.7 gives
   // rather than against the state the previous evaluation left.
-  UdpEvalState state(*inst->decl, UdpInitialOutput(*inst->decl, ctx, arena));
+  UdpEvalState& state = *drv->state;
   FindUdpSelectOutput(inst->output, drv, ctx);
 
   // §29.7: that value is the state table's current state as simulation
@@ -375,6 +390,25 @@ static SimCoroutine MakeUdpInstCoroutine(const RtlirUdpInst* inst,
   }
 }
 
+// §37.35 detail 2: files the setter of the state of the sequential instance
+// `inst`, driving through `drv`, under its flat name below `inst_prefix`, the
+// name its udp object carries, for a VPI put to reach it. The elements of an
+// instance array share the name the array is written with, so an instance
+// standing alone is the one a name reaches.
+static void RegisterUdpStateSetter(const RtlirUdpInst& inst,
+                                   UdpOutputDriver* drv,
+                                   const std::string& inst_prefix,
+                                   SimContext& ctx, Arena& arena) {
+  if (!inst.decl->is_sequential || inst.name.empty() ||
+      inst.source_item->inst_range_left != nullptr) {
+    return;
+  }
+  ctx.UdpStateSetters()[inst_prefix + std::string(inst.name)] =
+      [output = inst.output, drv, &ctx, &arena](char bit) {
+        PutUdpState(output, drv, bit, ctx, arena);
+      };
+}
+
 void Lowerer::LowerUdpInst(const RtlirUdpInst& inst, bool from_program) {
   auto* p = arena_.Create<Process>();
   // §29.8 instantiates a UDP just as a gate is, and a gate drives
@@ -397,14 +431,16 @@ void Lowerer::LowerUdpInst(const RtlirUdpInst& inst, bool from_program) {
   UdpOutputDriver* drv = nullptr;
   if (inst.decl != nullptr && inst.output != nullptr) {
     drv = arena_.Create<UdpOutputDriver>(MakeUdpOutputDriver(inst, ctx_));
+    const char kInitial = UdpInitialOutput(*inst.decl, ctx_, arena_);
+    drv->state = arena_.Create<UdpEvalState>(*inst.decl, kInitial);
     // §29.7 (printed page 867): under `initial q = 1'b1` the output q holds 1
     // as simulation begins, so a sequential
     // primitive driving a whole net drives it before time 0, and a procedure
     // reading the net at time 0 sees it whichever process runs first.
     if (inst.decl->is_sequential && drv->net != nullptr) {
-      CommitUdpOutput(inst.output, drv,
-                      UdpInitialOutput(*inst.decl, ctx_, arena_), ctx_, arena_);
+      CommitUdpOutput(inst.output, drv, kInitial, ctx_, arena_);
     }
+    RegisterUdpStateSetter(inst, drv, inst_prefix_, ctx_, arena_);
   }
   p->coro = MakeUdpInstCoroutine(&inst, drv, ctx_, arena_).Release();
 

@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <string>
 #include <vector>
 
@@ -125,10 +126,11 @@ TEST_F(PrimitivePrimTerm, IndexTransitionIsNullWhenNotAnArrayElement) {
 // gate, switch, combinational UDP, or generic primitive - is rejected. The put
 // returns NULL and records a vpi_chk_error() error, leaving nothing written.
 TEST_F(PrimitivePrimTerm, PutValueRejectedOnNonSequentialPrimitive) {
-  const int kKinds[] = {vpiGate, vpiSwitch, vpiUdp, vpiCombPrim, vpiPrimitive};
+  const int kKinds[] = {vpiGate, vpiSwitch, vpiUdp, vpiPrimitive};
   for (int kind : kKinds) {
     VpiObject prim;
     prim.type = kind;
+    prim.prim_type = vpiCombPrim;
 
     s_vpi_value val = {};
     val.format = vpiScalarVal;
@@ -152,7 +154,8 @@ TEST_F(PrimitivePrimTerm, PutValueAcceptedOnSequentialUdp) {
 
   vpiHandle h = vpi_handle_by_name(VpiText("seq"), nullptr);
   ASSERT_NE(h, nullptr);
-  VpiObjectOf(h)->type = vpiSeqPrim;
+  VpiObjectOf(h)->type = vpiUdp;
+  VpiObjectOf(h)->prim_type = vpiSeqPrim;
 
   s_vpi_value val = {};
   val.format = vpiScalarVal;
@@ -174,17 +177,18 @@ TEST_F(PrimitivePrimTerm, PutValueAcceptedOnSequentialUdp) {
 // -----------------------------------------------------------------------------
 
 // Class membership: the kinds the enclosure holds are the gate, the switch and
-// the udp, the last in the sequential and combinational forms §37.36 detail 2
-// distinguishes. The class constant itself is not one of them.
+// the udp. The class constant itself is not one of them, and neither is the
+// iterator nor the io decl, whose object types share their numbers with the
+// vpiSeqPrim and vpiCombPrim values of vpiPrimType (#7369).
 TEST_F(PrimitivePrimTerm, ThePrimitiveClassGroupsTheConcreteKinds) {
   EXPECT_TRUE(VpiIsPrimitiveType(vpiGate));
   EXPECT_TRUE(VpiIsPrimitiveType(vpiSwitch));
   EXPECT_TRUE(VpiIsPrimitiveType(vpiUdp));
-  EXPECT_TRUE(VpiIsPrimitiveType(vpiSeqPrim));
-  EXPECT_TRUE(VpiIsPrimitiveType(vpiCombPrim));
 
   EXPECT_FALSE(VpiIsPrimitiveType(vpiPrimitive));
   EXPECT_FALSE(VpiIsPrimitiveType(kVpiNet));
+  EXPECT_FALSE(VpiIsPrimitiveType(vpiIterator));
+  EXPECT_FALSE(VpiIsPrimitiveType(vpiIODecl));
 }
 
 // §37.5 (figure, module ==> primitive): a module's primitives are what the edge
@@ -568,6 +572,158 @@ TEST_F(PrimitivePrimTerm, PrimitiveIsTheParentOrElseAHeldPrimitive) {
   holder.parent = &module;
   holder.children = {&gate};
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiPrimitive, VpiHandleOf(&holder))), &gate);
+}
+
+// The integer value of `obj`, -1 where nothing is written.
+int IntValueOf(vpiHandle obj) {
+  s_vpi_value value = {};
+  value.format = vpiIntVal;
+  value.value.integer = -1;
+  vpi_get_value(obj, &value);
+  return value.value.integer;
+}
+
+// §37.35 (figure): a primitive's value is its output's, and a prim term's the
+// value of the expression it connects (#7138).
+TEST_F(PrimitivesOfARun, AGateAndItsTermsReadTheirValues) {
+  Run("module top; wire y; logic a = 1, b = 0;\n"
+      "  and g(y, a, b);\n"
+      "endmodule\n");
+  vpiHandle g = Named(vpiPrimitive, By("top"), "g");
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(IntValueOf(g), 0);
+  const std::vector<vpiHandle> kTerms = TermsOf(g);
+  ASSERT_EQ(kTerms.size(), 3U);
+  EXPECT_EQ(IntValueOf(kTerms[0]), 0);
+  EXPECT_EQ(IntValueOf(kTerms[1]), 1);
+  EXPECT_EQ(IntValueOf(kTerms[2]), 0);
+}
+
+// The delays vpi_get_delays reads off `prim`, `count` of them, in ticks.
+std::vector<PLI_UINT32> DelaysOf(vpiHandle prim, int count) {
+  std::vector<s_vpi_time> da(static_cast<std::size_t>(count));
+  s_vpi_delay delay = {};
+  delay.da = da.data();
+  delay.no_of_delays = count;
+  delay.time_type = vpiSimTime;
+  vpi_get_delays(prim, &delay);
+  std::vector<PLI_UINT32> ticks;
+  for (const s_vpi_time& time : da) ticks.push_back(time.low);
+  return ticks;
+}
+
+// §37.35 with §28.16 and §29.8: a primitive reports through vpi_get_delays
+// the delays it was written with: a gate its rise, its fall and, where none
+// was written, a turn-off that is the smaller of the two; a switch the three
+// written; a UDP its rise and a fall that is the rise where none was written
+// (#7139).
+TEST_F(PrimitivesOfARun, APrimitiveReportsItsWrittenDelays) {
+  Run("`timescale 1ns/1ns\n"
+      "primitive inv_udp(o, a);\n"
+      "  output o; input a;\n"
+      "  table 0 : 1; 1 : 0; endtable\n"
+      "endprimitive\n"
+      "module top; wire y, z, w; logic a;\n"
+      "  and #(3, 5) g(y, a, a);\n"
+      "  bufif1 #(2, 4, 6) h(z, a, a);\n"
+      "  inv_udp #7 u(w, a);\n"
+      "  and n(y, a, a);\n"
+      "endmodule\n");
+  EXPECT_EQ(DelaysOf(Named(vpiPrimitive, By("top"), "g"), 3),
+            (std::vector<PLI_UINT32>{3, 5, 3}));
+  EXPECT_EQ(DelaysOf(Named(vpiPrimitive, By("top"), "h"), 3),
+            (std::vector<PLI_UINT32>{2, 4, 6}));
+  EXPECT_EQ(DelaysOf(Named(vpiPrimitive, By("top"), "u"), 2),
+            (std::vector<PLI_UINT32>{7, 7}));
+  EXPECT_EQ(DelaysOf(Named(vpiPrimitive, By("top"), "n"), 2),
+            (std::vector<PLI_UINT32>{0, 0}));
+}
+
+// §37.35 with §28.3.6: each element of an instance array of gates reports the
+// delays the array was written with.
+TEST_F(PrimitivesOfARun, AnArrayElementReportsTheArraysDelays) {
+  Run("`timescale 1ns/1ns\n"
+      "module top; wire [1:0] y; logic [1:0] a;\n"
+      "  not #(4, 6) g[1:0] (y, a);\n"
+      "endmodule\n");
+  EXPECT_EQ(DelaysOf(Named(vpiPrimitive, By("top"), "g[0]"), 3),
+            (std::vector<PLI_UINT32>{4, 6, 4}));
+}
+
+// §37.35 detail 2 with §38.34: a value put to a sequential UDP while it runs
+// becomes its state and its output at once, so the row that holds the output
+// (en low) holds the value put when an input moves after it. A put with a
+// scheduled delay is refused, and one in a format giving no bit writes
+// nothing (#7137).
+class SequentialUdpPuts : public PrimitivesOfARun {
+ protected:
+  void SetUp() override {
+    PrimitivesOfARun::SetUp();
+    s_vpi_systf_data data = {};
+    data.type = vpiSysTask;
+    data.tfname = VpiText("$put_one");
+    data.calltf = &PutOneCalltf;
+    ASSERT_NE(vpi_register_systf(&data), nullptr);
+  }
+
+  // The latch u1 of top, null for none.
+  static vpiHandle Latch() { return Named(vpiPrimitive, By("top"), "u1"); }
+
+  static PLI_INT32 PutOneCalltf(PLI_BYTE8* /*user_data*/) {
+    s_vpi_value value = {};
+    value.format = vpiScalarVal;
+    value.value.scalar = vpi1;
+    vpi_put_value(Latch(), &value, nullptr, vpiNoDelay);
+    return 0;
+  }
+};
+
+TEST_F(SequentialUdpPuts, APutBecomesTheUdpsState) {
+  Run("primitive latch_udp(q, d, en);\n"
+      "  output reg q; input d, en;\n"
+      "  initial q = 0;\n"
+      "  table\n"
+      "    0 1 : ? : 0;\n"
+      "    1 1 : ? : 1;\n"
+      "    ? 0 : ? : -;\n"
+      "  endtable\n"
+      "endprimitive\n"
+      "module top; wire q; logic d = 0, en = 0;\n"
+      "  latch_udp u1(q, d, en);\n"
+      "  initial begin #5 $put_one; #1 d = 1; #1 d = 0; end\n"
+      "endmodule\n");
+  vpiHandle u1 = Latch();
+  ASSERT_NE(u1, nullptr);
+  EXPECT_EQ(IntValueOf(By("top.q")), 1);
+  EXPECT_EQ(IntValueOf(u1), 1);
+
+  s_vpi_value zero = {};
+  zero.format = vpiScalarVal;
+  zero.value.scalar = vpi0;
+  s_vpi_time later = {};
+  later.type = vpiSimTime;
+  later.low = 2;
+  vpi_put_value(u1, &zero, &later, vpiTransportDelay);
+  s_vpi_error_info info = {};
+  EXPECT_EQ(vpi_chk_error(&info), vpiError);
+  EXPECT_EQ(IntValueOf(By("top.q")), 1);
+
+  s_vpi_value none = {};
+  none.format = vpiObjTypeVal;
+  vpi_put_value(u1, &none, nullptr, vpiNoDelay);
+  EXPECT_EQ(IntValueOf(By("top.q")), 1);
+
+  vpi_put_value(u1, &zero, nullptr, vpiNoDelay);
+  EXPECT_EQ(IntValueOf(By("top.q")), 0);
+}
+
+// §37.35 with §37.4.1: a module's primitives are its gates, switches and udps
+// alone, its io decls being none of them (#7369).
+TEST_F(PrimitivesOfARun, AModulesIoDeclsAreNoPrimitives) {
+  Run("module top(input a, output y);\n"
+      "  and g(y, a, a);\n"
+      "endmodule\n");
+  EXPECT_EQ(KindsOf(vpiPrimitive, By("top")), (std::vector<int>{vpiGate}));
 }
 }  // namespace
 }  // namespace delta

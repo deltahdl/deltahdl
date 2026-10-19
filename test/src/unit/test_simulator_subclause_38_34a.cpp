@@ -426,7 +426,8 @@ TEST_F(VpiPutValueSim, SequentialUdpRejectsDelayMode) {
 
   vpiHandle h = vpi_handle_by_name(VpiText("up"), nullptr);
   ASSERT_NE(h, nullptr);
-  VpiObjectOf(h)->type = vpiSeqPrim;
+  VpiObjectOf(h)->type = vpiUdp;
+  VpiObjectOf(h)->prim_type = vpiSeqPrim;
 
   s_vpi_value val = {};
   val.format = vpiScalarVal;
@@ -453,7 +454,8 @@ TEST_F(VpiPutValueSim, SequentialUdpRejectsPureTransportDelay) {
 
   vpiHandle h = vpi_handle_by_name(VpiText("uq"), nullptr);
   ASSERT_NE(h, nullptr);
-  VpiObjectOf(h)->type = vpiSeqPrim;
+  VpiObjectOf(h)->type = vpiUdp;
+  VpiObjectOf(h)->prim_type = vpiSeqPrim;
 
   s_vpi_value val = {};
   val.format = vpiScalarVal;
@@ -479,7 +481,8 @@ TEST_F(VpiPutValueSim, SequentialUdpRejectsInertialDelay) {
 
   vpiHandle h = vpi_handle_by_name(VpiText("ui"), nullptr);
   ASSERT_NE(h, nullptr);
-  VpiObjectOf(h)->type = vpiSeqPrim;
+  VpiObjectOf(h)->type = vpiUdp;
+  VpiObjectOf(h)->prim_type = vpiSeqPrim;
 
   s_vpi_value val = {};
   val.format = vpiScalarVal;
@@ -503,7 +506,8 @@ TEST_F(VpiPutValueSim, SequentialUdpAcceptsNoDelay) {
 
   vpiHandle h = vpi_handle_by_name(VpiText("ua"), nullptr);
   ASSERT_NE(h, nullptr);
-  VpiObjectOf(h)->type = vpiSeqPrim;
+  VpiObjectOf(h)->type = vpiUdp;
+  VpiObjectOf(h)->prim_type = vpiSeqPrim;
 
   s_vpi_value val = {};
   val.format = vpiScalarVal;

@@ -191,6 +191,16 @@ VpiObject* GateDelayExpression(const ModuleItem& item, const PrimSite& site,
       build);
 }
 
+// §37.35 with §28.16: the delays the gate or switch instantiation `item` at
+// `site` was written with, a rise, a fall and a turn-off, as vpi_get_delays
+// reads them.
+std::vector<VpiDelayInfo> GateDelays(const ModuleItem& item,
+                                     const PrimSite& site, SimContext& ctx) {
+  return VpiWrittenDelays(
+      {item.gate_delay, item.gate_delay_fall, item.gate_delay_decay}, true,
+      VpiFlatName(site.prefix, ""), ctx);
+}
+
 // The expressions `item`'s terminals are written as at `site`.
 std::vector<VpiObject*> TerminalObjects(const ModuleItem& item,
                                         const PrimSite& site, SimContext& ctx,
@@ -215,14 +225,16 @@ VpiObject* ElementTerminal(VpiObject* whole, int64_t offset, int64_t length) {
 
 // What one instance array of primitives is made of: the instantiation `item`
 // writing its range and terminals, the shape its elements share, the kind of
-// array, the delay each element is instantiated with, and the udp defn a udp
-// array's elements reach, null for a gate or switch array.
+// array, the delay each element is instantiated with, the udp defn a udp
+// array's elements reach, null for a gate or switch array, and the delays each
+// element reports through vpi_get_delays.
 struct PrimArraySpec {
   const ModuleItem& item;
   PrimShape shape;
   int kind;
   VpiObject* delay;
   VpiObject* udp_defn = nullptr;
+  std::vector<VpiDelayInfo> delays = {};
 };
 
 // §37.11 with §28.3.6: the instance array `spec` describes at `site`, a gate,
@@ -256,6 +268,7 @@ void MakePrimitiveArray(const PrimArraySpec& spec, const PrimSite& site,
     VpiObject* prim =
         MakePrimitiveObject(spec.shape, kName, terminals, site.instance, build);
     prim->delay_expr = spec.delay;
+    prim->delays = spec.delays;
     prim->udp_defn = spec.udp_defn;
     VpiRecordWrittenLocation(prim, item.loc, ctx);
     VpiAddArrayElement(array, prim, index, build);
@@ -276,6 +289,14 @@ VpiObject* UdpDelayExpression(const RtlirUdpInst& inst, const PrimSite& site,
                                   build);
 }
 
+// §37.35 with §29.8: the same delays as vpi_get_delays reads them, a rise and
+// a fall, a UDP having no z to turn off to.
+std::vector<VpiDelayInfo> UdpDelays(const RtlirUdpInst& inst,
+                                    const PrimSite& site, SimContext& ctx) {
+  return VpiWrittenDelays({inst.delay, inst.delay_fall, nullptr}, false,
+                          VpiFlatName(site.prefix, ""), ctx);
+}
+
 // §29.8 with §37.35: the udp the instantiation `inst` of a UDP makes at `site`,
 // its output terminal first and its inputs after it as §29.8 writes them, and
 // reaching the udp defn `defn` of the UDP it instantiates. Answers the object
@@ -293,6 +314,10 @@ VpiObject* MakeUdpObject(const RtlirUdpInst& inst, const PrimSite& site,
                                        terminals, site.instance, build);
   udp->udp_defn = defn;
   udp->delay_expr = UdpDelayExpression(inst, site, ctx, build);
+  udp->delays = UdpDelays(inst, site, ctx);
+  // §37.35 detail 2: the name a put to a sequential UDP finds the running
+  // instance under.
+  udp->run_key = VpiFlatName(site.prefix, inst.name);
   // §37.3.3: where the instantiation was written.
   VpiRecordWrittenLocation(udp, inst.loc, ctx);
   return udp;
@@ -311,7 +336,8 @@ void MakeInstanceUdps(const RtlirModule& mod, const PrimSite& site,
       if (arrays.insert(inst.source_item).second) {
         MakePrimitiveArray(
             {*inst.source_item, UdpShape(*inst.decl), vpiUdpArray,
-             UdpDelayExpression(inst, site, ctx, build), defn},
+             UdpDelayExpression(inst, site, ctx, build), defn,
+             UdpDelays(inst, site, ctx)},
             site, ctx, build);
       }
       continue;
@@ -346,7 +372,8 @@ void AttachPrimitives(const RtlirDesign* design, const VpiObjectMap& objects,
             MakePrimitiveArray(
                 {*item, kShape,
                  kShape.type == vpiSwitch ? vpiSwitchArray : vpiGateArray,
-                 GateDelayExpression(*item, kSite, ctx, build)},
+                 GateDelayExpression(*item, kSite, ctx, build), nullptr,
+                 GateDelays(*item, kSite, ctx)},
                 kSite, ctx, build);
             continue;
           }
@@ -354,6 +381,7 @@ void AttachPrimitives(const RtlirDesign* design, const VpiObjectMap& objects,
               ShapeOf(item->gate_kind), item->gate_inst_name,
               TerminalObjects(*item, kSite, ctx, build), instance, build);
           prim->delay_expr = GateDelayExpression(*item, kSite, ctx, build);
+          prim->delays = GateDelays(*item, kSite, ctx);
           // §37.3.3: where the instantiation was written.
           VpiRecordWrittenLocation(prim, item->loc, ctx);
           // §37.83: the attributes it is written with.

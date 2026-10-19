@@ -1,6 +1,7 @@
 #include "simulator/vpi_source_delay.h"
 
 #include <algorithm>
+#include <array>
 #include <functional>
 #include <initializer_list>
 #include <string_view>
@@ -52,24 +53,36 @@ VpiObject* VpiSourceDelayExpression(const std::vector<const Expr*>& delays,
   return op;
 }
 
-void VpiFillContAssignDelays(VpiObject* obj, const RtlirContAssign& ca,
-                             std::string_view scope_prefix, SimContext& ctx,
-                             const std::function<VpiObject*()>& alloc) {
-  if (ca.delay == nullptr) return;
+std::vector<VpiDelayInfo> VpiWrittenDelays(
+    const std::array<const Expr*, 3>& delays, bool turn_off,
+    std::string_view scope_prefix, SimContext& ctx) {
+  std::vector<VpiDelayInfo> written;
+  if (delays[0] == nullptr) return written;
+  InstancePrefixOverride scope(ctx.InstancePrefixOverride(), scope_prefix);
   Arena& arena = ctx.GetArena();
   const auto kTicks = [&ctx, &arena](const Expr* delay) {
     return static_cast<double>(
         DelayValueToTicks(EvalExpr(delay, ctx, arena), ctx));
   };
-  const double kRise = kTicks(ca.delay);
-  const double kFall = ca.delay_fall != nullptr ? kTicks(ca.delay_fall) : kRise;
-  const double kOff = ca.delay_decay != nullptr ? kTicks(ca.delay_decay)
-                                                : std::min(kRise, kFall);
+  const double kRise = kTicks(delays[0]);
+  const double kFall = delays[1] != nullptr ? kTicks(delays[1]) : kRise;
+  const double kOff =
+      delays[2] != nullptr ? kTicks(delays[2]) : std::min(kRise, kFall);
   for (const double kDelay : {kRise, kFall, kOff}) {
     VpiDelayInfo info;
     info.delay = kDelay;
-    obj->delays.push_back(info);
+    written.push_back(info);
   }
+  if (!turn_off) written.pop_back();
+  return written;
+}
+
+void VpiFillContAssignDelays(VpiObject* obj, const RtlirContAssign& ca,
+                             std::string_view scope_prefix, SimContext& ctx,
+                             const std::function<VpiObject*()>& alloc) {
+  if (ca.delay == nullptr) return;
+  obj->delays = VpiWrittenDelays({ca.delay, ca.delay_fall, ca.delay_decay},
+                                 true, scope_prefix, ctx);
   obj->delay_expr = VpiSourceDelayExpression(
       {ca.delay, ca.delay_fall, ca.delay_decay}, scope_prefix, ctx, alloc);
 }

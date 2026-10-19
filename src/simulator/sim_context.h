@@ -19,6 +19,7 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <ostream>
@@ -606,6 +607,12 @@ class SimContext : public DeclaredNameTables,
   std::vector<std::unique_ptr<FileMonitor>>& FileMonitors() {
     return files_.monitors;
   }
+  // §37.35 detail 2 with §38.34: what sets the state of each running
+  // sequential UDP instance under its flat name, which a VPI put calls.
+  std::unordered_map<std::string, std::function<void(char)>>&
+  UdpStateSetters() {
+    return udp_state_setters_;
+  }
 
   SemaphoreObject* CreateSemaphore(std::string_view name, int32_t keys);
   SemaphoreObject* FindSemaphore(std::string_view name);
@@ -876,6 +883,7 @@ class SimContext : public DeclaredNameTables,
   std::unordered_map<std::string, TimeScale> scope_timescales_;
   std::vector<std::string> plus_args_;
   SimFileTables files_;
+  std::unordered_map<std::string, std::function<void(char)>> udp_state_setters_;
   void EnsureStdioDescriptors();
 
   std::unordered_map<std::string_view, ArrayInfo> array_infos_;

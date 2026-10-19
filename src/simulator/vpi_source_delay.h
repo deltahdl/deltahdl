@@ -1,8 +1,11 @@
 #pragma once
 
+#include <array>
 #include <functional>
 #include <string_view>
 #include <vector>
+
+#include "simulator/vpi_constants.h"
 
 namespace delta {
 
@@ -22,6 +25,16 @@ VpiObject* VpiSourceDelayExpression(const std::vector<const Expr*>& delays,
                                     std::string_view scope_prefix,
                                     SimContext& ctx,
                                     const std::function<VpiObject*()>& alloc);
+
+// §37.35, §37.47 and §38.10: the delays an object whose source code wrote
+// `delays`, a rise, a fall and a turn-off, reports through vpi_get_delays, in
+// ticks, evaluated in the instance under `scope_prefix`: the rise, a fall that
+// is the rise where none was written and, where `turn_off` says the object
+// has one, a turn-off that is the smaller of the two where none was (§10.3.3,
+// §28.16). None where no delay was written.
+std::vector<VpiDelayInfo> VpiWrittenDelays(
+    const std::array<const Expr*, 3>& delays, bool turn_off,
+    std::string_view scope_prefix, SimContext& ctx);
 
 // §37.47 with §37.3.4 and §10.3.3: the delays the continuous assignment `ca`
 // was written with, set on its object `obj` twice over: in ticks, as

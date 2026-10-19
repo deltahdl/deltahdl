@@ -33,6 +33,7 @@
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_primitive_value.h"
 #include "simulator/vpi_value_pools.h"
 #include "simulator/vpi_value_strings.h"
 
@@ -450,6 +451,10 @@ static void BindRunStorage(VpiObject& obj, SimContext* sim) {
 // its own, or null where its value is already written to `value`.
 static VpiHandle ValueStandIn(VpiHandle obj, s_vpi_value* value,
                               VpiValuePools& pools, SimContext* sim) {
+  // §37.35: a primitive and a prim term read the expression they connect.
+  if (VpiHandle source = VpiPrimitiveValueSource(obj); source != obj) {
+    return source;
+  }
   // §37.45 details 1 and 2: a delay term reads the value on its side of the
   // delay. The input term's is the value a module path transition still
   // carries across the delay where one runs on its net, and otherwise the
@@ -583,7 +588,7 @@ static bool PutValueTargetIsRejected(VpiHandle obj, s_vpi_error_info& error) {
   // switch, combinational UDP, or a generic primitive - is not allowed, so the
   // put is rejected before any value is written. (The complementary delay-mode
   // restriction on a sequential UDP itself is checked further below.)
-  if (VpiObjectIsPrimitive(obj->type) && obj->type != vpiSeqPrim) {
+  if (VpiObjectIsPrimitive(obj->type) && obj->prim_type != vpiSeqPrim) {
     RecordVpiError(
         error,
         "vpi_put_value(): only a sequential UDP primitive may be written");
@@ -710,7 +715,7 @@ static bool PutValueDelayModeIsRejected(VpiHandle obj, int mode, bool has_delay,
   // the primitive instance carries, so a value may be put to it only with the
   // vpiNoDelay flag. Supplying one of the scheduled delay modes instead is an
   // error, and the put is rejected.
-  if (obj->type == vpiSeqPrim &&
+  if (obj->prim_type == vpiSeqPrim &&
       (mode == vpiInertialDelay || mode == vpiTransportDelay ||
        mode == vpiPureTransportDelay)) {
     RecordVpiError(error,
@@ -890,7 +895,8 @@ VpiHandle VpiContext::PutValue(VpiHandle obj, s_vpi_value* value,
 
   bool has_delay = PutValueHasDelay(mode, time);
 
-  if (PutValueDelayModeIsRejected(obj, mode, has_delay, last_error_)) {
+  if (PutValueDelayModeIsRejected(obj, mode, has_delay, last_error_) ||
+      VpiPutSequentialUdpValue(*obj, value, sim_ctx_)) {
     return nullptr;
   }
 

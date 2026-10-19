@@ -26,6 +26,10 @@ class UdpEvalState {
   void SetInputs(const std::vector<char>& inputs);
 
   char GetOutput() const { return output_; }
+  // §38.34: makes `output` the primitive's output, and so the current state
+  // its next evaluation matches against (§29.5), as a VPI put of a sequential
+  // primitive's value does.
+  void SetOutput(char output) { output_ = output; }
 
  private:
   const UdpDecl& decl_;
