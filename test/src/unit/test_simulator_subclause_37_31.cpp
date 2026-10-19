@@ -468,7 +468,7 @@ TEST_F(ClassDefinitionsOfARun, AClassDefnIteratesItsTypedefs) {
   Run("module top; class C; typedef int T; localparam type U = byte;\n"
       "  typedef logic [3:0] N; int x; endclass endmodule\n");
   vpiHandle defn = DefnIn(By("top"), "C");
-  EXPECT_EQ(NamesOf(vpiTypedef, defn), (std::vector<std::string>{"T", "N"}));
+  EXPECT_EQ(NamesOf(vpiTypedef, defn), (std::vector<std::string>{"N", "T"}));
   vpiHandle t = Named(vpiTypedef, defn, "T");
   ASSERT_NE(t, nullptr);
   EXPECT_EQ(vpi_get(vpiType, t), vpiIntTypespec);
@@ -484,7 +484,7 @@ TEST_F(ClassDefinitionsOfARun, AClassDefnIteratesItsParameters) {
       "  class D; parameter type V = byte; endclass endmodule\n");
   vpiHandle c = DefnIn(By("top"), "C");
   EXPECT_EQ(NamesOf(vpiParameter, c),
-            (std::vector<std::string>{"W", "T", "L", "P", "U"}));
+            (std::vector<std::string>{"L", "P", "T", "U", "W"}));
   const auto kTypeOf = [&](std::string_view name) {
     return vpi_get(vpiType, Named(vpiParameter, c, name));
   };

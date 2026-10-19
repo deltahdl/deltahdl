@@ -744,7 +744,12 @@ void AttachPackageSubroutineBodies(const RtlirDesign& design,
   const std::string kUnit("$unit");
   const BodyWalk kUnitWalk{design, kNoModule, objects, kUnit, calls, build};
   for (const ModuleItem* item : design.cu_function_decls) {
-    WalkSubroutineBody(*item, calls.subroutines.at({item, kUnit}), kUnitWalk);
+    // §8.24: a method body written outside its class is no task of the unit,
+    // and its class defn's method walks it.
+    const auto kMade = calls.subroutines.find({item, kUnit});
+    if (kMade != calls.subroutines.end()) {
+      WalkSubroutineBody(*item, kMade->second, kUnitWalk);
+    }
   }
 }
 
