@@ -614,6 +614,8 @@ void VpiContext::AttachUdpDefns(const RtlirDesign* design) {
   for (const UdpDecl* decl : VpiDesignUdpDecls(design)) {
     auto* defn = AllocObject();
     VpiFillUdpDefnObject(defn, *decl, name_pool_);
+    // §37.3.6: a primitive declared in a decryption envelope is protected.
+    RecordProtection(defn, decl->range.start, SourcesOf(sim_ctx_));
     run_objects_.try_emplace(decl, defn);
     // §37.13 with §29.3: an io decl per port the primitive declares, its one
     // output first and then its inputs, each one bit and declaring no net of
@@ -632,7 +634,16 @@ void VpiContext::AttachUdpDefns(const RtlirDesign* design) {
     kIoDecl(decl->output_name, vpiOutput);
     for (std::string_view input : decl->input_names) kIoDecl(input, vpiInput);
     for (const UdpTableRow& row : decl->table) {
-      VpiFillUdpTableEntryObject(AllocObject(), row, defn);
+      VpiFillUdpTableEntryObject(AllocObject(), row, defn,
+                                 sim_ctx_->GetArena());
+    }
+    // §37.36 (figure): the initial statement of a sequential UDP, which gives
+    // the output its run begins with (§29.3.3).
+    if (decl->has_initial) {
+      auto* initial = AllocObject();
+      initial->type = vpiInitial;
+      initial->parent = defn;
+      defn->children.push_back(initial);
     }
   }
 }

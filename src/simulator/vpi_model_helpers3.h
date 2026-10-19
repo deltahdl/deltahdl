@@ -15,6 +15,7 @@
 
 namespace delta {
 
+class Arena;
 struct RtlirDesign;
 struct UdpDecl;
 struct UdpTableRow;
@@ -685,9 +686,9 @@ VpiHandle VpiInstanceArrayRightRange(
 // entries of its rows. These build that object out of the design.
 // ===========================================================================
 
-// §37.36 (figure): the UDP declarations a design instantiates, each named once.
-// A declaration reaches elaboration on the instances of it, so the distinct
-// declarations behind those instances are what the definitions are made from.
+// §37.36 (figure): the UDP declarations of a design, each named once: every
+// definition its compilation unit declares, an extern prototype being none,
+// and then any other an instance of it names.
 std::vector<const UdpDecl*> VpiDesignUdpDecls(const RtlirDesign* design);
 
 // §37.36 (figure): fill in a udp defn. Its properties are the declaration's own
@@ -698,8 +699,9 @@ void VpiFillUdpDefnObject(VpiObject* obj, const UdpDecl& decl,
                           std::deque<std::string>& names);
 
 // §37.36 (figure): fill in one of the udp defn's table entries, which reports
-// how many symbol entries its row holds through vpiSize.
+// how many symbol entries its row holds through vpiSize and, by detail 1, the
+// row's text as its value, kept in `arena`.
 void VpiFillUdpTableEntryObject(VpiObject* obj, const UdpTableRow& row,
-                                VpiObject* defn);
+                                VpiObject* defn, Arena& arena);
 
 }  // namespace delta

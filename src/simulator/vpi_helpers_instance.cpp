@@ -2,6 +2,7 @@
 #include <array>
 #include <cctype>
 #include <cstdarg>
+#include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <deque>
@@ -15,12 +16,15 @@
 #include "common/arena.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_primitives.h"
+#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_specify.h"
+#include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/specify.h"
 #include "simulator/specify_path_delay.h"
 #include "simulator/specify_timing_check.h"
+#include "simulator/variable.h"
 #include "simulator/vpi_user.h"
 // §37.10 detail 3: the package/interface/program instance kinds are defined in
 // the SystemVerilog VPI header alongside the §37.10 vpiInstance relation.
@@ -273,9 +277,22 @@ int VpiSmallestTimePrecision(const std::vector<int>& precisions) {
 // §37.36 UDP.
 // ===========================================================================
 
-std::vector<const UdpDecl*> VpiDesignUdpDecls(const RtlirDesign* design) {
+// The primitives the compilation unit of `design` defines, one no instance
+// uses among them; an extern prototype names the primitive its definition
+// declares (§3.13), so it is none of them.
+static std::vector<const UdpDecl*> UnitUdpDefinitions(
+    const RtlirDesign& design) {
   std::vector<const UdpDecl*> decls;
-  if (design == nullptr) return decls;
+  if (design.compilation_unit == nullptr) return decls;
+  for (const UdpDecl* decl : design.compilation_unit->udps) {
+    if (!decl->is_extern) decls.push_back(decl);
+  }
+  return decls;
+}
+
+std::vector<const UdpDecl*> VpiDesignUdpDecls(const RtlirDesign* design) {
+  if (design == nullptr) return {};
+  std::vector<const UdpDecl*> decls = UnitUdpDefinitions(*design);
 
   std::vector<const RtlirModule*> work(design->top_modules.begin(),
                                        design->top_modules.end());
@@ -306,13 +323,43 @@ void VpiFillUdpDefnObject(VpiObject* obj, const UdpDecl& decl,
   obj->prim_type = decl.is_sequential ? vpiSeqPrim : vpiCombPrim;
 }
 
+// §37.36 detail 1: `row` as the table writes it, its input symbols with an
+// edge in parentheses among them, then the current state of a sequential row
+// and the output, each field set off by a colon.
+static std::string DecompiledUdpRow(const UdpTableRow& row) {
+  std::string text;
+  for (std::size_t i = 0; i < row.inputs.size(); ++i) {
+    if (i > 0) text += ' ';
+    if (row.inputs[i] != '\x01') {
+      text += row.inputs[i];
+      continue;
+    }
+    text += '(';
+    text += row.paren_edges[i].first;
+    text += row.paren_edges[i].second;
+    text += ')';
+  }
+  if (row.current_state != 0) {
+    text += " : ";
+    text += row.current_state;
+  }
+  text += " : ";
+  text += row.output;
+  return text;
+}
+
 void VpiFillUdpTableEntryObject(VpiObject* obj, const UdpTableRow& row,
-                                VpiObject* defn) {
+                                VpiObject* defn, Arena& arena) {
   obj->type = vpiTableEntry;
   // The symbol entries of a row are the input symbols it matches on, the
   // current state a sequential row carries, and the output symbol it names.
   obj->size = static_cast<int>(row.inputs.size()) +
               (row.current_state != 0 ? 1 : 0) + 1;
+  // §37.36 detail 1: the row's text, which a string value reads as it is and
+  // a vector value as the ASCII codes of its characters.
+  auto* text = arena.Create<Variable>();
+  text->value = StringToLogic4Vec(arena, DecompiledUdpRow(row));
+  obj->var = text;
   obj->parent = defn;
   defn->children.push_back(obj);
 }

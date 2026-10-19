@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <cstddef>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -10,7 +12,10 @@
 #include "common/types.h"
 #include "elaborator/rtlir.h"
 #include "fixture_simulator.h"
+#include "fixture_vpi_run.h"
+#include "helpers_sealed_design_run.h"
 #include "parser/ast_specify.h"
+#include "preprocessor/protect_processing.h"
 #include "simulator/net.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
@@ -317,10 +322,11 @@ TEST(UdpDesign, ADesignsUdpDeclarationIsAUdpDefnObject) {
   EXPECT_EQ(g_udp_table_entries, 3);
 }
 
-// §37.36: the UDP definitions of a design are the ones its UDP instances name,
-// each once, however many instances name it and however deep they stand. A
-// child instance with no module to stand for and a UDP instance naming no
-// definition add none.
+// §37.36: the UDP definitions of a design include the ones its UDP instances
+// name, each once, however many instances name it and however deep they
+// stand, here with no compilation unit to read the declarations of. A child
+// instance with no module to stand for and a UDP instance naming no definition
+// add none.
 TEST(UdpDefinitionsOfADesign, EachDefinitionAnInstanceNamesOnce) {
   UdpDecl decl;
   decl.name = "u";
@@ -337,6 +343,144 @@ TEST(UdpDefinitionsOfADesign, EachDefinitionAnInstanceNamesOnce) {
   design.top_modules = {&top};
 
   EXPECT_EQ(VpiDesignUdpDecls(&design), (std::vector<const UdpDecl*>{&decl}));
+}
+
+// §37.36 against designs read and run whole, a udp defn read back once the run
+// is over.
+class UdpDefnsOfARun : public VpiDesignRun {
+ protected:
+  // The text the vector value of the table entry `entry` holds, one character
+  // per byte, the first in the most significant, `length` characters long.
+  static std::string VectorText(vpiHandle entry, std::size_t length) {
+    s_vpi_value value = {};
+    value.format = vpiVectorVal;
+    vpi_get_value(entry, &value);
+    std::string text;
+    if (value.value.vector == nullptr) return text;
+    for (std::size_t i = length; i-- > 0;) {
+      const PLI_UINT32 kWord = value.value.vector[i / 4].aval;
+      text.push_back(static_cast<char>((kWord >> ((i % 4) * 8)) & 0xffu));
+    }
+    return text;
+  }
+
+  // The string value of the table entry `entry`, empty for none.
+  static std::string StringText(vpiHandle entry) {
+    s_vpi_value value = {};
+    value.format = vpiStringVal;
+    vpi_get_value(entry, &value);
+    return value.value.str == nullptr ? "" : value.value.str;
+  }
+};
+
+// §37.36: the circle iteration reaches every UDP the design declares, one no
+// instance uses among them, and a primitive written as an extern prototype and
+// then defined once only (#7143).
+TEST_F(UdpDefnsOfARun, EveryDeclaredUdpHasADefn) {
+  Run("primitive used_and(o, a, b);\n"
+      "  output o; input a, b;\n"
+      "  table 0 ? : 0; ? 0 : 0; 1 1 : 1; endtable\n"
+      "endprimitive\n"
+      "extern primitive spare_or(output o, input a, b);\n"
+      "primitive spare_or(output o, input a, b);\n"
+      "  table 1 ? : 1; ? 1 : 1; 0 0 : 0; endtable\n"
+      "endprimitive\n"
+      "module top;\n"
+      "  wire o;\n"
+      "  used_and u1(o, 1'b1, 1'b0);\n"
+      "endmodule\n");
+  EXPECT_EQ(NamesOf(vpiUdpDefn, nullptr),
+            (std::vector<std::string>{"spare_or", "used_and"}));
+}
+
+constexpr const char* kFlop =
+    "primitive flop(q, clk, d);\n"
+    "  output reg q; input clk, d;\n"
+    "  initial q = 1'b0;\n"
+    "  table\n"
+    "    r 0 : ? : 0;\n"
+    "    (0x) 1 : 1 : 1;\n"
+    "    ? * : ? : -;\n"
+    "  endtable\n"
+    "endprimitive\n"
+    "primitive gate(o, a);\n"
+    "  output o; input a;\n"
+    "  table 0 : 1; 1 : 0; endtable\n"
+    "endprimitive\n"
+    "module top;\n"
+    "  reg clk, d; wire q, o;\n"
+    "  flop u1(q, clk, d);\n"
+    "  gate u2(o, d);\n"
+    "endmodule\n";
+
+// §37.36 detail 1: a table entry's string value is its row as the table writes
+// it, an edge in parentheses among its inputs and the current state of a
+// sequential row in its own field, and its vector value holds that text's
+// ASCII codes (#7141).
+TEST_F(UdpDefnsOfARun, ATableEntryReadsAsItsRow) {
+  Run(kFlop);
+  const std::vector<vpiHandle> kRows =
+      ObjectsOf(vpiTableEntry, Named(vpiUdpDefn, nullptr, "flop"));
+  ASSERT_EQ(kRows.size(), 3u);
+  EXPECT_EQ(StringText(kRows[0]), "r 0 : ? : 0");
+  EXPECT_EQ(StringText(kRows[1]), "(0x) 1 : 1 : 1");
+  EXPECT_EQ(StringText(kRows[2]), "? * : ? : -");
+  EXPECT_EQ(VectorText(kRows[1], 14), "(0x) 1 : 1 : 1");
+  const std::vector<vpiHandle> kGateRows =
+      ObjectsOf(vpiTableEntry, Named(vpiUdpDefn, nullptr, "gate"));
+  ASSERT_EQ(kGateRows.size(), 2u);
+  EXPECT_EQ(StringText(kGateRows[1]), "1 : 0");
+}
+
+// §37.36 (figure): a sequential UDP written with an initial statement reaches
+// it from its defn, and a combinational one, written with none, reaches none
+// (#7140).
+TEST_F(UdpDefnsOfARun, ASequentialUdpReachesItsInitial) {
+  Run(kFlop);
+  vpiHandle flop = Named(vpiUdpDefn, nullptr, "flop");
+  ASSERT_NE(flop, nullptr);
+  vpiHandle initial = vpi_handle(vpiInitial, flop);
+  ASSERT_NE(initial, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, initial), vpiInitial);
+  EXPECT_EQ(vpi_handle(vpiInitial, Named(vpiUdpDefn, nullptr, "gate")),
+            nullptr);
+}
+
+constexpr std::string_view kUdpKey = "udp-exchange-key";
+
+// §37.36 with §37.3.6: a UDP declared in a decryption envelope is protected
+// code, and one written in the clear answers vpiProtected FALSE, without error
+// (#7142).
+TEST_F(UdpDefnsOfARun, ASealedUdpIsProtected) {
+  RunUnderKey(EncryptEnvelopes("`pragma protect begin\n"
+                               "primitive sealed_and(o, a, b);\n"
+                               "  output o; input a, b;\n"
+                               "  table 0 ? : 0; ? 0 : 0; 1 1 : 1; endtable\n"
+                               "endprimitive\n"
+                               "`pragma protect end\n"
+                               "primitive clear_not(o, a);\n"
+                               "  output o; input a;\n"
+                               "  table 0 : 1; 1 : 0; endtable\n"
+                               "endprimitive\n"
+                               "module t;\n"
+                               "  wire o1, o2;\n"
+                               "  sealed_and u1(o1, 1'b1, 1'b0);\n"
+                               "  clear_not u2(o2, 1'b1);\n"
+                               "endmodule\n",
+                               kUdpKey),
+              kUdpKey, f_);
+  std::vector<int> sealed;
+  vpiHandle clear = nullptr;
+  for (vpiHandle defn : ObjectsOf(vpiUdpDefn, nullptr)) {
+    sealed.push_back(vpi_get(vpiIsProtected, defn));
+    if (sealed.back() == 0) clear = defn;
+  }
+  std::ranges::sort(sealed);
+  EXPECT_EQ(sealed, (std::vector<int>{0, 1}));
+  ASSERT_NE(clear, nullptr);
+  EXPECT_EQ(vpi_get(vpiProtected, clear), 0);
+  s_vpi_error_info info = {};
+  EXPECT_EQ(vpi_chk_error(&info), 0);
 }
 
 }  // namespace

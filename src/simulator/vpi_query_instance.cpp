@@ -15,6 +15,12 @@ bool VpiGetInstanceProperty(int property, VpiHandle obj, int& value) {
     value = static_cast<int>(obj->in_compilation_unit);
     return true;
   }
+  // §37.36: a udp defn reports through vpiProtected whether it is protected
+  // code (§37.3.6).
+  if (property == vpiProtected && obj->type == vpiUdpDefn) {
+    value = static_cast<int>(obj->is_protected);
+    return true;
+  }
   if (!VpiIsInstanceType(obj->type)) return false;
   const VpiInstanceFacts& facts = obj->instance_facts;
   switch (property) {
