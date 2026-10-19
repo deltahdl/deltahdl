@@ -743,6 +743,8 @@ void PrefixFullNamesWithTop(VpiObject* obj, std::string_view top) {
 
 void VpiContext::MakeNettypeDecls(VpiHandle scope,
                                   const std::vector<ModuleItem*>& items) {
+  const VpiAttachBuild kBuild{[this] { return AllocObject(); },
+                              VpiPoolKeeper(name_pool_), sim_ctx_->GetArena()};
   for (const ModuleItem* entry : items) {
     if (entry->kind != ModuleItemKind::kNettypeDecl) continue;
     const ModuleItem& item = *entry;
@@ -764,6 +766,11 @@ void VpiContext::MakeNettypeDecls(VpiHandle scope,
         decl->aliased = earlier;
         decl->nettype_with = earlier->nettype_with;
       }
+    }
+    // §37.23 (figure): the typespec of the type it declares.
+    if (VpiObject* typespec = VpiNettypeTypespec(item.typedef_type, *scope,
+                                                 decl, *sim_ctx_, kBuild)) {
+      decl->children.push_back(typespec);
     }
     scope->children.push_back(decl);
 

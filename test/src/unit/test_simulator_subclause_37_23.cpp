@@ -3,6 +3,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
@@ -163,6 +164,32 @@ TEST(NettypeDeclarationDesign, ADesignsNettypeDeclarationsAreObjects) {
   // my_resolve` reaches the function that names.
   EXPECT_TRUE(g_plain_with_is_null);
   EXPECT_EQ(g_resolution_function_name, "my_resolve");
+}
+
+// §37.23 against a design read and run whole.
+class NettypesOfARun : public VpiDesignRun {};
+
+// §37.23 (figure): a nettype decl reaches the typespec of the type it
+// declares: a keyword's over the range written, a typedef's, and for an alias
+// the one the nettype it aliases declares (#7026).
+TEST_F(NettypesOfARun, ANettypeReachesTheTypespecOfItsType) {
+  Run("module top;\n"
+      "  typedef logic [3:0] nib_t;\n"
+      "  nettype logic [3:0] bnt;\n"
+      "  nettype bnt alias_nt;\n"
+      "  nettype nib_t nnt;\n"
+      "endmodule\n");
+  vpiHandle top = By("top");
+  vpiHandle of_bnt = vpi_handle(vpiTypespec, Named(vpiNetTypedef, top, "bnt"));
+  ASSERT_NE(of_bnt, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, of_bnt), vpiLogicTypespec);
+  EXPECT_NE(vpi_iterate(vpiRange, of_bnt), nullptr);
+  EXPECT_EQ(VpiObjectOf(
+                vpi_handle(vpiTypespec, Named(vpiNetTypedef, top, "alias_nt"))),
+            VpiObjectOf(of_bnt));
+  vpiHandle of_nnt = vpi_handle(vpiTypespec, Named(vpiNetTypedef, top, "nnt"));
+  ASSERT_NE(of_nnt, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, of_nnt), "nib_t");
 }
 
 }  // namespace

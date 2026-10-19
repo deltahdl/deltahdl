@@ -744,6 +744,32 @@ void MakeClassTypespecs(const ClassDecl& decl, VpiObject* defn,
 
 }  // namespace
 
+VpiObject* VpiNettypeTypespec(const DataType& type, const VpiObject& scope,
+                              VpiObject* decl, SimContext& ctx,
+                              const VpiAttachBuild& build) {
+  if (type.kind == DataTypeKind::kNamed) {
+    const auto kFound =
+        std::ranges::find_if(scope.children, [&type](const VpiObject* child) {
+          const bool kTyped =
+              VpiIsTypespecType(child->type) ||
+              (child->type == vpiNettypeDecl && !child->children.empty());
+          return kTyped && child->name == type.type_name;
+        });
+    if (kFound == scope.children.end()) return nullptr;
+    return (*kFound)->type == vpiNettypeDecl ? (*kFound)->children.front()
+                                             : *kFound;
+  }
+  const int kKind = VpiTypespecKind(type.kind);
+  if (kKind == 0) return nullptr;
+  VpiObject* typespec = build.alloc();
+  typespec->type = kKind;
+  typespec->parent = decl;
+  for (const PackedRange& dim : WrittenPackedDims(&type, ctx)) {
+    typespec->children.push_back(VpiRangeObject(typespec, dim, build));
+  }
+  return typespec;
+}
+
 VpiObject* VpiImportedTypespec(std::string_view name,
                                const std::vector<RtlirImport>& imports,
                                const VpiObjectMap& answered) {
