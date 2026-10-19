@@ -686,6 +686,26 @@ std::unordered_map<std::string_view, std::vector<RtlirEnumMember>> ClassEnums(
 // found under `prefix`, the key of the scope declaring the class. A body's
 // `localparam type`, which the parser carries as a typedef, is a parameter of
 // the class (detail 7) instead.
+// The variable the property `name` of the class `defn` stands for stands as,
+// among the defn's children; null for none.
+VpiObject* PropertyObject(const VpiObject& defn, std::string_view name) {
+  const auto kFound =
+      std::ranges::find_if(defn.children, [name](const VpiObject* child) {
+        const bool kVariable = VpiIsVariablesType(child->type) ||
+                               child->type == vpiNamedEvent ||
+                               child->type == vpiNamedEventArray;
+        return kVariable && child->name == name;
+      });
+  return kFound == defn.children.end() ? nullptr : *kFound;
+}
+
+// Whether `obj` reaches a typespec already.
+bool ReachesATypespec(const VpiObject& obj) {
+  return std::ranges::any_of(obj.children, [](const VpiObject* child) {
+    return VpiIsTypespecType(child->type);
+  });
+}
+
 void MakeClassTypespecs(const ClassDecl& decl, VpiObject* defn,
                         const std::string& prefix,
                         const DesignTypespecs& design,
@@ -699,10 +719,26 @@ void MakeClassTypespecs(const ClassDecl& decl, VpiObject* defn,
   }
   const std::vector<RtlirImport> kNoImports;
   const auto kEnums = ClassEnums(typedefs, defn, design.ctx);
-  const TypespecsByName kMade = MakeTypespecs(
-      typedefs, {defn, prefix, &kEnums, answered, kNoImports, design});
+  const ScopeTypespecs kAt{defn, prefix, &kEnums, answered, kNoImports, design};
+  const TypespecsByName kMade = MakeTypespecs(typedefs, kAt);
   for (const auto& [name, typespec] : kMade) {
     typespec->full_name = defn->full_name + "::" + std::string(name);
+  }
+  // §37.31 with §37.17: each property reaches the typespec of the type it was
+  // declared with, a typedef of the class's among them, where nothing has
+  // related it to one; one of a class type or a type parameter of the class
+  // was related to its own as the defn was made.
+  TypespecMaker maker(kAt, kMade);
+  for (const ClassMember* member : decl.members) {
+    if (member->kind != ClassMemberKind::kProperty || member->is_param) {
+      continue;
+    }
+    VpiObject* var = PropertyObject(*defn, member->name);
+    if (var == nullptr || ReachesATypespec(*var)) continue;
+    if (VpiObject* typespec = maker.Of(member->data_type, member->unpacked_dims,
+                                       std::string_view{}, var)) {
+      var->children.push_back(typespec);
+    }
   }
 }
 

@@ -573,5 +573,40 @@ TEST_F(ClassDefinitionsOfARun, AnOutOfBlockMethodIsNoTaskOfTheUnit) {
   vpi_release_handle(it);
   EXPECT_EQ(NamesOf(vpiTaskFunc, unit), std::vector<std::string>{"ut"});
 }
+
+// §37.31 with §37.17: a class's property reaches the typespec of the type it
+// was declared with: a keyword's, with the packed range written, a typedef of
+// the class's, and an event's (#7373).
+TEST_F(ClassDefinitionsOfARun, APropertyReachesItsTypespec) {
+  Run("module top;\n"
+      "  class C;\n"
+      "    typedef bit [3:0] nib_t;\n"
+      "    int x;\n"
+      "    logic [7:0] b;\n"
+      "    nib_t n;\n"
+      "    event e;\n"
+      "  endclass\n"
+      "endmodule\n");
+  vpiHandle defn = Named(vpiClassDefn, By("top"), "C");
+  ASSERT_NE(defn, nullptr);
+  const auto kTypespecOf = [defn](const char* name) {
+    vpiHandle property = Named(vpiVariables, defn, name);
+    if (property == nullptr) property = Named(vpiNamedEvent, defn, name);
+    return property == nullptr ? nullptr : vpi_handle(vpiTypespec, property);
+  };
+  vpiHandle of_x = kTypespecOf("x");
+  ASSERT_NE(of_x, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, of_x), vpiIntTypespec);
+  vpiHandle of_b = kTypespecOf("b");
+  ASSERT_NE(of_b, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, of_b), vpiLogicTypespec);
+  EXPECT_NE(vpi_iterate(vpiRange, of_b), nullptr);
+  vpiHandle of_n = kTypespecOf("n");
+  ASSERT_NE(of_n, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, of_n), "nib_t");
+  vpiHandle of_e = kTypespecOf("e");
+  ASSERT_NE(of_e, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, of_e), vpiEventTypespec);
+}
 }  // namespace
 }  // namespace delta
