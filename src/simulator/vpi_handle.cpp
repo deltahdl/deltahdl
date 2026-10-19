@@ -738,24 +738,11 @@ bool TryResolvePrefixWithRelation(int type, VpiHandle ref, VpiHandle& out) {
   return TryResolveCalledTfRelation(type, ref, out);
 }
 
-// §37.40/§37.45/§37.39: a timing check's ref/data terms, a delay device's
-// in/out terms, and a foreach constraint/statement's array variable.
+// §37.40/§37.45/§37.39: a timing check's terms and notifier and a tchk term's
+// expression and condition, a delay device's in/out terms, and a foreach
+// constraint/statement's array variable.
 bool TryResolveTimingTermRelation(int type, VpiHandle ref, VpiHandle& out) {
-  if (type == vpiTchkRefTerm && ref->type == vpiTchk) {
-    out = ref->tchk_ref_term;
-    return true;
-  }
-  if (type == vpiTchkDataTerm && ref->type == vpiTchk) {
-    out = ref->tchk_data_term;
-    return true;
-  }
-  // §37.40 (figure): the notifier register a violated check toggles. The
-  // relation was resolved by nothing, so it fell through to a walk looking for
-  // a child whose own type is the vpiTchkNotifier tag - a type no object has.
-  if (type == vpiTchkNotifier && ref->type == vpiTchk) {
-    out = ref->tchk_notifier;
-    return true;
-  }
+  if (TryResolveTchkRelation(type, ref, out)) return true;
   if (type == vpiInTerm && ref->type == vpiDelayDevice) {
     out = ref->in_term;
     return true;

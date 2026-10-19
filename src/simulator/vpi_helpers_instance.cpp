@@ -4,13 +4,17 @@
 #include <cstdint>
 #include <cstdio>
 #include <deque>
+#include <functional>
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
+#include "common/arena.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_primitives.h"
+#include "parser/ast_expr.h"
 #include "parser/ast_specify.h"
 #include "simulator/sim_context.h"
 #include "simulator/specify.h"
@@ -461,6 +465,114 @@ static VpiObject* MakeTchkTerm(VpiObject* term, std::string_view signal,
   return term;
 }
 
+// §31.2: whether a check of `kind` is written with two timing_check_limits, a
+// $setuphold's setup and hold limits, a $recrem's recovery and removal limits
+// and a $fullskew's two. $width's threshold and $nochange's edge offsets are
+// no limits (§31.4.4, §31.4.6), so every other check has one.
+static bool HasTwoLimits(TimingCheckKind kind) {
+  return kind == TimingCheckKind::kSetuphold ||
+         kind == TimingCheckKind::kRecrem || kind == TimingCheckKind::kFullskew;
+}
+
+// §37.40 (figure): one limit of the check `tchk`, `ticks` long, which
+// vpi_get_delays() retrieves in the order the check wrote its limits.
+static void AddTchkLimit(VpiObject* tchk, uint64_t ticks) {
+  VpiDelayInfo limit;
+  limit.delay = static_cast<double>(ticks);
+  limit.min_delay = limit.delay;
+  limit.typ_delay = limit.delay;
+  limit.max_delay = limit.delay;
+  tchk->delays.push_back(limit);
+}
+
+// A.7.3 with A.7.5.2: the expression a timing check's terminal stands for -
+// the signal it names, a member of the interface port it names it through
+// where it names one, selected as the terminal was written.
+static const Expr* TerminalExpression(const SpecifyTerminal& terminal,
+                                      Arena& arena) {
+  auto* signal = arena.Create<Expr>();
+  signal->kind = ExprKind::kIdentifier;
+  signal->text = terminal.name;
+  if (!terminal.interface_name.empty()) {
+    auto* port = arena.Create<Expr>();
+    port->kind = ExprKind::kIdentifier;
+    port->text = terminal.interface_name;
+    auto* member = arena.Create<Expr>();
+    member->kind = ExprKind::kMemberAccess;
+    member->lhs = port;
+    member->rhs = signal;
+    signal = member;
+  }
+  if (terminal.range_kind == SpecifyRangeKind::kNone) return signal;
+  auto* select = arena.Create<Expr>();
+  select->kind = ExprKind::kSelect;
+  select->base = signal;
+  select->index = terminal.range_left;
+  if (terminal.range_kind != SpecifyRangeKind::kBitSelect) {
+    select->index_end = terminal.range_right;
+  }
+  select->is_part_select_plus =
+      terminal.range_kind == SpecifyRangeKind::kPlusIndexed;
+  select->is_part_select_minus =
+      terminal.range_kind == SpecifyRangeKind::kMinusIndexed;
+  return select;
+}
+
+// A.7.5.2: the expression a delayed_reference or delayed_data stands for, the
+// signal `name` selected by `index` where one was written; none where the
+// check names none.
+static const Expr* DelayedSignalExpression(std::string_view name, Expr* index,
+                                           Arena& arena) {
+  if (name.empty()) return nullptr;
+  SpecifyTerminal terminal;
+  terminal.name = name;
+  terminal.range_left = index;
+  if (index != nullptr) terminal.range_kind = SpecifyRangeKind::kBitSelect;
+  return TerminalExpression(terminal, arena);
+}
+
+// The object an expression a timing check writes stands for in the instance
+// declaring the check.
+using TchkExpression = std::function<VpiObject*(const Expr*)>;
+
+// §37.40 (figure): the signal the event of `term` names and the `&&&`
+// condition it was written with (§31.7), as `expr` makes them.
+static void FillTchkTerm(VpiObject* term, const SpecifyTerminal& terminal,
+                         const Expr* condition, const TchkExpression& expr,
+                         Arena& arena) {
+  if (term == nullptr) return;
+  term->tchk_term_expr = expr(TerminalExpression(terminal, arena));
+  term->tchk_term_condition = expr(condition);
+}
+
+// §37.40 detail 2: the arguments of the check `tchk` that `decl` declares, in
+// the order A.7.5.1 writes them - its events as its tchk terms, $setup naming
+// its data event first (§31.3.1), then its limits, the threshold or edge
+// offsets written where a limit stands, its notifier, and what the check
+// writes behind the notifier - each argument but an event as `expr` makes it.
+// An argument the declaration left out has none.
+static void FillTchkArguments(VpiObject* tchk, const TimingCheckDecl& decl,
+                              const TchkExpression& expr, Arena& arena) {
+  VpiObject* first = tchk->tchk_ref_term;
+  VpiObject* second = tchk->tchk_data_term;
+  FillTchkTerm(first, decl.ref_terminal, decl.ref_condition, expr, arena);
+  FillTchkTerm(second, decl.data_terminal, decl.data_condition, expr, arena);
+  if (decl.check_kind == TimingCheckKind::kSetup) std::swap(first, second);
+  std::vector<VpiObject*> arguments = {first, second};
+  for (const Expr* limit : decl.limits) arguments.push_back(expr(limit));
+  arguments.push_back(tchk->tchk_notifier);
+  const std::vector<const Expr*> kTrailing = {
+      decl.timestamp_cond,
+      decl.timecheck_cond,
+      DelayedSignalExpression(decl.delayed_ref, decl.delayed_ref_expr, arena),
+      DelayedSignalExpression(decl.delayed_data, decl.delayed_data_expr, arena),
+      decl.event_based_flag,
+      decl.remain_active_flag};
+  for (const Expr* trailing : kTrailing) arguments.push_back(expr(trailing));
+  std::erase(arguments, nullptr);
+  tchk->tchk_arguments = std::move(arguments);
+}
+
 void VpiContext::AttachTimingChecks(SimContext& sim_ctx) {
   // §37.40 draws a tchk carrying the kind of check it is (vpiTchkType), the
   // limit vpi_get_delays() retrieves, the two event terms details 1 and 2 are
@@ -469,6 +581,12 @@ void VpiContext::AttachTimingChecks(SimContext& sim_ctx) {
   // none of the checks its specify block declared.
   SpecifyManager* specify = sim_ctx.GetSpecifyManager();
   if (specify == nullptr) return;
+  const VpiAttachBuild kBuild{[this] { return AllocObject(); },
+                              [this](std::string name) {
+                                name_pool_.push_back(std::move(name));
+                                return std::string_view(name_pool_.back());
+                              },
+                              sim_ctx.GetArena()};
 
   for (const TimingCheckEntry& check : specify->GetTimingChecks()) {
     // §31.1 puts a timing check inside a specify block inside a module
@@ -492,15 +610,10 @@ void VpiContext::AttachTimingChecks(SimContext& sim_ctx) {
     // §37.3.3: where the check was written.
     VpiRecordWrittenLocation(obj, check.loc, sim_ctx);
 
-    // §37.40 (figure): "-> limit", retrieved with vpi_get_delays(). §31.2
-    // writes a check's limit as the one time it is given, so the object
-    // carries it as its single delay.
-    VpiDelayInfo limit;
-    limit.delay = static_cast<double>(check.limit);
-    limit.min_delay = limit.delay;
-    limit.typ_delay = limit.delay;
-    limit.max_delay = limit.delay;
-    obj->delays.push_back(limit);
+    // §37.40 (figure): "-> limit", retrieved with vpi_get_delays(), which
+    // §38.10 has read as many delays as the check has limits.
+    AddTchkLimit(obj, check.limit);
+    if (HasTwoLimits(check.kind)) AddTchkLimit(obj, check.limit2);
 
     obj->tchk_ref_term = MakeTchkTerm(AllocObject(), check.ref_signal,
                                       check.ref_edge, obj, name_pool_);
@@ -517,6 +630,17 @@ void VpiContext::AttachTimingChecks(SimContext& sim_ctx) {
       obj->tchk_notifier = DesignObjectForFlatName(
           std::string(check.inst_prefix) + std::string(check.notifier));
     }
+
+    // A check §32.9's $sdf_annotate registered was declared by no source, so
+    // it has no arguments written to make.
+    if (check.decl == nullptr) continue;
+    // The names the check writes resolve in the instance declaring it, keyed
+    // under its prefix without the closing `.`, and the first top's under none.
+    const std::string kPrefix(SpecifyEntryScope(check.inst_prefix, ""));
+    const TchkExpression kExpression = [&](const Expr* expr) {
+      return VpiInstanceExpression(expr, object_map_, kPrefix, sim_ctx, kBuild);
+    };
+    FillTchkArguments(obj, *check.decl, kExpression, sim_ctx.GetArena());
   }
 }
 

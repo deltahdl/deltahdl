@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "fixture_simulator.h"
@@ -97,65 +98,48 @@ TEST_F(TimingCheck, TermRelationsApplyOnlyToTimingChecks) {
   EXPECT_EQ(vpi_handle(vpiTchkDataTerm, VpiHandleOf(&not_a_tchk)), nullptr);
 }
 
-// Detail 2: iterating vpiExpr over a timing check returns its arguments - the
-// reference, controlled-reference, and data events as tchk term handles, and
-// every other argument with the type of its expression. A non-argument child
-// (the notifier register) is not reached by this relation.
-TEST_F(TimingCheck, ExprIterationReturnsTermsAndExpressions) {
+// Detail 2: iterating vpiExpr over a timing check returns its arguments in
+// the order they were written - the reference, controlled-reference and data
+// events as tchk term handles, and every other argument, the notifier among
+// them, with the type of its expression. A child of the check that is no
+// argument of it is not reached.
+TEST_F(TimingCheck, ExprIterationReturnsTheArgumentsInOrder) {
   VpiObject ref_term;  // a reference event -> vpiTchkTerm
   ref_term.type = vpiTchkTerm;
   VpiObject data_term;  // a data event -> vpiTchkTerm
   data_term.type = vpiTchkTerm;
   VpiObject limit;  // a limit argument expression -> its own expr type
   limit.type = vpiOperation;
-  VpiObject notifier;  // the notifier register: not an expr argument
+  VpiObject notifier;  // the notifier, a variable named as an argument
   notifier.type = vpiReg;
+  VpiObject stray;  // a child the check holds that is none of its arguments
+  stray.type = vpiConstant;
 
   VpiObject tchk;
   tchk.type = vpiTchk;
   tchk.tchk_ref_term = &ref_term;
   tchk.tchk_data_term = &data_term;
-  tchk.children = {&ref_term, &notifier, &data_term, &limit};
+  tchk.children = {&ref_term, &data_term, &stray};
+  tchk.tchk_arguments = {&data_term, &ref_term, &limit, &notifier};
 
   vpiHandle it = vpi_iterate(vpiExpr, VpiHandleOf(&tchk));
   ASSERT_NE(it, nullptr);
-
-  int count = 0;
-  bool saw_ref = false;
-  bool saw_data = false;
-  bool saw_limit = false;
-  bool saw_notifier = false;
-  while (vpiHandle h = vpi_scan(it)) {
-    ++count;
-    if (VpiObjectOf(h) == &ref_term) saw_ref = true;
-    if (VpiObjectOf(h) == &data_term) saw_data = true;
-    if (VpiObjectOf(h) == &limit) saw_limit = true;
-    if (VpiObjectOf(h) == &notifier) saw_notifier = true;
-  }
-
-  EXPECT_EQ(count, 3);
-  EXPECT_TRUE(saw_ref);
-  EXPECT_TRUE(saw_data);
-  EXPECT_TRUE(saw_limit);
-  EXPECT_FALSE(saw_notifier);  // the notifier reg is not an expr argument
-
-  // The event arguments are returned with the tchk term type; the other
-  // argument keeps the type of its expression.
-  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&ref_term)), vpiTchkTerm);
-  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&data_term)), vpiTchkTerm);
-  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&limit)), vpiOperation);
+  std::vector<VpiObject*> reached;
+  while (vpiHandle h = vpi_scan(it)) reached.push_back(VpiObjectOf(h));
+  EXPECT_EQ(reached, (std::vector<VpiObject*>{&data_term, &ref_term, &limit,
+                                              &notifier}));
 }
 
-// Detail 2 (edge): a timing check whose only children are non-argument objects
-// has nothing for the vpiExpr iteration to walk, so vpi_iterate reports a null
-// handle rather than an iterator that scans to nothing.
+// Detail 2 (edge): a timing check with no arguments has nothing for the
+// vpiExpr iteration to walk, whatever children it holds, so vpi_iterate
+// reports a null handle rather than an iterator that scans to nothing.
 TEST_F(TimingCheck, ExprIterationIsNullWhenNoArguments) {
-  VpiObject notifier;
-  notifier.type = vpiReg;
+  VpiObject term;
+  term.type = vpiTchkTerm;
 
   VpiObject tchk;
   tchk.type = vpiTchk;
-  tchk.children = {&notifier};
+  tchk.children = {&term};
 
   EXPECT_EQ(vpi_iterate(vpiExpr, VpiHandleOf(&tchk)), nullptr);
 }
@@ -335,6 +319,161 @@ TEST_F(TimingChecksOfARun, ATopModulesSpecifyBlockHangsFromTheTop) {
   EXPECT_EQ(CountOf(vpiTchk, By("top")), 1);
   EXPECT_EQ(CountOf(vpiModPath, By("top.u")), 1);
   EXPECT_EQ(CountOf(vpiTchk, By("top.u")), 1);
+}
+
+// The tchk of `type` the instance `inst` declares; null for none.
+vpiHandle CheckOfType(int type, vpiHandle inst) {
+  vpiHandle it = vpi_iterate(vpiTchk, inst);
+  if (it == nullptr) return nullptr;
+  while (vpiHandle tchk = vpi_scan(it)) {
+    if (vpi_get(vpiTchkType, tchk) == type) return tchk;
+  }
+  return nullptr;
+}
+
+// §37.40 (figure): a tchk term reaches the signal its event names as its
+// expression, a select of it where the event names one, and through
+// vpiCondition the `&&&` condition the event was written with (§31.7), which
+// an event written without one does not have.
+TEST_F(TimingChecksOfARun, ATchkTermReachesItsExpressionAndCondition) {
+  Run("module m(input clk, input en, input [3:0] bus);\n"
+      "  specify\n"
+      "    $hold(posedge clk &&& en, bus[2:1], 1);\n"
+      "  endspecify\n"
+      "endmodule\n"
+      "module top; reg clk, en; reg [3:0] bus; m m1(clk, en, bus); "
+      "endmodule\n");
+  vpiHandle hold = CheckOfType(vpiHold, By("top.m1"));
+  ASSERT_NE(hold, nullptr);
+  vpiHandle ref = vpi_handle(vpiTchkRefTerm, hold);
+  ASSERT_NE(ref, nullptr);
+  EXPECT_EQ(NameOf(vpi_handle(vpiExpr, ref)), "clk");
+  EXPECT_EQ(NameOf(vpi_handle(vpiCondition, ref)), "en");
+
+  vpiHandle data = vpi_handle(vpiTchkDataTerm, hold);
+  ASSERT_NE(data, nullptr);
+  vpiHandle selected = vpi_handle(vpiExpr, data);
+  ASSERT_NE(selected, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, selected), vpiPartSelect);
+  EXPECT_EQ(NameOf(vpi_handle(vpiParent, selected)), "bus");
+  EXPECT_EQ(vpi_handle(vpiCondition, data), nullptr);
+  // Neither draws the other's relations: a check has no condition of its own,
+  // and a term no notifier.
+  EXPECT_EQ(vpi_handle(vpiCondition, hold), nullptr);
+  EXPECT_EQ(vpi_handle(vpiTchkNotifier, ref), nullptr);
+}
+
+// The `count` delays vpi_get_delays reads off `tchk` in ticks, or none where it
+// refuses that count.
+std::vector<int> DelaysOf(vpiHandle tchk, int count) {
+  s_vpi_time times[2] = {};
+  s_vpi_delay delays = {};
+  delays.da = times;
+  delays.no_of_delays = count;
+  delays.time_type = vpiSimTime;
+  times[0].low = 99;
+  vpi_get_delays(tchk, &delays);
+  std::vector<int> read;
+  if (times[0].low == 99) return read;
+  for (int i = 0; i < count; ++i)
+    read.push_back(static_cast<int>(times[i].low));
+  return read;
+}
+
+// §37.40 (figure) with §38.10: a check's limits are read with
+// vpi_get_delays, as many as the check has (§31.2) - two for $setuphold, its
+// setup limit and its hold limit, and one for $width, whose threshold is no
+// limit of it (§31.4.4).
+TEST_F(TimingChecksOfARun, EveryLimitOfACheckIsADelay) {
+  Run("module m(input clk, input d);\n"
+      "  specify\n"
+      "    $setuphold(posedge clk, d, 3, 7);\n"
+      "    $width(posedge clk, 6, 2);\n"
+      "  endspecify\n"
+      "endmodule\n"
+      "module top; reg clk, d; m m1(clk, d); endmodule\n");
+  vpiHandle setuphold = CheckOfType(vpiSetupHold, By("top.m1"));
+  ASSERT_NE(setuphold, nullptr);
+  EXPECT_EQ(DelaysOf(setuphold, 2), (std::vector<int>{3, 7}));
+  EXPECT_TRUE(DelaysOf(setuphold, 1).empty());
+  vpiHandle width = CheckOfType(vpiWidth, By("top.m1"));
+  ASSERT_NE(width, nullptr);
+  EXPECT_EQ(DelaysOf(width, 1), (std::vector<int>{6}));
+  EXPECT_TRUE(DelaysOf(width, 2).empty());
+}
+
+// What `tchk`'s vpiExpr iteration returns, in order: the type of each, with
+// the name it reports, or for a constant the value it holds.
+std::vector<std::pair<int, std::string>> ArgumentsOf(vpiHandle tchk) {
+  std::vector<std::pair<int, std::string>> found;
+  vpiHandle it = vpi_iterate(vpiExpr, tchk);
+  if (it == nullptr) return found;
+  while (vpiHandle arg = vpi_scan(it)) {
+    const int kType = vpi_get(vpiType, arg);
+    if (kType != vpiConstant) {
+      found.emplace_back(kType, NameOf(arg));
+      continue;
+    }
+    s_vpi_value value = {};
+    value.format = vpiIntVal;
+    vpi_get_value(arg, &value);
+    found.emplace_back(kType, std::to_string(value.value.integer));
+  }
+  return found;
+}
+
+// §37.40 detail 2: a check's vpiExpr iteration returns each of its arguments
+// in the order written - its events as tchk terms, $setup naming its data
+// event first (§31.3.1), and its limits, its notifier and what $setuphold
+// writes behind the notifier as the expressions they are, a variable named
+// being that variable. An argument left out is none.
+TEST_F(TimingChecksOfARun, ACheckIteratesEveryArgumentAsWritten) {
+  Run("module m(input clk, input d, input en);\n"
+      "  reg ntfr, dclk, dd;\n"
+      "  specify\n"
+      "    $setup(d, posedge clk, 3);\n"
+      "    $setuphold(posedge clk, d, 1, 2, ntfr, en, , dclk, dd);\n"
+      "  endspecify\n"
+      "endmodule\n"
+      "module top; reg clk, d, en; m m1(clk, d, en); endmodule\n");
+  using Arg = std::pair<int, std::string>;
+  EXPECT_EQ(ArgumentsOf(CheckOfType(vpiSetup, By("top.m1"))),
+            (std::vector<Arg>{
+                {vpiTchkTerm, "d"}, {vpiTchkTerm, "clk"}, {vpiConstant, "3"}}));
+  vpiHandle setuphold = CheckOfType(vpiSetupHold, By("top.m1"));
+  vpiHandle notifier = vpi_handle(vpiTchkNotifier, setuphold);
+  ASSERT_NE(notifier, nullptr);
+  const int kReg = vpi_get(vpiType, notifier);
+  EXPECT_EQ(ArgumentsOf(setuphold),
+            (std::vector<Arg>{{vpiTchkTerm, "clk"},
+                              {vpiTchkTerm, "d"},
+                              {vpiConstant, "1"},
+                              {vpiConstant, "2"},
+                              {kReg, "ntfr"},
+                              {vpi_get(vpiType, By("top.m1.en")), "en"},
+                              {kReg, "dclk"},
+                              {kReg, "dd"}}));
+}
+
+// §37.40 (figure) with A.7.3: an event naming a member of an interface port,
+// `b.clk`, has that member for its expression, the signal of the interface
+// instance the port is bound to.
+TEST_F(TimingChecksOfARun, AnInterfacePortMemberIsATermsExpression) {
+  Run("interface bus;\n"
+      "  logic clk, d;\n"
+      "endinterface\n"
+      "module dut(bus b);\n"
+      "  specify\n"
+      "    $hold(posedge b.clk, b.d, 1);\n"
+      "  endspecify\n"
+      "endmodule\n"
+      "module top; bus b(); dut u(b); endmodule\n");
+  vpiHandle hold = CheckOfType(vpiHold, By("top.u"));
+  ASSERT_NE(hold, nullptr);
+  EXPECT_EQ(NameOf(vpi_handle(vpiExpr, vpi_handle(vpiTchkRefTerm, hold))),
+            "clk");
+  EXPECT_EQ(NameOf(vpi_handle(vpiExpr, vpi_handle(vpiTchkDataTerm, hold))),
+            "d");
 }
 
 // A path or check filed under the empty prefix belongs to the first top the

@@ -701,27 +701,25 @@ struct VpiObject {
   // relation applied to it reaches a null handle (detail 5). Null by default.
   VpiObject* referenced_object = nullptr;
 
-  // §37.40 detail 1: the event terms a timing check reaches through its
-  // vpiTchkRefTerm and vpiTchkDataTerm relations. The reference term is the
-  // check's reference event or controlled reference event; the data term is its
-  // data event, present only when the check has one (otherwise null). Both are
-  // tchk term objects, whose own type (vpiTchkTerm) differs from the relation
-  // enum, so they are held as designated pointers rather than found by a type
-  // match. Null by default.
+  // §37.40 detail 1: the terms vpiTchkRefTerm and vpiTchkDataTerm reach, the
+  // reference or controlled reference event and the data event, null for a
+  // check with none; and (figure) a tchk term's expression and the `&&&`
+  // condition vpiCondition reaches, null for an event written without one.
+  // Each is designated, its own type not being the relation's.
   VpiObject* tchk_ref_term = nullptr;
   VpiObject* tchk_data_term = nullptr;
+  VpiObject* tchk_term_expr = nullptr;
+  VpiObject* tchk_term_condition = nullptr;
+  // §37.40 detail 2: a timing check's arguments as written, which its vpiExpr
+  // iteration returns - its event terms and every other argument's expression.
+  std::vector<VpiObject*> tchk_arguments;
 
-  // §37.40 (figure): the kind of timing check this object is, reported through
-  // vpi_get(vpiTchkType) - one of §31.2's checks, vpiSetup, vpiHold,
-  // vpiSetupHold, vpiRecovery, vpiRemoval, vpiRecrem, vpiWidth, vpiPeriod,
-  // vpiSkew, vpiTimeskew, vpiFullskew or vpiNochange. Zero for every object
-  // that is not a timing check.
+  // §37.40 (figure): which of §31.2's checks this object is, reported through
+  // vpi_get(vpiTchkType); zero for every object that is not a timing check.
   int tchk_type = 0;
 
-  // §37.40 (figure): the notifier register a timing check toggles when it is
-  // violated, reached through vpiTchkNotifier. Its own type is a variable kind
-  // rather than the relation enum, so it is held as a designated pointer. Null
-  // for a check that was written without a notifier.
+  // §37.40 (figure): the notifier register a violated check toggles, reached
+  // through vpiTchkNotifier; null for a check written without one.
   VpiObject* tchk_notifier = nullptr;
 
   // §37.45: a delay device's input and output terms, which vpiInTerm and

@@ -100,6 +100,11 @@ void VpiCollectTfCallArguments(VpiHandle call, VpiHandle iter);
 // vpi_handle_statements.cpp, used by vpi_handle.cpp.
 bool TryResolveProcessAndStmtRelation(int type, VpiHandle ref, VpiHandle& out);
 
+// §37.40 (figure): a timing check's ref and data terms and the notifier it
+// toggles, and a tchk term's expression and `&&&` condition. Defined in
+// vpi_handle_timing.cpp, used by vpi_handle.cpp.
+bool TryResolveTchkRelation(int type, VpiHandle ref, VpiHandle& out);
+
 // §37.80 (figure): whether an object is one of the kinds the callback diagram
 // draws a single arrow from to `callback`. Defined in vpi_callbacks.cpp, used
 // by vpi_handle.cpp.

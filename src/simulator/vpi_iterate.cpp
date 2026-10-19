@@ -377,8 +377,8 @@ bool VpiIterateMatchesKindMode(int obj_type, const VpiIterateModes& modes,
 
 // §37.24/§37.40/§37.72/§37.42/§37.34 (selected): resolve the remaining special
 // modes that reach edge-specific objects - the interconnect subelements, a
-// timing check's term/expr arguments, a case item's match conditions, a tf
-// call's arguments, and a constraint's constraint items. Returns true if one of
+// case item's match conditions, a tf call's arguments, and a constraint's
+// constraint items. Returns true if one of
 // these applied and writes its verdict into *matched. These are checked after
 // the kind-mode group so the original precedence is preserved.
 bool VpiIterateMatchesEdgeMode(VpiHandle obj, int type, VpiHandle ref,
@@ -386,10 +386,6 @@ bool VpiIterateMatchesEdgeMode(VpiHandle obj, int type, VpiHandle ref,
   if (modes.interconnect_array_element || modes.interconnect_net_element ||
       modes.interconnect_net_member) {
     *matched = VpiIsInterconnectSubelementType(obj->type);
-    return true;
-  }
-  if (modes.tchk_expr) {
-    *matched = obj->type == vpiTchkTerm || VpiIsExprType(obj->type);
     return true;
   }
   if (ref && ref->type == vpiCaseItem && type == vpiExpr) {
@@ -726,9 +722,10 @@ bool DispatchRegistryMode(int type, VpiHandle ref,
 // computed from a non-null reference - net/variable drivers and loads, foreach
 // loop variables, constraint-expression bodies, and registered callback
 // objects. Returns true if one of these modes applied.
-// §36.10.3/§37.26/§37.39: route the reference-object modes whose collector
-// hands back the objects as a list - an operation's operands, the members of a
-// structure or union, and the terms of a module path. They are grouped apart
+// §36.10.3/§37.26/§37.39/§37.40: route the reference-object modes whose
+// collector hands back the objects as a list - an operation's operands, the
+// members of a structure or union, the terms of a module path, and a timing
+// check's arguments (detail 2). They are grouped apart
 // from the modes above so neither dispatcher grows past the complexity limit
 // clang-tidy-src holds every function under.
 bool DispatchListedMode(int type, VpiHandle ref, const VpiIterateModes& modes,
@@ -742,6 +739,8 @@ bool DispatchListedMode(int type, VpiHandle ref, const VpiIterateModes& modes,
     listed = VpiTermOrPortObjects(type, ref);
   } else if (modes.simple_expr_use) {
     listed = VpiSimpleExprUses(ref);
+  } else if (modes.tchk_expr) {
+    listed = ref->tchk_arguments;
   } else {
     return false;
   }
