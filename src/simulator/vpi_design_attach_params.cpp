@@ -10,6 +10,7 @@
 #include "elaborator/elaborator_items_params.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_defparam.h"
+#include "elaborator/rtlir_scopes.h"
 #include "parser/ast_module.h"
 #include "parser/ast_specify.h"
 #include "parser/ast_type.h"
@@ -195,29 +196,22 @@ void DescribeValueParameter(VpiObject& obj, const RtlirParamDecl& param,
   }
 }
 
-// The gen scope named `name` among the children of `scope`, null for none.
-VpiObject* GenScopeNamed(const VpiObject& scope, std::string_view name) {
-  const auto kFound =
-      std::ranges::find_if(scope.children, [name](const VpiObject* child) {
-        return child->type == vpiGenScope && child->name == name;
-      });
-  return kFound == scope.children.end() ? nullptr : *kFound;
-}
-
-// §37.28 with §37.85: the scope `param` stands in below the instance
-// `scope`: the gen scope of the generate block it was declared in, reached
-// through the blocks its prefix names, outermost first, or the instance
-// itself; null where a block has no gen scope.
-VpiObject* ParameterScope(const RtlirParamDecl& param, VpiObject* scope) {
-  std::string_view rest = param.gen_block_prefix;
-  while (scope != nullptr && !rest.empty()) {
-    const std::size_t kDot = rest.find('.');
-    const std::string_view kStep = rest.substr(0, kDot);
-    rest = kDot == std::string_view::npos ? std::string_view{}
-                                          : rest.substr(kDot + 1);
-    scope = GenScopeNamed(*scope, kStep);
+// §37.28 with §37.85: the scope the parameter `mod.params[index]` stands in
+// below the instance `scope`: the gen scope of the generate block it was
+// declared in, which its listing among the block's members names (§27.4), or
+// the instance itself; null where the block has no gen scope.
+VpiObject* ParameterScope(const RtlirModule& mod, std::size_t index,
+                          VpiObject* scope) {
+  if (scope == nullptr || mod.params[index].gen_block_prefix.empty()) {
+    return scope;
   }
-  return scope;
+  const auto kMember = std::ranges::find_if(
+      mod.gen_block_members, [index](const RtlirGenBlockMember& member) {
+        return member.kind == RtlirGenBlockMember::Kind::kParam &&
+               member.param_index == index;
+      });
+  if (kMember == mod.gen_block_members.end()) return nullptr;
+  return VpiGenScopeOf(scope, kMember->gen_block_path);
 }
 
 // The parameters of the instance `at` describes, an instance of `mod`, each
@@ -225,9 +219,10 @@ VpiObject* ParameterScope(const RtlirParamDecl& param, VpiObject* scope) {
 // declaration was written at.
 void AttachScopeParameters(const RtlirModule* mod, const ParamScope& at,
                            const ParamAttach& with) {
-  for (const RtlirParamDecl& param : mod->params) {
+  for (std::size_t i = 0; i < mod->params.size(); ++i) {
+    const RtlirParamDecl& param = mod->params[i];
     if (param.is_type_param) {
-      if (VpiObject* holder = ParameterScope(param, at.scope)) {
+      if (VpiObject* holder = ParameterScope(*mod, i, at.scope)) {
         MakeTypeParameter(holder, param,
                           param.gen_block_prefix.empty()
                               ? DeclaredDefaultType(at.decl, param.name)
