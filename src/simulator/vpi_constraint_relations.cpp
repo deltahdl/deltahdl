@@ -18,6 +18,20 @@ const std::vector<VpiObject*>* VpiConstraintListOf(int type,
   return type == vpiSolveAfter ? &ref->solve_after : nullptr;
 }
 
+namespace {
+
+// The expression a distribution weights, its one child no dist item, or the
+// one a soft disable discards the soft constraints of, its one child.
+VpiObject* ConstraintItemExpr(const VpiObject* ref) {
+  VpiObject* expr = nullptr;
+  for (VpiObject* child : ref->children) {
+    if (child->type != vpiDistItem) expr = child;
+  }
+  return expr;
+}
+
+}  // namespace
+
 bool VpiTryResolveConstraintRelation(int type, VpiHandle ref, VpiHandle& out) {
   if (type == vpiParent && ref->type == vpiConstraint) {
     const bool kOfObject =
@@ -25,11 +39,9 @@ bool VpiTryResolveConstraintRelation(int type, VpiHandle ref, VpiHandle& out) {
     out = kOfObject ? ref->parent : nullptr;
     return true;
   }
-  if (type == vpiExpr && ref->type == vpiDistribution) {
-    out = nullptr;
-    for (VpiObject* child : ref->children) {
-      if (child->type != vpiDistItem) out = child;
-    }
+  if (type == vpiExpr &&
+      (ref->type == vpiDistribution || ref->type == vpiSoftDisable)) {
+    out = ConstraintItemExpr(ref);
     return true;
   }
   if (ref->type != vpiDistItem) return false;

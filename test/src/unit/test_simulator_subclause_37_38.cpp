@@ -23,12 +23,11 @@ namespace {
 // §37.38 Constraint expression: the VPI object model for a constraint
 // expression - the group spanning an implication, a constraint if / if-else, a
 // foreach constraint, a distribution, a bare (optionally soft) expression, and
-// a soft disable. The soft-disable expr edge and the foreach distribution edge
-// are served by the generic object-model and §38 traversal routines. This
-// clause's own rules are its three numbered Details, and the tests below
-// observe the production code that applies them, together with the two figure
-// edges that reach nothing without a rule of their own - the vpiCondition of a
-// guarded constraint and the vpiElseConst of a constraint if-else:
+// a soft disable. This clause's own rules are its three numbered Details, and
+// the tests below observe the production code that applies them, together with
+// the figure edges that reach nothing without a rule of their own - the
+// vpiCondition of a guarded constraint, the vpiElseConst of a constraint
+// if-else and the vpiExpr of a soft disable:
 //   D1 - the variable reached from a foreach constraint via vpiVariables
 //        represents the array being indexed (the designated-pointer Handle
 //        case).
@@ -578,6 +577,26 @@ TEST_F(ConstraintExpressionsOfARun, ADistItemIsADistribution) {
   EXPECT_EQ(vpi_handle(vpiValueRange, kEntries[4]), nullptr);
   EXPECT_EQ(vpi_get(vpiType, vpi_handle(vpiWeight, kEntries[4])), vpiConstant);
   EXPECT_EQ(vpi_handle(vpiCondition, kEntries[0]), nullptr);
+}
+
+// §18.5.13.2 with §37.38: a soft disable reaches through vpiExpr the
+// expression whose soft constraints it discards, the second of two properties
+// here, and reaches no condition (#7136).
+TEST_F(ConstraintExpressionsOfARun, ASoftDisableReachesItsExpression) {
+  Run("module top;\n"
+      "  class C; rand int x, y;\n"
+      "    constraint c { soft y > 4; disable soft y; }\n"
+      "  endclass\n"
+      "endmodule\n");
+  vpiHandle defn = Named(vpiClassDefn, By("top"), "C");
+  const std::vector<vpiHandle> kItems =
+      All(vpiConstraintItem, Named(vpiConstraint, defn, "c"));
+  ASSERT_EQ(kItems.size(), 2u);
+  vpiHandle disable = kItems[1];
+  EXPECT_EQ(vpi_get(vpiType, disable), vpiSoftDisable);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, disable)),
+            VpiObjectOf(Named(vpiVariables, defn, "y")));
+  EXPECT_EQ(vpi_handle(vpiCondition, disable), nullptr);
 }
 
 // §37.19 with §37.38: a select through two unpacked dimensions of a class's

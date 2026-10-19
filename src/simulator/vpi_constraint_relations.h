@@ -5,8 +5,8 @@
 #include "simulator/vpi_object.h"
 
 // The relations of §37.34's constraint, constraint ordering and dist item, and
-// of §37.38's constraint if else, that the parts of a constraint serve from
-// the fields VpiObject keeps them in.
+// of §37.38's constraint if else and soft disable, that the parts of a
+// constraint serve from the fields VpiObject keeps them in.
 
 namespace delta {
 
@@ -19,7 +19,8 @@ const std::vector<VpiObject*>* VpiConstraintListOf(int type,
 // §37.34: what a constraint's vpiParent reaches, the class obj holding it and
 // nothing for a constraint any other object holds, the figure drawing the
 // edge from no other holder; the expression a distribution weights, its one
-// child no dist item; and a dist item's vpiValueRange and vpiWeight. False,
+// child no dist item, and the one a §37.38 soft disable discards the soft
+// constraints of; and a dist item's vpiValueRange and vpiWeight. False,
 // leaving `out` alone, for any other relation.
 bool VpiTryResolveConstraintRelation(int type, VpiHandle ref, VpiHandle& out);
 
