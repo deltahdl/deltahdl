@@ -35,6 +35,15 @@ VpiObject* VpiStmtObjectFor(const VpiStmtObjects& stmts, const Stmt* stmt,
   return found->second;
 }
 
+namespace {
+
+// Whether ThreadObjectFor is making the object of a thread that forked another
+// as that one's parent, which is no beginning of the thread to report through
+// cbStartOfThread (§38.36.1): the thread began before.
+thread_local bool g_making_forking_thread = false;
+
+}  // namespace
+
 VpiHandle VpiContext::ThreadObjectFor(Process* proc) {
   if (proc == nullptr) return nullptr;
   auto it = run_objects_.find(proc);
@@ -54,6 +63,7 @@ VpiHandle VpiContext::ThreadObjectFor(Process* proc) {
   // which end with it.
   obj->body = VpiStmtObjectFor(stmt_objects_, proc->origin, proc->inst_prefix);
   run_objects_[proc] = obj;
+  const bool kBeginning = !g_making_forking_thread;
   // §37.44 (vpiParent): the thread that forked this one, made an object as
   // well, so a thread reached through its frame reaches it; the link is the
   // one RefreshThreadObjects makes.
@@ -63,7 +73,9 @@ VpiHandle VpiContext::ThreadObjectFor(Process* proc) {
           forking->children.end()) {
         continue;
       }
+      g_making_forking_thread = true;
       VpiHandle parent = ThreadObjectFor(forking);
+      g_making_forking_thread = !kBeginning;
       obj->parent = parent;
       parent->children.push_back(obj);
       break;
@@ -73,7 +85,7 @@ VpiHandle VpiContext::ThreadObjectFor(Process* proc) {
   // through its life, and cbStartOfThread is the one that
   // reports its beginning. This is where the thread becomes an object of the
   // model, and no site delivered the callback at all.
-  DispatchCallbacks(cbStartOfThread, obj);
+  if (kBeginning) DispatchCallbacks(cbStartOfThread, obj);
   return obj;
 }
 
