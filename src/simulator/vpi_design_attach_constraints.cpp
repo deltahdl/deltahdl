@@ -232,7 +232,13 @@ VpiObject* VpiMakeConstraint(const ClassMember& block, VpiObject* holder,
   }
   constraint->parent = holder;
   constraint->automatic = !block.is_static;
-  constraint->access_type = block.is_constraint_prototype ? vpiExternAcc : 0;
+  // §18.5.2: the pure constraint of an abstract class is the virtual one,
+  // written with no block as a prototype is but completed by no external
+  // constraint block (§18.5.1), so it is not declared outside its class.
+  constraint->is_virtual = block.is_pure_virtual;
+  constraint->access_type =
+      block.is_constraint_prototype && !block.is_pure_virtual ? vpiExternAcc
+                                                              : 0;
   constraint->constraint_enabled = true;
   constraint->children =
       MakeItems(block.constraint_items,

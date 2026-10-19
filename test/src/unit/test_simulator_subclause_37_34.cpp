@@ -323,5 +323,26 @@ TEST_F(ConstraintsOfARun, OnlyAClassObjsConstraintReachesAParent) {
   EXPECT_EQ(vpi_handle(vpiParent, VpiHandleOf(&loose)), nullptr);
 }
 
+// §37.34 with §18.5.2: the pure constraint an abstract class declares is the
+// virtual one, an obligation every non-abstract class extending it fulfils,
+// and the constraint fulfilling it, like any other, is not (#7134).
+TEST_F(ConstraintsOfARun, APureConstraintIsVirtual) {
+  Run("module top;\n"
+      "  virtual class A; rand int x; pure constraint p; endclass\n"
+      "  class C extends A; constraint p { x > 0; } endclass\n"
+      "endmodule\n");
+  vpiHandle pure =
+      Named(vpiConstraint, Named(vpiClassDefn, By("top"), "A"), "p");
+  vpiHandle fulfilling =
+      Named(vpiConstraint, Named(vpiClassDefn, By("top"), "C"), "p");
+  ASSERT_NE(pure, nullptr);
+  ASSERT_NE(fulfilling, nullptr);
+  EXPECT_EQ(vpi_get(vpiVirtual, pure), 1);
+  EXPECT_EQ(vpi_get(vpiVirtual, fulfilling), 0);
+  // No external constraint block completes a pure constraint, so it was not
+  // declared outside its class (D3).
+  EXPECT_EQ(vpi_get(vpiAccessType, pure), 0);
+}
+
 }  // namespace
 }  // namespace delta
