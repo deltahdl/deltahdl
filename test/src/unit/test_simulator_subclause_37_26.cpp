@@ -345,5 +345,28 @@ TEST(StructuresAndUnionsModel, OnlyChildrenOfTheMemberKindAreMembers) {
   EXPECT_TRUE(VpiStructUnionMembers(&net).empty());
 }
 
+// A design whose unions are declared tagged, soft or neither.
+class UnionFlagsOfARun : public VpiDesignRun {};
+
+// §37.26 (figure): a union var and a union net report through vpiTagged and
+// vpiSoft whether their union was declared tagged or soft (#7101).
+TEST_F(UnionFlagsOfARun, AUnionReportsWhetherItIsTaggedOrSoft) {
+  Run("module top;\n"
+      "  typedef union tagged { int a; bit b; } tu_t;\n"
+      "  tu_t t;\n"
+      "  union soft packed { logic [3:0] a; logic [1:0] b; } s;\n"
+      "  union packed { logic [3:0] a; logic [3:0] b; } p;\n"
+      "  wire union soft packed { logic [3:0] a; logic [1:0] b; } ws;\n"
+      "endmodule\n");
+  EXPECT_EQ(vpi_get(vpiTagged, By("top.t")), 1);
+  EXPECT_EQ(vpi_get(vpiSoft, By("top.t")), 0);
+  EXPECT_EQ(vpi_get(vpiSoft, By("top.s")), 1);
+  EXPECT_EQ(vpi_get(vpiTagged, By("top.s")), 0);
+  EXPECT_EQ(vpi_get(vpiTagged, By("top.p")), 0);
+  EXPECT_EQ(vpi_get(vpiSoft, By("top.p")), 0);
+  EXPECT_EQ(vpi_get(vpiType, By("top.ws")), vpiUnionNet);
+  EXPECT_EQ(vpi_get(vpiSoft, By("top.ws")), 1);
+}
+
 }  // namespace
 }  // namespace delta

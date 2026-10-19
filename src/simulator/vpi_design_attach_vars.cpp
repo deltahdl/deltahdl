@@ -110,6 +110,11 @@ void RecordAggregateFacts(VpiObject* obj, const std::string& key,
 void RecordVariableFacts(VpiObject* obj, const RtlirVariable& var,
                          const std::string& key, SimContext& ctx) {
   RecordAggregateFacts(obj, key, ctx);
+  // §37.26: whether the union was declared tagged or soft.
+  if (obj->type == vpiUnionVar && var.dtype != nullptr) {
+    obj->tagged = var.dtype->is_tagged;
+    obj->soft = var.dtype->is_soft;
+  }
   obj->decl_signed = var.is_signed;
   const VpiScalarVectorQuery kQuery = ScalarVectorQueryOf(obj->type, var);
   obj->decl_scalar = VpiVariableScalar(kQuery);

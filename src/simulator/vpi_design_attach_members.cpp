@@ -404,6 +404,11 @@ void AttachNetMembers(const MemberSite& site) {
     if (info == nullptr) continue;
     VpiObject* holder = FindObjectForFlatName(site.objects, kKey);
     holder->type = info->is_union ? vpiUnionNet : vpiStructNet;
+    // §37.26: whether the union was declared tagged or soft.
+    if (info->is_union && net.dtype != nullptr) {
+      holder->tagged = net.dtype->is_tagged;
+      holder->soft = net.dtype->is_soft;
+    }
     MakeMembers(holder, *info, site);
   }
 }
