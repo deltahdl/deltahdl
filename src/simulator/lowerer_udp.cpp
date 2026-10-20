@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <format>
 #include <string>
 #include <string_view>
 #include <unordered_set>
@@ -392,21 +393,19 @@ static SimCoroutine MakeUdpInstCoroutine(const RtlirUdpInst* inst,
 
 // §37.35 detail 2: files the setter of the state of the sequential instance
 // `inst`, driving through `drv`, under its flat name below `inst_prefix`, the
-// name its udp object carries, for a VPI put to reach it. The elements of an
-// instance array share the name the array is written with, so an instance
-// standing alone is the one a name reaches.
+// name its udp object carries, for a VPI put to reach it: an element of an
+// instance array's being the array's with its index after it, u[0] (§28.3.6).
 static void RegisterUdpStateSetter(const RtlirUdpInst& inst,
                                    UdpOutputDriver* drv,
                                    const std::string& inst_prefix,
                                    SimContext& ctx, Arena& arena) {
-  if (!inst.decl->is_sequential || inst.name.empty() ||
-      inst.source_item->inst_range_left != nullptr) {
-    return;
-  }
-  ctx.UdpStateSetters()[inst_prefix + std::string(inst.name)] =
-      [output = inst.output, drv, &ctx, &arena](char bit) {
-        PutUdpState(output, drv, bit, ctx, arena);
-      };
+  if (!inst.decl->is_sequential || inst.name.empty()) return;
+  std::string name = inst_prefix + std::string(inst.name);
+  if (inst.array_index) name += std::format("[{}]", *inst.array_index);
+  ctx.UdpStateSetters()[name] = [output = inst.output, drv, &ctx,
+                                 &arena](char bit) {
+    PutUdpState(output, drv, bit, ctx, arena);
+  };
 }
 
 void Lowerer::LowerUdpInst(const RtlirUdpInst& inst, bool from_program) {

@@ -325,8 +325,10 @@ class Elaborator : public ElaboratorClassRules {
   void ElaborateUdpInst(ModuleItem* item, RtlirModule* mod);
 
   // §29.8: appends the one instance of a user-defined primitive that the
-  // terminal list currently held on `item` describes.
-  void ElaborateOneUdpInst(const ModuleItem* item, RtlirModule* mod);
+  // terminal list currently held on `item` describes, the element `index` of
+  // the instance array `item` declares where it writes a range (§28.3.6).
+  void ElaborateOneUdpInst(const ModuleItem* item, RtlirModule* mod,
+                           std::optional<int64_t> index);
 
   UdpDecl* FindUdpByName(std::string_view name) const;
   UdpDecl* FindUdpForInstance(const ModuleItem* item);

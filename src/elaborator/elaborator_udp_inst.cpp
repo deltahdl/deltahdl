@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <cstdlib>
 #include <format>
 #include <optional>
@@ -15,6 +16,7 @@
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "common/packed_range.h"
 #include "common/source_loc.h"
 #include "elaborator/concurrent_assertion_expr.h"
 #include "elaborator/const_eval.h"
@@ -304,14 +306,20 @@ void Elaborator::ElaborateUdpInst(ModuleItem* item, RtlirModule* mod) {
   // gates. ExpandInstanceArray (src/elaborator/elaborator_helpers.h) is that
   // one expansion, and it answers false where the range declares one instance
   // or names a bound it cannot fold, leaving the range to record the one
-  // instance it describes.
-  if (ExpandInstanceArray(item, mod, arena_, BuildParamScope(mod),
-                          [this, mod](ModuleItem* element) {
-                            ElaborateOneUdpInst(element, mod);
-                          }))
+  // instance it describes. The elements are made from the least significant
+  // end of the range, so the `offset`th is the one at the index that many
+  // places above it; the one instance a range declares is at its left bound.
+  const ScopeMap kScope = BuildParamScope(mod);
+  int64_t offset = 0;
+  if (ExpandInstanceArray(item, mod, arena_, kScope, [&](ModuleItem* element) {
+        const PackedRange kRange{
+            ConstEvalInt(item->inst_range_left, kScope).value_or(0),
+            ConstEvalInt(item->inst_range_right, kScope).value_or(0)};
+        ElaborateOneUdpInst(element, mod, kRange.IndexAtOffset(offset++));
+      }))
     return;
 
-  ElaborateOneUdpInst(item, mod);
+  ElaborateOneUdpInst(item, mod, ConstEvalInt(item->inst_range_left, kScope));
 }
 
 // §29.8: appends the one RtlirUdpInst that the terminal list currently held on
@@ -342,7 +350,8 @@ void Elaborator::ElaborateUdpInst(ModuleItem* item, RtlirModule* mod) {
 // (src/elaborator/elaborator_generate.cpp:122) stamps §27.4's loop-index values
 // onto RtlirModule::processes and RtlirModule::assigns after the item is
 // elaborated, and it does not stamp RtlirModule::udp_insts.
-void Elaborator::ElaborateOneUdpInst(const ModuleItem* item, RtlirModule* mod) {
+void Elaborator::ElaborateOneUdpInst(const ModuleItem* item, RtlirModule* mod,
+                                     std::optional<int64_t> index) {
   const UdpDecl* decl = FindUdpForInstance(item);
   if (decl == nullptr) return;
   if (item->gate_terminals.empty()) return;
@@ -351,6 +360,7 @@ void Elaborator::ElaborateOneUdpInst(const ModuleItem* item, RtlirModule* mod) {
   inst.decl = decl;
   inst.source_item = item;
   inst.name = item->gate_inst_name;
+  inst.array_index = index;
   inst.loc = item->loc;
   inst.output = item->gate_terminals.front();
   inst.inputs.assign(item->gate_terminals.begin() + 1,

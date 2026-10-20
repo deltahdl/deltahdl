@@ -270,6 +270,11 @@ void MakePrimitiveArray(const PrimArraySpec& spec, const PrimSite& site,
     prim->delay_expr = spec.delay;
     prim->delays = spec.delays;
     prim->udp_defn = spec.udp_defn;
+    // §37.35 detail 2: the name a put to a sequential udp element finds the
+    // running instance under, as for a udp standing alone (MakeUdpObject).
+    if (spec.kind == vpiUdpArray) {
+      prim->run_key = VpiFlatName(site.prefix, kName);
+    }
     VpiRecordWrittenLocation(prim, item.loc, ctx);
     VpiAddArrayElement(array, prim, index, build);
   }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string_view>
 #include <vector>
 
@@ -59,6 +60,10 @@ struct RtlirUdpInst {
   // §29.8: the instance name is optional, as for gates. Empty where the source
   // wrote none, which is why it cannot be what identifies the instance.
   std::string_view name;
+  // §28.3.6 with §29.8: the index of the element of the instance array `name`
+  // this instance is, which its own name writes after the array's, u[0]; none
+  // for an instance written without a range.
+  std::optional<int64_t> array_index;
   // Where the primitive's name stands, which is the position a report about
   // this instance carries.
   SourceLoc loc;

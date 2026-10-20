@@ -718,6 +718,31 @@ TEST_F(SequentialUdpPuts, APutBecomesTheUdpsState) {
   EXPECT_EQ(IntValueOf(By("top.q")), 0);
 }
 
+// ...and so does one put to an element of an instance array of them, a
+// primitive of its own (§28.3.6, §29.8), the other elements keeping theirs
+// (#7370).
+TEST_F(SequentialUdpPuts, APutBecomesAnArrayElementsState) {
+  Run("primitive latch_udp(q, d, en);\n"
+      "  output reg q; input d, en;\n"
+      "  initial q = 0;\n"
+      "  table\n"
+      "    0 1 : ? : 0;\n"
+      "    1 1 : ? : 1;\n"
+      "    ? 0 : ? : -;\n"
+      "  endtable\n"
+      "endprimitive\n"
+      "module top; wire [1:0] q; logic [1:0] d = 0, en = 0;\n"
+      "  latch_udp u[1:0] (q, d, en);\n"
+      "endmodule\n");
+  vpiHandle u0 = Named(vpiPrimitive, By("top"), "u[0]");
+  ASSERT_NE(u0, nullptr);
+  s_vpi_value one = {};
+  one.format = vpiScalarVal;
+  one.value.scalar = vpi1;
+  vpi_put_value(u0, &one, nullptr, vpiNoDelay);
+  EXPECT_EQ(IntValueOf(By("top.q")), 1);
+}
+
 // §37.35 with §37.4.1: a module's primitives are its gates, switches and udps
 // alone, its io decls being none of them (#7369).
 TEST_F(PrimitivesOfARun, AModulesIoDeclsAreNoPrimitives) {
