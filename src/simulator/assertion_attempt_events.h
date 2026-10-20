@@ -6,7 +6,6 @@
 #include <vector>
 
 #include "parser/ast_stmt.h"
-#include "simulator/process.h"
 #include "simulator/property_attempts.h"
 #include "simulator/sim_context.h"
 #include "simulator/sva_engine_sampling.h"
@@ -41,18 +40,11 @@ void NoteAttemptVerdict(const Stmt* stmt, const PropertyVerdict& verdict,
 // cbAssertionDisabledEvaluation callback placed on the assertion.
 void NoteAttemptDisabled(const Stmt* stmt, uint64_t started, SimContext& ctx);
 
-// §39.4.2.1: keeps the process `asserting` the assertion `stmt` stands in,
-// whose property names a global clocking future sampled value function
-// (§16.9.4), so that the assertion's control callbacks wait for the next tick
-// of the global clocking event it carries, read in its instance; kept only
-// where a callback is placed, which is all it is kept for.
-void KeepFutureGclkAsserting(const Stmt* stmt, const Process& asserting,
-                             SimContext& ctx);
-
 // §39.4.2: calls each `reason` control callback placed on the assertion the
 // API keeps under `key`, with the current time as cb_time: at once, or,
-// §39.4.2.1, for an assertion KeepFutureGclkAsserting kept the process of, at
-// the nearest tick of its global clocking event after the current time.
+// §39.4.2.1, for an assertion whose property names a global clocking future
+// sampled value function (§16.9.4), at the nearest tick of its global clocking
+// event after the current time.
 void RaiseAssertionControlCallback(std::string_view key, int reason,
                                    SimContext& ctx);
 

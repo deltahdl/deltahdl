@@ -42,7 +42,6 @@ namespace delta {
 struct Expr;
 struct MailboxObject;
 struct ModuleItem;
-struct Process;
 struct SemaphoreObject;
 struct Stmt;
 
@@ -467,20 +466,6 @@ class DeclaredNameTables {
   bool VirtualInterfaceIsBound(const Variable* v) const;
   std::string_view VirtualInterfaceBinding(const Variable* v) const;
 
-  // §39.4.2.1: the process asserting each assertion whose property names a
-  // global clocking future sampled value function (§16.9.4), under the key
-  // the assertion API keeps it by, whose global clocking event, read in its
-  // instance, the assertion's callbacks wait for the next tick of; null for
-  // every other assertion.
-  void NoteFutureGclkAssertion(const std::string& key,
-                               const Process& asserting) {
-    future_gclk_asserting_.try_emplace(key, &asserting);
-  }
-  const Process* FutureGclkAsserting(std::string_view key) const {
-    auto it = future_gclk_asserting_.find(key);
-    return it == future_gclk_asserting_.end() ? nullptr : it->second;
-  }
-
  protected:
   // §3.12.1 (printed page 56): the running code's compilation-unit scope name
   // where each unit has a scope of its own, empty otherwise; SimContext
@@ -596,7 +581,6 @@ class DeclaredNameTables {
   // issued.
   std::vector<std::string> vi_instance_scopes_;
   std::unordered_map<std::string, uint64_t> vi_instance_handles_;
-  std::map<std::string, const Process*, std::less<>> future_gclk_asserting_;
 };
 
 // §27.3 with §23.9 and §26.3: the keys a bare `name` may stand under in the

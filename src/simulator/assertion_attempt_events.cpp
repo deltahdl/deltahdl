@@ -16,6 +16,7 @@
 #include "simulator/cover_statement.h"
 #include "simulator/process.h"
 #include "simulator/property_attempts.h"
+#include "simulator/scheduler.h"
 #include "simulator/scope_hier_name.h"
 #include "simulator/sim_context.h"
 #include "simulator/stmt_exec_assertion_internal.h"
@@ -100,6 +101,21 @@ SimCoroutine DeferredControlCallback(std::string key, int reason,
     co_await EventAwaiter{ctx, gclk_event, ctx.GetArena()};
   } while (ctx.CurrentTime().ticks <= event_time);
   GetGlobalAssertionApi().DeliverAssertionEvent(key, reason, event_time, {});
+}
+
+// §16.9.4: the process asserting the assertion the API keeps under `key`
+// where its property names a global clocking future sampled value function,
+// the one process carrying a global clocking event that was started from that
+// assertion; null for every other assertion.
+const Process* FutureGclkAsserting(std::string_view key, SimContext& ctx) {
+  for (const Process* proc : ctx.GetScheduler().Threads()) {
+    if (proc->gclk_future_event.empty() || proc->origin == nullptr) continue;
+    if (RunAssertionKey(proc->origin, ProcessHierName(*proc, ctx), ctx) ==
+        key) {
+      return proc;
+    }
+  }
+  return nullptr;
 }
 
 // The attempt information of the attempt begun at `started`, in ticks.
@@ -197,17 +213,10 @@ void NoteAttemptDisabled(const Stmt* stmt, uint64_t started, SimContext& ctx) {
                     AttemptBegunAt(started), ctx);
 }
 
-void KeepFutureGclkAsserting(const Stmt* stmt, const Process& asserting,
-                             SimContext& ctx) {
-  if (GetGlobalAssertionApi().PlacedCallbackCount() == 0) return;
-  ctx.NoteFutureGclkAssertion(
-      RunAssertionKey(stmt, ProcessHierName(asserting, ctx), ctx), asserting);
-}
-
 void RaiseAssertionControlCallback(std::string_view key, int reason,
                                    SimContext& ctx) {
   const uint64_t kNow = ctx.CurrentTime().ticks;
-  const Process* asserting = ctx.FutureGclkAsserting(key);
+  const Process* asserting = FutureGclkAsserting(key, ctx);
   if (asserting == nullptr) {
     GetGlobalAssertionApi().DeliverAssertionEvent(key, reason, kNow, {});
     return;

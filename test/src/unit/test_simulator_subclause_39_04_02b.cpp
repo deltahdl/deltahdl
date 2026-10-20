@@ -170,13 +170,13 @@ TEST_F(AssertionRun, ASequencePropertysAttemptsReachTheirCallbacks) {
 TEST_F(AssertionRun, AnImmediateAssertionsAttemptsReachTheirCallbacks) {
   AssertionArmer() = [] {
     // The assertion stands inside a procedure, and is found by walking the
-    // instance's assertions to the one of that full name.
+    // instance's assertions to the one of that name.
     vpiHandle it =
         vpi_iterate(vpiAssertion, vpi_handle_by_name(VpiText("top"), nullptr));
     vpiHandle i1 = nullptr;
     while (vpiHandle obj = it == nullptr ? nullptr : vpi_scan(it)) {
-      const char* name = vpi_get_str(vpiFullName, obj);
-      if (name != nullptr && std::string(name) == "top.i1") i1 = obj;
+      const char* name = vpi_get_str(vpiName, obj);
+      if (name != nullptr && std::string(name) == "i1") i1 = obj;
     }
     ASSERT_NE(i1, nullptr);
     for (int reason :
@@ -188,7 +188,9 @@ TEST_F(AssertionRun, AnImmediateAssertionsAttemptsReachTheirCallbacks) {
   };
   Run("module top;\n"
       "  logic clk = 0, x = 1;\n"
-      "  always @(posedge clk) i1: assert (x) else begin end\n"
+      "  always @(posedge clk) begin\n"
+      "    i1: assert (x) else begin end\n"
+      "  end\n"
       "  initial begin\n"
       "    $arm;\n"
       "    #2 clk = 1;\n"

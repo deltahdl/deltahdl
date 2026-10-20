@@ -866,7 +866,6 @@ ExecTask ExecImmediateAssert(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   // the five, which is every assertion in a design that uses none.
   Process* proc = ctx.CurrentProcess();
   if (proc != nullptr && !proc->gclk_future_event.empty()) {
-    KeepFutureGclkAsserting(stmt, *proc, ctx);
     StartFutureGclkAttempt(stmt, *proc, ctx, arena);
     co_return StmtResult::kDone;
   }
