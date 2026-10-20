@@ -1,11 +1,13 @@
 #include <algorithm>
 #include <cstddef>
+#include <limits>
 #include <string>
 #include <string_view>
 #include <vector>
 
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_attribute.h"
+#include "elaborator/rtlir_scopes.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -41,6 +43,10 @@ struct MadeClassDefn {
   const RtlirModule* mod = nullptr;
   // §26.2: the package declaring the class, empty for none.
   std::string_view package = {};
+  // §27.4: the full name of the generate block instance declaring the class,
+  // which tells the defns of one declaration in each instance of the block
+  // apart; empty for a class declared outside every generate block.
+  std::string block = {};
 };
 
 // §37.31: the class defn `decl` stands as, hung from the scope declaring it
@@ -59,7 +65,17 @@ void MakeClassDefn(VpiObject* scope, const ClassDecl* decl,
   made.push_back({decl, defn, prefix, nullptr});
 }
 
-// The class defns of the classes each module instance declares.
+// Whether a generate block of `mod` declares the class `decl`.
+bool DeclaredInGenerateBlock(const RtlirModule& mod, const ClassDecl* decl) {
+  return std::ranges::any_of(mod.gen_block_classes,
+                             [decl](const RtlirGenBlockClass& declared) {
+                               return declared.decl == decl;
+                             });
+}
+
+// The class defns of the classes each module instance declares, and with
+// §37.12 and §37.85 one of each class a generate block declares under each
+// gen scope that is an instance of the block, full-named in it.
 void MakeInstanceClassDefns(const RtlirDesign& design,
                             const VpiObjectMap& objects,
                             const VpiAttachBuild& build,
@@ -69,12 +85,20 @@ void MakeInstanceClassDefns(const RtlirDesign& design,
         VpiObject* scope = FindObjectForFlatName(
             objects, prefix.empty() ? std::string(mod->name) : prefix);
         if (scope == nullptr) return;
+        const auto kMake = [&](VpiObject* within, const ClassDecl* decl) {
+          MakeClassDefn(within, decl, prefix, build, made);
+          made.back().attrs = &mod->node_attrs;
+          made.back().mod = mod;
+        };
         for (const ClassDecl* decl : mod->class_decls) {
-          MakeClassDefn(scope, decl, prefix, build, made);
-          if (decl != nullptr) {
-            made.back().attrs = &mod->node_attrs;
-            made.back().mod = mod;
+          if (decl != nullptr && !DeclaredInGenerateBlock(*mod, decl)) {
+            kMake(scope, decl);
           }
+        }
+        for (const RtlirGenBlockClass& declared : mod->gen_block_classes) {
+          VpiObject* block = VpiGenScopeOf(scope, declared.gen_block_path);
+          kMake(block, declared.decl);
+          made.back().block = block->full_name;
         }
       });
 }
@@ -136,6 +160,7 @@ void MakeNestedClassDefns(const VpiAttachBuild& build,
       nested.attrs = kOuter.attrs;
       nested.mod = kOuter.mod;
       nested.package = kOuter.package;
+      nested.block = kOuter.block;
     }
   }
 }
@@ -153,36 +178,61 @@ ClassReference SplitClassReference(std::string_view written) {
   return {written.substr(0, kColons), written.substr(kColons + 2)};
 }
 
-// Whether `candidate` is the class `ref` names from the scope `derived` is
-// declared in: the package's class of that name where `ref` is qualified, and
-// otherwise a class of that name declared beside `derived`.
-bool NamesClassBeside(const MadeClassDefn& candidate,
-                      const MadeClassDefn& derived, const ClassReference& ref) {
+// How far out a class stands that is not the one a reference names.
+constexpr int kNotAround = std::numeric_limits<int>::max();
+
+// How far out from the scope `derived` is declared in `candidate` is the
+// class `ref` names: the package's class of that name where `ref` is
+// qualified, and otherwise a class of that name declared beside `derived` or,
+// with §27.4, around the generate block instances it is declared in, one
+// further out for each such instance or array of them passed; kNotAround
+// where `candidate` is none of these.
+int ScopesOutTo(const MadeClassDefn& candidate, const MadeClassDefn& derived,
+                const ClassReference& ref) {
   const VpiObject* scope = candidate.defn->parent;
   if (!ref.package.empty()) {
-    return scope != nullptr && scope->type == vpiPackage &&
-           scope->name == ref.package;
+    const bool kInPackage = scope != nullptr && scope->type == vpiPackage &&
+                            scope->name == ref.package;
+    return kInPackage ? 0 : kNotAround;
   }
-  return scope == derived.defn->parent && candidate.defn->in_compilation_unit ==
-                                              derived.defn->in_compilation_unit;
+  if (candidate.defn->in_compilation_unit !=
+      derived.defn->in_compilation_unit) {
+    return kNotAround;
+  }
+  int out = 0;
+  for (const VpiObject* around = derived.defn->parent;;
+       around = around->parent) {
+    if (around == scope) return out;
+    if (around == nullptr ||
+        (around->type != vpiGenScope && around->type != vpiGenScopeArray)) {
+      return kNotAround;
+    }
+    ++out;
+  }
 }
 
-// §8.13: the class defn of the class `derived` extends, one declared beside it
-// or a package's it names, and otherwise one of the compilation unit; null
-// where the design declares none of that name.
+// §8.13: the class defn of the class `derived` extends, the nearest of those
+// declared beside it or around it or a package's it names, and otherwise one
+// of the compilation unit; null where the design declares none of that name.
 VpiObject* BaseClassDefn(const MadeClassDefn& derived,
                          const std::vector<MadeClassDefn>& made) {
   const ClassReference kRef{derived.decl->base_class_scope,
                             derived.decl->base_class};
   VpiObject* in_unit = nullptr;
+  VpiObject* nearest = nullptr;
+  int nearest_out = kNotAround;
   for (const MadeClassDefn& candidate : made) {
     if (candidate.decl->name != kRef.name) continue;
-    if (NamesClassBeside(candidate, derived, kRef)) return candidate.defn;
+    const int kOut = ScopesOutTo(candidate, derived, kRef);
+    if (kOut < nearest_out) {
+      nearest = candidate.defn;
+      nearest_out = kOut;
+    }
     if (kRef.package.empty() && candidate.defn->in_compilation_unit) {
       in_unit = candidate.defn;
     }
   }
-  return in_unit;
+  return nearest != nullptr ? nearest : in_unit;
 }
 
 // §37.31 details 5 and 6 with §8.13 and §8.17: the extends object of a derived
@@ -531,7 +581,8 @@ VpiClassDefnObjects AttachClassDefinitions(const RtlirDesign* design,
   }
   VpiClassDefnObjects defns;
   for (const MadeClassDefn& owner : made) {
-    defns[{owner.decl, owner.prefix}] = owner.defn;
+    defns[{owner.decl, owner.block.empty() ? owner.prefix : owner.block}] =
+        owner.defn;
     sites[owner.defn] = {owner.mod, owner.package};
   }
   // §37.33 detail 5 with §37.31: a property of a class type, its class found

@@ -641,9 +641,17 @@ TypespecsByName AnswerPackageTypespecs(const PackageDecl& pkg,
 // The typespecs each gen scope declares, by the gen scope.
 using GenScopeTypespecs = std::unordered_map<const VpiObject*, TypespecsByName>;
 
-// The typedefs among which the extends clause of each class defn finds the
-// types it names, by the key the defn is found under.
-using ClassTypedefs = std::map<VpiClassDefnObjects::key_type, TypespecsByName>;
+// §37.32 detail 3 with §27.4: for a class a generate block instance declares,
+// the prefix of the module instance its names resolve in, and the typedefs
+// among which its extends clause finds the types it names.
+struct BlockClassTypedefs {
+  std::string prefix;
+  TypespecsByName typedefs;
+};
+
+// Those of each such class, by the key its class defn is found under.
+using ClassTypedefs =
+    std::map<VpiClassDefnObjects::key_type, BlockClassTypedefs>;
 
 // §37.85 detail 5: the typedefs a generate block instance of `mod`, whose
 // instance object is `instance`, declares are typespecs of the instance's gen
@@ -665,9 +673,8 @@ GenScopeTypespecs MakeGenBlockTypespecs(const RtlirModule& mod,
 }
 
 // §37.32 detail 3 with §27.4: the typedefs a name written in the generate
-// block instance the path `path` names below `instance` finds: those of that
-// block and of the blocks enclosing it, the innermost first, among `gen`, and
-// then `local`, the instance's own.
+// block instance `path` names below `instance` finds: its block's and its
+// enclosing blocks', the innermost first, among `gen`, then `local`'s.
 TypespecsByName GenBlockTypedefs(VpiObject* instance, const HierPath& path,
                                  const TypespecsByName& local,
                                  const GenScopeTypespecs& gen) {
@@ -683,16 +690,15 @@ TypespecsByName GenBlockTypedefs(VpiObject* instance, const HierPath& path,
   return found;
 }
 
-// §37.32 detail 3: the typedefs among which the extends clause of the class
-// defn found under `key` finds the types it names: those `in_blocks` holds
-// for a class a generate block declares, else those `declaring` holds for the
-// package or instance declaring it, and `none` where neither holds any.
+// §37.32 detail 3: the typedefs the extends clause of the class defn found
+// under `key` finds the types it names among: `in_blocks`' for a generate
+// block's class, else `declaring`'s for its package or instance, else `none`.
 const TypespecsByName& ExtendsTypedefs(
     const VpiClassDefnObjects::key_type& key, const ClassTypedefs& in_blocks,
     const std::unordered_map<std::string, TypespecsByName>& declaring,
     const TypespecsByName& none) {
   const auto kInBlock = in_blocks.find(key);
-  if (kInBlock != in_blocks.end()) return kInBlock->second;
+  if (kInBlock != in_blocks.end()) return kInBlock->second.typedefs;
   const auto kDeclaring = declaring.find(key.second);
   return kDeclaring == declaring.end() ? none : kDeclaring->second;
 }
@@ -883,9 +889,8 @@ VpiObjectMap AttachTypespecs(const RtlirDesign* design,
                     {unit_scope == objects.end() ? nullptr : unit_scope->second,
                      kUnitPrefix, nullptr, kNone, kNoImports, kDesign});
   VpiObjectMap answered(kUnit.begin(), kUnit.end());
-  // The typedefs of each package and instance, by the key a class defn the
-  // scope declares is found under, and those a class a generate block
-  // declares sees, by the class defn's own key.
+  // The typedefs of each package and instance, by the key the class defns it
+  // declares are found under, and those of each generate block's class.
   std::unordered_map<std::string, TypespecsByName> declaring;
   ClassTypedefs in_blocks;
   for (const PackageDecl* pkg : design->packages) {
@@ -903,15 +908,19 @@ VpiObjectMap AttachTypespecs(const RtlirDesign* design,
         const GenScopeTypespecs kGen =
             MakeGenBlockTypespecs(mod, scope, prefix, kDesign, answered);
         for (const RtlirGenBlockClass& declared : mod.gen_block_classes) {
-          in_blocks[{declared.decl, prefix}] =
-              GenBlockTypedefs(scope, declared.gen_block_path, kLocal, kGen);
+          const HierPath& path = declared.gen_block_path;
+          in_blocks[{declared.decl, VpiGenScopeOf(scope, path)->full_name}] = {
+              prefix, GenBlockTypedefs(scope, path, kLocal, kGen)};
         }
         RelateVariableTypespecs(mod, {kLocal, kUnit, objects, kAt});
       });
   for (const auto& [key, defn] : classes) {
-    MakeClassTypespecs(*key.first, defn, key.second, kDesign, answered);
+    const auto kInBlock = in_blocks.find(key);
+    const std::string& prefix =
+        kInBlock == in_blocks.end() ? key.second : kInBlock->second.prefix;
+    MakeClassTypespecs(*key.first, defn, prefix, kDesign, answered);
     AssignExtendsNamedTypes(
-        *key.first, {defn, key.second, nullptr, answered, kNoImports, kDesign},
+        *key.first, {defn, prefix, nullptr, answered, kNoImports, kDesign},
         ExtendsTypedefs(key, in_blocks, declaring, kNone));
   }
   return answered;

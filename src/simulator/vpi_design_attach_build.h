@@ -292,9 +292,9 @@ using VpiCalleeResolver = std::function<VpiObject*(const Expr& callee)>;
 // The resolver of the callees of calls written at `site`.
 VpiCalleeResolver VpiCalleesAt(const VpiCallSite& site);
 
-// §37.31: the class defn made for each class declaration, keyed by the
-// declaration and the flat name of the scope it was made in: an instance's
-// path, a package's name, or "$unit" for the compilation unit.
+// §37.31: the class defn made for each class declaration, keyed by it and
+// the flat name of the scope it was made in: an instance's path, a generate
+// block instance's full name, a package's name, or "$unit".
 using VpiClassDefnObjects =
     std::map<std::pair<const ClassDecl*, std::string>, VpiObject*>;
 

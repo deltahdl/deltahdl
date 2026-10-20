@@ -368,6 +368,22 @@ TEST_F(CallStatementsInAScope, AStaticMethodCalledThroughItsScopeIsACall) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiFunction, g)), VpiObjectOf(d_g));
 }
 
+// ...and so does one of a class a generate block declares, called in the
+// block, reaching the method of the class defn made under the block (#7382).
+TEST_F(CallStatementsInAScope, AGenerateBlocksStaticMethodCalledIsACall) {
+  Run("module top;\n"
+      "  if (1) begin : g\n"
+      "    class C; static function void f(); endfunction endclass\n"
+      "    initial begin : b C::f(); end\n"
+      "  end\n"
+      "endmodule\n");
+  vpiHandle f = CallOf(vpiMethodFuncCall, By("top.g.b"), "f");
+  vpiHandle c_f = Named(vpiMethods, Named(vpiClassDefn, By("top.g"), "C"), "f");
+  ASSERT_NE(f, nullptr);
+  ASSERT_NE(c_f, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiFunction, f)), VpiObjectOf(c_f));
+}
+
 // §8.23 and §8.25 with §37.42: a static method called through a
 // specialization's scope is one of the class the specialization gives C's type
 // parameter as its base: B2's tick for C #(.T(B2)) and C #(B2), and B's run

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -33,6 +34,13 @@ struct Expr;
 void VpiAttachClassSpecializations(const VpiClassDefnObjects& defns,
                                    SimContext& ctx,
                                    const VpiAttachBuild& build);
+
+// §37.31: the class defn among `defns` made for the class `decl` in the scope
+// keyed `scope`, else the first made for `decl`: one a module declares under
+// the module's first instance, or one a generate block declares under the
+// first instance of the block (§27.4); null for none.
+VpiObject* VpiClassDefnOf(const VpiClassDefnObjects& defns,
+                          const ClassDecl* decl, const std::string& scope);
 
 // §37.31 detail 5 and §37.32 detail 10: the list the class defn `defn` keeps
 // apart from its children that the iteration `type` reaches, its derived

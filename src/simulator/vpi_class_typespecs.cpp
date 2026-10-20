@@ -102,19 +102,12 @@ VpiObject* DefnParameter(const VpiObject& defn, std::string_view name) {
 
 // The class defn among `defns` the class type `type` is of: for a copy the
 // run holds of a class a module declares under a later instance of it, the
-// defn under that instance, and otherwise the first defn of its declaration,
-// the one under the module's first instance where a module declares it; null
-// for none.
+// defn under that instance, and otherwise as VpiClassDefnOf finds one.
 VpiObject* DefnOfClass(const VpiClassDefnObjects& defns,
                        const ClassTypeInfo& type) {
   std::string_view scope = type.instance_scope;
   if (scope.ends_with('.')) scope.remove_suffix(1);
-  const auto kOwn = defns.find({type.decl, std::string(scope)});
-  if (kOwn != defns.end()) return kOwn->second;
-  const auto kFirst = defns.lower_bound({type.decl, std::string()});
-  const bool kOfDecl =
-      kFirst != defns.end() && kFirst->first.first == type.decl;
-  return kOfDecl ? kFirst->second : nullptr;
+  return VpiClassDefnOf(defns, type.decl, std::string(scope));
 }
 
 // §37.32 detail 3: what the extends clause of a derived class gives one
@@ -191,6 +184,15 @@ constexpr std::array<std::pair<std::string_view, int>, 3> kBuiltinClasses{{
 }};
 
 }  // namespace
+
+VpiObject* VpiClassDefnOf(const VpiClassDefnObjects& defns,
+                          const ClassDecl* decl, const std::string& scope) {
+  const auto kOwn = defns.find({decl, scope});
+  if (kOwn != defns.end()) return kOwn->second;
+  const auto kFirst = defns.lower_bound({decl, std::string()});
+  const bool kOfDecl = kFirst != defns.end() && kFirst->first.first == decl;
+  return kOfDecl ? kFirst->second : nullptr;
+}
 
 void VpiAttachClassSpecializations(const VpiClassDefnObjects& defns,
                                    SimContext& ctx,

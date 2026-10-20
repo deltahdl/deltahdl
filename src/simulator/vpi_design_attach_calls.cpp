@@ -15,6 +15,7 @@
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_class_typespecs.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_attach_procedures_internal.h"
 #include "simulator/vpi_design_walk.h"
@@ -417,11 +418,14 @@ int FirstDimIndexKind(const std::vector<Expr*>& dims, const BodyWalk& walk) {
 // §37.42 with §37.31: the task or function the class defn made for `owner`
 // holds under `name`; null for no owner. A defn is made for each class of an
 // instance, a package or the compilation unit, under the scope FindClassDecl
-// reports, holding a method for each method the class declares.
+// reports, holding a method for each method the class declares, and one for
+// a class a generate block declares under each instance of the block, of
+// which VpiClassDefnOf finds the first.
 VpiObject* MethodObject(const BodyWalk& walk, const ScopedClass& owner,
                         std::string_view name) {
   if (owner.decl == nullptr) return nullptr;
-  const VpiObject* defn = walk.calls.classes.at({owner.decl, owner.scope});
+  const VpiObject* defn =
+      VpiClassDefnOf(walk.calls.classes, owner.decl, owner.scope);
   return *std::ranges::find_if(defn->children, [name](const VpiObject* child) {
     return VpiIsClassMethodType(child->type) && child->name == name;
   });
@@ -903,8 +907,7 @@ VpiObject* MethodCallClassDefn(const Expr& access, const BlockParent& parent,
                                const BodyWalk& walk) {
   const ExprClassName kClass = ExprClass(*access.lhs, parent, walk);
   const ScopedClass kFound = FindClassDecl(walk, kClass.cls, kClass.package);
-  const auto kMade = walk.calls.classes.find({kFound.decl, kFound.scope});
-  return kMade == walk.calls.classes.end() ? nullptr : kMade->second;
+  return VpiClassDefnOf(walk.calls.classes, kFound.decl, kFound.scope);
 }
 
 CallShape CallShapeOf(const Expr& expr, const BlockParent& parent,

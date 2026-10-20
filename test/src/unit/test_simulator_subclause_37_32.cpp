@@ -549,8 +549,8 @@ TEST_F(ClassTypespecsOfARun,
   vpiHandle m = Named(vpiTypedef, By("top"), "m_t");
   ASSERT_NE(nib, nullptr);
   ASSERT_NE(m, nullptr);
-  EXPECT_EQ(VpiObjectOf(ExtendsRhs("top", "D", "T")), VpiObjectOf(nib));
-  EXPECT_EQ(VpiObjectOf(ExtendsRhs("top", "D", "U")), VpiObjectOf(m));
+  EXPECT_EQ(VpiObjectOf(ExtendsRhs("top.g.h", "D", "T")), VpiObjectOf(nib));
+  EXPECT_EQ(VpiObjectOf(ExtendsRhs("top.g.h", "D", "U")), VpiObjectOf(m));
 }
 
 // §37.32: the typespec of a mailbox's and a semaphore's class obj reports the

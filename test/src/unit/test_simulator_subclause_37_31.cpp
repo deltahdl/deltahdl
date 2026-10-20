@@ -608,5 +608,55 @@ TEST_F(ClassDefinitionsOfARun, APropertyReachesItsTypespec) {
   ASSERT_NE(of_e, nullptr);
   EXPECT_EQ(vpi_get(vpiType, of_e), vpiEventTypespec);
 }
+
+// §37.31 with §37.12, §37.85 and §27: a class a generate block declares is a
+// class defn of each instance of that block, full-named under it and reached
+// from it, standing in it as its scope while its instance is the module's
+// (#7382).
+TEST_F(ClassDefinitionsOfARun, AGenerateBlocksClassIsAClassDefnOfEachInstance) {
+  Run("module top;\n"
+      "  class B; endclass\n"
+      "  for (genvar i = 0; i < 2; i++) begin : g\n"
+      "    class C; endclass\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_EQ(NamesOf(vpiClassDefn, By("top")), std::vector<std::string>{"B"});
+  vpiHandle g0 = By("top.g[0]");
+  vpiHandle c0 = DefnIn(g0, "C");
+  vpiHandle c1 = DefnIn(By("top.g[1]"), "C");
+  ASSERT_NE(c0, nullptr);
+  ASSERT_NE(c1, nullptr);
+  EXPECT_NE(VpiObjectOf(c0), VpiObjectOf(c1));
+  EXPECT_STREQ(vpi_get_str(vpiFullName, c0), "top.g[0].C");
+  EXPECT_STREQ(vpi_get_str(vpiFullName, c1), "top.g[1].C");
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiScope, c0)), VpiObjectOf(g0));
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiInstance, c0)), VpiObjectOf(By("top")));
+  EXPECT_EQ(NamesOf(vpiInternalScope, g0), std::vector<std::string>{"C"});
+}
+
+// ...and its extends clause names a class declared around the block, the
+// module's where no block between declares one of that name (#7382).
+TEST_F(ClassDefinitionsOfARun, AGenerateBlocksClassExtendsAClassAroundIt) {
+  Run("module top;\n"
+      "  class B; endclass\n"
+      "  if (1) begin : g\n"
+      "    class E; endclass\n"
+      "    if (1) begin : h\n"
+      "      class D extends B; endclass\n"
+      "      class F extends E; endclass\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  const auto kBaseOf = [](vpiHandle derived) {
+    return VpiObjectOf(vpi_handle(
+        vpiClassDefn,
+        vpi_handle(vpiClassTypespec, vpi_handle(vpiExtends, derived))));
+  };
+  vpiHandle h = By("top.g.h");
+  ASSERT_NE(DefnIn(By("top"), "B"), nullptr);
+  ASSERT_NE(DefnIn(By("top.g"), "E"), nullptr);
+  EXPECT_EQ(kBaseOf(DefnIn(h, "D")), VpiObjectOf(DefnIn(By("top"), "B")));
+  EXPECT_EQ(kBaseOf(DefnIn(h, "F")), VpiObjectOf(DefnIn(By("top.g"), "E")));
+}
 }  // namespace
 }  // namespace delta
