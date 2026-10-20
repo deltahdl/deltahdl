@@ -425,17 +425,12 @@ void AttachNetMembers(const MemberSite& site) {
 
 // §37.16 detail 32 and §37.18 detail 3 with §6.18: the layout of the struct
 // or union each subelement of a packed array declared with the type `written`
-// holds past its last packed dimension, that of the typedef it names, `P::name`
-// for one a package declares; null for an enum and for a type written in
-// place.
+// holds past its last packed dimension, that of the typedef it names; null for
+// an enum and for a type written in place.
 const StructTypeInfo* PackedArrayElementLayout(const DataType* written,
                                                SimContext& ctx) {
   if (written == nullptr) return nullptr;
-  if (written->scope_name.empty()) {
-    return ctx.FindStructType(written->type_name);
-  }
-  return ctx.FindStructType(std::string(written->scope_name) +
-                            "::" + std::string(written->type_name));
+  return ctx.FindStructType(written->type_name);
 }
 
 // The members under `holder` that MakeMembers rooted at the net subelement
