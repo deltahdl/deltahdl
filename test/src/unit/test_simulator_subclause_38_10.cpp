@@ -349,7 +349,8 @@ class VpiDelayCountSim : public VpiDelaysSimBase {
 
 // §38.10: the number of delays a request may name is fixed by the object's
 // category -- 1, 2, 3, 6 or 12 for a module path, 2 or 3 for an intermodule
-// path and for a continuous assignment (§37.47 with §10.3.3), and none for an
+// path and for a continuous assignment (§37.47 with §10.3.3), 2 or 3 for the
+// module input port delay of a port or a port bit (§37.14), and none for an
 // object that bears no delays, a net among them.
 TEST_F(VpiDelayCountSim, EachCategoryAcceptsItsOwnDelayCounts) {
   const VpiDelayInfo kD;
@@ -357,6 +358,10 @@ TEST_F(VpiDelayCountSim, EachCategoryAcceptsItsOwnDelayCounts) {
   EXPECT_TRUE(AcceptsDelays(vpiModPath, 12, {}));
   EXPECT_TRUE(AcceptsDelays(vpiInterModPath, 3, {kD, kD, kD}));
   EXPECT_FALSE(AcceptsDelays(vpiInterModPath, 4, {}));
+  EXPECT_TRUE(AcceptsDelays(vpiPort, 2, {kD, kD}));
+  EXPECT_FALSE(AcceptsDelays(vpiPort, 1, {}));
+  EXPECT_TRUE(AcceptsDelays(vpiPortBit, 3, {kD, kD, kD}));
+  EXPECT_FALSE(AcceptsDelays(vpiPortBit, 4, {}));
   EXPECT_TRUE(AcceptsDelays(vpiContAssign, 3, {kD, kD, kD}));
   EXPECT_FALSE(AcceptsDelays(vpiContAssign, 4, {}));
   EXPECT_FALSE(AcceptsDelays(vpiNet, 2, {kD, kD}));
@@ -364,14 +369,15 @@ TEST_F(VpiDelayCountSim, EachCategoryAcceptsItsOwnDelayCounts) {
 
 // §37.14 detail 2 with §38.10: a port other than an interface port is no
 // object the delay routines refuse outright, and it is then judged as any
-// other object is -- it bears no delays, so a request for two is the error.
+// other object is -- its module input port delay is a rise, a fall and a
+// turn-off, so a request for one is the error.
 TEST_F(VpiGetDelaysSim, APortThatIsNoInterfacePortIsJudgedByItsCategory) {
   VpiHandle port = MakeDelayObject(vpiPort, {});
   port->port_type = vpiPort;
-  s_vpi_time da[2] = {};
+  s_vpi_time da[1] = {};
   s_vpi_delay delay = {};
   delay.da = da;
-  delay.no_of_delays = 2;
+  delay.no_of_delays = 1;
   delay.time_type = vpiScaledRealTime;
   vpi_get_delays(VpiHandleOf(port), &delay);
   EXPECT_STREQ(vpi_ctx_.LastError().message,

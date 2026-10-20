@@ -106,6 +106,13 @@ VpiObject* VpiPlaceInterModPathDevice(
                              alloc);
 }
 
+VpiObject* VpiPlacePortDelayDevice(VpiObject* port,
+                                   const std::function<VpiObject*()>& alloc) {
+  VpiObject* net = port->low_conn;
+  if (net == nullptr || !VpiIsNetsType(net->type)) return nullptr;
+  return VpiPlaceDelayDevice(port, net, port->parent, vpiMIPDelay, alloc);
+}
+
 VpiObject* VpiDelayTermValueNet(const VpiObject& term) {
   const VpiObject& device = *term.parent;
   if (device.out_term != &term || device.delay_type != vpiModPathDelay) {
@@ -125,13 +132,8 @@ void VpiContext::PlaceSdfDelayDevice(std::string_view source,
   if (load_port == nullptr) return;
   const auto kAlloc = [this] { return AllocObject(); };
   if (source.empty()) {
-    // §32.4.4: a PORT entry gives the port a module input port delay, which
-    // sits on the net the port's lower connection names inside its instance.
-    VpiObject* net = load_port->low_conn;
-    if (net != nullptr && VpiIsNetsType(net->type)) {
-      VpiPlaceDelayDevice(load_port, net, load_port->parent, vpiMIPDelay,
-                          kAlloc);
-    }
+    // §32.4.4: a PORT entry gives the port a module input port delay.
+    VpiPlacePortDelayDevice(load_port, kAlloc);
     return;
   }
   // §32.4.4: an INTERCONNECT entry gives the intermodule path between its two

@@ -466,8 +466,9 @@ TEST_F(VpiPutDelaysSim, SuppressTimeSetsNoTimeValue) {
 
 // §37.14 detail 2 with §38.32: the delay routines do not apply to an interface
 // port, so a put to one is refused outright; a port of any other kind is
-// judged by its category, which bears no delays, so a put of two to it is the
-// error that rule gives. Neither stores a delay.
+// judged by its category, a module input port delay of a rise, a fall and a
+// turn-off, so a put of one to it is the error that rule gives. Neither
+// stores a delay.
 TEST_F(VpiPutDelaysSim, APortIsRefusedAsItsKindSays) {
   s_vpi_time da[2] = {};
   s_vpi_delay delay = {};
@@ -485,11 +486,31 @@ TEST_F(VpiPutDelaysSim, APortIsRefusedAsItsKindSays) {
 
   VpiHandle port = MakeDelayObject(vpiPort, {});
   port->port_type = vpiPort;
+  delay.no_of_delays = 1;
   vpi_put_delays(VpiHandleOf(port), &delay);
   EXPECT_STREQ(vpi_ctx_.LastError().message,
                "vpi_put_delays(): the requested number of delays is not legal "
                "for this object");
   EXPECT_TRUE(port->delays.empty());
+}
+
+// §38.32 with §37.14: a port no instance connects inside, which has no net
+// for its module input port delay to stand on, keeps the delays it is given
+// all the same.
+TEST_F(VpiPutDelaysSim, APortWithNoLowerConnectionKeepsItsDelays) {
+  VpiHandle port = MakeDelayObject(vpiPort, {});
+  port->port_type = vpiPort;
+  s_vpi_time da[2] = {};
+  da[0].real = 4.0;
+  da[1].real = 6.0;
+  s_vpi_delay delay = {};
+  delay.da = da;
+  delay.no_of_delays = 2;
+  delay.time_type = vpiScaledRealTime;
+  vpi_put_delays(VpiHandleOf(port), &delay);
+  ASSERT_EQ(port->delays.size(), 2u);
+  EXPECT_DOUBLE_EQ(port->delays[0].delay, 4.0);
+  EXPECT_DOUBLE_EQ(port->delays[1].delay, 6.0);
 }
 
 // §38.32: a continuous assignment no run made, which names no net to file
@@ -552,6 +573,37 @@ TEST_F(ChildAssignmentDelaysOfARun, AnInstancesAssignmentTakesThePutDelays) {
   EXPECT_EQ(value.value.integer, 15);
   vpi_get_value(By("top.u.fell"), &value);
   EXPECT_EQ(value.value.integer, 26);
+}
+
+class PortDelaysOfARun : public VpiDesignRun {};
+
+// §38.32 with §37.14: a put of a rise of 4 and a fall of 6 to an instance's
+// input port records no error, and vpi_get_delays reads the two back from the
+// port in the order they were put (#7364).
+TEST_F(PortDelaysOfARun, APortTakesARiseAndFallAndReadsThemBack) {
+  Run("module rcv(input i); endmodule\n"
+      "module top; wire w; rcv r(w); endmodule\n");
+  vpiHandle port = Named(vpiPort, By("top.r"), "i");
+  ASSERT_NE(port, nullptr);
+  s_vpi_time times[2] = {};
+  times[0].low = 4;
+  times[1].low = 6;
+  s_vpi_delay delay = {};
+  delay.da = times;
+  delay.no_of_delays = 2;
+  delay.time_type = vpiSimTime;
+  vpi_put_delays(port, &delay);
+  s_vpi_error_info info = {};
+  EXPECT_EQ(vpi_chk_error(&info), 0);
+
+  s_vpi_time out[2] = {};
+  s_vpi_delay get = {};
+  get.da = out;
+  get.no_of_delays = 2;
+  get.time_type = vpiSimTime;
+  vpi_get_delays(port, &get);
+  EXPECT_EQ(out[0].low, 4u);
+  EXPECT_EQ(out[1].low, 6u);
 }
 
 }  // namespace

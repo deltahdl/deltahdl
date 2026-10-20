@@ -225,7 +225,7 @@ void RegisterPeek(const char* net) {
 // The delay devices of a run: the one a module path a specify block declares
 // places on the net its output terminal names (#7168), the values its terms
 // read (#7363), and those an annotated SDF entry (#7361) and a delay put on an
-// intermodule path (#7362) place.
+// intermodule path (#7362) or on a port (#7365) place.
 class DelayDevicesOfARun : public VpiDesignRun {
  protected:
   // A cell whose buffer drives y, with a delay of 3 on the path from a to y,
@@ -376,6 +376,60 @@ TEST_F(DelayDevicesOfARun, APutOnAnIntermodulePathPlacesADevice) {
   ASSERT_NE(module, nullptr);
   EXPECT_EQ(std::string(vpi_get_str(vpiFullName, module)), "top");
   EXPECT_EQ(TermsOf(vpiDriver, w).size(), 1u);
+}
+
+// An input port given a delay with vpi_put_delays places a device of
+// vpiDelayType vpiMIPDelay on the net its lower connection names inside the
+// instance, in that instance; before the put the net holds no delay term, and
+// a second put leaves the one device standing (#7365).
+TEST_F(DelayDevicesOfARun, APutOnAnInputPortPlacesADevice) {
+  Run("module rcv(input i); endmodule\n"
+      "module top; wire w; rcv r(w); endmodule\n");
+  vpiHandle port = Named(vpiPort, By("top.r"), "i");
+  ASSERT_NE(port, nullptr);
+  vpiHandle i = By("top.r.i");
+  ASSERT_NE(i, nullptr);
+  EXPECT_TRUE(TermsOf(vpiLoad, i).empty());
+
+  s_vpi_time times[2] = {};
+  times[0].type = vpiSimTime;
+  times[0].low = 4;
+  times[1].type = vpiSimTime;
+  times[1].low = 6;
+  s_vpi_delay delay = {};
+  delay.da = times;
+  delay.no_of_delays = 2;
+  delay.time_type = vpiSimTime;
+  vpi_put_delays(port, &delay);
+  vpi_put_delays(port, &delay);
+
+  const std::vector<vpiHandle> kLoadTerms = TermsOf(vpiLoad, i);
+  ASSERT_EQ(kLoadTerms.size(), 1u);
+  vpiHandle device = vpi_handle(vpiDelayDevice, kLoadTerms[0]);
+  ASSERT_NE(device, nullptr);
+  EXPECT_EQ(vpi_get(vpiDelayType, device), vpiMIPDelay);
+  vpiHandle module = vpi_handle(vpiModule, device);
+  ASSERT_NE(module, nullptr);
+  EXPECT_EQ(std::string(vpi_get_str(vpiFullName, module)), "top.r");
+  EXPECT_EQ(TermsOf(vpiDriver, i).size(), 1u);
+  EXPECT_TRUE(TermsOf(vpiLoad, By("top.w")).empty());
+}
+
+// An input port whose lower connection is a variable has no net for a device
+// to sit on, so a put of its delay places none, inside the instance or above.
+TEST_F(DelayDevicesOfARun, APutOnAPortIntoAVariablePlacesNoDevice) {
+  Run("module rcv(input var logic i); endmodule\n"
+      "module top; logic w; rcv r(w); endmodule\n");
+  vpiHandle port = Named(vpiPort, By("top.r"), "i");
+  ASSERT_NE(port, nullptr);
+  s_vpi_time times[2] = {};
+  s_vpi_delay delay = {};
+  delay.da = times;
+  delay.no_of_delays = 2;
+  delay.time_type = vpiSimTime;
+  vpi_put_delays(port, &delay);
+  EXPECT_EQ(DeviceOfKindOnNet("top.r.i", vpiMIPDelay), nullptr);
+  EXPECT_EQ(DeviceOfKindOnNet("top.w", vpiMIPDelay), nullptr);
 }
 
 // Details 1 and 2 for a path into an instance's output port, whose delay the

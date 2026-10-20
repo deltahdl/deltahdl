@@ -24,6 +24,13 @@ VpiObject* VpiPlaceDelayDevice(VpiObject* source, VpiObject* net,
 VpiObject* VpiPlaceInterModPathDevice(VpiObject* path,
                                       const std::function<VpiObject*()>& alloc);
 
+// §37.14 with §37.45: the delay device the port `port` places once given a
+// module input port delay, of vpiDelayType vpiMIPDelay, on the net its lower
+// connection names inside its instance, under that instance; null where that
+// connection is no net.
+VpiObject* VpiPlacePortDelayDevice(VpiObject* port,
+                                   const std::function<VpiObject*()>& alloc);
+
 // §37.45 details 1 and 2: the net whose value the delay term `term` reads. An
 // input term takes the value ahead of the delay, which is its own net's. An
 // output term takes the value past it: for a module path's device, whose delay

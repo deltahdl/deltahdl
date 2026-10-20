@@ -326,6 +326,10 @@ bool VpiNoOfDelaysLegal(int type, int n, size_t available) {
   if (type == vpiModPath)
     return n == 1 || n == 2 || n == 3 || n == 6 || n == 12;
   if (type == vpiInterModPath) return n == 2 || n == 3;
+  // §37.14: a port's delay is its module input port delay, which §38.10's list
+  // leaves out. It is an interconnect delay, as an intermodule path's is
+  // (§32.4.4 annotates both), so it is a rise, a fall and a turn-off too.
+  if (type == vpiPort || type == vpiPortBit) return n == 2 || n == 3;
   // §37.47 with §10.3.3: a continuous assignment's delays are a gate's, a
   // rise, a fall and a turn-off.
   if (type == vpiContAssign) return n == 2 || n == 3;
@@ -613,6 +617,10 @@ void VpiContext::PutDelays(VpiHandle obj, s_vpi_delay* delay_p) {
   // §37.45: an intermodule path's delay is one a delay device stands for.
   if (obj->type == vpiInterModPath) {
     VpiPlaceInterModPathDevice(obj, [this] { return AllocObject(); });
+  }
+  // §37.45 with §37.14: so is a port's module input port delay.
+  if (obj->type == vpiPort) {
+    VpiPlacePortDelayDevice(obj, [this] { return AllocObject(); });
   }
 }
 
