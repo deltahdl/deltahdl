@@ -284,12 +284,11 @@ class TypespecMaker {
   // named `name` and hung from `parent`: an enumeration's with its constants,
   // those of the typedef `typedef_name`, and its base type's typespec, a
   // structure's or union's with its members, and a predefined type's named by
-  // a typedef standing as an alias of that type's own (detail 6). Null for a
-  // type it draws no typespec for.
+  // a typedef standing as an alias of that type's own (detail 6). A named type
+  // goes through Named, so every kind reaching here draws a typespec.
   VpiObject* Own(const DataType& type, std::string_view name, VpiObject* parent,
                  std::string_view typedef_name) {
     const int kKind = VpiTypespecKind(type.kind);
-    if (kKind == 0) return nullptr;
     VpiObject* typespec = Alloc(name, parent);
     typespec->type = kKind;
     if (kKind == vpiEnumTypespec) {
