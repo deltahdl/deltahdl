@@ -244,6 +244,7 @@ struct RtlirNet {
   // not recorded here answers neither. Invalid for a net no declaration
   // produced, an implicitly declared one among them.
   SourceLoc loc;
+  SourceLoc implicit_ref_loc;  // §6.10: the reference declaring it implicitly
 
   // §23.4: whether this net stands for an object of a lexically enclosing
   // module rather than one of this module's own. The outer name space is

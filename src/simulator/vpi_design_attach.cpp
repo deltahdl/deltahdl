@@ -344,10 +344,12 @@ void RecordDeclarationSourceLocations(
 
   WalkInstancePaths(
       design, [&](const RtlirModule* mod, const std::string& prefix) {
+        // §37.16 detail 9: an implicit net's file is that of the reference
+        // declaring it; RecordNetDeclaration reports its line as 0.
         for (const RtlirNet& net : mod->nets) {
           RecordSourceLocation(
               FindObjectForFlatName(objects, VpiFlatName(prefix, net.name)),
-              net.loc, sources);
+              net.loc.IsValid() ? net.loc : net.implicit_ref_loc, sources);
         }
         for (const RtlirVariable& var : mod->variables) {
           RecordSourceLocation(

@@ -408,5 +408,31 @@ TEST_F(NetDetailsOfARun, AnInlineStructsPackedArrayNetHasMemberNets) {
   EXPECT_EQ(IntOf(Named(vpiMember, kLeaves[1], "b")), 4);
 }
 
+// §37.16 with §6.10: vpiImplicitDecl is TRUE for a net the left side of a
+// continuous assignment declares implicitly and FALSE for a declared one
+// (#7067).
+TEST_F(NetDetailsOfARun, AnImplicitlyDeclaredNetReportsImplicitDecl) {
+  Run("module top;\n"
+      "  assign y = 1'b0;\n"
+      "  wire w;\n"
+      "endmodule\n");
+  EXPECT_EQ(vpi_get(vpiImplicitDecl, By("top.y")), 1);
+  EXPECT_EQ(vpi_get(vpiImplicitDecl, By("top.w")), 0);
+}
+
+// §37.16 detail 9: an implicitly declared net reports line 0 and the file of
+// the reference that declared it, where a declared net reports its
+// declaration's line (#7068).
+TEST_F(NetDetailsOfARun, AnImplicitNetReportsItsFirstReferencesFileAtLineZero) {
+  Run("module top;\n"
+      "  assign y = 1'b0;\n"
+      "  wire w;\n"
+      "endmodule\n");
+  vpiHandle y = By("top.y");
+  EXPECT_EQ(vpi_get(vpiLineNo, y), 0);
+  EXPECT_STREQ(vpi_get_str(vpiFile, y), "<test>");
+  EXPECT_EQ(vpi_get(vpiLineNo, By("top.w")), 3);
+}
+
 }  // namespace
 }  // namespace delta

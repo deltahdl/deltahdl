@@ -255,6 +255,8 @@ bool Elaborator::MaybeCreateImplicitNet(std::string_view name, SourceLoc loc,
   // RtlirNet::refers_outward tells Lowerer which. §6.10 gives a name declared
   // nowhere to the scope of the reference, so it is the nested module's own.
   net.refers_outward = IsNameInEnclosingScope(name);
+  // §37.16 detail 9: the reference stands where the net is first referenced.
+  net.implicit_ref_loc = loc;
   mod->nets.push_back(net);
   declared_names_.insert(scoped);
   net_names_.insert(name);

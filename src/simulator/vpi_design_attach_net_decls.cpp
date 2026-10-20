@@ -6,6 +6,7 @@
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_attach_nets.h"
 #include "simulator/vpi_design_walk.h"
+#include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -36,10 +37,14 @@ int VpiDriveStrengthConstant(uint8_t written) {
 // whether it wrote the scalared or the vectored keyword, through
 // vpiExplicitScalared and vpiExplicitVectored and, a vectored net not being
 // expanded into its bits, vpiExpanded; and the drive strengths of its net
-// declaration assignment through vpiStrength0 and vpiStrength1.
+// declaration assignment through vpiStrength0 and vpiStrength1. A net §6.10
+// declared implicitly reports vpiImplicitDecl and, by §37.16 detail 9, line 0
+// of the file RecordDeclarationSourceLocations read off its first reference.
 void RecordNetDeclaration(const RtlirNet& net, VpiObject& obj) {
   obj.is_scalared = net.is_scalared;
   obj.is_vectored = net.is_vectored;
+  obj.implicit_decl = net.implicit_ref_loc.IsValid();
+  obj.line_no = VpiNetLineNo(obj.implicit_decl, obj.line_no);
   const DataType* written = net.written_type;
   if (written == nullptr) return;
   obj.strength0 = VpiDriveStrengthConstant(written->drive_strength0);
