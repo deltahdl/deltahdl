@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cstring>
 #include <vector>
 
 #include "common/arena.h"
@@ -8,6 +9,7 @@
 #include "fixture_vpi_run.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
+#include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
@@ -268,6 +270,8 @@ TEST_F(VpiCompareObjectsRun, PackedStructBitAndMemberBitAreOneObject) {
   ASSERT_NE(ps1, nullptr);
   EXPECT_EQ(vpi_compare_objects(ps0, member_bit), 1);
   EXPECT_EQ(vpi_compare_objects(ps1, member_bit), 0);
+  // Two members of one structure stand for different bits of its storage.
+  EXPECT_EQ(vpi_compare_objects(member, By("top.ps.a")), 0);
 }
 
 // §38.3 Example 2: the var select `i[j]` is the element `i[0]` while `j` is
@@ -285,6 +289,44 @@ TEST_F(VpiCompareObjectsRun, ClassMemberReferencesFollowTheirHandles) {
       "$cmp(c.a, d.a); c = new; $cmp(c.a, d.a); d = c; $cmp(c.a, d.a); "
       "c = new; $cmp(c.a, d.a); end endmodule");
   EXPECT_EQ(compared, (std::vector<int>{0, 0, 1, 0}));
+}
+
+// The property variable named `name` of the class object the class var
+// `class_var` holds; null where it holds none or the object has no such
+// property.
+vpiHandle PropertyOf(const char* class_var, const char* name) {
+  vpiHandle obj =
+      vpi_handle(vpiClassObj, vpi_handle_by_name(VpiText(class_var), nullptr));
+  vpiHandle it = obj != nullptr ? vpi_iterate(vpiVariables, obj) : nullptr;
+  if (it == nullptr) return nullptr;
+  while (vpiHandle var = vpi_scan(it)) {
+    if (std::strcmp(vpi_get_str(vpiName, var), name) == 0) {
+      vpi_release_handle(it);
+      return var;
+    }
+  }
+  return nullptr;
+}
+
+// §38.3 Example 3 with §37.33: `c.a` stands for the member `a` of the object
+// `c` holds, which is the object's property variable `a`.
+TEST_F(VpiCompareObjectsRun, AMemberReferenceIsItsObjectsPropertyVariable) {
+  s_vpi_systf_data data = {};
+  data.type = vpiSysTask;
+  data.tfname = VpiText("$cmp_property");
+  data.calltf = [](PLI_BYTE8* /*user_data*/) -> PLI_INT32 {
+    vpiHandle args =
+        vpi_iterate(vpiArgument, vpi_handle(vpiSysTfCall, nullptr));
+    vpiHandle reference = vpi_scan(args);
+    vpi_release_handle(args);
+    compared.push_back(
+        vpi_compare_objects(reference, PropertyOf("top.c", "a")));
+    return 0;
+  };
+  ASSERT_NE(vpi_register_systf(&data), nullptr);
+  Run("module top; class C; int a; endclass C c; initial begin "
+      "c = new; $cmp_property(c.a); end endmodule");
+  EXPECT_EQ(compared, (std::vector<int>{1}));
 }
 
 }  // namespace

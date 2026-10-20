@@ -3,6 +3,7 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "helpers_run_files.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/vpi_context.h"
@@ -147,6 +148,32 @@ TEST_F(VpiMcdFlushSim, AToolFlushFailureIsReportedForChannelOne) {
 
   EXPECT_NE(vpi_mcd_flush(1), 0);
   EXPECT_EQ(vpi_ctx_.OutputChannelBuffer(), "pending\n");
+}
+
+// What vpi_mcd_flush returned for the mcd the design's $fopen opened.
+PLI_INT32 run_flush_result = 1;
+
+// §38.25 with §21.3.1: in a run, vpi_mcd_flush flushes the file the design's
+// $fopen opened on the channel, and the text written before it is in the file.
+class FlushOfAFopenedFile : public RunFilesRun {
+ protected:
+  static PLI_INT32 FlushIt(PLI_BYTE8* /*user_data*/) {
+    run_flush_result = vpi_mcd_flush(DescriptorIn("top.mcd"));
+    return 0;
+  }
+};
+
+TEST_F(FlushOfAFopenedFile, ItsTextIsInTheFile) {
+  RegisterTask("$flush_it", &FlushIt);
+  Run("module top; integer mcd;\n"
+      "  initial begin\n"
+      "    mcd = $fopen(\"mcd.txt\");\n"
+      "    $fwrite(mcd, \"before\");\n"
+      "    $flush_it;\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_EQ(run_flush_result, 0);
+  EXPECT_EQ(FileText("mcd.txt"), "before");
 }
 
 }  // namespace

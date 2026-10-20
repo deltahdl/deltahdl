@@ -172,12 +172,15 @@ TEST_F(VpiMcdCloseSim, AnFdNamingNoOpenFileIsReportedBack) {
 // opened.
 PLI_UINT32 fd_close_result = 1;
 PLI_UINT32 mcd_close_result = 1;
+// What vpi_mcd_close returned for an mcd naming a channel no file is open on.
+PLI_UINT32 unopened_close_result = 0;
 
 class CloseOfAFopenedFile : public RunFilesRun {
  protected:
   static PLI_INT32 CloseBoth(PLI_BYTE8* /*user_data*/) {
     fd_close_result = vpi_mcd_close(DescriptorIn("top.fd"));
     mcd_close_result = vpi_mcd_close(DescriptorIn("top.mcd"));
+    unopened_close_result = vpi_mcd_close(PLI_UINT32{1} << 20);
     return 0;
   }
 };
@@ -197,6 +200,8 @@ TEST_F(CloseOfAFopenedFile, BothFormsAreClosed) {
       "endmodule\n");
   EXPECT_EQ(fd_close_result, 0u);
   EXPECT_EQ(mcd_close_result, 0u);
+  // §38.24: a channel of the run with no file open is reported back unclosed.
+  EXPECT_EQ(unopened_close_result, PLI_UINT32{1} << 20);
   EXPECT_EQ(FileText("fd.txt"), "");
   EXPECT_EQ(FileText("mcd.txt"), "");
 }

@@ -9,6 +9,7 @@
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/variable.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_internal.h"
@@ -651,6 +652,20 @@ TEST_F(VpiPutValueSim, APutWithNoSchedulerNotesNothing) {
   EXPECT_EQ(vpi_put_value(net, &val, nullptr, vpiNoDelay), nullptr);
   EXPECT_EQ(vpi_put_value(ev, nullptr, nullptr, vpiNoDelay), nullptr);
   EXPECT_EQ(event->triggered_ticks, UINT64_MAX);
+}
+
+// §38.34: with a scheduler to note it in but no run to resume processes in, a
+// put to a named event stamps the event's trigger time and nothing more.
+TEST_F(VpiPutValueSim, AnEventPutWithNoRunStampsItsTriggerTime) {
+  Variable event;
+  event.is_event = true;
+  VpiObject obj;
+  obj.type = vpiNamedEvent;
+  obj.var = &event;
+  vpi_ctx_.SetScheduler(&scheduler_);
+  EXPECT_EQ(vpi_put_value(VpiHandleOf(&obj), nullptr, nullptr, vpiNoDelay),
+            nullptr);
+  EXPECT_EQ(event.triggered_ticks, scheduler_.CurrentTime().ticks);
 }
 
 // §38.34: a delay mode takes its delay from time_p, a delay being present

@@ -8,6 +8,9 @@
 #include "fixture_simulator.h"
 #include "fixture_vpi_run.h"
 #include "helpers_vpi_delays_fixture.h"
+#include "simulator/sim_context.h"
+#include "simulator/specify.h"
+#include "simulator/specify_path_delay.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
@@ -530,22 +533,22 @@ TEST_F(ContAssignDelaysOfARun, AContinuousAssignmentsDelaysAreRead) {
   EXPECT_EQ(ContAssignDelaysRead(), (std::vector<uint32_t>{3, 4}));
 }
 
-// The six values vpi_get_delays() reads back from `obj`'s two delays with
-// mtm_flag set, in Table 38-2's order -- each delay's minimum, typical and
-// maximum -- as multiples of the first, so the case reads them whatever unit
-// the run keeps its ticks in.
-std::vector<double> MtmMultiples(vpiHandle obj) {
+// The values vpi_get_delays() reads back from `obj`'s `count` delays, two
+// unless named, with mtm_flag set, in Table 38-2's order -- each delay's
+// minimum, typical and maximum -- as multiples of the first, so the case reads
+// them whatever unit the run keeps its ticks in.
+std::vector<double> MtmMultiples(vpiHandle obj, int count = 2) {
   s_vpi_time da[6] = {};
   s_vpi_delay delay = {};
   delay.da = da;
-  delay.no_of_delays = 2;
+  delay.no_of_delays = count;
   delay.time_type = vpiSimTime;
   delay.mtm_flag = 1;
   vpi_get_delays(obj, &delay);
   std::vector<double> multiples;
   if (da[0].low == 0) return multiples;
-  for (const s_vpi_time& value : da) {
-    multiples.push_back(static_cast<double>(value.low) /
+  for (int k = 0; k < 3 * count; ++k) {
+    multiples.push_back(static_cast<double>(da[k].low) /
                         static_cast<double>(da[0].low));
   }
   return multiples;
@@ -589,6 +592,38 @@ TEST_F(MtmDelaysOfARun, AModulePathsMinTypMaxDelaysAreRead) {
   std::vector<vpiHandle> paths = ObjectsOf(vpiModPath, By("top"));
   ASSERT_EQ(paths.size(), 1u);
   EXPECT_EQ(MtmMultiples(paths[0]), OneToSix());
+}
+
+// §38.10 Table 38-2 with §11.11 and §37.68: a delay control written
+// min:typ:max reads back its three values under mtm_flag.
+TEST_F(MtmDelaysOfARun, ADelayControlsMinTypMaxDelayIsRead) {
+  Run("module top; initial #(1:2:3) $noop; endmodule\n");
+  vpiHandle procs = vpi_iterate(vpiProcess, By("top"));
+  ASSERT_NE(procs, nullptr);
+  vpiHandle control = vpi_handle(vpiStmt, vpi_scan(procs));
+  ASSERT_NE(control, nullptr);
+  ASSERT_EQ(vpi_get(vpiType, control), vpiDelayControl);
+  EXPECT_EQ(MtmMultiples(control, 1), (std::vector<double>{1, 2, 3}));
+}
+
+// §38.10 Table 38-2: a module path no declaration wrote delays for, as one
+// filed straight into the run's specify manager, reads its run delay back as
+// its minimum, typical and maximum alike.
+TEST_F(MtmDelaysOfARun, AModulePathOfNoWrittenDelayReadsItsRunDelay) {
+  Run("module top(input a, output y); assign y = a; initial $noop;\n"
+      "endmodule\n");
+  PathDelay path;
+  path.src_port = "a";
+  path.dst_port = "y";
+  path.delay_count = 1;
+  path.delays[0] = 7;
+  f_.ctx.AcquireSpecifyManager().AddPathDelay(path);
+  VpiContext reattached;
+  SetGlobalVpiContext(&reattached);
+  reattached.Attach(f_.ctx);
+  std::vector<vpiHandle> paths = ObjectsOf(vpiModPath, By("top"));
+  ASSERT_EQ(paths.size(), 1u);
+  EXPECT_EQ(MtmMultiples(paths[0], 1), (std::vector<double>{1, 1, 1}));
 }
 
 }  // namespace
