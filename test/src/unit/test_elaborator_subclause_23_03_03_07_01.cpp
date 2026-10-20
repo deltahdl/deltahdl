@@ -564,7 +564,10 @@ TEST(InterconnectPortConnectionElaboration,
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
   EXPECT_EQ(InterconnectNetType(design, "top", "c"), NetType::kTri);
-  EXPECT_EQ(InterconnectNetType(design, "sink", "q"), NetType::kTri);
+  auto sink = design->all_modules.find("sink");
+  ASSERT_NE(sink, design->all_modules.end());
+  ASSERT_EQ(sink->second->ports.size(), 1u);
+  EXPECT_EQ(sink->second->ports[0].net_type, NetType::kTri);
 }
 
 // §23.3.3.7.1 with Table 23-1: an interconnect chain reaching dissimilar typed
