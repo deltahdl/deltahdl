@@ -381,7 +381,9 @@ TEST_F(DelayDevicesOfARun, APutOnAnIntermodulePathPlacesADevice) {
 // An input port given a delay with vpi_put_delays places a device of
 // vpiDelayType vpiMIPDelay on the net its lower connection names inside the
 // instance, in that instance; before the put the net holds no delay term, and
-// a second put leaves the one device standing (#7365).
+// a second put leaves the one device standing. The net above holds none of its
+// own: its vpiLoad reaches the term through the port, as §37.16 has it, and
+// only its vpiLocalLoad keeps to the net itself (#7365).
 TEST_F(DelayDevicesOfARun, APutOnAnInputPortPlacesADevice) {
   Run("module rcv(input i); endmodule\n"
       "module top; wire w; rcv r(w); endmodule\n");
@@ -412,7 +414,7 @@ TEST_F(DelayDevicesOfARun, APutOnAnInputPortPlacesADevice) {
   ASSERT_NE(module, nullptr);
   EXPECT_EQ(std::string(vpi_get_str(vpiFullName, module)), "top.r");
   EXPECT_EQ(TermsOf(vpiDriver, i).size(), 1u);
-  EXPECT_TRUE(TermsOf(vpiLoad, By("top.w")).empty());
+  EXPECT_TRUE(TermsOf(vpiLocalLoad, By("top.w")).empty());
 }
 
 // An input port whose lower connection is a variable has no net for a device
