@@ -195,7 +195,7 @@ TEST(Typespec, MemberTypespecIsTheTypespecChild) {
   default_value.type = vpiConstant;
   member.children = {&default_value, &member_type};
 
-  EXPECT_EQ(VpiTypespecMemberTypespec(&member), &member_type);
+  EXPECT_EQ(VpiTypespecChild(&member), &member_type);
 }
 
 // D4: vpiName of a typespec member is the member's own name, not the name of
@@ -237,13 +237,13 @@ TEST(Typespec, MemberTypespecNullWhenNoTypespecChild) {
   default_value.type = vpiConstant;  // an expr, not a typespec
   member.children = {&default_value};
 
-  EXPECT_EQ(VpiTypespecMemberTypespec(&member), nullptr);
+  EXPECT_EQ(VpiTypespecChild(&member), nullptr);
 }
 
 // D3/D4/D7 error condition: the member relations tolerate a null member handle,
 // reporting no type, no name, and no default expr rather than dereferencing it.
 TEST(Typespec, MemberRelationsNullHandleSafe) {
-  EXPECT_EQ(VpiTypespecMemberTypespec(nullptr), nullptr);
+  EXPECT_EQ(VpiTypespecChild(nullptr), nullptr);
   EXPECT_EQ(VpiTypespecMemberName(nullptr), nullptr);
   EXPECT_EQ(VpiTypespecMemberDefaultExpr(nullptr), nullptr);
 }

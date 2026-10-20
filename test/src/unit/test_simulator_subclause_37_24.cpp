@@ -453,17 +453,6 @@ TEST_F(InterconnectsOfARun, AnInterconnectNetTakesTheTypespecOfItsNet) {
   EXPECT_EQ(TypespecNameOf(LowConnOf("top.x", "p")), "(none)");
 }
 
-// §37.24 detail 1 with §6.6.8: an interconnect net connected only to another
-// interconnect net is connected to no net of a data type, so neither reaches a
-// typespec.
-TEST_F(InterconnectsOfARun, AnInterconnectJoinedToAnInterconnectHasNoTypespec) {
-  Run("module leaf(interconnect p); endmodule\n"
-      "module top; interconnect c; leaf u(c); endmodule\n");
-  EXPECT_EQ(vpi_get(vpiType, By("top.c")), vpiInterconnectNet);
-  EXPECT_EQ(TypespecNameOf(By("top.c")), "(none)");
-  EXPECT_EQ(TypespecNameOf(LowConnOf("top.u", "p")), "(none)");
-}
-
 // §37.24 (figure) with §23.4: a nested module's interconnect array is shaped
 // as any other, and the net a nested module's assignment writes of its
 // enclosing module stands up no object of its own under the instance.

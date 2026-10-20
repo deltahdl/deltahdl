@@ -572,8 +572,9 @@ std::vector<VpiHandle> VpiTypespecMembers(
     int ts_type, const std::vector<VpiHandle>& members);
 
 // §37.25 detail 3: the typespec relation of a struct/union member indicates the
-// member's type - the member's typespec child.
-VpiHandle VpiTypespecMemberTypespec(VpiHandle member);
+// member's type - the member's typespec child. Any object's typespec is reached
+// the same way; null for none or for no object.
+VpiHandle VpiTypespecChild(VpiHandle obj);
 
 // §37.25 detail 4: vpiName of a typespec member is the member's own name, not
 // the name of the member's typespec.

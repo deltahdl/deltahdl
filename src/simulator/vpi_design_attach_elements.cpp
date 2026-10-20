@@ -289,15 +289,6 @@ void ShapeInterconnect(VpiObject& net, const std::string& key,
   }
 }
 
-// The typespec `obj` reaches through vpiTypespec, the first among its
-// children; null for none.
-VpiObject* TypespecChild(const VpiObject& obj) {
-  for (VpiObject* child : obj.children) {
-    if (VpiIsTypespecType(child->type)) return child;
-  }
-  return nullptr;
-}
-
 // The value of a range's bound, a 32-bit integer constant (VpiIntConstant).
 int64_t BoundOf(const VpiObject& constant) {
   return static_cast<int32_t>(
@@ -328,10 +319,10 @@ void GiveInterconnectTypespec(VpiObject& net, VpiObject* typespec,
   if (typespec == nullptr) return;
   net.children.push_back(typespec);
   if (VpiIsInterconnectStructDataTypespec(typespec->type)) {
-    for (const VpiObject* member : typespec->children) {
+    for (VpiObject* member : typespec->children) {
       VpiObject* sub = SubInterconnectNet(
           net, member->name, "." + std::string(member->name), build);
-      GiveInterconnectTypespec(*sub, TypespecChild(*member), build);
+      GiveInterconnectTypespec(*sub, VpiTypespecChild(member), build);
     }
     return;
   }
@@ -449,10 +440,8 @@ void AttachInterconnectTypespecs(const RtlirDesign* design,
       [&](const RtlirModule*, const std::string&, VpiObject* instance) {
         for (VpiObject* net : instance->children) {
           if (net->type != vpiInterconnectNet) continue;
-          VpiObject* connected = VpiConnectedNet(net);
-          GiveInterconnectTypespec(
-              *net, connected != nullptr ? TypespecChild(*connected) : nullptr,
-              build);
+          GiveInterconnectTypespec(*net, VpiTypespecChild(VpiConnectedNet(net)),
+                                   build);
         }
       });
 }

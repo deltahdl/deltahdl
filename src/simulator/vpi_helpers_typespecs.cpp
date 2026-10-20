@@ -85,10 +85,11 @@ std::vector<VpiHandle> VpiTypespecMembers(
   return {};
 }
 
-VpiHandle VpiTypespecMemberTypespec(VpiHandle member) {
-  // §37.25 detail 3: the member's type is its typespec child.
-  if (!member) return nullptr;
-  for (auto* child : member->children) {
+VpiHandle VpiTypespecChild(VpiHandle obj) {
+  // §37.25 detail 3: a member's type is its typespec child, as a net's or an
+  // interconnect net's is (§37.24 detail 1).
+  if (!obj) return nullptr;
+  for (auto* child : obj->children) {
     if (VpiIsTypespecType(child->type)) return child;
   }
   return nullptr;
