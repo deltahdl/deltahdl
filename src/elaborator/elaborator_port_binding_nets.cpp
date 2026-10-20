@@ -252,7 +252,7 @@ static void CollapseOneDissimilarNetType(
   const RtlirPort* port = FindPortByName(child_ports, binding.port_name);
   if (!port) return;
 
-  NetType internal = PortNetType(port->type_kind);
+  NetType internal = port->net_type;
   NetType external = FindSignalNetType(conn->text, parent_mod);
   if (internal == NetType::kNone || external == NetType::kNone) return;
   if (internal == external) return;
@@ -294,8 +294,9 @@ static void MergeInterconnectNetType(RtlirNet& net, NetType internal) {
 }
 
 // §23.3.3.7.1: merge one interconnect net with the net on the other side of a
-// port connection. Only a built-in net type on the child-port side contributes
-// a type; an interconnect or variable port contributes nothing.
+// port connection. A child port that is a net contributes its net type, the
+// default net type where its declaration wrote a data type and no net type
+// keyword (§23.2.2.3); an interconnect or variable port contributes nothing.
 static void CollapseOneInterconnectNetType(
     RtlirModule* parent_mod, const std::vector<RtlirPort>& child_ports,
     const RtlirPortBinding& binding,
@@ -304,13 +305,10 @@ static void CollapseOneInterconnectNetType(
   if (!conn || conn->kind != ExprKind::kIdentifier) return;
   if (interconnect_names.count(conn->text) == 0) return;
 
-  // An interconnect port's data type is written as a wire's (Syntax 23-4's
-  // `interconnect implicit_data_type`), so its type kind alone gave the
-  // interconnect net it meets a wire type of its own.
   const RtlirPort* port = FindPortByName(child_ports, binding.port_name);
   if (!port || port->is_interconnect) return;
 
-  NetType internal = PortNetType(port->type_kind);
+  NetType internal = port->net_type;
   if (internal == NetType::kNone) return;
 
   for (auto& net : parent_mod->nets) {

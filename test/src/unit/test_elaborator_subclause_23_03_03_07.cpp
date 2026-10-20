@@ -825,4 +825,25 @@ TEST(DissimilarNetTypePortConnectionElaboration,
   EXPECT_EQ(ElaboratedNetType(design, "top", "w"), NetType::kTrireg);
 }
 
+// §23.3.3.7 / Table 23-1 with §23.2.2.3: an input port declared with a data
+// type alone is a net of the default net type, here wand, which dominates the
+// external wire, so the collapsed net is a wand (#7391).
+TEST(DissimilarNetTypePortConnectionElaboration,
+     DataTypedInputOfTheDefaultNetTypeDominatesExternalWire) {
+  ElabFixture f;
+  auto* design = ElaborateWithPreprocessor(
+      "`default_nettype wand\n"
+      "module child(input logic a);\n"
+      "endmodule\n"
+      "`default_nettype wire\n"
+      "module top;\n"
+      "  wire w;\n"
+      "  child u(.a(w));\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ElaboratedNetType(design, "top", "w"), NetType::kWand);
+}
+
 }  // namespace

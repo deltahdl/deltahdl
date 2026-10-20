@@ -489,4 +489,58 @@ TEST(InterconnectPortConnectionElaboration,
                             4, "23.3.3.7.1"));
 }
 
+// §23.3.3.7.1 with §23.2.2.3: an input port declared with a data type and no
+// net type keyword is a net of the default net type, so the interconnect net
+// connected to it merges into a wire (#7390).
+TEST(InterconnectPortConnectionElaboration,
+     ExternalInterconnectOnADataTypedInputResolvesToWire) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module sink(input logic q);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  interconnect c;\n"
+      "  sink v(c);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(InterconnectNetType(design, "top", "c"), NetType::kWire);
+}
+
+// §23.3.3.7.1 with §23.2.2.3 and §22.8: the default net type in force where the
+// port's module is defined is the one the merged net takes.
+TEST(InterconnectPortConnectionElaboration,
+     ExternalInterconnectOnADataTypedInputTakesTheDefaultNetType) {
+  ElabFixture f;
+  auto* design = ElaborateWithPreprocessor(
+      "`default_nettype tri\n"
+      "module sink(input logic q);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  interconnect c;\n"
+      "  sink v(c);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_EQ(InterconnectNetType(design, "top", "c"), NetType::kTri);
+}
+
+// §23.3.3.7.1: an output port declared with a data type alone is a variable
+// (§23.2.2.3), no net, so it gives the interconnect net no net type.
+TEST(InterconnectPortConnectionElaboration,
+     ExternalInterconnectOnAVariablePortGetsNoNetType) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module src(output logic q);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  interconnect c;\n"
+      "  src u(c);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_EQ(InterconnectNetType(design, "top", "c"), NetType::kInterconnect);
+}
+
 }  // namespace
