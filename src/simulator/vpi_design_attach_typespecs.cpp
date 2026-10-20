@@ -689,9 +689,7 @@ std::unordered_map<std::string_view, std::vector<RtlirEnumMember>> ClassEnums(
 // methods are (§37.41 detail 5), an enumeration's with its constants, and
 // found under `prefix`, the key of the scope declaring the class. A body's
 // `localparam type`, which the parser carries as a typedef, is a parameter of
-// the class (detail 7) instead. The types its extends clause gives as names
-// are found among `declaring`, the typedefs of the scope declaring the class
-// (§37.32 detail 3).
+// the class (detail 7) instead.
 // The variable the property `name` of the class `defn` stands for stands as,
 // among the defn's children; null for none.
 VpiObject* PropertyObject(const VpiObject& defn, std::string_view name) {
@@ -713,16 +711,19 @@ bool ReachesATypespec(const VpiObject& obj) {
 }
 
 // §37.32 detail 3: gives the param assigns of the typespec the extends clause
-// of `decl` writes, its class defn being `defn`, the typespecs `maker` finds
-// for the types it assigns as names.
-void AssignExtendsNamedTypes(const ClassDecl& decl, const VpiObject& defn,
-                             TypespecMaker& maker,
-                             const VpiClassDefnObjects& classes) {
+// of `decl` writes, its class defn being `at.scope`, the typespecs of the
+// types it assigns as names. The clause, written before the class's body,
+// finds those names among `declaring`, the typedefs of the scope declaring
+// the class, not among the class's own.
+void AssignExtendsNamedTypes(const ClassDecl& decl, const ScopeTypespecs& at,
+                             const TypespecsByName& declaring) {
+  const VpiObject& defn = *at.scope;
   const auto kExtends =
       std::ranges::find(defn.children, vpiExtends, &VpiObject::type);
   if (kExtends == defn.children.end()) return;
   VpiObject* typespec = (*kExtends)->children.front();
-  for (const auto& [key, base] : classes) {
+  TypespecMaker maker(at, declaring);
+  for (const auto& [key, base] : at.design.classes) {
     if (std::ranges::find(typespec->children, base) ==
         typespec->children.end()) {
       continue;
@@ -738,8 +739,7 @@ void AssignExtendsNamedTypes(const ClassDecl& decl, const VpiObject& defn,
 void MakeClassTypespecs(const ClassDecl& decl, VpiObject* defn,
                         const std::string& prefix,
                         const DesignTypespecs& design,
-                        const VpiObjectMap& answered,
-                        const TypespecsByName& declaring) {
+                        const VpiObjectMap& answered) {
   std::vector<ModuleItem*> typedefs;
   for (const ClassMember* member : decl.members) {
     if (member->kind == ClassMemberKind::kTypedef &&
@@ -770,11 +770,6 @@ void MakeClassTypespecs(const ClassDecl& decl, VpiObject* defn,
       var->children.push_back(typespec);
     }
   }
-  // §37.32 detail 3: the types the extends clause, written before the class's
-  // body, gives as names are found among the typedefs of the scope declaring
-  // the class, not the class's own.
-  TypespecMaker outside(kAt, declaring);
-  AssignExtendsNamedTypes(decl, *defn, outside, design.classes);
 }
 
 }  // namespace
@@ -860,9 +855,10 @@ VpiObjectMap AttachTypespecs(const RtlirDesign* design,
         RelateVariableTypespecs(mod, {kLocal, kUnit, objects, kAt});
       });
   for (const auto& [key, defn] : classes) {
+    MakeClassTypespecs(*key.first, defn, key.second, kDesign, answered);
     const auto kDeclaring = declaring.find(key.second);
-    MakeClassTypespecs(
-        *key.first, defn, key.second, kDesign, answered,
+    AssignExtendsNamedTypes(
+        *key.first, {defn, key.second, nullptr, answered, kNoImports, kDesign},
         kDeclaring == declaring.end() ? kNone : kDeclaring->second);
   }
   return answered;
