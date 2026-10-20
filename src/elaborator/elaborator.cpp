@@ -586,6 +586,8 @@ RtlirDesign* Elaborator::ElaborateTops(
   }
   // §23.3.3.6: whether the design calls $sdf_annotate is known only now.
   WarnUwireNetsKeptApart(*design, diag_);
+  // §23.3.3.7.1: every interconnect port connection is known only now.
+  interconnect_merges_.Report(diag_);
 
   // §23.10.4.2: detect defparam hierarchical names whose early resolution would
   // diverge from the fully elaborated hierarchy. all_modules holds each

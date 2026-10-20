@@ -379,4 +379,114 @@ TEST(InterconnectPortConnectionElaboration,
   EXPECT_EQ(InterconnectNetType(design, "netlist", "iwire"), NetType::kWand);
 }
 
+// §23.3.3.7.1: the merging is transitive. An interconnect net joined to an
+// interconnect port whose instance passes it on to a wire port is one net with
+// that wire, so it is not of interconnect type at the end of elaboration,
+// though the port joining the two interconnect nets has interconnect on both
+// sides
+// (#7388).
+TEST(InterconnectPortConnectionElaboration,
+     InterconnectChainReachingAWireBelowIsLegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module sink(input wire q);\n"
+      "endmodule\n"
+      "module mid(interconnect p);\n"
+      "  sink s(p);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  interconnect c;\n"
+      "  mid m(c);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §23.3.3.7.1: the wire the chain reaches may stand above it, a bit of it
+// connected to the interconnect port that passes the net down to another
+// interconnect port.
+TEST(InterconnectPortConnectionElaboration,
+     InterconnectChainReachingAWireAboveIsLegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module leaf(interconnect p);\n"
+      "endmodule\n"
+      "module mid(interconnect p);\n"
+      "  leaf l(p);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  wire [1:0] w;\n"
+      "  mid m(w[0]);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §23.3.3.7.1: the wire may also be reached through a later sibling instance,
+// whose port connection the merged net takes its type from after the first
+// instance's interconnect port has joined it.
+TEST(InterconnectPortConnectionElaboration,
+     InterconnectChainReachingAWireThroughASiblingIsLegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module leaf(interconnect p);\n"
+      "endmodule\n"
+      "module sink(input wire q);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  interconnect c;\n"
+      "  leaf u(c);\n"
+      "  sink v(c);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §23.3.3.7.1 with §23.3.3.7.2: a gate terminal gives the interconnect net on
+// it a net type of its own, and a chain reaching that net reaches the type.
+TEST(InterconnectPortConnectionElaboration,
+     InterconnectChainReachingAGateTerminalIsLegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module mid(interconnect p);\n"
+      "  wire a, b;\n"
+      "  and g(p, a, b);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  interconnect c;\n"
+      "  mid m(c);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §23.3.3.7.1 (negative form): a chain of interconnect nets that reaches no net
+// of another type anywhere is still of interconnect type at the end of
+// elaboration, and is reported at each port joining two of its nets, however
+// many other nets stand beside it.
+TEST(InterconnectPortConnectionElaboration,
+     InterconnectChainReachingNoOtherTypeIsIllegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module leaf(interconnect p);\n"
+      "endmodule\n"
+      "module mid(interconnect p);\n"
+      "  leaf l(p);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  wire w;\n"
+      "  interconnect c;\n"
+      "  mid m(c);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "simulated net for port 'p' of instance 'm' has "
+                            "interconnect type at end of elaboration",
+                            9, "23.3.3.7.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "simulated net for port 'p' of instance 'l' has "
+                            "interconnect type at end of elaboration",
+                            4, "23.3.3.7.1"));
+}
+
 }  // namespace

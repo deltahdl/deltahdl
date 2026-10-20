@@ -536,6 +536,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/interface_port_typedef.cpp
     elaborator/elaborator_port_binding_checks.cpp
     elaborator/sdf_annotate_calls.cpp
+    elaborator/interconnect_merges.cpp
     elaborator/elaborator_process.cpp
     elaborator/elaborator_process_validate.cpp
     elaborator/elaborator_resolve.cpp

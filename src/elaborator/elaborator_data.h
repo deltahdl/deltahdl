@@ -20,6 +20,7 @@
 #include "elaborator/elaborator_bind_scope.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_scope_rules_names.h"
+#include "elaborator/interconnect_merges.h"
 #include "elaborator/property_rewrite.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
@@ -391,6 +392,9 @@ class ElaboratorData {
   std::unordered_map<std::string_view, std::string_view> nettype_resolve_funcs_;
   std::unordered_map<std::string_view, std::string_view> nettype_canonical_;
   std::unordered_set<std::string_view> interconnect_names_;
+  // §23.3.3.7.1: the nets the design's interconnect port connections merge,
+  // judged once every instance is elaborated (ElaborateTops).
+  InterconnectMerges interconnect_merges_;
   std::unordered_set<std::string_view> scalar_var_names_;
   // §11.5.1: the real variables the rule barring a bit-select or part-select of
   // a scalar, a real variable or a real parameter names in its second

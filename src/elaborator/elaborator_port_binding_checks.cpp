@@ -15,6 +15,7 @@
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_port_binding_internal.h"
+#include "elaborator/interconnect_merges.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
 #include "elaborator/sdf_annotate_calls.h"
@@ -170,9 +171,16 @@ void Elaborator::CheckUwirePortMerge(RtlirModuleInst& inst,
   }
 }
 
+// §23.3.3.7.1: each port connection of `inst` involving an interconnect net is
+// kept in the design's merges, one joining two interconnect nets joining them
+// and one joining an interconnect net to anything else typing it, so that
+// whether a merged net is still an interconnect net is judged once the whole
+// design is elaborated (InterconnectMerges::Report). Each port with
+// interconnect on both sides was reported here, though the merged net may
+// reach a typed net through a connection further on (#7388).
 void Elaborator::CheckInterconnectPortMerge(const RtlirModuleInst& inst,
                                             const ModuleItem* item,
-                                            RtlirModule*) {
+                                            RtlirModule* mod) {
   if (!inst.resolved) return;
   const auto& child_ports = inst.resolved->ports;
 
@@ -180,21 +188,19 @@ void Elaborator::CheckInterconnectPortMerge(const RtlirModuleInst& inst,
     const RtlirPort* port_it = FindBoundChildPort(child_ports, binding);
     if (!port_it) continue;
 
-    bool internal_is_interconnect = port_it->is_interconnect;
-
-    bool external_is_interconnect = false;
-    if (binding.connection->kind == ExprKind::kIdentifier) {
-      external_is_interconnect =
-          interconnect_names_.count(binding.connection->text) != 0;
-    }
-
-    if (internal_is_interconnect && external_is_interconnect) {
-      diag_.Error(
-          item->loc,
-          std::format("simulated net for port '{}' of instance '{}' has "
-                      "interconnect type at end of elaboration",
-                      binding.port_name, inst.inst_name),
-          Subclause("23.3.3.7.1"));
+    const Expr* conn = binding.connection;
+    const InterconnectMerges::Net kOuter{mod, conn->text};
+    const InterconnectMerges::Net kInner{inst.resolved, binding.port_name};
+    const bool kOuterIsInterconnect =
+        conn->kind == ExprKind::kIdentifier &&
+        interconnect_names_.count(conn->text) != 0;
+    if (port_it->is_interconnect && kOuterIsInterconnect) {
+      interconnect_merges_.Join(kOuter, kInner, item->loc, binding.port_name,
+                                inst.inst_name);
+    } else if (port_it->is_interconnect) {
+      interconnect_merges_.MarkTyped(kInner);
+    } else if (kOuterIsInterconnect) {
+      interconnect_merges_.MarkTyped(kOuter);
     }
   }
 }
