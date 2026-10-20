@@ -494,7 +494,10 @@ class NetRelationsOfARun : public VpiDesignRun {
       "  assign d = c;\n"
       "  always_comb v = c;\n"
       "endmodule\n"
-      "module top; wire x, y, z, e; wire [1:0] b;\n"
+      "module pair(input a2, input b2, output o2);\n"
+      "  assign o2 = a2 & b2;\n"
+      "endmodule\n"
+      "module top; wire x, y, z, e, g; wire [1:0] b;\n"
       "  logic k; logic [1:0] kv;\n"
       "  sub u(.c(k), .d(z), .v(y), .io());\n"
       "  sub w(.c(x), .d(), .v(), .io());\n"
@@ -504,6 +507,9 @@ class NetRelationsOfARun : public VpiDesignRun {
       "  sub q(.c({e}), .d(), .v(), .io());\n"
       "  sub t(.c(1'b1), .d(), .v(), .io());\n"
       "  sub r(.c(x & e), .d(), .v(), .io());\n"
+      "  sub m(.c({k}), .d(), .v(), .io());\n"
+      "  sub h(.c(b[0]), .d(), .v(), .io());\n"
+      "  pair pr(.a2(g), .b2(g), .o2());\n"
       "endmodule\n";
 };
 
@@ -545,15 +551,17 @@ TEST_F(NetRelationsOfARun, ADriverIterationReachesAPortAVariableDrives) {
   EXPECT_EQ(CountOf(vpiDriver, By("top.u.c"), vpiPort), 1);
   EXPECT_EQ(CountOf(vpiDriver, By("top.w.c"), vpiPort), 0);
   EXPECT_EQ(CountOf(vpiDriver, By("top.u.d"), vpiPort), 0);
-  // Nothing, a select of a net or a concatenation of nets drives the port as
-  // nets do; a select of a variable, a constant or another operation drives
-  // it as something else.
+  // Nothing, a bit or a select of a net or a concatenation of nets drives the
+  // port as nets do; a select of a variable, a constant, a concatenation
+  // holding a variable or another operation drives it as something else.
   EXPECT_EQ(CountOf(vpiDriver, By("top.n.c"), vpiPort), 0);
   EXPECT_EQ(CountOf(vpiDriver, By("top.s.c"), vpiPort), 0);
   EXPECT_EQ(CountOf(vpiDriver, By("top.q.c"), vpiPort), 0);
   EXPECT_EQ(CountOf(vpiDriver, By("top.p.c"), vpiPort), 1);
   EXPECT_EQ(CountOf(vpiDriver, By("top.t.c"), vpiPort), 1);
   EXPECT_EQ(CountOf(vpiDriver, By("top.r.c"), vpiPort), 1);
+  EXPECT_EQ(CountOf(vpiDriver, By("top.m.c"), vpiPort), 1);
+  EXPECT_EQ(CountOf(vpiDriver, By("top.h.c"), vpiPort), 0);
 }
 
 // §37.16 detail 17: the local drivers and loads of a net are those its own
@@ -584,6 +592,9 @@ TEST_F(NetRelationsOfARun, DriversAndLoadsReachAcrossAPortNetsDrive) {
   // A concatenation of nets joins them to the port's net, an operation joins
   // none: e reaches q's assignment, and r's, which reads x & e, neither.
   EXPECT_EQ(CountOf(vpiLoad, By("top.e"), vpiContAssign), 1);
+  // An assignment two joined nets both reach is reached once: pr's reads a2
+  // and b2, which g joins.
+  EXPECT_EQ(CountOf(vpiLoad, By("top.g"), vpiContAssign), 1);
 }
 
 }  // namespace

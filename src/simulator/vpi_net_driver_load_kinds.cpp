@@ -105,17 +105,17 @@ bool VpiIsNetDriverOrLoad(VpiHandle child, VpiHandle net, bool want_driver) {
 namespace {
 
 // §37.16 detail 16: whether the connection `conn` on one end of a port is
-// driven by nets alone, or by nothing: a net, a bit or a select of one, or a
-// concatenation of such, each of whose nets drives its own bits. A variable, a
-// constant or any other operation drives the port as something else.
+// driven by nets alone, or by nothing: a net, a bit or a select of one (what
+// stands in a net), or a concatenation of such, each of whose nets drives its
+// own bits. A variable, a constant or any other operation drives the port as
+// something else.
 bool DrivenByNets(VpiHandle conn) {
   if (conn == nullptr || VpiIsNetsType(conn->type)) return true;
   if (conn->type == vpiOperation) {
     return VpiIsConcatenationExpression(conn) &&
            std::ranges::all_of(VpiOperationOperands(conn), DrivenByNets);
   }
-  return conn->parent != nullptr && VpiIsNetsType(conn->parent->type) &&
-         VpiIsVariableSelectType(conn->type);
+  return conn->parent != nullptr && VpiIsNetsType(conn->parent->type);
 }
 
 // Whether a port of direction `direction` passes values into the module it is
@@ -160,17 +160,14 @@ void NetsNamedIn(VpiHandle conn, std::vector<VpiHandle>& out) {
   }
   const bool kPart = conn->type == vpiNetBit || !VpiIsNetsType(conn->type);
   VpiHandle net = kPart ? conn->parent : conn;
-  if (net != nullptr && std::ranges::find(out, net) == out.end()) {
-    out.push_back(net);
-  }
+  if (std::ranges::find(out, net) == out.end()) out.push_back(net);
 }
 
 // Adds to `joined`, once each, the nets on the far end of each port nets drive
 // at both ends that `net` stands on one end of.
 void AddNetsJoinedTo(VpiHandle net, std::vector<VpiHandle>& joined) {
   for (VpiHandle port : VpiNetPortInsts(net)) {
-    if (port->low_conn != nullptr && DrivenByNets(port->high_conn) &&
-        DrivenByNets(port->low_conn)) {
+    if (DrivenByNets(port->high_conn) && DrivenByNets(port->low_conn)) {
       NetsNamedIn(port->low_conn, joined);
     }
   }
