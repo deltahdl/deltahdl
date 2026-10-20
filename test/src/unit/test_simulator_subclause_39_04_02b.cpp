@@ -179,6 +179,8 @@ TEST_F(AssertionRun, AnImmediateAssertionsAttemptsReachTheirCallbacks) {
       if (name != nullptr && std::string(name) == "i1") i1 = obj;
     }
     ASSERT_NE(i1, nullptr);
+    EXPECT_EQ(vpi_get(vpiType, i1), vpiImmediateAssert);
+    EXPECT_STREQ(vpi_get_str(vpiFullName, i1), "top.i1");
     for (int reason :
          {cbAssertionStart, cbAssertionSuccess, cbAssertionFailure}) {
       ASSERT_NE(

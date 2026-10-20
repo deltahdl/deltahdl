@@ -414,12 +414,18 @@ VpiObject* MakeBuiltStmt(const Stmt& stmt, const BlockParent& parent,
   VpiObject* obj = MakeAtomicStatement(stmt, kKind, parent, walk);
   // §37.49: an assertion reports where its text stands, and §39.3.1: one
   // that is labelled is named in the hierarchy of the scope it is written in,
-  // the path its named blocks extend; a procedure or an unnamed block it
-  // stands under adds no level.
+  // the path its named blocks extend. Its label also opens a named begin
+  // around it (§9.3.5, WalkStmt), whose path already ends in the label: that
+  // begin's name is the assertion's own and adds no level of its own.
   if (VpiIsAssertionType(kKind)) {
     VpiRecordAssertionLocation(obj, stmt.range, walk.calls.ctx);
+    const bool kInOwnLabel = parent.block == nullptr &&
+                             parent.scope->type == vpiNamedBegin &&
+                             parent.scope->name == stmt.label;
     if (!stmt.label.empty()) {
-      obj->full_name = parent.path + "." + std::string(stmt.label);
+      obj->full_name = kInOwnLabel
+                           ? parent.path
+                           : parent.path + "." + std::string(stmt.label);
     }
   }
   VpiFillStmt(obj, stmt, StmtBuildAt(parent, walk));
