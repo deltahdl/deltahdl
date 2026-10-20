@@ -343,6 +343,23 @@ class ClassTypespecsOfARun : public VpiDesignRun {
     }
     return assigned;
   }
+
+  // What the param assign of the parameter `param` reaches through vpiRhs on
+  // the typespec the extends clause of the class `derived`, which `scope`
+  // declares, writes; null for none.
+  static vpiHandle ExtendsRhs(const char* scope, const char* derived,
+                              std::string_view param) {
+    vpiHandle typespec = vpi_handle(
+        vpiClassTypespec,
+        vpi_handle(vpiExtends, Named(vpiClassDefn, By(scope), derived)));
+    for (vpiHandle assign : ObjectsOf(vpiParamAssign, typespec)) {
+      vpiHandle lhs = vpi_handle(vpiLhs, assign);
+      if (lhs != nullptr && vpi_get_str(vpiName, lhs) == param) {
+        return vpi_handle(vpiRhs, assign);
+      }
+    }
+    return nullptr;
+  }
 };
 
 constexpr const char* kSpecializations =
@@ -470,6 +487,46 @@ TEST_F(ClassTypespecsOfARun, AnExtendsClausesTypeIsAssignedItsTypespec) {
   };
   EXPECT_EQ(kAssigned("F"), (std::vector<int>{vpiByteTypespec, vpiConstant}));
   EXPECT_EQ(kAssigned("G"), (std::vector<int>{vpiIntTypespec, vpiConstant}));
+}
+
+// §37.32 detail 3: a type written as a name, given a type parameter by an
+// extends clause or declared as its default, is assigned the typespec the
+// name finds: a typedef's own, or a class typespec reaching the class's defn
+// (#7374).
+TEST_F(ClassTypespecsOfARun, AnExtendsClausesNamedTypeIsAssignedItsTypespec) {
+  Run("module top;\n"
+      "  typedef bit [3:0] nib_t;\n"
+      "  class C; endclass\n"
+      "  class B3 #(type T = nib_t, type U = int); endclass\n"
+      "  class H extends B3 #(.U(C)); endclass\n"
+      "  class J extends B3 #(nib_t, nib_t); endclass\n"
+      "endmodule\n");
+  vpiHandle nib = Named(vpiTypedef, By("top"), "nib_t");
+  ASSERT_NE(nib, nullptr);
+  EXPECT_EQ(VpiObjectOf(ExtendsRhs("top", "H", "T")), VpiObjectOf(nib));
+  EXPECT_EQ(VpiObjectOf(ExtendsRhs("top", "J", "T")), VpiObjectOf(nib));
+  EXPECT_EQ(VpiObjectOf(ExtendsRhs("top", "J", "U")), VpiObjectOf(nib));
+  vpiHandle c = ExtendsRhs("top", "H", "U");
+  ASSERT_NE(c, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, c), vpiClassTypespec);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiClassDefn, c)),
+            VpiObjectOf(Named(vpiClassDefn, By("top"), "C")));
+}
+
+// §37.32 detail 3: a class a package declares finds a type its extends clause
+// gives as a name among the package's typedefs (#7374).
+TEST_F(ClassTypespecsOfARun, APackagesExtendsClauseFindsThePackagesTypedef) {
+  Run("package pk;\n"
+      "  typedef byte b_t;\n"
+      "  class PB #(type T = int); endclass\n"
+      "  class PD extends PB #(b_t); endclass\n"
+      "endpackage\n"
+      "module top;\n"
+      "  pk::PD d = new;\n"
+      "endmodule\n");
+  vpiHandle b = Named(vpiTypedef, By("pk"), "b_t");
+  ASSERT_NE(b, nullptr);
+  EXPECT_EQ(VpiObjectOf(ExtendsRhs("pk", "PD", "T")), VpiObjectOf(b));
 }
 
 // §37.32: the typespec of a mailbox's and a semaphore's class obj reports the

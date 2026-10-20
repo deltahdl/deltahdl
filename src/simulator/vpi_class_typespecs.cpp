@@ -117,9 +117,47 @@ VpiObject* DefnOfClass(const VpiClassDefnObjects& defns,
   return kOfDecl ? kFirst->second : nullptr;
 }
 
+// §37.32 detail 3: what the extends clause of a derived class gives one
+// parameter `name` of its base a value may be given: the actual it writes,
+// null for none, and the parameter's default, an expression `declared` for a
+// value parameter and a type `declared_type` for a type parameter.
+struct ExtendsParam {
+  std::string_view name;
+  const DataType* actual = nullptr;
+  const Expr* declared = nullptr;
+  const DataType* declared_type = nullptr;
+};
+
+// What the extends clause of `derived` gives each parameter of `base`'s
+// parameter port list a value may be given, by name or in order.
+std::vector<ExtendsParam> ExtendsParams(const ClassDecl& derived,
+                                        const ClassDecl& base) {
+  std::vector<ExtendsParam> params;
+  std::size_t ordered = 0;
+  for (std::size_t i = 0; i < base.params.size(); ++i) {
+    const auto& [name, declared] = base.params[i];
+    if (base.localparam_port_names.contains(name)) continue;
+    params.push_back(
+        {name, WrittenActual(derived.base_class_type_params, name, ordered++),
+         declared,
+         i < base.param_types.size() ? &base.param_types[i] : nullptr});
+  }
+  return params;
+}
+
+// The type `param` is assigned: the type the clause writes for it, or else
+// the default type it was declared with; null where it is assigned an
+// expression or nothing.
+const DataType* AssignedType(const ExtendsParam& param) {
+  if (param.actual != nullptr) {
+    return param.actual->type_ref_expr == nullptr ? param.actual : nullptr;
+  }
+  return param.declared == nullptr ? param.declared_type : nullptr;
+}
+
 // §37.32 detail 3: a typespec of the type `type` writes as a keyword, of that
 // keyword's kind; null for a type written as a name, whose typespec is made
-// after the class defns are (#7374).
+// after the class defns are (VpiAssignExtendsNamedTypes).
 VpiObject* KeywordTypespec(const DataType& type, const VpiAttachBuild& build) {
   const int kKind = VpiTypespecKind(type.kind);
   if (kKind == 0) return nullptr;
@@ -128,22 +166,20 @@ VpiObject* KeywordTypespec(const DataType& type, const VpiAttachBuild& build) {
   return typespec;
 }
 
-// §37.32 detail 3: what a lexical typespec's param assign reaches through
-// vpiRhs: the expression `actual` writes for a value parameter, or the
-// typespec of the type it writes for a type parameter; where it writes none,
-// the default expression `declared` of a value parameter, or the typespec of
-// the default type `declared_type` of a type parameter.
+// §37.32 detail 3: what a lexical typespec's param assign of `param` reaches
+// through vpiRhs: the expression `expression` makes of the value the clause
+// writes for a value parameter, or else of its default; or a typespec of the
+// type it is assigned for a type parameter.
 VpiObject* AssignedValue(
-    const DataType* actual, const Expr* declared, const DataType* declared_type,
+    const ExtendsParam& param,
     const std::function<VpiObject*(const Expr*)>& expression,
     const VpiAttachBuild& build) {
-  if (actual != nullptr) {
-    return actual->type_ref_expr != nullptr ? expression(actual->type_ref_expr)
-                                            : KeywordTypespec(*actual, build);
+  if (const DataType* type = AssignedType(param)) {
+    return KeywordTypespec(*type, build);
   }
-  if (declared != nullptr) return expression(declared);
-  if (declared_type == nullptr) return nullptr;
-  return KeywordTypespec(*declared_type, build);
+  const Expr* written =
+      param.actual != nullptr ? param.actual->type_ref_expr : param.declared;
+  return written == nullptr ? nullptr : expression(written);
 }
 
 // The built-in classes §37.32's vpiClassType names, by the name each is
@@ -194,23 +230,30 @@ void VpiMakeExtendsParamAssigns(
     const std::function<VpiObject*(const Expr*)>& expression,
     const VpiAttachBuild& build) {
   const VpiObject& base_defn = *typespec->children.front();
-  std::size_t ordered = 0;
-  for (std::size_t i = 0; i < base.params.size(); ++i) {
-    const auto& [name, declared] = base.params[i];
-    if (base.localparam_port_names.contains(name)) continue;
-    const DataType* actual =
-        WrittenActual(derived.base_class_type_params, name, ordered++);
-    VpiObject* param = DefnParameter(base_defn, name);
+  for (const ExtendsParam& written : ExtendsParams(derived, base)) {
+    VpiObject* param = DefnParameter(base_defn, written.name);
     if (param == nullptr) continue;
     VpiObject* assign = build.alloc();
     assign->type = vpiParamAssign;
     assign->parent = typespec;
     assign->children.push_back(param);
-    assign->rhs = AssignedValue(
-        actual, declared,
-        i < base.param_types.size() ? &base.param_types[i] : nullptr,
-        expression, build);
+    assign->rhs = AssignedValue(written, expression, build);
     typespec->children.push_back(assign);
+  }
+}
+
+void VpiAssignExtendsNamedTypes(
+    VpiObject* typespec, const ClassDecl& derived, const ClassDecl& base,
+    const std::function<VpiObject*(const DataType&, VpiObject*)>& named) {
+  for (const ExtendsParam& written : ExtendsParams(derived, base)) {
+    const DataType* type = AssignedType(written);
+    if (type == nullptr || type->kind != DataTypeKind::kNamed) continue;
+    for (VpiObject* assign : typespec->children) {
+      if (assign->type == vpiParamAssign &&
+          assign->children.front()->name == written.name) {
+        assign->rhs = named(*type, assign);
+      }
+    }
   }
 }
 

@@ -16,6 +16,7 @@ namespace delta {
 
 class SimContext;
 struct ClassDecl;
+struct DataType;
 struct Expr;
 
 // §37.32 details 1 and 10: a class typespec per class specialization of the
@@ -52,11 +53,21 @@ VpiObject* VpiSpecializationTypespec(const VpiObject& defn,
 // makes of the value the clause gives it, by name or in order, or else of the
 // default it was declared with; for a type parameter, a typespec of the type
 // the clause gives, or of its default type, where that is written as a
-// keyword (a named type's is #7374).
+// keyword; one written as a name is left to VpiAssignExtendsNamedTypes.
 void VpiMakeExtendsParamAssigns(
     VpiObject* typespec, const ClassDecl& derived, const ClassDecl& base,
     const std::function<VpiObject*(const Expr*)>& expression,
     const VpiAttachBuild& build);
+
+// §37.32 detail 3: gives each param assign VpiMakeExtendsParamAssigns made
+// on `typespec` for a type parameter whose type, the one the clause gives or
+// else its default type, is written as a name, the typespec `named` finds for
+// that type, hung from the assign it is given. The typespecs a name finds,
+// those of the typedefs, are made after the class defns are, so this runs
+// once they are.
+void VpiAssignExtendsNamedTypes(
+    VpiObject* typespec, const ClassDecl& derived, const ClassDecl& base,
+    const std::function<VpiObject*(const DataType&, VpiObject*)>& named);
 
 // §37.32: the vpiClassType of the class typespec `typespec`: the built-in
 // mailbox, semaphore or process class, none of which has a declaration
