@@ -128,17 +128,26 @@ void CollectInstancePorts(VpiHandle instance, VpiHandle ref, VpiHandle net,
   }
 }
 
-// The ports of the instances `scope` holds, reaching into the generate blocks
-// it holds but not into the instances, whose ports `ref` stands outside of.
-void CollectPortInsts(VpiHandle scope, VpiHandle ref, VpiHandle net,
-                      std::vector<VpiHandle>& out) {
+// The instances `scope` holds, reaching into the generate blocks it holds but
+// not into the instances, whose ports a net of `scope` stands outside of.
+void CollectHeldInstances(VpiHandle scope, std::vector<VpiHandle>& out) {
   for (VpiHandle child : scope->children) {
     if (child->type == vpiGenScope || child->type == vpiGenScopeArray) {
-      CollectPortInsts(child, ref, net, out);
+      CollectHeldInstances(child, out);
     } else if (VpiIsInstanceType(child->type)) {
-      CollectInstancePorts(child, ref, net, out);
+      out.push_back(child);
     }
   }
+}
+
+// The instances held by the instance holding the net, or the vector of the net
+// bit, `net`: those whose ports `net` can stand on the higher side of.
+std::vector<VpiHandle> InstancesBeside(VpiHandle net) {
+  VpiHandle whole = net->type == vpiNetBit ? net->parent : net;
+  std::vector<VpiHandle> held;
+  VpiHandle instance = whole == nullptr ? nullptr : InstanceHolding(whole);
+  if (instance != nullptr) CollectHeldInstances(instance, held);
+  return held;
 }
 
 // §37.16 detail 6: the port bits of `port`, its children, whose lower
@@ -173,8 +182,9 @@ std::vector<VpiHandle> VpiNetPorts(VpiHandle net) {
 std::vector<VpiHandle> VpiNetPortInsts(VpiHandle net) {
   VpiHandle whole = net->type == vpiNetBit ? net->parent : net;
   std::vector<VpiHandle> ports;
-  VpiHandle instance = whole == nullptr ? nullptr : InstanceHolding(whole);
-  if (instance != nullptr) CollectPortInsts(instance, net, whole, ports);
+  for (VpiHandle instance : InstancesBeside(net)) {
+    CollectInstancePorts(instance, net, whole, ports);
+  }
   return ports;
 }
 
@@ -235,12 +245,17 @@ std::vector<VpiHandle> VpiNetBitsJoinedThroughPorts(VpiHandle bit) {
   // §37.16 details 4 and 18: a port joins the bits standing at one place on
   // its two ends, so a bit shares the drivers and loads of the bits joined to
   // it, however many instances apart, and of no other bit of their vectors.
+  // Every port of the instances held beside the bit is read place by place,
+  // since a connection may hold the bits of one vector in any order.
   std::vector<VpiHandle> joined{bit};
   for (std::size_t k = 0; k < joined.size(); ++k) {
     VpiHandle current = joined[k];
-    std::vector<VpiHandle> ports = VpiNetPortInsts(current);
-    const std::vector<VpiHandle> kOwn = VpiNetPorts(current);
-    ports.insert(ports.end(), kOwn.begin(), kOwn.end());
+    std::vector<VpiHandle> ports = VpiNetPorts(current);
+    for (VpiHandle instance : InstancesBeside(current)) {
+      for (VpiHandle port : instance->children) {
+        if (port->type == kVpiPort) ports.push_back(port);
+      }
+    }
     for (VpiHandle port : ports) {
       AddBitsJoinedAcross(port->type == vpiPortBit ? port->parent : port,
                           current, joined);
