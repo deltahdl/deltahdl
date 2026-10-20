@@ -11,6 +11,7 @@
 #include "simulator/sim_context.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_walk.h"
+#include "simulator/vpi_dynamic_ranges.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -61,10 +62,11 @@ std::vector<DimBounds> PackedNetDims(const RtlirNet& net, SimContext& ctx) {
 
 // Detail 4: a range object per dimension under `obj`, leftmost first. Detail
 // 6: the leftmost one's bounds are the variable's vpiLeftRange and
-// vpiRightRange, which are null where that range is empty.
-void AttachRanges(VpiObject* obj, const std::vector<DimBounds>& dims,
-                  const VpiAttachBuild& build) {
-  if (dims.empty()) return;
+// vpiRightRange, which are null where that range is empty. Answers the
+// leftmost range, null where there are none.
+VpiObject* AttachRanges(VpiObject* obj, const std::vector<DimBounds>& dims,
+                        const VpiAttachBuild& build) {
+  if (dims.empty()) return nullptr;
   VpiObject* leftmost = VpiRangeObject(obj, dims.front(), build);
   obj->children.push_back(leftmost);
   for (std::size_t i = 1; i < dims.size(); ++i) {
@@ -72,6 +74,7 @@ void AttachRanges(VpiObject* obj, const std::vector<DimBounds>& dims,
   }
   obj->left_range = leftmost->left_range;
   obj->right_range = leftmost->right_range;
+  return leftmost;
 }
 
 // §37.16 detail 26: the ranges vpiRange reaches from `net`, keyed under
@@ -146,7 +149,13 @@ void AttachVariableAndNetRanges(const RtlirDesign& design,
         for (const RtlirVariable& var : mod->variables) {
           VpiObject* obj =
               FindObjectForFlatName(objects, VpiFlatName(prefix, var.name));
-          if (obj != nullptr) AttachRanges(obj, RangeDims(var, ctx), build);
+          if (obj == nullptr) continue;
+          VpiObject* leftmost = AttachRanges(obj, RangeDims(var, ctx), build);
+          // §37.22 detail 1: a dynamic array's or queue's leftmost range takes
+          // its bounds from the elements the array holds when it is read.
+          if (var.is_queue || var.is_dynamic) {
+            VpiGiveDynamicRangeBounds(*leftmost, build);
+          }
         }
         for (const RtlirNet& net : VpiDeclaredNets(*mod)) {
           if (!VpiNetIsInterconnect(net)) {

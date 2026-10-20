@@ -1,7 +1,14 @@
 #include <gtest/gtest.h>
 
+#include <string>
+#include <vector>
+
+#include "fixture_vpi_run.h"
+#include "simulator/sim_context_types.h"
+#include "simulator/vpi_dynamic_ranges.h"
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_user.h"
 
 namespace delta {
 namespace {
@@ -74,6 +81,69 @@ TEST(ObjectRange, NonEmptyRangeWithZeroCountStillReportsBounds) {
   EXPECT_EQ(VpiRangeSize(range), 0);
   EXPECT_EQ(VpiRangeLeftRange(range), &left);
   EXPECT_EQ(VpiRangeRightRange(range), &right);
+}
+
+// A design run with a PLI application registered, its ranges read back once
+// the run is over.
+class RangesOfARun : public VpiDesignRun {
+ protected:
+  // The integer value of a range's bound, -1 where it has none.
+  static int BoundOf(vpiHandle bound) {
+    if (bound == nullptr) return -1;
+    s_vpi_value value = {};
+    value.format = vpiIntVal;
+    vpi_get_value(bound, &value);
+    return value.value.integer;
+  }
+
+  // The size of the first range `obj` reaches and its bounds,
+  // "size:left:right".
+  static std::string FirstRangeOf(vpiHandle obj) {
+    const std::vector<vpiHandle> kRanges = ObjectsOf(vpiRange, obj);
+    if (kRanges.empty()) return "(none)";
+    vpiHandle range = kRanges.front();
+    return std::to_string(vpi_get(vpiSize, range)) + ":" +
+           std::to_string(BoundOf(vpi_handle(vpiLeftRange, range))) + ":" +
+           std::to_string(BoundOf(vpi_handle(vpiRightRange, range)));
+  }
+};
+
+// D1 and D2: the range of a dynamic array or a queue is empty while the array
+// holds no element, and once it holds some is [0:n-1] over its current
+// elements, a range the variable's own vpiLeftRange and vpiRightRange read as
+// well (#7025).
+TEST_F(RangesOfARun, ADynamicArraysRangeFollowsItsCurrentSize) {
+  Run("module top;\n"
+      "  int arr1 []; int empty1 []; int q [$];\n"
+      "  initial begin arr1 = new[2]; q = {5, 6, 7}; end\n"
+      "endmodule\n");
+  EXPECT_EQ(FirstRangeOf(By("top.arr1")), "2:0:1");
+  EXPECT_EQ(FirstRangeOf(By("top.q")), "3:0:2");
+  EXPECT_EQ(FirstRangeOf(By("top.empty1")), "0:-1:-1");
+  EXPECT_EQ(BoundOf(vpi_handle(vpiRightRange, By("top.arr1"))), 1);
+}
+
+// D1: a range that belongs to no array is a fixed one, and so is one of a
+// dynamic array that was given no bounds to follow its elements with; a
+// dynamic array holding no range has none whose bounds follow it.
+TEST(ObjectRange, OnlyADynamicArraysFirstRangeFollowsIt) {
+  VpiObject loose;
+  loose.type = vpiRange;
+  EXPECT_EQ(VpiDynamicRangeOf(&loose), nullptr);
+  QueueObject store;
+  VpiObject array;
+  array.queue = &store;
+  VpiObject fixed;
+  fixed.type = vpiRange;
+  fixed.parent = &array;
+  array.children = {&fixed};
+  EXPECT_EQ(VpiDynamicRangeOf(&array), nullptr);
+  VpiObject bound;
+  bound.type = vpiConstant;
+  VpiObject bare;
+  bare.queue = &store;
+  bare.children = {&bound};
+  EXPECT_EQ(VpiDynamicRangeOf(&bare), nullptr);
 }
 
 }  // namespace

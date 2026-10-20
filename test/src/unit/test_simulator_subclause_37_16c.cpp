@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <string>
 #include <vector>
 
 #include "fixture_vpi_run.h"
@@ -302,6 +303,60 @@ TEST_F(NetDetailsOfARun, APackedArrayNetReachesItsSubelements) {
   const std::vector<vpiHandle> kEnums = ObjectsOf(vpiElement, By("top.en"));
   ASSERT_EQ(kEnums.size(), 2U);
   EXPECT_EQ(vpi_get(vpiType, kEnums[0]), vpiEnumNet);
+}
+
+// §37.16 detail 2: vpiPackedArrayMember is TRUE for a subelement of a packed
+// array net, a packed array net or a struct net whose vpiParent is one, and
+// FALSE for the packed array net itself (#7397).
+TEST_F(NetDetailsOfARun, APackedArrayNetsSubelementsArePackedArrayMembers) {
+  Run("module top;\n"
+      "  typedef struct packed { integer i1; logic [1:0][2:3] bvec; } pst;\n"
+      "  wire pst [0:2][6:3] panet1;\n"
+      "endmodule\n");
+  vpiHandle panet1 = By("top.panet1");
+  const std::vector<vpiHandle> kRows = ObjectsOf(vpiElement, panet1);
+  ASSERT_EQ(kRows.size(), 3U);
+  const std::vector<vpiHandle> kLeaves = ObjectsOf(vpiElement, kRows[0]);
+  ASSERT_EQ(kLeaves.size(), 4U);
+  EXPECT_EQ(vpi_get(vpiPackedArrayMember, kRows[0]), 1);
+  EXPECT_EQ(vpi_get(vpiPackedArrayMember, kLeaves[0]), 1);
+  EXPECT_EQ(vpi_get(vpiPackedArrayMember, panet1), 0);
+}
+
+// §37.16 detail 32 with §37.26: a struct subelement of a packed array net has
+// a member net per field, named under the subelement and holding the field's
+// bits of that subelement's share of the net (#7393).
+TEST_F(NetDetailsOfARun, APackedArrayNetsStructSubelementHasMemberNets) {
+  Run("module top;\n"
+      "  typedef struct packed { integer i1; logic [3:0] bvec; } pst;\n"
+      "  wire pst [1:0] pn;\n"
+      "  assign pn = {32'd7, 4'h9, 32'd5, 4'h3};\n"
+      "endmodule\n");
+  const std::vector<vpiHandle> kLeaves = ObjectsOf(vpiElement, By("top.pn"));
+  ASSERT_EQ(kLeaves.size(), 2U);
+  EXPECT_EQ(NamesOf(vpiMember, kLeaves[0]),
+            (std::vector<std::string>{"i1", "bvec"}));
+  vpiHandle bvec = Named(vpiMember, kLeaves[0], "bvec");
+  ASSERT_NE(bvec, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, bvec), "top.pn[1].bvec");
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiParent, bvec)), VpiObjectOf(kLeaves[0]));
+  EXPECT_EQ(IntOf(bvec), 9);
+  vpiHandle i1 = Named(vpiMember, kLeaves[1], "i1");
+  ASSERT_NE(i1, nullptr);
+  EXPECT_EQ(IntOf(i1), 5);
+}
+
+// §37.16 detail 32 with §26.3: the struct subelements of a packed array net of
+// a struct typedef a package declares have its members too (#7393).
+TEST_F(NetDetailsOfARun, APackageStructsPackedArrayNetHasMemberNets) {
+  Run("package pk;\n"
+      "  typedef struct packed { logic a; logic [1:0] b; } ps_t;\n"
+      "endpackage\n"
+      "module top; wire pk::ps_t [1:0] pw; endmodule\n");
+  const std::vector<vpiHandle> kLeaves = ObjectsOf(vpiElement, By("top.pw"));
+  ASSERT_EQ(kLeaves.size(), 2U);
+  EXPECT_EQ(NamesOf(vpiMember, kLeaves[1]),
+            (std::vector<std::string>{"a", "b"}));
 }
 
 // §37.16 detail 34: a net decompiles to the name an expression writes it by,

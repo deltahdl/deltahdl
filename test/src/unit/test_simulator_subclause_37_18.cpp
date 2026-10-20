@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <string>
 #include <vector>
 
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
@@ -303,6 +305,79 @@ TEST(PackedArrayVarPublic, ASubelementReachesThePackedArrayItBelongsTo) {
   EXPECT_EQ(vpi_handle(vpiParent, VpiHandleOf(&loose)), nullptr);
 
   SetGlobalVpiContext(nullptr);
+}
+
+// A design run with a PLI application registered, its variables read back
+// once the run is over.
+class PackedArrayVarsOfARun : public VpiDesignRun {
+ protected:
+  // The integer value of an object.
+  static int IntOf(vpiHandle obj) {
+    s_vpi_value value = {};
+    value.format = vpiIntVal;
+    vpi_get_value(obj, &value);
+    return value.value.integer;
+  }
+};
+
+// Details 1 to 4: a variable of a packed struct typedef with packed dimensions
+// of its own is a packed array var as many bits wide as it holds, whose
+// vpiElement iteration reaches a packed array var per index of its first
+// dimension and, past the last, the struct vars, each a packed array member
+// whose vpiParent is the whole variable, holding its share of the bits and a
+// member per field (#7017).
+TEST_F(PackedArrayVarsOfARun, AStructVarWithAPackedDimensionIsAPackedArrayVar) {
+  Run("module top;\n"
+      "  typedef struct packed { int i1; bit [3:0] bvec; } pst;\n"
+      "  pst [0:1][1:0] pavar1;\n"
+      "  initial pavar1 = {32'd1, 4'h2, 32'd3, 4'h4, 32'd5, 4'h6, 32'd7, "
+      "4'h8};\n"
+      "endmodule\n");
+  vpiHandle pavar1 = By("top.pavar1");
+  ASSERT_NE(pavar1, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, pavar1), vpiPackedArrayVar);
+  EXPECT_EQ(vpi_get(vpiSize, pavar1), 4 * 36);
+  const std::vector<vpiHandle> kRows = ObjectsOf(vpiElement, pavar1);
+  ASSERT_EQ(kRows.size(), 2U);
+  EXPECT_EQ(vpi_get(vpiType, kRows[1]), vpiPackedArrayVar);
+  EXPECT_STREQ(vpi_get_str(vpiName, kRows[1]), "pavar1[1]");
+  EXPECT_EQ(vpi_get(vpiSize, kRows[1]), 2 * 36);
+  const std::vector<vpiHandle> kLeaves = ObjectsOf(vpiElement, kRows[1]);
+  ASSERT_EQ(kLeaves.size(), 2U);
+  EXPECT_EQ(vpi_get(vpiType, kLeaves[0]), vpiStructVar);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, kLeaves[0]), "top.pavar1[1][1]");
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiParent, kLeaves[0])),
+            VpiObjectOf(pavar1));
+  EXPECT_EQ(vpi_get(vpiPackedArrayMember, kLeaves[0]), 1);
+  EXPECT_EQ(vpi_get(vpiPackedArrayMember, pavar1), 0);
+  EXPECT_EQ(IntOf(Named(vpiMember, kLeaves[0], "bvec")), 6);
+  EXPECT_EQ(IntOf(Named(vpiMember, kLeaves[1], "i1")), 7);
+}
+
+// Details 1 and 3: a variable of an enum or a union typedef with a packed
+// dimension of its own is a packed array var whose subelements are enum vars
+// or union vars (#7017).
+TEST_F(PackedArrayVarsOfARun, AnEnumOrUnionVarWithAPackedDimensionIsOne) {
+  Run("module top;\n"
+      "  typedef enum logic [1:0] { A, B, C } et;\n"
+      "  typedef union packed { logic [3:0] a; bit [3:0] b; } ut;\n"
+      "  et [2:0] e; ut [1:0] u;\n"
+      "endmodule\n");
+  vpiHandle e = By("top.e");
+  ASSERT_NE(e, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, e), vpiPackedArrayVar);
+  const std::vector<vpiHandle> kLeaves = ObjectsOf(vpiElement, e);
+  ASSERT_EQ(kLeaves.size(), 3U);
+  EXPECT_EQ(vpi_get(vpiType, kLeaves[0]), vpiEnumVar);
+  EXPECT_STREQ(vpi_get_str(vpiName, kLeaves[0]), "e[2]");
+  vpiHandle u = By("top.u");
+  ASSERT_NE(u, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, u), vpiPackedArrayVar);
+  const std::vector<vpiHandle> kUnions = ObjectsOf(vpiElement, u);
+  ASSERT_EQ(kUnions.size(), 2U);
+  EXPECT_EQ(vpi_get(vpiType, kUnions[0]), vpiUnionVar);
+  EXPECT_EQ(NamesOf(vpiMember, kUnions[0]),
+            (std::vector<std::string>{"a", "b"}));
 }
 
 }  // namespace

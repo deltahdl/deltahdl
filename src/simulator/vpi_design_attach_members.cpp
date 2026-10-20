@@ -21,6 +21,7 @@
 #include "simulator/variable.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_design_attach_build.h"
+#include "simulator/vpi_design_attach_packed_arrays.h"
 #include "simulator/vpi_design_attach_vars.h"
 #include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_model_helpers2.h"
@@ -422,7 +423,84 @@ void AttachNetMembers(const MemberSite& site) {
   }
 }
 
+// §37.16 detail 32 and §37.18 detail 3 with §6.18: the layout of the struct
+// or union each subelement of a packed array declared with the type `written`
+// holds past its last packed dimension, that of the typedef it names, `P::name`
+// for one a package declares; null for an enum and for a type written in
+// place.
+const StructTypeInfo* PackedArrayElementLayout(const DataType* written,
+                                               SimContext& ctx) {
+  if (written == nullptr) return nullptr;
+  if (written->scope_name.empty()) {
+    return ctx.FindStructType(written->type_name);
+  }
+  return ctx.FindStructType(std::string(written->scope_name) +
+                            "::" + std::string(written->type_name));
+}
+
+// The members under `holder` that MakeMembers rooted at the net subelement
+// `sub`, rooted instead at the packed array net `top` holding the run's
+// storage, at the subelement's offset in it. A var subelement is rooted at
+// its packed array var already, and so are the members made under it.
+void RootMembersAt(VpiObject& holder, const VpiObject& sub, VpiObject& top) {
+  for (VpiObject* member : holder.children) {
+    if (member->member_of != &sub) continue;
+    member->member_of = &top;
+    member->member_offset += static_cast<uint32_t>(sub.bit_offset);
+    RootMembersAt(*member, sub, top);
+  }
+}
+
+// §37.16 detail 32, §37.18 detail 3 and §37.26: each struct or union
+// subelement under `holder`, the packed array `top` or a subelement of it,
+// given a member per field of `info`, each holding its field's bits of the
+// subelement's share of `top`.
+void MakeSubelementMembers(VpiObject& holder, VpiObject& top,
+                           const StructTypeInfo& info, const MemberSite& site) {
+  for (VpiObject* sub : holder.children) {
+    if (sub->parent != &top) continue;
+    if (sub->type == vpiPackedArrayNet || sub->type == vpiPackedArrayVar) {
+      MakeSubelementMembers(*sub, top, info, site);
+    } else if (sub->type == vpiStructNet || sub->type == vpiUnionNet ||
+               sub->type == vpiStructVar || sub->type == vpiUnionVar) {
+      MakeMembers(sub, info, site);
+      RootMembersAt(*sub, *sub, top);
+    }
+  }
+}
+
+// The members of the subelements of the packed array `top`, if it is one,
+// declared with the type `written`.
+void MakePackedArrayMembers(VpiObject* top, const DataType* written,
+                            const MemberSite& site) {
+  if (top == nullptr ||
+      (top->type != vpiPackedArrayNet && top->type != vpiPackedArrayVar)) {
+    return;
+  }
+  const StructTypeInfo* info = PackedArrayElementLayout(written, site.ctx);
+  if (info != nullptr) MakeSubelementMembers(*top, *top, *info, site);
+}
+
 }  // namespace
+
+void AttachPackedArrayMembers(const RtlirDesign* design,
+                              const VpiObjectMap& objects, SimContext& ctx,
+                              const VpiAttachBuild& build) {
+  WalkInstancePaths(
+      design, [&](const RtlirModule* mod, const std::string& prefix) {
+        const MemberSite kSite{*design, *mod, prefix, objects, ctx, build};
+        for (const RtlirNet& net : mod->nets) {
+          MakePackedArrayMembers(
+              FindObjectForFlatName(objects, VpiFlatName(prefix, net.name)),
+              net.written_type, kSite);
+        }
+        for (const RtlirVariable& var : VpiDeclaredVariables(*mod)) {
+          MakePackedArrayMembers(
+              FindObjectForFlatName(objects, VpiFlatName(prefix, var.name)),
+              var.written_type, kSite);
+        }
+      });
+}
 
 int VpiNetObjectKind(const RtlirNet& net) {
   // §37.24 (figure): a generic interconnect is an interconnect net, which has

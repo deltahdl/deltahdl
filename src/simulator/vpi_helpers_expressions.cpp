@@ -1,3 +1,4 @@
+#include "simulator/vpi_dynamic_ranges.h"
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers2.h"
@@ -58,6 +59,12 @@ bool TryResolveRangeBounds(int type, VpiHandle ref, VpiHandle& out) {
       !VpiIsVariablesType(ref->type) && !VpiIsNetsType(ref->type) &&
       !VpiIsInstanceArrayType(ref->type)) {
     return false;
+  }
+  // §37.22 detail 1: a dynamic array's or queue's, and its first range's,
+  // are those of the elements it holds now.
+  if (const VpiObject* range = VpiDynamicRangeOf(ref)) {
+    out = VpiDynamicRangeBound(type, *range);
+    return true;
   }
   out = type == vpiLeftRange ? ref->left_range : ref->right_range;
   return true;

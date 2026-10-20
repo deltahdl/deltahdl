@@ -30,6 +30,7 @@
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_attach_interconnects.h"
+#include "simulator/vpi_design_attach_packed_arrays.h"
 #include "simulator/vpi_design_attach_typespecs.h"
 #include "simulator/vpi_design_viewports.h"
 #include "simulator/vpi_design_walk.h"
@@ -280,6 +281,7 @@ int VpiVariableObjectKind(const RtlirVariable& var) {
   // variables were class vars to nothing, vpiObjId and vpiClassObj answered for
   // none of them, and a vpiClassVar iteration reached none.
   if (!var.class_type_name.empty()) return vpiClassVar;
+  if (VpiVariableIsPackedArray(var)) return vpiPackedArrayVar;
   if (var.decl_kind == DataTypeKind::kShortreal) return vpiShortRealVar;
   if (var.is_real) return vpiRealVar;
   if (var.is_string) return vpiStringVar;

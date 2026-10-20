@@ -22,6 +22,7 @@
 #include "simulator/vpi_design_attach_interconnects.h"
 #include "simulator/vpi_design_attach_interface_tf_decls.h"
 #include "simulator/vpi_design_attach_nets.h"
+#include "simulator/vpi_design_attach_packed_arrays.h"
 #include "simulator/vpi_design_attach_vars.h"
 #include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_instance_facts.h"
@@ -325,7 +326,8 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
     // kind both passes above look for, so its own kind comes after them.
     RecordNetObjectKinds(design, object_map_);
     RecordNetDeclarationFacts(design, object_map_);
-    AttachPackedArrayNetElements(design, object_map_, *sim_ctx_, kBuild);
+    AttachPackedArrayElements(design, object_map_, *sim_ctx_, kBuild);
+    AttachPackedArrayMembers(design, object_map_, *sim_ctx_, kBuild);
     // An alias and a default disable iff name the bits and members above.
     AttachDefaultDisableIffs(design, object_map_, *sim_ctx_, kBuild);
     AttachAliasStatements(design, object_map_, *sim_ctx_, kBuild);
