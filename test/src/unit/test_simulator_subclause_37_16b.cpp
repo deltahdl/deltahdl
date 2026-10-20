@@ -399,6 +399,22 @@ TEST_F(NetPortsOfARun, ABitBelowASelectReachesNoPort) {
   EXPECT_EQ(NamesOf(vpiPortInst, By("top.w3")), std::vector<std::string>{"s2"});
 }
 
+// §37.16 detail 7 with §11.4.12: a net bit reaches the port bit of the place it
+// stands on, whatever order the concatenation holds its vector's bits in
+// (#7378).
+TEST_F(NetPortsOfARun, ABitReachesItsPlaceWhateverOrderItsVectorStandsIn) {
+  Run("module sub(input wire [1:0] a); endmodule\n"
+      "module top; wire [1:0] y; sub u(.a({y[0], y[1]})); endmodule\n");
+  vpiHandle high = OnlyOf(vpiPortInst, BitOf("top.y", 0));
+  ASSERT_NE(high, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiLowConn, high)),
+            VpiObjectOf(BitOf("top.u.a", 1)));
+  vpiHandle low = OnlyOf(vpiPortInst, BitOf("top.y", 1));
+  ASSERT_NE(low, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiLowConn, low)),
+            VpiObjectOf(BitOf("top.u.a", 0)));
+}
+
 // §37.16 (figure): a module's nets are those its body declares and those its
 // ANSI ports declare, a port declaring a net the body declares again counted
 // once; a variable port and an interconnect port declare none of them. A
@@ -636,6 +652,44 @@ TEST_F(NetRelationsOfARun, ABitsDriversAndLoadsFollowItAcrossAPort) {
   EXPECT_EQ(CountOf(vpiDriver, BitOf("top.y2", 0), vpiContAssign), 0);
   EXPECT_EQ(CountOf(vpiLocalDriver, BitOf("top.u.d", 0), vpiContAssign), 1);
   EXPECT_EQ(CountOf(vpiLocalDriver, BitOf("top.z", 0), vpiContAssign), 0);
+}
+
+// §37.16 details 4 and 18: a primitive terminal connected to a bit of a vector
+// drives or loads that bit and no other, in the bit's own instance and in each
+// bit a port joins it to (#7379).
+TEST_F(NetRelationsOfARun, ABitsDriversAndLoadsTakeThePrimTermsOnIt) {
+  Run("module sub(input [1:0] a); wire w; and h(w, a[1], a[0]); endmodule\n"
+      "module top; wire [1:0] z; wire a, b, y;\n"
+      "  and g(z[0], a, b);\n"
+      "  buf f(y, z[1]);\n"
+      "  sub u(.a(z));\n"
+      "endmodule\n");
+  EXPECT_EQ(CountOf(vpiDriver, BitOf("top.z", 0), vpiPrimTerm), 1);
+  EXPECT_EQ(CountOf(vpiDriver, BitOf("top.z", 1), vpiPrimTerm), 0);
+  EXPECT_EQ(CountOf(vpiLoad, BitOf("top.z", 0), vpiPrimTerm), 1);
+  EXPECT_EQ(CountOf(vpiLoad, BitOf("top.z", 1), vpiPrimTerm), 2);
+  EXPECT_EQ(CountOf(vpiLocalLoad, BitOf("top.z", 1), vpiPrimTerm), 1);
+}
+
+// §37.16 details 16 and 18: a port bit is a driver of its net bit where what
+// its port's higher connection holds at its place is something other than a
+// net: a variable, a variable within a concatenation, or an operation; a net,
+// or nothing, past the connection's end or with no connection, makes it none
+// (#7380).
+TEST_F(NetRelationsOfARun, ABitsDriversTakeThePortBitsANonNetDrives) {
+  Run("module sub(input [1:0] a, input [1:0] b, input [1:0] c,\n"
+      "           input [1:0] d, input [1:0] e);\n"
+      "endmodule\n"
+      "module top; logic [1:0] k; wire [1:0] n; logic m;\n"
+      "  sub u(.a(k), .b({m, n[0]}), .c(n & k), .d({m}), .e());\n"
+      "endmodule\n");
+  EXPECT_EQ(CountOf(vpiDriver, BitOf("top.u.a", 0), vpiPortBit), 1);
+  EXPECT_EQ(CountOf(vpiDriver, BitOf("top.u.b", 1), vpiPortBit), 1);
+  EXPECT_EQ(CountOf(vpiDriver, BitOf("top.u.b", 0), vpiPortBit), 0);
+  EXPECT_EQ(CountOf(vpiDriver, BitOf("top.u.c", 0), vpiPortBit), 1);
+  EXPECT_EQ(CountOf(vpiDriver, BitOf("top.u.d", 0), vpiPortBit), 1);
+  EXPECT_EQ(CountOf(vpiDriver, BitOf("top.u.d", 1), vpiPortBit), 0);
+  EXPECT_EQ(CountOf(vpiDriver, BitOf("top.u.e", 0), vpiPortBit), 0);
 }
 
 }  // namespace

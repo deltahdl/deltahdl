@@ -725,7 +725,9 @@ bool VpiIsNetDriverOrLoad(VpiHandle child, VpiHandle net, bool want_driver);
 // §37.16 detail 16: the ports driving the net `net` from something other than
 // a net or a net bit: an output or inout port of an instance its own instance
 // holds whose lower connection is such, and an input or inout port of its own
-// instance whose higher connection is.
+// instance whose higher connection is. Of a net bit (detail 18), they are port
+// bits, and a port bit is judged by what its port's higher connection holds at
+// its place.
 std::vector<VpiHandle> VpiNetPortDrivers(VpiHandle net);
 
 // §37.16 details 4 and 16: the net `net` and every net joined to it through a

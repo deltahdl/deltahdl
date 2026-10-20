@@ -115,13 +115,62 @@ VpiHandle PortInstOf(VpiHandle port, VpiHandle ref, VpiHandle net,
   return PortBitAt(port, kFirst);
 }
 
+VpiHandle NetBitAt(VpiHandle conn, int place);
+
+// §11.4.12: the net bit `place` bits above the least significant end of the
+// concatenation `concat`, its last operand written lowest; null past its
+// most significant end.
+VpiHandle NetBitInConcatenation(VpiHandle concat, int place) {
+  const std::vector<VpiHandle> kOperands = VpiOperationOperands(concat);
+  for (VpiHandle operand : std::views::reverse(kOperands)) {
+    if (place < operand->size) return NetBitAt(operand, place);
+    place -= operand->size;
+  }
+  return nullptr;
+}
+
+// The net bit standing `place` bits above the least significant end of the
+// port connection `conn`, or the net standing there whole where it has no
+// bits, a scalar net; null where none does or where what does cannot be told:
+// a varying bit, a variable, or an operation other than a concatenation.
+VpiHandle NetBitAt(VpiHandle conn, int place) {
+  if (conn == nullptr) return nullptr;
+  if (conn->type == vpiOperation) {
+    return conn->op_type == vpiConcatOp ? NetBitInConcatenation(conn, place)
+                                        : nullptr;
+  }
+  if (place >= conn->size || !VpiIsNetsType(conn->type)) return nullptr;
+  if (conn->type == vpiNetBit) {
+    // A bit a constant index names is the net's own; a varying one is not.
+    return VpiBitAtOffset(*conn->parent, conn->bit_offset) == conn ? conn
+                                                                   : nullptr;
+  }
+  VpiHandle bit = VpiBitAtOffset(*conn, place);
+  return bit != nullptr ? bit : conn;
+}
+
+// Where `ref`, of the net `net`, stands in the higher connection of `port`. A
+// connection may hold the bits of one vector in any order, so a net bit found
+// at one of the port's places is placed there; any other reference, or a bit
+// found at none, takes its net's place.
+NetPlace PlaceOfReference(VpiHandle port, VpiHandle ref, VpiHandle net) {
+  if (ref->type == vpiNetBit) {
+    for (int place = 0; place < port->size; ++place) {
+      if (NetBitAt(port->high_conn, place) == ref) {
+        return {true, true, place - ref->bit_offset};
+      }
+    }
+  }
+  return PlaceIn(port->high_conn, net);
+}
+
 // What the ports of `instance` whose higher connection holds `net` give a
 // vpiPortInst iteration of `ref`.
 void CollectInstancePorts(VpiHandle instance, VpiHandle ref, VpiHandle net,
                           std::vector<VpiHandle>& out) {
   for (VpiHandle port : instance->children) {
     if (port->type != kVpiPort || port->high_conn == nullptr) continue;
-    const NetPlace kPlace = PlaceIn(port->high_conn, net);
+    const NetPlace kPlace = PlaceOfReference(port, ref, net);
     if (!kPlace.held) continue;
     VpiHandle reached = PortInstOf(port, ref, net, kPlace);
     if (reached != nullptr) out.push_back(reached);
@@ -189,40 +238,6 @@ std::vector<VpiHandle> VpiNetPortInsts(VpiHandle net) {
 }
 
 namespace {
-
-VpiHandle NetBitAt(VpiHandle conn, int place);
-
-// §11.4.12: the net bit `place` bits above the least significant end of the
-// concatenation `concat`, its last operand written lowest; null past its
-// most significant end.
-VpiHandle NetBitInConcatenation(VpiHandle concat, int place) {
-  const std::vector<VpiHandle> kOperands = VpiOperationOperands(concat);
-  for (VpiHandle operand : std::views::reverse(kOperands)) {
-    if (place < operand->size) return NetBitAt(operand, place);
-    place -= operand->size;
-  }
-  return nullptr;
-}
-
-// The net bit standing `place` bits above the least significant end of the
-// port connection `conn`, or the net standing there whole where it has no
-// bits, a scalar net; null where none does or where what does cannot be told:
-// a varying bit, a variable, or an operation other than a concatenation.
-VpiHandle NetBitAt(VpiHandle conn, int place) {
-  if (conn == nullptr) return nullptr;
-  if (conn->type == vpiOperation) {
-    return conn->op_type == vpiConcatOp ? NetBitInConcatenation(conn, place)
-                                        : nullptr;
-  }
-  if (place >= conn->size || !VpiIsNetsType(conn->type)) return nullptr;
-  if (conn->type == vpiNetBit) {
-    // A bit a constant index names is the net's own; a varying one is not.
-    return VpiBitAtOffset(*conn->parent, conn->bit_offset) == conn ? conn
-                                                                   : nullptr;
-  }
-  VpiHandle bit = VpiBitAtOffset(*conn, place);
-  return bit != nullptr ? bit : conn;
-}
 
 // Adds to `joined`, once each, what the port `port` joins `bit` to: at each of
 // its places where one end holds `bit`, the net bit or scalar net the other

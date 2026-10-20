@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cstddef>
+#include <ranges>
 #include <vector>
 
 #include "simulator/vpi_constants.h"
@@ -137,6 +138,30 @@ bool PassesValues(int direction, bool inward) {
   return direction == vpiInout || direction == (inward ? vpiInput : vpiOutput);
 }
 
+// §11.4.12: what stands `place` bits above the least significant end of the
+// connection `conn`: within a concatenation, its last operand written lowest,
+// the operand there, or nothing past its most significant end; anything else
+// whole, its bits not told apart.
+VpiHandle ConnectionAt(VpiHandle conn, int place) {
+  if (conn == nullptr || conn->type != vpiOperation ||
+      conn->op_type != vpiConcatOp) {
+    return conn;
+  }
+  const std::vector<VpiHandle> kOperands = VpiOperationOperands(conn);
+  for (VpiHandle operand : std::views::reverse(kOperands)) {
+    if (place < operand->size) return ConnectionAt(operand, place);
+    place -= operand->size;
+  }
+  return nullptr;
+}
+
+// The higher connection of `port`; a port bit has none of its own and takes
+// what its port's holds at its place.
+VpiHandle HigherConnectionOf(VpiHandle port) {
+  if (port->type != vpiPortBit) return port->high_conn;
+  return ConnectionAt(port->parent->high_conn, port->bit_offset);
+}
+
 }  // namespace
 
 std::vector<VpiHandle> VpiNetPortDrivers(VpiHandle net) {
@@ -152,7 +177,8 @@ std::vector<VpiHandle> VpiNetPortDrivers(VpiHandle net) {
     }
   }
   for (VpiHandle port : VpiNetPorts(net)) {
-    if (PassesValues(port->direction, true) && !DrivenByNets(port->high_conn)) {
+    if (PassesValues(port->direction, true) &&
+        !DrivenByNets(HigherConnectionOf(port))) {
       ports.push_back(port);
     }
   }
@@ -243,13 +269,25 @@ void CollectOfOneNet(VpiHandle net, bool want_driver, bool local,
   found.insert(found.end(), ports.begin(), ports.end());
 }
 
-// §37.16 detail 18: a net bit's forces and continuous assignments hang on its
-// vector, and the bit is driven or loaded by those writing or reading it.
-void CollectBitAssignments(VpiHandle bit, bool want_driver,
-                           std::vector<VpiHandle>& found) {
+// Whether `child`, which hangs on the vector of the net bit `bit`, bears on
+// that bit: a force or continuous assignment always, judged later by which
+// side uses the bit, and a primitive terminal whose connection uses it.
+bool BearsOnBit(VpiHandle child, VpiHandle bit) {
+  if (child->type == vpiPrimTerm) {
+    // A term hangs on a net only through the expression it connects.
+    return VpiExpressionUses(child->children.front(), *bit);
+  }
+  return child->type == vpiForce || child->type == vpiContAssign;
+}
+
+// §37.16 details 4 and 18: a net bit's forces, continuous assignments and
+// primitive terminals hang on its vector, and the bit is driven or loaded by
+// those writing or reading it.
+void CollectFromVector(VpiHandle bit, bool want_driver,
+                       std::vector<VpiHandle>& found) {
   if (bit->parent == nullptr) return;
   for (VpiHandle child : bit->parent->children) {
-    if ((child->type == vpiForce || child->type == vpiContAssign) &&
+    if (BearsOnBit(child, bit) &&
         VpiIsNetDriverOrLoad(child, bit, want_driver)) {
       found.push_back(child);
     }
@@ -282,7 +320,7 @@ std::vector<VpiHandle> VpiNetDriversOrLoads(VpiHandle node, bool want_driver,
   for (VpiHandle joined : NetsSharingRelations(net, local)) {
     CollectOfOneNet(joined, want_driver, local, found);
     if (joined->type == vpiNetBit) {
-      CollectBitAssignments(joined, want_driver, found);
+      CollectFromVector(joined, want_driver, found);
     }
   }
   std::vector<VpiHandle> unique;
