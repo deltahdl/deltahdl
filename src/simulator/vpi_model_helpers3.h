@@ -380,6 +380,12 @@ std::vector<VpiHandle> VpiNetPorts(VpiHandle net);
 // of whose bits it reaches is left out.
 std::vector<VpiHandle> VpiNetPortInsts(VpiHandle net);
 
+// §37.16 details 4 and 18: the net bit `bit` and every net bit, or scalar net,
+// a port joins to it by standing at the same place on the port's other end,
+// in either direction and at any depth, each once, `bit` first. vpiDriver and
+// vpiLoad of the bit reach the drivers and loads of them all.
+std::vector<VpiHandle> VpiNetBitsJoinedThroughPorts(VpiHandle bit);
+
 // §37.39 (figure), §37.16 details 6 and 7 and §37.15 (figure): whether `type`
 // asked of `ref` is one of a module path's three path-term relations, a net's
 // two port relations or a ref obj's three, whose objects are terms and ports

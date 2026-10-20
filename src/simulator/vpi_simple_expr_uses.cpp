@@ -96,11 +96,12 @@ bool IsUseOfBit(const VpiObject* node, const VpiObject& bit) {
   return kSpan && kSpan->first <= *kIndex && *kIndex <= kSpan->second;
 }
 
-// Whether the expression `node`, or one written inside it, uses `expr`
-// (§37.58 details 1 and 2). A net or a variable it names is the object
-// itself, whose own children are its bits and its drivers and loads, none
-// written in the expression.
-bool ExpressionUses(const VpiObject* node, const VpiObject& expr) {
+}  // namespace
+
+bool VpiExpressionUses(const VpiObject* node, const VpiObject& expr) {
+  // A net or a variable the expression names is the object itself, whose own
+  // children are its bits and its drivers and loads, none written in the
+  // expression.
   if (node == nullptr) return false;
   if (IsBit(expr) ? IsUseOfBit(node, expr) : IsVectorOrSelectOf(node, &expr)) {
     return true;
@@ -108,13 +109,15 @@ bool ExpressionUses(const VpiObject* node, const VpiObject& expr) {
   for (const VpiObject* part :
        {node->index_expr, node->base_expr, node->width_expr, node->left_range,
         node->right_range}) {
-    if (ExpressionUses(part, expr)) return true;
+    if (VpiExpressionUses(part, expr)) return true;
   }
   if (!VpiIsExprType(node->type)) return false;
   return std::ranges::any_of(node->children, [&](const VpiObject* child) {
-    return ExpressionUses(child, expr);
+    return VpiExpressionUses(child, expr);
   });
 }
+
+namespace {
 
 // Whether `obj` is of a kind §37.58's figure draws vpiUse to.
 bool IsUseKind(VpiHandle obj) {
@@ -151,10 +154,10 @@ void GatherUses(VpiObject* scope, const VpiObject& expr,
 bool VpiUsesExpr(const VpiObject& use, const VpiObject& expr) {
   for (const VpiObject* side :
        {use.lhs, use.rhs, use.high_conn, use.low_conn}) {
-    if (ExpressionUses(side, expr)) return true;
+    if (VpiExpressionUses(side, expr)) return true;
   }
   return std::ranges::any_of(use.children, [&](VpiObject* child) {
-    return VpiIsOperandObject(child) && ExpressionUses(child, expr);
+    return VpiIsOperandObject(child) && VpiExpressionUses(child, expr);
   });
 }
 

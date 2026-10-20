@@ -734,12 +734,14 @@ std::vector<VpiHandle> VpiNetPortDrivers(VpiHandle net);
 // all.
 std::vector<VpiHandle> VpiNetsJoinedThroughPorts(VpiHandle net);
 
-// §37.46 with §37.16 details 4, 11, 16 and 17: the drivers (`want_driver`) or
-// loads of `node`, a net or a delay term placed on one, each once. The local
-// relations (`local`) take those the net's own instance holds with its ports;
-// the whole ones those of every net joined to it through ports nets drive,
-// with the ports something other than a net drives it through. A delay term
-// reaches those of its net less its own device's terms (§37.45).
+// §37.46 with §37.16 details 4, 11, 16, 17 and 18: the drivers (`want_driver`)
+// or loads of `node`, a net or a delay term placed on one, each once. The
+// local relations (`local`) take those the net's own instance holds with its
+// ports; the whole ones those of every net joined to it through ports nets
+// drive, with the ports something other than a net drives it through. A net
+// bit takes the assignments of its vector writing or reading it, and of each
+// bit a port joins it to. A delay term reaches those of its net less its own
+// device's terms (§37.45).
 std::vector<VpiHandle> VpiNetDriversOrLoads(VpiHandle node, bool want_driver,
                                             bool local);
 

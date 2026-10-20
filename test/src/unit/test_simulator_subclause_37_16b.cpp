@@ -489,6 +489,11 @@ class NetRelationsOfARun : public VpiDesignRun {
     return static_cast<int>(std::ranges::count(kKinds, kind));
   }
 
+  // The bit of the net `name` at `index`.
+  static vpiHandle BitOf(const char* name, int index) {
+    return vpi_handle_by_index(By(name), index);
+  }
+
   static constexpr const char* kPortDesign =
       "module sub(input c, output d, output logic v, inout io);\n"
       "  assign d = c;\n"
@@ -595,6 +600,42 @@ TEST_F(NetRelationsOfARun, DriversAndLoadsReachAcrossAPortNetsDrive) {
   // An assignment two joined nets both reach is reached once: pr's reads a2
   // and b2, which g joins.
   EXPECT_EQ(CountOf(vpiLoad, By("top.g"), vpiContAssign), 1);
+}
+
+// §37.16 details 4 and 18: vpiDriver and vpiLoad of a net bit trace that bit
+// alone, to the assignments and forces writing or reading it, whether they
+// name the bit or its whole vector, in its own instance and in each bit a
+// port joins it to at the same place; the local relations stop at the
+// instance (#7377).
+TEST_F(NetRelationsOfARun, ABitsDriversAndLoadsFollowItAcrossAPort) {
+  Run("module sub(output [1:0] d, input [1:0] a);\n"
+      "  assign d[0] = a[1];\n"
+      "  initial force d[1] = 1'b0;\n"
+      "endmodule\n"
+      "module top; wire [1:0] z, y, v, y2; wire s; logic k; integer i;\n"
+      "  assign v = 2'b10;\n"
+      "  sub u(.d(z), .a({y[0], y[1]}));\n"
+      "  sub w(.d(v[1]), .a({y[0]}));\n"
+      "  sub o(.d(), .a(y & v));\n"
+      "  sub g(.d({s, y2[1]}), .a({y2[i], y2[0]}));\n"
+      "  sub e(.d(), .a({k, y2[1]}));\n"
+      "endmodule\n");
+  EXPECT_EQ(CountOf(vpiDriver, BitOf("top.z", 0), vpiContAssign), 1);
+  EXPECT_EQ(CountOf(vpiDriver, BitOf("top.z", 0), vpiForce), 0);
+  EXPECT_EQ(CountOf(vpiDriver, BitOf("top.z", 1), vpiContAssign), 0);
+  EXPECT_EQ(CountOf(vpiDriver, BitOf("top.z", 1), vpiForce), 1);
+  EXPECT_EQ(CountOf(vpiLoad, BitOf("top.y", 0), vpiContAssign), 1);
+  EXPECT_EQ(CountOf(vpiLoad, BitOf("top.y", 1), vpiContAssign), 0);
+  // An assignment to the whole vector drives each of its bits, and a bit a
+  // port joins to one of them adds its own drivers to that bit alone.
+  EXPECT_EQ(CountOf(vpiDriver, BitOf("top.v", 0), vpiContAssign), 1);
+  EXPECT_EQ(CountOf(vpiDriver, BitOf("top.v", 1), vpiContAssign), 2);
+  EXPECT_EQ(CountOf(vpiDriver, BitOf("top.o.d", 0), vpiContAssign), 1);
+  // An assignment reading a vector drives none of its bits.
+  EXPECT_EQ(CountOf(vpiDriver, BitOf("top.y2", 1), vpiContAssign), 1);
+  EXPECT_EQ(CountOf(vpiDriver, BitOf("top.y2", 0), vpiContAssign), 0);
+  EXPECT_EQ(CountOf(vpiLocalDriver, BitOf("top.u.d", 0), vpiContAssign), 1);
+  EXPECT_EQ(CountOf(vpiLocalDriver, BitOf("top.z", 0), vpiContAssign), 0);
 }
 
 }  // namespace

@@ -1,8 +1,11 @@
+#include <algorithm>
+#include <cstddef>
 #include <ranges>
 #include <vector>
 
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_constants.h"
+#include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_model_helpers3.h"
@@ -173,6 +176,77 @@ std::vector<VpiHandle> VpiNetPortInsts(VpiHandle net) {
   VpiHandle instance = whole == nullptr ? nullptr : InstanceHolding(whole);
   if (instance != nullptr) CollectPortInsts(instance, net, whole, ports);
   return ports;
+}
+
+namespace {
+
+VpiHandle NetBitAt(VpiHandle conn, int place);
+
+// §11.4.12: the net bit `place` bits above the least significant end of the
+// concatenation `concat`, its last operand written lowest; null past its
+// most significant end.
+VpiHandle NetBitInConcatenation(VpiHandle concat, int place) {
+  const std::vector<VpiHandle> kOperands = VpiOperationOperands(concat);
+  for (VpiHandle operand : std::views::reverse(kOperands)) {
+    if (place < operand->size) return NetBitAt(operand, place);
+    place -= operand->size;
+  }
+  return nullptr;
+}
+
+// The net bit standing `place` bits above the least significant end of the
+// port connection `conn`, or the net standing there whole where it has no
+// bits, a scalar net; null where none does or where what does cannot be told:
+// a varying bit, a variable, or an operation other than a concatenation.
+VpiHandle NetBitAt(VpiHandle conn, int place) {
+  if (conn == nullptr) return nullptr;
+  if (conn->type == vpiOperation) {
+    return conn->op_type == vpiConcatOp ? NetBitInConcatenation(conn, place)
+                                        : nullptr;
+  }
+  if (place >= conn->size || !VpiIsNetsType(conn->type)) return nullptr;
+  if (conn->type == vpiNetBit) {
+    // A bit a constant index names is the net's own; a varying one is not.
+    return VpiBitAtOffset(*conn->parent, conn->bit_offset) == conn ? conn
+                                                                   : nullptr;
+  }
+  VpiHandle bit = VpiBitAtOffset(*conn, place);
+  return bit != nullptr ? bit : conn;
+}
+
+// Adds to `joined`, once each, what the port `port` joins `bit` to: at each of
+// its places where one end holds `bit`, the net bit or scalar net the other
+// end holds there.
+void AddBitsJoinedAcross(VpiHandle port, VpiHandle bit,
+                         std::vector<VpiHandle>& joined) {
+  for (int place = 0; place < port->size; ++place) {
+    VpiHandle high = NetBitAt(port->high_conn, place);
+    VpiHandle low = NetBitAt(port->low_conn, place);
+    VpiHandle far = high == bit ? low : (low == bit ? high : nullptr);
+    if (far != nullptr && std::ranges::find(joined, far) == joined.end()) {
+      joined.push_back(far);
+    }
+  }
+}
+
+}  // namespace
+
+std::vector<VpiHandle> VpiNetBitsJoinedThroughPorts(VpiHandle bit) {
+  // §37.16 details 4 and 18: a port joins the bits standing at one place on
+  // its two ends, so a bit shares the drivers and loads of the bits joined to
+  // it, however many instances apart, and of no other bit of their vectors.
+  std::vector<VpiHandle> joined{bit};
+  for (std::size_t k = 0; k < joined.size(); ++k) {
+    VpiHandle current = joined[k];
+    std::vector<VpiHandle> ports = VpiNetPortInsts(current);
+    const std::vector<VpiHandle> kOwn = VpiNetPorts(current);
+    ports.insert(ports.end(), kOwn.begin(), kOwn.end());
+    for (VpiHandle port : ports) {
+      AddBitsJoinedAcross(port->type == vpiPortBit ? port->parent : port,
+                          current, joined);
+    }
+  }
+  return joined;
 }
 
 bool VpiIsTermOrPortRelation(int type, VpiHandle ref) {

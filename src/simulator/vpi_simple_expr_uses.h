@@ -11,6 +11,12 @@ namespace delta {
 // obj, a parameter, a spec param, a var select or a bit select.
 bool VpiIsSimpleExpr(VpiHandle obj);
 
+// §37.58 details 1 and 2: whether the expression `node`, or one written inside
+// it, uses `expr`. Of a vector, the vector or any select of it is a use; of a
+// bit, that bit, the vector it is a bit of, or a select of that vector holding
+// it.
+bool VpiExpressionUses(const VpiObject* node, const VpiObject& expr);
+
 // §37.58 details 1 and 2: whether `use`, an object an expression is written
 // with, uses `expr` through one of its two sides, one of the two ends of a
 // port, or an expression it holds. Of a vector, a use of the vector or of any

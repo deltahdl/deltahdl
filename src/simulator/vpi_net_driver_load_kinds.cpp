@@ -7,6 +7,7 @@
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_simple_expr_uses.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -73,6 +74,22 @@ bool VpiIsConcatenationExpression(const VpiObject* expr) {
   return expr->op_type == vpiConcatOp || expr->op_type == vpiMultiConcatOp;
 }
 
+// A force and a continuous assignment drive what their target writes and load
+// what their expression reads, the one without the other unless the net
+// stands on both sides. Of a net bit, a side holds the bit where it uses it
+// (§37.58 detail 2), through the bit, its vector or a select holding it, the
+// target writing into that vector rather than only reading an index there.
+bool AssignmentDrivesOrLoads(const VpiObject& assign, const VpiObject& net,
+                             bool want_driver) {
+  if (net.type != vpiNetBit || net.parent == nullptr) {
+    return want_driver ? VpiAssignTargetWrites(assign.lhs, net)
+                       : VpiExpressionReads(assign.rhs, net);
+  }
+  return want_driver ? VpiAssignTargetWrites(assign.lhs, *net.parent) &&
+                           VpiExpressionUses(assign.lhs, net)
+                     : VpiExpressionUses(assign.rhs, net);
+}
+
 }  // namespace
 
 bool VpiIsNetDriverOrLoad(VpiHandle child, VpiHandle net, bool want_driver) {
@@ -80,12 +97,8 @@ bool VpiIsNetDriverOrLoad(VpiHandle child, VpiHandle net, bool want_driver) {
     return child->direction == kVpiInout ||
            child->direction == (want_driver ? kVpiOutput : kVpiInput);
   }
-  // A force and a continuous assignment drive what their target writes and
-  // load what their expression reads, the one without the other unless the
-  // net stands on both sides.
   if (child->type == vpiForce || child->type == vpiContAssign) {
-    return want_driver ? VpiAssignTargetWrites(child->lhs, *net)
-                       : VpiExpressionReads(child->rhs, *net);
+    return AssignmentDrivesOrLoads(*child, *net, want_driver);
   }
   // §37.45 details 1 and 2: of the two terms a delay device places on a net,
   // the input term takes the value the net's drivers give and the output term
@@ -230,6 +243,28 @@ void CollectOfOneNet(VpiHandle net, bool want_driver, bool local,
   found.insert(found.end(), ports.begin(), ports.end());
 }
 
+// §37.16 detail 18: a net bit's forces and continuous assignments hang on its
+// vector, and the bit is driven or loaded by those writing or reading it.
+void CollectBitAssignments(VpiHandle bit, bool want_driver,
+                           std::vector<VpiHandle>& found) {
+  if (bit->parent == nullptr) return;
+  for (VpiHandle child : bit->parent->children) {
+    if ((child->type == vpiForce || child->type == vpiContAssign) &&
+        VpiIsNetDriverOrLoad(child, bit, want_driver)) {
+      found.push_back(child);
+    }
+  }
+}
+
+// The nets whose drivers and loads those of `net` take in: `net` alone for the
+// local relations (§37.16 detail 17), and otherwise each net, or of a net bit
+// each bit, a port joins to it (details 4 and 18).
+std::vector<VpiHandle> NetsSharingRelations(VpiHandle net, bool local) {
+  if (local) return {net};
+  return net->type == vpiNetBit ? VpiNetBitsJoinedThroughPorts(net)
+                                : VpiNetsJoinedThroughPorts(net);
+}
+
 }  // namespace
 
 std::vector<VpiHandle> VpiNetDriversOrLoads(VpiHandle node, bool want_driver,
@@ -244,14 +279,11 @@ std::vector<VpiHandle> VpiNetDriversOrLoads(VpiHandle node, bool want_driver,
     CollectAroundDelayTerm(node, net, want_driver, found);
     return found;
   }
-  // §37.16 details 4 and 16: the whole relations of a net reach across the
-  // ports nets drive at both ends; the local ones stop at the net's own
-  // instance, and so do a net bit's, a port joining whole nets.
-  const std::vector<VpiHandle> kNets = local || net->type == vpiNetBit
-                                           ? std::vector<VpiHandle>{net}
-                                           : VpiNetsJoinedThroughPorts(net);
-  for (VpiHandle joined : kNets) {
+  for (VpiHandle joined : NetsSharingRelations(net, local)) {
     CollectOfOneNet(joined, want_driver, local, found);
+    if (joined->type == vpiNetBit) {
+      CollectBitAssignments(joined, want_driver, found);
+    }
   }
   std::vector<VpiHandle> unique;
   for (VpiHandle object : found) {
