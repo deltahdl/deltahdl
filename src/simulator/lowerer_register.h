@@ -440,6 +440,13 @@ void FillMultiDimLeaves(std::string_view name, const RtlirVariable& var,
 // which SimContext::FindVariable would resolve the complete key against.
 // Defined in lowerer_var_multidim.cpp.
 Variable* ExistingArrayElement(SimContext& ctx, const std::string& key);
+// §10.9.1: the value a pattern item `val` gives an element of the array `var`
+// declares, held in storage of its own: resized to the element width for an
+// integral element (§10.7), and for a real one converted by its value to the
+// element's format (§6.12.1), single precision for a shortreal. Defined in
+// lowerer_var_multidim.cpp.
+Logic4Vec ArrayItemForElement(const RtlirVariable& var, const Logic4Vec& val,
+                              Arena& arena);
 
 }  // namespace delta
 

@@ -590,4 +590,46 @@ TEST(ArrayLiteralSim, ADeclarationsQueueItemOfTheWrongSizeIsAnError) {
       "array size mismatch in assignment to fixed-size array", 3, "7.6"));
 }
 
+// §10.9.1 assigns each item of a declaration's array pattern to its element
+// by the element type's assignment rules, and §6.12 with §6.12.1 makes that a
+// conversion to the element's real format: single precision for a shortreal,
+// and an integer item converted by its value. The shortreal elements held
+// the low 32 bits of each item's double, 0.0 for both 1.0 and 2.5 (#7489),
+// and an integer item kept its integer bits in a real or shortreal element.
+TEST(ArrayLiteralSim, ADeclarationsPatternGivesRealElementsTheirValues) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  shortreal s [2] = '{1.0, 2.5};\n"
+      "  shortreal i [2] = '{3, -2};\n"
+      "  shortreal k [2] = '{1: 0.5, default: -4.0};\n"
+      "  real r [2] = '{1.0, 2.5};\n"
+      "  real j [2] = '{3, -2};\n"
+      "  initial begin\n"
+      "    $display(\"%0.1f %0.1f %0.1f %0.1f %0.1f %0.1f\",\n"
+      "             s[0], s[1], i[0], i[1], k[0], k[1]);\n"
+      "    $display(\"%0.1f %0.1f %0.1f %0.1f\", r[0], r[1], j[0], j[1]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "1.0 2.5 3.0 -2.0 -4.0 0.5\n"
+            "1.0 2.5 3.0 -2.0\n");
+}
+
+// §10.9.1 with §7.4.4: the leaves of a multidimensional shortreal array take
+// the single-precision values of the items that reach them, as a
+// one-dimensional array's elements do.
+TEST(ArrayLiteralSim, ADeclarationsPatternGivesShortrealLeavesTheirValues) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  shortreal m [2][2] = '{'{1.0, 2.5}, '{-4.0, 7}};\n"
+      "  initial $display(\"%0.1f %0.1f %0.1f %0.1f\",\n"
+      "                   m[0][0], m[0][1], m[1][0], m[1][1]);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1.0 2.5 -4.0 7.0\n");
+}
+
 }  // namespace

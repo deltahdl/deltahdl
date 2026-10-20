@@ -89,7 +89,7 @@ static Logic4Vec Table67ElementDefault(const RtlirVariable& var, Arena& arena) {
 // procedural write of the same 9 reads 9.
 static Logic4Vec CoerceArrayInitItem(const RtlirVariable& var, Logic4Vec val,
                                      Arena& arena) {
-  val = OwnRhsWords(ResizeToWidth(val, var.width, arena), arena);
+  val = ArrayItemForElement(var, val, arena);
   if (!var.is_4state && !var.is_string && !var.is_real) CoerceTo2State(val);
   if (!var.is_real) val.is_signed = var.is_signed;
   return val;

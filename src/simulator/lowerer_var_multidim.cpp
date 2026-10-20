@@ -111,6 +111,15 @@ Variable* ExistingArrayElement(SimContext& ctx, const std::string& key) {
   return found == variables.end() ? nullptr : found->second;
 }
 
+// A real item reaches a shortreal element as a double and an integer item a
+// real element as its integer bits, so a resize alone would keep the low 32
+// bits of the double or reinterpret the integer's (#7489).
+Logic4Vec ArrayItemForElement(const RtlirVariable& var, const Logic4Vec& val,
+                              Arena& arena) {
+  if (var.is_real) return MakeRealVec(arena, RealValueOf(val), var.width);
+  return OwnRhsWords(ResizeToWidth(val, var.width, arena), arena);
+}
+
 // The leaf of the array under `name`: the one made here, or the one already
 // standing under its key for a walk in place.
 static Variable* MultiDimLeaf(const MultiDimArray& m, const std::string& name) {
@@ -129,7 +138,7 @@ static void StoreMultiDimLeaf(const MultiDimArray& m, const std::string& name,
                               const Logic4Vec& val) {
   Variable* elem = MultiDimLeaf(m, name);
   if (elem == nullptr) return;
-  elem->value = OwnRhsWords(ResizeToWidth(val, m.var.width, m.arena), m.arena);
+  elem->value = ArrayItemForElement(m.var, val, m.arena);
 }
 
 // Gives one leaf variable of the array the value of the pattern item that
