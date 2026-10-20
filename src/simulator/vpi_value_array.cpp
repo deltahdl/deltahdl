@@ -98,7 +98,17 @@ struct ElementWords {
   bool is_4state = false;
   // The variable holding the element, null for a position reading as zero.
   const Variable* var = nullptr;
+  // Whether the element is a real or a shortreal one (§7.4), its bits the
+  // floating-point number they encode.
+  bool is_real = false;
 };
+
+// §38.16 and §38.35 with §7.4: whether `element` is an element of a real or
+// shortreal array, which holds a real of that precision whatever the run's
+// variable for it records.
+bool IsRealElement(const VpiObject& element) {
+  return element.type == vpiRealVar || element.type == vpiShortRealVar;
+}
 
 // §38.2: record a VPI error into err and return false, so a validation step can
 // report a rejected precondition in a single statement.
@@ -197,11 +207,13 @@ uint64_t RealElementBits(double value, uint32_t width) {
 
 // §38.35: decode one supplied source value from a scalar arm (the integer,
 // short-int, long-int, real, or short-real format) into a 64-bit aval for the
-// element `var`. An integer is sign-extended, so the element's own width keeps
-// a negative value negative; a real fills a real element with its IEEE-754
-// bits and any other with its value converted to an integer.
+// element value `ev`. An integer is sign-extended, so the element's own width
+// keeps a negative value negative; a real fills a real element
+// (`real_element`) with its IEEE-754 bits, marking `ev` real, and any other
+// with its value converted to an integer.
 uint64_t DecodePutScalarAval(const s_vpi_arrayvalue* arrayvalue_p,
-                             unsigned int src, int fmt, const Variable& var) {
+                             unsigned int src, int fmt, Logic4Vec& ev,
+                             bool real_element) {
   double real = 0.0;
   switch (fmt) {
     case kVpiShortIntVal:
@@ -219,8 +231,9 @@ uint64_t DecodePutScalarAval(const s_vpi_arrayvalue* arrayvalue_p,
       return static_cast<uint64_t>(
           static_cast<int64_t>(arrayvalue_p->value.integers[src]));
   }
-  if (var.is_real || var.value.is_real) {
-    return RealElementBits(real, var.value.width);
+  if (real_element) {
+    ev.is_real = true;
+    return RealElementBits(real, ev.width);
   }
   return static_cast<uint64_t>(static_cast<int64_t>(real));
 }
@@ -276,9 +289,8 @@ void DecodePutRaw(const s_vpi_arrayvalue* arrayvalue_p, unsigned int src,
 // The byte and word group layouts follow the standard's per-format
 // descriptions; a time or scalar value fills the low word.
 void DecodePutSourceValue(const s_vpi_arrayvalue* arrayvalue_p,
-                          unsigned int src, Variable& var) {
-  Logic4Vec& ev = var.value;
-  const bool is_4state = var.is_4state;
+                          unsigned int src, Logic4Vec& ev, bool is_4state,
+                          bool real_element) {
   int fmt = static_cast<int>(arrayvalue_p->format);
   switch (fmt) {
     case kVpiTimeVal:
@@ -294,7 +306,8 @@ void DecodePutSourceValue(const s_vpi_arrayvalue* arrayvalue_p,
     default:
       // The scalar formats, the rest of what VpiArrayPutFormatSupported
       // admitted before any value is decoded.
-      ev.words[0].aval = DecodePutScalarAval(arrayvalue_p, src, fmt, var);
+      ev.words[0].aval =
+          DecodePutScalarAval(arrayvalue_p, src, fmt, ev, real_element);
       break;
   }
 }
@@ -366,7 +379,8 @@ Variable* PutValueArrayElement(VpiObject* element,
 
   Logic4Vec& ev = element->var->value;
   for (uint32_t i = 0; i < ev.nwords; ++i) ev.words[i] = Logic4Word{};
-  DecodePutSourceValue(arrayvalue_p, src, *element->var);
+  DecodePutSourceValue(arrayvalue_p, src, ev, element->var->is_4state,
+                       IsRealElement(*element));
   const uint32_t kTopBits = ev.width % 64;
   if (kTopBits != 0) {
     const uint64_t kMask = (uint64_t{1} << kTopBits) - 1;
@@ -538,7 +552,7 @@ void EncodeGetScalarValue(s_vpi_arrayvalue* arrayvalue_p, unsigned int k,
     Logic4Vec element = value.var->value;
     element.is_signed = element.is_signed || value.var->is_signed;
     integer = VpiKnownIntegerValue(element);
-    if (element.is_real || value.var->is_real) {
+    if (value.is_real) {
       real = RealVecToDouble(element);
     } else {
       real = element.is_signed ? static_cast<double>(integer)
@@ -762,8 +776,8 @@ void VpiContext::GetValueArray(VpiHandle obj, s_vpi_arrayvalue* arrayvalue_p,
     const VpiObject* element = section[k];
     ElementWords value{kZeros.data(), false};
     if (element != nullptr && element->var != nullptr) {
-      value = {element->var->value.words, element->var->is_4state,
-               element->var};
+      value = {element->var->value.words, element->var->is_4state, element->var,
+               IsRealElement(*element)};
     }
     EncodeGetElementValue(arrayvalue_p, k, width, value);
   }

@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include <cstdint>
+#include <deque>
 #include <vector>
 
 #include "common/arena.h"
@@ -9,6 +9,7 @@
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -149,13 +150,21 @@ TEST_F(VpiGetUserDataSim, AReadDuringEndOfResetStartsFromNullAndCanBeSetAgain) {
 
 // What each invocation of `$count` read from its call's user data, before
 // putting back one more.
-std::vector<intptr_t> counts_read;
+std::vector<int> counts_read;
+
+// The counts the calls' user data point at, one per call that has run.
+std::deque<int>& CallCounts() {
+  static std::deque<int> counts;
+  return counts;
+}
 
 PLI_INT32 CountCalltf(PLI_BYTE8* /*user_data*/) {
   vpiHandle call = vpi_handle(vpiSysTfCall, nullptr);
-  const auto kCount = reinterpret_cast<intptr_t>(vpi_get_userdata(call)) + 1;
-  counts_read.push_back(kCount);
-  vpi_put_userdata(call, reinterpret_cast<void*>(kCount));
+  auto* count = static_cast<int*>(vpi_get_userdata(call));
+  if (count == nullptr) count = &CallCounts().emplace_back(0);
+  ++*count;
+  counts_read.push_back(*count);
+  vpi_put_userdata(call, count);
   return 0;
 }
 
@@ -164,6 +173,7 @@ class UserDataOfACallInATask : public VpiDesignRun {
   void SetUp() override {
     VpiDesignRun::SetUp();
     counts_read.clear();
+    CallCounts().clear();
     s_vpi_systf_data data = {};
     data.type = vpiSysTask;
     data.tfname = VpiText("$count");
@@ -180,7 +190,7 @@ TEST_F(UserDataOfACallInATask, ItLastsFromOneInvocationToTheNext) {
       "  task t; $count; endtask\n"
       "  initial begin t; t; end\n"
       "endmodule\n");
-  EXPECT_EQ(counts_read, (std::vector<intptr_t>{1, 2}));
+  EXPECT_EQ(counts_read, (std::vector<int>{1, 2}));
 }
 
 }  // namespace

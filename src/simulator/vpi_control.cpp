@@ -27,6 +27,7 @@
 #include "simulator/variable.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
+#include "simulator/vpi_control_requests.h"
 #include "simulator/vpi_data_structs.h"
 #include "simulator/vpi_object.h"
 
@@ -42,6 +43,14 @@ static void OnRoutineReturn(VpiControlRequests& control,
     return;
   }
   task();
+}
+
+// §20.2: end the run `sim`, where there is one, as $finish (`finish`) or
+// $stop ends it, with the diagnostic message `level` gives.
+static void EndRunAsRequested(SimContext* sim, bool finish, int level) {
+  if (sim == nullptr) return;
+  EmitFinishDiagnostic(*sim, finish ? "$finish" : "$stop", level, sim->Out());
+  sim->RequestFinish();
 }
 
 void VpiContext::LeaveApplicationRoutine() {
@@ -62,10 +71,7 @@ int VpiContext::Control(int operation, int arg0, int arg1, int arg2,
     (kFinish ? control_.finish_requested : control_.stop_requested) = true;
     (kFinish ? control_.finish_diag_level : control_.stop_diag_level) = arg0;
     OnRoutineReturn(control_, [this, kFinish, arg0] {
-      if (sim_ctx_ == nullptr) return;
-      EmitFinishDiagnostic(*sim_ctx_, kFinish ? "$finish" : "$stop", arg0,
-                           sim_ctx_->Out());
-      sim_ctx_->RequestFinish();
+      EndRunAsRequested(sim_ctx_, kFinish, arg0);
     });
     return 1;
   }

@@ -553,7 +553,8 @@ std::vector<double> MtmMultiples(vpiHandle obj) {
 
 using MtmDelaysOfARun = VpiDesignRun;
 
-const std::vector<double> kOneToSix = {1, 2, 3, 4, 5, 6};
+// The six delays each case below writes, as min:typ:max triples.
+std::vector<double> OneToSix() { return {1, 2, 3, 4, 5, 6}; }
 
 // §38.10 Table 38-2 with §11.11: with mtm_flag set, each delay reads back as
 // the minimum, typical and maximum its min:typ:max expression wrote (#7456).
@@ -564,7 +565,7 @@ TEST_F(MtmDelaysOfARun, AGatesMinTypMaxDelaysAreRead) {
       "endmodule\n");
   vpiHandle g = By("top.g");
   ASSERT_NE(g, nullptr);
-  EXPECT_EQ(MtmMultiples(g), kOneToSix);
+  EXPECT_EQ(MtmMultiples(g), OneToSix());
 }
 
 TEST_F(MtmDelaysOfARun, AContinuousAssignmentsMinTypMaxDelaysAreRead) {
@@ -574,7 +575,7 @@ TEST_F(MtmDelaysOfARun, AContinuousAssignmentsMinTypMaxDelaysAreRead) {
       "endmodule\n");
   std::vector<vpiHandle> assigns = ObjectsOf(vpiContAssign, By("top"));
   ASSERT_EQ(assigns.size(), 1u);
-  EXPECT_EQ(MtmMultiples(assigns[0]), kOneToSix);
+  EXPECT_EQ(MtmMultiples(assigns[0]), OneToSix());
 }
 
 TEST_F(MtmDelaysOfARun, AModulePathsMinTypMaxDelaysAreRead) {
@@ -587,7 +588,7 @@ TEST_F(MtmDelaysOfARun, AModulePathsMinTypMaxDelaysAreRead) {
       "endmodule\n");
   std::vector<vpiHandle> paths = ObjectsOf(vpiModPath, By("top"));
   ASSERT_EQ(paths.size(), 1u);
-  EXPECT_EQ(MtmMultiples(paths[0]), kOneToSix);
+  EXPECT_EQ(MtmMultiples(paths[0]), OneToSix());
 }
 
 }  // namespace

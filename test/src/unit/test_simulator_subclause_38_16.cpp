@@ -718,9 +718,11 @@ class ElementValuesOfARun : public VpiDesignRun {
 // in vpiRealVal as a double and in vpiShortRealVal as a float (#7462).
 TEST_F(ElementValuesOfARun, ARealElementIsReadAsItsValue) {
   Run("module top;\n"
-      "  real r[2] = '{1.0, 2.5};\n"
-      "  shortreal s[2] = '{1.0, 2.5};\n"
-      "  initial $noop;\n"
+      "  real r[2];\n"
+      "  shortreal s[2];\n"
+      "  initial begin\n"
+      "    r[0] = 1.0; r[1] = 2.5; s[0] = 1.0; s[1] = 2.5; $noop;\n"
+      "  end\n"
       "endmodule\n");
   EXPECT_EQ(ReadTwo("top.r", vpiRealVal, &ArrayValueArms::reals),
             (std::vector<double>{1.0, 2.5}));
@@ -733,7 +735,7 @@ TEST_F(ElementValuesOfARun, ARealElementIsReadAsItsValue) {
 TEST_F(ElementValuesOfARun, ASignedElementKeepsItsSign) {
   Run("module top;\n"
       "  byte b[2] = '{-1, -2};\n"
-      "  int i[2] = '{-1, -2};\n"
+      "  shortint h[2] = '{-1, -2};\n"
       "  initial $noop;\n"
       "endmodule\n");
   EXPECT_EQ(ReadTwo("top.b", vpiShortIntVal, &ArrayValueArms::shortints),
@@ -742,7 +744,7 @@ TEST_F(ElementValuesOfARun, ASignedElementKeepsItsSign) {
             (std::vector<PLI_INT32>{-1, -2}));
   EXPECT_EQ(ReadTwo("top.b", vpiLongIntVal, &ArrayValueArms::longints),
             (std::vector<PLI_INT64>{-1, -2}));
-  EXPECT_EQ(ReadTwo("top.i", vpiLongIntVal, &ArrayValueArms::longints),
+  EXPECT_EQ(ReadTwo("top.h", vpiLongIntVal, &ArrayValueArms::longints),
             (std::vector<PLI_INT64>{-1, -2}));
 }
 

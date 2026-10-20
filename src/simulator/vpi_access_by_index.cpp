@@ -7,6 +7,18 @@
 
 namespace delta {
 
+bool VpiIndexesItsVarBits(const VpiObject& obj) {
+  return (obj.type == vpiStructVar || obj.type == vpiUnionVar) &&
+         obj.decl_vector;
+}
+
+VpiObject* VpiVarBitAt(const VpiObject& obj, int index) {
+  for (VpiObject* child : obj.children) {
+    if (child->type == vpiVarBit && child->index == index) return child;
+  }
+  return nullptr;
+}
+
 bool VpiHasAccessByIndex(int type) {
   switch (type) {
     // §37.10 draws no access by index for an instance, whose ports are

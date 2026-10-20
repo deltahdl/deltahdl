@@ -171,5 +171,25 @@ TEST_F(HandleByIndexOfARun,
   EXPECT_EQ(vpi_handle_by_multi_index(r0, 1, second), nullptr);
 }
 
+// §38.19 with §37.17 details 12 and 20: a packed struct var indexes its var
+// bits, so an index into it selects the bit of that index, and an index
+// beyond its bits, or into an unpacked struct, whose members carry no index,
+// selects nothing.
+TEST_F(HandleByIndexOfARun, APackedStructVarIndexesItsBits) {
+  Run("module top; struct packed { logic [1:0] a; logic b; } ps;\n"
+      "  struct { logic a; } us; initial $noop; endmodule\n");
+  vpiHandle ps = By("top.ps");
+  ASSERT_NE(ps, nullptr);
+  vpiHandle bit = vpi_handle_by_index(ps, 2);
+  ASSERT_NE(bit, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, bit), vpiVarBit);
+  EXPECT_EQ(vpi_compare_objects(bit, vpi_handle_by_index(By("top.ps.a"), 1)),
+            1);
+  EXPECT_EQ(vpi_handle_by_index(ps, 3), nullptr);
+  vpiHandle us = By("top.us");
+  ASSERT_NE(us, nullptr);
+  EXPECT_EQ(vpi_handle_by_index(us, 0), nullptr);
+}
+
 }  // namespace
 }  // namespace delta

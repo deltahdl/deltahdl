@@ -233,15 +233,15 @@ class VpiCompareObjectsRun : public VpiDesignRun {
 // objects; two handles to one bit, reached by different routes, are one.
 TEST_F(VpiCompareObjectsRun, BitsOfOneVectorAreDifferentObjects) {
   Run("module top; wire [3:0] w; logic [3:0] v; initial $noop; endmodule");
-  for (const char* kName : {"top.w", "top.v"}) {
-    vpiHandle vec = By(kName);
-    ASSERT_NE(vec, nullptr) << kName;
+  for (const char* name : {"top.w", "top.v"}) {
+    vpiHandle vec = By(name);
+    ASSERT_NE(vec, nullptr) << name;
     vpiHandle bit0 = vpi_handle_by_index(vec, 0);
     vpiHandle bit1 = vpi_handle_by_index(vec, 1);
-    ASSERT_NE(bit0, nullptr) << kName;
-    ASSERT_NE(bit1, nullptr) << kName;
-    EXPECT_EQ(vpi_compare_objects(bit0, bit1), 0) << kName;
-    EXPECT_EQ(vpi_compare_objects(bit0, vec), 0) << kName;
+    ASSERT_NE(bit0, nullptr) << name;
+    ASSERT_NE(bit1, nullptr) << name;
+    EXPECT_EQ(vpi_compare_objects(bit0, bit1), 0) << name;
+    EXPECT_EQ(vpi_compare_objects(bit0, vec), 0) << name;
   }
   vpiHandle by_index = vpi_handle_by_index(By("top.w"), 2);
   vpiHandle by_name = By("top.w[2]");

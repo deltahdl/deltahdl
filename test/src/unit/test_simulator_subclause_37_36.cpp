@@ -362,8 +362,8 @@ class UdpDefnsOfARun : public VpiDesignRun {
     std::vector<std::string> symbols;
     if (value.value.vector == nullptr) return symbols;
     for (std::size_t k = 0; k < count; ++k) {
-      const s_vpi_vecval& kElement = value.value.vector[k / 4];
-      const PLI_UINT32 kHalf = k % 4 < 2 ? kElement.aval : kElement.bval;
+      const s_vpi_vecval& element = value.value.vector[k / 4];
+      const PLI_UINT32 kHalf = k % 4 < 2 ? element.aval : element.bval;
       const PLI_UINT32 kPair = (kHalf >> (k % 2 == 0 ? 16 : 0)) & 0xffffu;
       std::string symbol(1, static_cast<char>(kPair >> 8));
       if ((kPair & 0xffu) != 0) symbol.push_back(static_cast<char>(kPair));

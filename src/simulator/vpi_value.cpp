@@ -11,6 +11,7 @@
 #include <utility>
 #include <vector>
 
+#include "common/arena.h"
 #include "common/packed_range.h"
 #include "common/types.h"
 #include "simulator/class_object.h"
@@ -235,9 +236,15 @@ static void DispatchGetValueByFormat(VpiHandle obj, s_vpi_value* value,
     DispatchIntegerFormat(kSlice, value, pools);
     return;
   }
-  // §38.15: a signed variable's value is read with its sign.
+  // §38.15: a signed variable's value is read with its sign. A declared
+  // variable's signedness is its declaration's (§6.11), whatever a value
+  // written to it carried: `logic a = 1` holds a 1 that reads as 1, not as a
+  // signed -1, through the variable or a reference to it.
   Logic4Vec whole = obj->var->value;
-  whole.is_signed = whole.is_signed || obj->var->is_signed;
+  const bool kDeclared = obj->decl_signed || obj->var->is_signed;
+  whole.is_signed = obj->var->declared_type != nullptr
+                        ? kDeclared
+                        : whole.is_signed || kDeclared;
   DispatchValueByFormat(whole, value, pools);
 }
 
@@ -429,6 +436,34 @@ static VpiHandle ValueStandIn(VpiHandle obj, s_vpi_value* value,
   return obj;
 }
 
+// §37.3.5 with §38.15: an operation or a call holds no storage; its value is
+// its expression's, evaluated now. Any other object without storage gives
+// none, and the caller's buffer is left as it was. §37.47: a cont assign
+// bit's value is its one bit of the assignment's.
+static void GetStoragelessValue(const VpiObject& obj, s_vpi_value* value,
+                                VpiValuePools& pools, SimContext* sim) {
+  if (obj.expr_scope == nullptr) return;
+  if (obj.type == vpiContAssignBit) {
+    std::vector<Logic4Word> words;
+    DispatchIntegerFormat(SliceOfValue(VpiEvaluateExpressionObject(obj, *sim),
+                                       obj.bit_offset, 1, words),
+                          value, pools);
+    return;
+  }
+  DispatchValueByFormat(VpiEvaluateExpressionObject(obj, *sim), value, pools);
+}
+
+// §37.36 with §38.15: a table entry's vector, its row's symbols two bytes
+// each (VpiTableEntryVector).
+static void GetTableEntryVector(const VpiObject& obj, s_vpi_value* value,
+                                VpiValuePools& pools) {
+  s_vpi_value row = {};
+  row.format = kVpiStringVal;
+  GetValueStringVal(obj.var->value, &row, pools.strings);
+  pools.vectors.push_back(VpiTableEntryVector(row.value.str));
+  value->value.vector = pools.vectors.back().data();
+}
+
 void VpiContext::GetValue(VpiHandle obj, s_vpi_value* value) {
   if (!obj || !value) return;
   // §37.3.6: an object a decryption envelope sealed gives up no value; the
@@ -457,20 +492,7 @@ void VpiContext::GetValue(VpiHandle obj, s_vpi_value* value) {
   VpiRefreshElementCopy(*obj);
   BindRunStorage(*obj, sim_ctx_);
   if (!obj->var) {
-    // §37.3.5 with §38.15: an operation or a call holds no storage; its value
-    // is its expression's, evaluated now. Any other object without storage
-    // gives none, and the caller's buffer is left as it was.
-    // §37.47: a cont assign bit's value is its one bit of the assignment's.
-    if (obj->expr_scope != nullptr && obj->type == vpiContAssignBit) {
-      std::vector<Logic4Word> words;
-      DispatchIntegerFormat(
-          SliceOfValue(VpiEvaluateExpressionObject(*obj, *sim_ctx_),
-                       obj->bit_offset, 1, words),
-          value, value_pools_);
-    } else if (obj->expr_scope != nullptr) {
-      DispatchValueByFormat(VpiEvaluateExpressionObject(*obj, *sim_ctx_), value,
-                            value_pools_);
-    }
+    GetStoragelessValue(*obj, value, value_pools_, sim_ctx_);
     return;
   }
   if (const PackedRange* dim = VaryingSelectDim(*obj)) {
@@ -478,11 +500,7 @@ void VpiContext::GetValue(VpiHandle obj, s_vpi_value* value) {
     return;
   }
   if (obj->type == vpiTableEntry && value->format == kVpiVectorVal) {
-    s_vpi_value row = {};
-    row.format = kVpiStringVal;
-    GetValueStringVal(obj->var->value, &row, value_pools_.strings);
-    value_pools_.vectors.push_back(VpiTableEntryVector(row.value.str));
-    value->value.vector = value_pools_.vectors.back().data();
+    GetTableEntryVector(*obj, value, value_pools_);
     return;
   }
   // §38.15: an integer or time variable is read as the type it is.
@@ -526,6 +544,21 @@ static bool PutValueFormatIsRejected(VpiHandle obj, const s_vpi_value* value,
 static void PutValueWriteBits(VpiHandle obj, const s_vpi_value* value) {
   const uint32_t kWidth = VpiPutWidth(*obj);
   std::vector<Logic4Word> bits;
+  // §38.34 with §6.12: a real object takes a real or an integer put to it as
+  // the real number it is, held in the object's own precision, rather than
+  // the integer the value rounds to.
+  if ((obj->var->is_real || obj->var->value.is_real) &&
+      (value->format == kVpiRealVal || value->format == kVpiIntVal)) {
+    const double kReal = value->format == kVpiRealVal
+                             ? value->value.real
+                             : static_cast<double>(value->value.integer);
+    Arena scratch;
+    const Logic4Vec kBits = MakeRealVec(scratch, kReal, kWidth);
+    bits.assign(kBits.words, kBits.words + kBits.nwords);
+    VpiWriteDecodedBits(*obj, bits, kWidth);
+    obj->var->value.is_real = true;
+    return;
+  }
   if (VpiPutValueBits(*value, kWidth, bits)) {
     VpiWriteDecodedBits(*obj, bits, kWidth);
   }
@@ -550,7 +583,7 @@ static bool PutValueResolveWritableTarget(VpiHandle obj, Scheduler* scheduler,
   // In a run that is the trigger `->` makes (§15.5.1), which resumes the
   // processes waiting on it.
   if (obj->var->is_event) {
-    if (sim != nullptr) {
+    if (scheduler != nullptr && sim != nullptr) {
       TriggerEvent(obj->var, *sim);
     } else if (scheduler) {
       obj->var->triggered_ticks = scheduler->CurrentTime().ticks;

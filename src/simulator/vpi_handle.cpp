@@ -161,6 +161,8 @@ VpiHandle VpiContext::HandleByIndex(int index, VpiHandle parent) {
     return nullptr;
   }
 
+  if (VpiIndexesItsVarBits(*parent)) return VpiVarBitAt(*parent, index);
+
   // §38.19: the reference object must have the access-by-index property. An
   // object whose type offers no index-selected relationship cannot anchor an
   // index select, so there is no handle to return.

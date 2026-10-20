@@ -674,9 +674,13 @@ Logic4Vec Lowerer::CoerceVarInitValue(const RtlirVariable& var, Logic4Vec val,
   if (val.width != width && !var.is_real && !var.is_string)
     val = ResizeToWidth(val, width, arena_);
   if (var.is_string) val = StripStringZeros(val, arena_);
-  if (!var.is_4state && !var.is_string && !var.is_real && !var.is_event &&
-      !var.is_chandle)
-    CoerceTo2State(val);
+  // §6.11: an integral variable is signed or unsigned as declared, so the
+  // value it starts with is too, not the initializer's: `logic a = 1` holds an
+  // unsigned 1 though the literal 1 is signed.
+  if (!var.is_string && !var.is_real && !var.is_event && !var.is_chandle) {
+    val.is_signed = var.is_signed;
+    if (!var.is_4state) CoerceTo2State(val);
+  }
   return val;
 }
 

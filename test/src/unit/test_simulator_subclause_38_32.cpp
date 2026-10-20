@@ -799,13 +799,13 @@ class DelaysPutInARun : public PortDelaysOfARun {
 // than 15 (#7468).
 TEST_F(DelaysPutInARun, AModulePathTakesItsPutDelay) {
   RegisterTask("$path_put", &PutPathDelay);
-  Run("module cell(input a, output y); timeunit 1ns; timeprecision 1ns;\n"
+  Run("module leaf(input a, output y); timeunit 1ns; timeprecision 1ns;\n"
       "  assign y = a;\n"
       "  specify (a => y) = 5; endspecify\n"
       "endmodule\n"
       "module top; timeunit 1ns; timeprecision 1ns;\n"
       "  logic a = 0; wire y; int rose;\n"
-      "  cell c(a, y);\n"
+      "  leaf c(a, y);\n"
       "  always @(y) if (y === 1'b1) rose = $time;\n"
       "  initial begin #1 $path_put; #9 a = 1; #10; end\n"
       "endmodule\n");
@@ -837,14 +837,14 @@ TEST_F(DelaysPutInARun, AGateAndAUdpTakeTheirPutDelays) {
 // (#7470).
 TEST_F(DelaysPutInARun, ATimingCheckIsJudgedAgainstItsPutLimit) {
   RegisterTask("$limit_put", &PutCheckLimit);
-  Run("module cell(input clk, d); timeunit 1ns; timeprecision 1ns;\n"
+  Run("module leaf(input clk, d); timeunit 1ns; timeprecision 1ns;\n"
       "  reg notifier = 0; int violations = 0;\n"
       "  specify $setup(d, posedge clk, 5, notifier); endspecify\n"
       "  always @(notifier) violations = violations + 1;\n"
       "endmodule\n"
       "module top; timeunit 1ns; timeprecision 1ns;\n"
       "  logic clk = 0, d = 0;\n"
-      "  cell c(clk, d);\n"
+      "  leaf c(clk, d);\n"
       "  initial begin\n"
       "    #1 $limit_put;\n"
       "    #9 d = 1; #3 clk = 1; #5 clk = 0;\n"

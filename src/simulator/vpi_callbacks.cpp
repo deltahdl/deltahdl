@@ -5,9 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
-#include <string>
 #include <string_view>
-#include <utility>
 #include <vector>
 
 #include "common/types.h"
@@ -16,6 +14,7 @@
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_user.h"
+#include "simulator/vpi_value_change_watch.h"
 // §37.10 detail 3: the package/interface/program instance kinds are defined in
 // the SystemVerilog VPI header alongside the §37.10 vpiInstance relation.
 #include "simulator/sv_vpi_user.h"
@@ -219,87 +218,6 @@ bool HasCallbackFor(const std::vector<s_cb_data>& callbacks, int reason) {
 
 namespace {
 
-// §38.36.1: whether a `reason` registration placed on `obj` is still live
-// among `callbacks`.
-bool IsPlacedOn(const std::vector<s_cb_data>& callbacks, int reason,
-                const VpiObject* obj) {
-  return std::ranges::any_of(callbacks, [reason, obj](const s_cb_data& cb) {
-    return cb.reason == reason && cb.obj != nullptr &&
-           VpiObjectOf(cb.obj) == obj;
-  });
-}
-
-// The aval and bval words of the bits `obj` stands for: its variable's, or,
-// for a bit or a select of one, those of its parent's it spans.
-std::vector<uint64_t> ObjectBits(const VpiObject& obj) {
-  const Logic4Vec& whole = obj.var->value;
-  std::vector<uint64_t> bits;
-  if (obj.bit_offset < 0) {
-    for (uint32_t i = 0; i < whole.nwords; ++i) {
-      bits.push_back(whole.words[i].aval);
-      bits.push_back(whole.words[i].bval);
-    }
-    return bits;
-  }
-  for (int k = 0; k < std::max(obj.size, 1); ++k) {
-    const auto kBit = static_cast<uint32_t>(obj.bit_offset + k);
-    if (kBit / 64 >= whole.nwords) break;
-    bits.push_back((whole.words[kBit / 64].aval >> (kBit % 64)) & 1);
-    bits.push_back((whole.words[kBit / 64].bval >> (kBit % 64)) & 1);
-  }
-  return bits;
-}
-
-// §38.36.1 with §37.17 detail 14: watch the storage of `obj` and, as it is
-// written, call back the cbSizeChange registrations placed on it where its
-// size changed, then the cbValueChange ones where its value did, a write of
-// what it holds being no change, until none of either is left.
-// The strength the net `obj` reads, or none for an object without one.
-NetStrength StrengthOf(const VpiObject& obj) {
-  return obj.net != nullptr ? obj.net->resolved_strength : NetStrength{};
-}
-
-bool SameStrength(const NetStrength& a, const NetStrength& b) {
-  return a.s0_hi == b.s0_hi && a.s0_lo == b.s0_lo && a.s1_hi == b.s1_hi &&
-         a.s1_lo == b.s1_lo;
-}
-
-void WatchObjectChanges(VpiContext& vpi, VpiObject* obj) {
-  if (obj == nullptr || obj->var == nullptr || obj->value_change_watched) {
-    return;
-  }
-  obj->value_change_watched = true;
-  obj->var->AddWatcher([&vpi, obj, held = ObjectBits(*obj),
-                        strength = StrengthOf(*obj),
-                        size = vpi.Get(vpiSize, obj)]() mutable {
-    const auto& callbacks = vpi.RegisteredCallbacks();
-    const bool kSizes = IsPlacedOn(callbacks, cbSizeChange, obj);
-    const bool kValues = IsPlacedOn(callbacks, cbValueChange, obj);
-    if (!kSizes && !kValues) {
-      obj->value_change_watched = false;
-      return true;
-    }
-    const int kSize = vpi.Get(vpiSize, obj);
-    if (kSize != size) {
-      size = kSize;
-      if (kSizes) vpi.DispatchCallbacks(cbSizeChange, obj);
-    }
-    std::vector<uint64_t> now = ObjectBits(*obj);
-    const NetStrength kStrength = StrengthOf(*obj);
-    const bool kStrengthChanged = !SameStrength(kStrength, strength);
-    strength = kStrength;
-    if (now == held) {
-      // §38.36.1: a change of strength alone is a change to a callback
-      // registered with vpiStrengthVal, and to no other.
-      if (kStrengthChanged && kValues) vpi.DispatchStrengthChange(obj);
-      return false;
-    }
-    held = std::move(now);
-    if (kValues) vpi.DispatchCallbacks(cbValueChange, obj);
-    return false;
-  });
-}
-
 // §38.36.2: the delay a simulation-time callback's time gives, in ticks of
 // the simulation time unit `sim_unit`: a vpiScaledRealTime one in the time
 // unit of the callback's object, or the simulation time unit without one.
@@ -327,6 +245,25 @@ void ScheduleTimeCallback(VpiContext& vpi, Scheduler& scheduler, VpiObject* cb,
   scheduler.ScheduleEvent(
       SimTime{cb->event_time + CallbackDelayTicks(data, vpi.SimTimeUnit())},
       RegionForPliCallback(data.reason), queued);
+}
+
+// §38.36.1: a net watched in vpiStrengthVal is told of a change of its
+// strength alone, which a net otherwise keeps to itself.
+void WatchStrengthIfAsked(const s_cb_data& data) {
+  VpiObject* watched = VpiObjectOf(data.obj);
+  if (watched->net != nullptr && data.value != nullptr &&
+      data.value->format == vpiStrengthVal) {
+    watched->net->strength_watched = true;
+  }
+}
+
+// §38.36.1.1: whether `data` is called as a statement runs, which
+// NoteStmtExecuting is told of: a cbStmt, or a cbValueChange placed on an
+// event statement.
+bool IsCalledAsAStatementRuns(const s_cb_data& data) {
+  return data.reason == cbStmt ||
+         (data.reason == cbValueChange && data.obj != nullptr &&
+          VpiObjectOf(data.obj)->type == vpiEventStmt);
 }
 
 }  // namespace
@@ -373,24 +310,12 @@ VpiHandle VpiContext::RegisterCb(s_cb_data* data) {
   }
   if ((data->reason == cbValueChange || data->reason == cbSizeChange) &&
       data->obj != nullptr) {
-    // §38.36.1: a net watched in vpiStrengthVal is told of a change of its
-    // strength alone, which a net otherwise keeps to itself.
-    VpiObject* watched = VpiObjectOf(data->obj);
-    if (watched->net != nullptr && data->value != nullptr &&
-        data->value->format == vpiStrengthVal) {
-      watched->net->strength_watched = true;
-    }
-    WatchObjectChanges(*this, watched);
+    WatchStrengthIfAsked(*data);
+    WatchObjectChanges(*this, VpiObjectOf(data->obj));
     VpiWatchContAssignChanges(*this, VpiObjectOf(data->obj), sim_ctx_);
   }
-  // §38.36.1: a cbValueChange on an event statement is called as the
-  // statement executes, which NoteStmtExecuting is told of, as for a cbStmt.
   if (data->reason == cbSignal) VpiTrapSignal(data->index);
-  if (data->reason == cbStmt ||
-      (data->reason == cbValueChange && data->obj != nullptr &&
-       VpiObjectOf(data->obj)->type == vpiEventStmt)) {
-    stmt_callbacks_registered_ = true;
-  }
+  if (IsCalledAsAStatementRuns(*data)) stmt_callbacks_registered_ = true;
   if (scheduler_ != nullptr &&
       VpiIsSimulationTimeCallbackReason(data->reason)) {
     ScheduleTimeCallback(*this, *scheduler_, cb_obj, *data);

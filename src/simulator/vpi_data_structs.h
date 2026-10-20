@@ -119,6 +119,15 @@ bool VpiIsSimulationTimeCallbackReason(int reason);
 // reference object.
 bool VpiHasAccessByIndex(int type);
 
+// §38.19 with §37.17: whether `obj` is a packed struct or union var (detail
+// 20), whose access by index selects its var bits (detail 12) rather than the
+// members it holds, which carry no index.
+bool VpiIndexesItsVarBits(const VpiObject& obj);
+
+// The var bit of `obj` that `index` selects, as §38.3 Example 1's `ps[0]`
+// selects one of a packed struct, or null where no bit carries the index.
+VpiObject* VpiVarBitAt(const VpiObject& obj, int index);
+
 // §37.85 detail 1: the size of a gen scope array - the number of gen scope
 // elements it holds - reported through vpi_get(vpiSize). It is counted from the
 // array's element children rather than read from a stored width.

@@ -13,6 +13,7 @@
 #include "simulator/specify.h"
 #include "simulator/specify_path_delay.h"
 #include "simulator/specify_timing_check.h"
+#include "simulator/vpi_constants.h"
 #include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_primitive_value.h"

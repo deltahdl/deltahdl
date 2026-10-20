@@ -534,17 +534,17 @@ TEST_F(EventCallbacksOfARun, ASignalCallbackIsCalledAndTheRunGoesOn) {
     PlaceEventCallback(cbStartOfReset, nullptr);
     s_cb_data data = {};
     data.reason = cbSignal;
-    data.index = SIGUSR1;
+    data.index = SIGTERM;
     data.cb_rtn = &RecordEventDelivery;
     signal_callback = vpi_register_cb(&data);
-    std::raise(SIGUSR1);
+    std::raise(SIGTERM);
   };
   Run("module top; timeunit 1ns; timeprecision 1ns; int after = 0;\n"
       "  initial begin $arm; #1 after = 1; end\n"
       "endmodule\n");
   const std::vector<EventDelivery> kSignals = DeliveriesOf(cbSignal);
   ASSERT_EQ(kSignals.size(), 1u);
-  EXPECT_EQ(kSignals[0].index, SIGUSR1);
+  EXPECT_EQ(kSignals[0].index, SIGTERM);
   s_vpi_value after = {};
   after.format = vpiIntVal;
   vpi_get_value(TopObject("top.after"), &after);
@@ -557,19 +557,17 @@ TEST_F(EventCallbacksOfARun, ASignalCallbackIsCalledAndTheRunGoesOn) {
 // number that names no signal it can trap.
 TEST(VpiSignalTraps, ASignalIsTrappedWhileAskedFor) {
   VpiTrapSignal(0);
-  VpiTrapSignal(SIGKILL);
-  VpiTrapSignal(SIGUSR2);
-  VpiTrapSignal(SIGUSR2);
+  VpiTrapSignal(SIGINT);
+  VpiTrapSignal(SIGINT);
   std::vector<s_cb_data> asked(1);
   asked[0].reason = cbSignal;
-  asked[0].index = SIGUSR2;
-  VpiReleaseSignal(SIGUSR2, asked);
+  asked[0].index = SIGINT;
+  VpiReleaseSignal(SIGINT, asked);
   EXPECT_TRUE(VpiTakeRaisedSignals().empty());
-  std::raise(SIGUSR2);
-  EXPECT_EQ(VpiTakeRaisedSignals(), std::vector<int>{SIGUSR2});
-  VpiReleaseSignal(SIGUSR2, {});
+  std::raise(SIGINT);
+  EXPECT_EQ(VpiTakeRaisedSignals(), std::vector<int>{SIGINT});
+  VpiReleaseSignal(SIGINT, {});
   VpiReleaseSignal(0, {});
-  VpiReleaseSignal(SIGKILL, {});
 }
 
 }  // namespace

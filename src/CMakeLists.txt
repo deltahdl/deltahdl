@@ -843,6 +843,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/vpi_systf_build.cpp
     simulator/vpi_typespec_shapes.cpp
     simulator/vpi_value_array.cpp
+    simulator/vpi_value_change_watch.cpp
     simulator/vpi_value_numbers.cpp
     simulator/vpi_value_refusals.cpp
     simulator/vpi_value_strings.cpp

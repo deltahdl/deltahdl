@@ -272,6 +272,27 @@ TEST_F(PutsOfARun, APutToAPartOfANettypeNetIsRefused) {
   EXPECT_EQ(vpi_chk_error(nullptr), 0);
 }
 
+// §38.34 with §6.12: a real variable takes a real put to it as that real and
+// an integer put to it as the real number the integer is, in its own
+// precision, neither rounded nor left as integer bits.
+TEST_F(PutsOfARun, ARealVariableHoldsTheRealOrIntegerPut) {
+  Run("module top; real r; shortreal s; initial $noop; endmodule\n");
+  s_vpi_value half = {};
+  half.format = vpiRealVal;
+  half.value.real = 2.5;
+  vpi_put_value(By("top.r"), &half, nullptr, vpiNoDelay);
+  s_vpi_value three = {};
+  three.format = vpiIntVal;
+  three.value.integer = -3;
+  vpi_put_value(By("top.s"), &three, nullptr, vpiNoDelay);
+  s_vpi_value read = {};
+  read.format = vpiRealVal;
+  vpi_get_value(By("top.r"), &read);
+  EXPECT_DOUBLE_EQ(read.value.real, 2.5);
+  vpi_get_value(By("top.s"), &read);
+  EXPECT_DOUBLE_EQ(read.value.real, -3.0);
+}
+
 // What the vpiStringVal put to the `$half_of_five` call recorded.
 int string_put_error = 0;
 

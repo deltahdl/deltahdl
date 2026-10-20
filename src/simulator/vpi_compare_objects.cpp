@@ -12,6 +12,7 @@
 #include "simulator/vpi_expr_values.h"
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_user.h"
 
 namespace delta {
 

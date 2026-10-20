@@ -96,8 +96,8 @@ TEST_F(VpiGet64Sim, ANullHandleReadsTheSameRunWideAnswersVpiGetReads) {
   EXPECT_EQ(vpi_get64(vpiSaveRestartID, nullptr),
             vpi_get(vpiSaveRestartID, nullptr));
 
-  // A property a null handle says nothing about still reads as nothing.
-  EXPECT_EQ(vpi_get64(vpiObjId, nullptr), 0);
+  // A property a null handle says nothing about is undefined for it (§38.6).
+  EXPECT_EQ(vpi_get64(vpiObjId, nullptr), vpiUndefined);
 }
 
 // §37.59 detail 8 lets vpiSize through only for a protected expression, so a

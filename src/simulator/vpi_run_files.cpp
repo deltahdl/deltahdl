@@ -1,7 +1,6 @@
 #include "simulator/vpi_run_files.h"
 
 #include <bit>
-#include <cstdint>
 #include <cstdio>
 #include <string>
 #include <string_view>
