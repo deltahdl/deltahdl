@@ -852,7 +852,7 @@ void Lowerer::Lower(const RtlirDesign* design) {
   // design runs when the design calls $sdf_annotate, or when an application
   // loaded into the run, which registers a system task or a callback, can put
   // one with vpi_put_delays.
-  const VpiContext& vpi = GetGlobalVpiContext();
+  VpiContext& vpi = GetGlobalVpiContext();
   interconnect_annotatable_ = DesignCallsSdfAnnotate(*design) ||
                               !vpi.RegisteredSystfs().empty() ||
                               !vpi.RegisteredCallbacks().empty();
@@ -939,7 +939,6 @@ void Lowerer::Lower(const RtlirDesign* design) {
   // build period's routines have run. §36.10.2 puts it in the same place, after
   // the sizetf routines, and has every function available from then until the
   // tool finishes, so the phase moves with it.
-  VpiContext& vpi = GetGlobalVpiContext();
   vpi.DispatchCallbacks(kCbEndOfCompile);
   vpi.SetToolPhase(VpiToolPhase::kFull);
 }
