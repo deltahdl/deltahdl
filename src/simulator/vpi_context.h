@@ -15,6 +15,7 @@
 #include "simulator/coverage_control.h"
 #include "simulator/vpi_channel_state.h"
 #include "simulator/vpi_constants.h"
+#include "simulator/vpi_control_requests.h"
 #include "simulator/vpi_data_structs.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_globals.h"
@@ -28,6 +29,7 @@ struct Expr;
 struct Process;
 struct RtlirDesign;
 struct ModuleItem;
+struct TimingCheckEntry;
 struct Variable;
 
 class VpiContext {
@@ -243,16 +245,26 @@ class VpiContext {
   // §38.36: deliver the one registration `cb_handle` names, once for a
   // simulation-time reason; answers 1 where it was delivered.
   int DeliverCallback(VpiHandle cb_handle);
+  // §38.36.3: call the cbSignal callbacks of the signals trapped since.
+  int DeliverRaisedSignals();
+  // §38.36.1: deliver the cbValueChange callbacks placed on `obj` in
+  // vpiStrengthVal, for a change of its strength alone.
+  int DispatchStrengthChange(VpiObject* obj);
   // §37.43 detail 4 and §38.36.1.1: `stmt`, run in the instance `prefix` names,
   // is the active frame's statement now, and its cbStmt callbacks are called.
   void NoteStmtExecuting(const Stmt* stmt, std::string prefix);
   // §38.36.1: what the run tells the simulation-event callbacks of, each
   // costing nothing where none of its reason is registered: a process created
   // or ended, an object constructed or reclaimed, a variable `stmt` in the
-  // instance `prefix` forced or released (cbForce, cbRelease), and the named
-  // block `label` there disabled (cbDisable).
+  // instance `prefix` forced, released, assigned or deassigned (cbForce,
+  // cbRelease, cbAssign, cbDeassign), and the named block `label` there
+  // disabled (cbDisable).
   void NoteThreadCreated(Process* proc);
   void NoteThreadEnded(Process* proc);
+  // §38.36.1: the thread `proc` resumes execution (cbEnterThread).
+  void NoteThreadEntered(Process* proc);
+  // §38.36.3: the timing check `check` is violated (cbTchkViolation).
+  void NoteTimingViolation(const TimingCheckEntry& check);
   void NoteObjectCreated(ClassObject& obj);
   void NoteObjectReclaimed(ClassObject& obj);
   void NoteForce(int reason, const Variable* var, const Stmt* stmt,
@@ -444,18 +456,8 @@ class VpiContext {
   // channel a set bit names, the accessors report what is pending on a channel
   // and what a flush has committed, and the failure hook fails the next flush.
   void WriteMcdChannel(PLI_UINT32 channel, std::string_view text);
-  const std::string& McdChannelBuffer(PLI_UINT32 channel) const {
-    auto it = channels_.mcd_channel_buffers.find(channel);
-    return it == channels_.mcd_channel_buffers.end()
-               ? channels_.empty_mcd_buffer
-               : it->second;
-  }
-  const std::string& McdChannelFlushed(PLI_UINT32 channel) const {
-    auto it = channels_.mcd_channel_flushed.find(channel);
-    return it == channels_.mcd_channel_flushed.end()
-               ? channels_.empty_mcd_buffer
-               : it->second;
-  }
+  const std::string& McdChannelBuffer(PLI_UINT32 channel) const;
+  const std::string& McdChannelFlushed(PLI_UINT32 channel) const;
   void SetMcdFlushShouldFail(bool fail) {
     channels_.mcd_flush_should_fail = fail;
   }
@@ -672,25 +674,24 @@ class VpiContext {
   }
   bool AtReadOnlySynchTime() const { return at_read_only_synch_time_; }
 
-  bool StopRequested() const { return stop_requested_; }
-  bool FinishRequested() const { return finish_requested_; }
-
-  // §38.4: the diagnostic message level vpi_control() forwarded with the most
-  // recent vpiStop/vpiFinish request (the same value $stop/$finish would carry,
-  // see 20.2).
-  int StopDiagLevel() const { return stop_diag_level_; }
-  int FinishDiagLevel() const { return finish_diag_level_; }
-
-  // §38.4: a reset requested through vpi_control(vpiReset, ...) and the three
-  // arguments it carried (the same values passed to the $reset task, see D.8).
-  bool ResetRequested() const { return reset_requested_; }
-  int ResetStopValue() const { return reset_stop_value_; }
-  int ResetResetValue() const { return reset_reset_value_; }
-  int ResetDiagValue() const { return reset_diag_value_; }
-
-  // §38.4: the scope vpi_control(vpiSetInteractiveScope, ...) most recently
-  // made the tool's interactive scope.
-  VpiHandle InteractiveScope() const { return interactive_scope_; }
+  // §38.4: what vpi_control() has been asked for (VpiControlRequests).
+  bool StopRequested() const { return control_.stop_requested; }
+  bool FinishRequested() const { return control_.finish_requested; }
+  int StopDiagLevel() const { return control_.stop_diag_level; }
+  int FinishDiagLevel() const { return control_.finish_diag_level; }
+  bool ResetRequested() const { return control_.reset_requested; }
+  int ResetStopValue() const { return control_.reset_stop_value; }
+  int ResetResetValue() const { return control_.reset_reset_value; }
+  int ResetDiagValue() const { return control_.reset_diag_value; }
+  VpiHandle InteractiveScope() const { return control_.interactive_scope; }
+  // §38.4: an application routine starts, and returns; the built-in tasks
+  // vpi_control() requested while one ran execute once the outermost returns.
+  void EnterApplicationRoutine() { ++control_.routines_running; }
+  void LeaveApplicationRoutine();
+  // §38.4 and D.11: make `scope` the interactive scope, as
+  // vpiSetInteractiveScope and $scope do, and call back the
+  // cbInteractiveScopeChange registrations.
+  void NoteInteractiveScope(VpiHandle scope);
 
   // §37.43 detail 4: record which frame is the one currently active. There is
   // at most one active frame at a time in a given thread, the running one's
@@ -833,15 +834,7 @@ class VpiContext {
   // §36.10.2: see SetToolPhase. Defaults to the full phase so VPI use outside
   // the startup window is unrestricted.
   VpiToolPhase tool_phase_ = VpiToolPhase::kFull;
-  bool stop_requested_ = false;
-  bool finish_requested_ = false;
-  int stop_diag_level_ = 0;
-  int finish_diag_level_ = 0;
-  bool reset_requested_ = false;
-  int reset_stop_value_ = 0;
-  int reset_reset_value_ = 0;
-  int reset_diag_value_ = 0;
-  VpiHandle interactive_scope_ = nullptr;
+  VpiControlRequests control_;
   // §37.43 detail 4: the frame active in each thread, keyed by its process
   // (null outside one); the running thread's is vpi_handle(vpiFrame, NULL).
   std::unordered_map<const void*, VpiHandle> active_frames_;
@@ -851,6 +844,13 @@ class VpiContext {
   // §37.42 detail 3 and §37.43 detail 6: the model's calls, which a registered
   // system task's invocation stands as and a subroutine's frame was entered by.
   VpiCallSiteObjects call_site_objects_;
+  // §38.14 with §38.33: the call instances the model made no object for, each
+  // made on its first invocation and kept, under its call site and instance,
+  // so that its user data lasts from one invocation to the next.
+  VpiCallSiteObjects invoked_call_objects_;
+  // §38.32: where in the run's specify manager each module path's and timing
+  // check's object stands, for vpi_put_delays to give it new delays there.
+  std::unordered_map<const VpiObject*, std::size_t> run_entry_index_;
   // §38.36.1.1: the model's statements, keyed as the call statements are, and
   // whether a cbStmt has been registered, before which none is looked up.
   VpiStmtObjects stmt_objects_;

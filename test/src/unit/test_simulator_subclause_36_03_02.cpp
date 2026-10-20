@@ -52,6 +52,7 @@ TEST_F(OverrideBuiltinSystf, UserApplicationOverridesBuiltinName) {
 
   s_vpi_systf_data data = {};
   data.type = vpiSysFunc;
+  data.sysfunctype = vpiIntFunc;
   data.tfname = VpiText("$random");
   data.calltf = user_random;
 
@@ -78,11 +79,13 @@ TEST_F(OverrideBuiltinSystf, LaterRegistrationOverridesEarlierOfSameName) {
 
   s_vpi_systf_data builtin = {};
   builtin.type = vpiSysFunc;
+  builtin.sysfunctype = vpiIntFunc;
   builtin.tfname = VpiText("$random");
   builtin.calltf = builtin_impl;
 
   s_vpi_systf_data user = {};
   user.type = vpiSysFunc;
+  user.sysfunctype = vpiIntFunc;
   user.tfname = VpiText("$random");
   user.calltf = user_impl;
 
@@ -180,6 +183,7 @@ TEST_F(OverrideBuiltinSystf,
        NonMatchingRegistrationsLeaveBuiltinNameUnclaimed) {
   s_vpi_systf_data other = {};
   other.type = vpiSysFunc;
+  other.sysfunctype = vpiIntFunc;
   other.tfname = VpiText("$my_func");
 
   ASSERT_NE(vpi_register_systf(&other), nullptr);

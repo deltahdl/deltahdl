@@ -286,13 +286,22 @@ VpiHandle VpiContext::MakeSystfCallObject(const s_vpi_systf_data& data,
   VpiObject* call = VpiCallSiteObjectFor(call_site_objects_, call_site,
                                          ctx.ActiveInstancePrefix());
   if (call == nullptr) {
-    call = AllocObject();
-    // A registration is refused without a name (RegisterSystf). A system task
-    // is called only as a statement, which its label alone names (§37.60
-    // detail 1), so only a system function's call is named after it.
-    if (data.type == vpiSysFunc) call->name = std::string_view(data.tfname);
-    // §37.3.3: the call stands for the text its call site was written as.
-    VpiRecordWrittenLocation(call, call_site->range.start, ctx);
+    // §38.14 with §38.33: such a call is still one call instance from one
+    // invocation to the next, the call site in the instance running it, and
+    // keeps the user data an application associated with it.
+    std::string instance = ctx.ActiveInstancePrefix();
+    if (!instance.empty()) instance.pop_back();
+    VpiObject*& made = invoked_call_objects_[{call_site, std::move(instance)}];
+    if (made == nullptr) {
+      made = AllocObject();
+      // A registration is refused without a name (RegisterSystf). A system
+      // task is called only as a statement, which its label alone names
+      // (§37.60 detail 1), so only a system function's call is named after it.
+      if (data.type == vpiSysFunc) made->name = std::string_view(data.tfname);
+      // §37.3.3: the call stands for the text its call site was written as.
+      VpiRecordWrittenLocation(made, call_site->range.start, ctx);
+    }
+    call = made;
   }
   call->type = (data.type == vpiSysFunc) ? vpiSysFuncCall : vpiSysTaskCall;
   // §37.42 with §38.37.1: a system function call's vpiFuncType is the kind of
@@ -326,6 +335,12 @@ VpiHandle VpiContext::MakeSystfCallObject(const s_vpi_systf_data& data,
   auto width = static_cast<uint32_t>(
       result_bits > 0 ? result_bits : kVpiDefaultSizedFuncBits);
   value_holder->value = MakeLogic4VecVal(arena, width, 0);
+  // §38.34 with Annex K.2: a vpiRealFunc returns a real, which the calltf
+  // puts as one and the call reads back as one.
+  if (data.type == vpiSysFunc && data.sysfunctype == vpiRealFunc) {
+    value_holder->is_real = true;
+    value_holder->value.is_real = true;
+  }
   call->var = value_holder;
   call->size = static_cast<int>(width);
 

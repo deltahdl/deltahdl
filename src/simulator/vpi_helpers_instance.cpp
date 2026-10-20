@@ -4,7 +4,6 @@
 #include <cstdarg>
 #include <cstddef>
 #include <cstdint>
-#include <cstdio>
 #include <deque>
 #include <functional>
 #include <span>
@@ -21,6 +20,7 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_specify.h"
 #include "simulator/evaluation.h"
+#include "simulator/instance_prefix_override.h"
 #include "simulator/sim_context.h"
 #include "simulator/specify.h"
 #include "simulator/specify_path_delay.h"
@@ -49,9 +49,6 @@ VpiContext::~VpiContext() {
   for (auto* obj : all_objects_) {
     delete obj;
   }
-  // §38.27: a file vpi_mcd_open opened and nothing closed is closed with the
-  // tool, its text written out.
-  for (auto& entry : channels_.mcd_files) std::fclose(entry.second);
 }
 
 VpiHandle VpiContext::AllocObject() {
@@ -387,7 +384,7 @@ void VpiFillUdpTableEntryObject(VpiObject* obj, const UdpTableRow& row,
   obj->size = static_cast<int>(row.inputs.size()) +
               (row.current_state != 0 ? 1 : 0) + 1;
   // §37.36 detail 1: the row's text, which a string value reads as it is and
-  // a vector value as the ASCII codes of its characters.
+  // a vector value as its symbols, two bytes each (§38.15).
   auto* text = arena.Create<Variable>();
   text->value = StringToLogic4Vec(arena, DecompiledUdpRow(row));
   obj->var = text;
@@ -579,6 +576,8 @@ void VpiContext::AttachModulePathDelays(SimContext& sim_ctx) {
     auto* obj = AllocObject();
     obj->type = vpiModPath;
     obj->parent = module;
+    run_entry_index_[obj] =
+        static_cast<std::size_t>(&path - specify->GetPathDelays().data());
     module->children.push_back(obj);  // §37.3.4: the delays the path
                                       // declaration wrote, as vpiDelay reaches
     // them.
@@ -592,12 +591,20 @@ void VpiContext::AttachModulePathDelays(SimContext& sim_ctx) {
     // module path is the order of its transition slots, and the
     // pulse limits §30.7 gives each of them travel with each delay.
     obj->delays.reserve(path.delay_count);
+    // §38.10 with §11.11: a delay the path declaration wrote min:typ:max
+    // reads back its three values under mtm_flag.
+    const bool kWritten = path.source_delays.size() == path.delay_count;
+    InstancePrefixOverride in_instance(sim_ctx.InstancePrefixOverride(),
+                                       path.inst_prefix);
     for (uint8_t i = 0; i < path.delay_count; ++i) {
       VpiDelayInfo info;
+      if (kWritten && path.source_delays[i] != nullptr) {
+        info = VpiWrittenDelay(path.source_delays[i], sim_ctx);
+      } else {
+        info.min_delay = info.typ_delay = info.max_delay =
+            static_cast<double>(path.delays[i]);
+      }
       info.delay = static_cast<double>(path.delays[i]);
-      info.min_delay = info.delay;
-      info.typ_delay = info.delay;
-      info.max_delay = info.delay;
       info.reject = static_cast<double>(path.reject_limit[i]);
       info.min_reject = info.reject;
       info.typ_reject = info.reject;
@@ -805,6 +812,8 @@ void VpiContext::AttachTimingChecks(SimContext& sim_ctx) {
     obj->type = vpiTchk;
     obj->tchk_type = VpiTchkTypeOf(check.kind);
     obj->parent = module;
+    run_entry_index_[obj] =
+        static_cast<std::size_t>(&check - specify->GetTimingChecks().data());
     module->children.push_back(
         obj);  // §37.3.4: the limits the check wrote, as vpiDelay reaches them.
     obj->delay_expr =
@@ -846,6 +855,24 @@ void VpiContext::AttachTimingChecks(SimContext& sim_ctx) {
         obj, *check.decl,
         ExpressionsIn(check.inst_prefix, object_map_, sim_ctx, kBuild),
         sim_ctx.GetArena());
+  }
+}
+
+void VpiContext::NoteTimingViolation(const TimingCheckEntry& check) {
+  if (sim_ctx_ == nullptr || !HasCallbackFor(callbacks_, cbTchkViolation)) {
+    return;
+  }
+  const SpecifyManager* specify = sim_ctx_->GetSpecifyManager();
+  if (specify == nullptr) return;
+  // §38.36.3: the routine's obj is the timing check violated, the vpiTchk
+  // AttachTimingChecks made for the run's entry.
+  const auto kIndex =
+      static_cast<std::size_t>(&check - specify->GetTimingChecks().data());
+  for (const auto& [obj, index] : run_entry_index_) {
+    if (obj->type == vpiTchk && index == kIndex) {
+      DispatchCallbacks(cbTchkViolation, const_cast<VpiObject*>(obj));
+      return;
+    }
   }
 }
 

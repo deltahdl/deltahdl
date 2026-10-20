@@ -14,6 +14,7 @@
 #include "simulator/vpi_collection_elements.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_internal.h"
+#include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -292,12 +293,20 @@ void VpiSchedulePut(VpiObject& obj, const s_vpi_value& value, int mode,
   scheduler.ScheduleEvent(SimTime{kAt}, Region::kActive, queued);
 }
 
+int VpiObjectTimeUnit(const VpiObject& obj, int sim_unit) {
+  for (const VpiObject* at = &obj; at != nullptr; at = at->parent) {
+    if (VpiIsInstanceType(at->type)) return at->time_unit;
+  }
+  return sim_unit;
+}
+
 uint64_t VpiPutDelayTicks(const VpiObject& obj, const s_vpi_time& time,
                           int sim_unit) {
   if (time.type != kVpiScaledRealTime) {
     return (uint64_t{time.high} << 32) | time.low;
   }
-  const double kScale = std::pow(10.0, obj.time_unit - sim_unit);
+  const double kScale =
+      std::pow(10.0, VpiObjectTimeUnit(obj, sim_unit) - sim_unit);
   return static_cast<uint64_t>(std::llround(time.real * kScale));
 }
 

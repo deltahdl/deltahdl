@@ -178,7 +178,7 @@ void EvaluatePulseWindow(const PulseWindow& window, uint64_t timecheck_ticks,
                       : PeriodViolated(check, elapsed);
   if (!violated) return;
   ReportPulseViolation(check, window.signal, elapsed, ctx);
-  ToggleNotifier(check, ctx);
+  NoteViolation(check, ctx);
 }
 
 // Arms the two watchers a §31.4.4 check needs on the one signal it names: the
@@ -326,7 +326,7 @@ void ReportNochangeViolation(const NochangeWindow& window, SimContext& ctx) {
                   "the window bounded by reference signal {}",
                   window.data_signal, window.ref_signal),
       "31.4.6", check.loc, ctx);
-  ToggleNotifier(check, ctx);
+  NoteViolation(check, ctx);
 }
 
 // A data transition of a §31.4.6 check at `data_ticks`, both reference edges of

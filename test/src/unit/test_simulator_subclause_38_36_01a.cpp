@@ -1,14 +1,11 @@
 #include <gtest/gtest.h>
 
-#include <cstdint>
-#include <functional>
-#include <string>
 #include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
-#include "fixture_vpi_run.h"
+#include "helpers_event_callbacks.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
@@ -429,76 +426,6 @@ TEST_F(VpiSimEventCbDelivery, ValueChangeOnOrdinaryVariableKeepsValue) {
   EXPECT_NE(g_delivered_value, &requested);
 }
 
-// One delivery of a simulation-event callback as its routine saw it: the
-// reason, the name of the object in its obj field, the value and the time it
-// was given, and its index.
-struct EventDelivery {
-  int reason = 0;
-  std::string obj;
-  int value = 0;
-  uint32_t time = 0;
-  int index = 0;
-  bool operator==(const EventDelivery&) const = default;
-};
-
-std::vector<EventDelivery>& EventDeliveries() {
-  static std::vector<EventDelivery> deliveries;
-  return deliveries;
-}
-
-// What `$arm` does when the design calls it.
-std::function<void()>& Armer() {
-  static std::function<void()> armer;
-  return armer;
-}
-
-PLI_INT32 RecordEventDelivery(p_cb_data cb) {
-  EventDelivery d;
-  d.reason = cb->reason;
-  const char* name =
-      cb->obj != nullptr ? vpi_get_str(vpiName, cb->obj) : nullptr;
-  d.obj = name == nullptr ? "" : name;
-  d.value = cb->value != nullptr ? cb->value->value.integer : 0;
-  d.time = cb->time != nullptr ? cb->time->low : 0;
-  d.index = cb->index;
-  EventDeliveries().push_back(d);
-  return 0;
-}
-
-// Places a `reason` callback on `obj`, asking for the time as vpiSimTime
-// and the value as vpiIntVal.
-vpiHandle PlaceEventCallback(int reason, vpiHandle obj) {
-  static s_vpi_time time;
-  static s_vpi_value value;
-  time.type = vpiSimTime;
-  value.format = vpiIntVal;
-  s_cb_data data = {};
-  data.reason = reason;
-  data.cb_rtn = &RecordEventDelivery;
-  data.obj = obj;
-  data.time = &time;
-  data.value = &value;
-  return vpi_register_cb(&data);
-}
-
-// A run whose design calls `$arm`, which places the case's callbacks once
-// the model exists, its deliveries recorded.
-class EventCallbacksOfARun : public VpiDesignRun {
- protected:
-  void SetUp() override {
-    VpiDesignRun::SetUp();
-    EventDeliveries().clear();
-    s_vpi_systf_data data = {};
-    data.type = vpiSysTask;
-    data.tfname = VpiText("$arm");
-    data.calltf = [](PLI_BYTE8*) -> PLI_INT32 {
-      Armer()();
-      return 0;
-    };
-    ASSERT_NE(vpi_register_systf(&data), nullptr);
-  }
-};
-
 constexpr const char* kValueChanges =
     "module top; timeunit 1ns; timeprecision 1ns; int x; int arr[4];\n"
     "  initial begin\n"
@@ -544,19 +471,6 @@ TEST_F(EventCallbacksOfARun, AValueChangeCallbackIsGivenTheTimeValueAndIndex) {
   EXPECT_EQ(EventDeliveries()[1].index, 2);
   EXPECT_EQ(EventDeliveries()[2].value, 6);
   EXPECT_EQ(EventDeliveries()[2].time, 4u);
-}
-
-// The deliveries recorded for `reason`, in order.
-std::vector<EventDelivery> DeliveriesOf(int reason) {
-  std::vector<EventDelivery> of;
-  for (const EventDelivery& d : EventDeliveries()) {
-    if (d.reason == reason) of.push_back(d);
-  }
-  return of;
-}
-
-vpiHandle TopObject(const char* name) {
-  return vpi_handle_by_name(VpiText(name), nullptr);
 }
 
 // §38.36.1 with §37.17 detail 14: a cbSizeChange routine is called after a

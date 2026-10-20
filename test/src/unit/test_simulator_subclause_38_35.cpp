@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "fixture_vpi_run.h"
 #include "helpers_vpi_value_array.h"
 #include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
@@ -585,6 +586,57 @@ TEST_F(VpiPutValueArraySim, AnArrayOfStringsIsRefused) {
   s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
   EXPECT_EQ(elems_[1]->value.words[0].bval, 0xFFu);  // still x
+}
+
+class ElementPutsOfARun : public VpiDesignRun {
+ protected:
+  // Puts `first` and `second` into the elements of `name` from index 0, in
+  // `format`, through the arm `arm` names in the value union.
+  template <typename T>
+  static void PutTwo(const char* name, int format,
+                     T* decltype(s_vpi_arrayvalue::value)::* arm, T first,
+                     T second) {
+    T values[2] = {first, second};
+    PLI_INT32 index = 0;
+    s_vpi_arrayvalue av = {};
+    av.format = format;
+    av.value.*arm = values;
+    vpi_put_value_array(By(name), &av, &index, 2);
+  }
+
+  // The element `index` of `name` read in `format`.
+  static s_vpi_value Element(const char* name, int index, int format) {
+    s_vpi_value value = {};
+    value.format = format;
+    vpi_get_value(vpi_handle_by_index(By(name), index), &value);
+    return value;
+  }
+};
+
+// §38.35: a real or shortreal element put in vpiRealVal or vpiShortRealVal
+// holds the floating-point value put (#7476).
+TEST_F(ElementPutsOfARun, ARealElementHoldsTheValuePut) {
+  Run("module top; real r[2]; shortreal s[2]; initial $noop; endmodule\n");
+  using Arms = decltype(s_vpi_arrayvalue::value);
+  PutTwo("top.r", vpiRealVal, &Arms::reals, 1.0, 2.5);
+  PutTwo("top.s", vpiShortRealVal, &Arms::shortreals, 1.0f, 2.5f);
+  for (const char* name : {"top.r", "top.s"}) {
+    EXPECT_DOUBLE_EQ(Element(name, 0, vpiRealVal).value.real, 1.0) << name;
+    EXPECT_DOUBLE_EQ(Element(name, 1, vpiRealVal).value.real, 2.5) << name;
+  }
+}
+
+// §38.35: a negative short or int put into a wider element keeps its sign
+// (#7477).
+TEST_F(ElementPutsOfARun, ANegativeValueKeepsItsSignInAWiderElement) {
+  Run("module top; int i[2]; longint l[2]; initial $noop; endmodule\n");
+  using Arms = decltype(s_vpi_arrayvalue::value);
+  PutTwo<PLI_INT16>("top.i", vpiShortIntVal, &Arms::shortints, -1, -2);
+  PutTwo<PLI_INT32>("top.l", vpiIntVal, &Arms::integers, -1, -2);
+  EXPECT_EQ(Element("top.i", 0, vpiIntVal).value.integer, -1);
+  EXPECT_EQ(Element("top.i", 1, vpiIntVal).value.integer, -2);
+  EXPECT_STREQ(Element("top.l", 0, vpiDecStrVal).value.str, "-1");
+  EXPECT_STREQ(Element("top.l", 1, vpiDecStrVal).value.str, "-2");
 }
 
 }  // namespace

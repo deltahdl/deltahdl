@@ -64,6 +64,7 @@ PLI_INT32 OtherCalltf(PLI_BYTE8*) {
 void RegisterProbe() {
   s_vpi_systf_data data = {};
   data.type = vpiSysFunc;
+  data.sysfunctype = vpiIntFunc;
   data.tfname = VpiText("$probe");
   data.compiletf = &ProbeCompiletf;
   data.calltf = &ProbeCalltf;
@@ -76,6 +77,7 @@ void RegisterProbe() {
 void RegisterOther() {
   s_vpi_systf_data data = {};
   data.type = vpiSysFunc;
+  data.sysfunctype = vpiIntFunc;
   data.tfname = VpiText("$other");
   data.compiletf = &OtherCompiletf;
   data.calltf = &OtherCalltf;

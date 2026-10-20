@@ -8,6 +8,7 @@
 // on them are SimContext's own, in src/simulator/sim_context_fileio.cpp.
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <memory>
@@ -22,6 +23,20 @@
 namespace delta {
 
 struct SimFileTables {
+  SimFileTables() = default;
+  SimFileTables(const SimFileTables&) = delete;
+  SimFileTables& operator=(const SimFileTables&) = delete;
+  // A file the design or an application opened and nothing closed is closed
+  // with the run, its text written out; the standard streams are left open.
+  ~SimFileTables() {
+    for (auto& [descriptor, file] : descriptors) {
+      if (file != stdin && file != stdout && file != stderr) std::fclose(file);
+    }
+    for (std::size_t bit = 1; bit < mcd_channels.size(); ++bit) {
+      if (mcd_channels[bit] != nullptr) std::fclose(mcd_channels[bit]);
+    }
+  }
+
   std::unordered_map<uint32_t, FILE*> descriptors;
   // §21.3.4: descriptors whose open type permits reading ("r"/"r+" families).
   std::unordered_set<uint32_t> readable;
@@ -34,6 +49,9 @@ struct SimFileTables {
   std::vector<std::unique_ptr<FileMonitor>> monitors;
   // Bit i in mcd_channels[i] tracks the file opened on channel i (1..30).
   std::array<FILE*, 31> mcd_channels = {};
+  // §38.26: the name each open file was opened under, keyed by its fd, or by
+  // the one channel bit of its multichannel descriptor.
+  std::unordered_map<uint32_t, std::string> names;
   bool stdio_ready = false;
 };
 

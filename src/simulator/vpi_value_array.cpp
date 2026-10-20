@@ -3,9 +3,11 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <vector>
 
 #include "common/types.h"
+#include "simulator/evaluation.h"
 #include "simulator/net.h"
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_user.h"
@@ -17,6 +19,7 @@
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_value_numbers.h"
 
 namespace delta {
 
@@ -93,6 +96,8 @@ void SetPiece(Logic4Word* words, bool bval, uint32_t piece, uint32_t bits,
 struct ElementWords {
   const Logic4Word* words = nullptr;
   bool is_4state = false;
+  // The variable holding the element, null for a position reading as zero.
+  const Variable* var = nullptr;
 };
 
 // §38.2: record a VPI error into err and return false, so a validation step can
@@ -176,27 +181,48 @@ bool ValidatePutValueArrayRequest(VpiHandle obj, s_vpi_arrayvalue* arrayvalue_p,
   return true;
 }
 
+// §38.35: the IEEE-754 bits of `value` a real element of `width` bits holds,
+// single precision for a shortreal (§6.12), the inverse of RealVecToDouble.
+uint64_t RealElementBits(double value, uint32_t width) {
+  if (width == 32) {
+    const auto kSingle = static_cast<float>(value);
+    uint32_t bits = 0;
+    std::memcpy(&bits, &kSingle, sizeof(bits));
+    return bits;
+  }
+  uint64_t bits = 0;
+  std::memcpy(&bits, &value, sizeof(bits));
+  return bits;
+}
+
 // §38.35: decode one supplied source value from a scalar arm (the integer,
-// short-int, long-int, real, or short-real format) into a 64-bit aval. Each
-// scalar arm holds one C value per source position; the value is widened (and,
-// for the signed/narrow integer arms, sign- or zero-handled by the same casts
-// the standard's per-format descriptions imply) into the element's low word.
+// short-int, long-int, real, or short-real format) into a 64-bit aval for the
+// element `var`. An integer is sign-extended, so the element's own width keeps
+// a negative value negative; a real fills a real element with its IEEE-754
+// bits and any other with its value converted to an integer.
 uint64_t DecodePutScalarAval(const s_vpi_arrayvalue* arrayvalue_p,
-                             unsigned int src, int fmt) {
+                             unsigned int src, int fmt, const Variable& var) {
+  double real = 0.0;
   switch (fmt) {
     case kVpiShortIntVal:
       return static_cast<uint64_t>(
-          static_cast<uint16_t>(arrayvalue_p->value.shortints[src]));
+          static_cast<int64_t>(arrayvalue_p->value.shortints[src]));
     case kVpiLongIntVal:
       return static_cast<uint64_t>(arrayvalue_p->value.longints[src]);
     case kVpiRealVal:
-      return static_cast<uint64_t>(arrayvalue_p->value.reals[src]);
+      real = arrayvalue_p->value.reals[src];
+      break;
     case kVpiShortRealVal:
-      return static_cast<uint64_t>(arrayvalue_p->value.shortreals[src]);
+      real = arrayvalue_p->value.shortreals[src];
+      break;
     default:  // kVpiIntVal, the one scalar format left
       return static_cast<uint64_t>(
-          static_cast<uint32_t>(arrayvalue_p->value.integers[src]));
+          static_cast<int64_t>(arrayvalue_p->value.integers[src]));
   }
+  if (var.is_real || var.value.is_real) {
+    return RealElementBits(real, var.value.width);
+  }
+  return static_cast<uint64_t>(static_cast<int64_t>(real));
 }
 
 // §38.35: decode one supplied source value from the vpiTimeVal arm into a
@@ -250,7 +276,9 @@ void DecodePutRaw(const s_vpi_arrayvalue* arrayvalue_p, unsigned int src,
 // The byte and word group layouts follow the standard's per-format
 // descriptions; a time or scalar value fills the low word.
 void DecodePutSourceValue(const s_vpi_arrayvalue* arrayvalue_p,
-                          unsigned int src, Logic4Vec& ev, bool is_4state) {
+                          unsigned int src, Variable& var) {
+  Logic4Vec& ev = var.value;
+  const bool is_4state = var.is_4state;
   int fmt = static_cast<int>(arrayvalue_p->format);
   switch (fmt) {
     case kVpiTimeVal:
@@ -266,7 +294,7 @@ void DecodePutSourceValue(const s_vpi_arrayvalue* arrayvalue_p,
     default:
       // The scalar formats, the rest of what VpiArrayPutFormatSupported
       // admitted before any value is decoded.
-      ev.words[0].aval = DecodePutScalarAval(arrayvalue_p, src, fmt);
+      ev.words[0].aval = DecodePutScalarAval(arrayvalue_p, src, fmt, var);
       break;
   }
 }
@@ -338,7 +366,7 @@ Variable* PutValueArrayElement(VpiObject* element,
 
   Logic4Vec& ev = element->var->value;
   for (uint32_t i = 0; i < ev.nwords; ++i) ev.words[i] = Logic4Word{};
-  DecodePutSourceValue(arrayvalue_p, src, ev, element->var->is_4state);
+  DecodePutSourceValue(arrayvalue_p, src, *element->var);
   const uint32_t kTopBits = ev.width % 64;
   if (kTopBits != 0) {
     const uint64_t kMask = (uint64_t{1} << kTopBits) - 1;
@@ -498,24 +526,40 @@ size_t ComputeGetValueArrayBytes(int fmt, int ngroups, int words_per_elem,
 
 // §38.16: encode one element's value into position k of a scalar arm (the
 // integer, short-int, long-int, real, or short-real format), widening or
-// narrowing the element's aval into the arm's C scalar type.
+// narrowing the element's value into the arm's C scalar type.
 void EncodeGetScalarValue(s_vpi_arrayvalue* arrayvalue_p, unsigned int k,
-                          int fmt, uint64_t aval) {
+                          int fmt, const ElementWords& value) {
+  // §38.16 by way of §38.15 Table 38-3: an integer arm takes the element's
+  // integer value, its x and z bits read as 0 and a signed element's sign kept;
+  // a real arm its value as a real, a real element's the one its bits encode.
+  int64_t integer = 0;
+  double real = 0.0;
+  if (value.var != nullptr) {
+    Logic4Vec element = value.var->value;
+    element.is_signed = element.is_signed || value.var->is_signed;
+    integer = VpiKnownIntegerValue(element);
+    if (element.is_real || value.var->is_real) {
+      real = RealVecToDouble(element);
+    } else {
+      real = element.is_signed ? static_cast<double>(integer)
+                               : static_cast<double>(element.ToUint64());
+    }
+  }
   switch (fmt) {
     case kVpiShortIntVal:
-      arrayvalue_p->value.shortints[k] = static_cast<int16_t>(aval);
+      arrayvalue_p->value.shortints[k] = static_cast<int16_t>(integer);
       break;
     case kVpiLongIntVal:
-      arrayvalue_p->value.longints[k] = static_cast<int64_t>(aval);
+      arrayvalue_p->value.longints[k] = integer;
       break;
     case kVpiRealVal:
-      arrayvalue_p->value.reals[k] = static_cast<double>(aval);
+      arrayvalue_p->value.reals[k] = real;
       break;
     case kVpiShortRealVal:
-      arrayvalue_p->value.shortreals[k] = static_cast<float>(aval);
+      arrayvalue_p->value.shortreals[k] = static_cast<float>(real);
       break;
     default:  // kVpiIntVal, the one scalar format left
-      arrayvalue_p->value.integers[k] = static_cast<int32_t>(aval);
+      arrayvalue_p->value.integers[k] = static_cast<int32_t>(integer);
       break;
   }
 }
@@ -589,7 +633,7 @@ void EncodeGetElementValue(s_vpi_arrayvalue* arrayvalue_p, unsigned int k,
     default:
       // The scalar formats, the rest of what VpiArrayPutFormatSupported
       // admitted before any value is read.
-      EncodeGetScalarValue(arrayvalue_p, k, fmt, value.words[0].aval);
+      EncodeGetScalarValue(arrayvalue_p, k, fmt, value);
       break;
   }
 }
@@ -718,7 +762,8 @@ void VpiContext::GetValueArray(VpiHandle obj, s_vpi_arrayvalue* arrayvalue_p,
     const VpiObject* element = section[k];
     ElementWords value{kZeros.data(), false};
     if (element != nullptr && element->var != nullptr) {
-      value = {element->var->value.words, element->var->is_4state};
+      value = {element->var->value.words, element->var->is_4state,
+               element->var};
     }
     EncodeGetElementValue(arrayvalue_p, k, width, value);
   }

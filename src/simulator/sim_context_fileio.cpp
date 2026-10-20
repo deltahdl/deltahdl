@@ -361,6 +361,7 @@ uint32_t SimContext::OpenFile(std::string_view filename,
   while (files_.descriptors.count(kFdMsb | slot) != 0) ++slot;
   uint32_t fd = kFdMsb | slot;
   files_.descriptors[fd] = fp;
+  files_.names[fd] = fname;
   // §21.3.4: only the "r"/"r+" type families authorize reading. Every such
   // type string begins with 'r', so track readability by that leading letter.
   if (!fmode.empty() && fmode.front() == 'r') files_.readable.insert(fd);
@@ -380,6 +381,7 @@ uint32_t SimContext::OpenMcd(std::string_view filename) {
         return 0;
       }
       files_.mcd_channels[bit] = fp;
+      files_.names[uint32_t{1} << bit] = fname;
       return uint32_t{1} << bit;
     }
   }
@@ -422,6 +424,7 @@ void SimContext::CloseFile(uint32_t descriptor) {
     files_.errors.erase(descriptor);
     files_.eof_detected.erase(descriptor);
     files_.pushback.erase(descriptor);
+    files_.names.erase(descriptor);
     return;
   }
   // Multichannel descriptor: every bit set selects a channel to close.
@@ -430,6 +433,7 @@ void SimContext::CloseFile(uint32_t descriptor) {
     if (files_.mcd_channels[bit] == nullptr) continue;
     std::fclose(files_.mcd_channels[bit]);
     files_.mcd_channels[bit] = nullptr;
+    files_.names.erase(uint32_t{1} << bit);
   }
 }
 

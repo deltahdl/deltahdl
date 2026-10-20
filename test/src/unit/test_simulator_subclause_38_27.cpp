@@ -11,6 +11,7 @@
 #include "elaborator/rtlir.h"
 #include "fixture_simulator.h"
 #include "fixture_vpi_run.h"
+#include "helpers_run_files.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/vpi_context.h"
@@ -226,6 +227,48 @@ TEST(McdFilesOfAContext, AFileLeftOpenIsClosedWithTheTool) {
   text << file.rdbuf();
   EXPECT_EQ(text.str(), "left open\n");
   std::remove(McdFilePath().c_str());
+}
+
+// What vpi_mcd_open returned for the file the design's $fopen had opened and
+// for one it had not.
+PLI_UINT32 reopened = 0;
+PLI_UINT32 fresh = 0;
+
+class ChannelsSharedWithFopen : public RunFilesRun {
+ protected:
+  // Opens the design's file again and another, prints to the design's mcd and
+  // hands the other's mcd to the design in `top.from_vpi`.
+  static PLI_INT32 OpenAlongside(PLI_BYTE8* /*user_data*/) {
+    reopened = vpi_mcd_open(VpiText("design.txt"));
+    fresh = vpi_mcd_open(VpiText("application.txt"));
+    vpi_mcd_printf(DescriptorIn("top.mcd"), VpiText("from vpi\n"));
+    s_vpi_value value = {};
+    value.format = vpiIntVal;
+    value.value.integer = static_cast<PLI_INT32>(fresh);
+    vpi_put_value(vpi_handle_by_name(VpiText("top.from_vpi"), nullptr), &value,
+                  nullptr, vpiNoDelay);
+    return 0;
+  }
+};
+
+// §38.27 with §21.3.1: vpi_mcd_open and $fopen share one set of channels, so a
+// file the design opened is handed back on its channel, another file gets a
+// channel of its own, and each side writes through the other's mcd (#7467).
+TEST_F(ChannelsSharedWithFopen, EachSideWritesThroughTheOthersMcd) {
+  RegisterTask("$open_alongside", &OpenAlongside);
+  Run("module top; integer mcd, from_vpi;\n"
+      "  initial begin\n"
+      "    mcd = $fopen(\"design.txt\");\n"
+      "    $open_alongside;\n"
+      "    $fdisplay(from_vpi, \"from the design\");\n"
+      "    $fclose(mcd | from_vpi);\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_EQ(reopened, DescriptorIn("top.mcd"));
+  EXPECT_NE(fresh, 0u);
+  EXPECT_NE(fresh, reopened);
+  EXPECT_EQ(FileText("design.txt"), "from vpi\n");
+  EXPECT_EQ(FileText("application.txt"), "from the design\n");
 }
 
 }  // namespace

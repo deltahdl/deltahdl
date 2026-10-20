@@ -95,6 +95,20 @@ TEST_F(VpiSimControlSim, ControlResetWithZeroArgumentsStillRequestsReset) {
 // §38.4: an operation vpi_control() does not recognize fails (returns 0) and
 // must do nothing else — no stop, finish, or reset is requested and the
 // interactive scope is left as it was.
+// §38.4: vpiSetInteractiveScope takes a handle of an object of the vpiScope
+// class (§37.12). A null handle, or one naming a net, names no scope to change
+// to, so the call fails and the scope stays where it was (#7454).
+TEST_F(VpiSimControlSim, ControlSetInteractiveScopeRefusesWhatIsNoScope) {
+  VpiHandle top = vpi_ctx_.CreateModule("top", "top");
+  ASSERT_EQ(vpi_control(vpiSetInteractiveScope, top), 1);
+  VpiObject net;
+  net.type = vpiNet;
+  EXPECT_EQ(
+      vpi_control(vpiSetInteractiveScope, static_cast<vpiHandle>(nullptr)), 0);
+  EXPECT_EQ(vpi_control(vpiSetInteractiveScope, VpiHandleOf(&net)), 0);
+  EXPECT_EQ(vpi_ctx_.InteractiveScope(), top);
+}
+
 TEST_F(VpiSimControlSim, ControlUnknownOpIsInert) {
   int result = vpi_control(12345, 0);
   EXPECT_EQ(result, 0);
@@ -146,6 +160,65 @@ TEST_F(FinishOfARun, AFinishFromACalltfEndsTheRun) {
 // ending there (#5134).
 TEST_F(FinishOfARun, AStopFromACalltfStopsTheRun) {
   EXPECT_EQ(AfterOnceProbedBy(&StopCalltf), 0);
+}
+
+// The run a calltf below looks at while it runs, and what it saw there.
+SimContext* looked_at_run = nullptr;
+bool finish_seen_in_routine = true;
+int reset_callbacks = 0;
+int reset_callbacks_in_routine = -1;
+
+PLI_INT32 FinishThenLookCalltf(PLI_BYTE8* /*user_data*/) {
+  vpi_control(vpiFinish, 0);
+  finish_seen_in_routine = looked_at_run->FinishRequested();
+  return 0;
+}
+
+PLI_INT32 CountResetCallback(p_cb_data /*data*/) {
+  ++reset_callbacks;
+  return 0;
+}
+
+PLI_INT32 ResetThenLookCalltf(PLI_BYTE8* /*user_data*/) {
+  vpi_control(vpiReset, 0, 0, 0);
+  reset_callbacks_in_routine = reset_callbacks;
+  return 0;
+}
+
+// §38.4: vpiFinish has $finish execute on return of the application routine,
+// not during the call: the routine goes on running with the run not yet
+// finishing (#7452).
+TEST_F(FinishOfARun, AFinishActsOnceTheRoutineReturns) {
+  looked_at_run = &f_.ctx;
+  EXPECT_EQ(AfterOnceProbedBy(&FinishThenLookCalltf), 0);
+  EXPECT_FALSE(finish_seen_in_routine);
+  EXPECT_TRUE(f_.ctx.FinishRequested());
+}
+
+// §38.4 with §38.36.3: vpiReset has $reset execute on return of the
+// application routine, so its reset callbacks are called after the routine
+// that requested it has returned (#7452).
+TEST_F(FinishOfARun, AResetCallsItsCallbacksOnceTheRoutineReturns) {
+  reset_callbacks = 0;
+  s_cb_data cb = {};
+  cb.reason = cbEndOfReset;
+  cb.cb_rtn = &CountResetCallback;
+  ASSERT_NE(vpi_register_cb(&cb), nullptr);
+  AfterOnceProbedBy(&ResetThenLookCalltf);
+  EXPECT_EQ(reset_callbacks_in_routine, 0);
+  EXPECT_EQ(reset_callbacks, 1);
+}
+
+// §38.4: vpiSetInteractiveScope changes the interactive scope the tool's
+// interactive tasks, $showscopes and $showvars among them, name objects from
+// -- the one $scope sets (D.11) (#7453).
+TEST_F(FinishOfARun, SetInteractiveScopeChangesTheRunsScope) {
+  Run("module sub; endmodule\n"
+      "module top; sub u(); initial $noop; endmodule\n");
+  vpiHandle u = By("top.u");
+  ASSERT_NE(u, nullptr);
+  EXPECT_EQ(vpi_control(vpiSetInteractiveScope, u), 1);
+  EXPECT_EQ(f_.ctx.InteractiveScope(), "top.u");
 }
 
 }  // namespace

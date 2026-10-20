@@ -5,6 +5,7 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "helpers_run_files.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/vpi_context.h"
@@ -110,6 +111,38 @@ TEST_F(VpiMcdNameSim, AMultiChannelDescriptorNamesNoOneFile) {
   ASSERT_STREQ(vpi_mcd_name(mcd_second), "second.log");
 
   EXPECT_EQ(vpi_mcd_name(mcd_first | mcd_second), nullptr);
+}
+
+// The names vpi_mcd_name gave the fd and the mcd the design's $fopen opened.
+std::string fd_name;
+std::string mcd_name;
+
+class NameOfAFopenedFile : public RunFilesRun {
+ protected:
+  static std::string NameOf(PLI_UINT32 cd) {
+    const char* name = vpi_mcd_name(cd);
+    return name == nullptr ? "" : name;
+  }
+  static PLI_INT32 NameBoth(PLI_BYTE8* /*user_data*/) {
+    fd_name = NameOf(DescriptorIn("top.fd"));
+    mcd_name = NameOf(DescriptorIn("top.mcd"));
+    return 0;
+  }
+};
+
+// §38.26 with §21.3.1: vpi_mcd_name names the file of an fd or an mcd the
+// design's $fopen returned (#7466).
+TEST_F(NameOfAFopenedFile, BothFormsAreNamed) {
+  RegisterTask("$name_both", &NameBoth);
+  Run("module top; integer fd, mcd;\n"
+      "  initial begin\n"
+      "    fd = $fopen(\"named_fd.txt\", \"w\");\n"
+      "    mcd = $fopen(\"named_mcd.txt\");\n"
+      "    $name_both;\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_EQ(fd_name, "named_fd.txt");
+  EXPECT_EQ(mcd_name, "named_mcd.txt");
 }
 
 }  // namespace

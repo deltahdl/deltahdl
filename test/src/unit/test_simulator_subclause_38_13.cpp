@@ -276,5 +276,84 @@ TEST_F(TimesOfARun, AnObjectReadsTheRunsTimeInItsOwnUnit) {
   EXPECT_DOUBLE_EQ(ProbedTimesOfTheCall().sub_scaled, 7000.0);
 }
 
+// What the `$scaled` calltf below read and the callback it placed saw.
+double scaled_net_time = 0.0;
+double callback_scaled_time = 0.0;
+
+vpiHandle TopS() { return vpi_handle_by_name(VpiText("top.s"), nullptr); }
+
+double ScaledTimeOfTopS() {
+  s_vpi_time time = {};
+  time.type = vpiScaledRealTime;
+  vpi_get_time(TopS(), &time);
+  return time.real;
+}
+
+PLI_INT32 AfterDelayCallback(p_cb_data /*data*/) {
+  callback_scaled_time = ScaledTimeOfTopS();
+  return 0;
+}
+
+PLI_INT32 ScaledCalltf(PLI_BYTE8* /*user_data*/) {
+  scaled_net_time = ScaledTimeOfTopS();
+  s_vpi_value value = {};
+  value.format = vpiScalarVal;
+  value.value.scalar = vpi1;
+  s_vpi_time delay = {};
+  delay.type = vpiScaledRealTime;
+  delay.real = 2.0;
+  vpi_put_value(TopS(), &value, &delay, vpiInertialDelay);
+  s_vpi_time after = {};
+  after.type = vpiScaledRealTime;
+  after.real = 3.0;
+  s_cb_data cb = {};
+  cb.reason = cbAfterDelay;
+  cb.cb_rtn = &AfterDelayCallback;
+  cb.obj = TopS();
+  cb.time = &after;
+  vpi_register_cb(&cb);
+  return 0;
+}
+
+class ScaledTimeOfAVariable : public VpiDesignRun {
+ protected:
+  void SetUp() override {
+    VpiDesignRun::SetUp();
+    scaled_net_time = 0.0;
+    callback_scaled_time = 0.0;
+    s_vpi_systf_data data = {};
+    data.type = vpiSysTask;
+    data.tfname = VpiText("$scaled");
+    data.calltf = &ScaledCalltf;
+    ASSERT_NE(vpi_register_systf(&data), nullptr);
+    Run("module top; timeunit 1ns; timeprecision 1ps;\n"
+        "  logic s = 0; realtime changed_at = 0;\n"
+        "  always @(s) changed_at = $realtime;\n"
+        "  initial #7 $scaled;\n"
+        "endmodule\n");
+  }
+};
+
+// §38.13 with §3.14.2: a variable has the timescale of the module declaring
+// it, so its vpiScaledRealTime time is read in that module's 1ns (#7457).
+TEST_F(ScaledTimeOfAVariable, ItsTimeIsReadInItsModulesUnit) {
+  EXPECT_DOUBLE_EQ(scaled_net_time, 7.0);
+}
+
+// §38.34: a vpiScaledRealTime delay put on the variable is in its module's
+// unit, so a delay of 2.0 at 7ns changes it at 9ns.
+TEST_F(ScaledTimeOfAVariable, APutDelayIsInItsModulesUnit) {
+  s_vpi_value value = {};
+  value.format = vpiRealVal;
+  vpi_get_value(By("top.changed_at"), &value);
+  EXPECT_DOUBLE_EQ(value.value.real, 9.0);
+}
+
+// §38.36.2: a cbAfterDelay with a vpiScaledRealTime delay is scaled by its
+// obj's timescale, so 3.0 placed at 7ns fires at 10ns.
+TEST_F(ScaledTimeOfAVariable, AnAfterDelayCallbackIsInItsModulesUnit) {
+  EXPECT_DOUBLE_EQ(callback_scaled_time, 10.0);
+}
+
 }  // namespace
 }  // namespace delta

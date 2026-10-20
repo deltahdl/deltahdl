@@ -727,5 +727,132 @@ TEST_F(PortDelaysOfARun, AnIntermodulePathIntoAnInoutTakesItsPutDelays) {
   EXPECT_EQ(IntOf("top.r.fell"), 26);
 }
 
+using ScaledDelaysOfAGate = VpiDesignRun;
+
+// §38.10 and §38.32 with §38.34: a vpiScaledRealTime delay is in the timescale
+// of the object, here its module's 1ns, while the run keeps ticks of the
+// design's 1ps precision (#7472).
+TEST_F(ScaledDelaysOfAGate, ScaledDelaysAreInTheModulesUnit) {
+  Run("module top; timeunit 1ns; timeprecision 1ps;\n"
+      "  wire y; reg a;\n"
+      "  buf #5 g(y, a);\n"
+      "  initial $noop;\n"
+      "endmodule\n");
+  vpiHandle g = By("top.g");
+  ASSERT_NE(g, nullptr);
+
+  s_vpi_time read[2] = {};
+  s_vpi_delay get = {};
+  get.da = read;
+  get.no_of_delays = 2;
+  get.time_type = vpiScaledRealTime;
+  vpi_get_delays(g, &get);
+  EXPECT_DOUBLE_EQ(read[0].real, 5.0);
+
+  s_vpi_time written[2] = {};
+  written[0].real = 2.0;
+  written[1].real = 2.0;
+  s_vpi_delay put = {};
+  put.da = written;
+  put.no_of_delays = 2;
+  put.time_type = vpiScaledRealTime;
+  vpi_put_delays(g, &put);
+
+  get.time_type = vpiSimTime;
+  vpi_get_delays(g, &get);
+  EXPECT_EQ(read[0].low, 2000u);
+}
+
+class DelaysPutInARun : public PortDelaysOfARun {
+ protected:
+  // Puts `count` delays of 2 on `obj`.
+  static void PutTwos(vpiHandle obj, int count) {
+    s_vpi_time times[2] = {};
+    times[0].low = 2;
+    times[1].low = 2;
+    s_vpi_delay delay = {};
+    delay.da = times;
+    delay.no_of_delays = count;
+    delay.time_type = vpiSimTime;
+    vpi_put_delays(obj, &delay);
+  }
+
+  static PLI_INT32 PutPathDelay(PLI_BYTE8* /*user_data*/) {
+    for (vpiHandle path : ObjectsOf(vpiModPath, By("top.c"))) PutTwos(path, 1);
+    return 0;
+  }
+
+  static PLI_INT32 PutPrimitiveDelays(PLI_BYTE8* /*user_data*/) {
+    PutTwos(By("top.g"), 2);
+    PutTwos(By("top.u"), 2);
+    return 0;
+  }
+
+  static PLI_INT32 PutCheckLimit(PLI_BYTE8* /*user_data*/) {
+    for (vpiHandle check : ObjectsOf(vpiTchk, By("top.c"))) PutTwos(check, 1);
+    return 0;
+  }
+};
+
+// §38.32 with §30.4: the delay vpi_put_delays gives a module path is the one
+// its next transition takes, a rise at 10 reaching the output at 12 rather
+// than 15 (#7468).
+TEST_F(DelaysPutInARun, AModulePathTakesItsPutDelay) {
+  RegisterTask("$path_put", &PutPathDelay);
+  Run("module cell(input a, output y); timeunit 1ns; timeprecision 1ns;\n"
+      "  assign y = a;\n"
+      "  specify (a => y) = 5; endspecify\n"
+      "endmodule\n"
+      "module top; timeunit 1ns; timeprecision 1ns;\n"
+      "  logic a = 0; wire y; int rose;\n"
+      "  cell c(a, y);\n"
+      "  always @(y) if (y === 1'b1) rose = $time;\n"
+      "  initial begin #1 $path_put; #9 a = 1; #10; end\n"
+      "endmodule\n");
+  EXPECT_EQ(IntOf("top.rose"), 12);
+}
+
+// §38.32 with §28.16 and §29.8: the delays vpi_put_delays gives a gate and a
+// udp are the ones their next output transitions take (#7469).
+TEST_F(DelaysPutInARun, AGateAndAUdpTakeTheirPutDelays) {
+  RegisterTask("$prim_put", &PutPrimitiveDelays);
+  Run("primitive pass(output o, input i);\n"
+      "  table 0 : 0; 1 : 1; endtable\n"
+      "endprimitive\n"
+      "module top; timeunit 1ns; timeprecision 1ns;\n"
+      "  logic a = 0; wire y, z; int gate_rose, udp_rose;\n"
+      "  buf #5 g(y, a);\n"
+      "  pass #5 u(z, a);\n"
+      "  always @(y) if (y === 1'b1) gate_rose = $time;\n"
+      "  always @(z) if (z === 1'b1) udp_rose = $time;\n"
+      "  initial begin #1 $prim_put; #9 a = 1; #10; end\n"
+      "endmodule\n");
+  EXPECT_EQ(IntOf("top.gate_rose"), 12);
+  EXPECT_EQ(IntOf("top.udp_rose"), 12);
+}
+
+// §38.32 with §31.3.1: the limit vpi_put_delays gives a $setup is the one its
+// next checks are judged against: with 2 in place of 5, a data change 3
+// before the clock edge is no violation, and one at the edge still is
+// (#7470).
+TEST_F(DelaysPutInARun, ATimingCheckIsJudgedAgainstItsPutLimit) {
+  RegisterTask("$limit_put", &PutCheckLimit);
+  Run("module cell(input clk, d); timeunit 1ns; timeprecision 1ns;\n"
+      "  reg notifier = 0; int violations = 0;\n"
+      "  specify $setup(d, posedge clk, 5, notifier); endspecify\n"
+      "  always @(notifier) violations = violations + 1;\n"
+      "endmodule\n"
+      "module top; timeunit 1ns; timeprecision 1ns;\n"
+      "  logic clk = 0, d = 0;\n"
+      "  cell c(clk, d);\n"
+      "  initial begin\n"
+      "    #1 $limit_put;\n"
+      "    #9 d = 1; #3 clk = 1; #5 clk = 0;\n"
+      "    #5 d = 0; clk = 1; #5;\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_EQ(IntOf("top.c.violations"), 1);
+}
+
 }  // namespace
 }  // namespace delta

@@ -142,6 +142,7 @@ TEST_F(SystfApplicationRoutineArguments,
 
   s_vpi_systf_data func = {};
   func.type = kVpiSysFunc;
+  func.sysfunctype = kVpiIntFunc;
   func.calltf = &RecordingCalltf;
   func.user_data = reinterpret_cast<PLI_BYTE8*>(&payload_b);
 

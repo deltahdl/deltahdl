@@ -125,5 +125,24 @@ TEST_F(VpiRemoveCbSim, HandleIsNoLongerValidAfterRemoval) {
   EXPECT_EQ(vpi_remove_cb(h), 0);
 }
 
+// §38.39 with §38.37: a vpi_register_systf() handle is a callback object
+// vpi_register_cb() did not register, so removing it fails and leaves the
+// callbacks vpi_register_cb() registered as they were (#7488).
+TEST_F(VpiRemoveCbSim, ASystfHandleIsNotRemoved) {
+  s_cb_data cb = {};
+  cb.reason = cbValueChange;
+  cb.cb_rtn = &CountingCb;
+  ASSERT_NE(vpi_register_cb(&cb), nullptr);
+  s_vpi_systf_data task = {};
+  task.type = vpiSysTask;
+  task.tfname = VpiText("$a_task");
+  vpiHandle tf = vpi_register_systf(&task);
+  ASSERT_NE(tf, nullptr);
+
+  EXPECT_EQ(vpi_remove_cb(tf), 0);
+  EXPECT_EQ(vpi_ctx_.DispatchCallbacks(cbValueChange), 1);
+  EXPECT_EQ(g_38_39_fired, 1);
+}
+
 }  // namespace
 }  // namespace delta

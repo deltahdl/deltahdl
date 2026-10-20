@@ -693,5 +693,69 @@ TEST_F(ValueArraysOfARun, ARunsArrayOfStringsIsRefused) {
   EXPECT_TRUE(StringArrayRefused());
 }
 
+// The union of the arms a s_vpi_arrayvalue's value is held in.
+using ArrayValueArms = decltype(s_vpi_arrayvalue::value);
+
+class ElementValuesOfARun : public VpiDesignRun {
+ protected:
+  // The two elements of `name` from index 0, read in `format` into an
+  // application buffer of T, whose address `arm` names in the value union.
+  template <typename T>
+  static std::vector<T> ReadTwo(const char* name, int format,
+                                T* ArrayValueArms::* arm) {
+    T buf[2] = {};
+    PLI_INT32 index = 0;
+    s_vpi_arrayvalue av = {};
+    av.format = format;
+    av.flags = vpiUserAllocFlag;
+    av.value.*arm = buf;
+    vpi_get_value_array(By(name), &av, &index, 2);
+    return {buf[0], buf[1]};
+  }
+};
+
+// §38.16 with §38.15: a real element is read as the value its bits encode,
+// in vpiRealVal as a double and in vpiShortRealVal as a float (#7462).
+TEST_F(ElementValuesOfARun, ARealElementIsReadAsItsValue) {
+  Run("module top;\n"
+      "  real r[2] = '{1.0, 2.5};\n"
+      "  shortreal s[2] = '{1.0, 2.5};\n"
+      "  initial $noop;\n"
+      "endmodule\n");
+  EXPECT_EQ(ReadTwo("top.r", vpiRealVal, &ArrayValueArms::reals),
+            (std::vector<double>{1.0, 2.5}));
+  EXPECT_EQ(ReadTwo("top.s", vpiShortRealVal, &ArrayValueArms::shortreals),
+            (std::vector<float>{1.0f, 2.5f}));
+}
+
+// §38.16 with §38.15 Table 38-3: a signed element's negative value keeps its
+// sign in every integer format (#7463).
+TEST_F(ElementValuesOfARun, ASignedElementKeepsItsSign) {
+  Run("module top;\n"
+      "  byte b[2] = '{-1, -2};\n"
+      "  int i[2] = '{-1, -2};\n"
+      "  initial $noop;\n"
+      "endmodule\n");
+  EXPECT_EQ(ReadTwo("top.b", vpiShortIntVal, &ArrayValueArms::shortints),
+            (std::vector<PLI_INT16>{-1, -2}));
+  EXPECT_EQ(ReadTwo("top.b", vpiIntVal, &ArrayValueArms::integers),
+            (std::vector<PLI_INT32>{-1, -2}));
+  EXPECT_EQ(ReadTwo("top.b", vpiLongIntVal, &ArrayValueArms::longints),
+            (std::vector<PLI_INT64>{-1, -2}));
+  EXPECT_EQ(ReadTwo("top.i", vpiLongIntVal, &ArrayValueArms::longints),
+            (std::vector<PLI_INT64>{-1, -2}));
+}
+
+// §38.16 with §38.15 Table 38-3: an x or z bit of an element reads as 0 in an
+// integer format (#7464).
+TEST_F(ElementValuesOfARun, AnUnknownBitOfAnElementReadsAsZero) {
+  Run("module top;\n"
+      "  logic [3:0] a[2] = '{4'b10x1, 4'bxxxx};\n"
+      "  initial $noop;\n"
+      "endmodule\n");
+  EXPECT_EQ(ReadTwo("top.a", vpiIntVal, &ArrayValueArms::integers),
+            (std::vector<PLI_INT32>{9, 0}));
+}
+
 }  // namespace
 }  // namespace delta

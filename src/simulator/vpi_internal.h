@@ -27,6 +27,12 @@ inline PLI_BYTE8* VpiText(const char* text) {
   return const_cast<PLI_BYTE8*>(text);
 }
 
+// §38.3: the representative of the underlying simulation object `obj`
+// denotes, reached by following its same_object_as chain. A bounded walk
+// guards against an accidental cycle; the chains the simulator builds are short
+// (a handle aliases at most one representative).
+VpiObject* VpiResolveSameObject(VpiObject* obj);
+
 // Defined in vpi_helpers_statements.cpp, used by vpi_callbacks.cpp.
 bool VpiIsScopeBodyStmtType(int type);
 
@@ -182,6 +188,13 @@ void VpiSchedulePut(VpiObject& obj, const s_vpi_value& value, int mode,
 // Defined in vpi_put_value_bits.cpp.
 uint64_t VpiPutDelayTicks(const VpiObject& obj, const s_vpi_time& time,
                           int sim_unit);
+
+// §38.13 with §3.14.2: the time unit a vpiScaledRealTime time of `obj` is
+// read in -- that of the instance, an instance itself or the one enclosing it,
+// whose design element declares the object; the simulation time unit
+// `sim_unit` for an object no instance encloses. Defined in
+// vpi_put_value_bits.cpp.
+int VpiObjectTimeUnit(const VpiObject& obj, int sim_unit);
 
 // Defined in vpi_systf.cpp, used by vpi_design_attach.cpp.
 std::vector<std::string_view> VpiNamePathComponents(

@@ -275,6 +275,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/sensitivity.cpp
     elaborator/design_scopes.cpp
     simulator/driver_update.cpp
+    simulator/event_trigger.cpp
     simulator/net.cpp
     simulator/net_trireg.cpp
     simulator/net_user_nettype.cpp
@@ -755,6 +756,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/vpi_class_objects.cpp
     simulator/vpi_class_typespecs.cpp
     simulator/vpi_collection_elements.cpp
+    simulator/vpi_compare_objects.cpp
     simulator/vpi_compatibility.cpp
     simulator/vpi_constraint_relations.cpp
     simulator/vpi_control.cpp
@@ -822,6 +824,11 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/vpi_include_file.cpp
     simulator/vpi_iterate.cpp
     simulator/vpi_net_driver_load_kinds.cpp
+    simulator/vpi_put_run_delays.cpp
+    simulator/vpi_run_files.cpp
+    simulator/vpi_signal_callbacks.cpp
+    simulator/vpi_statement_callbacks.cpp
+    simulator/vpi_table_entry_value.cpp
     simulator/vpi_variable_driver_load_kinds.cpp
     simulator/vpi_io_decl_stand_in.cpp
     simulator/vpi_query.cpp
@@ -836,6 +843,8 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/vpi_systf_build.cpp
     simulator/vpi_typespec_shapes.cpp
     simulator/vpi_value_array.cpp
+    simulator/vpi_value_numbers.cpp
+    simulator/vpi_value_refusals.cpp
     simulator/vpi_value_strings.cpp
     simulator/vpi_primitive_value.cpp
     simulator/vpi_put_value_bits.cpp

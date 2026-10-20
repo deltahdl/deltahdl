@@ -50,6 +50,7 @@ TEST_F(UserDefinedSystfRegistration, NameWithDollarIsAccepted) {
 TEST_F(UserDefinedSystfRegistration, NullNameIsRejected) {
   s_vpi_systf_data data = {};
   data.type = vpiSysFunc;
+  data.sysfunctype = vpiIntFunc;
   data.tfname = nullptr;
 
   vpiHandle h = vpi_register_systf(&data);
@@ -100,6 +101,7 @@ TEST_F(UserDefinedSystfRegistration,
 
   s_vpi_systf_data func = {};
   func.type = vpiSysFunc;
+  func.sysfunctype = vpiIntFunc;
   func.tfname = VpiText("$as_func");
 
   ASSERT_NE(vpi_register_systf(&task), nullptr);
@@ -122,6 +124,7 @@ void StartupRoutineRegistersTask() {
 void StartupRoutineRegistersFunc() {
   s_vpi_systf_data data = {};
   data.type = vpiSysFunc;
+  data.sysfunctype = vpiIntFunc;
   data.tfname = VpiText("$startup_func");
   vpi_register_systf(&data);
 }

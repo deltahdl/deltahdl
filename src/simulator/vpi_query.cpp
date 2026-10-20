@@ -745,7 +745,12 @@ int VpiContext::Get(int property, VpiHandle obj) {
     // has an application do first. It was answered with the 0 every unknown
     // property gets, which is the value those two routines refuse.
     if (property == vpiSaveRestartID) return kVpiRunSaveRestartId;
-    return 0;
+    // §38.1 and §38.6: for any other property the object is mandatory, and a
+    // NULL one names nothing to read -- an error, answered with vpiUndefined.
+    last_error_.state = kVpiPLI;
+    last_error_.level = kVpiError;
+    last_error_.message = VpiText("vpi_get() requires an object");
+    return vpiUndefined;
   }
   // §37.13: an io decl's size, signing and shape are those of what it declares.
   obj = VpiIoDeclStandIn(obj, property);

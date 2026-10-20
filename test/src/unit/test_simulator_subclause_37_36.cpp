@@ -187,7 +187,7 @@ TEST_F(UdpModel, TableEntryValueAllowsStringFormat) {
 }
 
 // C9 / Detail 1: a table entry's value is also obtainable as a vector (its
-// ASCII symbol values). The read succeeds with no error.
+// symbols, two bytes each). The read succeeds with no error.
 TEST_F(UdpModel, TableEntryValueAllowsVectorFormat) {
   auto* var = sim_ctx_.CreateVariable("te_vec", 16);
   var->value = MakeLogic4VecVal(arena_, 16, 0x4142);
@@ -201,7 +201,9 @@ TEST_F(UdpModel, TableEntryValueAllowsVectorFormat) {
   s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), 0);
   ASSERT_NE(v.value.vector, nullptr);
-  EXPECT_EQ(v.value.vector[0].aval, 0x4142u);
+  // §38.15: each symbol of the row "AB" takes two bytes, its character then
+  // NUL.
+  EXPECT_EQ(v.value.vector[0].aval, 0x41004200u);
 }
 
 // C9 / Detail 1 (the shall): no other format may be obtained for a table entry.
@@ -349,19 +351,25 @@ TEST(UdpDefinitionsOfADesign, EachDefinitionAnInstanceNamesOnce) {
 // is over.
 class UdpDefnsOfARun : public VpiDesignRun {
  protected:
-  // The text the vector value of the table entry `entry` holds, one character
-  // per byte, the first in the most significant, `length` characters long.
-  static std::string VectorText(vpiHandle entry, std::size_t length) {
+  // §38.15: the symbols the vector value of the table entry `entry` holds,
+  // `count` of them, each in two bytes of aval or bval, four to an element,
+  // its second byte NUL for a one-character symbol.
+  static std::vector<std::string> VectorSymbols(vpiHandle entry,
+                                                std::size_t count) {
     s_vpi_value value = {};
     value.format = vpiVectorVal;
     vpi_get_value(entry, &value);
-    std::string text;
-    if (value.value.vector == nullptr) return text;
-    for (std::size_t i = length; i-- > 0;) {
-      const PLI_UINT32 kWord = value.value.vector[i / 4].aval;
-      text.push_back(static_cast<char>((kWord >> ((i % 4) * 8)) & 0xffu));
+    std::vector<std::string> symbols;
+    if (value.value.vector == nullptr) return symbols;
+    for (std::size_t k = 0; k < count; ++k) {
+      const s_vpi_vecval& kElement = value.value.vector[k / 4];
+      const PLI_UINT32 kHalf = k % 4 < 2 ? kElement.aval : kElement.bval;
+      const PLI_UINT32 kPair = (kHalf >> (k % 2 == 0 ? 16 : 0)) & 0xffffu;
+      std::string symbol(1, static_cast<char>(kPair >> 8));
+      if ((kPair & 0xffu) != 0) symbol.push_back(static_cast<char>(kPair));
+      symbols.push_back(symbol);
     }
-    return text;
+    return symbols;
   }
 
   // The string value of the table entry `entry`, empty for none.
@@ -415,8 +423,8 @@ constexpr const char* kFlop =
 
 // §37.36 detail 1: a table entry's string value is its row as the table writes
 // it, an edge in parentheses among its inputs and the current state of a
-// sequential row in its own field, and its vector value holds that text's
-// ASCII codes (#7141).
+// sequential row in its own field, and its vector value holds its symbols, an
+// edge's two characters together (#7141, #7461).
 TEST_F(UdpDefnsOfARun, ATableEntryReadsAsItsRow) {
   Run(kFlop);
   const std::vector<vpiHandle> kRows =
@@ -425,7 +433,8 @@ TEST_F(UdpDefnsOfARun, ATableEntryReadsAsItsRow) {
   EXPECT_EQ(StringText(kRows[0]), "r 0 : ? : 0");
   EXPECT_EQ(StringText(kRows[1]), "(0x) 1 : 1 : 1");
   EXPECT_EQ(StringText(kRows[2]), "? * : ? : -");
-  EXPECT_EQ(VectorText(kRows[1], 14), "(0x) 1 : 1 : 1");
+  EXPECT_EQ(VectorSymbols(kRows[1], 4),
+            (std::vector<std::string>{"0x", "1", "1", "1"}));
   const std::vector<vpiHandle> kGateRows =
       ObjectsOf(vpiTableEntry, Named(vpiUdpDefn, nullptr, "gate"));
   ASSERT_EQ(kGateRows.size(), 2u);
@@ -515,6 +524,30 @@ TEST_F(UdpDefnsOfARun, ASealedUdpIsProtected) {
   EXPECT_EQ(vpi_get(vpiProtected, clear), 0);
   s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), 0);
+}
+
+// §38.15: the vector value of a table entry is its symbols, two bytes each,
+// the first two in aval's halves and the third in bval's upper half (#7461).
+TEST_F(UdpDefnsOfARun, ATableEntrysVectorHoldsTwoBytesPerSymbol) {
+  Run("primitive p(output o, input a, b);\n"
+      "  table\n"
+      "    1 0 : 1;\n"
+      "  endtable\n"
+      "endprimitive\n"
+      "module top;\n"
+      "  wire o, a, b;\n"
+      "  p g(o, a, b);\n"
+      "  initial $noop;\n"
+      "endmodule\n");
+  const std::vector<vpiHandle> kRows =
+      ObjectsOf(vpiTableEntry, Named(vpiUdpDefn, nullptr, "p"));
+  ASSERT_EQ(kRows.size(), 1u);
+  s_vpi_value value = {};
+  value.format = vpiVectorVal;
+  vpi_get_value(kRows[0], &value);
+  ASSERT_NE(value.value.vector, nullptr);
+  EXPECT_EQ(value.value.vector[0].aval, 0x31003000u);
+  EXPECT_EQ(value.value.vector[0].bval, 0x31000000u);
 }
 
 }  // namespace

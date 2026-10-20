@@ -49,6 +49,7 @@ void RegisterTaskAndFunction() {
 
   s_vpi_systf_data func = {};
   func.type = vpiSysFunc;
+  func.sysfunctype = vpiIntFunc;
   func.tfname = VpiText("$my_random");
   vpi_register_systf(&func);
 }

@@ -100,6 +100,7 @@ TEST_F(CalltfApplicationRoutine, RunsForBothSystemTaskAndSystemFunction) {
 
   s_vpi_systf_data func = {};
   func.type = kVpiSysFunc;
+  func.sysfunctype = kVpiIntFunc;
   func.calltf = &RecordingCalltf;
   func.user_data = reinterpret_cast<PLI_BYTE8*>(&payload);
 
@@ -127,6 +128,7 @@ TEST_F(CalltfApplicationRoutine, SuppliedRoutineRoundTripsAndReceivesUserData) {
 
   s_vpi_systf_data with_calltf = {};
   with_calltf.type = kVpiSysFunc;
+  with_calltf.sysfunctype = kVpiIntFunc;
   with_calltf.tfname = VpiText("$get_vector");
   with_calltf.calltf = &RecordingCalltf;
   with_calltf.user_data = reinterpret_cast<PLI_BYTE8*>(&payload);

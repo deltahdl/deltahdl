@@ -516,6 +516,12 @@ class SpecifyManager {
   const std::vector<TimingCheckEntry>& GetTimingChecks() const {
     return timing_checks_;
   }
+  // §38.32: the paths and checks, for vpi_put_delays to give a path new delays
+  // and a check new limits, which its next transitions and checks take.
+  std::vector<PathDelay>& MutablePathDelays() { return path_delays_; }
+  std::vector<TimingCheckEntry>& MutableTimingChecks() {
+    return timing_checks_;
+  }
 
   // §31.9.1: settles how far each delayed copy of a negative $setuphold's or
   // $recrem's signals lags its original, once every check is registered. A

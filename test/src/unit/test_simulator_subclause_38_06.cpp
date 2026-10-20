@@ -50,8 +50,25 @@ TEST_F(VpiGetPropertySim, GetSizeForVariable) {
   EXPECT_EQ(vpi_get(vpiSize, h), 32);
 }
 
-TEST_F(VpiGetPropertySim, GetReturnsZeroForNullHandle) {
-  EXPECT_EQ(vpi_get(vpiType, nullptr), 0);
+// §38.6 with §38.1: a NULL object is given a meaning for vpiTimeUnit and
+// vpiTimePrecision alone (and vpiSaveRestartID, §38.9); with any other
+// property it names no object, an error answered with vpiUndefined (#7455).
+TEST_F(VpiGetPropertySim, NullHandleIsAnErrorForAnObjectProperty) {
+  EXPECT_EQ(vpi_get(vpiSize, nullptr), vpiUndefined);
+  EXPECT_NE(vpi_chk_error(nullptr), 0);
+  EXPECT_EQ(vpi_get64(vpiSize, nullptr), vpiUndefined);
+  EXPECT_NE(vpi_chk_error(nullptr), 0);
+  EXPECT_EQ(vpi_get(vpiType, nullptr), vpiUndefined);
+}
+
+// §38.6: with vpiTimeUnit a NULL object asks for the simulation time unit, and
+// §38.9 has vpiSaveRestartID of NULL answer the run's id; neither is an error.
+TEST_F(VpiGetPropertySim, NullHandleStillAnswersTheRunsProperties) {
+  EXPECT_EQ(vpi_get(vpiTimeUnit, nullptr),
+            vpi_ctx_.SmallestModuleTimePrecision());
+  EXPECT_EQ(vpi_chk_error(nullptr), 0);
+  EXPECT_NE(vpi_get(vpiSaveRestartID, nullptr), vpiUndefined);
+  EXPECT_EQ(vpi_chk_error(nullptr), 0);
 }
 
 // §38.6: Boolean properties report 1 for TRUE and 0 for FALSE.

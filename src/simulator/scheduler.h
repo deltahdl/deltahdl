@@ -114,6 +114,11 @@ class Scheduler {
     if (threads_seen_.insert(proc).second) threads_.push_back(proc);
   }
   const std::vector<Process*>& Threads() const { return threads_; }
+  // §38.36.1: whether the run has switched to `proc` before, so that a switch
+  // to it now resumes it rather than starting it.
+  bool HasRunThread(Process* proc) const {
+    return threads_seen_.contains(proc);
+  }
 
   // §8.29: a process made with stacks of its own before it first runs -- a
   // fork branch carrying its parent's locals, an embedded covergroup's

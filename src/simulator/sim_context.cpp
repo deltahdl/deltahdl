@@ -27,6 +27,8 @@
 #include "simulator/sim_context_types.h"
 #include "simulator/specify.h"
 #include "simulator/unit_scopes.h"
+#include "simulator/vpi_context.h"
+#include "simulator/vpi_globals.h"
 
 namespace delta {
 
@@ -542,7 +544,15 @@ Net* SimContext::CreateNet(std::string_view name, NetType type, uint32_t width,
 }
 
 void SimContext::SetCurrentProcess(Process* proc) {
-  if (proc == current_process_) return;
+  // §38.36.1: a thread the run switches to after it first ran resumes
+  // execution here, which a cbEnterThread callback is called for once the
+  // thread is the one running, as it is where it was running already.
+  const bool kResuming =
+      proc != nullptr && !proc->stand_in && scheduler_.HasRunThread(proc);
+  if (proc == current_process_) {
+    if (kResuming) GetGlobalVpiContext().NoteThreadEntered(proc);
+    return;
+  }
   // §37.44: a process reaching here is one the run has a thread for. This is
   // the one place every process passes through, which is what makes the list
   // the scheduler builds the run's threads rather than some of them. A stand-in
@@ -579,6 +589,7 @@ void SimContext::SetCurrentProcess(Process* proc) {
   // the named scopes it stands in are the ones in active_scope_stack_.
   g_park_slot = proc != nullptr ? &proc->park : nullptr;
   if (proc != nullptr) proc->park.named_scopes = &active_scope_stack_;
+  if (kResuming) GetGlobalVpiContext().NoteThreadEntered(proc);
 }
 
 // §9.3.2 with §8.6 and §13.3.2: a branch spawned inside a method runs on the

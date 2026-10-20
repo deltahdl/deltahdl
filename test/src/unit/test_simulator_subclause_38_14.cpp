@@ -1,6 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <vector>
+
 #include "common/arena.h"
+#include "fixture_vpi_run.h"
 #include "simulator/scheduler.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
@@ -43,6 +47,7 @@ class VpiGetUserDataSim : public ::testing::Test {
   VpiHandle MakeCall(int type) {
     VpiHandle obj = vpi_ctx_.CreateModule("c", "c");
     obj->type = type;
+    obj->user_defined = true;
     return obj;
   }
 
@@ -140,6 +145,42 @@ TEST_F(VpiGetUserDataSim, AReadDuringEndOfResetStartsFromNullAndCanBeSetAgain) {
   EXPECT_EQ(g_seen_during_reset, nullptr);  // the clear came first
   EXPECT_EQ(vpi_get_userdata(VpiHandleOf(call)), &g_value_set_during_reset);
   EXPECT_NE(vpi_get_userdata(VpiHandleOf(call)), &before_reset);
+}
+
+// What each invocation of `$count` read from its call's user data, before
+// putting back one more.
+std::vector<intptr_t> counts_read;
+
+PLI_INT32 CountCalltf(PLI_BYTE8* /*user_data*/) {
+  vpiHandle call = vpi_handle(vpiSysTfCall, nullptr);
+  const auto kCount = reinterpret_cast<intptr_t>(vpi_get_userdata(call)) + 1;
+  counts_read.push_back(kCount);
+  vpi_put_userdata(call, reinterpret_cast<void*>(kCount));
+  return 0;
+}
+
+class UserDataOfACallInATask : public VpiDesignRun {
+ protected:
+  void SetUp() override {
+    VpiDesignRun::SetUp();
+    counts_read.clear();
+    s_vpi_systf_data data = {};
+    data.type = vpiSysTask;
+    data.tfname = VpiText("$count");
+    data.calltf = &CountCalltf;
+    ASSERT_NE(vpi_register_systf(&data), nullptr);
+  }
+};
+
+// §38.14 with §38.33: a call written in a task's body is one call instance
+// each time the task runs it, so the user data one invocation put is there at
+// the next (#7458).
+TEST_F(UserDataOfACallInATask, ItLastsFromOneInvocationToTheNext) {
+  Run("module top;\n"
+      "  task t; $count; endtask\n"
+      "  initial begin t; t; end\n"
+      "endmodule\n");
+  EXPECT_EQ(counts_read, (std::vector<intptr_t>{1, 2}));
 }
 
 }  // namespace

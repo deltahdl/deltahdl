@@ -608,6 +608,7 @@ class SimContext : public DeclaredNameTables,
   std::vector<std::unique_ptr<FileMonitor>>& FileMonitors() {
     return files_.monitors;
   }
+  SimFileTables& FileTables() { return files_; }
   // §37.35 detail 2 with §38.34: what sets the state of each running
   // sequential UDP instance under its flat name, which a VPI put calls.
   std::unordered_map<std::string, std::function<void(char)>>&

@@ -149,10 +149,10 @@ TEST_F(TaskFuncCall, UserSystfsRetrievedByIteration) {
 
   s_vpi_systf_data func = {};
   func.type = vpiSysFunc;
+  func.sysfunctype = vpiIntFunc;
   func.tfname = VpiText("$as_func");
   vpiHandle func_h = vpi_register_systf(&func);
   ASSERT_NE(func_h, nullptr);
-
   vpiHandle it = vpi_iterate(vpiUserSystf, nullptr);
   ASSERT_NE(it, nullptr);
   int count = 0;

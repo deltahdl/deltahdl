@@ -432,14 +432,14 @@ void EvaluateStabilityPair(const StabilityPair& pair, SimContext& ctx) {
     auto* event = ctx.GetScheduler().GetEventPool().Acquire();
     event->callback = [pair, side, &ctx]() {
       ReportViolation(pair.armed.Entry().kind, side, pair, ctx);
-      ToggleNotifier(pair.armed.Entry(), ctx);
+      NoteViolation(pair.armed.Entry(), ctx);
     };
     ctx.GetScheduler().ScheduleEvent(SimTime{kDetected}, Region::kActive,
                                      event);
     return;
   }
   ReportViolation(check.kind, side, pair, ctx);
-  ToggleNotifier(check, ctx);
+  NoteViolation(check, ctx);
 }
 
 }  // namespace

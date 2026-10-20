@@ -600,12 +600,11 @@ StmtResult ExecForceOrAssignImpl(const Stmt* stmt, SimContext& ctx,
   // the name ResolveLhsVariable above resolved through.
   spec.net = ForceTargetNet(stmt->lhs, ctx);
   InstallProcContAssign(var, stmt, spec, ctx, arena);
-  // §38.36.1: a cbForce callback is called after the force.
-  if (stmt->kind == StmtKind::kForce) {
-    GetGlobalVpiContext().NoteForce(cbForce, var, stmt,
-                                    ctx.ActiveInstancePrefix());
-  }
-
+  // §38.36.1: a cbForce callback is called after the force, and a cbAssign
+  // one after a procedural assign.
+  GetGlobalVpiContext().NoteForce(
+      stmt->kind == StmtKind::kForce ? cbForce : cbAssign, var, stmt,
+      ctx.ActiveInstancePrefix());
   return StmtResult::kDone;
 }
 
@@ -665,6 +664,9 @@ StmtResult ExecReleaseOrDeassignImpl(const Stmt* stmt, SimContext& ctx,
 
   if (stmt->kind == StmtKind::kDeassign) {
     EndProcContAssign(var, /*release=*/false, ctx, arena);
+    // §38.36.1: a cbDeassign callback is called after the deassign.
+    GetGlobalVpiContext().NoteForce(cbDeassign, var, stmt,
+                                    ctx.ActiveInstancePrefix());
     return StmtResult::kDone;
   }
   // §10.6.2: a released net at once takes the value its drivers determine,

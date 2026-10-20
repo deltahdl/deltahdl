@@ -3,6 +3,7 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "helpers_run_files.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/vpi_context.h"
@@ -165,6 +166,39 @@ TEST_F(VpiMcdCloseSim, AnFdNamingNoOpenFileIsReportedBack) {
   PLI_UINT32 unknown_fd = 0x80000007u;
 
   EXPECT_EQ(vpi_mcd_close(unknown_fd), unknown_fd);
+}
+
+// What vpi_mcd_close returned for the fd and the mcd the design's $fopen
+// opened.
+PLI_UINT32 fd_close_result = 1;
+PLI_UINT32 mcd_close_result = 1;
+
+class CloseOfAFopenedFile : public RunFilesRun {
+ protected:
+  static PLI_INT32 CloseBoth(PLI_BYTE8* /*user_data*/) {
+    fd_close_result = vpi_mcd_close(DescriptorIn("top.fd"));
+    mcd_close_result = vpi_mcd_close(DescriptorIn("top.mcd"));
+    return 0;
+  }
+};
+
+// §38.24 with §21.3.1: vpi_mcd_close closes a file the design's $fopen opened,
+// as an fd or as an mcd, and the design writes nothing more to it (#7465).
+TEST_F(CloseOfAFopenedFile, BothFormsAreClosed) {
+  RegisterTask("$close_both", &CloseBoth);
+  Run("module top; integer fd, mcd;\n"
+      "  initial begin\n"
+      "    fd = $fopen(\"fd.txt\", \"w\");\n"
+      "    mcd = $fopen(\"mcd.txt\");\n"
+      "    $close_both;\n"
+      "    $fdisplay(fd, \"after\");\n"
+      "    $fdisplay(mcd, \"after\");\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_EQ(fd_close_result, 0u);
+  EXPECT_EQ(mcd_close_result, 0u);
+  EXPECT_EQ(FileText("fd.txt"), "");
+  EXPECT_EQ(FileText("mcd.txt"), "");
 }
 
 }  // namespace

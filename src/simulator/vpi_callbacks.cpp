@@ -11,7 +11,6 @@
 #include <vector>
 
 #include "common/types.h"
-#include "parser/ast_stmt.h"
 #include "simulator/net.h"
 #include "simulator/scheduler.h"
 #include "simulator/vpi_design_attach_build.h"
@@ -30,7 +29,7 @@
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
-#include "simulator/vpi_stmt_objects.h"
+#include "simulator/vpi_signal_callbacks.h"
 
 namespace delta {
 
@@ -255,12 +254,23 @@ std::vector<uint64_t> ObjectBits(const VpiObject& obj) {
 // written, call back the cbSizeChange registrations placed on it where its
 // size changed, then the cbValueChange ones where its value did, a write of
 // what it holds being no change, until none of either is left.
+// The strength the net `obj` reads, or none for an object without one.
+NetStrength StrengthOf(const VpiObject& obj) {
+  return obj.net != nullptr ? obj.net->resolved_strength : NetStrength{};
+}
+
+bool SameStrength(const NetStrength& a, const NetStrength& b) {
+  return a.s0_hi == b.s0_hi && a.s0_lo == b.s0_lo && a.s1_hi == b.s1_hi &&
+         a.s1_lo == b.s1_lo;
+}
+
 void WatchObjectChanges(VpiContext& vpi, VpiObject* obj) {
   if (obj == nullptr || obj->var == nullptr || obj->value_change_watched) {
     return;
   }
   obj->value_change_watched = true;
   obj->var->AddWatcher([&vpi, obj, held = ObjectBits(*obj),
+                        strength = StrengthOf(*obj),
                         size = vpi.Get(vpiSize, obj)]() mutable {
     const auto& callbacks = vpi.RegisteredCallbacks();
     const bool kSizes = IsPlacedOn(callbacks, cbSizeChange, obj);
@@ -275,7 +285,15 @@ void WatchObjectChanges(VpiContext& vpi, VpiObject* obj) {
       if (kSizes) vpi.DispatchCallbacks(cbSizeChange, obj);
     }
     std::vector<uint64_t> now = ObjectBits(*obj);
-    if (now == held) return false;
+    const NetStrength kStrength = StrengthOf(*obj);
+    const bool kStrengthChanged = !SameStrength(kStrength, strength);
+    strength = kStrength;
+    if (now == held) {
+      // §38.36.1: a change of strength alone is a change to a callback
+      // registered with vpiStrengthVal, and to no other.
+      if (kStrengthChanged && kValues) vpi.DispatchStrengthChange(obj);
+      return false;
+    }
     held = std::move(now);
     if (kValues) vpi.DispatchCallbacks(cbValueChange, obj);
     return false;
@@ -355,10 +373,24 @@ VpiHandle VpiContext::RegisterCb(s_cb_data* data) {
   }
   if ((data->reason == cbValueChange || data->reason == cbSizeChange) &&
       data->obj != nullptr) {
-    WatchObjectChanges(*this, VpiObjectOf(data->obj));
+    // §38.36.1: a net watched in vpiStrengthVal is told of a change of its
+    // strength alone, which a net otherwise keeps to itself.
+    VpiObject* watched = VpiObjectOf(data->obj);
+    if (watched->net != nullptr && data->value != nullptr &&
+        data->value->format == vpiStrengthVal) {
+      watched->net->strength_watched = true;
+    }
+    WatchObjectChanges(*this, watched);
     VpiWatchContAssignChanges(*this, VpiObjectOf(data->obj), sim_ctx_);
   }
-  if (data->reason == cbStmt) stmt_callbacks_registered_ = true;
+  // §38.36.1: a cbValueChange on an event statement is called as the
+  // statement executes, which NoteStmtExecuting is told of, as for a cbStmt.
+  if (data->reason == cbSignal) VpiTrapSignal(data->index);
+  if (data->reason == cbStmt ||
+      (data->reason == cbValueChange && data->obj != nullptr &&
+       VpiObjectOf(data->obj)->type == vpiEventStmt)) {
+    stmt_callbacks_registered_ = true;
+  }
   if (scheduler_ != nullptr &&
       VpiIsSimulationTimeCallbackReason(data->reason)) {
     ScheduleTimeCallback(*this, *scheduler_, cb_obj, *data);
@@ -408,6 +440,10 @@ int VpiContext::RemoveCb(VpiHandle cb_handle) {
   // wrong-typed handle is not a callback object, so removal fails.
   if (!cb_handle) return 0;
   if (cb_handle->type != kVpiCallback) return 0;
+  // §38.39 with §38.37: a vpi_register_systf() handle is a callback object
+  // too, but not one vpi_register_cb() registered, and its index counts
+  // system tasks and functions rather than the callbacks.
+  if (cb_handle->is_systf) return 0;
   int idx = cb_handle->index;
   if (idx >= 0 && idx < static_cast<int>(callbacks_.size())) {
     // §38.39: once vpi_remove_cb() has been called with a handle to the
@@ -415,7 +451,10 @@ int VpiContext::RemoveCb(VpiHandle cb_handle) {
     // already-removed slot, so a repeat removal on the stale handle fails
     // rather than reporting success a second time.
     if (callbacks_[idx].reason < 0) return 0;
+    const int kReason = callbacks_[idx].reason;
     callbacks_[idx].reason = -1;
+    if (kReason == cbSignal)
+      VpiReleaseSignal(callbacks_[idx].index, callbacks_);
     // §37.2.2: other VPI routines release handles as part of what they do, and
     // item a) has removing a callback release its handle. Clearing the
     // registration is what stops the callback from being delivered; releasing
@@ -610,7 +649,7 @@ bool PlacedElsewhere(const s_cb_data& reg, int reason, VpiHandle obj) {
   if (reason == cbStmt) return !VpiCbStmtIsPlacedOn(reg, obj);
   if (reg.obj == nullptr) return false;
   if (reason == cbValueChange || reason == cbSizeChange ||
-      reason == cbDisable) {
+      reason == cbDisable || reason == cbEnterThread) {
     return VpiObjectOf(reg.obj) != obj;
   }
   if (reason == cbCreateObj) {
@@ -738,21 +777,10 @@ void VpiContext::Deliver(s_cb_data data) {
   // afterward to keep nested dispatches honest.
   int saved_reason = current_callback_reason_;
   current_callback_reason_ = data.reason;
+  EnterApplicationRoutine();
   data.cb_rtn(&data);
+  LeaveApplicationRoutine();
   current_callback_reason_ = saved_reason;
-}
-
-void VpiContext::NoteStmtExecuting(const Stmt* stmt, std::string prefix) {
-  // §37.43 detail 4: the statement beginning in a frame is the one active
-  // within it, and stays the one detail 5 reports once the statement has
-  // activated a frame of its own, until the next one in this frame begins.
-  VpiHandle frame = sim_ctx_ != nullptr ? ActiveFrame() : nullptr;
-  if (frame == nullptr && !stmt_callbacks_registered_) return;
-  VpiObject* obj = VpiStmtObjectFor(stmt_objects_, stmt, std::move(prefix));
-  if (frame != nullptr) frame->frame_facts.stmt = obj;
-  if (stmt_callbacks_registered_ && obj != nullptr) {
-    DispatchCallbacks(cbStmt, obj);
-  }
 }
 
 void VpiContext::NoteThreadCreated(Process* proc) {
@@ -766,49 +794,6 @@ void VpiContext::NoteThreadCreated(Process* proc) {
 void VpiContext::NoteObjectCreated(ClassObject& obj) {
   if (sim_ctx_ == nullptr || !HasCallbackFor(callbacks_, cbCreateObj)) return;
   DispatchCallbacks(cbCreateObj, MadeClassObject(obj));
-}
-
-void VpiContext::NoteForce(int reason, const Variable* var, const Stmt* stmt,
-                           std::string prefix) {
-  if (!HasCallbackFor(callbacks_, reason)) return;
-  VpiObject* stmt_obj =
-      VpiStmtObjectFor(stmt_objects_, stmt, std::move(prefix));
-  const size_t kCount = callbacks_.size();
-  for (size_t i = 0; i < kCount; ++i) {
-    if (callbacks_[i].reason != reason || callbacks_[i].cb_rtn == nullptr) {
-      continue;
-    }
-    // §38.36.1: a callback placed on an object is called for a force or
-    // release of that object, one placed on none for every one, its obj the
-    // statement and its value the forced object's after the statement.
-    VpiObject* placed = VpiObjectOf(callbacks_[i].obj);
-    if (placed != nullptr && placed->var != var) continue;
-    s_cb_data data = callbacks_[i];
-    s_vpi_value value{};
-    if (placed != nullptr && data.value != nullptr &&
-        data.value->format != vpiSuppressVal) {
-      value.format = data.value->format;
-      GetValue(placed, &value);
-      data.value = &value;
-    }
-    data.obj = VpiHandleOf(stmt_obj);
-    Deliver(data);
-  }
-}
-
-void VpiContext::NoteDisabled(std::string_view label, std::string prefix) {
-  if (!HasCallbackFor(callbacks_, cbDisable)) return;
-  // §38.36.1: the named begin or fork the disable names, among the blocks of
-  // the instance it ran in.
-  if (!prefix.empty() && prefix.back() == '.') prefix.pop_back();
-  const std::string_view kLeaf = label.substr(label.rfind('.') + 1);
-  for (const auto& [key, obj] : stmt_objects_) {
-    if (key.second == prefix && obj->name == kLeaf &&
-        (obj->type == vpiNamedBegin || obj->type == vpiNamedFork)) {
-      DispatchCallbacks(cbDisable, obj);
-      return;
-    }
-  }
 }
 
 int VpiContext::DeliverCallback(VpiHandle cb_handle) {
@@ -825,6 +810,24 @@ int VpiContext::DeliverCallback(VpiHandle cb_handle) {
   Deliver(kData);
   at_read_only_synch_time_ = kSavedReadOnly;
   return 1;
+}
+
+int VpiContext::DispatchStrengthChange(VpiObject* obj) {
+  int fired = 0;
+  const size_t kCount = callbacks_.size();
+  for (size_t i = 0; i < kCount; ++i) {
+    const s_cb_data& reg = callbacks_[i];
+    if (reg.reason != cbValueChange || reg.cb_rtn == nullptr ||
+        reg.value == nullptr || reg.value->format != vpiStrengthVal ||
+        PlacedElsewhere(reg, cbValueChange, obj)) {
+      continue;
+    }
+    s_cb_data data = reg;
+    VpiApplyDispatchOverrides(data, obj, nullptr);
+    Deliver(data);
+    ++fired;
+  }
+  return fired;
 }
 
 int VpiContext::DispatchCallbacks(int reason, VpiHandle obj, void* user_data) {

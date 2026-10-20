@@ -24,4 +24,10 @@ Logic4Vec VpiEvaluateExpressionObject(const VpiObject& obj, SimContext& sim);
 void VpiWatchContAssignChanges(VpiContext& vpi, VpiObject* obj,
                                SimContext* sim);
 
+// §37.19: the member the var select `select`'s index names now -- an element
+// of its array var, or of the subarray a var select it selects through names;
+// null where an index on the way holds an x or z bit or lies outside its array
+// (§11.5.1).
+VpiObject* VpiVarSelectElement(const VpiObject& select, SimContext* sim);
+
 }  // namespace delta

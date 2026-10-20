@@ -9,6 +9,7 @@ namespace delta {
 struct Stmt;
 struct Expr;
 class SimContext;
+struct Variable;
 class Arena;
 enum class StmtKind : uint8_t;
 
@@ -52,6 +53,11 @@ const Stmt* ExecImmediateAssertInFunction(const Stmt* stmt, SimContext& ctx,
 // executor would.
 void ExecEventTriggerInFunction(const Stmt* stmt, SimContext& ctx,
                                 Arena& arena);
+
+// §15.5.1: triggers the event `var` holds, as `-> e` does: the event records
+// the time step it was triggered in (§15.5.3), and every process waiting on it
+// resumes.
+void TriggerEvent(Variable* var, SimContext& ctx);
 
 bool IsTimeControlStatement(StmtKind kind);
 

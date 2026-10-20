@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "fixture_simulator.h"
+#include "fixture_vpi_run.h"
 #include "helpers_vpi_delays_fixture.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
@@ -527,6 +528,66 @@ TEST_F(VpiGetDelaysInARun, TheRetrievedDelayIsTheOneTheSourceDeclared) {
 // assignment's delays, its rise and fall delays as two (#5108).
 TEST_F(ContAssignDelaysOfARun, AContinuousAssignmentsDelaysAreRead) {
   EXPECT_EQ(ContAssignDelaysRead(), (std::vector<uint32_t>{3, 4}));
+}
+
+// The six values vpi_get_delays() reads back from `obj`'s two delays with
+// mtm_flag set, in Table 38-2's order -- each delay's minimum, typical and
+// maximum -- as multiples of the first, so the case reads them whatever unit
+// the run keeps its ticks in.
+std::vector<double> MtmMultiples(vpiHandle obj) {
+  s_vpi_time da[6] = {};
+  s_vpi_delay delay = {};
+  delay.da = da;
+  delay.no_of_delays = 2;
+  delay.time_type = vpiSimTime;
+  delay.mtm_flag = 1;
+  vpi_get_delays(obj, &delay);
+  std::vector<double> multiples;
+  if (da[0].low == 0) return multiples;
+  for (const s_vpi_time& value : da) {
+    multiples.push_back(static_cast<double>(value.low) /
+                        static_cast<double>(da[0].low));
+  }
+  return multiples;
+}
+
+using MtmDelaysOfARun = VpiDesignRun;
+
+const std::vector<double> kOneToSix = {1, 2, 3, 4, 5, 6};
+
+// §38.10 Table 38-2 with §11.11: with mtm_flag set, each delay reads back as
+// the minimum, typical and maximum its min:typ:max expression wrote (#7456).
+TEST_F(MtmDelaysOfARun, AGatesMinTypMaxDelaysAreRead) {
+  Run("module top(input a, output y);\n"
+      "  buf #(1:2:3, 4:5:6) g(y, a);\n"
+      "  initial $noop;\n"
+      "endmodule\n");
+  vpiHandle g = By("top.g");
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(MtmMultiples(g), kOneToSix);
+}
+
+TEST_F(MtmDelaysOfARun, AContinuousAssignmentsMinTypMaxDelaysAreRead) {
+  Run("module top(input a, output y);\n"
+      "  assign #(1:2:3, 4:5:6) y = a;\n"
+      "  initial $noop;\n"
+      "endmodule\n");
+  std::vector<vpiHandle> assigns = ObjectsOf(vpiContAssign, By("top"));
+  ASSERT_EQ(assigns.size(), 1u);
+  EXPECT_EQ(MtmMultiples(assigns[0]), kOneToSix);
+}
+
+TEST_F(MtmDelaysOfARun, AModulePathsMinTypMaxDelaysAreRead) {
+  Run("module top(input a, output y);\n"
+      "  assign y = a;\n"
+      "  specify\n"
+      "    (a => y) = (1:2:3, 4:5:6);\n"
+      "  endspecify\n"
+      "  initial $noop;\n"
+      "endmodule\n");
+  std::vector<vpiHandle> paths = ObjectsOf(vpiModPath, By("top"));
+  ASSERT_EQ(paths.size(), 1u);
+  EXPECT_EQ(MtmMultiples(paths[0]), kOneToSix);
 }
 
 }  // namespace

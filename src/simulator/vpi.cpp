@@ -23,6 +23,7 @@
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_data_structs.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_run_files.h"
 
 namespace {
 
@@ -421,6 +422,18 @@ constexpr PLI_UINT32 kVpiFdDescriptorChannel = PLI_UINT32{1} << 31;
 // one is open.
 constexpr PLI_UINT32 kVpiToolOutputChannel = 1;
 
+const std::string& VpiContext::McdChannelBuffer(PLI_UINT32 channel) const {
+  auto it = channels_.mcd_channel_buffers.find(channel);
+  return it == channels_.mcd_channel_buffers.end() ? channels_.empty_mcd_buffer
+                                                   : it->second;
+}
+
+const std::string& VpiContext::McdChannelFlushed(PLI_UINT32 channel) const {
+  auto it = channels_.mcd_channel_flushed.find(channel);
+  return it == channels_.mcd_channel_flushed.end() ? channels_.empty_mcd_buffer
+                                                   : it->second;
+}
+
 void VpiContext::WriteMcdChannel(PLI_UINT32 channel, std::string_view text) {
   // §38.27: channel 1 is the tool's output channel and log file, so writing to
   // it is writing to those - the same pair §38.30's vpi_printf() writes and
@@ -433,15 +446,17 @@ void VpiContext::WriteMcdChannel(PLI_UINT32 channel, std::string_view text) {
     return;
   }
   // §38.28: in a run the text is written to the file the channel names.
-  auto file = channels_.mcd_files.find(channel);
-  if (file != channels_.mcd_files.end()) {
-    std::fwrite(text.data(), 1, text.size(), file->second);
+  if (sim_ctx_ != nullptr) {
+    VpiRunMcdWrite(*sim_ctx_, channel, text);
     return;
   }
   channels_.mcd_channel_buffers[channel].append(text);
 }
 
 PLI_UINT32 VpiContext::McdOpen(const std::string& filename) {
+  // §38.27: in a run the channels are the run's own, shared with $fopen.
+  if (sim_ctx_ != nullptr) return VpiRunMcdOpen(*sim_ctx_, filename);
+
   // §38.27: a file already open in the shared mcd namespace - whether a prior
   // vpi_mcd_open() assigned it or $fopen seeded it - is reported on the very
   // descriptor it already holds, rather than consuming a second channel.
@@ -470,13 +485,6 @@ PLI_UINT32 VpiContext::McdOpen(const std::string& filename) {
     if ((channels_.mcd_allocated_channels & channel) != 0) continue;
     // §38.27: open the file for writing and hand back its multichannel
     // descriptor, recording it so a later open of the same file finds it.
-    // §38.27: in a run the file itself is opened, an open the host refuses
-    // failing as one with no free channel does.
-    if (sim_ctx_ != nullptr) {
-      FILE* file = std::fopen(filename.c_str(), "w");
-      if (file == nullptr) return 0;
-      channels_.mcd_files[channel] = file;
-    }
     channels_.mcd_allocated_channels |= channel;
     // A file recorded under an fd is now recorded under the channel this
     // namespace opened for it; the fd remains $fopen's own to close.
@@ -528,28 +536,19 @@ bool CloseMcdChannelBit(int bit, PLI_UINT32 mcd, VpiChannelState& channels) {
   if ((allocated_channels & channel) == 0) return true;
 
   // §38.24: close the channel - free it in the shared namespace and drop any
-  // file that named it, closing the file a run opened on it.
+  // file that named it.
   allocated_channels &= ~channel;
   CloseMcdChannelFiles(channels.mcd_open_files, channel);
-  auto file = channels.mcd_files.find(channel);
-  if (file != channels.mcd_files.end()) {
-    std::fclose(file->second);
-    channels.mcd_files.erase(file);
-  }
   return false;
 }
 
-// §38.25: flush one channel other than the tool's own: the file a run opened
-// on it, or the text its buffer holds, which is appended to its committed
-// stream; false where the file's flush failed.
-bool FlushMcdChannel(VpiChannelState& channels, PLI_UINT32 channel) {
-  auto file = channels.mcd_files.find(channel);
-  if (file != channels.mcd_files.end()) return std::fflush(file->second) == 0;
+// §38.25: flush one channel other than the tool's own: the text its buffer
+// holds is appended to its committed stream.
+void FlushMcdChannel(VpiChannelState& channels, PLI_UINT32 channel) {
   auto it = channels.mcd_channel_buffers.find(channel);
-  if (it == channels.mcd_channel_buffers.end()) return true;
+  if (it == channels.mcd_channel_buffers.end()) return;
   channels.mcd_channel_flushed[channel].append(it->second);
   it->second.clear();
-  return true;
 }
 
 // §38.24: close the file an fd from $fopen names. An fd is one value rather
@@ -571,6 +570,9 @@ PLI_UINT32 CloseMcdFd(PLI_UINT32 fd,
 }  // namespace
 
 PLI_UINT32 VpiContext::McdClose(PLI_UINT32 mcd) {
+  // §38.24: in a run the files are the run's own, $fopen's among them.
+  if (sim_ctx_ != nullptr) return VpiRunMcdClose(*sim_ctx_, mcd);
+
   // §38.24: the routine closes file descriptors $fopen opened as well, and
   // §38.27 reserves channel 32 -
   // the MSB - to stand for such an fd. An fd is one value rather than a set of
@@ -619,7 +621,12 @@ PLI_INT32 VpiContext::McdFlush(PLI_UINT32 mcd) {
       if (Flush() != 0) return 1;
       continue;
     }
-    if (!FlushMcdChannel(channels_, channel)) return 1;
+    // §38.25: in a run the channel's file is the run's own.
+    if (sim_ctx_ != nullptr) {
+      if (!VpiRunMcdFlush(*sim_ctx_, channel)) return 1;
+      continue;
+    }
+    FlushMcdChannel(channels_, channel);
   }
 
   // §38.25: every named output buffer was flushed, so report success.
@@ -643,9 +650,13 @@ PLI_BYTE8* VpiContext::McdName(PLI_UINT32 cd) {
 
   // §38.26: the file it names is the entry recorded under exactly that
   // descriptor in the shared mcd/fd namespace, the same one vpi_mcd_open() and
-  // $fopen populate (§38.27, §21.3.1).
-  for (const auto& [name, descriptor] : channels_.mcd_open_files) {
-    if (descriptor != cd) continue;
+  // $fopen populate (§38.27, §21.3.1) -- in a run, the run's file table.
+  const std::string* name = nullptr;
+  if (sim_ctx_ != nullptr) name = VpiRunFileName(*sim_ctx_, cd);
+  for (const auto& [opened, descriptor] : channels_.mcd_open_files) {
+    if (descriptor == cd) name = &opened;
+  }
+  if (name != nullptr) {
     // §38.26: the name is returned through a buffer reused on every call, so a
     // pointer handed back earlier is overwritten here; a caller that needs to
     // keep the string must copy it. Reserve once so repeated assigns of typical
@@ -653,7 +664,7 @@ PLI_BYTE8* VpiContext::McdName(PLI_UINT32 cd) {
     // valid until the next call overwrites its contents.
     if (channels_.mcd_name_buffer.capacity() < 256)
       channels_.mcd_name_buffer.reserve(256);
-    channels_.mcd_name_buffer.assign(name);
+    channels_.mcd_name_buffer.assign(*name);
     return channels_.mcd_name_buffer.data();
   }
 

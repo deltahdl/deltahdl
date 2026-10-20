@@ -1,6 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <vector>
+
 #include "common/arena.h"
+#include "fixture_vpi_run.h"
 #include "simulator/scheduler.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
@@ -40,6 +43,7 @@ class VpiPutUserDataSim : public ::testing::Test {
   VpiHandle MakeCall(int type) {
     VpiHandle obj = vpi_ctx_.CreateModule("c", "c");
     obj->type = type;
+    obj->user_defined = true;
     return obj;
   }
 
@@ -145,6 +149,26 @@ TEST_F(VpiPutUserDataSim, TheFieldCanBeSetUpAgainFromAnEndOfRestartCallback) {
   ASSERT_TRUE(g_restore_ran);
   EXPECT_EQ(vpi_get_userdata(VpiHandleOf(call)), &g_restored_value);
   EXPECT_NE(vpi_get_userdata(VpiHandleOf(call)), &before_restart);
+}
+
+using UserDataOfABuiltInCall = VpiDesignRun;
+
+// §38.33 with §38.37: only a call of a system task an application registered
+// has a user-data storage location; a built-in's call has none, so putting
+// user data on it fails with an error (#7471).
+TEST_F(UserDataOfABuiltInCall, PuttingItIsAnError) {
+  Run("module top;\n"
+      "  initial $display(\"x\");\n"
+      "endmodule\n");
+  std::vector<vpiHandle> processes = ObjectsOf(vpiProcess, By("top"));
+  ASSERT_EQ(processes.size(), 1u);
+  vpiHandle display = vpi_handle(vpiStmt, processes[0]);
+  ASSERT_NE(display, nullptr);
+  ASSERT_EQ(vpi_get(vpiType, display), vpiSysTaskCall);
+  int value = 1;
+  EXPECT_EQ(vpi_put_userdata(display, &value), 0);
+  EXPECT_NE(vpi_chk_error(nullptr), 0);
+  EXPECT_EQ(vpi_get_userdata(display), nullptr);
 }
 
 }  // namespace

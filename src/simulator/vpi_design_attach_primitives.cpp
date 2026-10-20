@@ -270,11 +270,10 @@ void MakePrimitiveArray(const PrimArraySpec& spec, const PrimSite& site,
     prim->delay_expr = spec.delay;
     prim->delays = spec.delays;
     prim->udp_defn = spec.udp_defn;
-    // §37.35 detail 2: the name a put to a sequential udp element finds the
-    // running instance under, as for a udp standing alone (MakeUdpObject).
-    if (spec.kind == vpiUdpArray) {
-      prim->run_key = VpiFlatName(site.prefix, kName);
-    }
+    // §37.35 detail 2 and §38.32: the name a put to a sequential udp element
+    // finds the running instance under, as for a udp standing alone
+    // (MakeUdpObject), and a vpi_put_delays files its new delays below.
+    prim->run_key = VpiFlatName(site.prefix, kName);
     VpiRecordWrittenLocation(prim, item.loc, ctx);
     VpiAddArrayElement(array, prim, index, build);
   }
@@ -387,6 +386,9 @@ void AttachPrimitives(const RtlirDesign* design, const VpiObjectMap& objects,
               TerminalObjects(*item, kSite, ctx, build), instance, build);
           prim->delay_expr = GateDelayExpression(*item, kSite, ctx, build);
           prim->delays = GateDelays(*item, kSite, ctx);
+          // §38.32: the name the run keys the instance under, which a
+          // vpi_put_delays files its new delays below.
+          prim->run_key = VpiFlatName(prefix, item->gate_inst_name);
           // §37.3.3: where the instantiation was written.
           VpiRecordWrittenLocation(prim, item->loc, ctx);
           // §37.83: the attributes it is written with.

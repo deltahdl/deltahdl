@@ -306,5 +306,50 @@ TEST_F(ExpressionValuesOfARun,
   }
 }
 
+class ValuesByTypeOfARun : public VpiDesignRun {
+ protected:
+  static s_vpi_value Read(const char* name, int format) {
+    s_vpi_value value = {};
+    value.format = format;
+    vpi_get_value(By(name), &value);
+    return value;
+  }
+};
+
+// §38.15: vpiObjTypeVal reads an integer variable as vpiIntVal and a time
+// variable as vpiTimeVal in vpiSimTime, the formats their types name (#7459).
+TEST_F(ValuesByTypeOfARun, AnIntegerAndATimeVariableReadAsTheirTypes) {
+  Run("module top;\n"
+      "  integer i = 5;\n"
+      "  time t = 7;\n"
+      "  initial $noop;\n"
+      "endmodule\n");
+  const s_vpi_value kInteger = Read("top.i", vpiObjTypeVal);
+  EXPECT_EQ(kInteger.format, vpiIntVal);
+  EXPECT_EQ(kInteger.value.integer, 5);
+  const s_vpi_value kTime = Read("top.t", vpiObjTypeVal);
+  ASSERT_EQ(kTime.format, vpiTimeVal);
+  ASSERT_NE(kTime.value.time, nullptr);
+  EXPECT_EQ(kTime.value.time->type, vpiSimTime);
+  EXPECT_EQ(kTime.value.time->low, 7u);
+}
+
+// §38.15 Table 38-3: a signed object's negative value reads as negative in
+// vpiIntVal and vpiRealVal, and an unsigned one's all-ones as positive (#7460).
+TEST_F(ValuesByTypeOfARun, ASignedValueKeepsItsSign) {
+  Run("module top;\n"
+      "  byte b = -1;\n"
+      "  int i = -1;\n"
+      "  logic [7:0] u = 8'hFF;\n"
+      "  initial $noop;\n"
+      "endmodule\n");
+  for (const char* name : {"top.b", "top.i"}) {
+    EXPECT_EQ(Read(name, vpiIntVal).value.integer, -1) << name;
+    EXPECT_DOUBLE_EQ(Read(name, vpiRealVal).value.real, -1.0) << name;
+  }
+  EXPECT_EQ(Read("top.u", vpiIntVal).value.integer, 255);
+  EXPECT_DOUBLE_EQ(Read("top.u", vpiRealVal).value.real, 255.0);
+}
+
 }  // namespace
 }  // namespace delta

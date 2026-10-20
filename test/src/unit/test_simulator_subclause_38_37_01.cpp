@@ -160,6 +160,7 @@ TEST_F(VpiSystfCallbacksRegistration, TypeFieldStoresTaskOrFunc) {
 
   s_vpi_systf_data func = {};
   func.type = vpiSysFunc;
+  func.sysfunctype = vpiIntFunc;
   func.tfname = VpiText("$as_func");
 
   vpi_register_systf(&task);
@@ -373,6 +374,30 @@ TEST_F(SystemFunctionResultsOfARun, ASizedSignedFunctionReturnsASignedValue) {
       "endmodule\n");
   EXPECT_EQ(VectorOf("top.s").aval, 0xFFFFFFFFu);
   EXPECT_EQ(VectorOf("top.u").aval, 0xFFu);
+}
+
+// §38.37.1: a system function's sysfunctype is one of the five function
+// types, and a registration carrying any other is refused (#7487).
+TEST_F(VpiSystfCallbacksRegistration, RejectsAFunctionOfNoFunctionType) {
+  for (const int kFuncType : {0, 99}) {
+    s_vpi_systf_data func = {};
+    func.type = vpiSysFunc;
+    func.sysfunctype = kFuncType;
+    func.tfname = VpiText("$untyped");
+    EXPECT_EQ(vpi_register_systf(&func), nullptr) << kFuncType;
+    EXPECT_NE(vpi_chk_error(nullptr), 0) << kFuncType;
+  }
+  EXPECT_TRUE(vpi_ctx_.RegisteredSystfs().empty());
+}
+
+// §38.37.1: a system task has no use for sysfunctype, so a task registered
+// with none of the five is accepted (#7487).
+TEST_F(VpiSystfCallbacksRegistration, AcceptsATaskOfNoFunctionType) {
+  s_vpi_systf_data task = {};
+  task.type = vpiSysTask;
+  task.sysfunctype = 0;
+  task.tfname = VpiText("$untyped_task");
+  EXPECT_NE(vpi_register_systf(&task), nullptr);
 }
 
 }  // namespace

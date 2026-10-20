@@ -362,11 +362,11 @@ TEST(InstanceModel, NullHandleTimePrecisionHandlesEmptyAndSingleModule) {
 }
 
 // D7 edge: a null handle paired with a non-time property is not a precision
-// query and reports zero.
-TEST(InstanceModel, NullHandleNonTimePropertyReturnsZero) {
+// query; it names no object, an error answered with vpiUndefined (§38.6).
+TEST(InstanceModel, NullHandleNonTimePropertyIsUndefined) {
   VpiContext ctx;
   SetGlobalVpiContext(&ctx);
-  EXPECT_EQ(vpi_get(vpiType, nullptr), 0);
+  EXPECT_EQ(vpi_get(vpiType, nullptr), vpiUndefined);
 }
 
 // A design run with a PLI application registered, its VPI model read back

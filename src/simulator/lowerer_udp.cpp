@@ -37,6 +37,8 @@
 #include "simulator/process.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
+#include "simulator/specify.h"
+#include "simulator/specify_path_delay.h"
 #include "simulator/statement_assign.h"
 #include "simulator/stmt_exec_internal.h"
 #include "simulator/udp_eval.h"
@@ -156,6 +158,9 @@ struct UdpOutputDriver {
   // The instance's evaluator, kept beside the driver rather than in the
   // process's frame so that a VPI put (§38.34) can set its state.
   UdpEvalState* state = nullptr;
+  // The prefix of the instance the primitive is instantiated in, which a
+  // vpi_put_delays (§38.32) files new delays for its output below.
+  std::string inst_prefix;
 };
 
 static UdpOutputDriver MakeUdpOutputDriver(const RtlirUdpInst& inst,
@@ -231,6 +236,21 @@ static void PutUdpState(const Expr* terminal, UdpOutputDriver* drv, char bit,
   CommitUdpOutput(terminal, drv, bit, ctx, arena);
 }
 
+// §38.32: the rise and fall delays a vpi_put_delays gave the instance `inst`,
+// driving through `drv`, filed with the driver of its output terminal, which
+// replace its own; null where none was put.
+static const PrimitiveDriver* PutUdpDelays(const RtlirUdpInst& inst,
+                                           const UdpOutputDriver& drv,
+                                           SimContext& ctx) {
+  const SpecifyManager* specify = ctx.GetSpecifyManager();
+  const Expr* output = inst.output;
+  if (specify == nullptr || output == nullptr) return nullptr;
+  if (output->kind == ExprKind::kSelect) output = output->base;
+  if (output == nullptr || output->kind != ExprKind::kIdentifier)
+    return nullptr;
+  return specify->FindAnnotatedPrimitiveDriver(drv.inst_prefix, output->text);
+}
+
 // How long a transition to `out` waits before it reaches the output terminal.
 // §29.8 admits a delay2 on a primitive instance and allows no more than two
 // delays, a UDP having no z to turn off to, so this is the one-bit
@@ -238,12 +258,20 @@ static void PutUdpState(const Expr* terminal, UdpOutputDriver* drv, char bit,
 // absent: a transition to 1 waits the rise delay, one to 0 the fall delay, and
 // one to x the lesser of the two. Where the source wrote a single delay, §28.16
 // applies that one value to every propagation delay of the gate or net.
-static uint64_t SelectUdpDelay(const RtlirUdpInst& inst, char out,
+static uint64_t SelectUdpDelay(const RtlirUdpInst& inst,
+                               const UdpOutputDriver& drv, char out,
                                SimContext& ctx, Arena& arena) {
-  if (inst.delay == nullptr) return 0;
-  uint64_t rise = DelayValueToTicks(EvalExpr(inst.delay, ctx, arena), ctx);
-  if (inst.delay_fall == nullptr) return rise;
-  uint64_t fall = DelayValueToTicks(EvalExpr(inst.delay_fall, ctx, arena), ctx);
+  uint64_t rise = 0;
+  uint64_t fall = 0;
+  if (const PrimitiveDriver* put = PutUdpDelays(inst, drv, ctx)) {
+    rise = put->delays[0];
+    fall = put->delays[1];
+  } else {
+    if (inst.delay == nullptr) return 0;
+    rise = DelayValueToTicks(EvalExpr(inst.delay, ctx, arena), ctx);
+    if (inst.delay_fall == nullptr) return rise;
+    fall = DelayValueToTicks(EvalExpr(inst.delay_fall, ctx, arena), ctx);
+  }
   if (out == '0') return fall;
   if (out == '1') return rise;
   return std::min(rise, fall);
@@ -271,7 +299,7 @@ static void DriveUdpOutput(const RtlirUdpInst& inst, UdpOutputDriver* drv,
   ++drv->generation;
   drv->pending = 0;
   if (out == drv->committed) return;
-  uint64_t ticks = SelectUdpDelay(inst, out, ctx, arena);
+  uint64_t ticks = SelectUdpDelay(inst, *drv, out, ctx, arena);
   if (ticks == 0) {
     CommitUdpOutput(inst.output, drv, out, ctx, arena);
     return;
@@ -429,6 +457,7 @@ void Lowerer::LowerUdpInst(const RtlirUdpInst& inst, bool from_program) {
   UdpOutputDriver* drv = nullptr;
   if (inst.decl != nullptr && inst.output != nullptr) {
     drv = arena_.Create<UdpOutputDriver>(MakeUdpOutputDriver(inst, ctx_));
+    drv->inst_prefix = inst_prefix_;
     const char kInitial = UdpInitialOutput(*inst.decl, ctx_, arena_);
     drv->state = arena_.Create<UdpEvalState>(*inst.decl, kInitial);
     // §29.7 (printed page 867): under `initial q = 1'b1` the output q holds 1

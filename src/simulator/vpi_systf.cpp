@@ -30,6 +30,7 @@
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_put_run_delays.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -55,6 +56,20 @@ VpiHandle VpiContext::RegisterSystf(s_vpi_systf_data* data) {
     last_error_.message = VpiText(
         "system task or function registration must carry a type of vpiSysTask "
         "or vpiSysFunc");
+    return nullptr;
+  }
+
+  // §38.37.1: a system function's sysfunctype is the type of the value it
+  // returns, one of the five function types; a system task has no use for it.
+  if (data->type == kVpiSysFunc && data->sysfunctype != vpiIntFunc &&
+      data->sysfunctype != vpiRealFunc && data->sysfunctype != vpiTimeFunc &&
+      data->sysfunctype != vpiSizedFunc &&
+      data->sysfunctype != vpiSizedSignedFunc) {
+    last_error_.state = kVpiPLI;
+    last_error_.level = kVpiError;
+    last_error_.message = VpiText(
+        "system function registration must carry a sysfunctype of vpiIntFunc, "
+        "vpiRealFunc, vpiTimeFunc, vpiSizedFunc or vpiSizedSignedFunc");
     return nullptr;
   }
 
@@ -157,7 +172,9 @@ bool VpiContext::CallRegisteredSystf(const char* name, const Expr* call_site,
   VpiHandle outer_call = CurrentSystfCall();
   SetCurrentSystfCall(call);
   if (data->calltf != nullptr) {
+    EnterApplicationRoutine();
     data->calltf(data->user_data);
+    LeaveApplicationRoutine();
   }
   SetCurrentSystfCall(outer_call);
 
@@ -186,7 +203,9 @@ void VpiContext::CallCompiletfForSourceCall(const s_vpi_systf_data& data,
   // leaves this one to be put back.
   VpiHandle outer_call = CurrentSystfCall();
   SetCurrentSystfCall(call);
+  EnterApplicationRoutine();
   VpiSystfInvoke(data.compiletf, data.user_data);
+  LeaveApplicationRoutine();
   SetCurrentSystfCall(outer_call);
 }
 
@@ -268,7 +287,9 @@ void VpiContext::GetTime(VpiHandle obj, s_vpi_time* time_p) {
     // object's timescale, or the simulation time unit for a null handle or a
     // time queue object. The exponent difference is the power-of-ten conversion
     // between the two units.
-    int target_unit = use_sim_time_unit ? sim_time_unit_ : obj->time_unit;
+    int target_unit = use_sim_time_unit
+                          ? sim_time_unit_
+                          : VpiObjectTimeUnit(*obj, sim_time_unit_);
     double scale =
         std::pow(10.0, static_cast<double>(sim_time_unit_ - target_unit));
     time_p->real = static_cast<double>(ticks) * scale;
@@ -317,6 +338,9 @@ struct DelayCursor {
       delay_p;    // the application-allocated delay structure being walked
   int k;          // current write/read position within delay_p->da[]
   int time_type;  // the form (vpiScaledRealTime/vpiSimTime/...) of entries
+  // §38.34 with §38.13: simulation ticks per unit of the object's timescale,
+  // the unit a vpiScaledRealTime entry is in.
+  double ticks_per_unit;
 };
 
 // §38.10: whether `n` is a legal number of delays to request for an object of
@@ -348,15 +372,18 @@ bool VpiNoOfDelaysLegal(int type, int n, size_t available) {
 // dictated solely by the delay structure's time_type - the entry's own type
 // field is ignored on input and overwritten with time_type. vpiScaledRealTime
 // delivers a real; vpiSimTime delivers the value as a 64-bit count split across
-// high/low; vpiSuppressTime asks for no time and leaves the value cleared.
-void VpiWriteDelayValue(s_vpi_time* slot, int time_type, double value) {
-  slot->type = time_type;
+// high/low; vpiSuppressTime asks for no time and leaves the value cleared. A
+// delay is kept in simulation ticks, and a real is in the object's timescale
+// (§38.34), so it is scaled between the two.
+void VpiWriteDelayValue(s_vpi_time* slot, const DelayCursor& cur,
+                        double value) {
+  slot->type = cur.time_type;
   slot->high = 0;
   slot->low = 0;
   slot->real = 0.0;
-  if (time_type == vpiScaledRealTime) {
-    slot->real = value;
-  } else if (time_type == vpiSimTime) {
+  if (cur.time_type == vpiScaledRealTime) {
+    slot->real = value / cur.ticks_per_unit;
+  } else if (cur.time_type == vpiSimTime) {
     auto ticks = static_cast<uint64_t>(value);
     slot->high = static_cast<uint32_t>(ticks >> 32);
     slot->low = static_cast<uint32_t>(ticks & 0xFFFFFFFFu);
@@ -368,9 +395,11 @@ void VpiWriteDelayValue(s_vpi_time* slot, int time_type, double value) {
 // time_type: vpiScaledRealTime carries the value in the real field; vpiSimTime
 // carries it as a 64-bit count split across high/low; vpiSuppressTime carries
 // no time, so the value is zero.
-double VpiReadDelayValue(const s_vpi_time& slot, int time_type) {
-  if (time_type == vpiScaledRealTime) return slot.real;
-  if (time_type == vpiSimTime) {
+double VpiReadDelayValue(const s_vpi_time& slot, const DelayCursor& cur) {
+  if (cur.time_type == vpiScaledRealTime) {
+    return slot.real * cur.ticks_per_unit;
+  }
+  if (cur.time_type == vpiSimTime) {
     uint64_t ticks = (static_cast<uint64_t>(slot.high) << 32) | slot.low;
     return static_cast<double>(ticks);
   }
@@ -381,9 +410,9 @@ double VpiReadDelayValue(const s_vpi_time& slot, int time_type) {
 // into da[cur.k..cur.k+2], advancing the cursor past the run.
 void VpiWriteMtmTriple(DelayCursor& cur, double min_v, double typ_v,
                        double max_v) {
-  VpiWriteDelayValue(&cur.delay_p->da[cur.k++], cur.time_type, min_v);
-  VpiWriteDelayValue(&cur.delay_p->da[cur.k++], cur.time_type, typ_v);
-  VpiWriteDelayValue(&cur.delay_p->da[cur.k++], cur.time_type, max_v);
+  VpiWriteDelayValue(&cur.delay_p->da[cur.k++], cur, min_v);
+  VpiWriteDelayValue(&cur.delay_p->da[cur.k++], cur, typ_v);
+  VpiWriteDelayValue(&cur.delay_p->da[cur.k++], cur, max_v);
 }
 
 // §38.10 (Table 38-2): the both-flags arm - nine entries, min:typ:max of delay,
@@ -403,15 +432,15 @@ void VpiWriteDelayRun(DelayCursor& cur, bool mtm, bool pulsere,
                       const VpiDelayInfo& d) {
   if (!mtm && !pulsere) {
     // Neither flag set: one entry, the plain delay.
-    VpiWriteDelayValue(&cur.delay_p->da[cur.k++], cur.time_type, d.delay);
+    VpiWriteDelayValue(&cur.delay_p->da[cur.k++], cur, d.delay);
   } else if (mtm && !pulsere) {
     // min:typ:max only: three entries, min then typ then max delay.
     VpiWriteMtmTriple(cur, d.min_delay, d.typ_delay, d.max_delay);
   } else if (!mtm) {
     // Pulse limits only: delay, reject limit, error limit.
-    VpiWriteDelayValue(&cur.delay_p->da[cur.k++], cur.time_type, d.delay);
-    VpiWriteDelayValue(&cur.delay_p->da[cur.k++], cur.time_type, d.reject);
-    VpiWriteDelayValue(&cur.delay_p->da[cur.k++], cur.time_type, d.error);
+    VpiWriteDelayValue(&cur.delay_p->da[cur.k++], cur, d.delay);
+    VpiWriteDelayValue(&cur.delay_p->da[cur.k++], cur, d.reject);
+    VpiWriteDelayValue(&cur.delay_p->da[cur.k++], cur, d.error);
   } else {
     // Both flags: nine entries - min:typ:max of delay, then reject, then
     // error.
@@ -423,9 +452,9 @@ void VpiWriteDelayRun(DelayCursor& cur, bool mtm, bool pulsere,
 // the three referenced stored-delay fields, advancing the cursor past the run.
 void VpiReadMtmTriple(DelayCursor& cur, double& min_v, double& typ_v,
                       double& max_v) {
-  min_v = VpiReadDelayValue(cur.delay_p->da[cur.k++], cur.time_type);
-  typ_v = VpiReadDelayValue(cur.delay_p->da[cur.k++], cur.time_type);
-  max_v = VpiReadDelayValue(cur.delay_p->da[cur.k++], cur.time_type);
+  min_v = VpiReadDelayValue(cur.delay_p->da[cur.k++], cur);
+  typ_v = VpiReadDelayValue(cur.delay_p->da[cur.k++], cur);
+  max_v = VpiReadDelayValue(cur.delay_p->da[cur.k++], cur);
 }
 
 // §38.32 (Table 38-4): the both-flags arm - nine entries, min:typ:max of delay,
@@ -445,15 +474,15 @@ void VpiReadDelayRun(DelayCursor& cur, bool mtm, bool pulsere,
                      VpiDelayInfo& d) {
   if (!mtm && !pulsere) {
     // Neither flag set: one entry, the plain delay.
-    d.delay = VpiReadDelayValue(cur.delay_p->da[cur.k++], cur.time_type);
+    d.delay = VpiReadDelayValue(cur.delay_p->da[cur.k++], cur);
   } else if (mtm && !pulsere) {
     // min:typ:max only: three entries, min then typ then max delay.
     VpiReadMtmTriple(cur, d.min_delay, d.typ_delay, d.max_delay);
   } else if (!mtm) {
     // Pulse limits only: delay, reject limit, error limit.
-    d.delay = VpiReadDelayValue(cur.delay_p->da[cur.k++], cur.time_type);
-    d.reject = VpiReadDelayValue(cur.delay_p->da[cur.k++], cur.time_type);
-    d.error = VpiReadDelayValue(cur.delay_p->da[cur.k++], cur.time_type);
+    d.delay = VpiReadDelayValue(cur.delay_p->da[cur.k++], cur);
+    d.reject = VpiReadDelayValue(cur.delay_p->da[cur.k++], cur);
+    d.error = VpiReadDelayValue(cur.delay_p->da[cur.k++], cur);
   } else {
     // Both flags: nine entries - min:typ:max of delay, then reject, then
     // error.
@@ -473,15 +502,21 @@ static std::vector<VpiDelayInfo> DelayControlDelays(
     const std::function<double(VpiHandle)>& value_of) {
   VpiHandle expr = VpiDelayControlDelayExpr(control);
   if (expr == nullptr) return {};
-  int unit = sim_unit;
-  for (const VpiObject* at = control->parent; at != nullptr; at = at->parent) {
-    if (VpiIsInstanceType(at->type)) {
-      unit = at->time_unit;
-      break;
-    }
-  }
+  const double kScale =
+      std::pow(10.0, VpiObjectTimeUnit(*control, sim_unit) - sim_unit);
   VpiDelayInfo info;
-  info.delay = value_of(expr) * std::pow(10.0, unit - sim_unit);
+  info.delay = value_of(expr) * kScale;
+  info.min_delay = info.delay;
+  info.typ_delay = info.delay;
+  info.max_delay = info.delay;
+  // §38.10 with §11.11: a delay written min:typ:max reads back its three
+  // values under mtm_flag, the operation's three operands.
+  if (expr->type == vpiOperation && expr->op_type == vpiMinTypMaxOp &&
+      expr->children.size() == 3) {
+    info.min_delay = value_of(expr->children[0]) * kScale;
+    info.typ_delay = value_of(expr->children[1]) * kScale;
+    info.max_delay = value_of(expr->children[2]) * kScale;
+  }
   return {info};
 }
 
@@ -532,7 +567,9 @@ void VpiContext::GetDelays(VpiHandle obj, s_vpi_delay* delay_p) {
   // §38.10 (Table 38-2): each delay occupies a run of da entries selected by
   // mtm_flag and pulsere_flag, and the delays appear in source order. Walk the
   // delays in order, emitting each delay's run before moving to the next.
-  DelayCursor cur{delay_p, 0, kTt};
+  DelayCursor cur{
+      delay_p, 0, kTt,
+      std::pow(10.0, VpiObjectTimeUnit(*obj, sim_time_unit_) - sim_time_unit_)};
   for (int i = 0; i < delay_p->no_of_delays; ++i) {
     const VpiDelayInfo kD =
         (static_cast<size_t>(i) < kDelays.size()) ? kDelays[i] : VpiDelayInfo{};
@@ -640,7 +677,9 @@ void VpiContext::PutDelays(VpiHandle obj, s_vpi_delay* delay_p) {
   // delays are taken in source order. Only the fields the flags select are
   // written; every other field of the stored delay is left untouched, so when
   // pulsere_flag is clear the reject/error limits keep the values they had.
-  DelayCursor cur{delay_p, 0, kTt};
+  DelayCursor cur{
+      delay_p, 0, kTt,
+      std::pow(10.0, VpiObjectTimeUnit(*obj, sim_time_unit_) - sim_time_unit_)};
   for (int i = 0; i < delay_p->no_of_delays; ++i) {
     VpiDelayInfo& d = obj->delays[i];
     VpiReadDelayRun(cur, kMtm, kPulsere, d);
@@ -662,6 +701,7 @@ void VpiContext::PutDelays(VpiHandle obj, s_vpi_delay* delay_p) {
   if (obj->type == vpiPort && VpiPlacePortDelayDevice(obj, kAlloc) != nullptr) {
     AnnotateInterconnectDelays(*obj, *sim_ctx_);
   }
+  if (sim_ctx_ != nullptr) VpiPutRunDelays(*obj, run_entry_index_, *sim_ctx_);
 }
 
 void VpiContext::SeedSaveData(int id, const char* data, int len) {
@@ -761,18 +801,26 @@ int VpiContext::PutData(int id, const char* data_loc, int num_of_bytes) {
   return num_of_bytes;
 }
 
+// §38.33 with §38.37: whether `obj` is a call of a system task or function an
+// application registered, the only call an implementation keeps a user-data
+// storage location for; a built-in's call (§37.42 detail 5) has none.
+static bool VpiIsUserDefinedCall(VpiHandle obj) {
+  return obj != nullptr &&
+         (obj->type == vpiSysTaskCall || obj->type == vpiSysFuncCall) &&
+         obj->user_defined;
+}
+
 int VpiContext::PutUserData(VpiHandle obj, void* userdata) {
   // §38.33: the handle names the storage location of a user-defined system task
   // or system function call instance. A null handle, or a handle to any other
   // kind of object, has no such storage to write: that is a detected error
   // (§38.2) and the routine returns 0 with no association made.
-  if (obj == nullptr ||
-      (obj->type != vpiSysTaskCall && obj->type != vpiSysFuncCall)) {
+  if (!VpiIsUserDefinedCall(obj)) {
     last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
     last_error_.message = VpiText(
-        "vpi_put_userdata() requires a system task or system function call "
-        "handle");
+        "vpi_put_userdata() requires a user-defined system task or system "
+        "function call handle");
     return 0;
   }
 
@@ -787,13 +835,12 @@ void* VpiContext::GetUserData(VpiHandle obj) {
   // has a user-data storage location to read. A null handle, or a handle to any
   // other kind of object, has none: that is a detected error (§38.2) and the
   // routine returns null.
-  if (obj == nullptr ||
-      (obj->type != vpiSysTaskCall && obj->type != vpiSysFuncCall)) {
+  if (!VpiIsUserDefinedCall(obj)) {
     last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
     last_error_.message = VpiText(
-        "vpi_get_userdata() requires a system task or system function call "
-        "handle");
+        "vpi_get_userdata() requires a user-defined system task or system "
+        "function call handle");
     return nullptr;
   }
 

@@ -78,6 +78,7 @@ TEST_F(CompiletfApplicationRoutine, RunsForBothSystemTaskAndSystemFunction) {
 
   s_vpi_systf_data func = {};
   func.type = kVpiSysFunc;
+  func.sysfunctype = kVpiIntFunc;
   func.compiletf = &RecordingCompiletf;
   func.user_data = reinterpret_cast<PLI_BYTE8*>(&payload);
 
@@ -132,6 +133,7 @@ TEST_F(CompiletfApplicationRoutine,
 
   s_vpi_systf_data with_compiletf = {};
   with_compiletf.type = kVpiSysFunc;
+  with_compiletf.sysfunctype = kVpiIntFunc;
   with_compiletf.tfname = VpiText("$get_vector");
   with_compiletf.compiletf = &RecordingCompiletf;
   with_compiletf.user_data = reinterpret_cast<PLI_BYTE8*>(&payload);
@@ -211,6 +213,7 @@ PLI_INT32 InspectingCompiletf(PLI_BYTE8*) {
 void RegisterInspectingProbe(int type) {
   s_vpi_systf_data data = {};
   data.type = type;
+  data.sysfunctype = vpiIntFunc;
   data.tfname = VpiText("$probe");
   data.compiletf = &InspectingCompiletf;
   ASSERT_NE(vpi_register_systf(&data), nullptr);

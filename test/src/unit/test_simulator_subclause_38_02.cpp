@@ -160,8 +160,10 @@ TEST_F(VpiErrorCheckSim, ACompatibilityModeRoutineResetsErrorStatus) {
   RaiseError();
   EXPECT_EQ(vpi_get_1364v1995(vpiType, VpiHandleOf(&net)), vpiNet);
   EXPECT_EQ(vpi_chk_error(nullptr), 0);
+  VpiObject scope;
+  scope.type = vpiModule;
   RaiseError();
-  EXPECT_EQ(vpi_control_1800v2012(vpiSetInteractiveScope, VpiHandleOf(&net)),
+  EXPECT_EQ(vpi_control_1800v2012(vpiSetInteractiveScope, VpiHandleOf(&scope)),
             1);
   EXPECT_EQ(vpi_chk_error(nullptr), 0);
   RaiseError();

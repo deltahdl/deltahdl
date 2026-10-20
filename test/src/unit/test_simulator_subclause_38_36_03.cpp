@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <csignal>
 #include <iterator>
 #include <set>
 #include <string>
@@ -9,12 +10,14 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "fixture_simulator.h"
+#include "helpers_event_callbacks.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_signal_callbacks.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -439,6 +442,134 @@ TEST(UnresolvedSystfOfARun, AnUnknownSystemTaskIsReportedToTheApplication) {
   SetGlobalVpiContext(nullptr);
   EXPECT_EQ(UnresolvedNames(),
             (std::vector<std::string>{"$nobody_registered_this"}));
+}
+
+// The vpiTchkType of the timing check the last cbTchkViolation was given.
+int violated_tchk_type = 0;
+
+PLI_INT32 RecordViolatedCheck(p_cb_data cb) {
+  violated_tchk_type = vpi_get(vpiTchkType, cb->obj);
+  return RecordEventDelivery(cb);
+}
+
+// §38.36.3: a cbTchkViolation is called as a timing check is violated, its
+// obj the timing check (#7483).
+TEST_F(EventCallbacksOfARun, ATchkViolationCallbackIsGivenTheCheck) {
+  violated_tchk_type = 0;
+  Armer() = [] {
+    s_cb_data data = {};
+    data.reason = cbTchkViolation;
+    data.cb_rtn = &RecordViolatedCheck;
+    vpi_register_cb(&data);
+  };
+  Run("module top(output logic d, output logic clk);\n"
+      "  timeunit 1ns; timeprecision 1ns;\n"
+      "  specify\n"
+      "    $setup(d, posedge clk, 5);\n"
+      "  endspecify\n"
+      "  initial begin $arm; d = 0; clk = 0; #10 d = 1; #2 clk = 1; end\n"
+      "endmodule\n");
+  const std::vector<EventDelivery> kViolations = DeliveriesOf(cbTchkViolation);
+  ASSERT_EQ(kViolations.size(), 1u);
+  EXPECT_EQ(kViolations[0].obj_type, vpiTchk);
+  EXPECT_EQ(kViolations[0].now, 12u);
+  EXPECT_EQ(violated_tchk_type, vpiSetup);
+}
+
+// §38.36.3: a $reset the design invokes calls cbStartOfReset and then
+// cbEndOfReset (#7485).
+TEST_F(EventCallbacksOfARun, ADirectResetCallsTheResetCallbacks) {
+  Armer() = [] {
+    PlaceEventCallback(cbStartOfReset, nullptr);
+    PlaceEventCallback(cbEndOfReset, nullptr);
+  };
+  Run("module top; timeunit 1ns; timeprecision 1ns;\n"
+      "  initial begin $arm; #5 $reset; end\n"
+      "endmodule\n");
+  ASSERT_EQ(EventDeliveries().size(), 2u);
+  EXPECT_EQ(EventDeliveries()[0].reason, cbStartOfReset);
+  EXPECT_EQ(EventDeliveries()[1].reason, cbEndOfReset);
+}
+
+// §38.36.3 with D.11: a $scope the design invokes changes the interactive
+// scope, which calls cbInteractiveScopeChange given the new scope (#7486).
+TEST_F(EventCallbacksOfARun, AScopeTaskCallsTheScopeChangeCallback) {
+  Armer() = [] { PlaceEventCallback(cbInteractiveScopeChange, nullptr); };
+  Run("module top; timeunit 1ns; timeprecision 1ns;\n"
+      "  initial begin $arm; #1 $scope(top.blk); end\n"
+      "  initial begin : blk #2; end\n"
+      "endmodule\n");
+  const std::vector<EventDelivery> kChanges =
+      DeliveriesOf(cbInteractiveScopeChange);
+  ASSERT_EQ(kChanges.size(), 1u);
+  EXPECT_EQ(kChanges[0].obj, "blk");
+  EXPECT_EQ(kChanges[0].now, 1u);
+}
+
+// §38.36.3 with §38.4: vpi_control(vpiSetInteractiveScope) changes the
+// interactive scope, which calls cbInteractiveScopeChange given the new scope
+// (#7486).
+TEST_F(EventCallbacksOfARun, SettingTheScopeCallsTheScopeChangeCallback) {
+  Armer() = [] {
+    PlaceEventCallback(cbInteractiveScopeChange, nullptr);
+    vpi_control(vpiSetInteractiveScope, TopObject("top.blk"));
+  };
+  Run("module top;\n"
+      "  initial $arm;\n"
+      "  initial begin : blk #2; end\n"
+      "endmodule\n");
+  const std::vector<EventDelivery> kChanges =
+      DeliveriesOf(cbInteractiveScopeChange);
+  ASSERT_EQ(kChanges.size(), 1u);
+  EXPECT_EQ(kChanges[0].obj, "blk");
+}
+
+// The cbSignal registration the case below makes, removed once it is over.
+vpiHandle signal_callback = nullptr;
+
+// §38.36.3: a cbSignal callback traps the signal its index names and is
+// called at the run's next safe point, after which the run goes on (#7484).
+TEST_F(EventCallbacksOfARun, ASignalCallbackIsCalledAndTheRunGoesOn) {
+  Armer() = [] {
+    PlaceEventCallback(cbStartOfReset, nullptr);
+    s_cb_data data = {};
+    data.reason = cbSignal;
+    data.index = SIGUSR1;
+    data.cb_rtn = &RecordEventDelivery;
+    signal_callback = vpi_register_cb(&data);
+    std::raise(SIGUSR1);
+  };
+  Run("module top; timeunit 1ns; timeprecision 1ns; int after = 0;\n"
+      "  initial begin $arm; #1 after = 1; end\n"
+      "endmodule\n");
+  const std::vector<EventDelivery> kSignals = DeliveriesOf(cbSignal);
+  ASSERT_EQ(kSignals.size(), 1u);
+  EXPECT_EQ(kSignals[0].index, SIGUSR1);
+  s_vpi_value after = {};
+  after.format = vpiIntVal;
+  vpi_get_value(TopObject("top.after"), &after);
+  EXPECT_EQ(after.value.integer, 1);
+  EXPECT_EQ(vpi_remove_cb(signal_callback), 1);
+}
+
+// §38.36.3: a trap is set once per signal and kept while a cbSignal asks for
+// it, records the signal rather than taking its action, and is not set for a
+// number that names no signal it can trap.
+TEST(VpiSignalTraps, ASignalIsTrappedWhileAskedFor) {
+  VpiTrapSignal(0);
+  VpiTrapSignal(SIGKILL);
+  VpiTrapSignal(SIGUSR2);
+  VpiTrapSignal(SIGUSR2);
+  std::vector<s_cb_data> asked(1);
+  asked[0].reason = cbSignal;
+  asked[0].index = SIGUSR2;
+  VpiReleaseSignal(SIGUSR2, asked);
+  EXPECT_TRUE(VpiTakeRaisedSignals().empty());
+  std::raise(SIGUSR2);
+  EXPECT_EQ(VpiTakeRaisedSignals(), std::vector<int>{SIGUSR2});
+  VpiReleaseSignal(SIGUSR2, {});
+  VpiReleaseSignal(0, {});
+  VpiReleaseSignal(SIGKILL, {});
 }
 
 }  // namespace

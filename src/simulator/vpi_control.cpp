@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdio>
 #include <fstream>
+#include <functional>
 #include <optional>
 #include <sstream>
 #include <string>
@@ -31,30 +32,41 @@
 
 namespace delta {
 
+// §38.4: run `task`, a built-in task vpi_control() requested, on return of
+// the application routine that requested it: at once where no routine is
+// running, as when a test calls vpi_control() directly.
+static void OnRoutineReturn(VpiControlRequests& control,
+                            std::function<void()> task) {
+  if (control.routines_running > 0) {
+    control.on_return.push_back(std::move(task));
+    return;
+  }
+  task();
+}
+
+void VpiContext::LeaveApplicationRoutine() {
+  if (--control_.routines_running > 0) return;
+  std::vector<std::function<void()>> requested;
+  requested.swap(control_.on_return);
+  for (const std::function<void()>& task : requested) task();
+}
+
 int VpiContext::Control(int operation, int arg0, int arg1, int arg2,
                         VpiHandle scope) {
   // §38.4: vpiFinish/vpiStop request the matching built-in task on return of
   // the application routine and carry its diagnostic message level (see 20.2).
-  if (operation == kVpiFinish) {
-    finish_requested_ = true;
-    finish_diag_level_ = arg0;
-    // §20.2: the run ends as $finish ends it, at that level, the scheduler
-    // stopping once the application routine has returned.
-    if (sim_ctx_ != nullptr) {
-      EmitFinishDiagnostic(*sim_ctx_, "$finish", arg0, sim_ctx_->Out());
+  // §20.2: the run ends as $finish ends it, at that level; it is suspended as
+  // $stop suspends it, which a run with no interactive phase ends.
+  if (operation == kVpiFinish || operation == kVpiStop) {
+    const bool kFinish = operation == kVpiFinish;
+    (kFinish ? control_.finish_requested : control_.stop_requested) = true;
+    (kFinish ? control_.finish_diag_level : control_.stop_diag_level) = arg0;
+    OnRoutineReturn(control_, [this, kFinish, arg0] {
+      if (sim_ctx_ == nullptr) return;
+      EmitFinishDiagnostic(*sim_ctx_, kFinish ? "$finish" : "$stop", arg0,
+                           sim_ctx_->Out());
       sim_ctx_->RequestFinish();
-    }
-    return 1;
-  }
-  if (operation == kVpiStop) {
-    stop_requested_ = true;
-    stop_diag_level_ = arg0;
-    // §20.2: the run is suspended as $stop suspends it, which a run with no
-    // interactive phase ends.
-    if (sim_ctx_ != nullptr) {
-      EmitFinishDiagnostic(*sim_ctx_, "$stop", arg0, sim_ctx_->Out());
-      sim_ctx_->RequestFinish();
-    }
+    });
     return 1;
   }
   // §38.4: vpiReset requests $reset and is passed three additional integer
@@ -63,20 +75,32 @@ int VpiContext::Control(int operation, int arg0, int arg1, int arg2,
   // DispatchReset path so the reset-callback sequence (§38.36.3) runs exactly
   // as it does for a directly invoked $reset.
   if (operation == kVpiReset) {
-    reset_requested_ = true;
-    reset_stop_value_ = arg0;
-    reset_reset_value_ = arg1;
-    reset_diag_value_ = arg2;
-    DispatchReset();
+    control_.reset_requested = true;
+    control_.reset_stop_value = arg0;
+    control_.reset_reset_value = arg1;
+    control_.reset_diag_value = arg2;
+    OnRoutineReturn(control_, [this] { DispatchReset(); });
     return 1;
   }
   // §38.4: vpiSetInteractiveScope immediately retargets the tool's interactive
-  // scope to the supplied vpiScope handle.
+  // scope to the supplied handle, which names an object of the vpiScope class
+  // (§37.12); with no such object there is no scope to change to.
   if (operation == kVpiSetInteractiveScope) {
-    interactive_scope_ = scope;
+    if (scope == nullptr || !VpiIsScopeObject(scope)) return 0;
+    NoteInteractiveScope(scope);
     return 1;
   }
   return 0;
+}
+
+void VpiContext::NoteInteractiveScope(VpiHandle scope) {
+  control_.interactive_scope = scope;
+  // §38.4: the scope the tool's interactive tasks name objects from, which
+  // $scope sets too (D.11).
+  if (sim_ctx_ != nullptr) sim_ctx_->SetInteractiveScope(scope->full_name);
+  // §38.36.3: a change of the interactive scope is what a
+  // cbInteractiveScopeChange callback is called for, obj the new scope.
+  DispatchCallbacks(kCbInteractiveScopeChange, scope);
 }
 
 namespace {
@@ -415,44 +439,11 @@ VpiHandle VpiContext::HandleMulti(int type, VpiHandle ref1, VpiHandle ref2) {
   return ObjectSharedBy(ref1, ref2, type);
 }
 
-// §38.3: resolve a handle to the representative of the underlying simulation
-// object it denotes by following the same_object_as chain. A bounded walk
-// guards against an accidental cycle; the chains the simulator builds are short
-// (a handle aliases at most one representative).
-static VpiObject* ResolveSameObject(VpiObject* obj) {
+VpiObject* VpiResolveSameObject(VpiObject* obj) {
   for (int steps = 0; obj && obj->same_object_as && steps < 1000; ++steps) {
     obj = obj->same_object_as;
   }
   return obj;
-}
-
-int VpiContext::CompareObjects(VpiHandle obj1, VpiHandle obj2) {
-  // §38.3: a null handle names no object, so it can never refer to the same
-  // object as anything.
-  if (obj1 == nullptr || obj2 == nullptr) return 0;
-
-  VpiObject* a = ResolveSameObject(obj1);
-  VpiObject* b = ResolveSameObject(obj2);
-
-  // §38.3: the comparison holds only while the simulation object exists. A
-  // handle whose underlying object is absent (e.g. a class handle
-  // that is still null) is never equal to anything, even to itself.
-  if (!a->object_exists || !b->object_exists) return 0;
-
-  // §38.3: TRUE when both handles resolve to the same underlying object. The
-  // representatives are compared, not the original handle pointers, so two
-  // distinct handles that alias one object still compare equal - object
-  // equivalence cannot be settled by a C "==" of the handles.
-  if (a == b) return 1;
-
-  // §38.3 asks whether the handles name one underlying simulation object, and
-  // for a variable or a net that object is the storage the run
-  // keeps for it - which two objects of the model can name at once, a net and
-  // the variable its resolution writes among them. Only the representatives
-  // were compared, so two handles on one piece of the run's storage answered
-  // that they were different objects.
-  if (a->var != nullptr && a->var == b->var) return 1;
-  return a->net != nullptr && a->net == b->net ? 1 : 0;
 }
 
 VpiHandle VpiContext::CreateHandleFor(VpiHandle object) {
@@ -463,7 +454,7 @@ VpiHandle VpiContext::CreateHandleFor(VpiHandle object) {
   // underlying object so the new handle points straight at it. The fresh handle
   // is a distinct object (a different pointer than the one passed in), which
   // the standard allows, as it lets two handles to one object be distinct.
-  VpiObject* rep = ResolveSameObject(object);
+  VpiObject* rep = VpiResolveSameObject(object);
 
   // §37.2.4: a tool makes a handle to an object only while the object exists.
   // Past that lifetime there is no object for a
@@ -545,7 +536,7 @@ bool VpiContext::HandleValid(VpiHandle handle) const {
   // aliases the representative, so its own object_exists flag says nothing
   // about the object it denotes: the chain has to be resolved first, or an
   // alias to an object that has ceased to exist answers that it is still valid.
-  return ResolveSameObject(handle)->object_exists;
+  return VpiResolveSameObject(handle)->object_exists;
 }
 
 bool VpiContext::HandleSurvivesRestart(VpiHandle handle) const {
@@ -933,9 +924,12 @@ int VpiSystfResultSizeBits(const s_vpi_systf_data& data) {
   if (VpiSystfSizetfIsCalled(data) && data.sizetf != nullptr) {
     return VpiSystfInvoke(data.sizetf, data.user_data);
   }
-  // §38.37.1 with Annex K.2 and §6.11: a vpiTimeFunc returns time, a 64-bit
-  // type.
-  if (data.type == kVpiSysFunc && data.sysfunctype == vpiTimeFunc) return 64;
+  // §38.37.1 with Annex K.2, §6.11 and §6.12: a vpiTimeFunc returns time and
+  // a vpiRealFunc real, each 64 bits.
+  if (data.type == kVpiSysFunc &&
+      (data.sysfunctype == vpiTimeFunc || data.sysfunctype == vpiRealFunc)) {
+    return 64;
+  }
   return kVpiDefaultSizedFuncBits;
 }
 

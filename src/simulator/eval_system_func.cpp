@@ -27,6 +27,7 @@
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 
 namespace delta {
 
@@ -561,6 +562,9 @@ static Logic4Vec EvalAnnexDReset(const Expr* expr, SimContext& ctx,
         static_cast<int64_t>(EvalExpr(expr->args[1], ctx, arena).ToUint64());
   }
   ctx.RecordReset(reset_value);
+  // §38.36.3: a $reset invoked directly calls the cbStartOfReset and
+  // cbEndOfReset callbacks as one vpi_control(vpiReset) requests does.
+  GetGlobalVpiContext().DispatchReset();
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
@@ -579,6 +583,13 @@ static Logic4Vec EvalAnnexDScope(const Expr* expr, SimContext& ctx,
     std::string name = HierarchicalScopeName(expr->args[0]);
     if (ctx.IsHierarchicalScope(name)) {
       ctx.SetInteractiveScope(name);
+      // §38.36.3: a change of the interactive scope calls the
+      // cbInteractiveScopeChange callbacks, given the new scope where the
+      // VPI model holds one.
+      VpiContext& vpi = GetGlobalVpiContext();
+      if (VpiHandle scope = vpi.HandleByName(name.c_str(), nullptr)) {
+        vpi.NoteInteractiveScope(scope);
+      }
     } else {
       ctx.GetDiag().Error(
           expr->args[0]->range.start,

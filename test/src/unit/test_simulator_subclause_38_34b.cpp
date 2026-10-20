@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <cstring>
 #include <functional>
+#include <string>
 
 #include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
@@ -221,6 +222,96 @@ TEST_F(PutsOfARun, ADelayedPutOfAnUndecodableValueSchedulesNothing) {
   };
   Run(kTwoPutsOneEarlier);
   EXPECT_EQ(IntOf("top.v_at3"), 0);
+}
+
+// §38.34 with §15.5.1: a put to a named event triggers it as `->` does,
+// resuming the process waiting on it, and leaves it triggered for the rest of
+// the time step (§15.5.3) (#7473).
+TEST_F(PutsOfARun, APutToANamedEventTriggersIt) {
+  Putter() = [] {
+    vpi_put_value(vpi_handle_by_name(VpiText("top.ev"), nullptr), nullptr,
+                  nullptr, vpiNoDelay);
+  };
+  Run("module top; event ev; int seen = 0, fired = 0;\n"
+      "  initial begin @ev; seen = 1; end\n"
+      "  initial begin #1 $put; #0 fired = ev.triggered; end\n"
+      "endmodule\n");
+  EXPECT_EQ(IntOf("top.seen"), 1);
+  EXPECT_EQ(IntOf("top.fired"), 1);
+}
+
+// §38.34 with §6.6.7: a subelement of a user-defined nettype's net takes no
+// value of its own, so a put to one is refused and the net left as it was,
+// while a put to the whole net stands (#7475).
+TEST_F(PutsOfARun, APutToAPartOfANettypeNetIsRefused) {
+  Run("module top;\n"
+      "  nettype logic [7:4] n4;\n"
+      "  n4 n;\n"
+      "endmodule\n");
+  vpiHandle bits = vpi_iterate(vpiBit, By("top.n"));
+  ASSERT_NE(bits, nullptr);
+  vpiHandle bit = vpi_scan(bits);
+  ASSERT_NE(bit, nullptr);
+  s_vpi_value before = {};
+  before.format = vpiBinStrVal;
+  vpi_get_value(By("top.n"), &before);
+  const std::string kBefore = before.value.str;
+  s_vpi_value one = {};
+  one.format = vpiScalarVal;
+  one.value.scalar = vpi1;
+  vpi_put_value(bit, &one, nullptr, vpiNoDelay);
+  EXPECT_NE(vpi_chk_error(nullptr), 0);
+  s_vpi_value after = {};
+  after.format = vpiBinStrVal;
+  vpi_get_value(By("top.n"), &after);
+  EXPECT_EQ(std::string(after.value.str), kBefore);
+  s_vpi_value whole = {};
+  whole.format = vpiIntVal;
+  whole.value.integer = 5;
+  vpi_put_value(By("top.n"), &whole, nullptr, vpiNoDelay);
+  EXPECT_EQ(vpi_chk_error(nullptr), 0);
+}
+
+// What the vpiStringVal put to the `$half_of_five` call recorded.
+int string_put_error = 0;
+
+// A run whose design calls `$half_of_five`, a vpiRealFunc whose calltf first
+// puts a string to its call and then the real 2.5.
+class RealFunctionOfARun : public VpiDesignRun {
+ protected:
+  void SetUp() override {
+    VpiDesignRun::SetUp();
+    string_put_error = 0;
+    s_vpi_systf_data data = {};
+    data.type = vpiSysFunc;
+    data.sysfunctype = vpiRealFunc;
+    data.tfname = VpiText("$half_of_five");
+    data.calltf = [](PLI_BYTE8*) -> PLI_INT32 {
+      vpiHandle call = vpi_handle(vpiSysTfCall, nullptr);
+      s_vpi_value text = {};
+      text.format = vpiStringVal;
+      text.value.str = VpiText("2.5");
+      vpi_put_value(call, &text, nullptr, vpiNoDelay);
+      string_put_error = vpi_chk_error(nullptr);
+      s_vpi_value real = {};
+      real.format = vpiRealVal;
+      real.value.real = 2.5;
+      vpi_put_value(call, &real, nullptr, vpiNoDelay);
+      return 0;
+    };
+    ASSERT_NE(vpi_register_systf(&data), nullptr);
+  }
+};
+
+// §38.34 with §38.37.1: a vpiRealFunc returns the real its calltf puts, and
+// refuses a vpiStringVal put as a real object does (#7474).
+TEST_F(RealFunctionOfARun, ItReturnsTheRealPutAndRefusesAString) {
+  Run("module top; real r; initial r = $half_of_five; endmodule\n");
+  s_vpi_value value = {};
+  value.format = vpiRealVal;
+  vpi_get_value(By("top.r"), &value);
+  EXPECT_DOUBLE_EQ(value.value.real, 2.5);
+  EXPECT_NE(string_put_error, 0);
 }
 
 }  // namespace

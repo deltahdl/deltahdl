@@ -59,6 +59,7 @@ TEST_F(VpiGetSystfInfoSim, ReportsTheCallbackNamedByTheHandle) {
 
   s_vpi_systf_data second = {};
   second.type = vpiSysFunc;
+  second.sysfunctype = vpiIntFunc;
   second.tfname = VpiText("$second");
 
   vpiHandle h1 = vpi_register_systf(&first);

@@ -241,7 +241,7 @@ TEST_F(VpiDeprecatedDefinitions, VpiArrayMemberTellsAnElementFromAVariable) {
 TEST_F(VpiDeprecatedDefinitions, EveryOtherPropertyIsTheCurrentOne) {
   ASSERT_TRUE(ctx_.SetDefaultCompatibilityMode(vpiMode1364v1995));
   EXPECT_EQ(vpi_get(vpiIsMemory, VpiHandleOf(&memory_)), 1);
-  EXPECT_EQ(vpi_get(vpiType, nullptr), 0);
+  EXPECT_EQ(vpi_get(vpiType, nullptr), vpiUndefined);
 }
 
 // §37.3.6: asking for a property of a protected object other than vpiType is

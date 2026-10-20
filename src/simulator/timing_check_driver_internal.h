@@ -21,6 +21,8 @@
 #include "simulator/specify.h"
 #include "simulator/specify_timing_check.h"
 #include "simulator/variable.h"
+#include "simulator/vpi_context.h"
+#include "simulator/vpi_globals.h"
 
 namespace delta {
 
@@ -511,6 +513,13 @@ inline void ToggleNotifier(const TimingCheckEntry& check, SimContext& ctx) {
   var->value.words[0].bval =
       (var->value.words[0].bval & ~1ULL) | (toggled.bval & 1ULL);
   var->NotifyWatchers();
+}
+
+// §31.6 and §38.36.3: what a violation of `check` sets going besides its
+// report: the notifier's change, and the cbTchkViolation callbacks.
+inline void NoteViolation(const TimingCheckEntry& check, SimContext& ctx) {
+  GetGlobalVpiContext().NoteTimingViolation(check);
+  ToggleNotifier(check, ctx);
 }
 
 }  // namespace delta

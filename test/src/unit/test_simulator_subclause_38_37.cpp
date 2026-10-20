@@ -23,6 +23,7 @@ TEST_F(VpiSystfRegistrationSim, RegisterMultipleSystfs) {
 
   s_vpi_systf_data data2 = {};
   data2.type = vpiSysFunc;
+  data2.sysfunctype = vpiIntFunc;
   data2.tfname = VpiText("$func_b");
 
   vpi_register_systf(&data1);
@@ -41,6 +42,7 @@ TEST_F(VpiSystfRegistrationSim, RegisterSystfReturnsDistinctHandles) {
 
   s_vpi_systf_data func = {};
   func.type = vpiSysFunc;
+  func.sysfunctype = vpiIntFunc;
   func.tfname = VpiText("$second");
 
   vpiHandle h1 = vpi_register_systf(&task);

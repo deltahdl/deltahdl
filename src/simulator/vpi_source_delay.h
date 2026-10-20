@@ -26,12 +26,18 @@ VpiObject* VpiSourceDelayExpression(const std::vector<const Expr*>& delays,
                                     SimContext& ctx,
                                     const std::function<VpiObject*()>& alloc);
 
+// §38.10 with §11.11: the delay `delay` writes, in ticks, evaluated in the
+// instance the run is in: the value the run selected and, as mtm_flag reads
+// them back, the minimum, typical and maximum a min:typ:max expression gives.
+VpiDelayInfo VpiWrittenDelay(const Expr* delay, SimContext& ctx);
+
 // §37.35, §37.47 and §38.10: the delays an object whose source code wrote
 // `delays`, a rise, a fall and a turn-off, reports through vpi_get_delays, in
 // ticks, evaluated in the instance under `scope_prefix`: the rise, a fall that
 // is the rise where none was written and, where `turn_off` says the object
 // has one, a turn-off that is the smaller of the two where none was (§10.3.3,
-// §28.16). None where no delay was written.
+// §28.16), each with its minimum, typical and maximum (VpiWrittenDelay).
+// None where no delay was written.
 std::vector<VpiDelayInfo> VpiWrittenDelays(
     const std::array<const Expr*, 3>& delays, bool turn_off,
     std::string_view scope_prefix, SimContext& ctx);

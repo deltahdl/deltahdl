@@ -185,7 +185,7 @@ void ReportSkewViolation(const SkewWindow& window, uint64_t limit,
                     window.data_signal, window.ref_signal, limit),
         "31.4.2", check.loc, ctx);
   }
-  ToggleNotifier(check, ctx);
+  NoteViolation(check, ctx);
 }
 
 // Stops the pending timer-based report, if there is one. A window with no timer

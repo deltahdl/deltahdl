@@ -1,13 +1,17 @@
 #include <gtest/gtest.h>
 
+#include <vector>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "fixture_vpi_run.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -194,6 +198,93 @@ TEST_F(VpiCompareObjectsSim, ObjectsOnDifferentStorageAreDifferentObjects) {
   second->var = other;
 
   EXPECT_EQ(vpi_compare_objects(VpiHandleOf(first), VpiHandleOf(second)), 0);
+}
+
+// What each `$cmp(x, y)` call of a design compared its two arguments as,
+// read at the moment of the call (§38.3), in the order the calls ran.
+std::vector<int> compared;
+
+PLI_INT32 CompareArgumentsCalltf(PLI_BYTE8* /*user_data*/) {
+  vpiHandle call = vpi_handle(vpiSysTfCall, nullptr);
+  vpiHandle args = vpi_iterate(vpiArgument, call);
+  vpiHandle first = vpi_scan(args);
+  vpiHandle second = vpi_scan(args);
+  vpi_release_handle(args);
+  compared.push_back(vpi_compare_objects(first, second));
+  return 0;
+}
+
+// A design run whose `$cmp` calls record their comparisons in `compared`.
+class VpiCompareObjectsRun : public VpiDesignRun {
+ protected:
+  void SetUp() override {
+    VpiDesignRun::SetUp();
+    compared.clear();
+    s_vpi_systf_data data = {};
+    data.type = vpiSysTask;
+    data.tfname = VpiText("$cmp");
+    data.calltf = &CompareArgumentsCalltf;
+    ASSERT_NE(vpi_register_systf(&data), nullptr);
+  }
+};
+
+// §38.3: two bits of one vector, and a bit and its whole vector, share the
+// vector's storage but stand for different bits of it, so they are different
+// objects; two handles to one bit, reached by different routes, are one.
+TEST_F(VpiCompareObjectsRun, BitsOfOneVectorAreDifferentObjects) {
+  Run("module top; wire [3:0] w; logic [3:0] v; initial $noop; endmodule");
+  for (const char* kName : {"top.w", "top.v"}) {
+    vpiHandle vec = By(kName);
+    ASSERT_NE(vec, nullptr) << kName;
+    vpiHandle bit0 = vpi_handle_by_index(vec, 0);
+    vpiHandle bit1 = vpi_handle_by_index(vec, 1);
+    ASSERT_NE(bit0, nullptr) << kName;
+    ASSERT_NE(bit1, nullptr) << kName;
+    EXPECT_EQ(vpi_compare_objects(bit0, bit1), 0) << kName;
+    EXPECT_EQ(vpi_compare_objects(bit0, vec), 0) << kName;
+  }
+  vpiHandle by_index = vpi_handle_by_index(By("top.w"), 2);
+  vpiHandle by_name = By("top.w[2]");
+  ASSERT_NE(by_index, nullptr);
+  ASSERT_NE(by_name, nullptr);
+  EXPECT_EQ(vpi_compare_objects(by_index, by_name), 1);
+}
+
+// §38.3 Example 1: bit 0 of a packed structure and bit 7 of its member
+// `reg [0:7] b`, the last and so least significant field, are one bit named
+// two ways; bit 1 of the structure is another bit.
+TEST_F(VpiCompareObjectsRun, PackedStructBitAndMemberBitAreOneObject) {
+  Run("module top; struct packed { int a; reg [0:7] b; } ps; "
+      "initial $noop; endmodule");
+  vpiHandle ps = By("top.ps");
+  vpiHandle member = By("top.ps.b");
+  ASSERT_NE(ps, nullptr);
+  ASSERT_NE(member, nullptr);
+  vpiHandle member_bit = vpi_handle_by_index(member, 7);
+  vpiHandle ps0 = vpi_handle_by_index(ps, 0);
+  vpiHandle ps1 = vpi_handle_by_index(ps, 1);
+  ASSERT_NE(member_bit, nullptr);
+  ASSERT_NE(ps0, nullptr);
+  ASSERT_NE(ps1, nullptr);
+  EXPECT_EQ(vpi_compare_objects(ps0, member_bit), 1);
+  EXPECT_EQ(vpi_compare_objects(ps1, member_bit), 0);
+}
+
+// §38.3 Example 2: the var select `i[j]` is the element `i[0]` while `j` is
+// 0, and another element once `j` is 1.
+TEST_F(VpiCompareObjectsRun, VarSelectIsTheElementItsIndexNamesNow) {
+  Run("module top; integer i [0:3]; int j; initial begin "
+      "j = 0; $cmp(i[j], i[0]); j = 1; $cmp(i[j], i[0]); end endmodule");
+  EXPECT_EQ(compared, (std::vector<int>{1, 0}));
+}
+
+// §38.3 Example 3: `c.a` and `d.a` are no object while `c` or `d` is null,
+// one object once `d = c`, and two once `c` holds a new object.
+TEST_F(VpiCompareObjectsRun, ClassMemberReferencesFollowTheirHandles) {
+  Run("module top; class C; int a; endclass C c, d; initial begin "
+      "$cmp(c.a, d.a); c = new; $cmp(c.a, d.a); d = c; $cmp(c.a, d.a); "
+      "c = new; $cmp(c.a, d.a); end endmodule");
+  EXPECT_EQ(compared, (std::vector<int>{0, 0, 1, 0}));
 }
 
 }  // namespace

@@ -189,7 +189,7 @@ void EvaluateStabilityWindow(const StabilityWindow& window,
                                            timecheck_ticks);
   if (!violated) return;
   ReportViolation(check.kind, window, ctx);
-  ToggleNotifier(check, ctx);
+  NoteViolation(check, ctx);
 }
 
 // Arms the two watchers one §31.3 check needs. Nothing is armed when either

@@ -114,6 +114,13 @@ void VpiContext::NoteThreadEnded(Process* proc) {
   ReleaseFrameOrThreadObject(ThreadObjectFor(proc));
 }
 
+void VpiContext::NoteThreadEntered(Process* proc) {
+  if (sim_ctx_ == nullptr || !HasCallbackFor(callbacks_, cbEnterThread)) {
+    return;
+  }
+  DispatchCallbacks(cbEnterThread, ThreadObjectFor(proc));
+}
+
 void VpiContext::RefreshRunObjects() {
   RefreshThreadObjects();
   // §37.81: the time queue a run's iteration walks is its scheduler's slots
