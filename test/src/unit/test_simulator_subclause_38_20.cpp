@@ -32,14 +32,14 @@ class VpiHandleByMultiIndexSim : public ::testing::Test {
 // dimension of the reference handle per index. num_index says how many of the
 // supplied indices to apply.
 TEST_F(VpiHandleByMultiIndexSim, ResolvesNestedSubobjectFromIndexList) {
-  auto* mod = vpi_ctx_.CreateModule("top", "top");
-  vpi_ctx_.CreatePort("a", kVpiInput, mod);                  // index 0
-  auto* port_b = vpi_ctx_.CreatePort("b", kVpiOutput, mod);  // index 1
+  auto* bus = vpi_ctx_.CreateNetObj("bus", /*net_ptr=*/nullptr, /*width=*/8);
+  vpi_ctx_.CreatePort("a", kVpiInput, bus);                  // index 0
+  auto* port_b = vpi_ctx_.CreatePort("b", kVpiOutput, bus);  // index 1
   vpi_ctx_.CreatePort("b0", kVpiOutput, port_b);             // index 0 within b
   auto* bit_b1 = vpi_ctx_.CreatePort("b1", kVpiOutput, port_b);  // index 1
 
   int indices[] = {1, 1};
-  vpiHandle result = vpi_handle_by_multi_index(VpiHandleOf(mod), 2, indices);
+  vpiHandle result = vpi_handle_by_multi_index(VpiHandleOf(bus), 2, indices);
   ASSERT_NE(result, nullptr);
   EXPECT_EQ(VpiObjectOf(result), bit_b1);
 }
@@ -48,20 +48,20 @@ TEST_F(VpiHandleByMultiIndexSim, ResolvesNestedSubobjectFromIndexList) {
 // rightmost, so applying them in the opposite order names a different
 // subobject.
 TEST_F(VpiHandleByMultiIndexSim, IndicesAreAppliedLeftmostFirst) {
-  auto* mod = vpi_ctx_.CreateModule("top", "top");
-  auto* port_a = vpi_ctx_.CreatePort("a", kVpiInput, mod);   // index 0
-  auto* port_b = vpi_ctx_.CreatePort("b", kVpiOutput, mod);  // index 1
+  auto* bus = vpi_ctx_.CreateNetObj("bus", /*net_ptr=*/nullptr, /*width=*/8);
+  auto* port_a = vpi_ctx_.CreatePort("a", kVpiInput, bus);   // index 0
+  auto* port_b = vpi_ctx_.CreatePort("b", kVpiOutput, bus);  // index 1
   vpi_ctx_.CreatePort("a0", kVpiInput, port_a);              // a[0]
   auto* a1 = vpi_ctx_.CreatePort("a1", kVpiInput, port_a);   // a[1]
   auto* b0 = vpi_ctx_.CreatePort("b0", kVpiOutput, port_b);  // b[0]
 
   int forward[] = {0, 1};  // a then a[1]
   EXPECT_EQ(
-      VpiObjectOf(vpi_handle_by_multi_index(VpiHandleOf(mod), 2, forward)), a1);
+      VpiObjectOf(vpi_handle_by_multi_index(VpiHandleOf(bus), 2, forward)), a1);
 
   int reversed[] = {1, 0};  // b then b[0]
   EXPECT_EQ(
-      VpiObjectOf(vpi_handle_by_multi_index(VpiHandleOf(mod), 2, reversed)),
+      VpiObjectOf(vpi_handle_by_multi_index(VpiHandleOf(bus), 2, reversed)),
       b0);
 }
 
@@ -69,14 +69,14 @@ TEST_F(VpiHandleByMultiIndexSim, IndicesAreAppliedLeftmostFirst) {
 // many indices are applied, so a single outer index resolves to the
 // intermediate subobject without descending further.
 TEST_F(VpiHandleByMultiIndexSim, NumIndexGovernsHowManyIndicesApply) {
-  auto* mod = vpi_ctx_.CreateModule("top", "top");
-  vpi_ctx_.CreatePort("a", kVpiInput, mod);                  // index 0
-  auto* port_b = vpi_ctx_.CreatePort("b", kVpiOutput, mod);  // index 1
+  auto* bus = vpi_ctx_.CreateNetObj("bus", /*net_ptr=*/nullptr, /*width=*/8);
+  vpi_ctx_.CreatePort("a", kVpiInput, bus);                  // index 0
+  auto* port_b = vpi_ctx_.CreatePort("b", kVpiOutput, bus);  // index 1
   vpi_ctx_.CreatePort("b0", kVpiOutput, port_b);             // index 0 within b
 
   int indices[] = {1};
   EXPECT_EQ(
-      VpiObjectOf(vpi_handle_by_multi_index(VpiHandleOf(mod), 1, indices)),
+      VpiObjectOf(vpi_handle_by_multi_index(VpiHandleOf(bus), 1, indices)),
       port_b);
 }
 
@@ -88,34 +88,34 @@ TEST_F(VpiHandleByMultiIndexSim, NullParentReturnsNullptr) {
 // §38.20: when an index names no subobject the index list does not form a legal
 // SystemVerilog index select expression, so the routine returns a null handle.
 TEST_F(VpiHandleByMultiIndexSim, IndexNamingNoSubobjectReturnsNullptr) {
-  auto* mod = vpi_ctx_.CreateModule("top", "top");
-  auto* port_b = vpi_ctx_.CreatePort("b", kVpiOutput, mod);  // index 0
+  auto* bus = vpi_ctx_.CreateNetObj("bus", /*net_ptr=*/nullptr, /*width=*/8);
+  auto* port_b = vpi_ctx_.CreatePort("b", kVpiOutput, bus);  // index 0
   vpi_ctx_.CreatePort("b0", kVpiOutput, port_b);             // index 0 within b
 
   int indices[] = {0, 99};  // b exists, b[99] does not
-  EXPECT_EQ(vpi_handle_by_multi_index(VpiHandleOf(mod), 2, indices), nullptr);
+  EXPECT_EQ(vpi_handle_by_multi_index(VpiHandleOf(bus), 2, indices), nullptr);
 }
 
 // §38.20: with no indices there is no index select expression to construct, so
 // no subobject is named.
 TEST_F(VpiHandleByMultiIndexSim, EmptyIndexListReturnsNullptr) {
-  auto* mod = vpi_ctx_.CreateModule("top", "top");
-  vpi_ctx_.CreatePort("a", kVpiInput, mod);
+  auto* bus = vpi_ctx_.CreateNetObj("bus", /*net_ptr=*/nullptr, /*width=*/8);
+  vpi_ctx_.CreatePort("a", kVpiInput, bus);
 
   int indices[] = {0};
-  EXPECT_EQ(vpi_handle_by_multi_index(VpiHandleOf(mod), 0, indices), nullptr);
+  EXPECT_EQ(vpi_handle_by_multi_index(VpiHandleOf(bus), 0, indices), nullptr);
 }
 
 // §38.20: unless otherwise specified, calling vpi_handle_by_multi_index() for a
 // protected reference object is an error - no handle is produced and the error
 // status is recorded for vpi_chk_error() (§38.2).
 TEST_F(VpiHandleByMultiIndexSim, ProtectedReferenceObjectIsAnError) {
-  auto* mod = vpi_ctx_.CreateModule("top", "top");
-  vpi_ctx_.CreatePort("a", kVpiInput, mod);
-  mod->is_protected = true;
+  auto* bus = vpi_ctx_.CreateNetObj("bus", /*net_ptr=*/nullptr, /*width=*/8);
+  vpi_ctx_.CreatePort("a", kVpiInput, bus);
+  bus->is_protected = true;
 
   int indices[] = {0};
-  EXPECT_EQ(vpi_handle_by_multi_index(VpiHandleOf(mod), 1, indices), nullptr);
+  EXPECT_EQ(vpi_handle_by_multi_index(VpiHandleOf(bus), 1, indices), nullptr);
 
   s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
@@ -133,30 +133,11 @@ TEST_F(VpiHandleByMultiIndexSim, ReferenceWithoutAccessByIndexReturnsNullptr) {
   EXPECT_EQ(vpi_handle_by_multi_index(VpiHandleOf(param), 1, indices), nullptr);
 }
 
-// §38.20: the routine anchors on any reference object that carries the
-// access-by-index property, not on a module in particular. A net is
-// bit-indexable, so it can serve as the reference handle: the index list
-// descends its element then its trailing bit-select, resolving the same way it
-// does for a module. This exercises the access-by-index positive path on a
-// reference type other than kVpiModule.
-TEST_F(VpiHandleByMultiIndexSim, NetReferenceResolvesElementThenBitSelect) {
-  auto* net = vpi_ctx_.CreateNetObj("bus", /*net_ptr=*/nullptr, /*width=*/8);
-  auto* elem0 = vpi_ctx_.CreatePort("bus0", kVpiInput, net);     // element 0
-  vpi_ctx_.CreatePort("bus1", kVpiInput, net);                   // element 1
-  vpi_ctx_.CreatePort("bus0_0", kVpiInput, elem0);               // bit 0 of [0]
-  auto* bit1 = vpi_ctx_.CreatePort("bus0_1", kVpiInput, elem0);  // bit 1 of [0]
-
-  int indices[] = {0, 1};  // bus[0][1]
-  EXPECT_EQ(
-      VpiObjectOf(vpi_handle_by_multi_index(VpiHandleOf(net), 2, indices)),
-      bit1);
-}
-
 // §38.20: num_index counts the indices index_array holds, so a null array
 // names no subobject whatever the count.
 TEST_F(VpiHandleByMultiIndexSim, ANullIndexArrayNamesNothing) {
-  auto* mod = vpi_ctx_.CreateModule("top", "top");
-  EXPECT_EQ(vpi_handle_by_multi_index(VpiHandleOf(mod), 1, nullptr), nullptr);
+  auto* bus = vpi_ctx_.CreateNetObj("bus", /*net_ptr=*/nullptr, /*width=*/8);
+  EXPECT_EQ(vpi_handle_by_multi_index(VpiHandleOf(bus), 1, nullptr), nullptr);
 }
 }  // namespace
 }  // namespace delta

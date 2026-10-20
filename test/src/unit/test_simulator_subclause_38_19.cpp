@@ -30,14 +30,14 @@ class VpiHandleByIndexSim : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-TEST_F(VpiHandleByIndexSim, HandleByIndexReturnCorrectChild) {
+// §38.19 with §37.10: a module has no access by index, its ports being reached
+// by iteration, so an index matching a port's place names nothing (#7404).
+TEST_F(VpiHandleByIndexSim, AModulesIndexNamesNoPort) {
   auto* mod = vpi_ctx_.CreateModule("top", "top");
   vpi_ctx_.CreatePort("a", kVpiInput, mod);
-  auto* port_b = vpi_ctx_.CreatePort("b", kVpiOutput, mod);
+  vpi_ctx_.CreatePort("b", kVpiOutput, mod);
 
-  vpiHandle result = vpi_handle_by_index(VpiHandleOf(mod), 1);
-  ASSERT_NE(result, nullptr);
-  EXPECT_EQ(VpiObjectOf(result), port_b);
+  EXPECT_EQ(vpi_handle_by_index(VpiHandleOf(mod), 1), nullptr);
 }
 
 TEST_F(VpiHandleByIndexSim, HandleByIndexNullParentReturnsNullptr) {
@@ -48,8 +48,9 @@ TEST_F(VpiHandleByIndexSim, HandleByIndexNullParentReturnsNullptr) {
 // §38.19: an index that names no sub-object does not lead to a legal index
 // select expression, so the routine returns a null handle.
 TEST_F(VpiHandleByIndexSim, HandleByIndexOutOfRangeReturnsNullptr) {
-  auto* mod = vpi_ctx_.CreateModule("top", "top");
-  vpiHandle result = vpi_handle_by_index(VpiHandleOf(mod), 99);
+  auto* bus = vpi_ctx_.CreateNetObj("bus", /*net_ptr=*/nullptr, /*width=*/8);
+  vpi_ctx_.CreatePort("bus0", kVpiInput, bus);
+  vpiHandle result = vpi_handle_by_index(VpiHandleOf(bus), 99);
   EXPECT_EQ(result, nullptr);
 }
 
