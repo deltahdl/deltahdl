@@ -833,7 +833,7 @@ TEST_F(DelaysPutInARun, AGateAndAUdpTakeTheirPutDelays) {
 
 // §38.32 with §31.3.1: the limit vpi_put_delays gives a $setup is the one its
 // next checks are judged against: with 2 in place of 5, a data change 3
-// before the clock edge is no violation, and one at the edge still is
+// before the clock edge is no violation, and one 1 before it still is
 // (#7470).
 TEST_F(DelaysPutInARun, ATimingCheckIsJudgedAgainstItsPutLimit) {
   RegisterTask("$limit_put", &PutCheckLimit);
@@ -846,7 +846,7 @@ TEST_F(DelaysPutInARun, ATimingCheckIsJudgedAgainstItsPutLimit) {
       "    d = 0; clk = 0;\n"
       "    #1 $limit_put;\n"
       "    #9 d = 1; #3 clk = 1; #5 clk = 0;\n"
-      "    #5 d = 0; clk = 1; #5;\n"
+      "    #4 d = 0; #1 clk = 1; #5;\n"
       "  end\n"
       "endmodule\n");
   EXPECT_EQ(IntOf("top.violations"), 1);
