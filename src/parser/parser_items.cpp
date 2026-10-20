@@ -854,6 +854,8 @@ void Parser::ParseScopedTypeOrInst(const Token& name_tok,
       dtype.type_params = ParseTypeParamList();
     }
   }
+  // A.2.2.1: packed dimensions may follow the scoped type_identifier.
+  ParsePackedDims(dtype);
   ParseVarDeclList(items, dtype);
 }
 

@@ -773,6 +773,7 @@ class Parser {
                           const std::vector<Attribute>& attrs);
 
   DataType ParseDataType();
+  bool AtScopedTypeName();
   DataType ParseDeclaredDataType();
   // True when the token the parse stands on opens a `data_type_or_void`
   // (A.2.2.1), for a caller whose production makes that type optional and so
@@ -780,7 +781,6 @@ class Parser {
   // the whole of A.2.2.1's `data_type` rather than for its keyword cases
   // alone: an identifier opens one when it names a type this scope has
   // declared, which `known_types_` is what records.
-  //
   // A leading `signing` or packed dimension is admitted too. Neither opens a
   // `data_type` -- A.2.2.1 attaches `signing` to `integer_vector_type` and
   // `integer_atom_type` and puts a bare one in `implicit_data_type` -- and

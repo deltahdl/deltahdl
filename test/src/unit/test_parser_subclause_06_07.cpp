@@ -5,6 +5,7 @@
 
 #include "fixture_parser.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 
 using namespace delta;
@@ -276,6 +277,25 @@ TEST(NetDeclAssignmentForm, IdentifierWithInitExpression) {
   auto& items = r.cu->modules[0]->items;
   ASSERT_EQ(items.size(), 1u);
   EXPECT_NE(items[0]->init_expr, nullptr);
+}
+
+TEST(NetDeclAssignmentForm, PackageScopedTypedefWithPackedDimension) {
+  auto r = Parse(
+      "package pk;\n"
+      "  typedef struct packed { logic a; logic [1:0] b; } ps_t;\n"
+      "endpackage\n"
+      "module m; wire pk::ps_t [1:0] pw; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& items = r.cu->modules[0]->items;
+  ASSERT_EQ(items.size(), 1u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kNetDecl);
+  EXPECT_EQ(items[0]->name, "pw");
+  EXPECT_TRUE(items[0]->data_type.is_net);
+  EXPECT_EQ(items[0]->data_type.scope_name, "pk");
+  EXPECT_EQ(items[0]->data_type.type_name, "ps_t");
+  ASSERT_NE(items[0]->data_type.packed_dim_left, nullptr);
+  EXPECT_EQ(items[0]->data_type.packed_dim_left->int_val, 1u);
 }
 
 }  // namespace

@@ -599,4 +599,23 @@ TEST(VariableDeclaration, ClassHandleVarDeclWithNew) {
   EXPECT_NE(item->init_expr, nullptr);
 }
 
+TEST(VariableDeclaration, PackageScopedTypedefWithPackedDimension) {
+  auto r = Parse(
+      "package pk;\n"
+      "  typedef struct packed { logic a; logic [1:0] b; } ps_t;\n"
+      "endpackage\n"
+      "module m; pk::ps_t [1:0] pv; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& items = r.cu->modules[0]->items;
+  ASSERT_EQ(items.size(), 1u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(items[0]->name, "pv");
+  EXPECT_EQ(items[0]->data_type.kind, DataTypeKind::kNamed);
+  EXPECT_EQ(items[0]->data_type.scope_name, "pk");
+  EXPECT_EQ(items[0]->data_type.type_name, "ps_t");
+  ASSERT_NE(items[0]->data_type.packed_dim_left, nullptr);
+  EXPECT_EQ(items[0]->data_type.packed_dim_left->int_val, 1u);
+}
+
 }  // namespace
