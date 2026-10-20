@@ -293,6 +293,28 @@ class AssertionSampleStore {
   }
   const InstanceBindings* Bindings() const { return bindings_; }
 
+  // §39.4.2: what an attempt read at one tick, for the expression a failure
+  // and a step report. Where a log is installed, each attempt the evaluation
+  // steps is noted, by the time it began, with no expression, and then each
+  // operand it reads -- a sequence's Boolean, a property's -- with whether it
+  // held; nothing is noted where none is installed.
+  struct OperandRead {
+    uint64_t started = 0;
+    const Expr* expr = nullptr;
+    bool held = false;
+  };
+  void SetOperandLog(std::vector<OperandRead>* log) { operand_log_ = log; }
+  void NoteAttemptStepped(uint64_t started) {
+    attempt_started_ = started;
+    if (operand_log_ != nullptr)
+      operand_log_->push_back({started, nullptr, false});
+  }
+  void NoteOperand(const Expr* expr, bool held) {
+    if (operand_log_ != nullptr) {
+      operand_log_->push_back({attempt_started_, expr, held});
+    }
+  }
+
   // §16.13.1: while a property of more than one clock is being evaluated,
   // the clocks that ticked at the time step, a bit per clock in the order
   // the property numbered them, the leading clock bit 0; every bit set
@@ -385,6 +407,8 @@ class AssertionSampleStore {
   bool procedure_reads_sampled_ = false;
   bool reading_defaults_ = false;
   uint32_t clock_ticks_ = ~0u;
+  std::vector<OperandRead>* operand_log_ = nullptr;
+  uint64_t attempt_started_ = 0;
 };
 
 }  // namespace delta

@@ -83,6 +83,14 @@ using AssertionPlacedCallback =
 // NULL handle returned when a placement is in error.
 using AssertionCallbackHandle = uint64_t;
 
+// §39.3.1: the name the model keeps one instance of one assertion under --
+// its full name, `scope`.`name`, where it is labelled, and where it is not,
+// which an unnamed assertion may be (§39.3.1 details), the scope and the
+// source line and column it starts at, which no other assertion of the scope
+// shares.
+std::string AssertionKey(std::string_view scope, std::string_view name,
+                         uint32_t line, uint32_t column);
+
 // §20.11: what an assertion control task selects an assertion by -- the Table
 // 20-6 assertion_type bit and Table 20-7 directive_type bit of its kind, the
 // scope it stands in and its full name.
@@ -265,6 +273,15 @@ class AssertionApi {
   void NoteAssertionAttemptStarted(std::string_view assertion,
                                    uint64_t attempt_start_time);
 
+  // §39.5.2 with §39.4.2: the step the attempt of `assertion` begun at
+  // `attempt_start_time` takes next, counted from 0, the first taken from the
+  // origin state; kNoStep where the attempt does not step -- stepping was not
+  // enabled for it before it began, which NoteAssertionAttemptStarted then
+  // froze, or has been disabled for it since.
+  static constexpr uint32_t kNoStep = UINT32_MAX;
+  uint32_t TakeAttemptStep(std::string_view assertion,
+                           uint64_t attempt_start_time);
+
   bool LastControlGlobal() const { return last_control_global_; }
   bool AssertionsStarted() const { return started_; }
   bool SysLocked() const { return locked_; }
@@ -369,6 +386,7 @@ class AssertionApi {
   struct AttemptControlState {
     bool started = false;
     bool step_enabled = false;
+    uint32_t steps = 0;
   };
   struct AssertionControlState {
     bool enabled = true;
@@ -380,6 +398,10 @@ class AssertionApi {
   };
   std::unordered_map<std::string, AssertionControlState> assertion_state_;
   AssertionControlState& StateFor(std::string_view assertion);
+  // §39.5.1: whether the system refuses every §39.5.2 control -- locked by
+  // vpiAssertionSysLock, so no assertion's status may change, or ended by
+  // vpiAssertionSysEnd, after which no assertion-related action is permitted.
+  bool SystemRefusesControl() const { return locked_ || ended_; }
   const AssertionControlState* FindState(std::string_view assertion) const;
 
   // §39.5.3 pending deferred/procedural-concurrent instances per assertion that

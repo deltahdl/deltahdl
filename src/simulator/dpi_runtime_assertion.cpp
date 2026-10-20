@@ -51,6 +51,14 @@ bool IsStepReason(int reason) {
 
 }  // namespace
 
+std::string AssertionKey(std::string_view scope, std::string_view name,
+                         uint32_t line, uint32_t column) {
+  std::string key(scope);
+  if (!key.empty()) key += '.';
+  if (!name.empty()) return key.append(name);
+  return key + "@" + std::to_string(line) + ":" + std::to_string(column);
+}
+
 bool AssertionApi::IsAssertionCallbackReason(int reason) {
   switch (reason) {
     case cbAssertionStart:
@@ -106,9 +114,8 @@ bool AssertionApi::IsReasonValidForHandle(int reason, int handle_type) {
   // assertion statement.
   if (IsAssertionStatementHandle(handle_type)) return true;
   // A sequence or property instance accepts only the start, success, and
-  // failure callbacks.
-  if (handle_type == vpiSequenceDecl || handle_type == vpiProperty ||
-      handle_type == vpiPropertyDecl) {
+  // failure callbacks. A declaration is not an instance and accepts none.
+  if (handle_type == vpiSequenceInst || handle_type == vpiPropertyInst) {
     return reason == cbAssertionStart || reason == cbAssertionSuccess ||
            reason == cbAssertionFailure;
   }
@@ -314,15 +321,17 @@ bool IsStepCallbackReason(int reason) {
 // vpiAssertionSysReset: restore the system to its initial running state, drop
 // the step success/failure callbacks, and leave all others installed. Templated
 // on the callback container so the private CbEntry type need not be named.
-template <typename CallbackVec>
-void ApplySysReset(const SysControlState& s, CallbackVec& callbacks) {
+template <typename CallbackVec, typename PlacedVec>
+void ApplySysReset(const SysControlState& s, CallbackVec& callbacks,
+                   PlacedVec& placed) {
   s.attempts_in_progress = 0;
   s.started = true;
   s.fail_action_enabled = true;
   s.vacuous_action_enabled = true;
   s.nonvacuous_action_enabled = true;
-  std::erase_if(callbacks,
-                [](const auto& e) { return IsStepCallbackReason(e.reason); });
+  auto is_step = [](const auto& e) { return IsStepCallbackReason(e.reason); };
+  std::erase_if(callbacks, is_step);
+  std::erase_if(placed, is_step);
 }
 
 // vpiAssertionSysKill: discard attempts in progress and disable further starts.
@@ -332,13 +341,16 @@ void ApplySysKill(const SysControlState& s) {
 }
 
 // vpiAssertionSysEnd: discard attempts, disable further starts, remove all
-// installed callbacks, and mark the system ended so no further action proceeds.
-template <typename CallbackVec>
-void ApplySysEnd(const SysControlState& s, CallbackVec& callbacks) {
+// installed callbacks, those placed on an assertion included, and mark the
+// system ended so no further action proceeds.
+template <typename CallbackVec, typename PlacedVec>
+void ApplySysEnd(const SysControlState& s, CallbackVec& callbacks,
+                 PlacedVec& placed) {
   s.attempts_in_progress = 0;
   s.started = false;
   s.ended = true;
   callbacks.clear();
+  placed.clear();
 }
 
 }  // namespace
@@ -364,7 +376,7 @@ bool AssertionApi::SysControl(int control, std::string_view scope) {
 
   switch (control) {
     case vpiAssertionSysReset:
-      ApplySysReset(kState, callbacks_);
+      ApplySysReset(kState, callbacks_, placed_callbacks_);
       // §39.5.3: discarding all attempts in progress also flushes the
       // not-yet-matured deferred/procedural-concurrent instances of every
       // assertion.
@@ -391,7 +403,7 @@ bool AssertionApi::SysControl(int control, std::string_view scope) {
       started_ = true;
       return true;
     case vpiAssertionSysEnd:
-      ApplySysEnd(kState, callbacks_);
+      ApplySysEnd(kState, callbacks_, placed_callbacks_);
       // §39.5.3: discarding all attempts in progress also flushes their pending
       // deferred/procedural-concurrent instances.
       FlushAllPendingAssertionReports();
@@ -422,13 +434,15 @@ bool AssertionApi::SysControl(int control, std::string_view scope) {
 }
 
 bool AssertionApi::IsAssertionStatementHandle(int vpi_type) {
-  // Assert/assume/cover statements (immediate or concurrent) are the only
-  // handles these per-assertion controls accept. Sequence and property
-  // instances are not valid targets.
+  // Assert/assume/cover statements (immediate or concurrent), and restrict,
+  // the fourth concurrent assertion statement (§16.14), are the only handles
+  // these per-assertion controls accept. Sequence and property instances are
+  // not valid targets.
   switch (vpi_type) {
     case vpiAssert:
     case vpiAssume:
     case vpiCover:
+    case vpiRestrict:
     case vpiImmediateAssert:
     case vpiImmediateAssume:
     case vpiImmediateCover:
@@ -469,7 +483,7 @@ void AssertionApi::FlushAllPendingAssertionReports() {
 
 bool AssertionApi::Control(int control, std::string_view assertion) {
   // The second argument shall be a valid assertion handle.
-  if (assertion.empty()) return false;
+  if (assertion.empty() || SystemRefusesControl()) return false;
   AssertionControlState& s = StateFor(assertion);
   // While locked, the status of the assertion cannot be changed without first
   // unlocking it.
@@ -529,7 +543,7 @@ bool AssertionApi::Control(int control, std::string_view assertion) {
 
 bool AssertionApi::ControlAttempt(int control, std::string_view assertion,
                                   uint64_t attempt_start_time) {
-  if (assertion.empty()) return false;
+  if (assertion.empty() || SystemRefusesControl()) return false;
   AssertionControlState& s = StateFor(assertion);
   if (s.locked && control != vpiAssertionUnlock) return false;
 
@@ -553,7 +567,7 @@ bool AssertionApi::ControlAttempt(int control, std::string_view assertion,
 
 bool AssertionApi::ControlStep(int control, std::string_view assertion,
                                uint64_t attempt_start_time, int step_control) {
-  if (assertion.empty()) return false;
+  if (assertion.empty() || SystemRefusesControl()) return false;
   // The fourth argument shall be a step control constant.
   if (step_control != vpiAssertionClockSteps) return false;
   AssertionControlState& s = StateFor(assertion);
@@ -636,6 +650,18 @@ void AssertionApi::NoteAssertionAttemptStarted(std::string_view assertion,
   // Mark the attempt started, preserving any stepping enabled for it ahead of
   // time. A brand-new entry has stepping disabled by default.
   StateFor(assertion).attempts[attempt_start_time].started = true;
+}
+
+uint32_t AssertionApi::TakeAttemptStep(std::string_view assertion,
+                                       uint64_t attempt_start_time) {
+  auto state = assertion_state_.find(std::string(assertion));
+  if (state == assertion_state_.end()) return kNoStep;
+  auto it = state->second.attempts.find(attempt_start_time);
+  if (it == state->second.attempts.end() || !it->second.started ||
+      !it->second.step_enabled) {
+    return kNoStep;
+  }
+  return it->second.steps++;
 }
 
 }  // namespace delta

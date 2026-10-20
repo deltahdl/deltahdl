@@ -15,6 +15,7 @@
 #include "parser/ast_expr.h"
 #include "simulator/assert_control_log.h"
 #include "simulator/assertion_api.h"
+#include "simulator/assertion_attempt_events.h"
 #include "simulator/coverage_control.h"
 #include "simulator/eval_systask_internal.h"
 #include "simulator/evaluation.h"
@@ -547,9 +548,7 @@ static void RaiseControlCallbacks(const AssertControlCall& call,
       continue;
     }
     for (int reason : {raised.first, raised.second}) {
-      if (reason != 0) {
-        api.DeliverAssertionEvent(name, reason, ctx.CurrentTime().ticks, {});
-      }
+      if (reason != 0) RaiseAssertionControlCallback(name, reason, ctx);
     }
   }
 }

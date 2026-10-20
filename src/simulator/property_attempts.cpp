@@ -32,34 +32,6 @@
 
 namespace delta {
 
-// §16.13.7: one copy of a local variable of a named property for one
-// semantic leading clock of an instance's attempt: the node of the
-// expansion it is for, whose subtree reads `literal` in the local's place,
-// and the initialization assignment performed, into the literal, at the
-// first tick of that node's clock at or after the attempt begins, the value
-// cast to the local's width and signedness.
-struct LocalCopy {
-  const PropertyExprNode* node;
-  std::string_view name;
-  Expr* literal;
-  const Expr* init;
-  uint32_t width;
-  bool is_signed;
-};
-
-struct PropertyTreeState {
-  const PropertyExprNode* root = nullptr;
-  std::vector<FlatSequence> sequences;
-  std::vector<const Expr*> past_sites;
-  std::vector<NodeState*> attempts;
-  std::vector<LocalCopy> local_copies;
-  // §16.13: the clocks the sequences are evaluated on, the leading clock
-  // first, and the time step the tree last advanced at.
-  PropertyClocks clocks;
-  SimTime advanced_at{PropertyClocks::kNever};
-  bool every_match = false;
-};
-
 namespace {
 
 // §16.12.14: marks the states of the abort `node` in the attempt under
@@ -456,7 +428,9 @@ Tri StepBoolean(const PropertyExprNode* node, NodeState& state, StepContext& sc,
   if (state.expansion != nullptr) {
     return Step(state.expansion, *state.operands[0], sc, begin);
   }
-  return FromBool(EvalExpr(node->boolean, sc.ctx, sc.arena).IsTruthy());
+  const bool kHeld = EvalExpr(node->boolean, sc.ctx, sc.arena).IsTruthy();
+  sc.ctx.AssertionSamples().NoteOperand(node->boolean, kHeld);
+  return FromBool(kHeld);
 }
 
 Tri StepSequence(const PropertyExprNode* node, NodeState& state,
@@ -811,16 +785,6 @@ Tri Step(const PropertyExprNode* node, NodeState& state, StepContext& sc,
   return state.verdict;
 }
 
-// The verdict of an attempt decided, read off its root's state.
-PropertyVerdict VerdictOf(const PropertyExprNode* root,
-                          const NodeState& state) {
-  PropertyVerdict verdict;
-  verdict.holds = state.verdict == Tri::kTrue;
-  verdict.vacuous = verdict.holds && !Nonvacuous(root, state);
-  verdict.bindings = state.bindings;
-  return verdict;
-}
-
 }  // namespace
 
 PropertyTreeState* CreatePropertyTreeState(
@@ -877,6 +841,7 @@ static void StepAttempts(StepContext& sc, size_t beginning, size_t advanced,
     bool first = i + beginning >= state.attempts.size();
     // §16.14.6.1: the attempt reads the values its instance saved.
     samples.SetInstanceBindings(state.attempts[i]->bindings);
+    samples.NoteAttemptStepped(state.attempts[i]->started);
     Tri verdict = Step(state.root, *state.attempts[i], sc, first);
     samples.SetInstanceBindings(nullptr);
     if (verdict == Tri::kPending) {
@@ -915,6 +880,10 @@ PropertyTick AdvancePropertyTree(PropertyTreeState& state, bool disabled,
   samples.SetClockTicks(ticked);
   for (const Expr* site : state.past_sites) EvalExpr(site, ctx, arena);
   if (disabled) {
+    for (NodeState* attempt : state.attempts) {
+      tick.disabled.push_back(attempt->started);
+    }
+    tick.disabled.insert(tick.disabled.end(), beginning, now.ticks);
     state.attempts.clear();
     samples.SetClockTicks(~0u);
     return tick;
@@ -923,27 +892,13 @@ PropertyTick AdvancePropertyTree(PropertyTreeState& state, bool disabled,
   for (size_t i = 0; i < beginning; ++i) {
     NodeState* attempt = NewNodeState(state.root, state, 0, arena);
     attempt->bindings = instances[i];
+    attempt->started = now.ticks;
     state.attempts.push_back(attempt);
   }
   StepContext sc{state, ctx, arena, ticked};
   StepAttempts(sc, beginning, advanced, tick);
   samples.SetClockTicks(~0u);
   return tick;
-}
-
-std::vector<PropertyVerdict> FinishPropertyTree(PropertyTreeState& state) {
-  std::vector<PropertyVerdict> verdicts;
-  verdicts.reserve(state.attempts.size());
-  for (NodeState* attempt : state.attempts) {
-    Finish(state.root, *attempt);
-    verdicts.push_back(VerdictOf(state.root, *attempt));
-  }
-  state.attempts.clear();
-  return verdicts;
-}
-
-void AbortPropertyTreeAttempts(PropertyTreeState& state) {
-  state.attempts.clear();
 }
 
 }  // namespace delta

@@ -3,6 +3,7 @@
 #include <vector>
 
 #include "parser/ast_stmt.h"
+#include "simulator/property_attempts.h"
 #include "simulator/property_attempts_internal.h"
 #include "simulator/sequence_monitor.h"
 
@@ -234,6 +235,38 @@ Tri Finish(const PropertyExprNode* node, NodeState& state) {
       break;
   }
   return state.verdict;
+}
+
+// The verdict of an attempt decided, read off its root's state.
+PropertyVerdict VerdictOf(const PropertyExprNode* root,
+                          const NodeState& state) {
+  PropertyVerdict verdict;
+  verdict.holds = state.verdict == Tri::kTrue;
+  verdict.vacuous = verdict.holds && !Nonvacuous(root, state);
+  verdict.bindings = state.bindings;
+  verdict.started = state.started;
+  return verdict;
+}
+
+std::vector<PropertyVerdict> FinishPropertyTree(PropertyTreeState& state) {
+  std::vector<PropertyVerdict> verdicts;
+  verdicts.reserve(state.attempts.size());
+  for (NodeState* attempt : state.attempts) {
+    Finish(state.root, *attempt);
+    verdicts.push_back(VerdictOf(state.root, *attempt));
+  }
+  state.attempts.clear();
+  return verdicts;
+}
+
+void AbortPropertyTreeAttempts(PropertyTreeState& state) {
+  state.attempts.clear();
+}
+
+void AbortPropertyTreeAttemptAt(PropertyTreeState& state, uint64_t started) {
+  std::erase_if(state.attempts, [started](const NodeState* attempt) {
+    return attempt->started == started;
+  });
 }
 
 }  // namespace delta

@@ -45,4 +45,15 @@ PLI_INT32 VpiAssertionStepControl(int operation, VpiHandle assertion,
                                   const s_vpi_time* attempt_start_time,
                                   int step_control);
 
+// §39.4.1: the assertion system initializes as the run starts and, unless an
+// application has turned it off first, becomes active with it, so the
+// cbAssertionSysInitialized callbacks are called and then the cbAssertionSysOn
+// ones.
+void VpiStartAssertionSystem();
+// §39.4.1: the assertion system ends after the end of the run, once every
+// assertion has completed, so the cbAssertionSysEnd callbacks are called --
+// unless a vpiAssertionSysEnd control ended it during the run and they have
+// been called already.
+void VpiEndAssertionSystem();
+
 }  // namespace delta

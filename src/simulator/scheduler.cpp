@@ -7,6 +7,7 @@
 #include "common/arena.h"
 #include "common/types.h"
 #include "simulator/sim_context.h"
+#include "simulator/vpi_assertion_control.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
@@ -170,6 +171,8 @@ void Scheduler::Run() {
   // raise them, and this is where simulation starts: the design
   // is built and no event has run.
   GetGlobalVpiContext().DispatchCallbacks(kCbStartOfSimulation);
+  // §39.4.1: the assertion system initializes and starts with the run.
+  VpiStartAssertionSystem();
 
   // §20.2: an explicit $finish/$stop/$fatal requests a hard halt through the
   // SimContext, and the run ends where it was called. No later time slot runs
@@ -218,6 +221,8 @@ void Scheduler::Run() {
 void Scheduler::EndSimulation() {
   ctx_->RunFinalBlocks();
   GetGlobalVpiContext().DispatchCallbacks(kCbEndOfSimulation);
+  // §39.4.1: the assertion system ends after the end of simulation.
+  VpiEndAssertionSystem();
 }
 
 // §20.2 with §9.2.3: once a halt is requested the slot runs no further event,

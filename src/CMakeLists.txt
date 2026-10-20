@@ -341,6 +341,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/assume_sequence_terms.cpp
     simulator/lowerer_free_variables.cpp
     simulator/sequence_monitor.cpp
+    simulator/sequence_monitor_sites.cpp
     simulator/eval_systask.cpp
     simulator/eval_systask_bits.cpp
     simulator/eval_typename.cpp
@@ -442,6 +443,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/checker_variable_randomization.cpp
     simulator/assert_control_log.cpp
     simulator/assertion.cpp
+    simulator/assertion_attempt_events.cpp
     simulator/sva_engine.cpp
     simulator/coverage.cpp
     simulator/covergroup_instance.cpp

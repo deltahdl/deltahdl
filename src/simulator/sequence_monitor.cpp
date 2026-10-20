@@ -3,7 +3,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
-#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -14,7 +13,6 @@
 #include "parser/ast_stmt.h"
 #include "simulator/awaiters_event_control.h"
 #include "simulator/evaluation.h"
-#include "simulator/expr_walk.h"
 #include "simulator/instance_bindings.h"
 #include "simulator/process.h"
 #include "simulator/scheduler.h"
@@ -156,9 +154,10 @@ bool EvalOperand(const LinearSequence& body, LinearAttempt& attempt,
   for (const SeqMatchAssign& item : items) {
     if (item.init) scope.Assign(item, arena);
   }
-  if (!EvalExpr(body.operands[attempt.pos], ctx, arena).IsTruthy()) {
-    return false;
-  }
+  const bool kHeld =
+      EvalExpr(body.operands[attempt.pos], ctx, arena).IsTruthy();
+  ctx.AssertionSamples().NoteOperand(body.operands[attempt.pos], kHeld);
+  if (!kHeld) return false;
   TakeFlowedLocals(body.operands[attempt.pos], pick, ctx, arena);
   for (const SeqMatchAssign& item : items) {
     if (!item.init) scope.Assign(item, arena);
@@ -634,6 +633,8 @@ struct FirstMatchAttempt {
   // queued, bound around every step of the attempt; nullptr for a static
   // assertion's attempt.
   const InstanceBindings* bindings = nullptr;
+  // §39.4.2: the time the attempt began at, in ticks.
+  uint64_t started = 0;
 };
 
 const LinearSequence* OrOperandOf(const LinearSequence& body, size_t i) {
@@ -723,12 +724,6 @@ bool AdvanceBody(const LinearSequence& body, BodyAttempts& attempts,
 // body, and each is evaluated as the monitor resumes so that its sample for
 // the tick is recorded; an attempt reading it records the same value over
 // it.
-bool IsPastDirectedCall(const Expr* e) {
-  if (e->kind != ExprKind::kSystemCall) return false;
-  return e->callee == "$past" || e->callee == "$rose" || e->callee == "$fell" ||
-         e->callee == "$stable" || e->callee == "$changed";
-}
-
 void CollectPastDirectedSites(const LinearSequence& body,
                               std::vector<const Expr*>& sites) {
   ForEachLinearSequenceExpr(
@@ -787,22 +782,6 @@ bool AdvanceKeepingLocals(const LinearSequence& body, BodyAttempts& active,
 }
 
 }  // namespace
-
-void CollectPastDirectedSites(const Expr* e, std::vector<const Expr*>& sites) {
-  ForEachSubExpr(e, [&sites](const Expr* sub) {
-    if (IsPastDirectedCall(sub)) sites.push_back(sub);
-  });
-}
-
-std::string HierarchicalEndPoint(std::string_view path, SimContext& ctx) {
-  size_t dot = path.rfind('.');
-  if (dot == std::string_view::npos) return {};
-  std::string ep_name = std::string(path.substr(0, dot)) + ".__seq_" +
-                        std::string(path.substr(dot + 1));
-  const Variable* ep = ctx.FindVariable(ep_name);
-  if (ep == nullptr || !ep->is_event) return {};
-  return ep_name;
-}
 
 SimCoroutine MakeSequenceMonitorCoroutine(LinearSequence body,
                                           std::vector<EventExpr> clock,
@@ -884,20 +863,28 @@ std::vector<SequenceOutcome> AdvanceSequenceProperty(
     Arena& arena) {
   std::vector<SequenceOutcome> outcomes;
   for (const Expr* site : state.past_sites) EvalExpr(site, ctx, arena);
+  SimTime now = ctx.CurrentTime();
   // §16.12: a disable condition true at any tick of an attempt disables it,
   // and the attempts beginning at this tick with it.
   if (tick.disabled) {
+    for (const FirstMatchAttempt& attempt : state.attempts) {
+      outcomes.push_back(
+          {SequenceVerdict::kDisabled, attempt.bindings, attempt.started});
+    }
+    for (const InstanceBindings* bindings : tick.instances) {
+      outcomes.push_back({SequenceVerdict::kDisabled, bindings, now.ticks});
+    }
     state.attempts.clear();
     return outcomes;
   }
   // §16.14.6.3: at a second pass of one time step the attempts already
   // advanced at it advance no more; the new ones begin.
-  SimTime now = ctx.CurrentTime();
   size_t advanced = state.advanced_at == now ? state.attempts.size() : 0;
   state.advanced_at = now;
   for (const InstanceBindings* bindings : tick.instances) {
     state.attempts.push_back(FreshFirstMatchAttempt(state.body));
     state.attempts.back().bindings = bindings;
+    state.attempts.back().started = now.ticks;
   }
   auto& samples = ctx.AssertionSamples();
   std::vector<FirstMatchAttempt> kept;
@@ -909,16 +896,16 @@ std::vector<SequenceOutcome> AdvanceSequenceProperty(
     bool first = i + tick.instances.size() >= state.attempts.size();
     // §16.14.6.1: the attempt reads the values its instance saved.
     samples.SetInstanceBindings(state.attempts[i].bindings);
+    samples.NoteAttemptStepped(state.attempts[i].started);
     bool matched = AdvanceFirstMatchAttempt(state.body, state.attempts[i],
                                             first, ctx, arena);
     samples.SetInstanceBindings(nullptr);
     bool spent = FirstMatchAttemptIsSpent(state.attempts[i]);
-    if (matched) {
+    const FirstMatchAttempt& attempt = state.attempts[i];
+    if (matched || spent) {
       outcomes.push_back(
-          {SequenceVerdict::kMatched, state.attempts[i].bindings});
-    } else if (spent) {
-      outcomes.push_back(
-          {SequenceVerdict::kFailed, state.attempts[i].bindings});
+          {matched ? SequenceVerdict::kMatched : SequenceVerdict::kFailed,
+           attempt.bindings, attempt.started});
     }
     if (!spent && (!matched || tick.every_match)) {
       kept.push_back(std::move(state.attempts[i]));
@@ -928,12 +915,24 @@ std::vector<SequenceOutcome> AdvanceSequenceProperty(
   return outcomes;
 }
 
-size_t PendingSequenceAttempts(const SequencePropertyState& state) {
-  return state.attempts.size();
+std::vector<uint64_t> PendingSequenceStarts(
+    const SequencePropertyState& state) {
+  std::vector<uint64_t> starts;
+  for (const FirstMatchAttempt& attempt : state.attempts) {
+    starts.push_back(attempt.started);
+  }
+  return starts;
 }
 
 void AbortSequencePropertyAttempts(SequencePropertyState& state) {
   state.attempts.clear();
+}
+
+void AbortSequencePropertyAttemptAt(SequencePropertyState& state,
+                                    uint64_t started) {
+  std::erase_if(state.attempts, [started](const FirstMatchAttempt& attempt) {
+    return attempt.started == started;
+  });
 }
 
 }  // namespace delta

@@ -108,27 +108,41 @@ TEST(AssertionCallback, UnknownReasonErrorsWithNullHandle) {
   EXPECT_EQ(api.PlacedCallbackCount(), 0u);
 }
 
-// §39.4.2: every reason may be placed on a concurrent or immediate assertion;
-// only start, success, and failure may also be placed on a sequence or property
-// instance; no other handle type bears assertion callbacks.
+// §39.4.2: every reason may be placed on a concurrent or immediate assertion,
+// a restrict among the concurrent ones (§16.14); only start, success, and
+// failure may also be placed on a sequence or property instance, the objects
+// of type vpiSequenceInst and vpiPropertyInst; no other handle type bears
+// assertion callbacks, a sequence or property declaration included (#7498,
+// #7499).
 TEST(AssertionCallback, HandleTypeValidity) {
   EXPECT_TRUE(
       AssertionApi::IsReasonValidForHandle(cbAssertionDisable, vpiAssert));
   EXPECT_TRUE(AssertionApi::IsReasonValidForHandle(cbAssertionStepSuccess,
                                                    vpiImmediateAssert));
   EXPECT_TRUE(
-      AssertionApi::IsReasonValidForHandle(cbAssertionStart, vpiSequenceDecl));
+      AssertionApi::IsReasonValidForHandle(cbAssertionStart, vpiRestrict));
   EXPECT_TRUE(
-      AssertionApi::IsReasonValidForHandle(cbAssertionSuccess, vpiProperty));
+      AssertionApi::IsReasonValidForHandle(cbAssertionDisable, vpiRestrict));
   EXPECT_TRUE(
-      AssertionApi::IsReasonValidForHandle(cbAssertionFailure, vpiProperty));
+      AssertionApi::IsReasonValidForHandle(cbAssertionStart, vpiSequenceInst));
+  EXPECT_TRUE(AssertionApi::IsReasonValidForHandle(cbAssertionSuccess,
+                                                   vpiPropertyInst));
+  EXPECT_TRUE(AssertionApi::IsReasonValidForHandle(cbAssertionFailure,
+                                                   vpiPropertyInst));
 
   // Reasons other than start/success/failure are not valid on a sequence or
   // property instance.
   EXPECT_FALSE(AssertionApi::IsReasonValidForHandle(cbAssertionDisable,
-                                                    vpiSequenceDecl));
+                                                    vpiSequenceInst));
   EXPECT_FALSE(AssertionApi::IsReasonValidForHandle(cbAssertionStepSuccess,
-                                                    vpiProperty));
+                                                    vpiPropertyInst));
+  // A declaration is not an instance and accepts no assertion callbacks.
+  EXPECT_FALSE(
+      AssertionApi::IsReasonValidForHandle(cbAssertionStart, vpiSequenceDecl));
+  EXPECT_FALSE(
+      AssertionApi::IsReasonValidForHandle(cbAssertionSuccess, vpiProperty));
+  EXPECT_FALSE(AssertionApi::IsReasonValidForHandle(cbAssertionFailure,
+                                                    vpiPropertyDecl));
   // A non-assertion handle accepts no assertion callbacks.
   EXPECT_FALSE(
       AssertionApi::IsReasonValidForHandle(cbAssertionStart, vpiModule));
@@ -138,7 +152,7 @@ TEST(AssertionCallback, HandleTypeValidity) {
 // with the NULL handle.
 TEST(AssertionCallback, PlaceRejectsReasonInvalidForHandle) {
   AssertionApi api;
-  EXPECT_EQ(api.PlaceAssertionCallback(cbAssertionDisable, kA, vpiSequenceDecl,
+  EXPECT_EQ(api.PlaceAssertionCallback(cbAssertionDisable, kA, vpiSequenceInst,
                                        noop_cb, nullptr),
             0u);
   // The same reason is accepted on a concurrent assertion statement.
@@ -316,7 +330,7 @@ TEST(AssertionCallback, FailureCallbackFiresWhenPlacedOnPropertyInstance) {
   std::string fail_expr;
   uint64_t attempt_start = 0;
   AssertionCallbackHandle h = api.PlaceAssertionCallback(
-      cbAssertionFailure, kA, vpiProperty,
+      cbAssertionFailure, kA, vpiPropertyInst,
       [&](const AssertionCallbackArgs& a) {
         ++count;
         if (a.info != nullptr) {

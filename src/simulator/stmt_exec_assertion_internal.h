@@ -1,6 +1,7 @@
 #pragma once
 
 #include <coroutine>
+#include <cstdint>
 #include <string_view>
 #include <vector>
 
@@ -162,6 +163,13 @@ void ExecConcurrentAssertionTick(const Stmt* stmt,
 // assertion it selects, in whichever process keeps them; the aborted attempts
 // reach no verdict.
 void AbortKilledAttempts(const AssertControlCall& call, SimContext& ctx);
+
+// §39.5.2: vpiAssertionKill's discarding of the attempt that began at
+// `started`, in ticks, of the assertion the API keeps under `key`
+// (RunAssertionKey), which leaves the assertion's other attempts and its
+// state as they were.
+void AbortAttemptStartedAt(std::string_view key, uint64_t started,
+                           SimContext& ctx);
 
 // §20.11: the status the assertion control tasks called so far leave the
 // assertion `stmt` in, written where the running process stands.

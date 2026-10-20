@@ -2,10 +2,14 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string_view>
 #include <vector>
 
+#include "common/types.h"
 #include "parser/ast_stmt.h"
 #include "simulator/instance_bindings.h"
+#include "simulator/property_attempts.h"
+#include "simulator/property_clocks.h"
 #include "simulator/sequence_flatten.h"
 #include "simulator/sequence_monitor.h"
 
@@ -39,6 +43,9 @@ struct NodeState {
   // attempt; nullptr for a static assertion's attempt. Set on the root and
   // read there alone.
   const InstanceBindings* bindings = nullptr;
+  // §39.4.2: the time the attempt began at, in ticks. Set on the root and
+  // read there alone.
+  uint64_t started = 0;
   LinearSequenceAttempt* attempt = nullptr;
   // §16.14.3: whether the sequence's attempt, matched at this tick, may
   // match again at a later one.
@@ -78,6 +85,38 @@ struct NodeState {
   int clock = 0;
   bool awaiting = false;
 };
+
+// §16.13.7: one copy of a local variable of a named property for one
+// semantic leading clock of an instance's attempt: the node of the
+// expansion it is for, whose subtree reads `literal` in the local's place,
+// and the initialization assignment performed, into the literal, at the
+// first tick of that node's clock at or after the attempt begins, the value
+// cast to the local's width and signedness.
+struct LocalCopy {
+  const PropertyExprNode* node;
+  std::string_view name;
+  Expr* literal;
+  const Expr* init;
+  uint32_t width;
+  bool is_signed;
+};
+
+struct PropertyTreeState {
+  const PropertyExprNode* root = nullptr;
+  std::vector<FlatSequence> sequences;
+  std::vector<const Expr*> past_sites;
+  std::vector<NodeState*> attempts;
+  std::vector<LocalCopy> local_copies;
+  // §16.13: the clocks the sequences are evaluated on, the leading clock
+  // first, and the time step the tree last advanced at.
+  PropertyClocks clocks;
+  SimTime advanced_at{PropertyClocks::kNever};
+  bool every_match = false;
+};
+
+// The verdict of an attempt decided, read off its root's state. Defined in
+// property_finish.cpp.
+PropertyVerdict VerdictOf(const PropertyExprNode* root, const NodeState& state);
 
 // The verdict algebra: not over a verdict, a sequence's step as one, a
 // boolean as one, §16.12.4's or and §16.12.5's and over the operands'

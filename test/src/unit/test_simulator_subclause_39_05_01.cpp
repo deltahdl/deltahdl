@@ -1,10 +1,14 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
+#include <functional>
 #include <iterator>
 
+#include "helpers_assertion_run.h"
 #include "simulator/assertion_api.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_internal.h"
+#include "simulator/vpi_user.h"
 
 using namespace delta;
 
@@ -268,6 +272,180 @@ TEST(AssertionSysControl, EndBlocksEveryFurtherControl) {
   EXPECT_FALSE(api.SysControl(vpiAssertionSysReset, {}));
   EXPECT_FALSE(api.SysControl(vpiAssertionSysEnablePassAction, {}));
   EXPECT_TRUE(api.SysEnded());  // remains ended
+}
+
+// §39.5.1 C9 with §39.4.1: SysEnd removes every assertion callback installed,
+// the ones vpi_register_assertion_cb() placed on an assertion included, and
+// no assertion callback occurs after it (#7508).
+TEST(AssertionSysControl, SysEndRemovesCallbacksPlacedOnAssertions) {
+  AssertionApi api;
+  int calls = 0;
+  api.PlaceAssertionCallback(
+      cbAssertionFailure, "top.a1", vpiAssert,
+      [&](const AssertionCallbackArgs&) { ++calls; }, nullptr);
+
+  api.SysControl(vpiAssertionSysEnd, {});
+
+  EXPECT_EQ(api.PlacedCallbackCount(), 0u);
+  EXPECT_EQ(api.DeliverAssertionEvent("top.a1", cbAssertionFailure, 10, {}),
+            0u);
+  EXPECT_EQ(calls, 0);
+}
+
+// §39.5.1 C3: SysReset removes the step success and step failure callbacks
+// placed on an assertion and leaves its other callbacks placed (#7509).
+TEST(AssertionSysControl, SysResetRemovesPlacedStepCallbacks) {
+  AssertionApi api;
+  int failures = 0;
+  api.PlaceAssertionCallback(
+      cbAssertionStepSuccess, "top.a1", vpiAssert,
+      [](const AssertionCallbackArgs&) {}, nullptr);
+  api.PlaceAssertionCallback(
+      cbAssertionStepFailure, "top.a1", vpiAssert,
+      [](const AssertionCallbackArgs&) {}, nullptr);
+  api.PlaceAssertionCallback(
+      cbAssertionFailure, "top.a1", vpiAssert,
+      [&](const AssertionCallbackArgs&) { ++failures; }, nullptr);
+
+  api.SysControl(vpiAssertionSysReset, {});
+
+  EXPECT_EQ(api.PlacedCallbackCount(), 1u);
+  EXPECT_EQ(api.DeliverAssertionEvent("top.a1", cbAssertionFailure, 10, {}),
+            1u);
+  EXPECT_EQ(failures, 1);
+}
+
+// §39.5.1 C6: SysLock locks every assertion's status, so a §39.5.2 control
+// on one assertion is refused until SysUnlock (#7506).
+TEST(AssertionSysControl, SysLockBlocksPerAssertionControls) {
+  AssertionApi api;
+  api.SysControl(vpiAssertionSysLock, {});
+
+  EXPECT_FALSE(api.Control(vpiAssertionDisable, "top.a1"));
+  EXPECT_TRUE(api.AssertionEnabled("top.a1"));
+  EXPECT_FALSE(api.ControlAttempt(vpiAssertionKill, "top.a1", 5));
+  EXPECT_FALSE(api.ControlStep(vpiAssertionEnableStep, "top.a1", 5,
+                               vpiAssertionClockSteps));
+  EXPECT_FALSE(api.AssertionStepEnabled("top.a1", 5));
+
+  api.SysControl(vpiAssertionSysUnlock, {});
+  EXPECT_TRUE(api.Control(vpiAssertionDisable, "top.a1"));
+  EXPECT_FALSE(api.AssertionEnabled("top.a1"));
+}
+
+// §39.5.1 C9: once SysEnd is issued no assertion-related action is
+// permitted, a §39.5.2 control on one assertion included (#7507).
+TEST(AssertionSysControl, SysEndBlocksPerAssertionControls) {
+  AssertionApi api;
+  api.SysControl(vpiAssertionSysEnd, {});
+
+  EXPECT_FALSE(api.Control(vpiAssertionDisable, "top.a1"));
+  EXPECT_TRUE(api.AssertionEnabled("top.a1"));
+  EXPECT_FALSE(api.ControlAttempt(vpiAssertionKill, "top.a1", 5));
+  EXPECT_FALSE(api.ControlStep(vpiAssertionEnableStep, "top.a1", 5,
+                               vpiAssertionClockSteps));
+  EXPECT_FALSE(api.AssertionStepEnabled("top.a1", 5));
+}
+
+// Two instances of a module whose assertion fails at each of three clock
+// edges, its fail action counting the failures, the design calling $arm
+// between the edges.
+constexpr const char* kFailingInstances =
+    "module m(input logic clk);\n"
+    "  int fails = 0;\n"
+    "  logic a = 0;\n"
+    "  a1: assert property (@(posedge clk) a) else fails++;\n"
+    "endmodule\n"
+    "module top;\n"
+    "  logic clk = 0;\n"
+    "  m u1(clk);\n"
+    "  m u2(clk);\n"
+    "  initial begin\n"
+    "    #5 clk = 1;\n"
+    "    #5 clk = 0; $arm;\n"
+    "    #5 clk = 1;\n"
+    "    #5 clk = 0; $arm;\n"
+    "    #5 clk = 1;\n"
+    "  end\n"
+    "endmodule\n";
+
+// An assertion whose attempt begun at the first clock edge is in flight when
+// the design calls $arm, and fails at the second edge.
+constexpr const char* kAttemptInFlight =
+    "module top;\n"
+    "  logic clk = 0, a = 0;\n"
+    "  int fails = 0;\n"
+    "  a1: assert property (@(posedge clk) 1 |-> ##1 a) else fails++;\n"
+    "  initial begin\n"
+    "    #5 clk = 1;\n"
+    "    #5 clk = 0; $arm;\n"
+    "    #5 clk = 1;\n"
+    "  end\n"
+    "endmodule\n";
+
+// Calls vpi_control(`operation`, the scope `scope` names or NULL).
+std::function<void()> SysControl(int operation, const char* scope = nullptr) {
+  return [operation, scope] {
+    vpiHandle handle = scope == nullptr
+                           ? nullptr
+                           : vpi_handle_by_name(VpiText(scope), nullptr);
+    EXPECT_EQ(vpi_control(operation, handle), 1);
+  };
+}
+
+// §39.5.1: vpiAssertionSysOff stops every assertion of the design from
+// starting attempts until vpiAssertionSysOn restarts them, so the edge
+// between the two calls fails in neither instance (#7501).
+TEST_F(AssertionRun, SysOffStopsTheRunsAttemptsUntilSysOn) {
+  ArmInTurn({SysControl(vpiAssertionSysOff), SysControl(vpiAssertionSysOn)});
+  Run(kFailingInstances);
+
+  EXPECT_EQ(IntOf("top.u1.fails"), 2);
+  EXPECT_EQ(IntOf("top.u2.fails"), 2);
+}
+
+// §39.5.1: a scope handle confines vpiAssertionSysOff to the assertions of
+// that scope, the other instance's going on failing (#7501).
+TEST_F(AssertionRun, SysOffOfAScopeLeavesTheOtherInstanceRunning) {
+  ArmInTurn({SysControl(vpiAssertionSysOff, "top.u1")});
+  Run(kFailingInstances);
+
+  EXPECT_EQ(IntOf("top.u1.fails"), 1);
+  EXPECT_EQ(IntOf("top.u2.fails"), 3);
+}
+
+// §39.5.1: vpiAssertionSysDisableFailAction stops the fail actions until
+// vpiAssertionSysEnableFailAction, while the attempts still start and fail,
+// as the failure callback sees (#7501).
+TEST_F(AssertionRun, SysDisableFailActionStopsTheFailActionsAlone) {
+  ArmInTurn({[] {
+               ASSERT_NE(WatchAssertion("top.u1.a1", cbAssertionFailure),
+                         nullptr);
+               SysControl(vpiAssertionSysDisableFailAction)();
+             },
+             SysControl(vpiAssertionSysEnableFailAction)});
+  Run(kFailingInstances);
+
+  EXPECT_EQ(IntOf("top.u1.fails"), 2);
+  EXPECT_EQ(IntOf("top.u2.fails"), 2);
+  EXPECT_EQ(CallsOf(cbAssertionFailure).size(), 2u);
+}
+
+// §39.5.1: vpiAssertionSysKill discards the attempt in flight, which then
+// fails no more, where vpiAssertionSysOff lets it run on to its failure
+// (#7501).
+TEST_F(AssertionRun, SysKillDiscardsTheAttemptInFlight) {
+  ArmInTurn({SysControl(vpiAssertionSysKill)});
+  Run(kAttemptInFlight);
+
+  EXPECT_EQ(IntOf("top.fails"), 0);
+}
+
+TEST_F(AssertionRun, SysOffLetsTheAttemptInFlightRunOn) {
+  ArmInTurn({SysControl(vpiAssertionSysOff)});
+  Run(kAttemptInFlight);
+
+  EXPECT_EQ(IntOf("top.fails"), 1);
 }
 
 }  // namespace

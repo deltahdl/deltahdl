@@ -75,7 +75,8 @@ class AssertControlCallbacks : public VpiDesignRun {
 
 // Table 20-8: $assertoff and $assertcontrol(5) applied to the whole design
 // raise cbAssertionSysOff and cbAssertionSysKill, and a control_type Table
-// 20-5 does not list raises nothing.
+// 20-5 does not list raises nothing. The cbAssertionSysOn ahead of them is
+// the run's own, §39.4.1 starting the assertion system with the run.
 TEST_F(AssertControlCallbacks, AControlOfTheWholeDesignRaisesItsSystemReason) {
   for (int reason : {cbAssertionSysOff, cbAssertionSysKill, cbAssertionSysOn}) {
     s_cb_data cb = {};
@@ -91,7 +92,8 @@ TEST_F(AssertControlCallbacks, AControlOfTheWholeDesignRaisesItsSystemReason) {
       "  end\n"
       "endmodule\n");
   EXPECT_EQ(g_system_reasons,
-            (std::vector<int>{cbAssertionSysOff, cbAssertionSysKill}));
+            (std::vector<int>{cbAssertionSysOn, cbAssertionSysOff,
+                              cbAssertionSysKill}));
 }
 
 // Table 20-8: $assertoff naming a1 raises cbAssertionDisable on a1 alone, and

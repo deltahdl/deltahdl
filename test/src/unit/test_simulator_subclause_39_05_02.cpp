@@ -1,10 +1,16 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
+#include <cstdint>
+#include <functional>
 #include <iterator>
+#include <vector>
 
+#include "helpers_assertion_run.h"
 #include "simulator/assertion_api.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_internal.h"
+#include "simulator/vpi_user.h"
 
 using namespace delta;
 
@@ -26,14 +32,18 @@ TEST(SvVpiUser, AssertionActionControlConstants) {
   }
 }
 
-// §39.5.2 intro: only assertion statement handles (assert/assume/cover) are
-// valid; sequence and property instances are not.
+// §39.5.2 intro: only assertion statement handles (assert/assume/cover, and
+// restrict, §16.14's fourth concurrent assertion statement) are valid;
+// sequence and property instances are not.
 TEST(AssertionControl, OnlyAssertionStatementHandlesValid) {
   EXPECT_TRUE(AssertionApi::IsAssertionStatementHandle(vpiAssert));
   EXPECT_TRUE(AssertionApi::IsAssertionStatementHandle(vpiAssume));
   EXPECT_TRUE(AssertionApi::IsAssertionStatementHandle(vpiCover));
+  EXPECT_TRUE(AssertionApi::IsAssertionStatementHandle(vpiRestrict));
   EXPECT_TRUE(AssertionApi::IsAssertionStatementHandle(vpiImmediateAssert));
 
+  EXPECT_FALSE(AssertionApi::IsAssertionStatementHandle(vpiSequenceInst));
+  EXPECT_FALSE(AssertionApi::IsAssertionStatementHandle(vpiPropertyInst));
   EXPECT_FALSE(AssertionApi::IsAssertionStatementHandle(vpiSequenceDecl));
   EXPECT_FALSE(AssertionApi::IsAssertionStatementHandle(vpiProperty));
   EXPECT_FALSE(AssertionApi::IsAssertionStatementHandle(vpiPropertyDecl));
@@ -359,6 +369,139 @@ TEST(AssertionControl, EnableStepIsIdempotent) {
                               /*attempt_start_time=*/30,
                               vpiAssertionClockSteps));
   EXPECT_TRUE(api.AssertionStepEnabled(kA, 30));
+}
+
+// Two assertions, one of them unnamed, each failing at each of three clock
+// edges, their fail actions counting the failures, the design calling $arm
+// between the edges.
+constexpr const char* kTwoFailing =
+    "module top;\n"
+    "  logic clk = 0, a = 0;\n"
+    "  int f1 = 0, f2 = 0, f3 = 0;\n"
+    "  a1: assert property (@(posedge clk) a) else f1++;\n"
+    "  a2: assert property (@(posedge clk) a) else f2++;\n"
+    "  assert property (@(posedge clk) a) else f3++;\n"
+    "  initial begin\n"
+    "    #5 clk = 1;\n"
+    "    #5 clk = 0; $arm;\n"
+    "    #5 clk = 1;\n"
+    "    #5 clk = 0; $arm;\n"
+    "    #5 clk = 1;\n"
+    "  end\n"
+    "endmodule\n";
+
+// An assertion whose attempts each fail two clock edges after they begin, at
+// the third and the fourth edge, the design calling $arm after the first.
+constexpr const char* kAttemptsInFlight =
+    "module top;\n"
+    "  logic clk = 0, a = 0;\n"
+    "  a1: assert property (@(posedge clk) 1 |-> ##2 a) else begin end\n"
+    "  initial begin\n"
+    "    #5 clk = 1;\n"
+    "    #5 clk = 0; $arm;\n"
+    "    #5 clk = 1;\n"
+    "    #5 clk = 0;\n"
+    "    #5 clk = 1;\n"
+    "    #5 clk = 0;\n"
+    "    #5 clk = 1;\n"
+    "  end\n"
+    "endmodule\n";
+
+// Calls vpi_control(`operation`, the assertion `full_name` names).
+std::function<void()> Control(int operation, const char* full_name) {
+  return [operation, full_name] {
+    EXPECT_EQ(
+        vpi_control(operation, vpi_handle_by_name(VpiText(full_name), nullptr)),
+        1);
+  };
+}
+
+// The start time of each failed attempt the failure callback saw, in order.
+std::vector<uint64_t> FailedAttemptStarts() {
+  std::vector<uint64_t> starts;
+  for (const AssertionCall& call : AssertionRun::CallsOf(cbAssertionFailure)) {
+    starts.push_back(call.attempt_start);
+  }
+  return starts;
+}
+
+// §39.5.2: vpiAssertionDisable stops the one assertion it is handed from
+// starting attempts until vpiAssertionEnable, the assertion beside it going
+// on failing (#7502).
+TEST_F(AssertionRun, DisableStopsOneAssertionsAttemptsUntilEnable) {
+  ArmInTurn({Control(vpiAssertionDisable, "top.a1"),
+             Control(vpiAssertionEnable, "top.a1")});
+  Run(kTwoFailing);
+
+  EXPECT_EQ(IntOf("top.f1"), 2);
+  EXPECT_EQ(IntOf("top.f2"), 3);
+  EXPECT_EQ(IntOf("top.f3"), 3);
+}
+
+// §39.5.2: vpiAssertionDisableFailAction stops the assertion's fail action
+// while its attempts still fail, as the failure callback sees (#7502).
+TEST_F(AssertionRun, DisableFailActionStopsOneAssertionsFailAction) {
+  ArmInTurn({[] {
+    ASSERT_NE(WatchAssertion("top.a1", cbAssertionFailure), nullptr);
+    Control(vpiAssertionDisableFailAction, "top.a1")();
+  }});
+  Run(kTwoFailing);
+
+  EXPECT_EQ(IntOf("top.f1"), 1);
+  EXPECT_EQ(IntOf("top.f2"), 3);
+  EXPECT_EQ(CallsOf(cbAssertionFailure).size(), 2u);
+}
+
+// §39.5.2 with §39.3.1: an unnamed assertion's handle, reached by
+// iteration, is controlled as a named one's is (#7502).
+TEST_F(AssertionRun, DisableStopsAnUnnamedAssertion) {
+  ArmInTurn({[] {
+    vpiHandle unnamed = UnnamedAssertOf("top");
+    ASSERT_NE(unnamed, nullptr);
+    EXPECT_EQ(vpi_control(vpiAssertionDisable, unnamed), 1);
+  }});
+  Run(kTwoFailing);
+
+  EXPECT_EQ(IntOf("top.f1"), 3);
+  EXPECT_EQ(IntOf("top.f3"), 1);
+}
+
+// §39.5.2: vpiAssertionReset discards the assertion's attempt in flight and
+// leaves it starting attempts as it did at the outset (#7502).
+TEST_F(AssertionRun, ResetDiscardsTheAttemptInFlight) {
+  ArmInTurn({[] {
+    ASSERT_NE(WatchAssertion("top.a1", cbAssertionFailure), nullptr);
+    Control(vpiAssertionReset, "top.a1")();
+  }});
+  Run(kAttemptsInFlight);
+
+  EXPECT_EQ(FailedAttemptStarts(), (std::vector<uint64_t>{15}));
+}
+
+// §39.5.2: vpiAssertionKill discards the one attempt that began at the time
+// it is handed, the assertion going on with the rest; with no control both
+// attempts fail (#7503).
+TEST_F(AssertionRun, KillDiscardsTheAttemptBegunAtTheTimeHanded) {
+  ArmInTurn({[] {
+    ASSERT_NE(WatchAssertion("top.a1", cbAssertionFailure), nullptr);
+    s_vpi_time start = {vpiSimTime, 0, 5, 0.0};
+    EXPECT_EQ(
+        vpi_control(vpiAssertionKill,
+                    vpi_handle_by_name(VpiText("top.a1"), nullptr), &start),
+        1);
+  }});
+  Run(kAttemptsInFlight);
+
+  EXPECT_EQ(FailedAttemptStarts(), (std::vector<uint64_t>{15}));
+}
+
+TEST_F(AssertionRun, WithNoControlEveryAttemptFails) {
+  ArmInTurn({[] {
+    ASSERT_NE(WatchAssertion("top.a1", cbAssertionFailure), nullptr);
+  }});
+  Run(kAttemptsInFlight);
+
+  EXPECT_EQ(FailedAttemptStarts(), (std::vector<uint64_t>{5, 15}));
 }
 
 }  // namespace

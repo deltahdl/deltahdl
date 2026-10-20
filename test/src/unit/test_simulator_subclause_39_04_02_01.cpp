@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "helpers_assertion_run.h"
 #include "simulator/assertion_api.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
@@ -305,6 +306,52 @@ TEST_F(GlobalClockingFutureCallbackEntry, TheDeferredCallKeepsItsAttempt) {
   EXPECT_EQ(g_deferred_calls[0].cb_time_low, 11u);
   ASSERT_TRUE(g_deferred_calls[0].carried_info);
   EXPECT_EQ(g_deferred_calls[0].attempt_start_low, 10u);
+}
+
+// §39.4.2.1, after Figure 39-1: $assertkill at time 11 raises the reset and
+// disable callbacks of a1, which names $falling_gclk, at the global clock
+// tick that follows, 12, each with cb_time 11; a2 beside it, which names no
+// future function, has its own at once (#7513).
+TEST_F(AssertionRun, AControlCallbackOfAFutureGclkAssertionWaitsForTheTick) {
+  AssertionArmer() = [] {
+    for (const char* assertion : {"top.a1", "top.a2"}) {
+      for (int reason : {cbAssertionReset, cbAssertionDisable}) {
+        ASSERT_NE(WatchAssertion(assertion, reason), nullptr);
+      }
+    }
+  };
+  Run("module top;\n"
+      "  logic clk = 0, gclk = 0, a = 1, b = 1;\n"
+      "  global clocking @(posedge gclk); endclocking\n"
+      "  a1: assert property (@(posedge clk) $falling_gclk(a) |=> b)\n"
+      "      else begin end\n"
+      "  a2: assert property (@(posedge clk) a |=> b) else begin end\n"
+      "  initial begin\n"
+      "    $arm;\n"
+      "    #10 clk = 1; gclk = 1;\n"
+      "    #1 gclk = 0; $assertkill(0, top.a1, top.a2);\n"
+      "    #1 gclk = 1;\n"
+      "    #1 gclk = 0;\n"
+      "  end\n"
+      "endmodule\n");
+
+  std::vector<AssertionCall> a1;
+  std::vector<AssertionCall> a2;
+  for (const AssertionCall& call : AssertionCalls()) {
+    (call.assertion == "top.a1" ? a1 : a2).push_back(call);
+  }
+  ASSERT_EQ(a1.size(), 2u);
+  ASSERT_EQ(a2.size(), 2u);
+  for (const AssertionCall& call : a1) {
+    EXPECT_EQ(call.cb_time, 11u);
+    EXPECT_EQ(call.now, 12u);
+  }
+  for (const AssertionCall& call : a2) {
+    EXPECT_EQ(call.cb_time, 11u);
+    EXPECT_EQ(call.now, 11u);
+  }
+  EXPECT_EQ(a1[0].reason, cbAssertionReset);
+  EXPECT_EQ(a1[1].reason, cbAssertionDisable);
 }
 
 }  // namespace

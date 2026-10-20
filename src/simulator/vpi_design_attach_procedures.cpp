@@ -412,9 +412,13 @@ VpiObject* MakeBuiltStmt(const Stmt& stmt, const BlockParent& parent,
   const int kKind = VpiBuiltStmtKind(stmt);
   if (kKind == 0) return nullptr;
   VpiObject* obj = MakeAtomicStatement(stmt, kKind, parent, walk);
-  // §37.49: an assertion reports where its text stands.
+  // §37.49: an assertion reports where its text stands, and §39.3.1: one
+  // that is labelled is named in the hierarchy of the scope it is written in.
   if (VpiIsAssertionType(kKind)) {
     VpiRecordAssertionLocation(obj, stmt.range, walk.calls.ctx);
+    if (!stmt.label.empty()) {
+      obj->full_name = VpiScopedFullName(parent.scope, stmt.label);
+    }
   }
   VpiFillStmt(obj, stmt, StmtBuildAt(parent, walk));
   return obj;

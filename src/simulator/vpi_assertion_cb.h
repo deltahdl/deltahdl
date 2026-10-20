@@ -9,11 +9,19 @@
 // which callbacks may be placed and what a placed callback is handed are
 // written.
 
+#include <string>
+
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
+
+// §39.3.1: the key the assertion model keeps the assertion `obj` under, one
+// per instance of one assertion: its full name where it has one, the name a
+// hand-built object was given otherwise, and for an unnamed assertion its
+// scope and the place it starts at (AssertionKey).
+std::string VpiAssertionKeyOf(const VpiObject& obj);
 
 // §39.4.2: place `cb_rtn` on `assertion` for `reason`, with `user_data` carried
 // through to every call of it. A placement that succeeds answers a handle to

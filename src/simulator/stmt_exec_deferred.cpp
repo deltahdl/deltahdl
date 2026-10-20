@@ -16,9 +16,9 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
 #include "simulator/assert_control_log.h"
+#include "simulator/assertion_attempt_events.h"
 #include "simulator/awaiters_event_control.h"
 #include "simulator/cover_results.h"
-#include "simulator/cover_statement.h"
 #include "simulator/evaluation.h"
 #include "simulator/exec_task.h"
 #include "simulator/expr_walk.h"
@@ -302,54 +302,6 @@ static void RecordCoverImmediateSample(const Stmt* stmt, bool is_true,
                         });
 }
 
-// §16.14.3: the results record of a concurrent cover statement, the clocked
-// body a cover property or a cover sequence is lowered to, in the scope the
-// process stands in; nullptr for every other assertion statement.
-static ConcurrentCoverResult* ConcurrentCoverRecord(const Stmt* stmt,
-                                                    SimContext& ctx) {
-  if (stmt->kind != StmtKind::kCoverImmediate || !stmt->is_concurrent_clocked) {
-    return nullptr;
-  }
-  return &ctx.ConcurrentCovers().Record(
-      ScopeHierName(ctx), stmt->range.start.line,
-      stmt->cover_sequence ? CoverStatementCategory::kSequence
-                           : CoverStatementCategory::kProperty);
-}
-
-// §16.14.3: one attempt of a concurrent cover begun, disabled or not,
-// counted in its results; nothing for any other assertion.
-static void RecordConcurrentCoverAttempt(const Stmt* stmt, SimContext& ctx) {
-  ConcurrentCoverResult* record = ConcurrentCoverRecord(stmt, ctx);
-  if (record == nullptr) return;
-  record->attempted += stmt->cover_sequence
-                           ? CoverSequenceAttemptDelta()
-                           : CoverPropertyAttemptDelta(/*outcome=*/{});
-}
-
-// §16.14.3: one verdict of a concurrent cover's attempt counted in its
-// results: a cover sequence's match, with multiplicity, or a cover
-// property's success, at most once per attempt and apart where it is by
-// vacuity; a verdict that does not hold counts nothing, and a disabled
-// attempt reaches none. Nothing for any other assertion.
-static void RecordConcurrentCoverVerdict(const Stmt* stmt,
-                                         PropertyVerdict verdict,
-                                         SimContext& ctx) {
-  ConcurrentCoverResult* record = ConcurrentCoverRecord(stmt, ctx);
-  if (record == nullptr || !verdict.holds) return;
-  if (stmt->cover_sequence) {
-    // The evaluation drops an attempt at the tick the disable condition is
-    // true at, so a match that reaches a verdict completed without it.
-    record->matched +=
-        CoverSequenceMatchDelta({/*disable_iff_occurred=*/false});
-    return;
-  }
-  CoverPropertyAttemptOutcome outcome;
-  outcome.nonvacuous_success = !verdict.vacuous;
-  outcome.vacuous_success = verdict.vacuous;
-  record->succeeded += CoverPropertySuccessDelta(outcome);
-  record->vacuous += CoverPropertyVacuousSuccessDelta(outcome);
-}
-
 // §20.11: the Table 20-6 assertion_type bit that identifies an assertion
 // statement -- an expect statement, a concurrent assertion, or a simple
 // immediate, observed deferred or final deferred one -- so a $assertcontrol
@@ -385,13 +337,13 @@ static uint32_t DirectiveTypeBitOf(const Stmt* stmt) {
 }
 
 // §20.11: the assertion `stmt` as a control selects it, written in the scope
-// named `scope`, its own name, where it is labelled, kept in `name`. An empty
-// scope leaves both names out, for a run whose controls name no scope list.
+// named `scope`, its own name kept in `name`: its full name where it is
+// labelled, and where it is not, the key §39.3.1 has a VPI control name it
+// by, which no task's scope list can write. An empty scope leaves both names
+// out, for a run whose controls name no scope list.
 static AssertionIdentity IdentityOf(const Stmt* stmt, std::string_view scope,
-                                    std::string& name) {
-  if (!scope.empty() && !stmt->label.empty()) {
-    name = std::string(scope) + "." + std::string(stmt->label);
-  }
+                                    std::string& name, SimContext& ctx) {
+  if (!scope.empty()) name = RunAssertionKey(stmt, scope, ctx);
   return {AssertionTypeBitOf(stmt), DirectiveTypeBitOf(stmt), scope, name};
 }
 
@@ -400,7 +352,7 @@ AssertionStatus AssertionControlStatus(const Stmt* stmt, SimContext& ctx) {
   std::string scope;
   if (controls.NamesScopes()) scope = ScopeHierName(ctx);
   std::string name;
-  return controls.StatusOf(IdentityOf(stmt, scope, name));
+  return controls.StatusOf(IdentityOf(stmt, scope, name, ctx));
 }
 
 // §16.3 / §20.11: with no else clause the tool reports the violation via
@@ -452,7 +404,7 @@ static const Stmt* ConcludeAssertion(const Stmt* stmt, PropertyVerdict verdict,
                                      SimContext& ctx, Arena& arena) {
   bool is_true = verdict.holds;
   RecordCoverImmediateSample(stmt, is_true, ctx);
-  RecordConcurrentCoverVerdict(stmt, verdict, ctx);
+  NoteAttemptVerdict(stmt, verdict, ctx);
   const Stmt* action =
       is_true ? stmt->assert_pass_stmt : stmt->assert_fail_stmt;
   // §16.17: an expect statement's verdict unblocks the process it stands
@@ -501,13 +453,14 @@ static const Stmt* JudgeAssertion(const Stmt* stmt, SimContext& ctx,
   // directive, the assertion is not evaluated, records nothing, and runs no
   // action on this activation.
   if (!AssertionControlStatus(stmt, ctx).checking) return nullptr;
-  RecordConcurrentCoverAttempt(stmt, ctx);
+  NoteAttemptBegun(stmt, ctx);
 
   // §16.12: an attempt at which the disable condition, read as the variables
   // stand rather than sampled, is true is disabled: it neither succeeds nor
   // fails, so no action block runs and no failure is reported.
   if (stmt->assert_disable_iff != nullptr &&
       EvalExpr(stmt->assert_disable_iff, ctx, arena).IsTruthy()) {
+    NoteAttemptDisabled(stmt, ctx.CurrentTime().ticks, ctx);
     return nullptr;
   }
 
@@ -515,6 +468,8 @@ static const Stmt* JudgeAssertion(const Stmt* stmt, SimContext& ctx,
   bool is_true = EvalAssertionCondition(stmt, ctx, arena);
   PropertyVerdict verdict;
   verdict.holds = is_true != stmt->assert_negated;
+  verdict.started = ctx.CurrentTime().ticks;
+  verdict.failed_at = stmt->assert_expr;
   return ConcludeAssertion(stmt, verdict, ctx, arena);
 }
 
@@ -536,9 +491,11 @@ static SimCoroutine StrongAttemptsFinalCoroutine(const Stmt* stmt,
                                                  Arena& arena) {
   PendingReportScope saved;
   scope.Install(ctx, saved);
-  size_t pending = PendingSequenceAttempts(*state);
-  for (size_t i = 0; i < pending; ++i) {
+  for (uint64_t started : PendingSequenceStarts(*state)) {
     RecordCoverImmediateSample(stmt, false, ctx);
+    PropertyVerdict failed;
+    failed.started = started;
+    NoteAttemptVerdict(stmt, failed, ctx);
     if (stmt->assert_fail_stmt == nullptr) {
       if (stmt->kind != StmtKind::kCoverImmediate) {
         ReportDefaultAssertionFailure(stmt, ctx);
@@ -574,7 +531,7 @@ static SimCoroutine PropertyTreeFinalCoroutine(const Stmt* stmt,
   scope.Install(ctx, saved);
   for (PropertyVerdict verdict : FinishPropertyTree(*state)) {
     RecordCoverImmediateSample(stmt, verdict.holds, ctx);
-    RecordConcurrentCoverVerdict(stmt, verdict, ctx);
+    NoteAttemptVerdict(stmt, verdict, ctx);
     const Stmt* action =
         verdict.holds ? stmt->assert_pass_stmt : stmt->assert_fail_stmt;
     if (action == nullptr) {
@@ -623,12 +580,15 @@ static void ExecPropertyTreeTick(const Stmt* stmt,
   auto& samples = ctx.AssertionSamples();
   bool outer_evaluating_property = samples.EvaluatingProperty();
   samples.SetEvaluatingProperty(true);
+  AttemptReads reads(stmt, ctx);
   PropertyTick tick = AdvancePropertyTree(
       *state, disabled, BegunAttempts(stmt, instances, ctx), ctx, arena);
   samples.SetEvaluatingProperty(outer_evaluating_property);
-  for (uint32_t i = 0; i < tick.attempted; ++i) {
-    RecordConcurrentCoverAttempt(stmt, ctx);
+  for (uint32_t i = 0; i < tick.attempted; ++i) NoteAttemptBegun(stmt, ctx);
+  for (uint64_t started : tick.disabled) {
+    NoteAttemptDisabled(stmt, started, ctx);
   }
+  reads.Finish(tick.verdicts);
   for (PropertyVerdict verdict : tick.verdicts) {
     // §16.14.6.1: the action block scheduled for the verdict reads what the
     // instance saved, so the bindings stand while it is scheduled.
@@ -654,9 +614,7 @@ static void ExecSequencePropertyTick(const Stmt* stmt,
     }
   }
   AttemptInstances begun = BegunAttempts(stmt, instances, ctx);
-  for (size_t i = 0; i < begun.size(); ++i) {
-    RecordConcurrentCoverAttempt(stmt, ctx);
-  }
+  for (size_t i = 0; i < begun.size(); ++i) NoteAttemptBegun(stmt, ctx);
   SequenceTick tick;
   tick.disabled = stmt->assert_disable_iff != nullptr &&
                   EvalExpr(stmt->assert_disable_iff, ctx, arena).IsTruthy();
@@ -668,16 +626,26 @@ static void ExecSequencePropertyTick(const Stmt* stmt,
   auto& samples = ctx.AssertionSamples();
   bool outer_evaluating_property = samples.EvaluatingProperty();
   samples.SetEvaluatingProperty(true);
+  AttemptReads reads(stmt, ctx);
   std::vector<SequenceOutcome> outcomes =
       AdvanceSequenceProperty(*state, tick, ctx, arena);
   samples.SetEvaluatingProperty(outer_evaluating_property);
+  std::vector<PropertyVerdict> decided;
   for (const SequenceOutcome& outcome : outcomes) {
+    if (outcome.verdict == SequenceVerdict::kDisabled) {
+      NoteAttemptDisabled(stmt, outcome.started, ctx);
+      continue;
+    }
     bool matched = outcome.verdict == SequenceVerdict::kMatched;
-    PropertyVerdict decided;
-    decided.holds = matched != stmt->assert_negated;
-    decided.bindings = outcome.bindings;
-    samples.SetInstanceBindings(outcome.bindings);
-    ConcludeAssertion(stmt, decided, ctx, arena);
+    PropertyVerdict& verdict = decided.emplace_back();
+    verdict.holds = matched != stmt->assert_negated;
+    verdict.bindings = outcome.bindings;
+    verdict.started = outcome.started;
+  }
+  reads.Finish(decided);
+  for (const PropertyVerdict& verdict : decided) {
+    samples.SetInstanceBindings(verdict.bindings);
+    ConcludeAssertion(stmt, verdict, ctx, arena);
     samples.SetInstanceBindings(nullptr);
   }
 }
@@ -817,12 +785,12 @@ void ExecConcurrentAssertionTick(const Stmt* stmt,
 // process of its own for the global clocking tick is aborted with the
 // process.
 static void AbortProcessAttempts(Process& proc, const AssertControlCall& call,
-                                 const SimContext& ctx) {
+                                 SimContext& ctx) {
   std::string scope;
   if (!call.scopes.empty()) scope = ProcessHierName(proc, ctx);
   auto selects = [&](const Stmt* stmt) {
     std::string name;
-    AssertionIdentity identity = IdentityOf(stmt, scope, name);
+    AssertionIdentity identity = IdentityOf(stmt, scope, name, ctx);
     return CallSelects(call, identity) &&
            !ctx.AssertControls().StatusOf(identity).locked;
   };
@@ -854,6 +822,26 @@ void AbortKilledAttempts(const AssertControlCall& call, SimContext& ctx) {
   }
 }
 
+void AbortAttemptStartedAt(std::string_view key, uint64_t started,
+                           SimContext& ctx) {
+  for (Process* proc : ctx.GetScheduler().Threads()) {
+    const std::string kScope = ProcessHierName(*proc, ctx);
+    auto keyed = [&](const Stmt* stmt) {
+      return RunAssertionKey(stmt, kScope, ctx) == key;
+    };
+    for (auto& [stmt, state] : proc->property_tree_states) {
+      if (state != nullptr && keyed(stmt)) {
+        AbortPropertyTreeAttemptAt(*state, started);
+      }
+    }
+    for (auto& [stmt, state] : proc->sequence_property_states) {
+      if (state != nullptr && keyed(stmt)) {
+        AbortSequencePropertyAttemptAt(*state, started);
+      }
+    }
+  }
+}
+
 ExecTask ExecImmediateAssert(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   // §16.14.6: a concurrent assertion embedded in procedural code is not
   // evaluated where it is reached but placed in the procedural assertion
@@ -878,6 +866,7 @@ ExecTask ExecImmediateAssert(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   // the five, which is every assertion in a design that uses none.
   Process* proc = ctx.CurrentProcess();
   if (proc != nullptr && !proc->gclk_future_event.empty()) {
+    KeepFutureGclkAsserting(stmt, *proc, ctx);
     StartFutureGclkAttempt(stmt, *proc, ctx, arena);
     co_return StmtResult::kDone;
   }

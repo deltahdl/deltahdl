@@ -1,11 +1,17 @@
 #include "simulator/vpi_assertion_cb.h"
 
 #include <cstdint>
+#include <string>
+#include <string_view>
+#include <unordered_set>
+#include <vector>
 
 #include "simulator/assertion_api.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_model_helpers2.h"
+#include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -24,6 +30,28 @@ s_vpi_time VpiAssertionCallbackTime(std::uint64_t model_time) {
   return time;
 }
 
+// §39.4.2: the expression the assertion `assertion` holds whose source text
+// is `text`, found over the objects its expression or its property spec hangs
+// below it; null where it holds none. A net or variable an operand names is
+// its scope's, and what that object holds is no part of the assertion.
+VpiObject* ExpressionWritten(VpiObject* assertion, std::string_view text) {
+  if (text.empty()) return nullptr;
+  VpiContext& vpi = GetGlobalVpiContext();
+  std::vector<VpiObject*> pending(assertion->children.rbegin(),
+                                  assertion->children.rend());
+  std::unordered_set<const VpiObject*> seen;
+  while (!pending.empty()) {
+    VpiObject* obj = pending.back();
+    pending.pop_back();
+    if (obj == nullptr || !seen.insert(obj).second) continue;
+    const char* written = vpi.GetStrRaw(vpiDecompile, obj);
+    if (written != nullptr && text == written) return obj;
+    if (VpiIsVariablesType(obj->type) || VpiIsNetsType(obj->type)) continue;
+    pending.insert(pending.end(), obj->children.rbegin(), obj->children.rend());
+  }
+  return nullptr;
+}
+
 // §39.4.2: call the application's routine with the five arguments the clause
 // lists - the reason, a pointer to the time of the callback, the handle for the
 // assertion, a pointer to an attempt information structure, and the user data
@@ -32,23 +60,38 @@ s_vpi_time VpiAssertionCallbackTime(std::uint64_t model_time) {
 // The attempt information follows the clause's own rule about when there is
 // any: a lock, unlock, disable, enable, reset, kill, pass action, fail action,
 // vacuous action or nonvacuous action callback is given a NULL
-// p_vpi_attempt_info pointer, which is what the model reports
-// through the args it delivers, and attemptStartTime is what fills it. The
-// detail union is left as the clause leaves it for a start or success callback,
-// where only attemptStartTime is valid: the expressions a failure or a step
-// carries are held by the model as the source text of the expression rather
-// than as objects, so there is no handle to put in failExpr or in a step's
-// expression array until the run's assertion engine drives this API.
+// p_vpi_attempt_info pointer, which is what the model reports through the args
+// it delivers, and attemptStartTime is what fills it. A failure callback's
+// detail is the failExpr, and a step callback's the step: the expressions it
+// matched and the states it went from and to. The model holds each expression
+// as the source text the run read it by, which names the object of the
+// assertion that decompiles to it.
 void VpiCallAssertionRoutine(vpi_assertion_callback_func* cb_rtn,
                              VpiHandle assertion,
                              const AssertionCallbackArgs& args) {
   s_vpi_time cb_time = VpiAssertionCallbackTime(args.cb_time);
   s_vpi_attempt_info info = {};
   p_vpi_attempt_info info_p = nullptr;
+  s_vpi_assertion_step_info step = {};
+  std::vector<vpiHandle> matched;
   if (args.info != nullptr) {
     info.attemptStartTime =
         VpiAssertionCallbackTime(args.info->attempt_start_time);
     info_p = &info;
+    if (args.reason == cbAssertionFailure) {
+      info.detail.failExpr =
+          VpiHandleOf(ExpressionWritten(assertion, args.info->fail_expr));
+    } else if (args.reason == cbAssertionStepSuccess ||
+               args.reason == cbAssertionStepFailure) {
+      for (const std::string& text : args.info->step.matched_exprs) {
+        matched.push_back(VpiHandleOf(ExpressionWritten(assertion, text)));
+      }
+      step.matched_expression_count = static_cast<PLI_INT32>(matched.size());
+      step.matched_exprs = matched.empty() ? nullptr : matched.data();
+      step.stateFrom = args.info->step.state_from;
+      step.stateTo = args.info->step.state_to;
+      info.detail.step = &step;
+    }
   }
   cb_rtn(args.reason, &cb_time, VpiHandleOf(assertion), info_p,
          static_cast<PLI_BYTE8*>(args.user_data));
@@ -83,6 +126,15 @@ AssertionControlTarget ControlTargetOf(const VpiObject& obj) {
 
 }  // namespace
 
+std::string VpiAssertionKeyOf(const VpiObject& obj) {
+  if (!obj.full_name.empty()) return obj.full_name;
+  if (!obj.name.empty()) return std::string(obj.name);
+  std::string_view scope =
+      obj.parent != nullptr ? std::string_view(obj.parent->full_name) : "";
+  return AssertionKey(scope, {}, static_cast<uint32_t>(obj.start_line),
+                      static_cast<uint32_t>(obj.column));
+}
+
 VpiHandle VpiRegisterAssertionCb(VpiHandle assertion, int reason,
                                  vpi_assertion_callback_func* cb_rtn,
                                  PLI_BYTE8* user_data) {
@@ -99,14 +151,15 @@ VpiHandle VpiRegisterAssertionCb(VpiHandle assertion, int reason,
   // instance. A reason the assertion cannot carry is an error on placing, and
   // the placement answers with the NULL handle for it.
   AssertionApi& api = GetGlobalAssertionApi();
+  const std::string kKey = VpiAssertionKeyOf(*assertion);
   AssertionCallbackHandle placed = api.PlaceAssertionCallback(
-      reason, assertion->name, assertion->type,
+      reason, kKey, assertion->type,
       [cb_rtn, assertion](const AssertionCallbackArgs& args) {
         VpiCallAssertionRoutine(cb_rtn, assertion, args);
       },
       user_data);
   if (placed == 0) return nullptr;
-  api.NoteControlTarget(assertion->name, ControlTargetOf(*assertion));
+  api.NoteControlTarget(kKey, ControlTargetOf(*assertion));
 
   return GetGlobalVpiContext().CreateAssertionCallbackObject(placed);
 }

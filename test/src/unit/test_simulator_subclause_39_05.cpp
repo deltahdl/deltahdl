@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <vector>
+
 #include "simulator/assertion_api.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
@@ -124,6 +126,91 @@ TEST_F(AssertionControlFunctions, SteppingIsEnabledForTheNamedAttempt) {
 
   EXPECT_EQ(vpi_control(vpiAssertionDisableStep, assertion, &attempt), 1);
   EXPECT_FALSE(api_.AssertionStepEnabled("handshake_p", 10));
+}
+
+// The reasons the callbacks below were called for, in order, and whether each
+// was given attempt information.
+std::vector<int>& CalledReasons() {
+  static std::vector<int> reasons;
+  return reasons;
+}
+std::vector<bool>& CalledWithInfo() {
+  static std::vector<bool> with_info;
+  return with_info;
+}
+
+PLI_INT32 RecordSystemCallback(p_cb_data data) {
+  CalledReasons().push_back(data->reason);
+  return 0;
+}
+
+PLI_INT32 RecordAssertionCallback(PLI_INT32 reason, p_vpi_time /*cb_time*/,
+                                  vpiHandle /*assertion*/,
+                                  p_vpi_attempt_info info,
+                                  PLI_BYTE8* /*user_data*/) {
+  CalledReasons().push_back(reason);
+  CalledWithInfo().push_back(info != nullptr);
+  return 0;
+}
+
+// §39.4.1 with §39.5.1: a system control vpi_control() applies is the system
+// control action the matching assertion system callback reports, so the
+// callback is called once per control applied, and a control refused while
+// the system is locked calls none (#7504).
+TEST_F(AssertionControlFunctions, ASystemControlCallsItsSystemCallback) {
+  CalledReasons().clear();
+  for (int reason : {cbAssertionSysOff, cbAssertionSysOn, cbAssertionSysReset,
+                     cbAssertionSysLock}) {
+    s_cb_data data = {};
+    data.reason = reason;
+    data.cb_rtn = &RecordSystemCallback;
+    ASSERT_NE(vpi_register_cb(&data), nullptr);
+  }
+
+  auto* none = static_cast<vpiHandle>(nullptr);
+  EXPECT_EQ(vpi_control(vpiAssertionSysOff, none), 1);
+  EXPECT_EQ(vpi_control(vpiAssertionSysOn, none), 1);
+  EXPECT_EQ(vpi_control(vpiAssertionSysReset, none), 1);
+  EXPECT_EQ(vpi_control(vpiAssertionSysLock, none), 1);
+  EXPECT_EQ(vpi_control(vpiAssertionSysOff, none), 0);
+
+  EXPECT_EQ(CalledReasons(),
+            (std::vector<int>{cbAssertionSysOff, cbAssertionSysOn,
+                              cbAssertionSysReset, cbAssertionSysLock}));
+}
+
+// §39.4.2 with §39.5.2: a control vpi_control() applies to one assertion is
+// the control action its assertion callback of that kind reports, called with
+// no attempt information; a disable, an enable, a fail-action disable and an
+// attempt's kill each call theirs once, and a control the assertion's lock
+// refuses calls none (#7505).
+TEST_F(AssertionControlFunctions, AnAssertionControlCallsItsAssertionCallback) {
+  CalledReasons().clear();
+  CalledWithInfo().clear();
+  VpiHandle assertion = vpi_ctx_.CreateAssertion("handshake_p", vpiAssert);
+  for (int reason : {cbAssertionDisable, cbAssertionEnable,
+                     cbAssertionDisableFailAction, cbAssertionKill}) {
+    ASSERT_NE(vpi_register_assertion_cb(assertion, reason,
+                                        &RecordAssertionCallback, nullptr),
+              nullptr);
+  }
+
+  EXPECT_EQ(vpi_control(vpiAssertionDisable, assertion), 1);
+  EXPECT_EQ(vpi_control(vpiAssertionEnable, assertion), 1);
+  EXPECT_EQ(vpi_control(vpiAssertionDisableFailAction, assertion), 1);
+  s_vpi_time attempt = {};
+  attempt.type = vpiSimTime;
+  attempt.low = 10;
+  EXPECT_EQ(vpi_control(vpiAssertionKill, assertion, &attempt), 1);
+  // Refused while the assertion is locked, a disable performs no action and
+  // calls no callback.
+  EXPECT_EQ(vpi_control(vpiAssertionLock, assertion), 1);
+  EXPECT_EQ(vpi_control(vpiAssertionDisable, assertion), 0);
+
+  EXPECT_EQ(CalledReasons(),
+            (std::vector<int>{cbAssertionDisable, cbAssertionEnable,
+                              cbAssertionDisableFailAction, cbAssertionKill}));
+  EXPECT_EQ(CalledWithInfo(), (std::vector<bool>{false, false, false, false}));
 }
 
 }  // namespace

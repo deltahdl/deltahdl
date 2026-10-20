@@ -2,10 +2,12 @@
 
 #include <cstddef>
 #include <iterator>
+#include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "helpers_assertion_run.h"
 #include "simulator/assertion_api.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
@@ -162,6 +164,75 @@ TEST_F(AssertionSysCallbackPlacement, DeliveryIsSelectiveByReason) {
   // The reason it was placed for delivers exactly once.
   EXPECT_EQ(vpi_ctx_.DispatchCallbacks(cbAssertionSysEnd), 1);
   EXPECT_EQ(g_seen_reason, cbAssertionSysEnd);
+}
+
+// The reason `$arm` records when a case uses it as a mark of the design's own
+// progress.
+constexpr int kDesignRan = -1;
+
+// The reasons recorded, in order.
+std::vector<int> RecordedReasons() {
+  std::vector<int> reasons;
+  for (const AssertionCall& call : AssertionCalls()) {
+    reasons.push_back(call.reason);
+  }
+  return reasons;
+}
+
+// §39.4.1: the assertion system initializes and then becomes active as the
+// run starts, by default, so cbAssertionSysInitialized is called and then
+// cbAssertionSysOn before anything of the design runs; once the run has
+// ended, its final procedures with it, cbAssertionSysEnd is called (#7510,
+// #7511, #7512).
+TEST_F(AssertionRun, TheAssertionSystemStartsAndEndsWithTheRun) {
+  for (int reason :
+       {cbAssertionSysInitialized, cbAssertionSysOn, cbAssertionSysEnd}) {
+    ASSERT_NE(WatchAssertionSystem(reason), nullptr);
+  }
+  AssertionArmer() = [] { AssertionCalls().push_back({kDesignRan}); };
+  Run("module top;\n"
+      "  initial $arm;\n"
+      "  final $arm;\n"
+      "endmodule\n");
+  f_.scheduler.EndSimulation();
+
+  EXPECT_EQ(RecordedReasons(),
+            (std::vector<int>{cbAssertionSysInitialized, cbAssertionSysOn,
+                              kDesignRan, kDesignRan, cbAssertionSysEnd}));
+}
+
+// §39.4.1: an application may hold the assertion system back from starting
+// with the run through a system control action; turned off before the run,
+// it initializes but does not become active, so cbAssertionSysOn is not
+// called (#7511).
+TEST_F(AssertionRun, AnAssertionSystemTurnedOffBeforeTheRunDoesNotStart) {
+  for (int reason : {cbAssertionSysInitialized, cbAssertionSysOn}) {
+    ASSERT_NE(WatchAssertionSystem(reason), nullptr);
+  }
+  ASSERT_EQ(vpi_control(vpiAssertionSysOff, static_cast<vpiHandle>(nullptr)),
+            1);
+  Run("module top;\n"
+      "  initial $noop;\n"
+      "endmodule\n");
+
+  EXPECT_EQ(RecordedReasons(), (std::vector<int>{cbAssertionSysInitialized}));
+}
+
+// §39.4.1 with §39.5.1: an assertion system an application ended during the
+// run has had its cbAssertionSysEnd already, and the end of the run calls no
+// second one (#7512).
+TEST_F(AssertionRun, AnAssertionSystemEndedDuringTheRunEndsOnce) {
+  ASSERT_NE(WatchAssertionSystem(cbAssertionSysEnd), nullptr);
+  AssertionArmer() = [] {
+    vpi_control(vpiAssertionSysEnd, static_cast<vpiHandle>(nullptr));
+  };
+  Run("module top;\n"
+      "  initial #5 $arm;\n"
+      "endmodule\n");
+  f_.scheduler.EndSimulation();
+
+  ASSERT_EQ(CallsOf(cbAssertionSysEnd).size(), 1u);
+  EXPECT_EQ(CallsOf(cbAssertionSysEnd)[0].now, 5u);
 }
 
 }  // namespace

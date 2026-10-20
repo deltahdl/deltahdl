@@ -1,6 +1,5 @@
 #pragma once
 
-#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -67,16 +66,19 @@ SequencePropertyState* CreateSequencePropertyState(const ModuleItem* seq,
                                                    SimContext& ctx,
                                                    Arena& arena);
 
-enum class SequenceVerdict : uint8_t { kMatched, kFailed };
+// How an attempt ended: matched, failed, or, §16.12, dropped by the disable
+// condition, neither matching nor failing.
+enum class SequenceVerdict : uint8_t { kMatched, kFailed, kDisabled };
 
 // What one tick of the property asks: `disabled` says the disable
 // condition is true at this tick, which drops every attempt in flight and
-// begins none; §16.14.3: `every_match` keeps an attempt that matched in
-// flight while it can match again, so that each later match of it is a
-// verdict too, as a cover sequence counts every match of an attempt, where
-// a property holds at the first; `instances` are the attempts beginning at
-// the tick, one entry, null, for a static assertion and, §16.14.6, the
-// values each matured instance of a procedural one saved (§16.14.6.1).
+// each beginning at it, each with a disabled outcome; §16.14.3: `every_match`
+// keeps an attempt that matched in flight while it can match again, so that
+// each later match of it is a verdict too, as a cover sequence counts every
+// match of an attempt, where a property holds at the first; `instances` are the
+// attempts beginning at the tick, one entry, null, for a static assertion and,
+// §16.14.6, the values each matured instance of a procedural one saved
+// (§16.14.6.1).
 struct SequenceTick {
   bool disabled = false;
   bool every_match = false;
@@ -84,10 +86,12 @@ struct SequenceTick {
 };
 
 // The verdict one attempt reached at a tick, with the values its instance
-// saved for the action block to read, null for a static assertion's.
+// saved for the action block to read, null for a static assertion's, and,
+// §39.4.2, the time the attempt began at, in ticks.
 struct SequenceOutcome {
   SequenceVerdict verdict = SequenceVerdict::kFailed;
   const InstanceBindings* bindings = nullptr;
+  uint64_t started = 0;
 };
 
 // One tick of the property: every attempt in flight advances and the new
@@ -98,11 +102,16 @@ std::vector<SequenceOutcome> AdvanceSequenceProperty(
     SequencePropertyState& state, const SequenceTick& tick, SimContext& ctx,
     Arena& arena);
 
-// The attempts still in flight, which a strong property has fail when the
-// run ends.
-size_t PendingSequenceAttempts(const SequencePropertyState& state);
+// The times the attempts still in flight began at, in ticks, which a strong
+// property has fail when the run ends.
+std::vector<uint64_t> PendingSequenceStarts(const SequencePropertyState& state);
 
 // §20.11: Kill aborts every attempt in flight, which reaches no verdict.
 void AbortSequencePropertyAttempts(SequencePropertyState& state);
+
+// §39.5.2: the attempt in flight that began at `started`, in ticks, aborted,
+// reaching no verdict.
+void AbortSequencePropertyAttemptAt(SequencePropertyState& state,
+                                    uint64_t started);
 
 }  // namespace delta

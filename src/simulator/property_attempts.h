@@ -40,6 +40,10 @@ struct PropertyVerdict {
   // §16.14.6.1: the values the instance the attempt was saved when it was
   // queued, for its action block to read; nullptr for a static assertion's.
   const InstanceBindings* bindings = nullptr;
+  // §39.4.2: the time the attempt began at, in ticks, and, where it failed,
+  // the expression it failed at, null where none is known.
+  uint64_t started = 0;
+  const Expr* failed_at = nullptr;
 };
 
 // One tick: every attempt in flight advances and one new one begins per
@@ -48,11 +52,14 @@ struct PropertyVerdict {
 // and each whose tree is decided at this tick reaches its verdict and
 // leaves; `disabled` drops every attempt in flight and begins none, though
 // `attempted` counts those that would have begun, disabled or not, at a
-// tick of the leading clock, as §16.14.3 counts attempts. The sampled value
-// functions the tree holds are sampled at the tick first.
+// tick of the leading clock, as §16.14.3 counts attempts, and `disabled`
+// holds the time each attempt it drops began at, in ticks, those in flight
+// and those beginning at the tick. The sampled value functions the tree
+// holds are sampled at the tick first.
 struct PropertyTick {
   uint32_t attempted = 0;
   std::vector<PropertyVerdict> verdicts;
+  std::vector<uint64_t> disabled;
 };
 
 using AttemptInstances = std::vector<const InstanceBindings*>;
@@ -79,5 +86,9 @@ std::vector<PropertyVerdict> FinishPropertyTree(PropertyTreeState& state);
 
 // §20.11: Kill aborts every attempt in flight, which reaches no verdict.
 void AbortPropertyTreeAttempts(PropertyTreeState& state);
+
+// §39.5.2: the attempt in flight that began at `started`, in ticks, aborted,
+// reaching no verdict.
+void AbortPropertyTreeAttemptAt(PropertyTreeState& state, uint64_t started);
 
 }  // namespace delta
