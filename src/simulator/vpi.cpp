@@ -155,12 +155,8 @@ PLI_INT32 vpi_compare_objects(vpiHandle obj1, vpiHandle obj2) {
 
 vpiHandle vpi_iterate(PLI_INT32 type, vpiHandle ref) {
   VpiRoutineErrorScope error_scope;
-  // §36.10.2: nothing but the two registration routines is available until the
-  // cbEndOfCompile callbacks run.
-  if (delta::GetGlobalVpiContext().RoutineIsUnavailableNow(
-          delta::VpiRoutine::kIterate)) {
-    return nullptr;
-  }
+  // §36.10.2's wait for cbEndOfCompile is applied in
+  // VpiIterateInCompatibilityMode, which every form of vpi_iterate shares.
   // §36.12.2.2: the default mode the run was given is what sets the VPI
   // compatibility behavior of every application that does not use Mechanism 1's
   // compile-time scheme, and an application reaching

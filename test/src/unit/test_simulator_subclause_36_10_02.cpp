@@ -13,6 +13,14 @@
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_user.h"
 
+// The compile-based variants of vpi_iterate, declared as vpi_compatibility.cpp
+// defines them, with the C linkage Annex K.2 gives the prototype Annex L.2
+// renames to these, so one translation unit can call more than one.
+extern "C" {
+vpiHandle vpi_iterate_1364v1995(PLI_INT32 type, vpiHandle ref);
+vpiHandle vpi_iterate_1800v2012(PLI_INT32 type, vpiHandle ref);
+}
+
 namespace delta {
 namespace {
 
@@ -233,6 +241,20 @@ TEST_F(VpiFunctionAvailability, PutValueIsRefusedDuringStartup) {
   value.format = vpiIntVal;
   value.value.integer = 1;
   EXPECT_EQ(vpi_put_value(nullptr, &value, nullptr, vpiNoDelay), nullptr);
+  EXPECT_NE(vpi_chk_error(nullptr), 0);
+}
+
+// §36.10.2 (C2) with §36.12.2.1: an application compiled against one VPI
+// compatibility mode calls vpi_iterate under that mode's name, and the routine
+// is no more available to it during startup than under its own (#7446).
+TEST_F(VpiFunctionAvailability,
+       ACompatibilityModeIterateIsRefusedDuringStartup) {
+  vpi_ctx_.SetToolPhase(VpiToolPhase::kStartup);
+
+  EXPECT_EQ(vpi_iterate_1364v1995(vpiModule, nullptr), nullptr);
+  EXPECT_NE(vpi_chk_error(nullptr), 0);
+  vpi_ctx_.ResetErrorStatus();
+  EXPECT_EQ(vpi_iterate_1800v2012(vpiModule, nullptr), nullptr);
   EXPECT_NE(vpi_chk_error(nullptr), 0);
 }
 

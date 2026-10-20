@@ -24,6 +24,7 @@
 
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
+#include "simulator/vpi_data_structs.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers2.h"
@@ -166,8 +167,12 @@ VpiHandle VpiIterateInCompatibilityMode(int type, VpiHandle ref, int mode) {
   // The iterator the current routine builds, with the objects an application
   // of `mode` does not expect dropped. An iteration left with nothing is the
   // NULL §38.23 gives one that reaches no object, so the emptied iterator is
-  // released rather than handed back.
-  VpiHandle iterator = delta::GetGlobalVpiContext().Iterate(type, ref, mode);
+  // released rather than handed back. §36.10.2 keeps vpi_iterate from an
+  // application until the cbEndOfCompile callbacks run, under whichever mode's
+  // name it is called.
+  VpiContext& vpi = delta::GetGlobalVpiContext();
+  if (vpi.RoutineIsUnavailableNow(VpiRoutine::kIterate)) return nullptr;
+  VpiHandle iterator = vpi.Iterate(type, ref, mode);
   if (iterator == nullptr || !VpiModeIs1364(mode)) return iterator;
   std::vector<delta::VpiObject*> kept;
   for (auto* object : iterator->children) {

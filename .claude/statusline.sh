@@ -1,8 +1,15 @@
 #!/bin/bash
-# Claude Code status line: context and weekly usage bars, and the repo's open issue count.
+# Claude Code status line: tokens in context, the weekly usage bar, and the repo's open issue count.
 
 input=$(cat)
-ctx=$(echo "$input" | jq -r '.context_window.used_percentage // empty')
+# The tokens in context now: the last request's input, cache writes and cache
+# reads, or the used share of the window where no request has reported yet.
+ctx=$(echo "$input" | jq -r '.context_window as $w
+  | if $w.current_usage then
+      ($w.current_usage | (.input_tokens // 0) + (.cache_creation_input_tokens // 0) + (.cache_read_input_tokens // 0))
+    elif $w.used_percentage and $w.context_window_size then
+      $w.used_percentage * $w.context_window_size / 100
+    else empty end')
 wk=$(echo "$input" | jq -r '.rate_limits.seven_day.used_percentage // empty')
 cwd=$(echo "$input" | jq -r '.workspace.current_dir // .cwd // empty')
 
@@ -23,7 +30,7 @@ bar() {
 }
 
 out=''
-[ -n "$ctx" ] && out=$(bar Context "$ctx")
+[ -n "$ctx" ] && out=$(printf 'Context %.0fK' "$(echo "$ctx / 1000" | bc -l)")
 [ -n "$wk" ] && out="${out}${out:+  |  }$(bar Weekly "$wk")"
 
 # gh is slow, so the count is cached per working directory for two minutes.
