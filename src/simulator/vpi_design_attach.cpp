@@ -1,6 +1,5 @@
 #include "simulator/vpi_design_attach.h"
 
-#include <algorithm>
 #include <cstddef>
 #include <deque>
 #include <functional>
@@ -228,11 +227,6 @@ VpiObject* IoDeclItem(
 // application walking in from the port reaches. A port declaring a dimension
 // stands for an interconnect array instead, which AttachInterconnectPorts
 // makes once every port is made (§37.24 details 1 and 2).
-//
-// The net stands ahead of the port among the instance's children, where a net
-// the module declares stands, so that a name in the instance, a connection it
-// makes to the net that §23.3.3.7.1 merges with the net the port meets among
-// them, finds the net rather than the port.
 void FillInterconnectNetObject(VpiObject* obj, const RtlirPort& port,
                                VpiObject* port_obj,
                                std::deque<std::string>& names) {
@@ -242,7 +236,7 @@ void FillInterconnectNetObject(VpiObject* obj, const RtlirPort& port,
   obj->name = names.back();
   obj->size = static_cast<int>(port.width);
   obj->parent = module;
-  module->children.insert(std::ranges::find(module->children, port_obj), obj);
+  module->children.push_back(obj);
   port_obj->low_conn = obj;
 }
 

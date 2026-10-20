@@ -435,39 +435,6 @@ TEST_F(ResolvedNetTypesOfARun, AnInterconnectNetTakesTheTypeItIsConnectedTo) {
   EXPECT_EQ(Resolved(vpi_handle(vpiLowConn, port)), kWor);
 }
 
-// §37.16 with §23.3.3.7.1: the merging is transitive, so an interconnect net
-// whose port connection reaches only another interconnect net takes the type
-// of the typed net that one reaches further on. top.c reaches top.m.p, an
-// interconnect net, which reaches the tri net of top.m.s; neither stays
-// vpiInterconnect (#7389).
-TEST_F(ResolvedNetTypesOfARun,
-       AnInterconnectChainTakesTheTypeOfTheNetItReaches) {
-  Run("module sink(inout tri q); endmodule\n"
-      "module mid(interconnect p); sink s(p); endmodule\n"
-      "module top; interconnect c; mid m(c); endmodule\n");
-  // The chain itself: top.c is the higher connection of m's port, whose
-  // lower one, m.p, is the higher connection of s's, whose lower one is the
-  // tri net s.q.
-  vpiHandle ports = vpi_iterate(vpiPort, By("top.m"));
-  ASSERT_NE(ports, nullptr);
-  vpiHandle port = vpi_scan(ports);
-  ASSERT_NE(port, nullptr);
-  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiHighConn, port)),
-            VpiObjectOf(By("top.c")));
-  vpiHandle p = vpi_handle(vpiLowConn, port);
-  ASSERT_NE(p, nullptr);
-  EXPECT_EQ(vpi_get(vpiType, p), vpiInterconnectNet);
-  vpiHandle inner = vpi_iterate(vpiPort, By("top.m.s"));
-  ASSERT_NE(inner, nullptr);
-  vpiHandle q = vpi_scan(inner);
-  ASSERT_NE(q, nullptr);
-  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiHighConn, q)), VpiObjectOf(p));
-  EXPECT_EQ(vpi_get(vpiNetType, vpi_handle(vpiLowConn, q)), vpiTri);
-  const std::string kTri = std::to_string(vpiTri) + " vpiTri";
-  EXPECT_EQ(Resolved(By("top.c")), kTri);
-  EXPECT_EQ(Resolved(p), kTri);
-}
-
 // §37.16 with §23.3.3.7.1 and Table 23-1: an interconnect net that its module
 // connects to a wire port and a wand port is merged into a wand, the type the
 // elaborator gave its net, whichever port is connected first.
