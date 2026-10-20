@@ -304,8 +304,11 @@ static void CollapseOneInterconnectNetType(
   if (!conn || conn->kind != ExprKind::kIdentifier) return;
   if (interconnect_names.count(conn->text) == 0) return;
 
+  // An interconnect port's data type is written as a wire's (Syntax 23-4's
+  // `interconnect implicit_data_type`), so its type kind alone gave the
+  // interconnect net it meets a wire type of its own.
   const RtlirPort* port = FindPortByName(child_ports, binding.port_name);
-  if (!port) return;
+  if (!port || port->is_interconnect) return;
 
   NetType internal = PortNetType(port->type_kind);
   if (internal == NetType::kNone) return;
