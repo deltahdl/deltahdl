@@ -18,6 +18,7 @@
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_attach_interconnects.h"
 #include "simulator/vpi_design_walk.h"
+#include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
@@ -341,6 +342,28 @@ void GiveInterconnectTypespec(VpiObject& net, VpiObject* typespec,
   }
 }
 
+// The typespec of a net the net `net` is connected to through a port: the
+// upper connection of a port of its instance whose lower connection it is, or
+// the lower connection of a port of an instance in it whose upper connection
+// it is; null where none has one yet.
+VpiObject* ConnectedTypespec(const VpiObject& net) {
+  for (const VpiObject* child : net.parent->children) {
+    if (child->type == kVpiPort && child->low_conn == &net) {
+      if (VpiObject* typespec = VpiTypespecChild(child->high_conn)) {
+        return typespec;
+      }
+    }
+    if (!VpiIsInstanceType(child->type)) continue;
+    for (const VpiObject* port : child->children) {
+      if (port->type != kVpiPort || port->high_conn != &net) continue;
+      if (VpiObject* typespec = VpiTypespecChild(port->low_conn)) {
+        return typespec;
+      }
+    }
+  }
+  return nullptr;
+}
+
 }  // namespace
 
 void VpiRecordWrittenDims(VpiObject& array, const std::vector<Expr*>& dims,
@@ -435,15 +458,29 @@ void AttachInterconnectTypespecs(const RtlirDesign* design,
   // §37.24 detail 1: an interconnect net's typespec is that of the net it is
   // connected to. None was given one, so vpiTypespec of an interconnect net
   // was null and its vpiElement and vpiMember iterations reached nothing.
+  std::vector<VpiObject*> untyped;
   WalkInstanceObjects(
       design, objects,
       [&](const RtlirModule*, const std::string&, VpiObject* instance) {
         for (VpiObject* net : instance->children) {
-          if (net->type != vpiInterconnectNet) continue;
-          GiveInterconnectTypespec(*net, VpiTypespecChild(VpiConnectedNet(net)),
-                                   build);
+          if (net->type == vpiInterconnectNet) untyped.push_back(net);
         }
       });
+  // §23.3.3.7.1: interconnect nets connected to each other are one net with
+  // the typed net they reach, so one typed in a pass types its neighbours in
+  // the next, and the passes stop when one types none. Only the first
+  // connection was looked at, once, so an interconnect net connected to its
+  // typed net through another one reached no typespec (#7387).
+  for (bool typed = true; typed;) {
+    typed = false;
+    for (VpiObject*& net : untyped) {
+      VpiObject* typespec = net == nullptr ? nullptr : ConnectedTypespec(*net);
+      if (typespec == nullptr) continue;
+      GiveInterconnectTypespec(*net, typespec, build);
+      net = nullptr;
+      typed = true;
+    }
+  }
 }
 
 }  // namespace delta

@@ -453,6 +453,19 @@ TEST_F(InterconnectsOfARun, AnInterconnectNetTakesTheTypespecOfItsNet) {
   EXPECT_EQ(TypespecNameOf(LowConnOf("top.x", "p")), "(none)");
 }
 
+// §37.24 detail 1 with §23.3.3.7.1: interconnect nets connected to each other
+// are one net with the typed net they reach, so each takes that net's typespec
+// however many interconnect nets stand between, the one above the typed net
+// as much as the one beside it (#7387).
+TEST_F(InterconnectsOfARun, AnInterconnectNetReachesItsTypedNetThroughAnother) {
+  Run("typedef logic [7:0] byte_t;\n"
+      "module sink(input byte_t q); endmodule\n"
+      "module mid(interconnect p); sink s(p); endmodule\n"
+      "module top; interconnect c; mid m(c); endmodule\n");
+  EXPECT_EQ(TypespecNameOf(LowConnOf("top.m", "p")), "byte_t");
+  EXPECT_EQ(TypespecNameOf(By("top.c")), "byte_t");
+}
+
 // §37.24 (figure) with §23.4: a nested module's interconnect array is shaped
 // as any other, and the net a nested module's assignment writes of its
 // enclosing module stands up no object of its own under the instance.
