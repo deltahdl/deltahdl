@@ -99,6 +99,12 @@ struct PortBindCtx {
 
 int NetTypeGroup(NetType t);
 bool DissimilarNetResultIsInternal(NetType internal, NetType external);
+// §23.3.3.7.1 with Table 23-1: the type of a net merged through interconnect
+// nets so far, `merged`, once a net of type `incoming` joins it. The first
+// built-in type replaces the interconnect type, and each later one resolves
+// against what is there as a dissimilar port connection does; a type of no
+// built-in group, interconnect or none, adds nothing.
+NetType MergedInterconnectNetType(NetType merged, NetType incoming);
 void CheckRefPortsConnected(DiagEngine& diag,
                             const std::vector<RtlirPort>& child_ports,
                             const RtlirModuleInst& inst,

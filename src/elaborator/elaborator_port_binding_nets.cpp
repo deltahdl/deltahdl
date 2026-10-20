@@ -277,22 +277,6 @@ static void CollapseDissimilarNetTypes(RtlirModule* parent_mod,
     CollapseOneDissimilarNetType(parent_mod, inst.resolved->ports, binding);
 }
 
-// Fold one concrete net type into an interconnect net's accumulated type. The
-// first concrete type simply replaces the interconnect type; each later one
-// resolves against what is there using the same Table 23-1 dominance as the
-// built-in collapse.
-static void MergeInterconnectNetType(RtlirNet& net, NetType internal) {
-  if (net.net_type == NetType::kInterconnect) {
-    net.net_type = internal;
-    return;
-  }
-  if (net.net_type != internal && NetTypeGroup(net.net_type) >= 0) {
-    net.net_type = DissimilarNetResultIsInternal(net.net_type, internal)
-                       ? net.net_type
-                       : internal;
-  }
-}
-
 // §23.3.3.7.1: merge one interconnect net with the net on the other side of a
 // port connection. A child port that is a net contributes its net type, the
 // default net type where its declaration wrote a data type and no net type
@@ -313,7 +297,7 @@ static void CollapseOneInterconnectNetType(
 
   for (auto& net : parent_mod->nets) {
     if (net.name != conn->text) continue;
-    MergeInterconnectNetType(net, internal);
+    net.net_type = MergedInterconnectNetType(net.net_type, internal);
     break;
   }
 }

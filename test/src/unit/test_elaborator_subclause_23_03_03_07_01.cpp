@@ -543,4 +543,53 @@ TEST(InterconnectPortConnectionElaboration,
   EXPECT_EQ(InterconnectNetType(design, "top", "c"), NetType::kInterconnect);
 }
 
+// §23.3.3.7.1: the merging is transitive, so an interconnect net that reaches
+// a typed net only through another module's interconnect port takes that
+// net's type, and the typed net keeps its own. top.c meets mid's interconnect
+// port p, which meets sink's tri port q (#7396).
+TEST(InterconnectPortConnectionElaboration,
+     AnInterconnectChainTakesTheTypeOfTheNetItReaches) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module sink(inout tri q);\n"
+      "endmodule\n"
+      "module mid(interconnect p);\n"
+      "  sink s(p);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  interconnect c;\n"
+      "  mid m(c);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(InterconnectNetType(design, "top", "c"), NetType::kTri);
+  EXPECT_EQ(InterconnectNetType(design, "sink", "q"), NetType::kTri);
+}
+
+// §23.3.3.7.1 with Table 23-1: an interconnect chain reaching dissimilar typed
+// nets through an interconnect port is one net of the dominating type among
+// them, a wand over a wire whichever is connected first.
+TEST(InterconnectPortConnectionElaboration,
+     AnInterconnectChainTakesTheDominatingTypeItReaches) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module w_sink(inout wire q);\n"
+      "endmodule\n"
+      "module a_sink(inout wand q);\n"
+      "endmodule\n"
+      "module mid(interconnect p);\n"
+      "  w_sink s1(p);\n"
+      "  a_sink s2(p);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  interconnect c;\n"
+      "  mid m(c);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(InterconnectNetType(design, "top", "c"), NetType::kWand);
+}
+
 }  // namespace

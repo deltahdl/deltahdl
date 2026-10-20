@@ -198,9 +198,12 @@ void Elaborator::CheckInterconnectPortMerge(const RtlirModuleInst& inst,
       interconnect_merges_.Join(kOuter, kInner, item->loc, binding.port_name,
                                 inst.inst_name);
     } else if (port_it->is_interconnect) {
-      interconnect_merges_.MarkTyped(kInner);
+      // The type of the net the port is connected to, none for a variable or
+      // for an expression, which names no net.
+      interconnect_merges_.MarkTyped(kInner,
+                                     FindSignalNetType(conn->text, mod));
     } else if (kOuterIsInterconnect) {
-      interconnect_merges_.MarkTyped(kOuter);
+      interconnect_merges_.MarkTyped(kOuter, port_it->net_type);
     }
   }
 }
@@ -213,7 +216,7 @@ void Elaborator::ResolveInterconnectPrimitiveTerminals(
     // §23.3.3.7.1: the terminal's net type is that of the net any port
     // connection merges it with, an interconnect port's own net included,
     // which stands among no module's nets.
-    interconnect_merges_.MarkTyped({mod, term->text});
+    interconnect_merges_.MarkTyped({mod, term->text}, NetType::kNone);
     auto scoped = ScopedName(term->text);
     for (auto& net : mod->nets) {
       if (net.name == scoped && net.net_type == NetType::kInterconnect) {
