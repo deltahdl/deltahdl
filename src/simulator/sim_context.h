@@ -727,7 +727,6 @@ class SimContext : public DeclaredNameTables,
   // §20.11: the assertion control system tasks the run has called, which an
   // assertion reads its status from.
   AssertControlLog& AssertControls() { return assert_controls_; }
-  const AssertControlLog& AssertControls() const { return assert_controls_; }
 
   // §20.10: record the last severity system task's tool-specific message parts
   // so a harness can confirm the required call-site information was reported --

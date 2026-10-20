@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <functional>
 #include <iterator>
+#include <string>
 #include <vector>
 
 #include "helpers_assertion_run.h"
@@ -390,22 +391,35 @@ constexpr const char* kTwoFailing =
     "  end\n"
     "endmodule\n";
 
-// An assertion whose attempts each fail two clock edges after they begin, at
-// the third and the fourth edge, the design calling $arm after the first.
-constexpr const char* kAttemptsInFlight =
-    "module top;\n"
-    "  logic clk = 0, a = 0;\n"
-    "  a1: assert property (@(posedge clk) 1 |-> ##2 a) else begin end\n"
-    "  initial begin\n"
-    "    #5 clk = 1;\n"
-    "    #5 clk = 0; $arm;\n"
-    "    #5 clk = 1;\n"
-    "    #5 clk = 0;\n"
-    "    #5 clk = 1;\n"
-    "    #5 clk = 0;\n"
-    "    #5 clk = 1;\n"
-    "  end\n"
-    "endmodule\n";
+// A design whose assertion a1, of `property`, fails each attempt two clock
+// edges after it begins, at the third and the fourth edge, the design calling
+// $arm after the first.
+std::string AttemptsInFlight(const std::string& property) {
+  return "module top;\n"
+         "  logic clk = 0, a = 0;\n"
+         "  a1: assert property (@(posedge clk) " +
+         property +
+         ") else begin end\n"
+         "  initial begin\n"
+         "    #5 clk = 1;\n"
+         "    #5 clk = 0; $arm;\n"
+         "    #5 clk = 1;\n"
+         "    #5 clk = 0;\n"
+         "    #5 clk = 1;\n"
+         "    #5 clk = 0;\n"
+         "    #5 clk = 1;\n"
+         "  end\n"
+         "endmodule\n";
+}
+
+// Watches a1's failures and kills its attempt begun at 5.
+void KillAttemptBegunAt5() {
+  ASSERT_NE(WatchAssertion("top.a1", cbAssertionFailure), nullptr);
+  s_vpi_time start = {vpiSimTime, 0, 5, 0.0};
+  EXPECT_EQ(vpi_control(vpiAssertionKill,
+                        vpi_handle_by_name(VpiText("top.a1"), nullptr), &start),
+            1);
+}
 
 // Calls vpi_control(`operation`, the assertion `full_name` names).
 std::function<void()> Control(int operation, const char* full_name) {
@@ -473,7 +487,7 @@ TEST_F(AssertionRun, ResetDiscardsTheAttemptInFlight) {
     ASSERT_NE(WatchAssertion("top.a1", cbAssertionFailure), nullptr);
     Control(vpiAssertionReset, "top.a1")();
   }});
-  Run(kAttemptsInFlight);
+  Run(AttemptsInFlight("1 |-> ##2 a"));
 
   EXPECT_EQ(FailedAttemptStarts(), (std::vector<uint64_t>{15}));
 }
@@ -482,15 +496,17 @@ TEST_F(AssertionRun, ResetDiscardsTheAttemptInFlight) {
 // it is handed, the assertion going on with the rest; with no control both
 // attempts fail (#7503).
 TEST_F(AssertionRun, KillDiscardsTheAttemptBegunAtTheTimeHanded) {
-  ArmInTurn({[] {
-    ASSERT_NE(WatchAssertion("top.a1", cbAssertionFailure), nullptr);
-    s_vpi_time start = {vpiSimTime, 0, 5, 0.0};
-    EXPECT_EQ(
-        vpi_control(vpiAssertionKill,
-                    vpi_handle_by_name(VpiText("top.a1"), nullptr), &start),
-        1);
-  }});
-  Run(kAttemptsInFlight);
+  ArmInTurn({KillAttemptBegunAt5});
+  Run(AttemptsInFlight("1 |-> ##2 a"));
+
+  EXPECT_EQ(FailedAttemptStarts(), (std::vector<uint64_t>{15}));
+}
+
+// §39.5.2: the same of an assertion whose property is a sequence, whose
+// attempts the run keeps apart from those of a property of operators.
+TEST_F(AssertionRun, KillDiscardsTheSequenceAttemptBegunAtTheTimeHanded) {
+  ArmInTurn({KillAttemptBegunAt5});
+  Run(AttemptsInFlight("1 ##2 a"));
 
   EXPECT_EQ(FailedAttemptStarts(), (std::vector<uint64_t>{15}));
 }
@@ -499,7 +515,7 @@ TEST_F(AssertionRun, WithNoControlEveryAttemptFails) {
   ArmInTurn({[] {
     ASSERT_NE(WatchAssertion("top.a1", cbAssertionFailure), nullptr);
   }});
-  Run(kAttemptsInFlight);
+  Run(AttemptsInFlight("1 |-> ##2 a"));
 
   EXPECT_EQ(FailedAttemptStarts(), (std::vector<uint64_t>{5, 15}));
 }
