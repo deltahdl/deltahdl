@@ -4,6 +4,7 @@
 
 #include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -140,6 +141,16 @@ TEST_F(NetDetailsOfARun, ATriregNetReportsItsChargeStrength) {
   EXPECT_EQ(vpi_get(vpiChargeStrength, By("top")), 0);
 }
 
+// §37.16 (figure): a net object standing for no net of the run holds no
+// charge to report.
+TEST(NetChargeStrength, ANetStandingForNoRunNetHoldsNoCharge) {
+  VpiObject net;
+  net.type = vpiNet;
+  int charge = -1;
+  EXPECT_TRUE(VpiGetNetStrengthProperty(vpiChargeStrength, &net, charge));
+  EXPECT_EQ(charge, 0);
+}
+
 // §37.16 (figure): vpiExplicitScalared and vpiExplicitVectored say whether a
 // net's declaration wrote the scalared or the vectored keyword (#7065).
 TEST_F(NetDetailsOfARun, ANetReportsTheScalaredOrVectoredKeyword) {
@@ -173,29 +184,42 @@ TEST_F(NetDetailsOfARun, AVectoredNetIsNotExpanded) {
 // a struct or union net, and FALSE for the struct net itself (#7069).
 TEST_F(NetDetailsOfARun, AMemberOfAStructNetIsAStructUnionMember) {
   Run("module top;\n"
-      "  typedef struct packed { logic a; logic [1:0] b; } s_t;\n"
+      "  typedef struct packed {\n"
+      "    logic a; logic [1:0] b;\n"
+      "    union packed { logic [1:0] x; logic [1:0] y; } u;\n"
+      "  } s_t;\n"
       "  wire s_t sn;\n"
       "endmodule\n");
   vpiHandle sn = By("top.sn");
   const std::vector<vpiHandle> kMembers = ObjectsOf(vpiMember, sn);
-  ASSERT_EQ(kMembers.size(), 2U);
+  ASSERT_EQ(kMembers.size(), 3U);
   EXPECT_EQ(vpi_get(vpiStructUnionMember, kMembers[0]), 1);
   EXPECT_EQ(vpi_get(vpiStructUnionMember, kMembers[1]), 1);
   EXPECT_EQ(vpi_get(vpiStructUnionMember, sn), 0);
+  // A member whose field is a union is a union net of its own (detail 31),
+  // whose members are struct union members in turn.
+  EXPECT_EQ(vpi_get(vpiType, kMembers[2]), vpiUnionNet);
+  EXPECT_EQ(vpi_get(vpiPacked, kMembers[2]), 1);
+  const std::vector<vpiHandle> kInner = ObjectsOf(vpiMember, kMembers[2]);
+  ASSERT_EQ(kInner.size(), 2U);
+  EXPECT_EQ(vpi_get(vpiStructUnionMember, kInner[0]), 1);
 }
 
 // §37.16 detail 24: an unpacked structure net's vpiSize is its number of
 // members, and a packed one's, a net of an integral data type, its size in
-// bits (#7072).
+// bits, as a packed union net's is (#7072).
 TEST_F(NetDetailsOfARun, AnUnpackedStructNetsSizeIsItsMemberCount) {
   Run("module top;\n"
       "  typedef struct { logic a; logic [3:0] b; logic c; } u_t;\n"
       "  typedef struct packed { logic a; logic [1:0] b; } p_t;\n"
-      "  wire u_t un; wire p_t pn;\n"
+      "  typedef union packed { logic [4:0] x; logic [4:0] y; } pu_t;\n"
+      "  wire u_t un; wire p_t pn; wire pu_t pu;\n"
       "endmodule\n");
   EXPECT_EQ(vpi_get(vpiSize, By("top.un")), 3);
   EXPECT_EQ(vpi_get(vpiSize, By("top.pn")), 3);
   EXPECT_EQ(vpi_get(vpiPacked, By("top.pn")), 1);
+  EXPECT_EQ(vpi_get(vpiType, By("top.pu")), vpiUnionNet);
+  EXPECT_EQ(vpi_get(vpiSize, By("top.pu")), 5);
 }
 
 // §37.16 detail 28: a logic net with no packed dimension and a net bit are

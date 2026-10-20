@@ -48,16 +48,26 @@ void RecordNetDeclaration(const RtlirNet& net, VpiObject& obj) {
 
 }  // namespace
 
-void RecordNetDeclarationFacts(const RtlirDesign* design,
-                               const VpiObjectMap& objects) {
+void ForEachDeclaredNetObject(const RtlirDesign* design,
+                              const VpiObjectMap& objects,
+                              const VpiDeclaredNetVisit& visit) {
   WalkInstancePaths(
       design, [&](const RtlirModule* mod, const std::string& prefix) {
         for (const RtlirNet& net : VpiDeclaredNets(*mod)) {
           for (const std::string& key : VpiDeclaredNetKeys(net, prefix)) {
             VpiObject* obj = FindObjectForFlatName(objects, key);
-            if (obj != nullptr) RecordNetDeclaration(net, *obj);
+            if (obj != nullptr) visit(net, *obj, prefix);
           }
         }
+      });
+}
+
+void RecordNetDeclarationFacts(const RtlirDesign* design,
+                               const VpiObjectMap& objects) {
+  ForEachDeclaredNetObject(
+      design, objects,
+      [](const RtlirNet& net, VpiObject& obj, const std::string& /*prefix*/) {
+        RecordNetDeclaration(net, obj);
       });
 }
 

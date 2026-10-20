@@ -10,7 +10,6 @@
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_attach_nets.h"
-#include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_object.h"
 
 namespace delta {
@@ -76,20 +75,16 @@ void MakeSubelements(VpiObject* holder, std::size_t depth, int64_t offset,
 void AttachPackedArrayNetElements(const RtlirDesign* design,
                                   const VpiObjectMap& objects, SimContext& ctx,
                                   const VpiAttachBuild& build) {
-  WalkInstancePaths(
-      design, [&](const RtlirModule* mod, const std::string& prefix) {
+  ForEachDeclaredNetObject(
+      design, objects,
+      [&](const RtlirNet& net, VpiObject& obj, const std::string& prefix) {
+        if (VpiNetObjectKind(net) != vpiPackedArrayNet) return;
+        // The dimensions are evaluated in the instance declaring the net.
         InstancePrefixOverride scope(ctx.InstancePrefixOverride(),
                                      prefix.empty() ? "" : prefix + ".");
-        for (const RtlirNet& net : VpiDeclaredNets(*mod)) {
-          if (VpiNetObjectKind(net) != vpiPackedArrayNet) continue;
-          const PackedDims kDims = WrittenPackedDims(net.dtype, ctx);
-          for (const std::string& key : VpiDeclaredNetKeys(net, prefix)) {
-            VpiObject* obj = FindObjectForFlatName(objects, key);
-            if (obj == nullptr) continue;
-            MakeSubelements(obj, 0, 0,
-                            {obj, kDims, LeafKindOf(net.data_kind), build});
-          }
-        }
+        const PackedDims kDims = WrittenPackedDims(net.dtype, ctx);
+        MakeSubelements(&obj, 0, 0,
+                        {&obj, kDims, LeafKindOf(net.data_kind), build});
       });
 }
 

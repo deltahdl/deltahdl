@@ -254,11 +254,11 @@ bool VpiPortScalar(int port_width);
 // §37.14 detail 6: vpiVector is TRUE when the port is more than one bit wide.
 bool VpiPortVector(int port_width);
 
-// §37.14 detail 6 and §37.3 (Figure 37-1): the object kinds that report
-// vpiScalar and vpiVector off the width they carry -- a port, and a net, which
-// §37.3's example gives the property to in as many words.
+// §37.14 detail 6: the object kinds that report vpiScalar and vpiVector off
+// the width they carry, a port and an io decl. A net reports them by §37.16
+// detail 28 instead (VpiNetIsScalarOrVector).
 inline bool VpiScalarVectorAppliesTo(int type) {
-  return type == kVpiPort || type == kVpiNet || type == vpiIODecl;
+  return type == kVpiPort || type == vpiIODecl;
 }
 
 // §37.14 detail 7: vpiPortIndex and vpiName do not apply to a port bit (only to

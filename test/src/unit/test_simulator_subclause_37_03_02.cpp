@@ -353,9 +353,15 @@ TEST_F(VpiObjectTypeProperty, AnInterconnectNetPassesOverNetsOfNoType) {
   VpiObject leaf;
   leaf.type = vpiModule;
   leaf.children = {&leaf_port};
+  // The port that joins inner_ic to the net, seen from inside, leads back to
+  // a net the merge already holds.
+  VpiObject back;
+  back.type = vpiPort;
+  back.high_conn = &net;
+  back.low_conn = &inner_ic;
   VpiObject inner;
   inner.type = vpiModule;
-  inner.children = {&leaf};
+  inner.children = {&back, &leaf};
   inner_ic.parent = &inner;
   VpiObject to_bare;
   to_bare.type = vpiPort;

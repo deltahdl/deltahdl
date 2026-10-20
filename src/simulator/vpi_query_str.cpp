@@ -541,7 +541,7 @@ static const char* VpiDecompileStr(VpiHandle obj) {
   // §37.17 detail 28 and §37.16 detail 34: a variable or net decompiles to the
   // name an expression would write it by, built when it is first asked for.
   if (VpiIsVariablesType(obj->type) || obj->type == vpiRegBit ||
-      VpiIsNetsType(obj->type) || obj->type == vpiNetBit) {
+      VpiIsNetsType(obj->type)) {
     if (obj->decompile.empty()) {
       obj->decompile = VpiStructMemberDecompileOf(obj);
     }

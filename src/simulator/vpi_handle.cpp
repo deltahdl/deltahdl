@@ -368,13 +368,15 @@ static bool TryResolveParentRelation(int type, VpiHandle ref, VpiHandle& out) {
   // member reach what holds them through vpiParent, a tag no object's type is.
   if (VpiVariableIsPackedArrayMember(ref) || VpiVariableIsArrayMember(ref) ||
       VpiVariableIsStructUnionMember(ref) || VpiNetStructUnionMember(ref) ||
-      ref->type == vpiVarSelect || VpiNetIsArrayMember(ref)) {
+      ref->type == vpiVarSelect) {
     out = ref->parent;
-    // §37.16 detail 31: the largest array net holding a net, past the
-    // subarrays a multidimensional one is held in.
-    while (VpiNetIsArrayMember(out) && out->type == vpiNetArray) {
-      out = out->parent;
-    }
+    return true;
+  }
+  // §37.16 detail 31: a net in an array net reaches the largest array net
+  // holding it, past the subarrays a multidimensional one is held in.
+  if (VpiNetIsArrayMember(ref)) {
+    out = ref->parent;
+    while (VpiNetIsArrayMember(out)) out = out->parent;
     return true;
   }
   // §37.16 detail 31, §37.17 detail 26: a select of a packed vector that
