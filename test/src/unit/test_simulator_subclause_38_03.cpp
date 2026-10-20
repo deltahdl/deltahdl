@@ -294,7 +294,7 @@ TEST_F(VpiCompareObjectsRun, ClassMemberReferencesFollowTheirHandles) {
 // The property variable named `name` of the class object the class var
 // `class_var` holds; null where it holds none or the object has no such
 // property.
-vpiHandle PropertyOf(const char* class_var, const char* name) {
+vpiHandle ObjectProperty(const char* class_var, const char* name) {
   vpiHandle obj =
       vpi_handle(vpiClassObj, vpi_handle_by_name(VpiText(class_var), nullptr));
   vpiHandle it = obj != nullptr ? vpi_iterate(vpiVariables, obj) : nullptr;
@@ -320,7 +320,7 @@ TEST_F(VpiCompareObjectsRun, AMemberReferenceIsItsObjectsPropertyVariable) {
     vpiHandle reference = vpi_scan(args);
     vpi_release_handle(args);
     compared.push_back(
-        vpi_compare_objects(reference, PropertyOf("top.c", "a")));
+        vpi_compare_objects(reference, ObjectProperty("top.c", "a")));
     return 0;
   };
   ASSERT_NE(vpi_register_systf(&data), nullptr);
