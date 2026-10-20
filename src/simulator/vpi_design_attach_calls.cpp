@@ -420,28 +420,30 @@ int FirstDimIndexKind(const std::vector<Expr*>& dims, const BodyWalk& walk) {
 // instance, a package or the compilation unit, under the scope FindClassDecl
 // reports, holding a method for each method the class declares, and one for
 // a class a generate block declares under each instance of the block, of
-// which VpiClassDefnOf finds the first.
+// which a call standing in the scope `around` reaches its own instance's.
 VpiObject* MethodObject(const BodyWalk& walk, const ScopedClass& owner,
-                        std::string_view name) {
+                        std::string_view name, const VpiObject* around) {
   if (owner.decl == nullptr) return nullptr;
   const VpiObject* defn =
-      VpiClassDefnOf(walk.calls.classes, owner.decl, owner.scope);
+      VpiClassDefnOf(walk.calls.classes, owner.decl, owner.scope, around);
   return *std::ranges::find_if(defn->children, [name](const VpiObject* child) {
     return VpiIsClassMethodType(child->type) && child->name == name;
   });
 }
 
 // §37.42: a call of the method `name` that `call` resolves it to, applied to
-// `prefix`; nothing where it resolves to none.
+// `prefix` and standing in the scope `around`; nothing where it resolves to
+// none.
 CallShape MethodShape(const MethodCall& call, std::string_view name,
-                      VpiObject* prefix, const BodyWalk& walk) {
+                      VpiObject* prefix, const VpiObject* around,
+                      const BodyWalk& walk) {
   if (call.type == 0) return {};
   CallShape shape{call.type, name};
   shape.prefix = prefix;
   // Detail 11 tells a built-in method call apart from the rest, and the
   // figure's vpiUserDefn is what says which a method call is.
   shape.user_defined = call.declared;
-  shape.called = MethodObject(walk, call.owner, name);
+  shape.called = MethodObject(walk, call.owner, name, around);
   return shape;
 }
 
@@ -481,7 +483,7 @@ CallShape MethodCallShape(const Expr& access, const BlockParent& parent,
   } else if (VpiIsBuiltInMethod(kVar.holder, access.rhs->text)) {
     call.type = vpiMethodFuncCall;
   }
-  return MethodShape(call, access.rhs->text, kVar.object, walk);
+  return MethodShape(call, access.rhs->text, kVar.object, parent.scope, walk);
 }
 
 // §8.4 with §8.13: the property `name` the class `cls`, of the package
@@ -749,7 +751,7 @@ CallShape ExprCallShape(const Expr& access, const BlockParent& parent,
       kName,
       VpiCallSiteExpression(base, walk.objects, CallSiteOf(parent, walk),
                             walk.calls.ctx, walk.build),
-      walk);
+      parent.scope, walk);
   shape.prefix_members = std::move(members);
   return shape;
 }
@@ -801,7 +803,8 @@ CallShape MemberChainCallShape(const Expr& access, const BlockParent& parent,
     call = ClassMethodCall(kAt, type.cls, access.rhs->text, {}, type.args);
     if (call.type == 0) call.type = VpiMemberBuiltInCallKind(access.rhs->text);
   }
-  CallShape shape = MethodShape(call, access.rhs->text, prefix, kAt);
+  CallShape shape =
+      MethodShape(call, access.rhs->text, prefix, parent.scope, kAt);
   if (shape.type != 0) {
     shape.prefix_members.assign(
         names.begin() + static_cast<std::ptrdiff_t>(first), names.end());
@@ -843,11 +846,11 @@ CallShape ScopedCallShape(const Expr& callee, const BlockParent& parent,
     }
     const std::vector<DataType> kArgs = ScopeArguments(scope);
     return MethodShape(ClassMethodCall(walk, scope.text, kName, {}, kArgs),
-                       kName, nullptr, walk);
+                       kName, nullptr, parent.scope, walk);
   }
   return MethodShape(
       ClassMethodCall(walk, scope.rhs->text, kName, scope.lhs->text), kName,
-      nullptr, walk);
+      nullptr, parent.scope, walk);
 }
 
 // §8.6 and §8.13 with §37.42 detail 2: a call a class's constraint writes of
@@ -865,7 +868,7 @@ CallShape OwnMethodCallShape(const Expr& callee, const BlockParent& parent,
       walk.package);
   if (!kCall.declared) return {};
   return MethodShape(kCall, callee.text, kInObject ? parent.scope : nullptr,
-                     walk);
+                     parent.scope, walk);
 }
 
 }  // namespace
@@ -907,7 +910,8 @@ VpiObject* MethodCallClassDefn(const Expr& access, const BlockParent& parent,
                                const BodyWalk& walk) {
   const ExprClassName kClass = ExprClass(*access.lhs, parent, walk);
   const ScopedClass kFound = FindClassDecl(walk, kClass.cls, kClass.package);
-  return VpiClassDefnOf(walk.calls.classes, kFound.decl, kFound.scope);
+  return VpiClassDefnOf(walk.calls.classes, kFound.decl, kFound.scope,
+                        parent.scope);
 }
 
 CallShape CallShapeOf(const Expr& expr, const BlockParent& parent,

@@ -107,7 +107,7 @@ VpiObject* DefnOfClass(const VpiClassDefnObjects& defns,
                        const ClassTypeInfo& type) {
   std::string_view scope = type.instance_scope;
   if (scope.ends_with('.')) scope.remove_suffix(1);
-  return VpiClassDefnOf(defns, type.decl, std::string(scope));
+  return VpiClassDefnOf(defns, type.decl, std::string(scope), nullptr);
 }
 
 // §37.32 detail 3: what the extends clause of a derived class gives one
@@ -186,7 +186,13 @@ constexpr std::array<std::pair<std::string_view, int>, 3> kBuiltinClasses{{
 }  // namespace
 
 VpiObject* VpiClassDefnOf(const VpiClassDefnObjects& defns,
-                          const ClassDecl* decl, const std::string& scope) {
+                          const ClassDecl* decl, const std::string& scope,
+                          const VpiObject* around) {
+  for (; around != nullptr; around = around->parent) {
+    if (around->type != vpiGenScope) continue;
+    const auto kInBlock = defns.find({decl, around->full_name});
+    if (kInBlock != defns.end()) return kInBlock->second;
+  }
   const auto kOwn = defns.find({decl, scope});
   if (kOwn != defns.end()) return kOwn->second;
   const auto kFirst = defns.lower_bound({decl, std::string()});

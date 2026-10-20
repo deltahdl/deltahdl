@@ -35,12 +35,14 @@ void VpiAttachClassSpecializations(const VpiClassDefnObjects& defns,
                                    SimContext& ctx,
                                    const VpiAttachBuild& build);
 
-// §37.31: the class defn among `defns` made for the class `decl` in the scope
-// keyed `scope`, else the first made for `decl`: one a module declares under
-// the module's first instance, or one a generate block declares under the
-// first instance of the block (§27.4); null for none.
+// §37.31: the class defn among `defns` made for the class `decl` under the
+// innermost gen scope around the object `around` that has one, a generate
+// block's class having one under each instance of the block (§27.4); else the
+// one made in the scope keyed `scope`, else the first made for `decl`, under
+// a module's first instance or a generate block's; null for none.
 VpiObject* VpiClassDefnOf(const VpiClassDefnObjects& defns,
-                          const ClassDecl* decl, const std::string& scope);
+                          const ClassDecl* decl, const std::string& scope,
+                          const VpiObject* around);
 
 // §37.31 detail 5 and §37.32 detail 10: the list the class defn `defn` keeps
 // apart from its children that the iteration `type` reaches, its derived

@@ -384,6 +384,26 @@ TEST_F(CallStatementsInAScope, AGenerateBlocksStaticMethodCalledIsACall) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiFunction, f)), VpiObjectOf(c_f));
 }
 
+// ...a loop's block among them: a call in a block nested in each instance
+// reaches the method of that instance's class defn (#7383).
+TEST_F(CallStatementsInAScope, ALoopBlocksCallReachesItsOwnInstancesMethod) {
+  Run("module top;\n"
+      "  for (genvar i = 0; i < 2; i++) begin : g\n"
+      "    class C; static function void f(); endfunction endclass\n"
+      "    if (1) begin : h\n"
+      "      initial begin : b C::f(); end\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  for (const std::string kIn : {"top.g[0]", "top.g[1]"}) {
+    vpiHandle f = CallOf(vpiMethodFuncCall, By(kIn + ".h.b"), "f");
+    vpiHandle c_f = Named(vpiMethods, Named(vpiClassDefn, By(kIn), "C"), "f");
+    ASSERT_NE(f, nullptr);
+    ASSERT_NE(c_f, nullptr);
+    EXPECT_EQ(VpiObjectOf(vpi_handle(vpiFunction, f)), VpiObjectOf(c_f));
+  }
+}
+
 // §8.23 and §8.25 with §37.42: a static method called through a
 // specialization's scope is one of the class the specialization gives C's type
 // parameter as its base: B2's tick for C #(.T(B2)) and C #(B2), and B's run
