@@ -529,6 +529,30 @@ TEST_F(ClassTypespecsOfARun, APackagesExtendsClauseFindsThePackagesTypedef) {
   EXPECT_EQ(VpiObjectOf(ExtendsRhs("pk", "PD", "T")), VpiObjectOf(b));
 }
 
+// §37.32 detail 3 with §27.4: a class a generate block declares finds a type
+// its extends clause gives as a name among the typedefs of the blocks
+// enclosing it, the innermost first, before the module's (#7381).
+TEST_F(ClassTypespecsOfARun,
+       AGenerateBlocksExtendsClauseFindsTheBlocksTypedef) {
+  Run("module top;\n"
+      "  typedef byte nib_t;\n"
+      "  typedef int m_t;\n"
+      "  class B #(type T = int, type U = int); endclass\n"
+      "  if (1) begin : g\n"
+      "    typedef bit [3:0] nib_t;\n"
+      "    if (1) begin : h\n"
+      "      class D extends B #(nib_t, m_t); endclass\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  vpiHandle nib = Named(vpiTypedef, By("top.g"), "nib_t");
+  vpiHandle m = Named(vpiTypedef, By("top"), "m_t");
+  ASSERT_NE(nib, nullptr);
+  ASSERT_NE(m, nullptr);
+  EXPECT_EQ(VpiObjectOf(ExtendsRhs("top", "D", "T")), VpiObjectOf(nib));
+  EXPECT_EQ(VpiObjectOf(ExtendsRhs("top", "D", "U")), VpiObjectOf(m));
+}
+
 // §37.32: the typespec of a mailbox's and a semaphore's class obj reports the
 // built-in class it stands for (#7126).
 TEST_F(ClassTypespecsOfARun, ABuiltInClassReportsItsClassType) {

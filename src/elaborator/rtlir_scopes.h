@@ -8,6 +8,7 @@
 
 namespace delta {
 
+struct ClassDecl;
 struct EventExpr;
 struct Expr;
 struct ModuleItem;
@@ -163,6 +164,14 @@ struct RtlirGenBlockMember {
 // one body, so the item alone says not which instance declared the entry.
 struct RtlirGenBlockTypedef {
   ModuleItem* item = nullptr;
+  HierPath gen_block_path;
+};
+
+// §37.32 detail 3 with §27.4: a class declared in a generate block instance,
+// with the path that names the instance, whose typedefs and those of the
+// blocks enclosing it are where its extends clause finds the types it names.
+struct RtlirGenBlockClass {
+  const ClassDecl* decl = nullptr;
   HierPath gen_block_path;
 };
 

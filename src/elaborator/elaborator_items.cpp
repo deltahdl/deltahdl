@@ -601,6 +601,11 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
 void Elaborator::ElaborateModuleClassDecl(ModuleItem* item, RtlirModule* mod) {
   RecordClassDecl(item, mod, class_names_, parameterized_class_names_);
   if (item->class_decl == nullptr) return;
+  // §37.32 detail 3 with §27.4: a generate block instance's class finds the
+  // names its extends clause writes among its block's typedefs.
+  if (!gen_block_path_.empty()) {
+    mod->gen_block_classes.push_back({item->class_decl, gen_block_path_});
+  }
   // §8.23: the class's typedefs are reached through its name from outside
   // the class, `Node::value_t v;` in the module's own procedure, and the
   // "Class::name" key is what the type tables answer such a name by;

@@ -760,6 +760,8 @@ struct RtlirModule {
   std::vector<RtlirGenBlockClocking> gen_block_clocking;
   // §37.85 detail 5: the typedefs declared in generate blocks.
   std::vector<RtlirGenBlockTypedef> gen_block_typedefs;
+  // §37.32 detail 3: those of class_decls declared in generate blocks.
+  std::vector<RtlirGenBlockClass> gen_block_classes;
   std::vector<ModuleItem*> let_decls;
   // §37.12 with §27.4: those of let_decls declared in generate blocks.
   std::vector<RtlirGenBlockLet> gen_block_lets;
