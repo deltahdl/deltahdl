@@ -62,8 +62,7 @@ int VpiNetTypeOf(VpiHandle obj) {
   return VpiNetTypeConstant(obj->net->type);
 }
 
-// §23.3.3.7.1: every net a port connects the net `net` to, in the order
-// VpiConnectedNet takes the first of.
+// §23.3.3.7.1: every net a port connects the net `net` to.
 static std::vector<VpiHandle> VpiConnectedNets(VpiHandle net) {
   std::vector<VpiHandle> connected;
   for (VpiObject* child : net->parent->children) {
@@ -82,9 +81,20 @@ static std::vector<VpiHandle> VpiConnectedNets(VpiHandle net) {
   return connected;
 }
 
-VpiHandle VpiConnectedNet(VpiHandle net) {
-  const std::vector<VpiHandle> kConnected = VpiConnectedNets(net);
-  return kConnected.empty() ? nullptr : kConnected.front();
+VpiHandle VpiMergedTypedNet(VpiHandle net) {
+  // §23.3.3.7.1: the merging is transitive, so the merged net reaches on
+  // through every interconnect net among the connections to the first that is
+  // not one.
+  std::vector<VpiHandle> merged = {net};
+  for (std::size_t i = 0; i < merged.size(); ++i) {
+    for (VpiHandle next : VpiConnectedNets(merged[i])) {
+      if (!VpiIsInterconnectSubelementType(next->type)) return next;
+      if (std::ranges::find(merged, next) == merged.end()) {
+        merged.push_back(next);
+      }
+    }
+  }
+  return nullptr;
 }
 
 // The type the net `net` brings to the net a port connection merges it into:

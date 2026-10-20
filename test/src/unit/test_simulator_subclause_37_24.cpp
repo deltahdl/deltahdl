@@ -508,5 +508,33 @@ TEST_F(InterconnectsOfARun, AnInterconnectNetHasTheElementsOrMembersOfItsType) {
   EXPECT_STREQ(vpi_get_str(vpiFullName, member), "top.c.b");
 }
 
+// §37.14 with §37.24 (figure): an interconnect port declares one interconnect
+// net, the port's vpiLowConn, which a connection made inside the instance names
+// too, so it is the vpiHighConn of the port of an instance connected to it
+// there (#7395).
+TEST_F(InterconnectsOfARun, AnInterconnectPortsNetIsTheOneItsNameReaches) {
+  Run("module sink(inout tri q); endmodule\n"
+      "module mid(interconnect p); sink s(p); endmodule\n"
+      "module top; interconnect c; mid m(c); endmodule\n");
+  vpiHandle low = LowConnOf("top.m", "p");
+  ASSERT_NE(low, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, low), vpiInterconnectNet);
+  vpiHandle port = Named(vpiPort, By("top.m.s"), "q");
+  ASSERT_NE(port, nullptr);
+  EXPECT_EQ(vpi_compare_objects(vpi_handle(vpiHighConn, port), low), 1);
+}
+
+// §37.24 detail 1 with §23.3.3.7.1: an interconnect net reaching its typed net
+// only through another interconnect net takes that net's typespec as well,
+// whichever of them the instances' order reaches first (#7387).
+TEST_F(InterconnectsOfARun, AnInterconnectChainTakesTheTypespecItReaches) {
+  Run("typedef logic [7:0] byte_t;\n"
+      "module sink(input byte_t q); endmodule\n"
+      "module mid(interconnect p); sink s(p); endmodule\n"
+      "module top; interconnect c; mid m(c); endmodule\n");
+  EXPECT_EQ(TypespecNameOf(By("top.c")), "byte_t");
+  EXPECT_EQ(TypespecNameOf(LowConnOf("top.m", "p")), "byte_t");
+}
+
 }  // namespace
 }  // namespace delta

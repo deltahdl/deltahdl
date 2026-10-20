@@ -24,9 +24,9 @@ void AttachInterconnectPorts(const RtlirDesign* design,
                              const VpiAttachBuild& build);
 
 // §37.24 detail 1: give each interconnect net of an instance the typespec of
-// the net a port connects it to (VpiConnectedNet) and, where that is an array
-// or a struct or union, an interconnect net per element or member, which its
-// vpiElement or vpiMember iteration reaches.
+// the typed net its port connections reach (VpiMergedTypedNet) and, where that
+// is an array or a struct or union, an interconnect net per element or member,
+// which its vpiElement or vpiMember iteration reaches.
 void AttachInterconnectTypespecs(const RtlirDesign* design,
                                  const VpiObjectMap& objects,
                                  const VpiAttachBuild& build);

@@ -451,5 +451,20 @@ TEST_F(ResolvedNetTypesOfARun, AnInterconnectNetTakesItsMergedNetsType) {
   EXPECT_EQ(Resolved(By("top.c")), std::to_string(vpiWand) + " vpiWand");
 }
 
+// §37.16 with §23.3.3.7.1 and Table 23-1: an interconnect chain that reaches
+// a wire port and a wand port through an interconnect port is one net, merged
+// into a wand, which both of its interconnect nets resolve to (#7392).
+TEST_F(ResolvedNetTypesOfARun, AnInterconnectChainTakesItsMergedNetsType) {
+  Run("module dut1(inout wire w); endmodule\n"
+      "module dut2(inout wand w); endmodule\n"
+      "module mid(interconnect p); dut1 a(p); dut2 b(p); endmodule\n"
+      "module top; interconnect c; mid m(c); endmodule\n");
+  const std::string kWand = std::to_string(vpiWand) + " vpiWand";
+  EXPECT_EQ(Resolved(By("top.c")), kWand);
+  vpiHandle port = Named(vpiPort, By("top.m"), "p");
+  ASSERT_NE(port, nullptr);
+  EXPECT_EQ(Resolved(vpi_handle(vpiLowConn, port)), kWand);
+}
+
 }  // namespace
 }  // namespace delta

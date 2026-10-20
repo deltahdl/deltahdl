@@ -464,11 +464,13 @@ bool VpiGetNetStrengthProperty(int property, VpiHandle obj, int& out);
 // no other nets across a port.
 int VpiResolvedNetTypeOf(VpiHandle obj);
 
-// §23.3.3.7.1: the net a port connects the net `net` to: for the net a port of
-// its instance stands for inside, the net the instantiation connects to the
-// port, and for a net of an instance, the net inside an instance it holds that
-// a port connects it to; null where no port connects it to one.
-VpiHandle VpiConnectedNet(VpiHandle net);
+// §23.3.3.7.1: the first net that is not an interconnect net among those port
+// connections join the interconnect net `net` to, through every interconnect
+// net among them: for the net a port of its instance stands for inside, the
+// net the instantiation connects to the port, and for a net of an instance, the
+// net inside an instance it holds that a port connects it to; null where the
+// connections reach none.
+VpiHandle VpiMergedTypedNet(VpiHandle net);
 
 // §37.39 (figure): the path terms one of a module path's three term relations
 // reaches - vpiModPathOut the output terms, and of the input terms

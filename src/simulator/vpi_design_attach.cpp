@@ -222,21 +222,18 @@ VpiObject* IoDeclItem(
 // interconnect net at all: the vpiElement and vpiMember rules of detail 1 and
 // the dimension-at-a-time walk of detail 2 ran only over objects a test built.
 //
-// The net is hung in the instance the port belongs to and is the port's
+// The net is `obj`, the object the port's name reaches inside the instance the
+// port belongs to, which a connection made there names, and is the port's
 // §37.14 vpiLowConn - the connection inside the instance - which is what an
 // application walking in from the port reaches. A port declaring a dimension
 // stands for an interconnect array instead, which AttachInterconnectPorts
-// makes once every port is made (§37.24 details 1 and 2).
+// makes once every port is made (§37.24 details 1 and 2). Any other port, for
+// which `obj` is null, has no such net.
 void FillInterconnectNetObject(VpiObject* obj, const RtlirPort& port,
-                               VpiObject* port_obj,
-                               std::deque<std::string>& names) {
-  VpiHandle module = port_obj->parent;
+                               VpiObject* port_obj) {
+  if (obj == nullptr) return;
   obj->type = vpiInterconnectNet;
-  names.emplace_back(port.name);
-  obj->name = names.back();
   obj->size = static_cast<int>(port.width);
-  obj->parent = module;
-  module->children.push_back(obj);
   port_obj->low_conn = obj;
 }
 
@@ -411,15 +408,18 @@ void VpiContext::AttachDesignPorts(const RtlirDesign* design) {
         int index = 0;
         const SourceManager* sources = SourcesOf(sim_ctx_);
         for (const auto& port : mod->ports) {
+          // Found before the port is made, which bears the same name.
+          VpiObject* net =
+              port.is_interconnect
+                  ? DesignObjectForFlatName(VpiFlatName(prefix, port.name))
+                  : nullptr;
           auto* obj = AllocObject();
           FillPortObject(obj, port, index++, module, name_pool_);
           // §37.3.3: a port is written in the source text, so its object stands
           // where the declaration does and reports it.
           RecordSourceLocation(obj, port.loc, sources);
           RecordProtection(obj, port.loc, sources);
-          if (port.is_interconnect) {
-            FillInterconnectNetObject(AllocObject(), port, obj, name_pool_);
-          }
+          FillInterconnectNetObject(net, port, obj);
           // A port written as an expression stands for no declaration of its
           // own; port_expr_decls holds those it names.
           if (port.port_expr == nullptr) {

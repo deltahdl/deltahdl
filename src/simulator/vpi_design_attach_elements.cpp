@@ -422,7 +422,7 @@ void AttachInterconnectPorts(const RtlirDesign* design,
           }
           const RtlirPort& declared = mod->ports[port->index];
           ShapeInterconnect(
-              *port->low_conn, std::string(),
+              *port->low_conn, VpiFlatName(prefix, declared.name),
               InterconnectDims(declared.unpacked_dims, declared.dtype, ctx),
               objects, build);
         }
@@ -433,15 +433,16 @@ void AttachInterconnectTypespecs(const RtlirDesign* design,
                                  const VpiObjectMap& objects,
                                  const VpiAttachBuild& build) {
   // §37.24 detail 1: an interconnect net's typespec is that of the net it is
-  // connected to. None was given one, so vpiTypespec of an interconnect net
-  // was null and its vpiElement and vpiMember iterations reached nothing.
+  // connected to, through any interconnect nets between them. None was given
+  // one, so vpiTypespec of an interconnect net was null and its vpiElement and
+  // vpiMember iterations reached nothing.
   WalkInstanceObjects(
       design, objects,
       [&](const RtlirModule*, const std::string&, VpiObject* instance) {
         for (VpiObject* net : instance->children) {
           if (net->type != vpiInterconnectNet) continue;
-          GiveInterconnectTypespec(*net, VpiTypespecChild(VpiConnectedNet(net)),
-                                   build);
+          GiveInterconnectTypespec(
+              *net, VpiTypespecChild(VpiMergedTypedNet(net)), build);
         }
       });
 }
