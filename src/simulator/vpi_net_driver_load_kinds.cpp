@@ -165,6 +165,20 @@ void NetsNamedIn(VpiHandle conn, std::vector<VpiHandle>& out) {
   }
 }
 
+// Adds to `joined`, once each, the nets on the far end of each port nets drive
+// at both ends that `net` stands on one end of.
+void AddNetsJoinedTo(VpiHandle net, std::vector<VpiHandle>& joined) {
+  for (VpiHandle port : VpiNetPortInsts(net)) {
+    if (port->low_conn != nullptr && DrivenByNets(port->high_conn) &&
+        DrivenByNets(port->low_conn)) {
+      NetsNamedIn(port->low_conn, joined);
+    }
+  }
+  for (VpiHandle port : VpiNetPorts(net)) {
+    if (DrivenByNets(port->high_conn)) NetsNamedIn(port->high_conn, joined);
+  }
+}
+
 }  // namespace
 
 std::vector<VpiHandle> VpiNetsJoinedThroughPorts(VpiHandle net) {
@@ -173,21 +187,7 @@ std::vector<VpiHandle> VpiNetsJoinedThroughPorts(VpiHandle net) {
   // share them, however many instances apart.
   std::vector<VpiHandle> joined{net};
   for (std::size_t k = 0; k < joined.size(); ++k) {
-    std::vector<VpiHandle> far;
-    for (VpiHandle port : VpiNetPortInsts(joined[k])) {
-      if (port->low_conn != nullptr && DrivenByNets(port->high_conn) &&
-          DrivenByNets(port->low_conn)) {
-        NetsNamedIn(port->low_conn, far);
-      }
-    }
-    for (VpiHandle port : VpiNetPorts(joined[k])) {
-      if (DrivenByNets(port->high_conn)) NetsNamedIn(port->high_conn, far);
-    }
-    for (VpiHandle other : far) {
-      if (std::ranges::find(joined, other) == joined.end()) {
-        joined.push_back(other);
-      }
-    }
+    AddNetsJoinedTo(joined[k], joined);
   }
   return joined;
 }
@@ -201,6 +201,68 @@ std::vector<VpiHandle> VpiNetLocalPorts(VpiHandle net, bool want_driver) {
     if (PassesValues(port->direction, want_driver)) ports.push_back(port);
   }
   return ports;
+}
+
+namespace {
+
+// §37.45: the drivers or loads of the net `net` a delay term `term` placed on
+// it reaches, less the two terms of its own device, which stand between them.
+void CollectAroundDelayTerm(VpiHandle term, VpiHandle net, bool want_driver,
+                            std::vector<VpiHandle>& found) {
+  for (VpiHandle child : net->children) {
+    if (child->parent != term->parent &&
+        VpiIsNetDriverOrLoad(child, net, want_driver)) {
+      found.push_back(child);
+    }
+  }
+}
+
+// The drivers or loads the net `net` holds, with the ports detail 17 (`local`)
+// or detail 16 adds to them.
+void CollectOfOneNet(VpiHandle net, bool want_driver, bool local,
+                     std::vector<VpiHandle>& found) {
+  for (VpiHandle child : net->children) {
+    if (VpiIsNetDriverOrLoad(child, net, want_driver)) found.push_back(child);
+  }
+  std::vector<VpiHandle> ports;
+  if (local) {
+    ports = VpiNetLocalPorts(net, want_driver);
+  } else if (want_driver) {
+    ports = VpiNetPortDrivers(net);
+  }
+  found.insert(found.end(), ports.begin(), ports.end());
+}
+
+}  // namespace
+
+std::vector<VpiHandle> VpiNetDriversOrLoads(VpiHandle node, bool want_driver,
+                                            bool local) {
+  std::vector<VpiHandle> found;
+  VpiHandle net = node->term_net != nullptr ? node->term_net : node;
+  // §37.16 detail 11: a part of a nettype net has no driver iteration.
+  if (want_driver && !VpiNetDriverIterationSupported(VpiNetTypeOf(net))) {
+    return found;
+  }
+  if (net != node) {
+    CollectAroundDelayTerm(node, net, want_driver, found);
+    return found;
+  }
+  // §37.16 details 4 and 16: the whole relations of a net reach across the
+  // ports nets drive at both ends; the local ones stop at the net's own
+  // instance, and so do a net bit's, a port joining whole nets.
+  const std::vector<VpiHandle> kNets = local || net->type == vpiNetBit
+                                           ? std::vector<VpiHandle>{net}
+                                           : VpiNetsJoinedThroughPorts(net);
+  for (VpiHandle joined : kNets) {
+    CollectOfOneNet(joined, want_driver, local, found);
+  }
+  std::vector<VpiHandle> unique;
+  for (VpiHandle object : found) {
+    if (std::ranges::find(unique, object) == unique.end()) {
+      unique.push_back(object);
+    }
+  }
+  return unique;
 }
 
 void VpiHangOnNetsNamed(VpiHandle holder, VpiHandle expr) {

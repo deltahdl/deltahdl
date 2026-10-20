@@ -667,6 +667,13 @@ bool VpiExpressionReads(const VpiObject* rhs, const VpiObject& target);
 bool VpiIsVariableDriverOrLoad(const VpiObject& child, const VpiObject& var,
                                bool want_driver);
 
+// §37.21 (figure) + detail 1: gather the drivers (`want_driver`) or loads of
+// the variable `node` into the iterator `iter`: its own driver and load
+// children, and where `descend` is set - a structure, union, class or array
+// variable - those of its selects and members at any depth.
+void VpiCollectVariableDriversOrLoads(VpiObject* node, bool want_driver,
+                                      bool descend, VpiObject* iter);
+
 // §37.21: hang `holder`, a continuous assignment, a procedural assign, a force
 // or a port, among the children of each variable the expression object `expr`
 // names, itself or a part of it, or as an operand of it at any depth, which is
@@ -726,6 +733,15 @@ std::vector<VpiHandle> VpiNetPortDrivers(VpiHandle net);
 // once, `net` first. vpiDriver and vpiLoad reach the drivers and loads of them
 // all.
 std::vector<VpiHandle> VpiNetsJoinedThroughPorts(VpiHandle net);
+
+// §37.46 with §37.16 details 4, 11, 16 and 17: the drivers (`want_driver`) or
+// loads of `node`, a net or a delay term placed on one, each once. The local
+// relations (`local`) take those the net's own instance holds with its ports;
+// the whole ones those of every net joined to it through ports nets drive,
+// with the ports something other than a net drives it through. A delay term
+// reaches those of its net less its own device's terms (§37.45).
+std::vector<VpiHandle> VpiNetDriversOrLoads(VpiHandle node, bool want_driver,
+                                            bool local);
 
 // §37.16 detail 17: the ports of the instance holding the net `net` that are
 // among its local drivers (`want_driver`) or its local loads: of the ports it

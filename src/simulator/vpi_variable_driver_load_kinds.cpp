@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <initializer_list>
 
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers2.h"
@@ -34,9 +35,20 @@ bool VpiAssignTargetWrites(const VpiObject* lhs, const VpiObject& target) {
 }
 
 bool VpiExpressionReads(const VpiObject* rhs, const VpiObject& target) {
+  if (rhs == nullptr) return false;
   if (Within(rhs, target)) return true;
+  // A select reads what its index, its bounds, or its base and width read,
+  // which a select of a vector net holds apart from its children.
+  if (std::ranges::any_of(
+          std::initializer_list<const VpiObject*>{
+              rhs->index_expr, rhs->base_expr, rhs->width_expr, rhs->left_range,
+              rhs->right_range},
+          [&target](const VpiObject* part) {
+            return VpiExpressionReads(part, target);
+          })) {
+    return true;
+  }
   const bool kComposite =
-      rhs != nullptr &&
       (rhs->type == vpiOperation || rhs->type == vpiVarSelect ||
        VpiIsVariableSelectType(rhs->type) || VpiIsTfCallType(rhs->type));
   return kComposite &&
@@ -54,6 +66,17 @@ bool VpiIsVariableDriverOrLoad(const VpiObject& child, const VpiObject& var,
   if (child.type == vpiPort || child.type == vpiContAssignBit) return true;
   return want_driver ? VpiAssignTargetWrites(child.lhs, var)
                      : VpiExpressionReads(child.rhs, var);
+}
+
+void VpiCollectVariableDriversOrLoads(VpiObject* node, bool want_driver,
+                                      bool descend, VpiObject* iter) {
+  for (auto* child : node->children) {
+    if (VpiIsVariableDriverOrLoad(*child, *node, want_driver)) {
+      iter->children.push_back(child);
+    } else if (descend && VpiIsVariableSelectOrMemberType(child->type)) {
+      VpiCollectVariableDriversOrLoads(child, want_driver, descend, iter);
+    }
+  }
 }
 
 void VpiHangOnVariablesNamed(VpiHandle holder, VpiHandle expr) {
