@@ -115,9 +115,10 @@ bool VpiVariableIsPackedArray(const RtlirVariable& var) {
     return false;
   }
   if (!var.enum_type_name.empty()) return true;
-  const DataType* type = var.dtype != nullptr ? var.dtype : written;
-  return type->kind == DataTypeKind::kStruct ||
-         type->kind == DataTypeKind::kUnion;
+  // The elaborator carries a resolved type for every declaration that writes a
+  // packed dimension.
+  return var.dtype->kind == DataTypeKind::kStruct ||
+         var.dtype->kind == DataTypeKind::kUnion;
 }
 
 void AttachPackedArrayElements(const RtlirDesign* design,
