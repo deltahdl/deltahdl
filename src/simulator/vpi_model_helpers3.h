@@ -452,10 +452,16 @@ int VpiNetTypeOf(VpiHandle obj);
 int VpiNetTypeConstant(NetType type);
 const char* VpiNetTypeConstantName(int net_type);
 
+// §37.16 (figure): answers `property` of `obj` into `out` where it is one of
+// a net's strength properties the object's own fields do not hold,
+// vpiChargeStrength; false for any other property.
+bool VpiGetNetStrengthProperty(int property, VpiHandle obj, int& out);
+
 // §37.3.2 with §23.3.3.7: a net's vpiResolvedNetType, its type once the nets
-// a port joins are resolved. An interconnect net takes the type of the net a
-// port connects it to (§23.3.3.7.1); any other net keeps its own, the run
-// merging no other nets across a port.
+// a port joins are resolved. An interconnect net takes the type of the first
+// typed net its port connections reach, through other interconnect nets as
+// far as they go (§23.3.3.7.1); any other net keeps its own, the run merging
+// no other nets across a port.
 int VpiResolvedNetTypeOf(VpiHandle obj);
 
 // §23.3.3.7.1: the net a port connects the net `net` to: for the net a port of
@@ -609,6 +615,11 @@ VpiHandle VpiNetParent(const std::vector<VpiParentPrefix>& prefixes);
 // net.
 bool VpiNetElementIteratorApplies(int net_type);
 
+// §37.16 detail 32: the kinds a packed array net's vpiElement iteration
+// reaches, its subelements one dimension down: packed array nets, and past the
+// last dimension struct, union and enum nets.
+bool VpiIsPackedArrayNetElementType(int type);
+
 // §37.16 detail 32: the subelements a vpiElement iteration over a packed array
 // net returns - its element children, in declaration order.
 std::vector<VpiHandle> VpiPackedArrayNetElements(VpiHandle packed_array_net);
@@ -618,6 +629,16 @@ std::vector<VpiHandle> VpiPackedArrayNetElements(VpiHandle packed_array_net);
 // net), FALSE for any other net, and is not defined for a net bit (reported
 // FALSE).
 bool VpiNetStructUnionMember(VpiHandle net);
+
+// §37.16 detail 28: whether `net`, an object of the nets class, is a scalar,
+// or with `scalar` false whether it is a vector. A net bit, and a bit or logic
+// net with no packed dimension, is a scalar; any other net of an integral data
+// type a vector; an array net answers as its element; every other net FALSE.
+bool VpiNetIsScalarOrVector(bool scalar, VpiHandle net);
+
+// §37.16 detail 24: vpiSize of the struct or union net `net`, its size in bits
+// where it is packed and its number of members where it is not.
+int VpiAggregateNetSize(VpiHandle net);
 
 // §37.16 detail 34: vpiName of a net - the leaf member with its own index/slice
 // but none of its struct/union-net prefixes. Reuses §37.17's name-parts shape.

@@ -54,6 +54,9 @@ int VpiGetSize(VpiHandle obj) {
   if (obj->type == vpiStringVar && obj->var != nullptr) {
     return static_cast<int>(obj->var->value.width / 8);
   }
+  if (obj->type == vpiStructNet || obj->type == vpiUnionNet) {
+    return VpiAggregateNetSize(obj);
+  }
   if (obj->type == vpiContAssignBit) return 1;
   if (obj->type == vpiPort) return VpiPortSize(obj->null_port, obj->size);
   return obj->size;
@@ -281,16 +284,16 @@ int VpiGetConstantSelect(VpiHandle obj) {
 }
 
 // §37.17 detail 20: a variable's vpiScalar or vpiVector, as its declaration
-// made it when the run built its object; a var bit is a scalar. §37.25: a bit,
-// logic or packed array typespec is a vector where it has a packed range, and
-// never a scalar. A port or net answers by its width, and any other object
-// FALSE.
+// made it; a var bit is a scalar. §37.25: a bit, logic or packed array typespec
+// is a vector where it has a packed range. §37.16 detail 28 answers for a net;
+// a port answers by its width, and any other object FALSE.
 int VpiGetScalarOrVector(int property, VpiHandle obj) {
   const bool kScalar = property == vpiScalar;
   if (obj->type == vpiRegBit) return kScalar ? 1 : 0;
   if (VpiIsVariablesType(obj->type) || VpiIsTypespecType(obj->type)) {
     return (kScalar ? obj->decl_scalar : obj->decl_vector) ? 1 : 0;
   }
+  if (VpiIsNetsType(obj->type)) return VpiNetIsScalarOrVector(kScalar, obj);
   if (!VpiScalarVectorAppliesTo(obj->type)) return 0;
   return (kScalar ? VpiPortScalar(obj->size) : VpiPortVector(obj->size)) ? 1
                                                                          : 0;
@@ -331,6 +334,7 @@ int VpiGetTypeRestricted(int property, VpiHandle obj, bool& handled) {
   if (int instance = 0; VpiGetInstanceProperty(property, obj, instance)) {
     return instance;
   }
+  if (int net = 0; VpiGetNetStrengthProperty(property, obj, net)) return net;
   switch (property) {
     case vpiObjId:
       return VpiGetObjId(obj);
@@ -360,10 +364,11 @@ int VpiGetTypeRestricted(int property, VpiHandle obj, bool& handled) {
       return VpiRandTypeOf(obj);
     case vpiIsRandomized:
       return VpiBool(VpiVariableIsRandomized(obj));
-    // §37.17 detail 17 and (printed page 1025): whether a variable is a member
-    // of a structure or union variable, and whether it was declared const.
+    // §37.17 detail 17, §37.16 detail 33 and (printed page 1025): whether a
+    // variable or net is a struct or union member, and whether it is const.
     case vpiStructUnionMember:
-      return VpiBool(VpiVariableIsStructUnionMember(obj));
+      return VpiBool(VpiVariableIsStructUnionMember(obj) ||
+                     VpiNetStructUnionMember(obj));
     case vpiConstantVariable:
       return VpiBool(obj->decl_facts.constant_variable);
     // §37.16: the kind of net a net was declared.

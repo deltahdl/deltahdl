@@ -1,3 +1,7 @@
+#include <algorithm>
+#include <cstddef>
+#include <vector>
+
 #include "common/types.h"
 #include "simulator/net.h"
 #include "simulator/vpi_constants.h"
@@ -58,31 +62,63 @@ int VpiNetTypeOf(VpiHandle obj) {
   return VpiNetTypeConstant(obj->net->type);
 }
 
-VpiHandle VpiConnectedNet(VpiHandle net) {
+// §23.3.3.7.1: every net a port connects the net `net` to, in the order
+// VpiConnectedNet takes the first of.
+static std::vector<VpiHandle> VpiConnectedNets(VpiHandle net) {
+  std::vector<VpiHandle> connected;
   for (VpiObject* child : net->parent->children) {
     if (child->type == kVpiPort && child->low_conn == net &&
         child->high_conn != nullptr) {
-      return child->high_conn;
+      connected.push_back(child->high_conn);
     }
     if (!VpiIsInstanceType(child->type)) continue;
     for (VpiObject* port : child->children) {
       if (port->type == kVpiPort && port->high_conn == net &&
           port->low_conn != nullptr) {
-        return port->low_conn;
+        connected.push_back(port->low_conn);
       }
     }
   }
-  return nullptr;
+  return connected;
+}
+
+VpiHandle VpiConnectedNet(VpiHandle net) {
+  const std::vector<VpiHandle> kConnected = VpiConnectedNets(net);
+  return kConnected.empty() ? nullptr : kConnected.front();
+}
+
+// The type the net `net` brings to the net a port connection merges it into:
+// for an interconnect net the type the run gave its net, which the elaborator
+// merged from the ports its own module connects it to, and for any other net
+// its declared type.
+static int MergedNetTypeOf(VpiHandle net) {
+  if (net->net != nullptr && VpiIsInterconnectSubelementType(net->type)) {
+    return VpiNetTypeConstant(net->net->type);
+  }
+  return VpiNetTypeOf(net);
 }
 
 int VpiResolvedNetTypeOf(VpiHandle obj) {
   const int kDeclared = VpiNetTypeOf(obj);
   if (kDeclared != vpiInterconnect) return kDeclared;
-  // §23.3.3.7.1: an interconnect net takes the type of the net a port
-  // connects it to.
-  VpiHandle connected = VpiConnectedNet(obj);
-  const int kConnected = connected != nullptr ? VpiNetTypeOf(connected) : 0;
-  return kConnected != 0 ? kConnected : kDeclared;
+  // §23.3.3.7.1: a port connection merges an interconnect net with the net it
+  // joins it to, and the merging is transitive, so the merged net reaches on
+  // through every interconnect net among them and is of the first other type
+  // it reaches.
+  std::vector<VpiHandle> merged = {obj};
+  for (std::size_t i = 0; i < merged.size(); ++i) {
+    const int kMerged = MergedNetTypeOf(merged[i]);
+    if (kMerged != 0 && kMerged != vpiNone && kMerged != vpiInterconnect) {
+      return kMerged;
+    }
+    if (VpiNetTypeOf(merged[i]) != vpiInterconnect) continue;
+    for (VpiHandle next : VpiConnectedNets(merged[i])) {
+      if (std::ranges::find(merged, next) == merged.end()) {
+        merged.push_back(next);
+      }
+    }
+  }
+  return kDeclared;
 }
 
 const char* VpiNetTypeConstantName(int net_type) {

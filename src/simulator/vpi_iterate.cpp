@@ -136,8 +136,11 @@ void ComputeTfAndEventModes(int type, VpiHandle ref, VpiIterateModes& m) {
 // vpiIndex reaches the index expressions locating a subelement within its
 // parent. Both reach objects whose own type is not the relation type.
 void ComputePackedArrayModes(int type, VpiHandle ref, VpiIterateModes& m) {
-  m.packed_array_var_element =
-      ref && ref->type == vpiPackedArrayVar && type == vpiElement;
+  // §37.18 detail 3 and §37.16 detail 32: a packed array var's or packed array
+  // net's subelements, one dimension at a time.
+  m.packed_array_var_element = ref && type == vpiElement &&
+                               (ref->type == vpiPackedArrayVar ||
+                                VpiNetElementIteratorApplies(ref->type));
   m.packed_array_var_index =
       ref && ref->type == vpiPackedArrayVar && type == vpiIndex;
   // §37.19 (figure): the var select's vpiIndex arrows reach expr, the same
@@ -145,11 +148,14 @@ void ComputePackedArrayModes(int type, VpiHandle ref, VpiIterateModes& m) {
   // expressions a select was written with were reachable from it by nothing.
   // §37.58 (figure) draws the same vpiIndex edge from a bit select to expr,
   // and §37.17 details 13 and 18 one from a var bit and from an element of an
-  // array var to their indices.
-  m.var_select_index = ref && type == vpiIndex &&
-                       (ref->type == vpiVarSelect ||
-                        ref->type == vpiBitSelect || ref->type == vpiRegBit ||
-                        (ref->array_member && VpiIsVariablesType(ref->type)));
+  // array var to their indices, and §37.16 details 10 and 25 one from a net
+  // bit and from a net in an array net.
+  m.var_select_index =
+      ref && type == vpiIndex &&
+      (ref->type == vpiVarSelect || ref->type == vpiBitSelect ||
+       ref->type == vpiRegBit || ref->type == vpiNetBit ||
+       (ref->array_member &&
+        (VpiIsVariablesType(ref->type) || VpiIsNetsType(ref->type))));
 }
 
 // §37.24 details 1 and 2: classify the interconnect special modes. An
@@ -339,7 +345,8 @@ bool VpiIterateMatchesKindMode(int obj_type, const VpiIterateModes& modes,
     return true;
   }
   if (modes.packed_array_var_element) {
-    *matched = VpiIsPackedArrayVarElementType(obj_type);
+    *matched = VpiIsPackedArrayVarElementType(obj_type) ||
+               VpiIsPackedArrayNetElementType(obj_type);
     return true;
   }
   if (modes.packed_array_var_index) {
@@ -425,14 +432,18 @@ bool VpiIterateMatchesClass(int type, int obj_type, bool& matched) {
   }
 }
 
+// §37.17 detail 18 and §37.16 detail 25: an element of an array of vectors
+// holds its bits, and a subarray its elements, beside its indices, and none of
+// them is an index of it.
+static bool HeldBesideIndices(VpiHandle obj, VpiHandle ref) {
+  if (obj->parent != ref) return false;
+  return obj->type == vpiRegBit || obj->type == vpiNetBit || obj->array_member;
+}
+
 bool VpiIterateMatches(VpiHandle obj, int type, VpiHandle ref,
                        const VpiIterateModes& modes) {
   bool matched = false;
-  // §37.17 detail 18: an element of an array of vectors holds its bits beside
-  // its indices, and none of them is an index of it.
-  if (modes.var_select_index && obj->type == vpiRegBit && obj->parent == ref) {
-    return false;
-  }
+  if (modes.var_select_index && HeldBesideIndices(obj, ref)) return false;
   // §37.20 detail 1: a reg array's vpiMemoryWord iteration collects reg word
   // objects, etc. - the fixed-kind special modes resolved first to preserve
   // precedence.

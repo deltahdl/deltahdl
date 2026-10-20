@@ -357,11 +357,11 @@ void AttachClassVarTypespecs(const RtlirDesign* design,
                              const VpiClassDefnObjects& defns, SimContext& ctx,
                              const VpiAttachBuild& build);
 
-// §37.17 details 4 and 6, §37.22: give each variable of the design its range
-// objects and its leftmost bounds.
-void AttachVariableRanges(const RtlirDesign& design,
-                          const VpiObjectMap& objects, SimContext& ctx,
-                          const VpiAttachBuild& build);
+// §37.17 details 4 and 6, §37.16 detail 26, §37.22: give each variable and
+// each net of the design its range objects and its leftmost bounds.
+void AttachVariableAndNetRanges(const RtlirDesign& design,
+                                const VpiObjectMap& objects, SimContext& ctx,
+                                const VpiAttachBuild& build);
 
 // §37.17 details 4 and 6 for a variable a task or function declares (§37.41):
 // give `obj` a range object per dimension it was declared with, the unpacked

@@ -538,10 +538,13 @@ static const char* VpiConfigStr(VpiHandle obj) {
 // other object kind, and one that stored no decompiled form, yields null rather
 // than an empty string.
 static const char* VpiDecompileStr(VpiHandle obj) {
-  // §37.17 detail 28: a variable decompiles to the name an expression would
-  // write it by, built when it is first asked for.
-  if (VpiIsVariablesType(obj->type) || obj->type == vpiRegBit) {
-    if (obj->decompile.empty()) obj->decompile = VpiVariableDecompileOf(obj);
+  // §37.17 detail 28 and §37.16 detail 34: a variable or net decompiles to the
+  // name an expression would write it by, built when it is first asked for.
+  if (VpiIsVariablesType(obj->type) || obj->type == vpiRegBit ||
+      VpiIsNetsType(obj->type) || obj->type == vpiNetBit) {
+    if (obj->decompile.empty()) {
+      obj->decompile = VpiStructMemberDecompileOf(obj);
+    }
     return obj->decompile.c_str();
   }
   if (!VpiIsExprType(obj->type) && obj->type != vpiSysTaskCall) return nullptr;

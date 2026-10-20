@@ -659,15 +659,15 @@ std::string VpiVariableDecompile(const VpiVariableNameParts& parts) {
   return result;
 }
 
-std::string VpiVariableDecompileOf(VpiHandle var) {
-  // A var bit carries its own index in its name, and is a bit of a variable
-  // whose holders prefix it.
-  const VpiObject* named = var->type == vpiRegBit ? var->parent : var;
+std::string VpiStructMemberDecompileOf(VpiHandle var) {
+  // A var bit or net bit carries its own index in its name, and is a bit of a
+  // variable or net whose holders prefix it.
+  const VpiObject* named =
+      var->type == vpiRegBit || var->type == vpiNetBit ? var->parent : var;
   VpiVariableNameParts parts;
   parts.member = std::string(var->name);
   for (const VpiObject* holder = named->parent;
-       holder != nullptr &&
-       (holder->type == vpiStructVar || holder->type == vpiUnionVar);
+       holder != nullptr && VpiIsStructOrUnionType(holder->type);
        holder = holder->parent) {
     parts.member_prefixes.insert(parts.member_prefixes.begin(),
                                  std::string(holder->name));

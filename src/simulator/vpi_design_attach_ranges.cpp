@@ -47,6 +47,18 @@ std::vector<DimBounds> RangeDims(const RtlirVariable& var, SimContext& ctx) {
   return dims;
 }
 
+// §37.16 detail 26: the packed dimensions `net` declares, which leave out the
+// implicit range of a packed struct or union net and the base type's of an
+// enum net (detail 1).
+std::vector<DimBounds> PackedNetDims(const RtlirNet& net, SimContext& ctx) {
+  std::vector<DimBounds> dims;
+  if (!net.has_declared_packed_dim) return dims;
+  for (const PackedRange& dim : WrittenPackedDims(net.dtype, ctx)) {
+    dims.emplace_back(dim);
+  }
+  return dims;
+}
+
 // Detail 4: a range object per dimension under `obj`, leftmost first. Detail
 // 6: the leftmost one's bounds are the variable's vpiLeftRange and
 // vpiRightRange, which are null where that range is empty.
@@ -60,6 +72,27 @@ void AttachRanges(VpiObject* obj, const std::vector<DimBounds>& dims,
   }
   obj->left_range = leftmost->left_range;
   obj->right_range = leftmost->right_range;
+}
+
+// §37.16 detail 26: the ranges vpiRange reaches from `net`, keyed under
+// `prefix`: an array net's unpacked ranges, and a net's packed ones, a net in
+// an array net's among them, which the run keys under its element's name.
+void AttachNetRanges(const RtlirNet& net, const std::string& prefix,
+                     const VpiObjectMap& objects, SimContext& ctx,
+                     const VpiAttachBuild& build) {
+  const std::vector<DimBounds> kPacked = PackedNetDims(net, ctx);
+  for (const std::string& key : VpiDeclaredNetKeys(net, prefix)) {
+    VpiObject* obj = FindObjectForFlatName(objects, key);
+    if (obj != nullptr) AttachRanges(obj, kPacked, build);
+  }
+  if (net.unpacked_dims.empty()) return;
+  std::vector<DimBounds> unpacked;
+  for (const RtlirUnpackedDim& dim : net.unpacked_dims) {
+    unpacked.emplace_back(PackedRange{dim.left, dim.right});
+  }
+  VpiObject* array =
+      FindObjectForFlatName(objects, VpiFlatName(prefix, net.name));
+  if (array != nullptr) AttachRanges(array, unpacked, build);
 }
 
 }  // namespace
@@ -98,11 +131,13 @@ void AttachDeclaredRanges(VpiObject* obj, const DataType& type,
   AttachRanges(obj, dims, build);
 }
 
-void AttachVariableRanges(const RtlirDesign& design,
-                          const VpiObjectMap& objects, SimContext& ctx,
-                          const VpiAttachBuild& build) {
-  // §37.17 details 4 and 6: a variable's dimensions are reached as range
-  // objects and its leftmost bounds through vpiLeftRange and vpiRightRange.
+void AttachVariableAndNetRanges(const RtlirDesign& design,
+                                const VpiObjectMap& objects, SimContext& ctx,
+                                const VpiAttachBuild& build) {
+  // §37.17 details 4 and 6 and §37.16 detail 26: a variable's and a net's
+  // dimensions are reached as range objects and its leftmost bounds through
+  // vpiLeftRange and vpiRightRange. A generic interconnect is shaped apart
+  // with its own (AttachInterconnects).
   WalkInstancePaths(
       &design, [&](const RtlirModule* mod, const std::string& prefix) {
         InstancePrefixOverride scope(ctx.InstancePrefixOverride(),
@@ -111,6 +146,11 @@ void AttachVariableRanges(const RtlirDesign& design,
           VpiObject* obj =
               FindObjectForFlatName(objects, VpiFlatName(prefix, var.name));
           if (obj != nullptr) AttachRanges(obj, RangeDims(var, ctx), build);
+        }
+        for (const RtlirNet& net : VpiDeclaredNets(*mod)) {
+          if (!VpiNetIsInterconnect(net)) {
+            AttachNetRanges(net, prefix, objects, ctx, build);
+          }
         }
       });
 }

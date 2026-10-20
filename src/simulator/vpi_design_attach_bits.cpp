@@ -205,8 +205,9 @@ std::vector<int64_t> IndicesAtOffset(const PackedDims& dims, int64_t offset) {
 // left index first, each holding its offset into the parent's storage, size 1
 // and its index, which vpiIndex reaches as a constant (detail 13). Of a value
 // with more than one packed dimension, a bit is named by an index in each, and
-// its index is the innermost. A var bit's vpiIndex iteration reaches its
-// indices, starting with its own and working outward. The parent keeps the
+// its index is the innermost. A net bit's and a var bit's vpiIndex iteration
+// reaches its indices, starting with its own and working outward (§37.16
+// detail 10). The parent keeps the
 // dimensions, which a select of it indexes.
 void MakeVectorBits(const BitTarget& target, const VpiAttachBuild& build) {
   VpiObject* parent = target.parent;
@@ -227,11 +228,9 @@ void MakeVectorBits(const BitTarget& target, const VpiAttachBuild& build) {
     bit->name = build.keep(std::string(parent->name) + suffix);
     bit->full_name = parent->full_name + suffix;
     bit->index_expr = VpiIntConstant(kIndices.back(), build);
-    if (target.bit_type == vpiRegBit) {
-      bit->children.push_back(bit->index_expr);
-      for (std::size_t k = kIndices.size() - 1; k-- > 0;) {
-        bit->children.push_back(VpiIntConstant(kIndices[k], build));
-      }
+    bit->children.push_back(bit->index_expr);
+    for (std::size_t k = kIndices.size() - 1; k-- > 0;) {
+      bit->children.push_back(VpiIntConstant(kIndices[k], build));
     }
     parent->children.push_back(bit);
   }

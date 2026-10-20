@@ -465,9 +465,10 @@ struct VpiVariableNameParts {
 // of its struct/union/class-var prefixes.
 std::string VpiVariableName(const VpiVariableNameParts& parts);
 
-// §37.17 detail 28: the vpiDecompile of the variable or var bit `var`: its
-// name joined to the names of the struct and union vars it is a member of.
-std::string VpiVariableDecompileOf(VpiHandle var);
+// §37.17 detail 28 and §37.16 detail 34: the vpiDecompile of the variable,
+// net, var bit or net bit `var`: its name joined to the names of the struct
+// and union vars or nets it is a member of.
+std::string VpiStructMemberDecompileOf(VpiHandle var);
 
 // §37.17 detail 28: vpiDecompile - the prefixes joined to the member (and its
 // index/slice) without the top-level scope, so it resolves for any

@@ -370,6 +370,11 @@ static bool TryResolveParentRelation(int type, VpiHandle ref, VpiHandle& out) {
       VpiVariableIsStructUnionMember(ref) || VpiNetStructUnionMember(ref) ||
       ref->type == vpiVarSelect || VpiNetIsArrayMember(ref)) {
     out = ref->parent;
+    // §37.16 detail 31: the largest array net holding a net, past the
+    // subarrays a multidimensional one is held in.
+    while (VpiNetIsArrayMember(out) && out->type == vpiNetArray) {
+      out = out->parent;
+    }
     return true;
   }
   // §37.16 detail 31, §37.17 detail 26: a select of a packed vector that

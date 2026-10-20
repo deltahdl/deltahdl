@@ -26,9 +26,10 @@ namespace {
 // bit: the bit's index, and the object it is a bit of. §37.17 detail 5: a var
 // select's own index too, and detail 18 with §37.20: an element's of an array
 // var, a memory word's among them, the index that selects it out of its
-// array.
+// array. §37.16 (figure) draws the same vpiIndex from a net in an array net.
 bool TryResolveBitRelation(int type, VpiHandle ref, VpiHandle& out) {
-  const bool kElement = ref->array_member && VpiIsVariablesType(ref->type);
+  const bool kElement = ref->array_member && (VpiIsVariablesType(ref->type) ||
+                                              VpiIsNetsType(ref->type));
   if ((ref->type == vpiVarSelect || kElement) && type == vpiIndex) {
     out = ref->index_expr;
     return true;
@@ -49,12 +50,13 @@ bool TryResolveBitRelation(int type, VpiHandle ref, VpiHandle& out) {
 // §37.17 detail 6 and §37.22: a variable's leftmost bounds and a range's
 // bounds, recorded where the declaration has them and null where the range is
 // empty; as §37.41 draws them, the bounds of a function's return range; as
-// §37.11 draws them, an instance array's; and, as §37.24 does, the bounds of
-// an interconnect array's first dimension.
+// §37.11 draws them, an instance array's; as §37.16 detail 26 does, a net's
+// leftmost packed bounds; and, as §37.24 does, the bounds of an interconnect
+// array's first dimension.
 bool TryResolveRangeBounds(int type, VpiHandle ref, VpiHandle& out) {
   if (type != vpiLeftRange && type != vpiRightRange) return false;
   if (ref->type != vpiRange && ref->type != vpiFunction &&
-      ref->type != vpiInterconnectArray && !VpiIsVariablesType(ref->type) &&
+      !VpiIsVariablesType(ref->type) && !VpiIsNetsType(ref->type) &&
       !VpiIsInstanceArrayType(ref->type)) {
     return false;
   }
@@ -86,10 +88,22 @@ bool TryResolveVariableInit(int type, VpiHandle ref, VpiHandle& out) {
   return true;
 }
 
+// §37.16 (figure) and detail 20: the net a net, a net bit or an array net is
+// simulated as, which an implementation that collapses nets across the
+// hierarchy (§23.3.3.7) makes one for all of them. The run keeps every net a
+// port connects apart, joining them through the port, so each is simulated as
+// itself.
+bool TryResolveSimNet(int type, VpiHandle ref, VpiHandle& out) {
+  if (type != vpiSimNet || !VpiIsNetsType(ref->type)) return false;
+  out = ref;
+  return true;
+}
+
 }  // namespace
 
 bool TryResolveSelectRelation(int type, VpiHandle ref, VpiHandle& out) {
   if (TryResolveBitRelation(type, ref, out) ||
+      TryResolveSimNet(type, ref, out) ||
       TryResolveRangeBounds(type, ref, out) ||
       TryResolvePrimTermExpr(type, ref, out) ||
       TryResolveVariableInit(type, ref, out)) {

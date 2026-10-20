@@ -780,6 +780,8 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/vpi_design_attach_instances.cpp
     simulator/vpi_design_attach_interface_tf_decls.cpp
     simulator/vpi_design_attach_members.cpp
+    simulator/vpi_design_attach_net_decls.cpp
+    simulator/vpi_design_attach_packed_nets.cpp
     simulator/vpi_design_attach_params.cpp
     simulator/vpi_design_attach_ports.cpp
     simulator/vpi_design_attach_primitives.cpp
@@ -803,6 +805,8 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/vpi_helpers_expressions.cpp
     simulator/vpi_helpers_instance.cpp
     simulator/vpi_helpers_loops.cpp
+    simulator/vpi_helpers_net_shape.cpp
+    simulator/vpi_helpers_net_strength.cpp
     simulator/vpi_helpers_net_type.cpp
     simulator/vpi_helpers_net_ports.cpp
     simulator/vpi_helpers_nets.cpp

@@ -320,6 +320,63 @@ TEST_F(VpiObjectTypeProperty, AnInterconnectNetTakesItsInstancePortsNetType) {
   EXPECT_EQ(vpi_get(vpiResolvedNetType, VpiHandleOf(&net)), vpiWand);
 }
 
+// §37.3.2 with §23.3.3.7.1: the merged net is of the first type its nets
+// bring. An instance port joining the interconnect net to a net standing for
+// no net, or to a net of no type, brings none and is passed over, as is an
+// interconnect net whose net has no type, which still passes the merge on to
+// the wand net it is joined to.
+TEST_F(VpiObjectTypeProperty, AnInterconnectNetPassesOverNetsOfNoType) {
+  VpiObject module;
+  module.type = vpiModule;
+  VpiObject net;
+  net.type = vpiInterconnectNet;
+  net.parent = &module;
+  VpiObject bare;
+  bare.type = vpiNet;
+  Net none;
+  none.type = NetType::kNone;
+  VpiObject typeless;
+  typeless.type = vpiNet;
+  typeless.net = &none;
+  VpiObject inner_ic;
+  inner_ic.type = vpiInterconnectNet;
+  inner_ic.net = &none;
+  Net wand;
+  wand.type = NetType::kWand;
+  VpiObject leaf_net;
+  leaf_net.type = vpiNet;
+  leaf_net.net = &wand;
+  VpiObject leaf_port;
+  leaf_port.type = vpiPort;
+  leaf_port.high_conn = &inner_ic;
+  leaf_port.low_conn = &leaf_net;
+  VpiObject leaf;
+  leaf.type = vpiModule;
+  leaf.children = {&leaf_port};
+  VpiObject inner;
+  inner.type = vpiModule;
+  inner.children = {&leaf};
+  inner_ic.parent = &inner;
+  VpiObject to_bare;
+  to_bare.type = vpiPort;
+  to_bare.high_conn = &net;
+  to_bare.low_conn = &bare;
+  VpiObject to_typeless;
+  to_typeless.type = vpiPort;
+  to_typeless.high_conn = &net;
+  to_typeless.low_conn = &typeless;
+  VpiObject to_inner;
+  to_inner.type = vpiPort;
+  to_inner.high_conn = &net;
+  to_inner.low_conn = &inner_ic;
+  VpiObject holder;
+  holder.type = vpiModule;
+  holder.children = {&to_bare, &to_typeless, &to_inner};
+  module.children = {&holder};
+
+  EXPECT_EQ(vpi_get(vpiResolvedNetType, VpiHandleOf(&net)), vpiWand);
+}
+
 // §37.16: vpiNetType is the kind of net an object stands for. A net object
 // standing for no net has none to report, in either form; a net of no type is
 // vpiNone, and an interconnect net vpiInterconnect.
@@ -376,6 +433,35 @@ TEST_F(ResolvedNetTypesOfARun, AnInterconnectNetTakesTheTypeItIsConnectedTo) {
   vpiHandle port = vpi_scan(ports);
   ASSERT_NE(port, nullptr);
   EXPECT_EQ(Resolved(vpi_handle(vpiLowConn, port)), kWor);
+}
+
+// §37.16 with §23.3.3.7.1: the merging is transitive, so an interconnect net
+// whose port connection reaches only another interconnect net takes the type
+// of the typed net that one reaches further on. top.c reaches top.m.p, an
+// interconnect net, which reaches the tri net of top.m.s; neither stays
+// vpiInterconnect (#7389).
+TEST_F(ResolvedNetTypesOfARun,
+       AnInterconnectChainTakesTheTypeOfTheNetItReaches) {
+  Run("module sink(inout tri q); endmodule\n"
+      "module mid(interconnect p); sink s(p); endmodule\n"
+      "module top; interconnect c; mid m(c); endmodule\n");
+  const std::string kTri = std::to_string(vpiTri) + " vpiTri";
+  EXPECT_EQ(Resolved(By("top.c")), kTri);
+  vpiHandle ports = vpi_iterate(vpiPort, By("top.m"));
+  ASSERT_NE(ports, nullptr);
+  vpiHandle port = vpi_scan(ports);
+  ASSERT_NE(port, nullptr);
+  EXPECT_EQ(Resolved(vpi_handle(vpiLowConn, port)), kTri);
+}
+
+// §37.16 with §23.3.3.7.1 and Table 23-1: an interconnect net that its module
+// connects to a wire port and a wand port is merged into a wand, the type the
+// elaborator gave its net, whichever port is connected first.
+TEST_F(ResolvedNetTypesOfARun, AnInterconnectNetTakesItsMergedNetsType) {
+  Run("module dut1(inout wire w); endmodule\n"
+      "module dut2(inout wand w); endmodule\n"
+      "module top; interconnect c; dut1 a(c); dut2 b(c); endmodule\n");
+  EXPECT_EQ(Resolved(By("top.c")), std::to_string(vpiWand) + " vpiWand");
 }
 
 }  // namespace
