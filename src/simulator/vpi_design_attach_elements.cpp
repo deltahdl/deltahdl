@@ -236,12 +236,11 @@ void AttachInterconnectRanges(VpiObject& level, std::size_t depth,
 VpiObject* InterconnectElement(VpiObject& level, const std::string& key,
                                const std::string& suffix,
                                const InterconnectShape& shape) {
-  VpiObject* element =
-      key.empty() ? nullptr : FindObjectForFlatName(shape.objects, key);
+  VpiObject* element = FindObjectForFlatName(shape.objects, key);
   if (element == nullptr) {
     element = shape.build.alloc();
     element->name = shape.build.keep(std::string(level.name) + suffix);
-    if (!level.full_name.empty()) element->full_name = level.full_name + suffix;
+    element->full_name = level.full_name + suffix;
   } else {
     std::erase(element->parent->children, element);
   }
@@ -270,7 +269,7 @@ void ShapeInterconnectLevel(VpiObject& level, const std::string& key,
   const int64_t kStep = range.left <= range.right ? 1 : -1;
   for (int64_t index = range.left;; index += kStep) {
     const std::string kSuffix = "[" + std::to_string(index) + "]";
-    const std::string kKey = key.empty() ? std::string() : key + kSuffix;
+    const std::string kKey = key + kSuffix;
     VpiObject* element = InterconnectElement(level, kKey, kSuffix, shape);
     element->index = static_cast<int>(index);
     ShapeInterconnectLevel(*element, kKey, depth + 1, shape);
@@ -303,7 +302,7 @@ VpiObject* SubInterconnectNet(VpiObject& net, std::string_view name,
   VpiObject* sub = build.alloc();
   sub->type = vpiInterconnectNet;
   sub->name = name;
-  if (!net.full_name.empty()) sub->full_name = net.full_name + suffix;
+  sub->full_name = net.full_name + suffix;
   sub->parent = &net;
   net.children.push_back(sub);
   return sub;

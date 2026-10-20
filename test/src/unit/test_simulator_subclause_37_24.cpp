@@ -536,5 +536,15 @@ TEST_F(InterconnectsOfARun, AnInterconnectChainTakesTheTypespecItReaches) {
   EXPECT_EQ(TypespecNameOf(LowConnOf("top.m", "p")), "byte_t");
 }
 
+// §37.24 detail 1 with §23.3.3.7.1: an interconnect chain whose connections
+// lead only back to its own interconnect nets reaches no typed net, so neither
+// of them takes a typespec.
+TEST_F(InterconnectsOfARun, AnInterconnectChainReachingNoNetTakesNoTypespec) {
+  Run("module mid(interconnect p); endmodule\n"
+      "module top; interconnect c; mid m(c); endmodule\n");
+  EXPECT_EQ(TypespecNameOf(By("top.c")), "(none)");
+  EXPECT_EQ(TypespecNameOf(LowConnOf("top.m", "p")), "(none)");
+}
+
 }  // namespace
 }  // namespace delta
