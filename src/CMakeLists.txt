@@ -394,6 +394,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/assertion_read_names.cpp
     simulator/fsm_coverage.cpp
     simulator/lowerer.cpp
+    simulator/lowerer_net_arrays.cpp
     simulator/lowerer_params.cpp
     simulator/lowerer_always_comb.cpp
     simulator/lowerer_child.cpp

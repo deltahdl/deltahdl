@@ -238,9 +238,8 @@ uint64_t NetDecayTicks(const RtlirNet& net, const TimeScale& scale,
   return DelayToTicks(net.decay_ticks, scale, precision);
 }
 
-static Net* CreateNetStorage(std::string_view name, const RtlirNet& net,
-                             const TimeScale& scale, SimContext& ctx,
-                             Arena& arena) {
+Net* CreateNetStorage(std::string_view name, const RtlirNet& net,
+                      const TimeScale& scale, SimContext& ctx, Arena& arena) {
   auto* created = ctx.CreateNet(
       name, net.net_type, net.width,
       NetSpec{net.charge_strength,
@@ -254,34 +253,6 @@ static Net* CreateNetStorage(std::string_view name, const RtlirNet& net,
   // select names a run of the net's bits, as a net port's is.
   RegisterAggregateLayout(name, net.dtype, net.width, ctx, arena);
   return created;
-}
-
-// §7.4.2 (printed page 154): an element of a net array is used as a scalar or
-// vector net would be, so each element is a net of its own,
-// driven and resolved apart from the others, and §6.7.1 leaves one no driver
-// reaches at z. `wire n[0:2]; assign n[1] = 1'b1;` drives n[1] alone,
-// so n[0] and n[2] read z; a single net standing for all three had n[1]
-// selecting a bit it did not have. Each address of a one-dimensional array is
-// created as the net "name[addr]", the key an array element of a variable is
-// held under (CreateArrayElements in lowerer_var.cpp), and the array's shape
-// is registered so that a select of it reads that element.
-static void CreateNetArrayElements(std::string_view name, const RtlirNet& net,
-                                   const TimeScale& scale, SimContext& ctx,
-                                   Arena& arena) {
-  if (net.num_unpacked_dims != 1 || net.unpacked_dims.size() != 1) return;
-  const RtlirUnpackedDim& dim = net.unpacked_dims.front();
-  if (dim.Low() < 0) return;
-  ArrayInfo info;
-  info.lo = static_cast<uint32_t>(dim.Low());
-  info.size = dim.Size();
-  info.elem_width = net.width;
-  info.is_descending = dim.left > dim.right;
-  ctx.RegisterArray(name, info);
-  for (uint32_t i = 0; i < info.size; ++i) {
-    auto* key = arena.Create<std::string>(std::string(name) + "[" +
-                                          std::to_string(info.lo + i) + "]");
-    CreateNetStorage(*key, net, scale, ctx, arena);
-  }
 }
 
 void CreateDeclaredNet(std::string_view name, const RtlirNet& net,

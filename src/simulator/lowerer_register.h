@@ -21,6 +21,7 @@ struct ClassTypeInfo;
 struct DataType;
 struct Expr;
 struct ModuleItem;
+struct Net;
 struct PackageDecl;
 struct QueueObject;
 struct RtlirDesign;
@@ -219,6 +220,25 @@ void ReevaluateParamValue(const RtlirParamDecl& param, Variable* var,
 // expression reads having storage by then. A type parameter holds a type, and
 // a parameter written with no value has none to take.
 bool UnfoldedParamEvaluable(const RtlirParamDecl& param, SimContext& ctx);
+
+// The net of the run standing for the net `net` declares under `name`, alone:
+// a net array's elements are made apart (CreateNetArrayElements).
+Net* CreateNetStorage(std::string_view name, const RtlirNet& net,
+                      const TimeScale& scale, SimContext& ctx, Arena& arena);
+
+// §7.4.2 and §7.4.5: an element of a net array is used as a scalar or vector
+// net would be, so each element is a net of its own, driven and resolved apart
+// from the others, and §6.7.1 leaves one no driver reaches at z.
+// `wire n[0:2]; assign n[1] = 1'b1;` drives n[1] alone, so n[0] and n[2] read
+// z. Each address of an array of `net` named `name`, of every unpacked
+// dimension, is made the net "name[a][b]...", the key an element of an array
+// var is held under (CreateArrayElements and FillMultiDimLeaves), and the
+// array's shape is registered so that a select of it reads that element.
+// Nothing for a net with no unpacked dimension, or with one of a negative
+// bound.
+void CreateNetArrayElements(std::string_view name, const RtlirNet& net,
+                            const TimeScale& scale, SimContext& ctx,
+                            Arena& arena);
 
 // The storage of one declared net under `name`, the net itself and, for an
 // unpacked array of nets, a net for each element.

@@ -232,6 +232,22 @@ TEST(UnpackedArraySimulation, NetArrayElementsAreNetsOfTheirOwn) {
             "z1z 1z 1010 zzz1\n");
 }
 
+// §7.4.2 with §7.4.5: so is an element of a net array of more than one
+// unpacked dimension, `assign n[1][5] = 1'b1;` driving n[1][5] alone and
+// leaving the elements beside it, in its subarray and in the next, at z. The
+// array was held as one net with no element nets, so every element read x.
+TEST(UnpackedArraySimulation, MultidimensionalNetArrayElementsAreNets) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  wire n[0:2][4:5];\n"
+                       "  assign n[1][5] = 1'b1;\n"
+                       "  initial #1 $display(\"%b%b%b\", n[1][5], n[1][4], "
+                       "n[2][5]);\n"
+                       "endmodule\n",
+                       f),
+            "1zz\n");
+}
+
 // The same elements as the targets of output ports: each instance drives the
 // one element its connection names, `.y(nouts[2])`, and an array of instances
 // over the whole array drives one element per instance, left index to left

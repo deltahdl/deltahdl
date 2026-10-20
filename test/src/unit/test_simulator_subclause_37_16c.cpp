@@ -57,7 +57,8 @@ TEST_F(NetDetailsOfARun, ANetBitReachesItsIndicesWorkingOutward) {
 // through vpiIndex, and its vpiIndex iteration the indices that select it out
 // of the array net, its own first and working outward. Its own bits are none
 // of them, and a subarray of a multidimensional array net reaches its own
-// index alone (#7058).
+// index alone (#7058); a net in one reaches its indices from every dimension
+// (#7394).
 TEST_F(NetDetailsOfARun, ANetInAnArrayNetReachesItsIndices) {
   Run("module top; wire [3:0] m [0:2]; wire n [0:2][4:5]; endmodule\n");
   vpiHandle m1 = vpi_handle_by_index(By("top.m"), 1);
@@ -67,6 +68,11 @@ TEST_F(NetDetailsOfARun, ANetInAnArrayNetReachesItsIndices) {
   vpiHandle n1 = vpi_handle_by_index(By("top.n"), 1);
   ASSERT_NE(n1, nullptr);
   EXPECT_EQ(IntsOf(vpiIndex, n1), (std::vector<int>{1}));
+  vpiHandle n15 = vpi_handle_by_index(n1, 5);
+  ASSERT_NE(n15, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, n15), vpiNet);
+  EXPECT_EQ(IntOf(vpi_handle(vpiIndex, n15)), 5);
+  EXPECT_EQ(IntsOf(vpiIndex, n15), (std::vector<int>{5, 1}));
 }
 
 // §37.16 detail 26: a packed array net's vpiRange iteration reaches its packed
@@ -246,9 +252,9 @@ TEST_F(NetDetailsOfARun, ANetIsAScalarOrAVectorByItsKind) {
   EXPECT_EQ(shape(By("top.un")), (std::vector<int>{0, 0}));
 }
 
-// §37.16 detail 31: the vpiParent of a subarray of a multidimensional array
-// net is the largest array net holding it, not the subarray it is held in
-// (#7074).
+// §37.16 detail 31: the vpiParent of a net in a multidimensional array net,
+// and of a subarray of one, is the largest array net holding it, not the
+// subarray it is held in (#7074, #7394).
 TEST_F(NetDetailsOfARun, ANetsParentIsItsLargestArrayNet) {
   Run("module top; wire mda [1:0][1:0][2:3]; endmodule\n");
   vpiHandle mda = By("top.mda");
@@ -258,6 +264,9 @@ TEST_F(NetDetailsOfARun, ANetsParentIsItsLargestArrayNet) {
   vpiHandle subsub = vpi_handle_by_index(sub, 0);
   ASSERT_NE(subsub, nullptr);
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiParent, subsub)), VpiObjectOf(mda));
+  vpiHandle element = vpi_handle_by_index(subsub, 3);
+  ASSERT_NE(element, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiParent, element)), VpiObjectOf(mda));
 }
 
 // §37.16 detail 32: a packed array net's vpiElement iteration reaches its
