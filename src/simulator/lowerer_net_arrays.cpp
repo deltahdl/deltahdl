@@ -47,10 +47,7 @@ void CreateNetArrayLeaves(const std::string& prefix, std::size_t depth,
 void CreateNetArrayElements(std::string_view name, const RtlirNet& net,
                             const TimeScale& scale, SimContext& ctx,
                             Arena& arena) {
-  if (net.num_unpacked_dims == 0 ||
-      net.unpacked_dims.size() != net.num_unpacked_dims) {
-    return;
-  }
+  if (net.unpacked_dims.empty()) return;
   if (std::ranges::any_of(net.unpacked_dims, [](const RtlirUnpackedDim& dim) {
         return dim.Low() < 0;
       })) {
