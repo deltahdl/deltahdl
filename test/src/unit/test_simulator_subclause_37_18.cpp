@@ -380,5 +380,44 @@ TEST_F(PackedArrayVarsOfARun, AnEnumOrUnionVarWithAPackedDimensionIsOne) {
             (std::vector<std::string>{"a", "b"}));
 }
 
+// Details 1 and 3 with §26.3: the struct subelements of a packed array var
+// of a package's typedef have the members of that typedef, which the design's
+// layouts key by the package's name (#7400).
+TEST_F(PackedArrayVarsOfARun, APackageStructsPackedArrayVarHasMembers) {
+  Run("package pk;\n"
+      "  typedef struct packed { logic [3:0] a; logic [3:0] b; } ps_t;\n"
+      "endpackage\n"
+      "module top;\n"
+      "  pk::ps_t [1:0] pv;\n"
+      "  initial pv = 16'h1234;\n"
+      "endmodule\n");
+  const std::vector<vpiHandle> kLeaves = ObjectsOf(vpiElement, By("top.pv"));
+  ASSERT_EQ(kLeaves.size(), 2U);
+  EXPECT_EQ(NamesOf(vpiMember, kLeaves[0]),
+            (std::vector<std::string>{"a", "b"}));
+  EXPECT_EQ(IntOf(Named(vpiMember, kLeaves[0], "a")), 1);
+  EXPECT_EQ(IntOf(Named(vpiMember, kLeaves[1], "b")), 4);
+}
+
+// Details 1 and 3: the struct subelements of a packed array var whose
+// structure is written in place have a member per field the structure writes
+// (#7402).
+TEST_F(PackedArrayVarsOfARun, AnInlineStructsPackedArrayVarHasMembers) {
+  Run("module top;\n"
+      "  struct packed { logic [3:0] a; logic [3:0] b; } [1:0] v;\n"
+      "  initial v = 16'h1234;\n"
+      "endmodule\n");
+  vpiHandle v = By("top.v");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, v), vpiPackedArrayVar);
+  const std::vector<vpiHandle> kLeaves = ObjectsOf(vpiElement, v);
+  ASSERT_EQ(kLeaves.size(), 2U);
+  EXPECT_EQ(vpi_get(vpiType, kLeaves[0]), vpiStructVar);
+  EXPECT_EQ(NamesOf(vpiMember, kLeaves[0]),
+            (std::vector<std::string>{"a", "b"}));
+  EXPECT_EQ(IntOf(Named(vpiMember, kLeaves[0], "a")), 1);
+  EXPECT_EQ(IntOf(Named(vpiMember, kLeaves[1], "b")), 4);
+}
+
 }  // namespace
 }  // namespace delta

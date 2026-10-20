@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <format>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -11,10 +12,12 @@
 #include "common/packed_range.h"
 #include "common/types.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/type_eval.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
+#include "simulator/lowerer_register.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/sv_vpi_user.h"
@@ -409,7 +412,10 @@ void AttachNetMembers(const MemberSite& site) {
   for (const RtlirNet& net : site.mod.nets) {
     const std::string kKey = VpiFlatName(site.prefix, net.name);
     const StructTypeInfo* info = site.ctx.GetVariableStructType(kKey);
-    if (info == nullptr) continue;
+    // §37.16 detail 1: a packed array net of a structure written in place has
+    // the whole array's layout under its name, but its members belong to its
+    // subelements (AttachPackedArrayMembers).
+    if (info == nullptr || VpiNetObjectKind(net) == vpiPackedArrayNet) continue;
     VpiObject* holder = FindObjectForFlatName(site.objects, kKey);
     holder->type = info->is_union ? vpiUnionNet : vpiStructNet;
     // §37.16 detail 24: whether it is packed, which decides its vpiSize.
@@ -423,14 +429,39 @@ void AttachNetMembers(const MemberSite& site) {
   }
 }
 
+// §7.2.1: the layout of one element of a packed array of the structure or
+// union `written` writes in place, which no typedef registers. It is built
+// from the fields written as RegisterAggregateLayout builds a declaration's,
+// as wide as the type without the array's packed dimensions, under a key
+// naming the written type, which stands at one address for the run.
+const StructTypeInfo* InlineElementLayout(const DataType& written,
+                                          SimContext& ctx) {
+  DataType element = written;
+  element.packed_dim_left = nullptr;
+  element.packed_dim_right = nullptr;
+  element.extra_packed_dims.clear();
+  Arena& arena = ctx.GetArena();
+  auto* key = arena.Create<std::string>(
+      std::format("[]@{:x}", reinterpret_cast<uintptr_t>(&written)));
+  RegisterAggregateLayout(*key, &written, EvalTypeWidth(element), ctx, arena);
+  return ctx.FindStructType(*key);
+}
+
 // §37.16 detail 32 and §37.18 detail 3 with §6.18: the layout of the struct
 // or union each subelement of a packed array declared with the type `written`
-// holds past its last packed dimension, that of the typedef it names; null for
-// an enum and for a type written in place.
+// holds past its last packed dimension: that of a structure or union written
+// in place, or of the typedef it names, which the design's layouts key by its
+// package or class where one is written (§26.3); null for an enum.
 const StructTypeInfo* PackedArrayElementLayout(const DataType* written,
                                                SimContext& ctx) {
   if (written == nullptr) return nullptr;
-  return ctx.FindStructType(written->type_name);
+  if (!written->struct_members.empty()) {
+    return InlineElementLayout(*written, ctx);
+  }
+  if (written->scope_name.empty())
+    return ctx.FindStructType(written->type_name);
+  return ctx.FindStructType(std::string(written->scope_name) +
+                            "::" + std::string(written->type_name));
 }
 
 // The members under `holder` that MakeMembers rooted at the net subelement

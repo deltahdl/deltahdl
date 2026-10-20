@@ -367,5 +367,46 @@ TEST_F(NetDetailsOfARun, ANetDecompilesToItsPrefixedName) {
   EXPECT_STREQ(vpi_get_str(vpiName, By("top.str1.inner1.j1")), "j1");
 }
 
+// §37.16 detail 32 with §37.26 and §26.3: the struct subelements of a packed
+// array net of a package's typedef have the members of that typedef, which
+// the design's layouts key by the package's name (#7400).
+TEST_F(NetDetailsOfARun, APackageStructsPackedArrayNetHasMemberNets) {
+  Run("package pk;\n"
+      "  typedef struct packed { logic [3:0] a; logic [3:0] b; } ps_t;\n"
+      "endpackage\n"
+      "module top;\n"
+      "  wire pk::ps_t [1:0] pw;\n"
+      "  assign pw = 16'h1234;\n"
+      "endmodule\n");
+  const std::vector<vpiHandle> kLeaves = ObjectsOf(vpiElement, By("top.pw"));
+  ASSERT_EQ(kLeaves.size(), 2U);
+  EXPECT_EQ(NamesOf(vpiMember, kLeaves[0]),
+            (std::vector<std::string>{"a", "b"}));
+  EXPECT_EQ(IntOf(Named(vpiMember, kLeaves[0], "a")), 1);
+  EXPECT_EQ(IntOf(Named(vpiMember, kLeaves[1], "b")), 4);
+}
+
+// §37.16 details 1 and 32 with §37.26: a net of a packed structure written in
+// place with a packed dimension of its own is a packed array net, holding no
+// member itself, whose struct subelements each have a member net per field
+// of the structure (#7401, #7402).
+TEST_F(NetDetailsOfARun, AnInlineStructsPackedArrayNetHasMemberNets) {
+  Run("module top;\n"
+      "  wire struct packed { logic [3:0] a; logic [3:0] b; } [1:0] n;\n"
+      "  assign n = 16'h1234;\n"
+      "endmodule\n");
+  vpiHandle n = By("top.n");
+  ASSERT_NE(n, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, n), vpiPackedArrayNet);
+  EXPECT_TRUE(ObjectsOf(vpiMember, n).empty());
+  const std::vector<vpiHandle> kLeaves = ObjectsOf(vpiElement, n);
+  ASSERT_EQ(kLeaves.size(), 2U);
+  EXPECT_EQ(vpi_get(vpiType, kLeaves[0]), vpiStructNet);
+  EXPECT_EQ(NamesOf(vpiMember, kLeaves[0]),
+            (std::vector<std::string>{"a", "b"}));
+  EXPECT_EQ(IntOf(Named(vpiMember, kLeaves[0], "a")), 1);
+  EXPECT_EQ(IntOf(Named(vpiMember, kLeaves[1], "b")), 4);
+}
+
 }  // namespace
 }  // namespace delta
