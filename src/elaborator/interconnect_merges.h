@@ -33,12 +33,12 @@ class InterconnectMerges {
             std::string_view inst);
 
   // The interconnect net `net` connected through a port to something other
-  // than an interconnect net, which gives its merged net that thing's type.
+  // than an interconnect net, or standing on a gate terminal (§23.3.3.7.2),
+  // which gives its merged net a type other than interconnect.
   void MarkTyped(Net net);
 
-  // Reports each joining connection whose merged net reaches no typed net,
-  // either one marked or one its module gave a net type of its own, as a gate
-  // terminal does (§23.3.3.7.2), then forgets every connection.
+  // Reports each joining connection whose merged net reaches no net marked
+  // typed, then forgets every connection.
   void Report(DiagEngine& diag);
 
  private:

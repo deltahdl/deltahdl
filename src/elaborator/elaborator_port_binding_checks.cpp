@@ -210,6 +210,10 @@ void Elaborator::ResolveInterconnectPrimitiveTerminals(
   for (const auto* term : terminals) {
     if (!term || term->kind != ExprKind::kIdentifier) continue;
     if (interconnect_names_.count(term->text) == 0) continue;
+    // §23.3.3.7.1: the terminal's net type is that of the net any port
+    // connection merges it with, an interconnect port's own net included,
+    // which stands among no module's nets.
+    interconnect_merges_.MarkTyped({mod, term->text});
     auto scoped = ScopedName(term->text);
     for (auto& net : mod->nets) {
       if (net.name == scoped && net.net_type == NetType::kInterconnect) {
