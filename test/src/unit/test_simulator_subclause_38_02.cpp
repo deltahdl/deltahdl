@@ -1,8 +1,19 @@
 #include <gtest/gtest.h>
 
 #include "helpers_vpi_error_fixture.h"
+#include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_internal.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
+
+// The compile-based variants, declared as vpi_compatibility.cpp defines them,
+// with the C linkage Annex K.2 gives the prototypes Annex L.2 renames to these,
+// so one translation unit can call them alongside the plain routines.
+extern "C" {
+PLI_INT32 vpi_get_1364v1995(PLI_INT32 property, vpiHandle obj);
+PLI_INT32 vpi_control_1800v2012(PLI_INT32 operation, ...);
+vpiHandle vpi_iterate_1364v2005(PLI_INT32 type, vpiHandle ref);
+}
 
 namespace delta {
 namespace {
@@ -138,6 +149,36 @@ TEST_F(VpiErrorCheckSim, TheStateConstantsAreTheThreeTheFigureNames) {
   EXPECT_EQ(vpiCompile, 1);
   EXPECT_EQ(vpiPLI, 2);
   EXPECT_EQ(vpiRun, 3);
+}
+
+// §38.2 with §36.12.2.1: the names a compatibility mode gives the routines are
+// VPI routines too, so a successful call under one of them resets the error
+// status as the plain routine's does (#7445).
+TEST_F(VpiErrorCheckSim, ACompatibilityModeRoutineResetsErrorStatus) {
+  VpiObject net;
+  net.type = vpiNet;
+  RaiseError();
+  EXPECT_EQ(vpi_get_1364v1995(vpiType, VpiHandleOf(&net)), vpiNet);
+  EXPECT_EQ(vpi_chk_error(nullptr), 0);
+  RaiseError();
+  EXPECT_EQ(vpi_control_1800v2012(vpiSetInteractiveScope, VpiHandleOf(&net)),
+            1);
+  EXPECT_EQ(vpi_chk_error(nullptr), 0);
+  RaiseError();
+  vpi_iterate_1364v2005(vpiModule, nullptr);
+  EXPECT_EQ(vpi_chk_error(nullptr), 0);
+}
+
+// §38.2 with §39.4.2: vpi_register_assertion_cb() is a VPI routine, so it
+// resets the error status, and a placement that only answers NULL for want of
+// an assertion records no error of its own (#7447).
+TEST_F(VpiErrorCheckSim, RegisteringAnAssertionCallbackResetsErrorStatus) {
+  RaiseError();
+  ASSERT_EQ(vpi_chk_error(nullptr), vpiError);
+  EXPECT_EQ(
+      vpi_register_assertion_cb(nullptr, cbAssertionStart, nullptr, nullptr),
+      nullptr);
+  EXPECT_EQ(vpi_chk_error(nullptr), 0);
 }
 
 }  // namespace

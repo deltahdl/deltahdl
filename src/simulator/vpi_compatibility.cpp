@@ -29,6 +29,7 @@
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_routine_error_scope.h"
 #include "simulator/vpi_user.h"
 
 // The reader §38.4's entry point starts an argument list for; the vpi_control
@@ -196,6 +197,7 @@ PLI_INT32 vpi_compare_objects_1364v1995(vpiHandle obj1, vpiHandle obj2) {
   return vpi_compare_objects(obj1, obj2);
 }
 PLI_INT32 vpi_get_1364v1995(PLI_INT32 property, vpiHandle obj) {
+  delta::VpiRoutineErrorScope error_scope;
   return delta::VpiGetInCompatibilityMode(
       property, delta::VpiObjectOf(obj),
       delta::GetGlobalVpiContext().EffectiveCompatibilityMode(
@@ -234,6 +236,7 @@ vpiHandle vpi_register_cb_1364v1995(s_cb_data* data) {
 }
 vpiHandle vpi_scan_1364v1995(vpiHandle iterator) { return vpi_scan(iterator); }
 PLI_INT32 vpi_control_1364v1995(PLI_INT32 operation, ...) {
+  delta::VpiRoutineErrorScope error_scope;
   va_list args;
   va_start(args, operation);
   PLI_INT32 result = VpiControlWithArgs(operation, args);
@@ -241,6 +244,7 @@ PLI_INT32 vpi_control_1364v1995(PLI_INT32 operation, ...) {
   return result;
 }
 vpiHandle vpi_iterate_1364v1995(PLI_INT32 type, vpiHandle ref) {
+  delta::VpiRoutineErrorScope error_scope;
   // §36.12.2.2: an application using Mechanism 1 is governed by the mode
   // compiled into it, whatever default the run was given.
   return delta::VpiHandleOf(delta::VpiIterateInCompatibilityMode(
@@ -254,6 +258,7 @@ PLI_INT32 vpi_compare_objects_1364v2001(vpiHandle obj1, vpiHandle obj2) {
   return vpi_compare_objects(obj1, obj2);
 }
 PLI_INT32 vpi_get_1364v2001(PLI_INT32 property, vpiHandle obj) {
+  delta::VpiRoutineErrorScope error_scope;
   return delta::VpiGetInCompatibilityMode(
       property, delta::VpiObjectOf(obj),
       delta::GetGlobalVpiContext().EffectiveCompatibilityMode(
@@ -292,6 +297,7 @@ vpiHandle vpi_register_cb_1364v2001(s_cb_data* data) {
 }
 vpiHandle vpi_scan_1364v2001(vpiHandle iterator) { return vpi_scan(iterator); }
 PLI_INT32 vpi_control_1364v2001(PLI_INT32 operation, ...) {
+  delta::VpiRoutineErrorScope error_scope;
   va_list args;
   va_start(args, operation);
   PLI_INT32 result = VpiControlWithArgs(operation, args);
@@ -299,6 +305,7 @@ PLI_INT32 vpi_control_1364v2001(PLI_INT32 operation, ...) {
   return result;
 }
 vpiHandle vpi_iterate_1364v2001(PLI_INT32 type, vpiHandle ref) {
+  delta::VpiRoutineErrorScope error_scope;
   // §36.12.2.2: an application using Mechanism 1 is governed by the mode
   // compiled into it, whatever default the run was given.
   return delta::VpiHandleOf(delta::VpiIterateInCompatibilityMode(
@@ -312,6 +319,7 @@ PLI_INT32 vpi_compare_objects_1364v2005(vpiHandle obj1, vpiHandle obj2) {
   return vpi_compare_objects(obj1, obj2);
 }
 PLI_INT32 vpi_get_1364v2005(PLI_INT32 property, vpiHandle obj) {
+  delta::VpiRoutineErrorScope error_scope;
   return delta::VpiGetInCompatibilityMode(
       property, delta::VpiObjectOf(obj),
       delta::GetGlobalVpiContext().EffectiveCompatibilityMode(
@@ -350,6 +358,7 @@ vpiHandle vpi_register_cb_1364v2005(s_cb_data* data) {
 }
 vpiHandle vpi_scan_1364v2005(vpiHandle iterator) { return vpi_scan(iterator); }
 PLI_INT32 vpi_control_1364v2005(PLI_INT32 operation, ...) {
+  delta::VpiRoutineErrorScope error_scope;
   va_list args;
   va_start(args, operation);
   PLI_INT32 result = VpiControlWithArgs(operation, args);
@@ -357,6 +366,7 @@ PLI_INT32 vpi_control_1364v2005(PLI_INT32 operation, ...) {
   return result;
 }
 vpiHandle vpi_iterate_1364v2005(PLI_INT32 type, vpiHandle ref) {
+  delta::VpiRoutineErrorScope error_scope;
   // §36.12.2.2: an application using Mechanism 1 is governed by the mode
   // compiled into it, whatever default the run was given.
   return delta::VpiHandleOf(delta::VpiIterateInCompatibilityMode(
@@ -370,6 +380,7 @@ PLI_INT32 vpi_compare_objects_1800v2005(vpiHandle obj1, vpiHandle obj2) {
   return vpi_compare_objects(obj1, obj2);
 }
 PLI_INT32 vpi_get_1800v2005(PLI_INT32 property, vpiHandle obj) {
+  delta::VpiRoutineErrorScope error_scope;
   return vpi_get(property, obj);
 }
 PLI_BYTE8* vpi_get_str_1800v2005(PLI_INT32 property, vpiHandle obj) {
@@ -405,6 +416,7 @@ vpiHandle vpi_register_cb_1800v2005(s_cb_data* data) {
 }
 vpiHandle vpi_scan_1800v2005(vpiHandle iterator) { return vpi_scan(iterator); }
 PLI_INT32 vpi_control_1800v2005(PLI_INT32 operation, ...) {
+  delta::VpiRoutineErrorScope error_scope;
   va_list args;
   va_start(args, operation);
   PLI_INT32 result = VpiControlWithArgs(operation, args);
@@ -412,6 +424,7 @@ PLI_INT32 vpi_control_1800v2005(PLI_INT32 operation, ...) {
   return result;
 }
 vpiHandle vpi_iterate_1800v2005(PLI_INT32 type, vpiHandle ref) {
+  delta::VpiRoutineErrorScope error_scope;
   return delta::VpiHandleOf(delta::VpiIterateInCompatibilityMode(
       type, delta::VpiObjectOf(ref),
       delta::GetGlobalVpiContext().EffectiveCompatibilityMode(
@@ -423,6 +436,7 @@ PLI_INT32 vpi_compare_objects_1800v2009(vpiHandle obj1, vpiHandle obj2) {
   return vpi_compare_objects(obj1, obj2);
 }
 PLI_INT32 vpi_get_1800v2009(PLI_INT32 property, vpiHandle obj) {
+  delta::VpiRoutineErrorScope error_scope;
   return vpi_get(property, obj);
 }
 PLI_BYTE8* vpi_get_str_1800v2009(PLI_INT32 property, vpiHandle obj) {
@@ -458,6 +472,7 @@ vpiHandle vpi_register_cb_1800v2009(s_cb_data* data) {
 }
 vpiHandle vpi_scan_1800v2009(vpiHandle iterator) { return vpi_scan(iterator); }
 PLI_INT32 vpi_control_1800v2009(PLI_INT32 operation, ...) {
+  delta::VpiRoutineErrorScope error_scope;
   va_list args;
   va_start(args, operation);
   PLI_INT32 result = VpiControlWithArgs(operation, args);
@@ -465,6 +480,7 @@ PLI_INT32 vpi_control_1800v2009(PLI_INT32 operation, ...) {
   return result;
 }
 vpiHandle vpi_iterate_1800v2009(PLI_INT32 type, vpiHandle ref) {
+  delta::VpiRoutineErrorScope error_scope;
   return delta::VpiHandleOf(delta::VpiIterateInCompatibilityMode(
       type, delta::VpiObjectOf(ref),
       delta::GetGlobalVpiContext().EffectiveCompatibilityMode(
@@ -476,6 +492,7 @@ PLI_INT32 vpi_compare_objects_1800v2012(vpiHandle obj1, vpiHandle obj2) {
   return vpi_compare_objects(obj1, obj2);
 }
 PLI_INT32 vpi_get_1800v2012(PLI_INT32 property, vpiHandle obj) {
+  delta::VpiRoutineErrorScope error_scope;
   return vpi_get(property, obj);
 }
 PLI_BYTE8* vpi_get_str_1800v2012(PLI_INT32 property, vpiHandle obj) {
@@ -511,6 +528,7 @@ vpiHandle vpi_register_cb_1800v2012(s_cb_data* data) {
 }
 vpiHandle vpi_scan_1800v2012(vpiHandle iterator) { return vpi_scan(iterator); }
 PLI_INT32 vpi_control_1800v2012(PLI_INT32 operation, ...) {
+  delta::VpiRoutineErrorScope error_scope;
   va_list args;
   va_start(args, operation);
   PLI_INT32 result = VpiControlWithArgs(operation, args);
@@ -518,6 +536,7 @@ PLI_INT32 vpi_control_1800v2012(PLI_INT32 operation, ...) {
   return result;
 }
 vpiHandle vpi_iterate_1800v2012(PLI_INT32 type, vpiHandle ref) {
+  delta::VpiRoutineErrorScope error_scope;
   return delta::VpiHandleOf(delta::VpiIterateInCompatibilityMode(
       type, delta::VpiObjectOf(ref),
       delta::GetGlobalVpiContext().EffectiveCompatibilityMode(true, 0)));

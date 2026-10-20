@@ -5,11 +5,13 @@
 #include "simulator/vpi_assertion_cb.h"
 #include "simulator/vpi_coverage.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_routine_error_scope.h"
 #include "simulator/vpi_user.h"
 
 vpiHandle vpi_register_assertion_cb(vpiHandle assertion, PLI_INT32 reason,
                                     vpi_assertion_callback_func* cb_rtn,
                                     PLI_BYTE8* user_data) {
+  delta::VpiRoutineErrorScope error_scope;
   // §39.4.2: place the callback on the named assertion, answering with a handle
   // to it or with NULL where the placement was in error. The routine took its
   // four arguments and dropped every one of them, answering NULL whatever was
