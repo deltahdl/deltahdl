@@ -189,7 +189,11 @@ TEST_F(AssertionRun, TheAssertionSystemStartsAndEndsWithTheRun) {
        {cbAssertionSysInitialized, cbAssertionSysOn, cbAssertionSysEnd}) {
     ASSERT_NE(WatchAssertionSystem(reason), nullptr);
   }
-  AssertionArmer() = [] { AssertionCalls().push_back({kDesignRan}); };
+  AssertionArmer() = [] {
+    AssertionCall ran;
+    ran.reason = kDesignRan;
+    AssertionCalls().push_back(ran);
+  };
   Run("module top;\n"
       "  initial $arm;\n"
       "  final $arm;\n"
