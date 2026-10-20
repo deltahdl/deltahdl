@@ -682,6 +682,8 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   net.width = EvalTypeWidth(item->data_type, typedefs_, BuildParamScope(mod));
   net.dtype = NetDeclaredType(item, typedefs_, arena_);
   net.data_kind = ResolvedTypeKind(item->data_type, typedefs_);
+  net.written_type = &item->data_type;
+  net.declared_unpacked_dims = &item->unpacked_dims;
   // An inline enum holds its base type's range where a dimension written over
   // a named type or a struct or union is held, so only those two say the
   // declaration wrote one.

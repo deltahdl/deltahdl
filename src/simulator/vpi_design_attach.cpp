@@ -29,6 +29,7 @@
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_design_attach_build.h"
+#include "simulator/vpi_design_attach_interconnects.h"
 #include "simulator/vpi_design_attach_typespecs.h"
 #include "simulator/vpi_design_viewports.h"
 #include "simulator/vpi_design_walk.h"
@@ -223,12 +224,12 @@ VpiObject* IoDeclItem(
 //
 // The net is hung in the instance the port belongs to and is the port's
 // §37.14 vpiLowConn - the connection inside the instance - which is what an
-// application walking in from the port reaches. A port declaring an unpacked
-// dimension stands for an interconnect array instead (§37.24 details 1 and 2).
+// application walking in from the port reaches. A port declaring a dimension
+// stands for an interconnect array instead, which AttachInterconnectPorts
+// makes once every port is made (§37.24 details 1 and 2).
 void FillInterconnectNetObject(VpiObject* obj, const RtlirPort& port,
                                VpiObject* port_obj,
-                               std::deque<std::string>& names,
-                               const std::function<VpiObject*()>& alloc) {
+                               std::deque<std::string>& names) {
   VpiHandle module = port_obj->parent;
   obj->type = vpiInterconnectNet;
   names.emplace_back(port.name);
@@ -237,7 +238,6 @@ void FillInterconnectNetObject(VpiObject* obj, const RtlirPort& port,
   obj->parent = module;
   module->children.push_back(obj);
   port_obj->low_conn = obj;
-  VpiMakeInterconnectArray(obj, port, alloc, names);
 }
 
 // §37.3.3: the location properties apply to every object that stands for
@@ -418,8 +418,7 @@ void VpiContext::AttachDesignPorts(const RtlirDesign* design) {
           RecordSourceLocation(obj, port.loc, sources);
           RecordProtection(obj, port.loc, sources);
           if (port.is_interconnect) {
-            FillInterconnectNetObject(AllocObject(), port, obj, name_pool_,
-                                      kAlloc);
+            FillInterconnectNetObject(AllocObject(), port, obj, name_pool_);
           }
           // A port written as an expression stands for no declaration of its
           // own; port_expr_decls holds those it names.
@@ -444,6 +443,11 @@ void VpiContext::AttachDesignPorts(const RtlirDesign* design) {
   // §37.83: the attributes each port is written with.
   AttachPortAttributes(design, object_map_, *sim_ctx_, kBuild);
   AttachPortTypespecs(design, object_map_, call_objects_, *sim_ctx_, kBuild);
+  // §37.24: an interconnect port's net is shaped once it is made, and an
+  // interconnect net takes its typespec once every net it may connect to has
+  // one.
+  AttachInterconnectPorts(design, object_map_, *sim_ctx_, kBuild);
+  AttachInterconnectTypespecs(design, object_map_, kBuild);
 }
 
 namespace {

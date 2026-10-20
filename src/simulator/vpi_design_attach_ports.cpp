@@ -1,8 +1,4 @@
 #include <algorithm>
-#include <cstddef>
-#include <cstdint>
-#include <deque>
-#include <functional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -255,42 +251,7 @@ void ConnectPorts(const RtlirModuleInst& inst, VpiHandle writer,
   ConnectLowConns(module, kInstance, objects, build);
 }
 
-// The elements of `holder`, one per index of `dims[depth]` in the order it
-// declares them, each an interconnect array of the dimensions after it or, of
-// the last, an interconnect net.
-void FillInterconnectLevel(VpiObject* holder,
-                           const std::vector<RtlirUnpackedDim>& dims,
-                           std::size_t depth,
-                           const std::function<VpiObject*()>& alloc,
-                           std::deque<std::string>& names) {
-  const RtlirUnpackedDim& dim = dims[depth];
-  const bool kLast = depth + 1 == dims.size();
-  holder->size = static_cast<int>(dim.Size());
-  const int64_t kStep = dim.left <= dim.right ? 1 : -1;
-  for (int64_t index = dim.left;; index += kStep) {
-    VpiObject* element = alloc();
-    element->type = kLast ? vpiInterconnectNet : vpiInterconnectArray;
-    names.push_back(std::string(holder->name) + "[" + std::to_string(index) +
-                    "]");
-    element->name = names.back();
-    element->parent = holder;
-    element->index = static_cast<int>(index);
-    element->array_member = true;
-    holder->children.push_back(element);
-    if (!kLast) FillInterconnectLevel(element, dims, depth + 1, alloc, names);
-    if (index == dim.right) break;
-  }
-}
-
 }  // namespace
-
-void VpiMakeInterconnectArray(VpiObject* net, const RtlirPort& port,
-                              const std::function<VpiObject*()>& alloc,
-                              std::deque<std::string>& names) {
-  if (port.unpacked_dims.empty()) return;
-  net->type = vpiInterconnectArray;
-  FillInterconnectLevel(net, port.unpacked_dims, 0, alloc, names);
-}
 
 void AttachPortConnections(const RtlirDesign* design,
                            const VpiObjectMap& objects, SimContext& ctx,

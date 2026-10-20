@@ -417,8 +417,8 @@ void AttachNetMembers(const MemberSite& site) {
 
 int VpiNetObjectKind(const RtlirNet& net) {
   // §37.24 (figure): a generic interconnect is an interconnect net, which has
-  // no data type of its own.
-  if (net.net_type == NetType::kInterconnect) return vpiInterconnectNet;
+  // no data type of its own, whatever net a port connection merged it into.
+  if (VpiNetIsInterconnect(net)) return vpiInterconnectNet;
   switch (net.data_kind) {
     // §37.16 detail 1: a packed struct, union or enum net with a packed
     // dimension of its own is a packed array net.

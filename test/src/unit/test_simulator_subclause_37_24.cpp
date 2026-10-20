@@ -284,7 +284,48 @@ TEST(GenericInterconnectModel, PackedArraysAndUnionsSelectTheirRelation) {
 
 // A design run with a PLI application registered, its generic interconnects
 // read back once the run is over.
-class InterconnectsOfARun : public VpiDesignRun {};
+class InterconnectsOfARun : public VpiDesignRun {
+ protected:
+  // The object a port of the instance `instance` connects inside it.
+  static vpiHandle LowConnOf(const char* instance, const char* port) {
+    vpiHandle handle = Named(vpiPort, By(instance), port);
+    return handle != nullptr ? vpi_handle(vpiLowConn, handle) : nullptr;
+  }
+
+  // The integer value of a constant, -1 where there is none.
+  static int IntOf(vpiHandle constant) {
+    if (constant == nullptr) return -1;
+    s_vpi_value value = {};
+    value.format = vpiIntVal;
+    vpi_get_value(constant, &value);
+    return value.value.integer;
+  }
+
+  // The bounds of each range `array` reaches through vpiRange, "left:right".
+  static std::vector<std::string> RangesOf(vpiHandle array) {
+    std::vector<std::string> ranges;
+    for (vpiHandle range : ObjectsOf(vpiRange, array)) {
+      ranges.push_back(std::to_string(IntOf(vpi_handle(vpiLeftRange, range))) +
+                       ":" +
+                       std::to_string(IntOf(vpi_handle(vpiRightRange, range))));
+    }
+    return ranges;
+  }
+
+  // The bounds `array` reaches through vpiLeftRange and vpiRightRange.
+  static std::string BoundsOf(vpiHandle array) {
+    return std::to_string(IntOf(vpi_handle(vpiLeftRange, array))) + ":" +
+           std::to_string(IntOf(vpi_handle(vpiRightRange, array)));
+  }
+
+  // The name of the typespec `obj` reaches, "(none)" where it reaches none.
+  static std::string TypespecNameOf(vpiHandle obj) {
+    vpiHandle typespec = vpi_handle(vpiTypespec, obj);
+    if (typespec == nullptr) return "(none)";
+    const char* name = vpi_get_str(vpiName, typespec);
+    return name != nullptr ? name : "";
+  }
+};
 
 // §37.24 (figure): a generic interconnect a module's body declares is an
 // interconnect net, and one with an unpacked dimension an interconnect array
@@ -317,6 +358,137 @@ TEST_F(InterconnectsOfARun, AnInterconnectPortArrayReachesOneDimensionAtATime) {
   ASSERT_NE(it, nullptr);
   EXPECT_EQ(KindsOf(vpiElement, vpi_scan(it)),
             std::vector<int>(3, vpiInterconnectNet));
+}
+
+// §37.24 detail 2: a body interconnect array of two dimensions reaches an
+// interconnect array per index of the first, and each of those an interconnect
+// net per index of the second (#7081).
+TEST_F(InterconnectsOfARun, ABodyInterconnectArraysLeavesAreInterconnectNets) {
+  Run("module top; interconnect n [0:1][2:0]; endmodule\n");
+  const std::vector<vpiHandle> kRows = ObjectsOf(vpiElement, By("top.n"));
+  ASSERT_EQ(kRows.size(), 2u);
+  for (vpiHandle row : kRows) {
+    EXPECT_EQ(vpi_get(vpiType, row), vpiInterconnectArray);
+    EXPECT_EQ(KindsOf(vpiElement, row),
+              std::vector<int>(3, vpiInterconnectNet));
+  }
+  EXPECT_EQ(NamesOf(vpiElement, kRows[1]),
+            (std::vector<std::string>{"n[1][0]", "n[1][1]", "n[1][2]"}));
+}
+
+// §37.24 (figure): an interconnect array reaches a range per dimension it
+// holds through vpiRange, and the bounds of its first through vpiLeftRange and
+// vpiRightRange; each of its interconnect arrays holds the dimensions after
+// that one, and an interconnect port's array its own (#7078).
+TEST_F(InterconnectsOfARun, AnInterconnectArrayReachesItsRangesAndBounds) {
+  Run("module m(interconnect ip [2:0]); endmodule\n"
+      "module top; interconnect ia [0:1][3:1]; m u(); endmodule\n");
+  vpiHandle array = By("top.ia");
+  EXPECT_EQ(RangesOf(array), (std::vector<std::string>{"0:1", "3:1"}));
+  EXPECT_EQ(BoundsOf(array), "0:1");
+  const std::vector<vpiHandle> kRows = ObjectsOf(vpiElement, array);
+  ASSERT_EQ(kRows.size(), 2u);
+  EXPECT_EQ(RangesOf(kRows[0]), (std::vector<std::string>{"3:1"}));
+  EXPECT_EQ(BoundsOf(kRows[0]), "3:1");
+  vpiHandle port_array = LowConnOf("top.u", "ip");
+  ASSERT_NE(port_array, nullptr);
+  EXPECT_EQ(RangesOf(port_array), (std::vector<std::string>{"2:0"}));
+  EXPECT_EQ(BoundsOf(port_array), "2:0");
+}
+
+// §37.24 (figure) with §6.6.8: an interconnect declared with a packed dimension
+// is a packed interconnect array, of an interconnect net per index; with an
+// unpacked dimension too, it is an interconnect array of those, which is not
+// packed. A port so declared stands for one as a body declaration does (#7079).
+TEST_F(InterconnectsOfARun, APackedInterconnectIsAPackedInterconnectArray) {
+  Run("module m(interconnect [1:0] p); endmodule\n"
+      "module top; interconnect [3:0] w; interconnect [1:0] v [0:2];\n"
+      "  m u();\n"
+      "endmodule\n");
+  vpiHandle w = By("top.w");
+  EXPECT_EQ(vpi_get(vpiType, w), vpiInterconnectArray);
+  EXPECT_EQ(vpi_get(vpiPacked, w), 1);
+  EXPECT_EQ(vpi_get(vpiSize, w), 4);
+  EXPECT_EQ(BoundsOf(w), "3:0");
+  EXPECT_EQ(KindsOf(vpiElement, w), std::vector<int>(4, vpiInterconnectNet));
+  vpiHandle v = By("top.v");
+  EXPECT_EQ(vpi_get(vpiType, v), vpiInterconnectArray);
+  EXPECT_EQ(vpi_get(vpiPacked, v), 0);
+  EXPECT_EQ(RangesOf(v), (std::vector<std::string>{"0:2"}));
+  const std::vector<vpiHandle> kWords = ObjectsOf(vpiElement, v);
+  ASSERT_EQ(kWords.size(), 3u);
+  EXPECT_EQ(vpi_get(vpiType, kWords[2]), vpiInterconnectArray);
+  EXPECT_EQ(vpi_get(vpiPacked, kWords[2]), 1);
+  EXPECT_EQ(NamesOf(vpiElement, kWords[2]),
+            (std::vector<std::string>{"v[2][0]", "v[2][1]"}));
+  vpiHandle p = LowConnOf("top.u", "p");
+  ASSERT_NE(p, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, p), vpiInterconnectArray);
+  EXPECT_EQ(vpi_get(vpiPacked, p), 1);
+  EXPECT_EQ(KindsOf(vpiElement, p), std::vector<int>(2, vpiInterconnectNet));
+}
+
+// §37.24 (figure) with §23.3.3.7.1: a body interconnect a port connects is an
+// interconnect net still, though the run merged it with the port's wor net
+// (#7386).
+TEST_F(InterconnectsOfARun, AConnectedBodyInterconnectStaysAnInterconnectNet) {
+  Run("module sink(inout wor r); endmodule\n"
+      "module top; interconnect c; sink v(c); endmodule\n");
+  EXPECT_EQ(vpi_get(vpiType, By("top.c")), vpiInterconnectNet);
+}
+
+// §37.24 detail 1: an interconnect net's typespec is that of the net it is
+// connected to - the instantiation's net for an interconnect port, and the
+// port's net inside the instance for a body interconnect - and one connected
+// to no net reaches none (#7080).
+TEST_F(InterconnectsOfARun, AnInterconnectNetTakesTheTypespecOfItsNet) {
+  Run("typedef logic [7:0] byte_t;\n"
+      "module leaf(interconnect p); endmodule\n"
+      "module sink(input byte_t q); endmodule\n"
+      "module top; wire byte_t w; interconnect c;\n"
+      "  leaf u(w); sink v(c); leaf x();\n"
+      "endmodule\n");
+  EXPECT_EQ(TypespecNameOf(LowConnOf("top.u", "p")), "byte_t");
+  EXPECT_EQ(TypespecNameOf(By("top.c")), "byte_t");
+  EXPECT_EQ(TypespecNameOf(LowConnOf("top.x", "p")), "(none)");
+}
+
+// §37.24 detail 1: an interconnect net connected to a net of a packed array
+// reaches an interconnect net per element of it through vpiElement, in the
+// order its range runs, and one connected to a net of a struct an interconnect
+// net per member through vpiMember, each taking the typespec of its element or
+// member and named under the interconnect's own full name (#7385).
+TEST_F(InterconnectsOfARun, AnInterconnectNetHasTheElementsOrMembersOfItsType) {
+  Run("typedef struct packed { logic a; logic [1:0] b; } s_t;\n"
+      "module leaf(interconnect p, interconnect q, interconnect r);\n"
+      "endmodule\n"
+      "module sink(input s_t d); endmodule\n"
+      "module top; wire s_t [2:0] w; wire s_t s; wire s_t [0:1] z;\n"
+      "  interconnect c; leaf u(w, s, z); sink v(c);\n"
+      "endmodule\n");
+  vpiHandle p = LowConnOf("top.u", "p");
+  ASSERT_NE(p, nullptr);
+  const std::vector<vpiHandle> kElements = ObjectsOf(vpiElement, p);
+  ASSERT_EQ(kElements.size(), 3u);
+  EXPECT_STREQ(vpi_get_str(vpiName, kElements[0]), "p[2]");
+  EXPECT_EQ(vpi_get(vpiType, kElements[0]), vpiInterconnectNet);
+  EXPECT_EQ(TypespecNameOf(kElements[0]), "s_t");
+  EXPECT_EQ(NamesOf(vpiMember, kElements[0]),
+            (std::vector<std::string>{"a", "b"}));
+  EXPECT_TRUE(ObjectsOf(vpiMember, p).empty());
+  vpiHandle q = LowConnOf("top.u", "q");
+  ASSERT_NE(q, nullptr);
+  EXPECT_EQ(NamesOf(vpiMember, q), (std::vector<std::string>{"a", "b"}));
+  EXPECT_EQ(KindsOf(vpiMember, q), std::vector<int>(2, vpiInterconnectNet));
+  EXPECT_TRUE(ObjectsOf(vpiElement, q).empty());
+  vpiHandle r = LowConnOf("top.u", "r");
+  ASSERT_NE(r, nullptr);
+  const std::vector<vpiHandle> kRising = ObjectsOf(vpiElement, r);
+  ASSERT_EQ(kRising.size(), 2u);
+  EXPECT_STREQ(vpi_get_str(vpiName, kRising[0]), "r[0]");
+  vpiHandle member = Named(vpiMember, By("top.c"), "b");
+  ASSERT_NE(member, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, member), "top.c.b");
 }
 
 }  // namespace

@@ -1,3 +1,4 @@
+#include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers2.h"
@@ -47,12 +48,14 @@ bool TryResolveBitRelation(int type, VpiHandle ref, VpiHandle& out) {
 
 // §37.17 detail 6 and §37.22: a variable's leftmost bounds and a range's
 // bounds, recorded where the declaration has them and null where the range is
-// empty; as §37.41 draws them, the bounds of a function's return range; and,
-// as §37.11 draws them, an instance array's.
+// empty; as §37.41 draws them, the bounds of a function's return range; as
+// §37.11 draws them, an instance array's; and, as §37.24 does, the bounds of
+// an interconnect array's first dimension.
 bool TryResolveRangeBounds(int type, VpiHandle ref, VpiHandle& out) {
   if (type != vpiLeftRange && type != vpiRightRange) return false;
   if (ref->type != vpiRange && ref->type != vpiFunction &&
-      !VpiIsVariablesType(ref->type) && !VpiIsInstanceArrayType(ref->type)) {
+      ref->type != vpiInterconnectArray && !VpiIsVariablesType(ref->type) &&
+      !VpiIsInstanceArrayType(ref->type)) {
     return false;
   }
   out = type == vpiLeftRange ? ref->left_range : ref->right_range;

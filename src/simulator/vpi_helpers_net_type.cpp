@@ -44,6 +44,10 @@ int VpiNetTypeConstant(NetType type) {
 }
 
 int VpiNetTypeOf(VpiHandle obj) {
+  // §37.16 detail 12: an interconnect net or array is of net type
+  // vpiInterconnect, one a port declares with no net of the run's behind it,
+  // and one whose net in the run a port connection merged into another type.
+  if (VpiIsInterconnectSubelementType(obj->type)) return vpiInterconnect;
   if (obj->net == nullptr) return 0;
   // §37.16 detail 11: a net declared with a user-defined nettype (§6.6.7) is a
   // nettype net, and any part of one -- an object whose parent stands for the
@@ -55,34 +59,30 @@ int VpiNetTypeOf(VpiHandle obj) {
   return VpiNetTypeConstant(obj->net->type);
 }
 
-// §23.3.3.7.1: the type of the net a port connects `net` to: for the net a
-// port of its instance stands for inside, the net the instantiation connects
-// to the port, and for a net of an instance, the net inside an instance it
-// holds that a port connects it to; 0 where no port connects it to one.
-static int ConnectedNetType(VpiHandle net) {
-  for (const VpiObject* child : net->parent->children) {
+VpiHandle VpiConnectedNet(VpiHandle net) {
+  for (VpiObject* child : net->parent->children) {
     if (child->type == kVpiPort && child->low_conn == net &&
         child->high_conn != nullptr) {
-      return VpiNetTypeOf(child->high_conn);
+      return child->high_conn;
     }
     if (!VpiIsInstanceType(child->type)) continue;
-    for (const VpiObject* port : child->children) {
+    for (VpiObject* port : child->children) {
       if (port->type == kVpiPort && port->high_conn == net &&
           port->low_conn != nullptr) {
-        return VpiNetTypeOf(port->low_conn);
+        return port->low_conn;
       }
     }
   }
-  return 0;
+  return nullptr;
 }
 
 int VpiResolvedNetTypeOf(VpiHandle obj) {
-  // An interconnect port's net carries no net of its own; it is an
-  // interconnect net all the same (§37.24).
-  const int kDeclared =
-      obj->type == vpiInterconnectNet ? vpiInterconnect : VpiNetTypeOf(obj);
+  const int kDeclared = VpiNetTypeOf(obj);
   if (kDeclared != vpiInterconnect) return kDeclared;
-  const int kConnected = ConnectedNetType(obj);
+  // §23.3.3.7.1: an interconnect net takes the type of the net a port
+  // connects it to.
+  VpiHandle connected = VpiConnectedNet(obj);
+  const int kConnected = connected != nullptr ? VpiNetTypeOf(connected) : 0;
   return kConnected != 0 ? kConnected : kDeclared;
 }
 

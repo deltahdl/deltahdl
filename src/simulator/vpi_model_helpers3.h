@@ -458,6 +458,12 @@ const char* VpiNetTypeConstantName(int net_type);
 // merging no other nets across a port.
 int VpiResolvedNetTypeOf(VpiHandle obj);
 
+// §23.3.3.7.1: the net a port connects the net `net` to: for the net a port of
+// its instance stands for inside, the net the instantiation connects to the
+// port, and for a net of an instance, the net inside an instance it holds that
+// a port connects it to; null where no port connects it to one.
+VpiHandle VpiConnectedNet(VpiHandle net);
+
 // §37.39 (figure): the path terms one of a module path's three term relations
 // reaches - vpiModPathOut the output terms, and of the input terms
 // vpiModDataPathIn the data source of an edge-sensitive path and vpiModPathIn

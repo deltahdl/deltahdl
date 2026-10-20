@@ -86,6 +86,13 @@ TEST_F(ArrayNetsOfARun, TheBitsAreTheArrayNetsNets) {
 class NetKindsOfARun : public VpiDesignRun {
  protected:
   static int KindOf(const char* name) { return vpi_get(vpiType, By(name)); }
+
+  // The kind of the typespec the object `name` reaches, 0 where it reaches
+  // none.
+  static int TypespecKindOf(const char* name) {
+    vpiHandle typespec = vpi_handle(vpiTypespec, By(name));
+    return typespec != nullptr ? vpi_get(vpiType, typespec) : 0;
+  }
 };
 
 constexpr const char* kNetDataTypes =
@@ -690,6 +697,58 @@ TEST_F(NetRelationsOfARun, ABitsDriversTakeThePortBitsANonNetDrives) {
   EXPECT_EQ(CountOf(vpiDriver, BitOf("top.u.d", 0), vpiPortBit), 1);
   EXPECT_EQ(CountOf(vpiDriver, BitOf("top.u.d", 1), vpiPortBit), 0);
   EXPECT_EQ(CountOf(vpiDriver, BitOf("top.u.e", 0), vpiPortBit), 0);
+}
+
+// §37.16 (figure): a net reaches its typespec through vpiTypespec - the
+// typedef's its type names, and otherwise an unnamed one of the kind its data
+// type makes it, logic where the declaration writes no data type (#7062).
+TEST_F(NetKindsOfARun, ANetReachesTheTypespecOfItsType) {
+  Run(kNetDataTypes);
+  vpiHandle named = vpi_handle(vpiTypespec, By("top.e"));
+  ASSERT_NE(named, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, named), "e_t");
+  EXPECT_EQ(TypespecKindOf("top.w"), vpiLogicTypespec);
+  EXPECT_EQ(TypespecKindOf("top.l"), vpiLogicTypespec);
+  EXPECT_EQ(TypespecKindOf("top.i"), vpiIntegerTypespec);
+  EXPECT_EQ(TypespecKindOf("top.t"), vpiTimeTypespec);
+}
+
+// §37.16 (figure): an array net reaches an array typespec of its unpacked
+// dimension, and the net an ANSI or a non-ANSI port declares the typespec of
+// the type the port declaration wrote (#7062).
+TEST_F(NetKindsOfARun, AnArrayOrPortNetReachesTheTypespecOfItsType) {
+  Run("typedef logic [7:0] byte_t;\n"
+      "module sub(input byte_t a, input wire [2:0] b); endmodule\n"
+      "module body(c); input byte_t c; endmodule\n"
+      "module top; wire integer n [0:1]; sub u(); body v(); endmodule\n");
+  EXPECT_EQ(TypespecKindOf("top.n"), vpiArrayTypespec);
+  vpiHandle a = vpi_handle(vpiTypespec, By("top.u.a"));
+  ASSERT_NE(a, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, a), "byte_t");
+  EXPECT_EQ(TypespecKindOf("top.u.b"), vpiLogicTypespec);
+  vpiHandle c = vpi_handle(vpiTypespec, By("top.v.c"));
+  ASSERT_NE(c, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, c), "byte_t");
+}
+
+// §37.16 detail 12: vpiNetType of an interconnect net or array is
+// vpiInterconnect - the net or array an interconnect port declares, which no
+// net of the run's stands behind, and a body interconnect a port connects,
+// whose net in the run took the type of the wor net beyond the port (#7071).
+TEST_F(NetKindsOfARun, AnInterconnectsNetTypeIsInterconnect) {
+  Run("module leaf(interconnect p, interconnect q [0:1]); endmodule\n"
+      "module sink(inout wor r); endmodule\n"
+      "module top; interconnect c; leaf u(); sink v(c); endmodule\n");
+  for (const char* name : {"p", "q"}) {
+    vpiHandle port = Named(vpiPort, By("top.u"), name);
+    ASSERT_NE(port, nullptr);
+    vpiHandle net = vpi_handle(vpiLowConn, port);
+    ASSERT_NE(net, nullptr);
+    EXPECT_EQ(vpi_get(vpiNetType, net), vpiInterconnect) << name;
+    EXPECT_STREQ(vpi_get_str(vpiNetType, net), "vpiInterconnect") << name;
+  }
+  EXPECT_EQ(vpi_get(vpiNetType, By("top.c")), vpiInterconnect);
+  EXPECT_EQ(vpi_get(vpiResolvedNetType, By("top.c")), vpiWor);
 }
 
 }  // namespace

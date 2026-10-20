@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <deque>
 #include <functional>
 #include <map>
 #include <optional>
@@ -150,6 +149,11 @@ void VpiRecordWrittenDims(VpiObject& array, const std::vector<Expr*>& dims,
 // its ANSI ports declare, which stand in no list of the body's - each as a
 // declaration of its name, data type and dimensions.
 std::vector<RtlirNet> VpiDeclaredNets(const RtlirModule& mod);
+
+// §37.24 (figure) with §6.6.8: whether `net` was declared a generic
+// interconnect, which stands as an interconnect net or array whatever net type
+// a port connection merged it into (§23.3.3.7.1).
+bool VpiNetIsInterconnect(const RtlirNet& net);
 
 // §37.17 (figure): the variables `mod` declares - those its body declares, and
 // those its ANSI variable ports declare, which stand in no list of the body's
@@ -841,14 +845,6 @@ void AttachGenBlockInstances(const RtlirDesign* design,
 // connection, the expression the instantiation wrote for it, and its lower
 // one, the instance's own net or variable of the port. The ports are those
 // VpiContext::AttachDesignPorts made.
-// §37.24 details 1 and 2: turn `net`, the interconnect net an interconnect
-// port stands for, into an interconnect array where the port declares an
-// unpacked dimension - one element per index of its first dimension, each a
-// further interconnect array down to the interconnect nets of the last.
-void VpiMakeInterconnectArray(VpiObject* net, const RtlirPort& port,
-                              const std::function<VpiObject*()>& alloc,
-                              std::deque<std::string>& names);
-
 // §37.14 (figure): hang from `port` a port bit per bit of the net or variable
 // it stands for inside the instance, its lowConn, in that object's order and
 // each carrying its index and its place in the port's value; the bit is the

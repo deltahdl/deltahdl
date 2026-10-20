@@ -43,8 +43,14 @@ std::vector<RtlirNet> VpiDeclaredNets(const RtlirModule& mod) {
                                   port.dtype->kind != DataTypeKind::kEnum;
     net.num_unpacked_dims = port.num_unpacked_dims;
     net.unpacked_dims = port.unpacked_dims;
+    net.written_type = port.declared_type;
   }
   return nets;
+}
+
+bool VpiNetIsInterconnect(const RtlirNet& net) {
+  return net.net_type == NetType::kInterconnect ||
+         (net.written_type != nullptr && net.written_type->is_interconnect);
 }
 
 std::vector<RtlirVariable> VpiDeclaredVariables(const RtlirModule& mod) {
@@ -67,6 +73,7 @@ std::vector<RtlirVariable> VpiDeclaredVariables(const RtlirModule& mod) {
     var.is_string = port.data_kind == DataTypeKind::kString;
     var.num_unpacked_dims = port.num_unpacked_dims;
     var.unpacked_dims = port.unpacked_dims;
+    var.written_type = port.declared_type;
   }
   return vars;
 }
@@ -122,6 +129,9 @@ void AddNetBitTargets(const RtlirModule* mod, const std::string& prefix,
                       const VpiObjectMap& objects, SimContext& ctx,
                       std::vector<BitTarget>& targets) {
   for (const RtlirNet& net : VpiDeclaredNets(*mod)) {
+    // §37.24: an interconnect's packed dimensions make interconnect arrays
+    // rather than bits (AttachInterconnects).
+    if (VpiNetIsInterconnect(net)) continue;
     auto dims = DeclaredPackedDims(net.dtype, net.width, ctx);
     if (!dims) continue;
     for (const std::string& key : VpiDeclaredNetKeys(net, prefix)) {

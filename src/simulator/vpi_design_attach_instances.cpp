@@ -19,6 +19,7 @@
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_design_attach_assertion_decls.h"
 #include "simulator/vpi_design_attach_build.h"
+#include "simulator/vpi_design_attach_interconnects.h"
 #include "simulator/vpi_design_attach_interface_tf_decls.h"
 #include "simulator/vpi_design_attach_vars.h"
 #include "simulator/vpi_design_walk.h"
@@ -317,6 +318,7 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
     // come first.
     AttachVectorBits(design, object_map_, *sim_ctx_, kBuild);
     AttachArrayElements(design, object_map_, kBuild);
+    AttachInterconnects(design, object_map_, *sim_ctx_, kBuild);
     AttachStructMembers(design, object_map_, *sim_ctx_, kBuild);
     // A net's bits and members are made while it is still a logic net, the
     // kind both passes above look for, so its own kind comes after them.

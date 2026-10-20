@@ -32,6 +32,7 @@
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_model_helpers2.h"
+#include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_typespec_shapes.h"
 #include "simulator/vpi_user.h"
@@ -487,13 +488,6 @@ VpiObject* DeclaredTypespec(const DataType* written,
   return nullptr;
 }
 
-// Whether the module `mod`'s variables list holds a variable named `name`.
-bool HasVariable(const RtlirModule& mod, std::string_view name) {
-  return std::ranges::any_of(mod.variables, [name](const RtlirVariable& var) {
-    return var.name == name;
-  });
-}
-
 // Where the variables of one instance find their typespecs: the typedefs of
 // its module and of the compilation unit, by name, the instance's objects,
 // keyed under `at.prefix` in `objects`, and what makes a typespec of the
@@ -518,11 +512,14 @@ struct InstanceTypespecs {
     if (obj == nullptr || written == nullptr) return;
     TypespecMaker maker(at, local);
     // §37.27: a named event and an event array reach theirs as a variable
-    // does.
-    const bool kTyped = VpiIsVariablesType(obj->type) ||
+    // does, and §37.16 a net, of the packed dimensions written over a typedef
+    // too; an interconnect has no data type of its own (§6.6.8).
+    const bool kNet =
+        VpiIsNetsType(obj->type) && !VpiIsInterconnectSubelementType(obj->type);
+    const bool kTyped = kNet || VpiIsVariablesType(obj->type) ||
                         obj->type == vpiNamedEvent ||
                         obj->type == vpiNamedEventArray;
-    if (written->kind != DataTypeKind::kNamed && kTyped) {
+    if ((written->kind != DataTypeKind::kNamed || kNet) && kTyped) {
       static const std::vector<Expr*> kNoDims;
       typespec = maker.Of(*written, dims != nullptr ? *dims : kNoDims,
                           std::string_view{}, obj);
@@ -534,20 +531,17 @@ struct InstanceTypespecs {
   }
 };
 
-// §37.17: relates each variable of an instance of `mod` to its typespec: each
-// the module's variables list holds, and each variable port it does not.
-// §23.2.2.3 has a variable port declare a variable, which the list holds where
-// the port is of a structure or union type or the body declares it again; any
-// other relates to the type the port's declaration wrote.
+// §37.17 and §37.16 (figure): relates each variable and each net of an
+// instance of `mod` to its typespec, those its ports declare among them
+// (VpiDeclaredVariables, VpiDeclaredNets), which relate to the type the port's
+// declaration wrote.
 void RelateVariableTypespecs(const RtlirModule& mod,
                              const InstanceTypespecs& at) {
-  for (const RtlirVariable& var : mod.variables) {
+  for (const RtlirVariable& var : VpiDeclaredVariables(mod)) {
     at.Relate(var.name, var.written_type, var.declared_unpacked_dims);
   }
-  for (const RtlirPort& port : mod.ports) {
-    if (port.is_var && !HasVariable(mod, port.name)) {
-      at.Relate(port.name, port.declared_type, nullptr);
-    }
+  for (const RtlirNet& net : VpiDeclaredNets(mod)) {
+    at.Relate(net.name, net.written_type, net.declared_unpacked_dims);
   }
 }
 

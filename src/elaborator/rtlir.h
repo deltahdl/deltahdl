@@ -171,6 +171,14 @@ struct RtlirNet {
   // and whether a packed dimension was, which pick the kind of net object.
   DataTypeKind data_kind = DataTypeKind::kImplicit;
   bool has_declared_packed_dim = false;
+  // §37.16 (figure): the type the declaration wrote, a typedef name kept as
+  // the name, and the unpacked dimensions it wrote, from which the typespec
+  // the net reaches is made; null where no declaration of a net wrote them.
+  // §6.6.8: the type also says whether the net was declared a generic
+  // interconnect, which net_type stops saying once a port connection merges
+  // it with another net (§23.3.3.7.1).
+  const DataType* written_type = nullptr;
+  const std::vector<Expr*>* declared_unpacked_dims = nullptr;
 
   Strength charge_strength = Strength::kMedium;
   uint32_t trireg_capacitance = 0;
