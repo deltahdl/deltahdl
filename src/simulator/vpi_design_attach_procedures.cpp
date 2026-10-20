@@ -414,14 +414,12 @@ VpiObject* MakeBuiltStmt(const Stmt& stmt, const BlockParent& parent,
   VpiObject* obj = MakeAtomicStatement(stmt, kKind, parent, walk);
   // §37.49: an assertion reports where its text stands, and §39.3.1: one
   // that is labelled is named in the hierarchy of the scope it is written in,
-  // the nearest enclosing object with a full name; a procedure or a statement
-  // it stands under has none.
+  // the path its named blocks extend; a procedure or an unnamed block it
+  // stands under adds no level.
   if (VpiIsAssertionType(kKind)) {
     VpiRecordAssertionLocation(obj, stmt.range, walk.calls.ctx);
-    const VpiObject* named = parent.scope;
-    while (named != nullptr && named->full_name.empty()) named = named->parent;
     if (!stmt.label.empty()) {
-      obj->full_name = VpiScopedFullName(named, stmt.label);
+      obj->full_name = parent.path + "." + std::string(stmt.label);
     }
   }
   VpiFillStmt(obj, stmt, StmtBuildAt(parent, walk));
