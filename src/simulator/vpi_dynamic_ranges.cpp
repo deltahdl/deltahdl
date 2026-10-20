@@ -5,6 +5,8 @@
 #include "common/types.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/variable.h"
+#include "simulator/vpi_design_attach_build.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {

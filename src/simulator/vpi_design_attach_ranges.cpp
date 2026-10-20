@@ -99,6 +99,17 @@ void AttachNetRanges(const RtlirNet& net, const std::string& prefix,
   if (array != nullptr) AttachRanges(array, unpacked, build);
 }
 
+// §37.17 details 4 and 6: the ranges of the variable `var`, whose object is
+// `obj`. §37.22 detail 1: a dynamic array's or queue's leftmost range takes its
+// bounds from the elements the array holds when it is read.
+void AttachVariableRanges(VpiObject& obj, const RtlirVariable& var,
+                          SimContext& ctx, const VpiAttachBuild& build) {
+  VpiObject* leftmost = AttachRanges(&obj, RangeDims(var, ctx), build);
+  if (var.is_queue || var.is_dynamic) {
+    VpiGiveDynamicRangeBounds(*leftmost, build);
+  }
+}
+
 }  // namespace
 
 VpiObject* VpiRangeObject(VpiObject* parent,
@@ -149,13 +160,7 @@ void AttachVariableAndNetRanges(const RtlirDesign& design,
         for (const RtlirVariable& var : mod->variables) {
           VpiObject* obj =
               FindObjectForFlatName(objects, VpiFlatName(prefix, var.name));
-          if (obj == nullptr) continue;
-          VpiObject* leftmost = AttachRanges(obj, RangeDims(var, ctx), build);
-          // §37.22 detail 1: a dynamic array's or queue's leftmost range takes
-          // its bounds from the elements the array holds when it is read.
-          if (var.is_queue || var.is_dynamic) {
-            VpiGiveDynamicRangeBounds(*leftmost, build);
-          }
+          if (obj != nullptr) AttachVariableRanges(*obj, var, ctx, build);
         }
         for (const RtlirNet& net : VpiDeclaredNets(*mod)) {
           if (!VpiNetIsInterconnect(net)) {

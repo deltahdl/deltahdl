@@ -380,5 +380,18 @@ TEST_F(PackedArrayVarsOfARun, AnEnumOrUnionVarWithAPackedDimensionIsOne) {
             (std::vector<std::string>{"a", "b"}));
 }
 
+// Details 1 and 3 with §26.3: the struct subelements of a packed array var of
+// a struct typedef a package declares have its members too (#7017).
+TEST_F(PackedArrayVarsOfARun, APackageStructsPackedArrayVarHasMembers) {
+  Run("package pk;\n"
+      "  typedef struct packed { logic a; logic [1:0] b; } ps_t;\n"
+      "endpackage\n"
+      "module top; pk::ps_t [1:0] pv; endmodule\n");
+  const std::vector<vpiHandle> kLeaves = ObjectsOf(vpiElement, By("top.pv"));
+  ASSERT_EQ(kLeaves.size(), 2U);
+  EXPECT_EQ(NamesOf(vpiMember, kLeaves[1]),
+            (std::vector<std::string>{"a", "b"}));
+}
+
 }  // namespace
 }  // namespace delta

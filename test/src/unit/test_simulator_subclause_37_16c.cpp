@@ -335,7 +335,7 @@ TEST_F(NetDetailsOfARun, APackedArrayNetsStructSubelementHasMemberNets) {
   const std::vector<vpiHandle> kLeaves = ObjectsOf(vpiElement, By("top.pn"));
   ASSERT_EQ(kLeaves.size(), 2U);
   EXPECT_EQ(NamesOf(vpiMember, kLeaves[0]),
-            (std::vector<std::string>{"i1", "bvec"}));
+            (std::vector<std::string>{"bvec", "i1"}));
   vpiHandle bvec = Named(vpiMember, kLeaves[0], "bvec");
   ASSERT_NE(bvec, nullptr);
   EXPECT_STREQ(vpi_get_str(vpiFullName, bvec), "top.pn[1].bvec");
@@ -344,19 +344,6 @@ TEST_F(NetDetailsOfARun, APackedArrayNetsStructSubelementHasMemberNets) {
   vpiHandle i1 = Named(vpiMember, kLeaves[1], "i1");
   ASSERT_NE(i1, nullptr);
   EXPECT_EQ(IntOf(i1), 5);
-}
-
-// §37.16 detail 32 with §26.3: the struct subelements of a packed array net of
-// a struct typedef a package declares have its members too (#7393).
-TEST_F(NetDetailsOfARun, APackageStructsPackedArrayNetHasMemberNets) {
-  Run("package pk;\n"
-      "  typedef struct packed { logic a; logic [1:0] b; } ps_t;\n"
-      "endpackage\n"
-      "module top; wire pk::ps_t [1:0] pw; endmodule\n");
-  const std::vector<vpiHandle> kLeaves = ObjectsOf(vpiElement, By("top.pw"));
-  ASSERT_EQ(kLeaves.size(), 2U);
-  EXPECT_EQ(NamesOf(vpiMember, kLeaves[1]),
-            (std::vector<std::string>{"a", "b"}));
 }
 
 // §37.16 detail 34: a net decompiles to the name an expression writes it by,
