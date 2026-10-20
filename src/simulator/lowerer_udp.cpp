@@ -30,7 +30,6 @@
 #include "elaborator/rtlir_primitives.h"
 #include "elaborator/sensitivity.h"
 #include "parser/ast_expr.h"
-#include "parser/ast_module.h"
 #include "simulator/awaiters.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
