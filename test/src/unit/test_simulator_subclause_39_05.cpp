@@ -190,7 +190,7 @@ TEST_F(AssertionControlFunctions, AnAssertionControlCallsItsAssertionCallback) {
   VpiHandle assertion = vpi_ctx_.CreateAssertion("handshake_p", vpiAssert);
   for (int reason : {cbAssertionDisable, cbAssertionEnable,
                      cbAssertionDisableFailAction, cbAssertionKill}) {
-    ASSERT_NE(vpi_register_assertion_cb(assertion, reason,
+    ASSERT_NE(vpi_register_assertion_cb(VpiHandleOf(assertion), reason,
                                         &RecordAssertionCallback, nullptr),
               nullptr);
   }

@@ -169,8 +169,22 @@ TEST_F(AssertionRun, ASequencePropertysAttemptsReachTheirCallbacks) {
 // executes and succeeds or fails there and then (#7490, #7491, #7493).
 TEST_F(AssertionRun, AnImmediateAssertionsAttemptsReachTheirCallbacks) {
   AssertionArmer() = [] {
-    WatchFor("top.i1",
-             {cbAssertionStart, cbAssertionSuccess, cbAssertionFailure});
+    // The assertion stands inside a procedure, and is found by walking the
+    // instance's assertions to the one of that full name.
+    vpiHandle it =
+        vpi_iterate(vpiAssertion, vpi_handle_by_name(VpiText("top"), nullptr));
+    vpiHandle i1 = nullptr;
+    while (vpiHandle obj = it == nullptr ? nullptr : vpi_scan(it)) {
+      const char* name = vpi_get_str(vpiFullName, obj);
+      if (name != nullptr && std::string(name) == "top.i1") i1 = obj;
+    }
+    ASSERT_NE(i1, nullptr);
+    for (int reason :
+         {cbAssertionStart, cbAssertionSuccess, cbAssertionFailure}) {
+      ASSERT_NE(
+          vpi_register_assertion_cb(i1, reason, &RecordAssertionCall, nullptr),
+          nullptr);
+    }
   };
   Run("module top;\n"
       "  logic clk = 0, x = 1;\n"

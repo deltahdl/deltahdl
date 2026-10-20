@@ -716,20 +716,6 @@ bool AdvanceBody(const LinearSequence& body, BodyAttempts& attempts,
   return matched;
 }
 
-// §16.9.3: a sampled value function in a sequence is clocked by the
-// sequence's clock, and the history it looks back through is sampled at
-// every tick of that clock whether or not an attempt reads the operand at
-// the tick -- `$rose(ready)` standing after `inst` in a chain still answers
-// the tick before. The calls are collected once, over every chain of the
-// body, and each is evaluated as the monitor resumes so that its sample for
-// the tick is recorded; an attempt reading it records the same value over
-// it.
-void CollectPastDirectedSites(const LinearSequence& body,
-                              std::vector<const Expr*>& sites) {
-  ForEachLinearSequenceExpr(
-      body, [&sites](const Expr* e) { CollectPastDirectedSites(e, sites); });
-}
-
 // §16.13.6: mark the sequence endpoint event triggered and wake its waiters,
 // mirroring the named-event `-> ev` trigger path (stmt_exec.cpp).
 void FireSequenceEndpoint(SimContext& ctx, const std::string& ep_name) {
@@ -858,6 +844,43 @@ SequencePropertyState* CreateSequencePropertyState(const ModuleItem* seq,
   return state;
 }
 
+namespace {
+
+// §16.12: the outcomes of a tick the disable condition is true at, every
+// attempt in flight and every one beginning disabled, none left in flight.
+std::vector<SequenceOutcome> DisableSequenceAttempts(
+    SequencePropertyState& state, const SequenceTick& tick, SimTime now) {
+  std::vector<SequenceOutcome> outcomes;
+  outcomes.reserve(state.attempts.size() + tick.instances.size());
+  for (const FirstMatchAttempt& attempt : state.attempts) {
+    outcomes.push_back(
+        {SequenceVerdict::kDisabled, attempt.bindings, attempt.started});
+  }
+  for (const InstanceBindings* bindings : tick.instances) {
+    outcomes.push_back({SequenceVerdict::kDisabled, bindings, now.ticks});
+  }
+  state.attempts.clear();
+  return outcomes;
+}
+
+// The attempt `attempt` just stepped, `matched` where it matched at this tick:
+// the outcome it reached, matched or failed where it can match no more, added
+// to `outcomes`; whether it stays in flight, as an attempt that has not
+// matched or, with `every_match`, one that has does while it can match again.
+bool SettleSequenceAttempt(const FirstMatchAttempt& attempt, bool matched,
+                           bool every_match,
+                           std::vector<SequenceOutcome>& outcomes) {
+  bool spent = FirstMatchAttemptIsSpent(attempt);
+  if (matched || spent) {
+    outcomes.push_back(
+        {matched ? SequenceVerdict::kMatched : SequenceVerdict::kFailed,
+         attempt.bindings, attempt.started});
+  }
+  return !spent && (!matched || every_match);
+}
+
+}  // namespace
+
 std::vector<SequenceOutcome> AdvanceSequenceProperty(
     SequencePropertyState& state, const SequenceTick& tick, SimContext& ctx,
     Arena& arena) {
@@ -866,17 +889,7 @@ std::vector<SequenceOutcome> AdvanceSequenceProperty(
   SimTime now = ctx.CurrentTime();
   // §16.12: a disable condition true at any tick of an attempt disables it,
   // and the attempts beginning at this tick with it.
-  if (tick.disabled) {
-    for (const FirstMatchAttempt& attempt : state.attempts) {
-      outcomes.push_back(
-          {SequenceVerdict::kDisabled, attempt.bindings, attempt.started});
-    }
-    for (const InstanceBindings* bindings : tick.instances) {
-      outcomes.push_back({SequenceVerdict::kDisabled, bindings, now.ticks});
-    }
-    state.attempts.clear();
-    return outcomes;
-  }
+  if (tick.disabled) return DisableSequenceAttempts(state, tick, now);
   // §16.14.6.3: at a second pass of one time step the attempts already
   // advanced at it advance no more; the new ones begin.
   size_t advanced = state.advanced_at == now ? state.attempts.size() : 0;
@@ -900,14 +913,8 @@ std::vector<SequenceOutcome> AdvanceSequenceProperty(
     bool matched = AdvanceFirstMatchAttempt(state.body, state.attempts[i],
                                             first, ctx, arena);
     samples.SetInstanceBindings(nullptr);
-    bool spent = FirstMatchAttemptIsSpent(state.attempts[i]);
-    const FirstMatchAttempt& attempt = state.attempts[i];
-    if (matched || spent) {
-      outcomes.push_back(
-          {matched ? SequenceVerdict::kMatched : SequenceVerdict::kFailed,
-           attempt.bindings, attempt.started});
-    }
-    if (!spent && (!matched || tick.every_match)) {
+    if (SettleSequenceAttempt(state.attempts[i], matched, tick.every_match,
+                              outcomes)) {
       kept.push_back(std::move(state.attempts[i]));
     }
   }
@@ -918,6 +925,7 @@ std::vector<SequenceOutcome> AdvanceSequenceProperty(
 std::vector<uint64_t> PendingSequenceStarts(
     const SequencePropertyState& state) {
   std::vector<uint64_t> starts;
+  starts.reserve(state.attempts.size());
   for (const FirstMatchAttempt& attempt : state.attempts) {
     starts.push_back(attempt.started);
   }

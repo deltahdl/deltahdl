@@ -31,6 +31,9 @@ SimCoroutine MakeSequenceMonitorCoroutine(LinearSequence body,
 // that the history each looks back through is sampled at every tick of the
 // clock it is read on whether or not an attempt reads it there.
 void CollectPastDirectedSites(const Expr* e, std::vector<const Expr*>& sites);
+// The same, over every chain of the flattened sequence `body`.
+void CollectPastDirectedSites(const LinearSequence& body,
+                              std::vector<const Expr*>& sites);
 
 // §16.13.6 with §23.6: the end point of the sequence a hierarchical name
 // `u.s` selects, the event `u.__seq_s` the monitor of the sequence s fires in

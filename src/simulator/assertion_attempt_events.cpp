@@ -5,7 +5,6 @@
 #include <string_view>
 #include <vector>
 
-#include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "common/source_mgr.h"
@@ -66,14 +65,28 @@ void RecordConcurrentCoverVerdict(const Stmt* stmt,
   record->vacuous += CoverPropertyVacuousSuccessDelta(outcome);
 }
 
+// The key of the assertion `stmt` the current process is evaluating. A
+// labelled statement runs inside its label's own named scope (§21.2.1.5),
+// which is the assertion's name rather than a scope it is written in, so that
+// level is left out.
+std::string KeyHere(const Stmt* stmt, SimContext& ctx) {
+  std::string scope = ScopeHierName(ctx);
+  const std::vector<std::string_view>& named = ctx.ActiveNamedScopes();
+  if (!stmt->label.empty() && !named.empty() && named.back() == stmt->label &&
+      scope.size() > stmt->label.size()) {
+    scope.resize(scope.size() - stmt->label.size() - 1);
+  }
+  return RunAssertionKey(stmt, scope, ctx);
+}
+
 // §39.4.2: calls each `reason` callback placed on the assertion `stmt`,
 // handed `info`; nothing is looked up where no callback is placed at all.
 void RaiseAttemptEvent(const Stmt* stmt, int reason,
                        const AssertionAttemptInfo& info, SimContext& ctx) {
   AssertionApi& api = GetGlobalAssertionApi();
   if (api.PlacedCallbackCount() == 0) return;
-  api.DeliverAssertionEvent(RunAssertionKey(stmt, ScopeHierName(ctx), ctx),
-                            reason, ctx.CurrentTime().ticks, info);
+  api.DeliverAssertionEvent(KeyHere(stmt, ctx), reason, ctx.CurrentTime().ticks,
+                            info);
 }
 
 // §39.4.2.1: waits for the tick of `gclk_event` strictly after
@@ -82,9 +95,9 @@ void RaiseAttemptEvent(const Stmt* stmt, int reason,
 SimCoroutine DeferredControlCallback(std::string key, int reason,
                                      uint64_t event_time,
                                      const std::vector<EventExpr>& gclk_event,
-                                     SimContext& ctx, Arena& arena) {
+                                     SimContext& ctx) {
   do {
-    co_await EventAwaiter{ctx, gclk_event, arena};
+    co_await EventAwaiter{ctx, gclk_event, ctx.GetArena()};
   } while (ctx.CurrentTime().ticks <= event_time);
   GetGlobalAssertionApi().DeliverAssertionEvent(key, reason, event_time, {});
 }
@@ -114,6 +127,32 @@ const OperandRead* FailedRead(const AttemptLog& reads) {
   return last;
 }
 
+// The reads of each attempt in `log`, in the order the attempts were
+// stepped, each led by the note of its step.
+std::vector<AttemptLog> AttemptsIn(const std::vector<OperandRead>& log) {
+  std::vector<AttemptLog> attempts;
+  for (const OperandRead& read : log) {
+    if (read.expr == nullptr) attempts.emplace_back();
+    if (!attempts.empty()) attempts.back().push_back(&read);
+  }
+  return attempts;
+}
+
+// The verdict among `decided` of the attempt begun at `started`, null where
+// it was decided at no verdict this tick; a failure is given the operand it
+// failed at, `failed`, where one is known.
+const PropertyVerdict* DecisionOf(std::vector<PropertyVerdict>& decided,
+                                  uint64_t started, const OperandRead* failed) {
+  PropertyVerdict* verdict = nullptr;
+  for (PropertyVerdict& decision : decided) {
+    if (decision.started == started) verdict = &decision;
+  }
+  if (verdict != nullptr && !verdict->holds && failed != nullptr) {
+    verdict->failed_at = failed->expr;
+  }
+  return verdict;
+}
+
 }  // namespace
 
 std::string RunAssertionKey(const Stmt* stmt, std::string_view scope,
@@ -133,7 +172,7 @@ void NoteAttemptBegun(const Stmt* stmt, SimContext& ctx) {
   if (api.PlacedCallbackCount() == 0) return;
   // §39.5.2: stepping enabled for the attempt before it began is frozen now.
   const uint64_t kNow = ctx.CurrentTime().ticks;
-  const std::string kKey = RunAssertionKey(stmt, ScopeHierName(ctx), ctx);
+  const std::string kKey = KeyHere(stmt, ctx);
   if (api.AssertionStepEnabled(kKey, kNow)) {
     api.NoteAssertionAttemptStarted(kKey, kNow);
   }
@@ -161,8 +200,7 @@ void NoteAttemptDisabled(const Stmt* stmt, uint64_t started, SimContext& ctx) {
 void KeepFutureGclkAsserting(const Stmt* stmt, const Process& asserting,
                              SimContext& ctx) {
   if (GetGlobalAssertionApi().PlacedCallbackCount() == 0) return;
-  ctx.NoteFutureGclkAssertion(RunAssertionKey(stmt, ScopeHierName(ctx), ctx),
-                              asserting);
+  ctx.NoteFutureGclkAssertion(KeyHere(stmt, ctx), asserting);
 }
 
 void RaiseAssertionControlCallback(std::string_view key, int reason,
@@ -173,14 +211,14 @@ void RaiseAssertionControlCallback(std::string_view key, int reason,
     GetGlobalAssertionApi().DeliverAssertionEvent(key, reason, kNow, {});
     return;
   }
-  Arena& arena = ctx.GetArena();
-  Process* p = CreateAssertionChildProcess(ctx, arena, Region::kActive);
+  Process* p =
+      CreateAssertionChildProcess(ctx, ctx.GetArena(), Region::kActive);
   // The event is the asserting instance's, whichever process controlled it.
   p->inst_prefix = asserting->inst_prefix;
   p->gen_prefixes = asserting->gen_prefixes;
   p->gen_block_name = asserting->gen_block_name;
   p->coro = DeferredControlCallback(std::string(key), reason, kNow,
-                                    asserting->gclk_future_event, ctx, arena)
+                                    asserting->gclk_future_event, ctx)
                 .Release();
   ScheduleAssertionChildStart(p, p->home_region, ctx);
 }
@@ -199,31 +237,17 @@ void AttemptReads::Finish(std::vector<PropertyVerdict>& decided) {
   if (!logging_) return;
   ctx_.AssertionSamples().SetOperandLog(nullptr);
   logging_ = false;
-  // The reads of each attempt, in the order the attempts were stepped, each
-  // led by the note of its step.
-  std::vector<AttemptLog> attempts;
-  for (const OperandRead& read : log_) {
-    if (read.expr == nullptr) attempts.emplace_back();
-    if (!attempts.empty()) attempts.back().push_back(&read);
-  }
-  for (const AttemptLog& reads : attempts) {
+  for (const AttemptLog& reads : AttemptsIn(log_)) {
     const OperandRead* failed = FailedRead(reads);
-    const PropertyVerdict* verdict = nullptr;
-    for (PropertyVerdict& decision : decided) {
-      if (decision.started != reads.front()->started) continue;
-      if (!decision.holds && failed != nullptr)
-        decision.failed_at = failed->expr;
-      verdict = &decision;
-    }
-    Step(reads, verdict, failed);
+    Step(reads, DecisionOf(decided, reads.front()->started, failed), failed);
   }
 }
 
 void AttemptReads::Step(const AttemptLog& reads, const PropertyVerdict* verdict,
                         const OperandRead* failed) {
   const uint64_t kStarted = reads.front()->started;
-  const uint32_t kStep = GetGlobalAssertionApi().TakeAttemptStep(
-      RunAssertionKey(stmt_, ScopeHierName(ctx_), ctx_), kStarted);
+  const uint32_t kStep =
+      GetGlobalAssertionApi().TakeAttemptStep(KeyHere(stmt_, ctx_), kStarted);
   if (kStep == AssertionApi::kNoStep) return;
   const bool kFails = verdict != nullptr && !verdict->holds;
   AssertionAttemptInfo info = AttemptBegunAt(kStarted);

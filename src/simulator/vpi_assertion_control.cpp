@@ -56,70 +56,87 @@ bool VpiAssertionControlTarget(VpiHandle assertion, std::string& key) {
 // run has no part in it; neither has vpiAssertionKill's one attempt, which
 // the run discards apart.
 using enum AssertControlType;
+// A control type as the §20.11 call carries it; the slots a row leaves
+// unused hold 0, which no control type is.
+constexpr uint32_t CallType(AssertControlType type) {
+  return static_cast<uint32_t>(type);
+}
 struct ControlAction {
   int operation;
   int reason;
-  std::array<AssertControlType, 4> run;
+  std::array<uint32_t, 4> run;
   size_t run_count;
 };
 constexpr ControlAction kControlActions[] = {
-    {vpiAssertionSysLock, cbAssertionSysLock, {kLock}, 1},
-    {vpiAssertionSysUnlock, cbAssertionSysUnlock, {kUnlock}, 1},
-    {vpiAssertionSysOn, cbAssertionSysOn, {kOn}, 1},
-    {vpiAssertionSysOff, cbAssertionSysOff, {kOff}, 1},
-    {vpiAssertionSysKill, cbAssertionSysKill, {kKill}, 1},
-    {vpiAssertionSysEnd, cbAssertionSysEnd, {kKill, kLock}, 2},
+    {vpiAssertionSysLock, cbAssertionSysLock, {CallType(kLock)}, 1},
+    {vpiAssertionSysUnlock, cbAssertionSysUnlock, {CallType(kUnlock)}, 1},
+    {vpiAssertionSysOn, cbAssertionSysOn, {CallType(kOn)}, 1},
+    {vpiAssertionSysOff, cbAssertionSysOff, {CallType(kOff)}, 1},
+    {vpiAssertionSysKill, cbAssertionSysKill, {CallType(kKill)}, 1},
+    {vpiAssertionSysEnd,
+     cbAssertionSysEnd,
+     {CallType(kKill), CallType(kLock)},
+     2},
     {vpiAssertionSysReset,
      cbAssertionSysReset,
-     {kKill, kOn, kPassOn, kFailOn},
+     {CallType(kKill), CallType(kOn), CallType(kPassOn), CallType(kFailOn)},
      4},
     {vpiAssertionSysDisablePassAction,
      cbAssertionSysDisablePassAction,
-     {kPassOff},
+     {CallType(kPassOff)},
      1},
     {vpiAssertionSysEnablePassAction,
      cbAssertionSysEnablePassAction,
-     {kPassOn},
+     {CallType(kPassOn)},
      1},
     {vpiAssertionSysDisableFailAction,
      cbAssertionSysDisableFailAction,
-     {kFailOff},
+     {CallType(kFailOff)},
      1},
     {vpiAssertionSysEnableFailAction,
      cbAssertionSysEnableFailAction,
-     {kFailOn},
+     {CallType(kFailOn)},
      1},
     {vpiAssertionSysDisableVacuousAction,
      cbAssertionSysDisableVacuousAction,
-     {kVacuousOff},
+     {CallType(kVacuousOff)},
      1},
     {vpiAssertionSysEnableNonvacuousAction,
      cbAssertionSysEnableNonvacuousAction,
-     {kNonvacuousOn},
+     {CallType(kNonvacuousOn)},
      1},
-    {vpiAssertionReset, cbAssertionReset, {kKill, kOn, kPassOn, kFailOn}, 4},
-    {vpiAssertionLock, cbAssertionLock, {kLock}, 1},
-    {vpiAssertionUnlock, cbAssertionUnlock, {kUnlock}, 1},
-    {vpiAssertionDisable, cbAssertionDisable, {kOff}, 1},
-    {vpiAssertionEnable, cbAssertionEnable, {kOn}, 1},
+    {vpiAssertionReset,
+     cbAssertionReset,
+     {CallType(kKill), CallType(kOn), CallType(kPassOn), CallType(kFailOn)},
+     4},
+    {vpiAssertionLock, cbAssertionLock, {CallType(kLock)}, 1},
+    {vpiAssertionUnlock, cbAssertionUnlock, {CallType(kUnlock)}, 1},
+    {vpiAssertionDisable, cbAssertionDisable, {CallType(kOff)}, 1},
+    {vpiAssertionEnable, cbAssertionEnable, {CallType(kOn)}, 1},
     {vpiAssertionKill, cbAssertionKill, {}, 0},
     {vpiAssertionDisablePassAction,
      cbAssertionDisablePassAction,
-     {kPassOff},
+     {CallType(kPassOff)},
      1},
-    {vpiAssertionEnablePassAction, cbAssertionEnablePassAction, {kPassOn}, 1},
+    {vpiAssertionEnablePassAction,
+     cbAssertionEnablePassAction,
+     {CallType(kPassOn)},
+     1},
     {vpiAssertionDisableFailAction,
      cbAssertionDisableFailAction,
-     {kFailOff},
+     {CallType(kFailOff)},
      1},
-    {vpiAssertionEnableFailAction, cbAssertionEnableFailAction, {kFailOn}, 1},
+    {vpiAssertionEnableFailAction,
+     cbAssertionEnableFailAction,
+     {CallType(kFailOn)},
+     1},
     {vpiAssertionDisableVacuousAction,
      cbAssertionDisableVacuousAction,
-     {kVacuousOff},
+     {CallType(kVacuousOff)},
      1},
     {vpiAssertionEnableNonvacuousAction,
      cbAssertionEnableNonvacuousAction,
-     {kNonvacuousOn},
+     {CallType(kNonvacuousOn)},
      1}};
 
 int ReasonReporting(int operation) {
@@ -180,11 +197,11 @@ void ActOnRun(int operation, std::string_view selected) {
     if (action.operation != operation) continue;
     for (size_t i = 0; i < action.run_count; ++i) {
       AssertControlCall call;
-      call.control_type = static_cast<uint32_t>(action.run[i]);
+      call.control_type = action.run[i];
       call.assertion_type = kVpiControlledTypes;
       call.directive_type = kDirectiveTypeDefault;
       if (!selected.empty()) call.scopes.push_back({std::string(selected)});
-      if (action.run[i] == kKill) AbortKilledAttempts(call, *run);
+      if (action.run[i] == CallType(kKill)) AbortKilledAttempts(call, *run);
       run->AssertControls().Apply(std::move(call));
     }
   }
