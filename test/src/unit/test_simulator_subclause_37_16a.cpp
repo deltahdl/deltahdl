@@ -230,6 +230,7 @@ TEST_F(NetContext, APartOfANettypeNetIsANettypeNetSelect) {
   net.type = vpiNet;
   net.net = &user;
   net.children.push_back(&driver);
+  driver.lhs = &net;
   VpiObject bit;
   bit.type = vpiNetBit;
   bit.parent = &net;

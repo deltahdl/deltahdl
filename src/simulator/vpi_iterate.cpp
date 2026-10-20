@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdarg>
+#include <iterator>
 #include <vector>
 
 #include "simulator/vpi_class_typespecs.h"
@@ -46,17 +47,49 @@ void CollectVariableDriversOrLoads(VpiObject* node, bool want_driver,
 // figure lists. On the driver side a port is always a driver; on the load side
 // a port is reported only when it carries a complex, non-concatenation
 // expression on an input (detail 1).
-void CollectNetDriversOrLoads(VpiObject* node, bool want_driver,
+//
+// §37.16 detail 17: the local iteration (`local`) adds the ports of the net's
+// own instance that pass values into it or out of it; detail 16: the driver
+// iteration adds the ports something other than a net drives it through.
+void CollectNetDriversOrLoads(VpiObject* node, bool want_driver, bool local,
                               VpiObject* iter) {
   // §37.45: a delay term placed on a net reaches that net's drivers and loads,
   // less the two terms of its own device, which stand between them.
   VpiObject* net = node->term_net != nullptr ? node->term_net : node;
   // §37.16 detail 11: a part of a nettype net has no driver iteration.
   if (want_driver && !VpiNetDriverIterationSupported(VpiNetTypeOf(net))) return;
-  for (auto* child : net->children) {
-    if (net != node && child->parent == node->parent) continue;
-    if (VpiIsNetDriverOrLoad(child, net, want_driver)) {
-      iter->children.push_back(child);
+  if (net != node) {
+    for (auto* child : net->children) {
+      if (child->parent == node->parent) continue;
+      if (VpiIsNetDriverOrLoad(child, net, want_driver)) {
+        iter->children.push_back(child);
+      }
+    }
+    return;
+  }
+  // §37.16 details 4 and 16: the whole relations of a net reach across the
+  // ports nets drive at both ends; the local ones stop at the net's own
+  // instance, and so do a net bit's, a port joining whole nets.
+  const std::vector<VpiHandle> kNets = local || net->type == vpiNetBit
+                                           ? std::vector<VpiHandle>{net}
+                                           : VpiNetsJoinedThroughPorts(net);
+  std::vector<VpiHandle> found;
+  for (VpiHandle joined : kNets) {
+    for (auto* child : joined->children) {
+      if (VpiIsNetDriverOrLoad(child, joined, want_driver)) {
+        found.push_back(child);
+      }
+    }
+    if (local) {
+      std::ranges::copy(VpiNetLocalPorts(joined, want_driver),
+                        std::back_inserter(found));
+    } else if (want_driver) {
+      std::ranges::copy(VpiNetPortDrivers(joined), std::back_inserter(found));
+    }
+  }
+  for (VpiHandle object : found) {
+    if (std::ranges::find(iter->children, object) == iter->children.end()) {
+      iter->children.push_back(object);
     }
   }
 }
@@ -84,6 +117,9 @@ struct VpiIterateModes {
   bool array_var_elements = false;
   bool net_driver = false;
   bool net_load = false;
+  // §37.16 detail 17: a net's vpiLocalDriver and vpiLocalLoad relations.
+  bool net_local_driver = false;
+  bool net_local_load = false;
   bool variable_driver = false;
   bool variable_load = false;
   bool top_module = false;
@@ -120,6 +156,8 @@ struct VpiIterateModes {
   bool ordered_wait_events = false;
   // §37.58 details 1 and 2: a simple expression's vpiUse relation.
   bool simple_expr_use = false;
+  // §37.16 detail 5: a net's vpiContAssign relation.
+  bool net_cont_assign = false;
 };
 
 // The context-owned object and registry stores an iteration is resolved
@@ -219,9 +257,14 @@ void ComputeDriverLoadModes(int type, VpiHandle ref, VpiIterateModes& m) {
       ref && (VpiIsNetsType(ref->type) || ref->type == vpiDelayTerm);
   m.net_driver = kNetSide && type == vpiDriver;
   m.net_load = kNetSide && type == vpiLoad;
+  // §37.16 (figure): the local relations are drawn from the nets alone.
+  const bool kNet = ref && VpiIsNetsType(ref->type);
+  m.net_local_driver = kNet && type == vpiLocalDriver;
+  m.net_local_load = kNet && type == vpiLocalLoad;
   m.variable_driver = ref && type == vpiDriver && !m.net_driver;
   m.variable_load = ref && type == vpiLoad && !m.net_load;
   m.simple_expr_use = type == vpiUse && VpiIsSimpleExpr(ref);
+  m.net_cont_assign = ref && VpiIsNetsType(ref->type) && type == vpiContAssign;
 }
 
 // §37.31 details 1/3/5/6 + §37.33 details 3/4/6: classify the class special
@@ -739,6 +782,8 @@ bool DispatchListedMode(int type, VpiHandle ref, const VpiIterateModes& modes,
     listed = VpiTermOrPortObjects(type, ref);
   } else if (modes.simple_expr_use) {
     listed = VpiSimpleExprUses(ref);
+  } else if (modes.net_cont_assign) {
+    listed = VpiNetContAssigns(ref);
   } else if (modes.tchk_expr) {
     listed = ref->tchk_arguments;
   } else {
@@ -752,7 +797,11 @@ bool DispatchRefSpecialMode(int type, VpiHandle ref,
                             const VpiIterateModes& modes,
                             VpiIterateStores& stores, VpiObject* iter) {
   if (modes.net_driver || modes.net_load) {
-    CollectNetDriversOrLoads(ref, modes.net_driver, iter);
+    CollectNetDriversOrLoads(ref, modes.net_driver, false, iter);
+    return true;
+  }
+  if (modes.net_local_driver || modes.net_local_load) {
+    CollectNetDriversOrLoads(ref, modes.net_local_driver, true, iter);
     return true;
   }
   if (modes.variable_driver || modes.variable_load) {

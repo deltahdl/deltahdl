@@ -485,6 +485,11 @@ int VpiNetNettypeValue(bool is_part_of_nettype_net);
 // for a net whose vpiNetType is vpiNettypeNetSelect.
 bool VpiNetDriverIterationSupported(int nettype_value);
 
+// §37.16 detail 5: the continuous assignments the vpiContAssign relation of
+// the net `net` reaches: of a scalar net, those it holds; of a net bit, those
+// its vector holds that write or read the bit; of a vector net, none.
+std::vector<VpiHandle> VpiNetContAssigns(VpiHandle net);
+
 // §37.16 detail 12: vpiNetType for an interconnect net or interconnect net
 // select is vpiInterconnect.
 int VpiInterconnectNetType();

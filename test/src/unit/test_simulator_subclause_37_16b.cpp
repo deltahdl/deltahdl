@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -477,6 +478,112 @@ TEST_F(ArrayNetsOfARun, AnInstancesNetIterationReachesEveryNetKind) {
   EXPECT_EQ(vpi_get(vpiType, Named(vpiNet, By("top"), "e")), vpiEnumNet);
   EXPECT_EQ(vpi_get(vpiType, Named(vpiNet, By("top"), "i")), vpiIntegerNet);
   EXPECT_EQ(vpi_get(vpiType, Named(vpiNet, By("top"), "s")), vpiStructNet);
+}
+
+// A design run whose nets are read back once the run is over.
+class NetRelationsOfARun : public VpiDesignRun {
+ protected:
+  // How many of the objects of `type` `ref` reaches are of the kind `kind`.
+  static int CountOf(int type, vpiHandle ref, int kind) {
+    const std::vector<int> kKinds = KindsOf(type, ref);
+    return static_cast<int>(std::ranges::count(kKinds, kind));
+  }
+
+  static constexpr const char* kPortDesign =
+      "module sub(input c, output d, output logic v, inout io);\n"
+      "  assign d = c;\n"
+      "  always_comb v = c;\n"
+      "endmodule\n"
+      "module top; wire x, y, z, e; wire [1:0] b;\n"
+      "  logic k; logic [1:0] kv;\n"
+      "  sub u(.c(k), .d(z), .v(y), .io());\n"
+      "  sub w(.c(x), .d(), .v(), .io());\n"
+      "  sub n(.c(), .d(), .v(), .io());\n"
+      "  sub s(.c(b[1:1]), .d(), .v(), .io());\n"
+      "  sub p(.c(kv[1:1]), .d(), .v(), .io());\n"
+      "  sub q(.c({e}), .d(), .v(), .io());\n"
+      "  sub t(.c(1'b1), .d(), .v(), .io());\n"
+      "  sub r(.c(x & e), .d(), .v(), .io());\n"
+      "endmodule\n";
+};
+
+// §37.16 detail 5: a continuous assignment is reached from a scalar net or a
+// bit of a vector net, never from the vector net itself. From a bit, it is
+// each assignment writing or reading that bit, through the whole net, the bit
+// or a part select holding it (#7070).
+TEST_F(NetRelationsOfARun, AnAssignmentIsReachedFromAScalarOrABitAlone) {
+  Run("module top; wire [3:0] w; wire s; wire [1:0] t;\n"
+      "  assign w = 4'h1;\n"
+      "  assign s = w[2];\n"
+      "  assign t = w[3:2];\n"
+      "endmodule\n");
+  vpiHandle w = By("top.w");
+  ASSERT_NE(w, nullptr);
+  EXPECT_TRUE(KindsOf(vpiContAssign, w).empty());
+  EXPECT_EQ(KindsOf(vpiContAssign, vpi_handle_by_index(w, 1)).size(), 1u);
+  EXPECT_EQ(KindsOf(vpiContAssign, vpi_handle_by_index(w, 2)).size(), 3u);
+  EXPECT_EQ(KindsOf(vpiContAssign, vpi_handle_by_index(w, 3)).size(), 2u);
+  EXPECT_EQ(KindsOf(vpiContAssign, By("top.s")),
+            std::vector<int>{vpiContAssign});
+}
+
+// §37.16 detail 5: a bit no vector holds reaches no continuous assignment.
+TEST(NetContAssignModel, ABitNoVectorHoldsReachesNoAssignment) {
+  VpiObject bit;
+  bit.type = vpiNetBit;
+  EXPECT_TRUE(VpiNetContAssigns(&bit).empty());
+}
+
+// §37.16 detail 16: a net's drivers take in the ports driving it from
+// something other than a net or a net bit: an output port whose lower
+// connection is a variable, and an input port whose higher connection is one.
+// A port a net drives through either end is no such driver (#7077).
+TEST_F(NetRelationsOfARun, ADriverIterationReachesAPortAVariableDrives) {
+  Run(kPortDesign);
+  EXPECT_EQ(CountOf(vpiDriver, By("top.y"), vpiPort), 1);
+  EXPECT_EQ(CountOf(vpiDriver, By("top.z"), vpiPort), 0);
+  EXPECT_EQ(CountOf(vpiDriver, By("top.u.c"), vpiPort), 1);
+  EXPECT_EQ(CountOf(vpiDriver, By("top.w.c"), vpiPort), 0);
+  EXPECT_EQ(CountOf(vpiDriver, By("top.u.d"), vpiPort), 0);
+  // Nothing, a select of a net or a concatenation of nets drives the port as
+  // nets do; a select of a variable, a constant or another operation drives
+  // it as something else.
+  EXPECT_EQ(CountOf(vpiDriver, By("top.n.c"), vpiPort), 0);
+  EXPECT_EQ(CountOf(vpiDriver, By("top.s.c"), vpiPort), 0);
+  EXPECT_EQ(CountOf(vpiDriver, By("top.q.c"), vpiPort), 0);
+  EXPECT_EQ(CountOf(vpiDriver, By("top.p.c"), vpiPort), 1);
+  EXPECT_EQ(CountOf(vpiDriver, By("top.t.c"), vpiPort), 1);
+  EXPECT_EQ(CountOf(vpiDriver, By("top.r.c"), vpiPort), 1);
+}
+
+// §37.16 detail 17: the local drivers and loads of a net are those its own
+// instance holds, with the ports of that instance it connects to: an input
+// port a driver, an output port a load and an inout port both (#7060).
+TEST_F(NetRelationsOfARun, LocalDriversAndLoadsTakeInTheInstancesOwnPorts) {
+  Run(kPortDesign);
+  EXPECT_EQ(CountOf(vpiLocalDriver, By("top.w.c"), vpiPort), 1);
+  EXPECT_EQ(CountOf(vpiLocalLoad, By("top.w.c"), vpiPort), 0);
+  EXPECT_EQ(CountOf(vpiLocalLoad, By("top.w.c"), vpiContAssign), 1);
+  EXPECT_EQ(CountOf(vpiLocalDriver, By("top.w.c"), vpiContAssign), 0);
+  EXPECT_EQ(CountOf(vpiLocalLoad, By("top.w.d"), vpiPort), 1);
+  EXPECT_EQ(CountOf(vpiLocalDriver, By("top.w.d"), vpiPort), 0);
+  EXPECT_EQ(CountOf(vpiLocalDriver, By("top.w.d"), vpiContAssign), 1);
+  EXPECT_EQ(CountOf(vpiLocalDriver, By("top.w.io"), vpiPort), 1);
+  EXPECT_EQ(CountOf(vpiLocalLoad, By("top.w.io"), vpiPort), 1);
+}
+
+// §37.16 details 4, 16 and 17: vpiDriver and vpiLoad of a net reach across
+// the ports a net drives at both ends, to the drivers and loads of the nets on
+// the far side, while the local relations stop at the instance (#7376).
+TEST_F(NetRelationsOfARun, DriversAndLoadsReachAcrossAPortNetsDrive) {
+  Run(kPortDesign);
+  EXPECT_EQ(CountOf(vpiDriver, By("top.z"), vpiContAssign), 1);
+  EXPECT_EQ(CountOf(vpiLocalDriver, By("top.z"), vpiContAssign), 0);
+  EXPECT_EQ(CountOf(vpiLoad, By("top.x"), vpiContAssign), 1);
+  EXPECT_EQ(CountOf(vpiLocalLoad, By("top.x"), vpiContAssign), 0);
+  // A concatenation of nets joins them to the port's net, an operation joins
+  // none: e reaches q's assignment, and r's, which reads x & e, neither.
+  EXPECT_EQ(CountOf(vpiLoad, By("top.e"), vpiContAssign), 1);
 }
 
 }  // namespace

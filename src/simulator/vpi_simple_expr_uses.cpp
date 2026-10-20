@@ -131,18 +131,6 @@ bool IsUseKind(VpiHandle obj) {
   }
 }
 
-// Whether an expression `use` is written with uses `expr`: one of its two
-// sides, one of the two ends of a port, or an expression it holds.
-bool UsesExpr(const VpiObject& use, const VpiObject& expr) {
-  for (const VpiObject* side :
-       {use.lhs, use.rhs, use.high_conn, use.low_conn}) {
-    if (ExpressionUses(side, expr)) return true;
-  }
-  return std::ranges::any_of(use.children, [&](VpiObject* child) {
-    return VpiIsOperandObject(child) && ExpressionUses(child, expr);
-  });
-}
-
 // Gathers into `uses`, once each, the uses of `expr` held under `scope`, the
 // statements inside a statement among them. An expression's children are
 // walked by ExpressionUses alone, a statement written as a call excepted.
@@ -150,7 +138,7 @@ void GatherUses(VpiObject* scope, const VpiObject& expr,
                 std::unordered_set<const VpiObject*>& seen,
                 std::vector<VpiObject*>& uses) {
   if (scope == nullptr || !seen.insert(scope).second) return;
-  if (IsUseKind(scope) && UsesExpr(*scope, expr)) uses.push_back(scope);
+  if (IsUseKind(scope) && VpiUsesExpr(*scope, expr)) uses.push_back(scope);
   for (VpiObject* child : scope->children) {
     if (!VpiIsOperandObject(child)) GatherUses(child, expr, seen, uses);
   }
@@ -159,6 +147,16 @@ void GatherUses(VpiObject* scope, const VpiObject& expr,
 }
 
 }  // namespace
+
+bool VpiUsesExpr(const VpiObject& use, const VpiObject& expr) {
+  for (const VpiObject* side :
+       {use.lhs, use.rhs, use.high_conn, use.low_conn}) {
+    if (ExpressionUses(side, expr)) return true;
+  }
+  return std::ranges::any_of(use.children, [&](VpiObject* child) {
+    return VpiIsOperandObject(child) && ExpressionUses(child, expr);
+  });
+}
 
 bool VpiIsSimpleExpr(VpiHandle obj) {
   if (obj == nullptr) return false;

@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cctype>
 #include <cstdarg>
 #include <string>
@@ -12,6 +13,7 @@
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_simple_expr_uses.h"
 
 namespace delta {
 
@@ -468,6 +470,27 @@ int VpiNetNettypeValue(bool is_part_of_nettype_net) {
 bool VpiNetDriverIterationSupported(int nettype_value) {
   // §37.16 detail 11: driver iteration is unsupported on a vpiNettypeNetSelect.
   return nettype_value != vpiNettypeNetSelect;
+}
+
+std::vector<VpiHandle> VpiNetContAssigns(VpiHandle net) {
+  // §37.16 detail 5: a continuous assignment is reached from a scalar net or
+  // a bit of a vector net alone. It hangs among the children of the whole net
+  // it writes or reads, so a bit finds it there, among those using the bit.
+  std::vector<VpiHandle> assigns;
+  const bool kBit = net->type == vpiNetBit;
+  const VpiObject* holder = kBit ? net->parent : net;
+  if (holder == nullptr) return assigns;
+  if (!kBit && std::ranges::any_of(net->children, [](const VpiObject* child) {
+        return child->type == vpiNetBit;
+      })) {
+    return assigns;
+  }
+  for (VpiObject* child : holder->children) {
+    if (child->type == vpiContAssign && (!kBit || VpiUsesExpr(*child, *net))) {
+      assigns.push_back(child);
+    }
+  }
+  return assigns;
 }
 
 int VpiInterconnectNetType() {

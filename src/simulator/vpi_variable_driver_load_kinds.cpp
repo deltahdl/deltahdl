@@ -13,41 +13,37 @@ namespace delta {
 
 namespace {
 
-// Whether `obj` is the variable `var` or stands inside it: a select, a bit, an
-// element or a member of it at any depth.
-bool WithinVariable(const VpiObject* obj, const VpiObject& var) {
+// Whether `obj` is `target` or stands inside it: a select, a bit, an element
+// or a member of it at any depth.
+bool Within(const VpiObject* obj, const VpiObject& target) {
   for (; obj != nullptr; obj = obj->parent) {
-    if (obj == &var) return true;
+    if (obj == &target) return true;
   }
   return false;
 }
 
-// Whether the target `lhs` of an assignment writes `var`: names it, a part of
-// it, or names it among the operands of a concatenation.
-bool Drives(const VpiObject* lhs, const VpiObject& var) {
-  if (WithinVariable(lhs, var)) return true;
+}  // namespace
+
+bool VpiAssignTargetWrites(const VpiObject* lhs, const VpiObject& target) {
+  if (Within(lhs, target)) return true;
   return lhs != nullptr && lhs->type == vpiOperation &&
-         std::ranges::any_of(lhs->children, [&var](const VpiObject* operand) {
-           return Drives(operand, var);
-         });
+         std::ranges::any_of(lhs->children,
+                             [&target](const VpiObject* operand) {
+                               return VpiAssignTargetWrites(operand, target);
+                             });
 }
 
-// Whether the expression `rhs` reads `var`: names it or a part of it, or reads
-// it as an operand, an index of a select or an argument of a call at any
-// depth.
-bool Reads(const VpiObject* rhs, const VpiObject& var) {
-  if (WithinVariable(rhs, var)) return true;
+bool VpiExpressionReads(const VpiObject* rhs, const VpiObject& target) {
+  if (Within(rhs, target)) return true;
   const bool kComposite =
       rhs != nullptr &&
       (rhs->type == vpiOperation || rhs->type == vpiVarSelect ||
        VpiIsVariableSelectType(rhs->type) || VpiIsTfCallType(rhs->type));
   return kComposite &&
-         std::ranges::any_of(rhs->children, [&var](const VpiObject* sub) {
-           return Reads(sub, var);
+         std::ranges::any_of(rhs->children, [&target](const VpiObject* sub) {
+           return VpiExpressionReads(sub, target);
          });
 }
-
-}  // namespace
 
 bool VpiIsVariableDriverOrLoad(const VpiObject& child, const VpiObject& var,
                                bool want_driver) {
@@ -56,7 +52,8 @@ bool VpiIsVariableDriverOrLoad(const VpiObject& child, const VpiObject& var,
     return false;
   }
   if (child.type == vpiPort || child.type == vpiContAssignBit) return true;
-  return want_driver ? Drives(child.lhs, var) : Reads(child.rhs, var);
+  return want_driver ? VpiAssignTargetWrites(child.lhs, var)
+                     : VpiExpressionReads(child.rhs, var);
 }
 
 void VpiHangOnVariablesNamed(VpiHandle holder, VpiHandle expr) {

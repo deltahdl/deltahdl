@@ -650,6 +650,16 @@ bool VpiIsVariableDriverType(int type);
 // continuous assignment (whole or single bit). A port appears only as a driver.
 bool VpiIsVariableLoadType(int type);
 
+// §37.21 and §37.46: whether the target `lhs` of an assignment writes
+// `target`, a variable or a net: names it or a part of it, or names either
+// among the operands of a concatenation.
+bool VpiAssignTargetWrites(const VpiObject* lhs, const VpiObject& target);
+
+// §37.21 and §37.46: whether the expression `rhs` reads `target`, a variable
+// or a net: names it or a part of it, or reads it as an operand, an index of a
+// select or an argument of a call at any depth.
+bool VpiExpressionReads(const VpiObject* rhs, const VpiObject& target);
+
 // §37.21: whether `child`, an object hung among the variable `var`'s children,
 // is among the variable's drivers (`want_driver`) or its loads: a port always
 // a driver, and an assignment, a procedural assign or a force by whether its
@@ -700,10 +710,27 @@ bool VpiPortIsComplexExpressionLoad(VpiHandle port);
 
 // §37.46: whether `child`, an object hung among the net `net`'s children, is
 // among the net's drivers (`want_driver`) or its loads: a prim term by the
-// direction of its terminal (§37.35), a force by whether its target names the
-// net or its expression reads it (§37.79), a port by detail 1, and any other
-// object by its kind.
+// direction of its terminal (§37.35), a force (§37.79) or a continuous
+// assignment (§37.47) by whether its target writes the net or its expression
+// reads it, a port by detail 1, and any other object by its kind.
 bool VpiIsNetDriverOrLoad(VpiHandle child, VpiHandle net, bool want_driver);
+
+// §37.16 detail 16: the ports driving the net `net` from something other than
+// a net or a net bit: an output or inout port of an instance its own instance
+// holds whose lower connection is such, and an input or inout port of its own
+// instance whose higher connection is.
+std::vector<VpiHandle> VpiNetPortDrivers(VpiHandle net);
+
+// §37.16 details 4 and 16: the net `net` and every net joined to it through a
+// port nets drive at both ends, in either direction and at any depth, each
+// once, `net` first. vpiDriver and vpiLoad reach the drivers and loads of them
+// all.
+std::vector<VpiHandle> VpiNetsJoinedThroughPorts(VpiHandle net);
+
+// §37.16 detail 17: the ports of the instance holding the net `net` that are
+// among its local drivers (`want_driver`) or its local loads: of the ports it
+// connects to, an input or inout port a driver, an output or inout port a load.
+std::vector<VpiHandle> VpiNetLocalPorts(VpiHandle net, bool want_driver);
 
 // §37.46: hang `holder`, a prim term, a force or a port, among the children
 // of each net the expression object `expr` names, itself, a bit of it or an

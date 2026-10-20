@@ -63,6 +63,7 @@ TEST(NetDriversAndLoads, DriverIterationReachesEveryNetDriverKind) {
                   &cont_assign, &cont_assign_bit, &prim_term,
                   &assign_stmt, &unrelated};
   force.lhs = &net;
+  cont_assign.lhs = &net;
   prim_term.direction = vpiOutput;
 
   std::vector<VpiHandle> drivers =
@@ -110,6 +111,7 @@ TEST(NetDriversAndLoads, LoadIterationReachesNetLoadKindsExcludingPlainPort) {
   net.children = {&delay_term,      &assign_stmt, &force,      &cont_assign,
                   &cont_assign_bit, &prim_term,   &driver_port};
   force.rhs = &net;
+  cont_assign.rhs = &net;
   prim_term.direction = vpiInput;
 
   std::vector<VpiHandle> loads =
@@ -350,6 +352,7 @@ TEST(NetDriversAndLoads, ALoadIterationPassesOverTheNetsBits) {
   VpiObject net;
   net.type = vpiNet;
   net.children = {&bit, &cont_assign};
+  cont_assign.rhs = &net;
   std::vector<VpiHandle> loads =
       CollectVpiIteration(ctx, ctx.Iterate(vpiLoad, &net));
   ASSERT_EQ(loads.size(), 1u);
@@ -390,6 +393,25 @@ class NetDriversAndLoadsOfARun : public VpiDesignRun {
     return std::ranges::find(kinds, kind) != kinds.end();
   }
 };
+
+// A continuous assignment drives the nets its target writes and loads the nets
+// its expression reads, and is the one without the other unless a net stands on
+// both sides: assign w = x leaves it out of w's loads and x's drivers, and it
+// is a load of i through the index of the select it reads (#7375).
+TEST_F(NetDriversAndLoadsOfARun, AContinuousAssignmentDrivesOrLoadsByItsSide) {
+  Run("module top; wire w, x, i; wire [1:0] v, u;\n"
+      "  assign w = x;\n"
+      "  assign v = {u[i], v[0]};\n"
+      "endmodule\n");
+  EXPECT_TRUE(Holds(KindsOf(vpiDriver, By("top.w")), vpiContAssign));
+  EXPECT_FALSE(Holds(KindsOf(vpiLoad, By("top.w")), vpiContAssign));
+  EXPECT_TRUE(Holds(KindsOf(vpiLoad, By("top.x")), vpiContAssign));
+  EXPECT_FALSE(Holds(KindsOf(vpiDriver, By("top.x")), vpiContAssign));
+  EXPECT_TRUE(Holds(KindsOf(vpiLoad, By("top.i")), vpiContAssign));
+  EXPECT_FALSE(Holds(KindsOf(vpiDriver, By("top.u")), vpiContAssign));
+  EXPECT_TRUE(Holds(KindsOf(vpiDriver, By("top.v")), vpiContAssign));
+  EXPECT_TRUE(Holds(KindsOf(vpiLoad, By("top.v")), vpiContAssign));
+}
 
 // A prim term drives the net its output terminal connects and loads the nets
 // its input terminals connect (#7169); a force drives the net its target names
