@@ -7,6 +7,7 @@
 
 #include "common/types.h"
 #include "simulator/net.h"
+#include "simulator/sv_vpi_user.h"
 #include "simulator/variable.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_object.h"

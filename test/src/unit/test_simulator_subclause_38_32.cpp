@@ -789,7 +789,7 @@ class DelaysPutInARun : public PortDelaysOfARun {
   }
 
   static PLI_INT32 PutCheckLimit(PLI_BYTE8* /*user_data*/) {
-    for (vpiHandle check : ObjectsOf(vpiTchk, By("top.c"))) PutTwos(check, 1);
+    for (vpiHandle check : ObjectsOf(vpiTchk, By("top"))) PutTwos(check, 1);
     return 0;
   }
 };
@@ -837,21 +837,19 @@ TEST_F(DelaysPutInARun, AGateAndAUdpTakeTheirPutDelays) {
 // (#7470).
 TEST_F(DelaysPutInARun, ATimingCheckIsJudgedAgainstItsPutLimit) {
   RegisterTask("$limit_put", &PutCheckLimit);
-  Run("module leaf(input clk, d); timeunit 1ns; timeprecision 1ns;\n"
+  Run("module top(output logic d, output logic clk);\n"
+      "  timeunit 1ns; timeprecision 1ns;\n"
       "  reg notifier = 0; int violations = 0;\n"
       "  specify $setup(d, posedge clk, 5, notifier); endspecify\n"
       "  always @(notifier) violations = violations + 1;\n"
-      "endmodule\n"
-      "module top; timeunit 1ns; timeprecision 1ns;\n"
-      "  logic clk = 0, d = 0;\n"
-      "  leaf c(clk, d);\n"
       "  initial begin\n"
+      "    d = 0; clk = 0;\n"
       "    #1 $limit_put;\n"
       "    #9 d = 1; #3 clk = 1; #5 clk = 0;\n"
       "    #5 d = 0; clk = 1; #5;\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_EQ(IntOf("top.c.violations"), 1);
+  EXPECT_EQ(IntOf("top.violations"), 1);
 }
 
 }  // namespace

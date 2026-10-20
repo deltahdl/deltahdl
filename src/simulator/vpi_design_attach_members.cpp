@@ -204,6 +204,9 @@ std::optional<PackedDims> MemberBitDims(const VpiObject& member,
     return PackedDims{PackedRange{field.packed_left, field.packed_right},
                       PackedRange::Implicit(field.packed_elem_width)};
   }
+  // §7.4.1: a member of one packed dimension indexes its bits as its
+  // declaration does, `reg [0:7] b`'s b[7] being its least significant bit.
+  if (kVector && field.decl_range) return PackedDims{*field.decl_range};
   return PackedDims{PackedRange::Implicit(field.width)};
 }
 

@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <bit>
 #include <cstdint>
 #include <vector>
 
@@ -234,12 +235,12 @@ TEST_F(VpiGetValueArraySim, ShortIntValReturnsShortsPerElement) {
 }
 
 // §38.16: the vpiShortRealVal format returns one float per element through the
-// *shortreals arm; the element value is delivered as its floating-point form.
+// *shortreals arm; a shortreal element's value is the float its bits encode.
 TEST_F(VpiGetValueArraySim, ShortRealValReturnsFloatsPerElement) {
   VpiHandle arr = MakeArray("sr", {{0, 1}}, 2, 32);
   for (auto* elem : arr->children) elem->type = vpiShortRealVar;
-  SetElem(0, 42);
-  SetElem(1, 7);
+  SetElem(0, std::bit_cast<uint32_t>(42.0f));
+  SetElem(1, std::bit_cast<uint32_t>(7.0f));
 
   s_vpi_arrayvalue av = {};
   av.format = vpiShortRealVal;
