@@ -158,6 +158,11 @@ void CarryIn(const std::shared_ptr<InoutPortLink>& link, std::size_t slot,
 }  // namespace
 
 void LinkInoutPortNets(InoutPortLinkEnds ends, SimContext& ctx) {
+  // §23.3.3.7.1: an interconnect port's net is merged with the net connected
+  // to it and so is of that net's type, which a join gives it by sharing the
+  // net and two linked nets by the inner taking the outer's type.
+  if (ends.inner.type == NetType::kInterconnect)
+    ends.inner.type = ends.outer.type;
   auto link = std::make_shared<InoutPortLink>(std::move(ends), ctx.GetArena());
   link->ends.outer.driver_listeners.emplace_back(
       [link, &ctx](std::size_t slot) { CarryIn(link, slot, ctx); });
