@@ -154,5 +154,21 @@ TEST_F(HandleByIndexOfARun, AScalarNetsLoadPortIsNoIndexedSubobject) {
   EXPECT_EQ(vpi_handle_by_index(trinet, 1), nullptr);
 }
 
+// §38.19 with §37.10: a module instance that is no element of an instance
+// array has no access by index, so no index into it is a legal index select
+// and each names nothing, though the instance holds ports and nets (#7404).
+TEST_F(HandleByIndexOfARun,
+       AnInstanceThatIsNoArrayElementHasNoIndexedSubobject) {
+  Run("module ram(input a, input b); endmodule\n"
+      "module top; wire a, trinet; ram r0(a, !trinet); endmodule\n");
+  vpiHandle r0 = By("top.r0");
+  ASSERT_NE(r0, nullptr);
+  ASSERT_NE(vpi_iterate(vpiPort, r0), nullptr);
+  EXPECT_EQ(vpi_handle_by_index(r0, 0), nullptr);
+  EXPECT_EQ(vpi_handle_by_index(r0, 1), nullptr);
+  PLI_INT32 second[] = {1};
+  EXPECT_EQ(vpi_handle_by_multi_index(r0, 1, second), nullptr);
+}
+
 }  // namespace
 }  // namespace delta

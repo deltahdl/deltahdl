@@ -9,8 +9,9 @@ namespace delta {
 
 bool VpiHasAccessByIndex(int type) {
   switch (type) {
-    case kVpiModule:         // §38.19: module indexes its ports
-    case kVpiPort:           // a port indexes its bits
+    // §37.10 draws no access by index for an instance, whose ports are
+    // reached by iteration; §37.14 draws it for a port, which indexes its bits.
+    case kVpiPort:
     case kVpiReg:            // a reg indexes its bits
     case vpiBitVar:          // §37.17: so does a bit variable
     case vpiMemory:          // a memory indexes its words
