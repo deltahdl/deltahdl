@@ -536,14 +536,18 @@ TEST_F(InterconnectsOfARun, AnInterconnectChainTakesTheTypespecItReaches) {
   EXPECT_EQ(TypespecNameOf(LowConnOf("top.m", "p")), "byte_t");
 }
 
-// §37.24 detail 1 with §23.3.3.7.1: an interconnect chain whose connections
-// lead only back to its own interconnect nets reaches no typed net, so neither
-// of them takes a typespec.
-TEST_F(InterconnectsOfARun, AnInterconnectChainReachingNoNetTakesNoTypespec) {
-  Run("module mid(interconnect p); endmodule\n"
-      "module top; interconnect c; mid m(c); endmodule\n");
-  EXPECT_EQ(TypespecNameOf(By("top.c")), "(none)");
-  EXPECT_EQ(TypespecNameOf(LowConnOf("top.m", "p")), "(none)");
+// §37.24 detail 1 with §23.3.3.7.1: an interconnect net at a dead end of a
+// chain, whose connections lead back through interconnect nets already reached
+// before the typed net, takes that net's typespec too.
+TEST_F(InterconnectsOfARun, AnInterconnectChainsDeadEndTakesTheTypespec) {
+  Run("typedef logic [7:0] byte_t;\n"
+      "module leaf(interconnect r); endmodule\n"
+      "module mid(interconnect p); leaf l(p); endmodule\n"
+      "module sink(input byte_t q); endmodule\n"
+      "module top; interconnect c; mid m(c); sink v(c); endmodule\n");
+  EXPECT_EQ(TypespecNameOf(LowConnOf("top.m.l", "r")), "byte_t");
+  EXPECT_EQ(TypespecNameOf(LowConnOf("top.m", "p")), "byte_t");
+  EXPECT_EQ(TypespecNameOf(By("top.c")), "byte_t");
 }
 
 }  // namespace
