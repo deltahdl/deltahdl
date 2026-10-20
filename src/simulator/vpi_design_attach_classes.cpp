@@ -203,8 +203,7 @@ int ScopesOutTo(const MadeClassDefn& candidate, const MadeClassDefn& derived,
   for (const VpiObject* around = derived.defn->parent;;
        around = around->parent) {
     if (around == scope) return out;
-    if (around == nullptr ||
-        (around->type != vpiGenScope && around->type != vpiGenScopeArray)) {
+    if (around->type != vpiGenScope && around->type != vpiGenScopeArray) {
       return kNotAround;
     }
     ++out;

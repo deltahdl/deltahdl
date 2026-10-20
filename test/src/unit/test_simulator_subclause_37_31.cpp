@@ -658,5 +658,22 @@ TEST_F(ClassDefinitionsOfARun, AGenerateBlocksClassExtendsAClassAroundIt) {
   EXPECT_EQ(kBaseOf(DefnIn(h, "D")), VpiObjectOf(DefnIn(By("top"), "B")));
   EXPECT_EQ(kBaseOf(DefnIn(h, "F")), VpiObjectOf(DefnIn(By("top.g"), "E")));
 }
+
+// ...passing on its way out the array of instances a loop's block makes
+// (#7382).
+TEST_F(ClassDefinitionsOfARun, ALoopGenerateBlocksClassExtendsTheModulesClass) {
+  Run("module top;\n"
+      "  class B; endclass\n"
+      "  for (genvar i = 0; i < 2; i++) begin : g\n"
+      "    class C extends B; endclass\n"
+      "  end\n"
+      "endmodule\n");
+  vpiHandle b = DefnIn(By("top"), "B");
+  ASSERT_NE(b, nullptr);
+  vpiHandle extends = vpi_handle(vpiExtends, DefnIn(By("top.g[1]"), "C"));
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiClassDefn,
+                                   vpi_handle(vpiClassTypespec, extends))),
+            VpiObjectOf(b));
+}
 }  // namespace
 }  // namespace delta
