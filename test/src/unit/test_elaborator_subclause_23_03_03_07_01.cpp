@@ -1,6 +1,8 @@
 
 #include <gtest/gtest.h>
 
+#include <format>
+#include <string>
 #include <string_view>
 
 #include "common/types.h"
@@ -572,27 +574,38 @@ TEST(InterconnectPortConnectionElaboration,
 
 // §23.3.3.7.1 with Table 23-1: an interconnect chain reaching dissimilar typed
 // nets through an interconnect port is one net of the dominating type among
-// them, a wand over a wire whichever is connected first.
+// them, a wand over a wire whichever is connected first. Returns the type of
+// top's interconnect net c, which reaches through mid's interconnect port p one
+// sink port of type `first`, then one of type `second`, or kNone when the
+// design fails to elaborate cleanly.
+static NetType ChainTypeReachingSinks(std::string_view first,
+                                      std::string_view second) {
+  ElabFixture f;
+  const std::string kSrc = std::format(
+                               "module a_sink(inout {} q);\nendmodule\n"
+                               "module b_sink(inout {} q);\nendmodule\n",
+                               first, second) +
+                           "module mid(interconnect p);\n"
+                           "  a_sink s1(p);\n"
+                           "  b_sink s2(p);\n"
+                           "endmodule\n"
+                           "module top;\n"
+                           "  interconnect c;\n"
+                           "  mid m(c);\n"
+                           "endmodule\n";
+  auto* design = ElaborateSrc(kSrc, f);
+  if (design == nullptr || f.has_errors) return NetType::kNone;
+  return InterconnectNetType(design, "top", "c");
+}
+
 TEST(InterconnectPortConnectionElaboration,
      AnInterconnectChainTakesTheDominatingTypeItReaches) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module w_sink(inout wire q);\n"
-      "endmodule\n"
-      "module a_sink(inout wand q);\n"
-      "endmodule\n"
-      "module mid(interconnect p);\n"
-      "  w_sink s1(p);\n"
-      "  a_sink s2(p);\n"
-      "endmodule\n"
-      "module top;\n"
-      "  interconnect c;\n"
-      "  mid m(c);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  EXPECT_EQ(InterconnectNetType(design, "top", "c"), NetType::kWand);
+  EXPECT_EQ(ChainTypeReachingSinks("wire", "wand"), NetType::kWand);
+}
+
+TEST(InterconnectPortConnectionElaboration,
+     AnInterconnectChainKeepsTheDominatingTypeItReachesFirst) {
+  EXPECT_EQ(ChainTypeReachingSinks("wand", "wire"), NetType::kWand);
 }
 
 }  // namespace
