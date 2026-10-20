@@ -129,9 +129,12 @@ AssertionControlTarget ControlTargetOf(const VpiObject& obj) {
 std::string VpiAssertionKeyOf(const VpiObject& obj) {
   if (!obj.full_name.empty()) return obj.full_name;
   if (!obj.name.empty()) return std::string(obj.name);
-  std::string_view scope =
-      obj.parent != nullptr ? std::string_view(obj.parent->full_name) : "";
-  return AssertionKey(scope, {}, static_cast<uint32_t>(obj.start_line),
+  // The scope is the nearest enclosing object with a full name; a procedure
+  // or a statement the assertion stands under has none.
+  const VpiObject* scope = obj.parent;
+  while (scope != nullptr && scope->full_name.empty()) scope = scope->parent;
+  return AssertionKey(scope != nullptr ? scope->full_name : "", {},
+                      static_cast<uint32_t>(obj.start_line),
                       static_cast<uint32_t>(obj.column));
 }
 

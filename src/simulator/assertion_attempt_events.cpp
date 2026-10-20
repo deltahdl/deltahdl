@@ -200,7 +200,8 @@ void NoteAttemptDisabled(const Stmt* stmt, uint64_t started, SimContext& ctx) {
 void KeepFutureGclkAsserting(const Stmt* stmt, const Process& asserting,
                              SimContext& ctx) {
   if (GetGlobalAssertionApi().PlacedCallbackCount() == 0) return;
-  ctx.NoteFutureGclkAssertion(KeyHere(stmt, ctx), asserting);
+  ctx.NoteFutureGclkAssertion(
+      RunAssertionKey(stmt, ProcessHierName(asserting, ctx), ctx), asserting);
 }
 
 void RaiseAssertionControlCallback(std::string_view key, int reason,
