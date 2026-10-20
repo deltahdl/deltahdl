@@ -257,6 +257,11 @@ _RULE_BROKEN_BY_LIBRARY_THE_SUITE_EXPECTS_ACCEPTED: dict[str, str] = {
     "uvm": "10.9",
 }
 
+_ASSERTION_THE_STANDARD_FALSIFIES: dict[str, str] = {
+    "unpacked_multidim_array.sv":
+        "((-1515870811 == 2779096485) and ( 1515870810 == 1515870810))",
+}
+
 _CLAUSE_OF_FILE = (
     _CLAUSE_OF_MISTAGGED_FILE
     | _RULE_OF_FILE_TAGGED_BY_FEATURE
@@ -339,13 +344,16 @@ def _run_and_evaluate(
         defines=metadata.get("defines", "").split(),
         library=library,
     )
-    if expects_rejection(metadata, Path(path).name):
+    name = Path(path).name
+    if expects_rejection(metadata, name):
         ok = (
             returncode == 1
             and bool(stderr.strip())
-            and _rejection_matches_tag(
-                stderr, tagged_clause(metadata, Path(path).name),
-            )
+            and _rejection_matches_tag(stderr, tagged_clause(metadata, name))
+        )
+    elif name in _ASSERTION_THE_STANDARD_FALSIFIES:
+        ok = stderr == (
+            f"Assertion failed: {_ASSERTION_THE_STANDARD_FALSIFIES[name]}"
         )
     return "pass" if ok else "fail", stderr, int(ok), returncode
 
