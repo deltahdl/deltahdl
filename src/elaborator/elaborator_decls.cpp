@@ -629,6 +629,18 @@ static const DataType* NetDeclaredType(const ModuleItem* item,
   return NamedPackedVectorType(item->data_type, typedefs, arena);
 }
 
+// §37.16 (figure): records on `net` the type and the unpacked dimensions its
+// declaration `item` wrote, and whether that declaration wrote a packed
+// dimension. An inline enum holds its base type's range where a dimension
+// written over a named type or a struct or union is held, so only those two
+// say the declaration wrote one.
+static void RecordWrittenNetType(const ModuleItem& item, RtlirNet& net) {
+  net.written_type = &item.data_type;
+  net.declared_unpacked_dims = &item.unpacked_dims;
+  net.has_declared_packed_dim = item.data_type.packed_dim_left != nullptr &&
+                                item.data_type.kind != DataTypeKind::kEnum;
+}
+
 void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   // §6.23: a net declared with a type_reference data type (e.g. `wire type(x)
   // y`) resolves the referenced object's width/signedness before the net is
@@ -682,13 +694,7 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   net.width = EvalTypeWidth(item->data_type, typedefs_, BuildParamScope(mod));
   net.dtype = NetDeclaredType(item, typedefs_, arena_);
   net.data_kind = ResolvedTypeKind(item->data_type, typedefs_);
-  net.written_type = &item->data_type;
-  net.declared_unpacked_dims = &item->unpacked_dims;
-  // An inline enum holds its base type's range where a dimension written over
-  // a named type or a struct or union is held, so only those two say the
-  // declaration wrote one.
-  net.has_declared_packed_dim = item->data_type.packed_dim_left != nullptr &&
-                                item->data_type.kind != DataTypeKind::kEnum;
+  RecordWrittenNetType(*item, net);
   net.is_signed = IsSignedType(item->data_type, typedefs_);
   net.is_signed =
       ReconcilePartialPort(item->name, net.is_signed, net.net_type, mod);

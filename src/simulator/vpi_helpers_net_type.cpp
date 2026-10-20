@@ -1,6 +1,5 @@
 #include "common/types.h"
 #include "simulator/net.h"
-#include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers3.h"

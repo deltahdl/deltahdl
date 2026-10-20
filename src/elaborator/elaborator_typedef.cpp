@@ -25,6 +25,7 @@
 #include "elaborator/net_data_type.h"
 #include "elaborator/resolution_function_body.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_enum_member.h"
 #include "elaborator/type_eval.h"
 #include "elaborator/unit_scope_order.h"
 #include "lexer/token.h"

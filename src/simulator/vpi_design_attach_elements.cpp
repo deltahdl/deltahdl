@@ -201,14 +201,14 @@ struct InterconnectShape {
 std::vector<InterconnectDim> InterconnectDims(
     const std::vector<RtlirUnpackedDim>& unpacked, const DataType* type,
     SimContext& ctx) {
+  const PackedDims kPacked =
+      type != nullptr ? WrittenPackedDims(type, ctx) : PackedDims{};
   std::vector<InterconnectDim> dims;
+  dims.reserve(unpacked.size() + kPacked.size());
   for (const RtlirUnpackedDim& dim : unpacked) {
     dims.push_back({PackedRange{dim.left, dim.right}, false});
   }
-  if (type == nullptr) return dims;
-  for (const PackedRange& dim : WrittenPackedDims(type, ctx)) {
-    dims.push_back({dim, true});
-  }
+  for (const PackedRange& dim : kPacked) dims.push_back({dim, true});
   return dims;
 }
 

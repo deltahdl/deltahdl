@@ -78,9 +78,23 @@ int VpiTypespecKind(DataTypeKind kind) {
       return vpiStructTypespec;
     case DataTypeKind::kUnion:
       return vpiUnionTypespec;
+    // §6.7.1: a net whose declaration writes a net type keyword and no data
+    // type is of the implicit data type logic.
     case DataTypeKind::kImplicit:
     case DataTypeKind::kLogic:
     case DataTypeKind::kReg:
+    case DataTypeKind::kWire:
+    case DataTypeKind::kTri:
+    case DataTypeKind::kWand:
+    case DataTypeKind::kWor:
+    case DataTypeKind::kTriand:
+    case DataTypeKind::kTrior:
+    case DataTypeKind::kTri0:
+    case DataTypeKind::kTri1:
+    case DataTypeKind::kTrireg:
+    case DataTypeKind::kSupply0:
+    case DataTypeKind::kSupply1:
+    case DataTypeKind::kUwire:
       return vpiLogicTypespec;
     case DataTypeKind::kBit:
       return vpiBitTypespec;

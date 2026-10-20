@@ -10,6 +10,7 @@
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator_enum_constants.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_enum_member.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_type.h"
 #include "simulator/evaluation.h"

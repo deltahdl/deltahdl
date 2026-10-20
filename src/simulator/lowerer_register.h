@@ -9,6 +9,7 @@
 #include "common/types.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_enum_member.h"
 #include "elaborator/rtlir_scopes.h"
 #include "simulator/sim_context_types.h"
 

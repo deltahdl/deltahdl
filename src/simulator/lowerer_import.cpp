@@ -13,6 +13,7 @@
 #include "elaborator/elaborator_enum_constants.h"
 #include "elaborator/package_references.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_enum_member.h"
 #include "elaborator/rtlir_scopes.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"

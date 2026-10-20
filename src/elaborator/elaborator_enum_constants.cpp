@@ -19,7 +19,7 @@
 
 #include "common/arena.h"
 #include "elaborator/const_eval.h"
-#include "elaborator/rtlir.h"
+#include "elaborator/rtlir_enum_member.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"

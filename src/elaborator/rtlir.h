@@ -15,6 +15,7 @@
 #include "elaborator/rtlir_checker_site.h"
 #include "elaborator/rtlir_defparam.h"
 #include "elaborator/rtlir_element_shape.h"
+#include "elaborator/rtlir_enum_member.h"
 #include "elaborator/rtlir_io_decl.h"
 #include "elaborator/rtlir_primitives.h"
 #include "elaborator/rtlir_scopes.h"
@@ -171,12 +172,10 @@ struct RtlirNet {
   // and whether a packed dimension was, which pick the kind of net object.
   DataTypeKind data_kind = DataTypeKind::kImplicit;
   bool has_declared_packed_dim = false;
-  // §37.16 (figure): the type the declaration wrote, a typedef name kept as
-  // the name, and the unpacked dimensions it wrote, from which the typespec
-  // the net reaches is made; null where no declaration of a net wrote them.
-  // §6.6.8: the type also says whether the net was declared a generic
-  // interconnect, which net_type stops saying once a port connection merges
-  // it with another net (§23.3.3.7.1).
+  // §37.16 (figure): the type and unpacked dimensions the declaration wrote,
+  // which make the net's typespec; null where no net declaration wrote them.
+  // The type also says whether the net is a generic interconnect (§6.6.8),
+  // which net_type stops saying once a port merges it (§23.3.3.7.1).
   const DataType* written_type = nullptr;
   const std::vector<Expr*>* declared_unpacked_dims = nullptr;
 
@@ -654,14 +653,6 @@ struct RtlirModuleInst {
   std::vector<std::string_view> procedure_locals;
   // §17.3: that procedure's automatic variables.
   std::vector<std::string_view> procedure_automatics;
-};
-
-struct RtlirEnumMember {
-  std::string_view name;
-  int64_t value = 0;
-  // §6.19: the value expression of a member of a 4-state enumeration assigned
-  // an x or z value, which `value` cannot hold; null for any other member.
-  const Expr* xz_value = nullptr;
 };
 
 struct RtlirModule {
