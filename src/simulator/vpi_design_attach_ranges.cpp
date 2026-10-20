@@ -87,6 +87,7 @@ void AttachNetRanges(const RtlirNet& net, const std::string& prefix,
   }
   if (net.unpacked_dims.empty()) return;
   std::vector<DimBounds> unpacked;
+  unpacked.reserve(net.unpacked_dims.size());
   for (const RtlirUnpackedDim& dim : net.unpacked_dims) {
     unpacked.emplace_back(PackedRange{dim.left, dim.right});
   }

@@ -141,7 +141,14 @@ VpiObject* MakeMember(VpiObject* holder, const StructFieldInfo& field,
                       const RtlirDesign& design, const RtlirModule& mod,
                       const VpiAttachBuild& build) {
   VpiObject* member = build.alloc();
-  if (holder->type == vpiStructNet || holder->type == vpiUnionNet) {
+  // §37.16 detail 31: a member of a struct or union net is a net, a struct or
+  // union net itself where its field is a structure or union.
+  const bool kOfNet =
+      holder->type == vpiStructNet || holder->type == vpiUnionNet;
+  if (kOfNet && field.nested != nullptr) {
+    member->type = field.nested->is_union ? vpiUnionNet : vpiStructNet;
+    member->packed = field.nested->is_packed;
+  } else if (kOfNet) {
     member->type = kVpiNet;
   } else if (field.type_kind == DataTypeKind::kNamed) {
     member->type = VpiNamedTypeVariableKind(design, mod, field.type_name);

@@ -227,8 +227,14 @@ VpiObject* IoDeclItem(
 // application walking in from the port reaches. A port declaring a dimension
 // stands for an interconnect array instead, which AttachInterconnectPorts
 // makes once every port is made (§37.24 details 1 and 2).
+//
+// The net is keyed under its name in the instance, `prefix`, as a net the
+// module declares is, so that a connection the instance makes to it, the
+// interconnect net §23.3.3.7.1 merges with the net the port meets, reaches
+// this net.
 void FillInterconnectNetObject(VpiObject* obj, const RtlirPort& port,
-                               VpiObject* port_obj,
+                               VpiObject* port_obj, const std::string& prefix,
+                               VpiObjectMap& objects,
                                std::deque<std::string>& names) {
   VpiHandle module = port_obj->parent;
   obj->type = vpiInterconnectNet;
@@ -238,6 +244,8 @@ void FillInterconnectNetObject(VpiObject* obj, const RtlirPort& port,
   obj->parent = module;
   module->children.push_back(obj);
   port_obj->low_conn = obj;
+  names.emplace_back(VpiFlatName(prefix, port.name));
+  objects.try_emplace(names.back(), obj);
 }
 
 // §37.3.3: the location properties apply to every object that stands for
@@ -418,7 +426,8 @@ void VpiContext::AttachDesignPorts(const RtlirDesign* design) {
           RecordSourceLocation(obj, port.loc, sources);
           RecordProtection(obj, port.loc, sources);
           if (port.is_interconnect) {
-            FillInterconnectNetObject(AllocObject(), port, obj, name_pool_);
+            FillInterconnectNetObject(AllocObject(), port, obj, prefix,
+                                      object_map_, name_pool_);
           }
           // A port written as an expression stands for no declaration of its
           // own; port_expr_decls holds those it names.

@@ -20,8 +20,9 @@ bool VpiNetIsScalarOrVector(bool scalar, VpiHandle net) {
   VpiNetScalarVectorQuery query;
   query.net_type = net->type;
   // A net's leftmost bounds are those of its leftmost packed dimension where
-  // it declares one (§37.16 detail 26).
-  query.has_packed_dimension = net->left_range != nullptr;
+  // it declares one (§37.16 detail 26), and a bit or logic net wider than one
+  // bit declares one.
+  query.has_packed_dimension = net->left_range != nullptr || net->size > 1;
   query.packed = net->packed;
   // An enum net's base type is a scalar where it is a single bit.
   query.base_is_scalar = net->size == 1;

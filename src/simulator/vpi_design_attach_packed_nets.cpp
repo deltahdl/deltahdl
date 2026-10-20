@@ -45,13 +45,13 @@ int LeafKindOf(DataTypeKind kind) {
 void MakeSubelements(VpiObject* holder, std::size_t depth, int64_t offset,
                      const PackedNetShape& shape) {
   if (depth == shape.dims.size()) return;
-  const PackedRange& kDim = shape.dims[depth];
-  const int64_t kCount = kDim.HighIndex() - kDim.LowIndex() + 1;
+  const PackedRange& dim = shape.dims[depth];
+  const int64_t kCount = dim.HighIndex() - dim.LowIndex() + 1;
   const int64_t kWidth = holder->size / kCount;
   const bool kLeaf = depth + 1 == shape.dims.size();
-  const int64_t kStep = kDim.left <= kDim.right ? 1 : -1;
+  const int64_t kStep = dim.left <= dim.right ? 1 : -1;
   int64_t place = kCount - 1;
-  for (int64_t index = kDim.left;; index += kStep, --place) {
+  for (int64_t index = dim.left;; index += kStep, --place) {
     const std::string kSuffix = "[" + std::to_string(index) + "]";
     VpiObject* sub = shape.build.alloc();
     sub->type = kLeaf ? shape.leaf_kind : vpiPackedArrayNet;
@@ -67,7 +67,7 @@ void MakeSubelements(VpiObject* holder, std::size_t depth, int64_t offset,
     sub->children.push_back(sub->index_expr);
     holder->children.push_back(sub);
     MakeSubelements(sub, depth + 1, sub->bit_offset, shape);
-    if (index == kDim.right) break;
+    if (index == dim.right) break;
   }
 }
 
