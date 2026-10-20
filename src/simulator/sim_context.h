@@ -391,8 +391,9 @@ class SimContext : public DeclaredNameTables,
   // and reached by the bare name its module declared
   // (ClockingManager::FindInScope).
   std::string ActiveInstancePrefix() const;
-  UnitScopes& Units() { return units_; }  // §3.12.1, unit_scopes.h
-  std::string ActiveUnitScope() const;    // "$unit#k" running, "" for one unit
+  std::string_view ActiveGenBlockPrefix() const;  // §27.4, sim_context_scope
+  UnitScopes& Units() { return units_; }          // §3.12.1, unit_scopes.h
+  std::string ActiveUnitScope() const;  // "$unit#k" running, "" for one unit
 
   // §32.4.3: the instance an evaluation stands in, where that is not the
   // running process's. simulator/instance_prefix_override.h holds the reason

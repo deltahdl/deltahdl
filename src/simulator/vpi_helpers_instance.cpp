@@ -207,7 +207,7 @@ VpiHandle VpiSubobjectByIndices(VpiHandle parent,
   for (const int kIndex : indices) {
     VpiHandle next = nullptr;
     for (auto* child : current->children) {
-      if (VpiIndexSelects(*child, kIndex)) {
+      if (VpiIndexSelects(*current, *child, kIndex)) {
         next = child;
         break;
       }

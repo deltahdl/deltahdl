@@ -848,7 +848,14 @@ void Lowerer::Lower(const RtlirDesign* design) {
   // any part of it so the scheduler sees an empty event calendar.
   if (design->simulation_blocked) return;
   design_ = design;
-  interconnect_annotatable_ = DesignCallsSdfAnnotate(*design);
+  // §32.4.4 with §38.32: an interconnect delay can reach a port while the
+  // design runs when the design calls $sdf_annotate, or when an application
+  // loaded into the run, which registers a system task or a callback, can put
+  // one with vpi_put_delays.
+  const VpiContext& vpi = GetGlobalVpiContext();
+  interconnect_annotatable_ = DesignCallsSdfAnnotate(*design) ||
+                              !vpi.RegisteredSystfs().empty() ||
+                              !vpi.RegisteredCallbacks().empty();
   RegisterDesignScopes(design, ctx_);
   LowerDesignData();
 

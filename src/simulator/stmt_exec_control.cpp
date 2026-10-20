@@ -125,6 +125,10 @@ std::string_view BindNamedBlockVariable(std::string_view name,
                                         SimContext& ctx) {
   if (ctx.ActiveNamedScopes().empty()) return {};
   std::string path = ActiveNamedScopePath(ctx) + "." + std::string(name);
+  // §27.4: a named block in a generate block instance is that instance's, so
+  // its variables are kept under the instance's name as the VPI model reads
+  // them (BlockVariableRunKey in vpi_design_attach_procedures.cpp).
+  path.insert(ctx.ActiveInstancePrefix().size(), ctx.ActiveGenBlockPrefix());
   const std::string& key = *ctx.GetArena().Create<std::string>(std::move(path));
   ctx.RegisterBlockVariable(key);
   ctx.AliasVariable(key, name);

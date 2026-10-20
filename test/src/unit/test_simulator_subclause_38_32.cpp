@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <string>
+#include <string_view>
+
 #include "fixture_simulator.h"
 #include "fixture_vpi_run.h"
 #include "helpers_vpi_delays_fixture.h"
@@ -575,7 +578,69 @@ TEST_F(ChildAssignmentDelaysOfARun, AnInstancesAssignmentTakesThePutDelays) {
   EXPECT_EQ(value.value.integer, 26);
 }
 
-class PortDelaysOfARun : public VpiDesignRun {};
+// The port `name` of the instance `inst` names, or null where it has none.
+vpiHandle PortNamed(const char* inst, std::string_view name) {
+  vpiHandle it =
+      vpi_iterate(vpiPort, vpi_handle_by_name(VpiText(inst), nullptr));
+  if (it == nullptr) return nullptr;
+  while (vpiHandle port = vpi_scan(it)) {
+    if (name == vpi_get_str(vpiName, port)) {
+      vpi_release_handle(it);
+      return port;
+    }
+  }
+  return nullptr;
+}
+
+// Puts a rise of 4 and a fall of 6 to `obj`.
+void PutRiseOf4AndFallOf6(vpiHandle obj) {
+  s_vpi_time times[2] = {};
+  times[0].low = 4;
+  times[1].low = 6;
+  s_vpi_delay delay = {};
+  delay.da = times;
+  delay.no_of_delays = 2;
+  delay.time_type = vpiSimTime;
+  vpi_put_delays(obj, &delay);
+}
+
+PLI_INT32 PutReceiverPortDelays(PLI_BYTE8* /*user_data*/) {
+  PutRiseOf4AndFallOf6(PortNamed("top.r", "i"));
+  return 0;
+}
+
+PLI_INT32 PutDriverToReceiverPathDelays(PLI_BYTE8* /*user_data*/) {
+  PutRiseOf4AndFallOf6(vpi_handle_multi(
+      vpiInterModPath, PortNamed("top.d", "o"), PortNamed("top.r", "i")));
+  return 0;
+}
+
+class PortDelaysOfARun : public VpiDesignRun {
+ protected:
+  // Registers the system task `name` as running `calltf`.
+  static void RegisterTask(const char* name, PLI_INT32 (*calltf)(PLI_BYTE8*)) {
+    s_vpi_systf_data data = {};
+    data.type = vpiSysTask;
+    data.tfname = VpiText(name);
+    data.calltf = calltf;
+    ASSERT_NE(vpi_register_systf(&data), nullptr);
+  }
+
+  // The integer value of the object `name` names.
+  static int IntOf(const char* name) {
+    s_vpi_value value = {};
+    value.format = vpiIntVal;
+    vpi_get_value(By(name), &value);
+    return value.value.integer;
+  }
+
+  // A receiver noting when its input port's net last rose and fell.
+  static constexpr const char* kReceiver =
+      "module rcv(input i); timeunit 1ns; timeprecision 1ns;\n"
+      "  int rose, fell;\n"
+      "  always @(i) if (i === 1'b1) rose = $time; else fell = $time;\n"
+      "endmodule\n";
+};
 
 // §38.32 with §37.14: a put of a rise of 4 and a fall of 6 to an instance's
 // input port records no error, and vpi_get_delays reads the two back from the
@@ -604,6 +669,62 @@ TEST_F(PortDelaysOfARun, APortTakesARiseAndFallAndReadsThemBack) {
   vpi_get_delays(port, &get);
   EXPECT_EQ(out[0].low, 4u);
   EXPECT_EQ(out[1].low, 6u);
+}
+
+// §38.32 with §37.14 and §32.4.4: the rise and fall vpi_put_delays gives an
+// instance's input port are its module input port delay, the one its
+// connection then takes: the port's net rises 4 after the net above it does
+// at 10 and falls 6 after it does at 20 (#7384).
+TEST_F(PortDelaysOfARun, APortsPutDelaysAreTheOnesItsConnectionTakes) {
+  RegisterTask("$port_delays", &PutReceiverPortDelays);
+  Run(std::string(kReceiver) +
+      "module top; timeunit 1ns; timeprecision 1ns; logic a = 0; wire w;\n"
+      "  assign w = a; rcv r(w);\n"
+      "  initial begin #1 $port_delays; #9 a = 1; #10 a = 0; #10; end\n"
+      "endmodule\n");
+  EXPECT_EQ(IntOf("top.r.rose"), 14);
+  EXPECT_EQ(IntOf("top.r.fell"), 26);
+}
+
+// §38.32 with §37.37 and §32.4.4: the rise and fall vpi_put_delays gives the
+// intermodule path from one instance's output port to another's input port
+// are the interconnect delay that connection then takes: the input port's net
+// rises 4 after the output port drives a rise at 10 and falls 6 after the
+// fall at 20 (#6923).
+TEST_F(PortDelaysOfARun,
+       AnIntermodulePathsPutDelaysAreTheOnesItsConnectionTakes) {
+  RegisterTask("$path_delays", &PutDriverToReceiverPathDelays);
+  Run(std::string(kReceiver) +
+      "module drv(input a, output o); timeunit 1ns; timeprecision 1ns;\n"
+      "  assign o = a;\n"
+      "endmodule\n"
+      "module top; timeunit 1ns; timeprecision 1ns; logic a = 0; wire w;\n"
+      "  drv d(a, w); rcv r(w);\n"
+      "  initial begin #1 $path_delays; #9 a = 1; #10 a = 0; #10; end\n"
+      "endmodule\n");
+  EXPECT_EQ(IntOf("top.r.rose"), 14);
+  EXPECT_EQ(IntOf("top.r.fell"), 26);
+}
+
+// §38.32 with §37.37 and §32.4.4: an intermodule path into an inout port
+// takes the delays vpi_put_delays gives it as well, in a design that calls no
+// $sdf_annotate: the inout port's net rises 4 after the output port drives a
+// rise at 10 and falls 6 after the fall at 20 (#7403).
+TEST_F(PortDelaysOfARun, AnIntermodulePathIntoAnInoutTakesItsPutDelays) {
+  RegisterTask("$path_delays", &PutDriverToReceiverPathDelays);
+  Run("module rcv(inout i); timeunit 1ns; timeprecision 1ns;\n"
+      "  int rose, fell;\n"
+      "  always @(i) if (i === 1'b1) rose = $time; else fell = $time;\n"
+      "endmodule\n"
+      "module drv(input a, output o); timeunit 1ns; timeprecision 1ns;\n"
+      "  assign o = a;\n"
+      "endmodule\n"
+      "module top; timeunit 1ns; timeprecision 1ns; logic a = 0; wire w;\n"
+      "  drv d(a, w); rcv r(w);\n"
+      "  initial begin #1 $path_delays; #9 a = 1; #10 a = 0; #10; end\n"
+      "endmodule\n");
+  EXPECT_EQ(IntOf("top.r.rose"), 14);
+  EXPECT_EQ(IntOf("top.r.fell"), 26);
 }
 
 }  // namespace

@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <functional>
+#include <string>
 #include <string_view>
 #include <unordered_set>
 #include <vector>
@@ -16,8 +17,10 @@
 #include "parser/ast_expr.h"
 #include "simulator/net.h"
 #include "simulator/scheduler.h"
+#include "simulator/sdf_parser.h"
 #include "simulator/sim_context.h"
 #include "simulator/specify.h"
+#include "simulator/specify_sdf.h"
 #include "simulator/variable.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
@@ -556,6 +559,40 @@ static void AnnotateContAssignDelays(const VpiObject& obj, SimContext& sim) {
   sim.AcquireSpecifyManager().AnnotateDriverDelays(kPrefix, kNet, delays);
 }
 
+// §32.4.4: the name the design's interconnect gives the port `port`: the path
+// of its instance below the top module, then its own name, as an SDF entry
+// spells it (SdfPortObject in vpi_delay_devices.cpp reads it back).
+static std::string InterconnectPortName(const VpiObject& port) {
+  const std::string& instance = port.parent->full_name;
+  return instance.substr(instance.find('.') + 1) + "." + std::string(port.name);
+}
+
+// §38.32 with §32.4.4: file the delays of the port or intermodule path `obj`
+// with the run `sim` as the interconnect delay an SDF PORT entry naming the
+// port, or an INTERCONNECT entry naming the path's two ports, files there,
+// which the connection into the load port takes on its next transition.
+static void AnnotateInterconnectDelays(const VpiObject& obj, SimContext& sim) {
+  SdfInterconnectAnnotation annotation;
+  if (obj.type == vpiInterModPath) {
+    annotation.source = InterconnectPortName(*obj.children[0]);
+    annotation.load = InterconnectPortName(*obj.children[1]);
+  } else {
+    annotation.construct = SdfInterconnectConstruct::kPort;
+    annotation.load = InterconnectPortName(obj);
+  }
+  std::vector<SdfDelayValue> values;
+  for (const VpiDelayInfo& delay : obj.delays) {
+    SdfDelayValue& value = values.emplace_back();
+    value.typ_val = static_cast<uint64_t>(std::llround(delay.delay));
+  }
+  const std::vector<uint64_t> kExpanded =
+      ExpandSdfDelays(values, SdfMtm::kTypical);
+  for (std::size_t i = 0; i < kExpanded.size(); ++i) {
+    annotation.delays[i] = kExpanded[i];
+  }
+  sim.AcquireSpecifyManager().AnnotateSdfInterconnect(annotation);
+}
+
 void VpiContext::PutDelays(VpiHandle obj, s_vpi_delay* delay_p) {
   // §38.32 / §38.1: the structure and its da array are application-allocated.
   // With no source values or no target object there is nothing to set; the
@@ -614,13 +651,16 @@ void VpiContext::PutDelays(VpiHandle obj, s_vpi_delay* delay_p) {
   if (obj->type == vpiContAssign && !obj->run_key.empty()) {
     AnnotateContAssignDelays(*obj, *sim_ctx_);
   }
-  // §37.45: an intermodule path's delay is one a delay device stands for.
-  if (obj->type == vpiInterModPath) {
-    VpiPlaceInterModPathDevice(obj, [this] { return AllocObject(); });
+  // §37.45: an intermodule path's delay is one a delay device stands for, and
+  // with §37.14 so is a port's module input port delay. A device is placed
+  // only on a net a run connected, and the run's connection takes the delay.
+  const auto kAlloc = [this] { return AllocObject(); };
+  if (obj->type == vpiInterModPath &&
+      VpiPlaceInterModPathDevice(obj, kAlloc) != nullptr) {
+    AnnotateInterconnectDelays(*obj, *sim_ctx_);
   }
-  // §37.45 with §37.14: so is a port's module input port delay.
-  if (obj->type == vpiPort) {
-    VpiPlacePortDelayDevice(obj, [this] { return AllocObject(); });
+  if (obj->type == vpiPort && VpiPlacePortDelayDevice(obj, kAlloc) != nullptr) {
+    AnnotateInterconnectDelays(*obj, *sim_ctx_);
   }
 }
 

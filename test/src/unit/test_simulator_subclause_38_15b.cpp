@@ -283,5 +283,28 @@ TEST(PutValueDecoding, AWritePastTheStorageStopsAtItsEnd) {
   EXPECT_EQ(storage.value.words[0].aval, uint64_t{0xF} << 60);
 }
 
+// §38.15 with §27.4: a variable a named block in a generate block declares
+// reads the value the block wrote to it, and each instance of a loop generate
+// block reads its own (#5783).
+TEST_F(ExpressionValuesOfARun,
+       ANamedBlocksVariableInAGenerateBlockReadsItsValue) {
+  Run("module top;\n"
+      "  if (1) begin : g initial begin : blk int v; v = 4; end end\n"
+      "  for (genvar i = 0; i < 2; i++) begin : h\n"
+      "    initial begin : blk int v; v = 5 + i; end\n"
+      "  end\n"
+      "endmodule\n");
+  for (const auto& [kName, kExpected] :
+       std::vector<std::pair<const char*, int>>{
+           {"top.g.blk.v", 4}, {"top.h[0].blk.v", 5}, {"top.h[1].blk.v", 6}}) {
+    vpiHandle v = By(kName);
+    ASSERT_NE(v, nullptr) << kName;
+    s_vpi_value value = {};
+    value.format = vpiIntVal;
+    vpi_get_value(v, &value);
+    EXPECT_EQ(value.value.integer, kExpected) << kName;
+  }
+}
+
 }  // namespace
 }  // namespace delta

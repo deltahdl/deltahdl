@@ -376,7 +376,7 @@ VpiObject* BitSelectObject(const Expr* expr, const AssignBuild& build) {
   }
   const auto kIndex = static_cast<int>(expr->index->int_val);
   for (VpiObject* child : base->children) {
-    if (VpiIndexSelects(*child, kIndex)) return child;
+    if (VpiIndexSelects(*base, *child, kIndex)) return child;
   }
   return nullptr;
 }

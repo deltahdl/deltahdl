@@ -178,7 +178,7 @@ VpiHandle VpiContext::HandleByIndex(int index, VpiHandle parent) {
          sim_ctx_->GetArena()});
   }
   for (auto* child : parent->children) {
-    if (VpiIndexSelects(*child, index)) return child;
+    if (VpiIndexSelects(*parent, *child, index)) return child;
   }
   return nullptr;
 }

@@ -3,6 +3,7 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "fixture_vpi_run.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
@@ -138,5 +139,24 @@ TEST_F(VpiHandleByIndexSim, AQueueElementNeedsARun) {
   array.queue = &queue;
   EXPECT_EQ(vpi_handle_by_index(VpiHandleOf(&array), 0), nullptr);
 }
+
+class HandleByIndexOfARun : public VpiDesignRun {};
+
+// §38.19 with §37.46: a port connected to an expression reading a scalar net
+// hangs among the net's children as one of its loads, but is no sub-object an
+// index into the net selects, so the index names nothing there, while the
+// same index into the instance still names its port (#7360).
+TEST_F(HandleByIndexOfARun, AScalarNetsLoadPortIsNoIndexedSubobject) {
+  Run("module ram(input a, input b); endmodule\n"
+      "module top; wire a, trinet; ram r0(a, !trinet); endmodule\n");
+  vpiHandle trinet = By("top.trinet");
+  ASSERT_NE(trinet, nullptr);
+  EXPECT_EQ(vpi_handle_by_index(trinet, 1), nullptr);
+  vpiHandle port = vpi_handle_by_index(By("top.r0"), 1);
+  ASSERT_NE(port, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, port), vpiPort);
+  EXPECT_STREQ(vpi_get_str(vpiName, port), "b");
+}
+
 }  // namespace
 }  // namespace delta
