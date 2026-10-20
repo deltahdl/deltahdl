@@ -371,9 +371,8 @@ bool Parser::TryParseNetDataType(DataType& dtype, bool has_intervening) {
     return false;
   }
 
-  if ((Check(TokenKind::kIdentifier) &&
-       known_types_.count(CurrentToken().text) != 0) ||
-      AtScopedTypeName()) {
+  if (Check(TokenKind::kIdentifier) &&
+      (known_types_.count(CurrentToken().text) != 0 || AtScopedTypeName())) {
     auto inner = ParseNamedType();
     // A.2.2.1 lets a type_identifier carry packed dimensions, and A.2.1.3
     // places the whole data_type before the net's name, so `wire t [1:0] v;`
@@ -465,25 +464,20 @@ bool Parser::AtDataTypeOrVoid() {
 // declaration (§8.24) whose class this parse does not know, not a type, and
 // it is left to ParseDataType and the name walk in ParseFuncName as is
 // everything else.
-bool Parser::AtScopedTypeName() {
-  if (!Check(TokenKind::kIdentifier) ||
-      known_types_.count(CurrentToken().text) != 0) {
-    return false;
-  }
-  auto saved = lexer_.SavePos();
-  Consume();
-  bool scoped = Match(TokenKind::kColonColon) && CheckIdentifier();
-  if (scoped) {
-    Consume();
-    scoped = !Check(TokenKind::kLParen);
-  }
-  lexer_.RestorePos(saved);
-  return scoped;
-}
-
-// The data_type itself, a scoped one read through ParseNamedType as above.
 DataType Parser::ParseDeclaredDataType() {
-  if (!AtScopedTypeName()) return ParseDataType();
+  bool scoped = false;
+  if (Check(TokenKind::kIdentifier) &&
+      known_types_.count(CurrentToken().text) == 0) {
+    auto saved = lexer_.SavePos();
+    Consume();
+    scoped = Match(TokenKind::kColonColon) && CheckIdentifier();
+    if (scoped) {
+      Consume();
+      scoped = !Check(TokenKind::kLParen);
+    }
+    lexer_.RestorePos(saved);
+  }
+  if (!scoped) return ParseDataType();
   DataType dtype = ParseNamedType();
   ParsePackedDims(dtype);
   return dtype;
