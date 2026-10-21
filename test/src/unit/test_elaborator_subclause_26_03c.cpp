@@ -372,16 +372,17 @@ TEST(PackageImport, ImportedNettypeDeclaresANetOfThePackagesNettype) {
       "  endfunction\n"
       "  nettype logic nt with pres;\n"
       "endpackage\n"
+      "module e;\n"
+      "  import P::nt;\n"
+      "  nt w;\n"
+      "endmodule\n"
       "module m;\n"
       "  import P::*;\n"
       "  nettype P::nt pnt;\n"
       "  nt n;\n"
       "  pnt a;\n"
       "  tran sw(n, a);\n"
-      "endmodule\n"
-      "module e;\n"
-      "  import P::nt;\n"
-      "  nt w;\n"
+      "  e u();\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);

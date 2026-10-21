@@ -61,6 +61,26 @@ void RegisterImportedNettype(std::string_view pkg, std::string_view nettype,
     scope.nettypes.canonical[name] = cit->second;
 }
 
+// An imported package parameter, entered in the compilation-unit parameter
+// scope under `name`. RegisterPackageParams in elaborator_resolve.cpp folded
+// the value where the declaration stands, against the package's own earlier
+// parameters and the members of its enumerations (§6.19, §6.20.1), and
+// recorded it under the "package.name" key. This scope holds none of those bare
+// names, so the recorded value is read back rather than folded again; an
+// initializer registration could not fold is folded here as before.
+void RegisterImportedParam(const ModuleItem* pi, const PackageDecl& pkg,
+                           std::string_view name, const ImportScope& scope) {
+  std::string qualified = std::string(pkg.name) + "." + std::string(pi->name);
+  auto it = scope.cu_param_scope.find(qualified);
+  if (it != scope.cu_param_scope.end()) {
+    scope.cu_param_scope[name] = it->second;
+    return;
+  }
+  auto val = FoldDeclaredParamValue(
+      pi->init_expr, InPackageScope(pi->data_type, pkg), scope.cu_param_scope);
+  if (val) scope.cu_param_scope[name] = *val;
+}
+
 // Register a single imported package item into a module's elaboration scopes:
 // typedefs become available by name, const parameters are entered into the
 // compilation-unit parameter scope, and classes into the class-name sets as
@@ -85,22 +105,7 @@ void RegisterImportItem(const ModuleItem* pi, const PackageDecl& pkg,
     // aggregate when the declaration carried unpacked dimensions.
     if (!pi->unpacked_dims.empty()) scope.aggregate_typedefs.insert(name);
   } else if (pi->kind == ModuleItemKind::kParamDecl && pi->init_expr) {
-    // RegisterPackageParams in elaborator_resolve.cpp folded the value where
-    // the declaration stands, against the package's own earlier parameters
-    // and the members of its enumerations (§6.19, §6.20.1), and recorded it
-    // under the "package.name" key. This scope holds none of those bare
-    // names, so the recorded value is read back rather than folded again; an
-    // initializer registration could not fold is folded here as before.
-    std::string qualified = std::string(pkg.name) + "." + std::string(pi->name);
-    auto it = scope.cu_param_scope.find(qualified);
-    if (it != scope.cu_param_scope.end()) {
-      scope.cu_param_scope[name] = it->second;
-      return;
-    }
-    auto val = FoldDeclaredParamValue(pi->init_expr,
-                                      InPackageScope(pi->data_type, pkg),
-                                      scope.cu_param_scope);
-    if (val) scope.cu_param_scope[name] = *val;
+    RegisterImportedParam(pi, pkg, name, scope);
   }
 }
 
