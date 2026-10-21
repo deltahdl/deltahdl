@@ -1,5 +1,6 @@
 #include <vector>
 
+#include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "lexer/token.h"
@@ -273,6 +274,28 @@ ModuleItem* Parser::ParseTypedef() {
   return item;
 }
 
+// The scope a nettype's with clause names its resolution function through,
+// read from the whole name `path` ParseNamedType gave the clause: the names
+// before the function's, the last of them as type_name. ParseNamedType keeps a
+// parameter_value_assignment in type_params, and scope_param_assignment_written
+// says the class before the last name was written with it. Null when the
+// function was named alone.
+static const DataType* NettypeResolveScope(const DataType& path, Arena& arena) {
+  if (path.scope_name.empty()) return nullptr;
+  auto* scope = arena.Create<DataType>();
+  scope->kind = DataTypeKind::kNamed;
+  scope->type_name = path.scope_name;
+  if (!path.outer_scope_names.empty()) {
+    scope->scope_name = path.outer_scope_names.back();
+    scope->outer_scope_names.assign(path.outer_scope_names.begin(),
+                                    path.outer_scope_names.end() - 1);
+  }
+  if (path.scope_param_assignment_written) {
+    scope->type_params = path.type_params;
+  }
+  return scope;
+}
+
 ModuleItem* Parser::ParseNettypeDecl() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kNettypeDecl;
@@ -289,26 +312,38 @@ ModuleItem* Parser::ParseNettypeDecl() {
                 Subclause("6.6.7"));
   }
 
-  // §6.6.7's Syntax 6-1: `with [ package_scope | class_scope ] tf_identifier`.
-  // The identifier before `::` is the package or class the function is named
-  // through, and it is kept: without it a nettype declared `with C::res` and
-  // one declared `with res` record the same function name, so the first binds
-  // to whatever plain function is called `res`.
-  if (Check(TokenKind::kKwWith)) {
-    Consume();
-    auto func_name = Expect(TokenKind::kIdentifier, Subclause("6.6.7")).text;
-    if (Match(TokenKind::kColonColon)) {
-      item->nettype_resolve_scope = func_name;
-      item->nettype_resolve_func =
-          Expect(TokenKind::kIdentifier, Subclause("6.6.7")).text;
-    } else {
-      item->nettype_resolve_func = func_name;
-    }
-  }
+  if (Match(TokenKind::kKwWith)) ParseNettypeWithClause(item);
   known_types_.insert(item->name);
   known_nettypes_.insert(item->name);
   Expect(TokenKind::kSemicolon, Subclause("6.6.7"));
   return item;
+}
+
+// A.2.1.3 with A.2.2.1: `with [ package_scope | class_scope ] tf_identifier`,
+// read from after `with`. A package_scope is a package name or `$unit`, then
+// `::`, and a class_scope a class_type, then `::`: a class name with an
+// optional parameter_value_assignment, named through a package_scope and
+// followed by the names of the classes nested in it, each with its own.
+// ParseNamedType reads that chain as it reads a scoped type's name, so the name
+// it ends at is the function's and the names before are its scope. The scope
+// is kept, since `with C::res` and `with res` name different functions.
+void Parser::ParseNettypeWithClause(ModuleItem* item) {
+  const bool kUnitScope =
+      Check(TokenKind::kSystemIdentifier) && CurrentToken().text == "$unit";
+  if (!kUnitScope && !CheckIdentifier()) {
+    Expect(TokenKind::kIdentifier, Subclause("6.6.7"));
+    return;
+  }
+  DataType path = ParseNamedType();
+  // `$unit` opens a package_scope and never names the function itself.
+  if (path.type_name == "$unit") {
+    const TokenKind kMissing = Match(TokenKind::kColonColon)
+                                   ? TokenKind::kIdentifier
+                                   : TokenKind::kColonColon;
+    Expect(kMissing, Subclause("A.2.1.3"));
+  }
+  item->nettype_resolve_func = path.type_name;
+  item->nettype_resolve_scope = NettypeResolveScope(path, arena_);
 }
 
 Direction Parser::ParseArgDirection(FunctionArg& arg, Direction sticky_dir,

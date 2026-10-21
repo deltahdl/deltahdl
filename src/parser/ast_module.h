@@ -505,16 +505,16 @@ struct ModuleItem {
   std::string_view nettype_resolve_func;
   // §6.6.7's Syntax 6-1 writes the with clause as
   // `with [ package_scope | class_scope ] tf_identifier`, so the resolution
-  // function may be named through a package or a class. This holds that
-  // qualifier -- the text before `::` -- and is empty when the clause carried
-  // none. It is a separate field from nettype_resolve_func because the two are
-  // separate names: a bare function name alone cannot say which scope was
-  // written, so a declaration reading `with C::res` and one reading `with res`
-  // recorded the same thing and bound to the same function.
-  //
-  // One field rather than a list, because the grammar admits one qualifier and
-  // not a chain.
-  std::string_view nettype_resolve_scope;
+  // function may be named through a package or a class. This holds that scope
+  // as the type it names, null when the clause wrote none: its type_name is the
+  // package, `$unit` or class declaring the function, and the names written
+  // before that one stand in scope_name and outer_scope_names, as they do for a
+  // scoped type. A.2.2.1 makes a class_scope a class_type, so the chain may run
+  // through a package, `$unit` and nested classes, and type_params holds the
+  // parameter values the declaring class was written with. It is apart from
+  // nettype_resolve_func because a bare function name cannot say which scope
+  // was written, so `with C::res` and `with res` would bind alike.
+  const DataType* nettype_resolve_scope = nullptr;
 
   Stmt* gen_init = nullptr;
   Expr* gen_cond = nullptr;

@@ -23,13 +23,13 @@
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/interface_port_typedef.h"
 #include "elaborator/net_data_type.h"
+#include "elaborator/nettype_resolution_lookup.h"
 #include "elaborator/resolution_function_body.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_enum_member.h"
 #include "elaborator/type_eval.h"
 #include "elaborator/unit_scope_order.h"
 #include "lexer/token.h"
-#include "parser/ast_class.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
@@ -649,95 +649,6 @@ static std::string NettypeResolutionRuleMessage(
   }
 }
 
-// §6.6.7's Syntax 6-1 writes the with clause as `with [ package_scope |
-// class_scope ] tf_identifier`, so the search for a resolution function ends in
-// one of three places, and which one it was is part of the answer: §6.6.7 lets
-// a class function method serve as a resolution function only if it is static,
-// since the call happens with no class object involved (printed page 98 of IEEE
-// 1800-2023), so whether the function is a class method decides which
-// requirements it is held to.
-//
-// `scope_named_nothing` separates a qualifier that reaches neither a package
-// nor a class from one that reaches a scope declaring no such function. They
-// are different mistakes and get different reports.
-struct NettypeResolutionTarget {
-  const ModuleItem* fn = nullptr;
-  bool is_class_method = false;
-  bool is_static_method = false;
-  bool scope_named_nothing = false;
-};
-
-// The function a class declares under `name`, whether or not it is static.
-// §6.6.7 admits a non-static one as far as being found, and rejects it by the
-// class-static rule rather than by not finding it, which is what lets the
-// report say what is wrong with the source rather than that the name is
-// missing.
-static NettypeResolutionTarget ClassResolutionMethod(const ClassDecl* cls,
-                                                     std::string_view name) {
-  for (const auto* m : cls->members) {
-    if (m->kind != ClassMemberKind::kMethod || !m->method) continue;
-    if (m->method->name != name) continue;
-    return {m->method, true, m->is_static, false};
-  }
-  return {nullptr, true, false, false};
-}
-
-// The function a package declares under `name`.
-static const ModuleItem* PackageResolutionFunction(const PackageDecl* pkg,
-                                                   std::string_view name) {
-  for (const auto* pi : pkg->items) {
-    if (pi->kind == ModuleItemKind::kFunctionDecl && pi->name == name)
-      return pi;
-  }
-  return nullptr;
-}
-
-// The package `unit` declares under `name`, or null.
-static const PackageDecl* FindNettypeScopePackage(const CompilationUnit* unit,
-                                                  std::string_view name) {
-  for (const auto* p : unit->packages) {
-    if (p->name == name) return p;
-  }
-  return nullptr;
-}
-
-// The class the scope of a resolution function names: a class by its own name,
-// or one a typedef names, which §6.6.7's own example does with `typedef
-// Base#(32) MyBaseT;` and `with MyBaseT::Ssum` (printed page 99). A chain of
-// typedefs is followed to the class; the hop limit keeps a cyclic typedef from
-// looping.
-static const ClassDecl* NettypeScopeClass(std::string_view scope,
-                                          const CompilationUnit* unit,
-                                          const TypedefMap& typedefs) {
-  for (int hops = 0; hops < 8; ++hops) {
-    if (const ClassDecl* cls = FindClassDecl(scope, unit)) return cls;
-    auto td = typedefs.find(scope);
-    if (td == typedefs.end() || td->second.kind != DataTypeKind::kNamed)
-      return nullptr;
-    scope = td->second.type_name;
-  }
-  return nullptr;
-}
-
-static NettypeResolutionTarget FindNettypeResolutionFunction(
-    const ModuleItem* item, const CompilationUnit* unit,
-    const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
-    const TypedefMap& typedefs) {
-  if (item->nettype_resolve_scope.empty()) {
-    auto fit = func_decls.find(item->nettype_resolve_func);
-    if (fit == func_decls.end()) return {};
-    return {fit->second, false, false, false};
-  }
-  if (const ClassDecl* cls =
-          NettypeScopeClass(item->nettype_resolve_scope, unit, typedefs))
-    return ClassResolutionMethod(cls, item->nettype_resolve_func);
-  if (const PackageDecl* pkg =
-          FindNettypeScopePackage(unit, item->nettype_resolve_scope))
-    return {PackageResolutionFunction(pkg, item->nettype_resolve_func), false,
-            false, false};
-  return {nullptr, false, false, true};
-}
-
 void Elaborator::CheckNettypeResolutionFunction(const ModuleItem* item) {
   NettypeResolutionTarget target =
       FindNettypeResolutionFunction(item, unit_, func_decls_, typedefs_);
@@ -746,20 +657,21 @@ void Elaborator::CheckNettypeResolutionFunction(const ModuleItem* item) {
   // hold may still be declared somewhere this does not see; only a qualifier
   // says where the function was supposed to be, and so only a qualifier makes
   // its absence something this can report.
-  if (!target.fn && item->nettype_resolve_scope.empty()) return;
+  if (!target.fn && item->nettype_resolve_scope == nullptr) return;
   if (target.scope_named_nothing) {
-    diag_.Error(item->loc,
-                std::format("resolution function of user-defined nettype '{}' "
-                            "names unknown package or class '{}'",
-                            item->name, item->nettype_resolve_scope),
-                Subclause("6.6.7"));
+    diag_.Error(
+        item->loc,
+        std::format("resolution function of user-defined nettype '{}' "
+                    "names unknown package or class '{}'",
+                    item->name, NettypeScopeText(*item->nettype_resolve_scope)),
+        Subclause("6.6.7"));
     return;
   }
   if (!target.fn) {
     diag_.Error(item->loc,
                 std::format("resolution function '{}::{}' of user-defined "
                             "nettype '{}' does not exist",
-                            item->nettype_resolve_scope,
+                            NettypeScopeText(*item->nettype_resolve_scope),
                             item->nettype_resolve_func, item->name),
                 Subclause("6.6.7"));
     return;
@@ -789,9 +701,9 @@ void Elaborator::CheckNettypeResolutionFunction(const ModuleItem* item) {
 // indistinguishable there.
 static std::string_view NettypeResolveFuncName(const ModuleItem* item,
                                                Arena& arena) {
-  if (item->nettype_resolve_scope.empty()) return item->nettype_resolve_func;
+  if (item->nettype_resolve_scope == nullptr) return item->nettype_resolve_func;
   auto* qname =
-      arena.Create<std::string>(std::string(item->nettype_resolve_scope) +
+      arena.Create<std::string>(NettypeScopeText(*item->nettype_resolve_scope) +
                                 "::" + std::string(item->nettype_resolve_func));
   return *qname;
 }

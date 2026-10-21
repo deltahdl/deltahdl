@@ -509,6 +509,7 @@ class Parser {
   void SkipBalancedParens();
   bool TryInterfacePortTypedef(ModuleItem* item);
   ModuleItem* ParseNettypeDecl();
+  void ParseNettypeWithClause(ModuleItem* item);
   DataType ParseEnumType();
   DataType ParseEnumBody(const DataType& base);
   Expr* ParseEnumRangeBound();

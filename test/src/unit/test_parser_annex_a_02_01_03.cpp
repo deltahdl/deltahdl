@@ -5,6 +5,7 @@
 #include "fixture_parser.h"
 #include "helpers_reported_error.h"
 #include "parser/ast_module.h"
+#include "parser/ast_type.h"
 
 using namespace delta;
 
@@ -668,6 +669,91 @@ TEST(TypeDeclParsing, InterconnectDeclThirdNetIsError) {
   EXPECT_FALSE(ReportedError(r.diags, kTwoNets, 4, "A.2.1.3"));
   ASSERT_NE(r.cu, nullptr);
   EXPECT_EQ(r.cu->modules[0]->items.size(), 6u);
+}
+
+// A.2.1.3 writes a nettype's resolution function after an optional
+// package_scope or class_scope, and A.2.2.1 makes a class_scope a class_type:
+// a class name with an optional parameter_value_assignment, itself named
+// through a package or $unit, followed by the names of the classes nested in
+// it. The scope is kept as the class_type or package it names, its last name
+// the one declaring the function, and a specialization's parameter values are
+// kept with it (#7592).
+TEST(TypeDeclParsing, NettypeWithClauseReadsAClassScopeChain) {
+  auto r = Parse(
+      "module m;\n"
+      "  nettype real n1 with P::C#(8)::resolve;\n"
+      "  nettype real n2 with Outer::Inner::resolve;\n"
+      "  nettype real n3 with P::Outer::Inner::resolve;\n"
+      "  nettype real n4 with $unit::C#(4, 5)::resolve;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& items = r.cu->modules[0]->items;
+  ASSERT_EQ(items.size(), 4u);
+  for (const ModuleItem* item : items) {
+    EXPECT_EQ(item->nettype_resolve_func, "resolve");
+    ASSERT_NE(item->nettype_resolve_scope, nullptr);
+  }
+  const DataType& n1 = *items[0]->nettype_resolve_scope;
+  EXPECT_TRUE(n1.outer_scope_names.empty());
+  EXPECT_EQ(n1.scope_name, "P");
+  EXPECT_EQ(n1.type_name, "C");
+  EXPECT_EQ(n1.type_params.size(), 1u);
+  const DataType& n2 = *items[1]->nettype_resolve_scope;
+  EXPECT_EQ(n2.scope_name, "Outer");
+  EXPECT_EQ(n2.type_name, "Inner");
+  EXPECT_TRUE(n2.type_params.empty());
+  const DataType& n3 = *items[2]->nettype_resolve_scope;
+  ASSERT_EQ(n3.outer_scope_names.size(), 1u);
+  EXPECT_EQ(n3.outer_scope_names[0], "P");
+  EXPECT_EQ(n3.scope_name, "Outer");
+  EXPECT_EQ(n3.type_name, "Inner");
+  const DataType& n4 = *items[3]->nettype_resolve_scope;
+  EXPECT_EQ(n4.scope_name, "$unit");
+  EXPECT_EQ(n4.type_name, "C");
+  EXPECT_EQ(n4.type_params.size(), 2u);
+}
+
+// A.2.2.1's package_scope is a package name or `$unit`, each followed by `::`,
+// so `with $unit::f` names the compilation unit's function f, and a with clause
+// writing no scope keeps none.
+TEST(TypeDeclParsing, NettypeWithClauseReadsAUnitOrPackageScope) {
+  auto r = Parse(
+      "module m;\n"
+      "  nettype real n1 with $unit::ufn;\n"
+      "  nettype real n2 with P::pfn;\n"
+      "  nettype real n3 with fn;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& items = r.cu->modules[0]->items;
+  ASSERT_EQ(items.size(), 3u);
+  ASSERT_NE(items[0]->nettype_resolve_scope, nullptr);
+  EXPECT_EQ(items[0]->nettype_resolve_scope->type_name, "$unit");
+  EXPECT_TRUE(items[0]->nettype_resolve_scope->scope_name.empty());
+  EXPECT_EQ(items[0]->nettype_resolve_func, "ufn");
+  ASSERT_NE(items[1]->nettype_resolve_scope, nullptr);
+  EXPECT_EQ(items[1]->nettype_resolve_scope->type_name, "P");
+  EXPECT_EQ(items[1]->nettype_resolve_func, "pfn");
+  EXPECT_EQ(items[2]->nettype_resolve_scope, nullptr);
+  EXPECT_EQ(items[2]->nettype_resolve_func, "fn");
+}
+
+// `$unit` opens a package_scope and is never the function itself, so a with
+// clause ending at `$unit`, or at `$unit::`, is missing the function's name,
+// as one naming nothing at all is.
+TEST(TypeDeclParsing, NettypeWithClauseOfUnitAloneIsError) {
+  auto r = Parse(
+      "module m;\n"
+      "  nettype real n1 with $unit;\n"
+      "  nettype real n2 with $unit::;\n"
+      "  nettype real n3 with ;\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "expected '::', got ';'", 2, "A.2.1.3"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got ';'", 3, "A.2.1.3"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got ';'", 4, "6.6.7"));
 }
 
 }  // namespace

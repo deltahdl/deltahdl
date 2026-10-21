@@ -5,6 +5,7 @@
 #include "fixture_parser.h"
 #include "helpers_reported_error.h"
 #include "parser/ast_module.h"
+#include "parser/ast_type.h"
 
 using namespace delta;
 static ModuleItem* FindNettypeDecl(ParseResult& r, std::string_view name = "") {
@@ -102,7 +103,8 @@ TEST(NettypeParsing, NettypeDeclWithScopedResolve) {
   auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kNettypeDecl);
   EXPECT_EQ(item->nettype_resolve_func, "resolve_fn");
-  EXPECT_EQ(item->nettype_resolve_scope, "pkg");
+  ASSERT_NE(item->nettype_resolve_scope, nullptr);
+  EXPECT_EQ(item->nettype_resolve_scope->type_name, "pkg");
 }
 
 // §6.6.7's Syntax 6-1 writes the with clause as
@@ -120,7 +122,8 @@ TEST(NettypeParsing, NettypeDeclWithClassScopedResolveKeepsTheClassName) {
   EXPECT_FALSE(r.has_errors);
   auto* nt = FindNettypeDecl(r, "wt");
   ASSERT_NE(nt, nullptr);
-  EXPECT_EQ(nt->nettype_resolve_scope, "C");
+  ASSERT_NE(nt->nettype_resolve_scope, nullptr);
+  EXPECT_EQ(nt->nettype_resolve_scope->type_name, "C");
   EXPECT_EQ(nt->nettype_resolve_func, "res");
 }
 
@@ -138,7 +141,7 @@ TEST(NettypeParsing, UnqualifiedWithClauseLeavesTheScopeEmpty) {
   auto* nt = FindNettypeDecl(r, "wt_plain");
   ASSERT_NE(nt, nullptr);
   EXPECT_EQ(nt->nettype_resolve_func, "res");
-  EXPECT_TRUE(nt->nettype_resolve_scope.empty());
+  EXPECT_EQ(nt->nettype_resolve_scope, nullptr);
 }
 
 TEST(NettypeParsing, NettypeInPackage) {
