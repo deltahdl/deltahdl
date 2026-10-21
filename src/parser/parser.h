@@ -474,7 +474,7 @@ class Parser {
   // SourceManager that produced the token (needed for library-map loading,
   // which parses each map file with a throwaway local SourceManager).
   std::string_view ArenaCopy(std::string_view text);
-
+  void ParseBindItem(std::vector<ModuleItem*>& items);
   BindDirective* ParseBindDirective();
   bool TryParseCuTypeDeclaration(CompilationUnit* unit);
   bool TryParseUnitBindDirective(CompilationUnit* unit);

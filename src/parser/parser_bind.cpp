@@ -6,10 +6,12 @@
 
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "common/diagnostic.h"
 #include "lexer/token.h"
 #include "parser/ast_design.h"
+#include "parser/ast_module.h"
 #include "parser/parser.h"
 #include "parser/parser_token_skips.h"
 
@@ -117,6 +119,29 @@ BindDirective* Parser::ParseBindDirective() {
   auto mod_tok = ExpectIdentifier(Subclause("23.11"));
   decl->instantiation = ParseModuleInst(mod_tok);
   return decl;
+}
+
+// A.1.4: a bind_directive among a body's items, a module_common_item, so not
+// one of a checker's, a program's or a package's. One in a generate block is
+// also an item of the block, since §27.5 instantiates it only with the block.
+void Parser::ParseBindItem(std::vector<ModuleItem*>& items) {
+  RejectInCheckerBody("a bind directive is not an item of a checker");
+  RejectInProgramBody(CurrentLoc(),
+                      "a bind directive is not an item of a program");
+  RejectInPackageBody("a bind directive is not an item of a package");
+  auto loc = CurrentLoc();
+  auto* bd = ParseBindDirective();
+  if (bd != nullptr && current_module_) {
+    current_module_->bind_directives.push_back(bd);
+  }
+  if (bd != nullptr && InGenerateBlock()) {
+    bd->in_generate_block = true;
+    auto* item = arena_.Create<ModuleItem>();
+    item->kind = ModuleItemKind::kBindDirective;
+    item->loc = loc;
+    item->bind_directive = bd;
+    items.push_back(item);
+  }
 }
 
 // A.1.4 puts a bind_directive among the items of a compilation unit. Answers

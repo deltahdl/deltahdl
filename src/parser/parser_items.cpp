@@ -8,7 +8,6 @@
 #include "common/source_loc.h"
 #include "common/types.h"
 #include "lexer/token.h"
-#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
@@ -456,23 +455,7 @@ bool Parser::TryParseMiscKeywordItem(std::vector<ModuleItem*>& items) {
     return true;
   }
   if (Check(TokenKind::kKwBind)) {
-    RejectInCheckerBody("a bind directive is not an item of a checker");
-    RejectInProgramBody(CurrentLoc(),
-                        "a bind directive is not an item of a program");
-    RejectInPackageBody("a bind directive is not an item of a package");
-    auto loc = CurrentLoc();
-    auto* bd = ParseBindDirective();
-    if (bd != nullptr && current_module_) {
-      current_module_->bind_directives.push_back(bd);
-    }
-    if (bd != nullptr && InGenerateBlock()) {
-      bd->in_generate_block = true;
-      auto* item = arena_.Create<ModuleItem>();
-      item->kind = ModuleItemKind::kBindDirective;
-      item->loc = loc;
-      item->bind_directive = bd;
-      items.push_back(item);
-    }
+    ParseBindItem(items);
     return true;
   }
   return false;
