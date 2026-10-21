@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
@@ -192,6 +194,55 @@ TEST(GenerateElaboration, SelfInstantiationEndsWhereTheConditionFails) {
     ++depth;
   }
   EXPECT_EQ(depth, 3);
+}
+
+// The design whose top `top` holds the instance u of leaf and, in a generate
+// block selected when `cond` holds, a bind of checker module chk into leaf.
+std::string BindInGenerateBlock(const char* cond) {
+  return std::string(
+             "module chk; endmodule\n"
+             "module leaf; endmodule\n"
+             "module top;\n"
+             "  leaf u();\n"
+             "  if (") +
+         cond +
+         ") begin : g\n"
+         "    bind leaf chk c();\n"
+         "  end\n"
+         "endmodule\n";
+}
+
+// How many children named c the instance u of the design's top holds.
+int BoundInU(const RtlirDesign* design) {
+  int count = 0;
+  for (const auto& ch : design->top_modules[0]->children) {
+    if (ch.inst_name != "u" || ch.resolved == nullptr) continue;
+    for (const auto& gch : ch.resolved->children) {
+      if (gch.inst_name == "c") ++count;
+    }
+  }
+  return count;
+}
+
+// §27.5 with §23.11: a generate block a conditional generate construct does
+// not select is not instantiated, so a bind directive written in it binds
+// nothing (#7556).
+TEST(GenerateElaboration, ABindInAnUnselectedBlockBindsNothing) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(BindInGenerateBlock("0"), f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(BoundInU(design), 0);
+}
+
+// The block the construct selects is instantiated, and its bind directive
+// binds as one written in the module would.
+TEST(GenerateElaboration, ABindInASelectedBlockBinds) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(BindInGenerateBlock("1"), f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(BoundInU(design), 1);
 }
 
 }  // namespace

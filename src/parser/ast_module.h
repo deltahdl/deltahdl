@@ -96,6 +96,9 @@ enum class ModuleItemKind : uint8_t {
   kElabSystemTask,
   kDefaultDisableIff,
   kNestedModuleDecl,
+  // §23.11 with §27.5: a bind directive written in a generate block, which
+  // binds only where the block is instantiated.
+  kBindDirective,
 };
 
 // Whether `kind` is a module item whose body is a procedural statement. §9.2
@@ -748,6 +751,9 @@ struct ModuleItem {
   std::vector<SpecifyItem*> specify_items;
 
   ModuleDecl* nested_module_decl = nullptr;
+
+  // The directive a kBindDirective item stands for.
+  BindDirective* bind_directive = nullptr;
 
   // §19.4.1: for the embedded-covergroup inheritance form
   // `covergroup extends base ;`, the covergroup_identifier of the base

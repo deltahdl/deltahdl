@@ -45,6 +45,10 @@ struct BindDirective {
   std::vector<BindTargetInstance> target_instances;
   ModuleItem* instantiation = nullptr;
   SourceLoc loc;
+  // Written in a generate block, where §27.5 instantiates it only if the
+  // block is selected; such a directive also stands as a kBindDirective item
+  // of the block.
+  bool in_generate_block = false;
 };
 
 enum class ConfigRuleKind : uint8_t {

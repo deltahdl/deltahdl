@@ -570,6 +570,12 @@ void Elaborator::CheckInstanceTerminalWidths(const ModuleItem* item,
 }
 
 void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
+  // A generate block's bind directive is applied with the rest by
+  // Elaborator::ApplyBindDirectives, once this block is known to be selected.
+  if (item->kind == ModuleItemKind::kBindDirective) {
+    generate_binds_.insert(item->bind_directive);
+    return;
+  }
   // §28.16: every delay a source can write reaches this walk, and each is
   // checked before the item is built. The nine slots live on the item rather
   // than on what it becomes, so one place sees the net delays, the continuous

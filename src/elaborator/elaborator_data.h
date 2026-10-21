@@ -621,6 +621,10 @@ class ElaboratorData {
   std::unordered_map<RtlirModule*, std::vector<DefparamSite>>
       generate_defparams_;
 
+  // §23.11 with §27.5: the bind directives of the generate blocks elaborated,
+  // the blocks a generate construct selected; one in any other binds nothing.
+  std::unordered_set<const BindDirective*> generate_binds_;
+
   // Keyed by the block instance's prefix as well as the statement, because the
   // one body AST is shared by every iteration of a loop generate block: without
   // the prefix, applying the statement for the first iteration would mark it

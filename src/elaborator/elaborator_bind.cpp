@@ -241,6 +241,12 @@ static void ReportBindParamsInConstants(
 
 void Elaborator::ApplyBindDirectives(const std::vector<RtlirModule*>& tops) {
   std::vector<BindDirectiveSite> binds = CollectBindDirectives(unit_);
+  // §27.5: a directive in a generate block no construct selected was never
+  // instantiated, and binds nothing.
+  std::erase_if(binds, [this](const BindDirectiveSite& site) {
+    return site.bd->in_generate_block && !generate_binds_.contains(site.bd);
+  });
+  generate_binds_.clear();
   if (binds.empty()) return;
   BindWalkCtx ctx{{binds, {}, {}, {}, {}}};
   for (auto* top : tops) {
