@@ -55,12 +55,13 @@ std::optional<std::vector<int64_t>> TryConstEvalInstParams(
   return values;
 }
 
-// §17.2/§17.7/§25.9: the kind of the enclosing scope that governs which nested
-// items and instances are legal. `kind_word` is the diagnostic noun ("program"
-// or "checker") used when either flag is set.
+// §17.2/§17.7/§25.9 and A.1.6: the kind of the enclosing scope that governs
+// which nested items and instances are legal. `kind_word` is the diagnostic
+// noun ("program", "checker" or "interface") used when any flag is set.
 struct ParentScopeKind {
   bool is_program;
   bool is_checker;
+  bool is_interface;
   std::string_view kind_word;
 };
 
@@ -150,15 +151,17 @@ void CheckNestedDeclItemRules(
   }
 }
 
-// §24.3: a program or checker instantiates no user-defined primitive.
+// §24.3: a program or checker instantiates no user-defined primitive. A.1.6:
+// nor does an interface, whose items, a generate block's among them, never
+// reach the udp_instantiation only A.1.4's module items do.
 void CheckUdpInstParentRule(const ModuleItem* item, const ModuleDecl* decl,
                             const ParentScopeKind& parent, DiagEngine& diag) {
-  if (!parent.is_program && !parent.is_checker) return;
+  if (!parent.is_program && !parent.is_checker && !parent.is_interface) return;
   diag.Error(item->loc,
              std::format("primitive cannot be instantiated inside "
                          "{} '{}'",
                          parent.kind_word, decl->name),
-             Subclause("24.3"));
+             Subclause(parent.is_interface ? "A.1.6" : "24.3"));
 }
 
 void CheckProgramCheckerItemRules(
@@ -609,10 +612,12 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   CollectNestedModulesAndCheckVif(decl, nested_module_decls_, diag_);
   const bool kParentIsProgram = decl->decl_kind == ModuleDeclKind::kProgram;
   const bool kParentIsChecker = decl->decl_kind == ModuleDeclKind::kChecker;
+  const bool kParentIsInterface = decl->decl_kind == ModuleDeclKind::kInterface;
+  std::string_view kind_word = "checker";
+  if (kParentIsProgram) kind_word = "program";
+  if (kParentIsInterface) kind_word = "interface";
   const ParentScopeKind kParentScope{kParentIsProgram, kParentIsChecker,
-                                     kParentIsProgram
-                                         ? std::string_view{"program"}
-                                         : std::string_view{"checker"}};
+                                     kParentIsInterface, kind_word};
   InstClassTables inst_class_tables{interface_inst_types_,
                                     interface_inst_param_values_,
                                     checker_inst_names_, program_inst_names_};
