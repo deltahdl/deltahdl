@@ -344,4 +344,25 @@ TEST(CoverageNomenclature, APragmaNamingNoSignalIdentifiesNoFsm) {
   EXPECT_EQ(kOut, "0\n");
 }
 
+// §40.2.2: a deferred assertion's action is a statement the run executes, in
+// the Reactive region rather than where the assertion stands, and counts as
+// executed once it has run. Of the six statements, all but the $display have
+// run when the figure is read (#7541).
+TEST(CoverageNomenclature, ADeferredAssertionsActionCountsAsExecuted) {
+  SimFixture f;
+  const std::string kOut = RunCapture(
+      "module top;\n"
+      "  int x, r;\n"
+      "  initial begin\n"
+      "    assert #0 (1) x = 1;\n"
+      "    #1 r = $coverage_get(22, 10, \"top\");\n"
+      "    $display(\"%0d %0d %0d\", $coverage_get_max(22, 10, \"top\"), r,\n"
+      "             x);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(kOut, "6 5 1\n");
+}
+
 }  // namespace

@@ -30,6 +30,7 @@
 #include "simulator/sequence_monitor.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
+#include "simulator/statement_coverage.h"
 #include "simulator/stmt_exec.h"
 #include "simulator/stmt_exec_assertion_internal.h"
 #include "simulator/stmt_exec_internal.h"
@@ -42,6 +43,9 @@ namespace delta {
 static void RunDeferredActionSync(const Stmt* action, SimContext& ctx,
                                   Arena& arena) {
   if (!action) return;
+  // §40.2.2: the action runs here rather than through ExecStmt, and counts as
+  // executed for statement coverage all the same.
+  NoteStatementExecuted(action, ctx);
   switch (action->kind) {
     case StmtKind::kNull:
       return;
