@@ -1,6 +1,7 @@
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -535,6 +536,20 @@ static void RejectStaticOutOfBlockMethod(const ModuleItem* item,
   }
 }
 
+// §8.7 defines `new` as a function with no return type, and A.1.9's
+// class_constructor_declaration and class_constructor_prototype write none
+// between `function` and `new`. A type written there, at `type_loc`, is
+// reported and dropped, so the constructor reads as it would have without one.
+static void RejectConstructorReturnType(ModuleItem* item, SourceLoc type_loc,
+                                        DiagEngine& diag) {
+  if (item->name != "new") return;
+  diag.Error(type_loc,
+             "'new' is declared with a return type here, which a constructor "
+             "never has",
+             Subclause("8.7"));
+  item->return_type = DataType{};
+}
+
 void Parser::ParseFuncName(ModuleItem* item) {
   if (Check(TokenKind::kKwNew)) {
     item->name = "new";
@@ -543,12 +558,15 @@ void Parser::ParseFuncName(ModuleItem* item) {
     return;
   }
 
+  const SourceLoc kTypeLoc = CurrentLoc();
   item->return_type = ParseFunctionReturnType();
+  bool type_written = true;
 
   if (item->return_type.kind == DataTypeKind::kNamed &&
       Check(TokenKind::kColonColon)) {
     item->method_class = item->return_type.type_name;
     item->return_type = DataType{};
+    type_written = false;
     Consume();
     item->name = Match(TokenKind::kKwNew)
                      ? "new"
@@ -566,6 +584,7 @@ void Parser::ParseFuncName(ModuleItem* item) {
                      : Expect(TokenKind::kIdentifier, Subclause("8.24")).text;
   }
   if (!item->method_class.empty()) RejectStaticOutOfBlockMethod(item, diag_);
+  if (type_written) RejectConstructorReturnType(item, kTypeLoc, diag_);
 
   if (Match(TokenKind::kDot)) {
     item->method_class = item->name;

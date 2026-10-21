@@ -3,8 +3,11 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_class.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 
 using namespace delta;
 namespace {
@@ -222,6 +225,49 @@ TEST(ClassConstructorParsing, DeclarationNewCallNamedArguments) {
       "module m;\n"
       "  C c = new(.b(2), .a(1));\n"
       "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §8.7 (printed page 184) defines `new` as a function with no return type, and
+// A.1.9's class_constructor_declaration and class_constructor_prototype write
+// none between `function` and `new`. A type written there was read as the
+// constructor's return type and kept (#7577).
+TEST(ClassConstructorParsing, ConstructorWithAReturnTypeIsError) {
+  auto r = Parse(
+      "class C;\n"
+      "  function void new(); endfunction\n"
+      "endclass\n"
+      "class D;\n"
+      "  extern function int new(int a);\n"
+      "endclass\n"
+      "function logic D::new(int a); endfunction\n");
+  ASSERT_NE(r.cu, nullptr);
+  const int kLines[] = {2, 5, 7};
+  for (int line : kLines) {
+    EXPECT_TRUE(ReportedError(r.diags,
+                              "'new' is declared with a return type here, "
+                              "which a constructor never has",
+                              line, "8.7"));
+  }
+  ASSERT_FALSE(r.cu->classes.empty());
+  ASSERT_FALSE(r.cu->classes[0]->members.empty());
+  const auto* ctor = r.cu->classes[0]->members[0]->method;
+  ASSERT_NE(ctor, nullptr);
+  EXPECT_EQ(ctor->name, "new");
+  EXPECT_EQ(ctor->return_type.kind, DataTypeKind::kImplicit);
+}
+
+// A class scope before `new` is no return type, and a method of the class
+// returning the class's own type is no constructor.
+TEST(ClassConstructorParsing, ConstructorWithoutAReturnTypeIsAccepted) {
+  auto r = Parse(
+      "class C;\n"
+      "  extern function new(int a);\n"
+      "  extern function C make();\n"
+      "endclass\n"
+      "function C::new(int a); endfunction\n"
+      "function C C::make(); return null; endfunction\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
