@@ -63,6 +63,7 @@ endfunction()
 
 
 
+add_unit_test(test_elaborator_annex_a_01_03)
 add_unit_test(test_elaborator_annex_a_01_04)
 add_unit_test(test_elaborator_annex_a_01_06)
 add_unit_test(test_elaborator_annex_a_01_08)

@@ -11,6 +11,7 @@
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "common/types.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/const_eval_internal.h"
@@ -457,6 +458,30 @@ static RtlirPort BuildRtlirPortBase(const PortDecl& port, bool port_is_var,
   return rp;
 }
 
+// A.1.3: a non-ANSI port's port_reference selects with a constant_select, so
+// each index, bound and width the selects of its port expression `expr`
+// write, a concatenation's operands' among them, is a constant expression.
+static void ReportNonConstantPortSelects(const Expr* expr, SourceLoc loc,
+                                         const ScopeMap& scope,
+                                         DiagEngine& diag) {
+  if (expr->kind == ExprKind::kConcatenation) {
+    for (const Expr* each : expr->elements) {
+      ReportNonConstantPortSelects(each, loc, scope, diag);
+    }
+    return;
+  }
+  for (; expr->kind == ExprKind::kSelect; expr = expr->base) {
+    for (const Expr* bound : {expr->index, expr->index_end}) {
+      if (bound != nullptr && !IsConstantExpr(bound, scope)) {
+        diag.Error(loc,
+                   "a port expression selects with an expression that is "
+                   "not constant",
+                   Subclause("A.1.3"));
+      }
+    }
+  }
+}
+
 // Elaborate one port declaration into its RtlirPort: run the per-port
 // diagnostics, track non-ANSI type info, and build the base fields. The
 // interface-port flag is resolved by the caller because it needs FindModule.
@@ -491,6 +516,10 @@ static RtlirPort ElaborateOnePort(const ModuleDecl* decl, const PortDecl& port,
 
   DiagnosePortTypeConstraints(port, port_is_var, ctx.diag);
   ValidateNetPortDataType(decl, port, port_is_var, ctx);
+  if (decl->is_non_ansi_ports && port.port_expr != nullptr) {
+    ReportNonConstantPortSelects(port.port_expr, port.loc, ctx.param_scope,
+                                 ctx.diag);
+  }
 
   uint32_t width = EvalTypeWidth(port.data_type, ctx.typedefs, ctx.param_scope);
   RtlirPort rp =
