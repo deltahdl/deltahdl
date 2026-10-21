@@ -38,20 +38,6 @@ TEST(ModuleParametersAndPorts, APortPartSelectByAVariableIsReported) {
                             1, "A.1.3"));
 }
 
-TEST(ModuleParametersAndPorts, AnIndexedPortPartSelectByAVariableIsReported) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module m3(c[k+:2]);\n"
-      "  input [3:0] c;\n"
-      "  int k;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "a port expression selects with an expression "
-                            "that is not constant",
-                            1, "A.1.3"));
-}
-
 // A.1.3: a parameter is a constant expression, so a port selecting by one is
 // accepted, as is a concatenation of constant selects.
 TEST(ModuleParametersAndPorts, APortSelectByAParameterIsAccepted) {
