@@ -37,6 +37,13 @@ struct ParserPortHelpers {
     auto name = p.Expect(TokenKind::kIdentifier, Subclause("23.2.2.1")).text;
     std::vector<Expr*> dims;
     p.ParseUnpackedDims(dims);
+    // A.2.3's list_of_variable_port_identifiers, an output declaration's list
+    // of variable ports, gives each one `= constant_expression`. It is read on
+    // every declaration, as an ANSI header's is, and the elaborator holds it
+    // to the ports that may take one: an initializer on an output net
+    // (§23.2.2.2), and a default value anywhere a non-ANSI port stands
+    // (§23.2.2.4).
+    Expr* init = p.Match(TokenKind::kEq) ? p.ParseExpr() : nullptr;
     bool found = false;
     for (auto& port : mod.ports) {
       if (port.name != name) continue;
@@ -52,6 +59,7 @@ struct ParserPortHelpers {
       port.has_explicit_var = shape.has_explicit_var;
       port.attrs = shape.attrs;
       port.unpacked_dims = dims;
+      port.default_value = init;
     }
     // §23.5: with a `.*` module header the port names come from the module's
     // extern declaration, which is not visible until elaboration, so the port
@@ -61,6 +69,7 @@ struct ParserPortHelpers {
     PortDecl np = shape;
     np.name = name;
     np.unpacked_dims = dims;
+    np.default_value = init;
     np.loc = loc;
     // §23.2.2.1 (printed page 733), Example 5: in `renamed_concat(.a({b, c}),
     // f, .g(h[1]))` the body's `input b, c;` and `output [1:0] h;` declare the
@@ -914,13 +923,9 @@ void Parser::ParseNonAnsiPortDecls(ModuleDecl& mod,
   auto dtype = ParseDataType();
   if (NonAnsiPortDeclIsNet(dir, dtype, has_var)) dtype.is_net = true;
 
-  if (dtype.kind == DataTypeKind::kImplicit && Check(TokenKind::kLBracket)) {
-    Consume();
-    dtype.packed_dim_left = ParseExpr();
-    Expect(TokenKind::kColon, Subclause("23.2.2.1"));
-    dtype.packed_dim_right = ParseExpr();
-    Expect(TokenKind::kRBracket, Subclause("23.2.2.1"));
-  }
+  // A.2.2.1's implicit_data_type takes any number of packed dimensions, and
+  // ParseDataType reads none of them when no signing opens the type.
+  if (dtype.kind == DataTypeKind::kImplicit) ParsePackedDims(dtype);
 
   PortDecl shape;
   shape.direction = dir;

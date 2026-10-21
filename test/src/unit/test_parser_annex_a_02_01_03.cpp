@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "fixture_parser.h"
 #include "helpers_reported_error.h"
 #include "parser/ast_module.h"
@@ -203,8 +205,9 @@ TEST(TypeDeclParsing, NetDeclInterconnectWithDelay) {
   EXPECT_TRUE(item->data_type.is_interconnect);
 }
 
+// A.2.1.3 gives an interconnect declaration a second net after a comma.
 TEST(TypeDeclParsing, NetDeclInterconnectMultipleNetIdentifiers) {
-  auto r = Parse("module m; interconnect a, b, c; endmodule");
+  auto r = Parse("module m; interconnect a, b; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   int net_count = 0;
@@ -213,7 +216,7 @@ TEST(TypeDeclParsing, NetDeclInterconnectMultipleNetIdentifiers) {
         item->data_type.is_interconnect)
       ++net_count;
   }
-  EXPECT_GE(net_count, 3);
+  EXPECT_EQ(net_count, 2);
 }
 
 TEST(TypeDeclParsing, TypedefWithVariableDimension) {
@@ -600,6 +603,94 @@ TEST(TypeDeclParsing, ForwardTypedefWithoutKeyword) {
   auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kTypedef);
   EXPECT_EQ(item->name, "incomplete_t");
+}
+
+// A.2.1.3 opens a data_declaration with `const`, then `var`, then a lifetime,
+// each optional, and §6.8's Syntax 6-3 repeats the order. Outside a class,
+// whose class_property puts qualifiers of its own in front, a qualifier
+// written after one that follows it in that order, or written twice, is
+// reported where it stands (#7589).
+TEST(TypeDeclParsing, DataDeclQualifiersOutOfOrderAreErrors) {
+  auto r = Parse(
+      "module m;\n"
+      "  static var logic a;\n"
+      "  var const int b = 1;\n"
+      "  initial begin\n"
+      "    automatic var c = 1'b0;\n"
+      "    static const int d = 2;\n"
+      "    var var int e;\n"
+      "  end\n"
+      "endmodule\n");
+  for (uint32_t line : {2U, 3U, 5U, 6U, 7U}) {
+    EXPECT_TRUE(ReportedError(r.diags,
+                              "a data declaration writes 'const', then 'var', "
+                              "then its lifetime, each at most once",
+                              line, "A.2.1.3"));
+  }
+}
+
+// Written in A.2.1.3's order, the qualifiers parse at module level and in a
+// block alike, a lifetime after `const` or `var` included, and a class
+// property keeps its leading `static` (#7589).
+TEST(TypeDeclParsing, DataDeclQualifiersInOrderParse) {
+  auto r = Parse(
+      "module m;\n"
+      "  var static logic a;\n"
+      "  const var int b = 1;\n"
+      "  const static int c = 2;\n"
+      "  const var static int d = 3;\n"
+      "  initial begin\n"
+      "    var automatic e = 1'b0;\n"
+      "    const static int f = 2;\n"
+      "  end\n"
+      "endmodule\n"
+      "class k;\n"
+      "  static const int w = 3;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// A.2.1.3 and §6.7's Syntax 6-2 give an interconnect declaration one net and
+// at most one more, so each net after the second is reported where it stands,
+// and the declaration is still read (#7590).
+TEST(TypeDeclParsing, InterconnectDeclThirdNetIsError) {
+  auto r = Parse(
+      "module m;\n"
+      "  interconnect a, b,\n"
+      "    c, d;\n"
+      "  interconnect e, f;\n"
+      "endmodule\n");
+  const char* const kTwoNets =
+      "an interconnect declaration names one net, or two";
+  EXPECT_TRUE(ReportedError(r.diags, kTwoNets, 3, "A.2.1.3"));
+  EXPECT_FALSE(ReportedError(r.diags, kTwoNets, 2, "A.2.1.3"));
+  EXPECT_FALSE(ReportedError(r.diags, kTwoNets, 4, "A.2.1.3"));
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_EQ(r.cu->modules[0]->items.size(), 6u);
+}
+
+// A.2.1.3 gives a net of a user-defined nettype a delay_control, a single
+// delay, where the form opening with a net_type keyword takes a delay3 of up
+// to three. So a nettype net written with two or three values is reported, and
+// one value, parenthesized or not, is accepted, as is a wire's three (#7591).
+TEST(TypeDeclParsing, NettypeNetMultiValueDelayIsError) {
+  auto r = Parse(
+      "module m;\n"
+      "  nettype real my_real;\n"
+      "  my_real #(1, 2) x;\n"
+      "  my_real #(1, 2, 3) y;\n"
+      "  my_real #(4) z;\n"
+      "  my_real #5 w;\n"
+      "  wire #(1, 2, 3) v;\n"
+      "endmodule\n");
+  const char* const kSingleDelay =
+      "a net of a user-defined nettype takes a single delay";
+  EXPECT_TRUE(ReportedError(r.diags, kSingleDelay, 3, "A.2.1.3"));
+  EXPECT_TRUE(ReportedError(r.diags, kSingleDelay, 4, "A.2.1.3"));
+  for (uint32_t line : {5U, 6U, 7U}) {
+    EXPECT_FALSE(ReportedError(r.diags, kSingleDelay, line, "A.2.1.3"));
+  }
 }
 
 }  // namespace

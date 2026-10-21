@@ -126,4 +126,20 @@ TEST(DefaultPortValueElaboration, NonConstantDefaultIsReported) {
   }
 }
 
+// §23.2.2.4: a default value may be given only in ANSI-style declarations, so
+// one written behind a non-ANSI input port's body declaration is reported, at
+// the port's place in the header.
+TEST(DefaultPortValueElaboration, NonAnsiPortDefaultIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m(a);\n"
+      "  input logic a = 1'b0;\n"
+      "endmodule\n",
+      f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "default value on port 'a'; defaults are only "
+                            "allowed with ANSI-style port declarations",
+                            1, "23.2.2.4"));
+}
+
 }  // namespace

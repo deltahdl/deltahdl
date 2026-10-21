@@ -7,6 +7,8 @@
 // group moved out of parser_stmt.cpp when the scoped-type predicate took that
 // file past the limit assert-no-oversized-source-files enforces.
 
+#include <algorithm>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -19,9 +21,58 @@
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 #include "parser/parser.h"
+#include "parser/parser_data_decl_internal.h"
 #include "parser/parser_token_skips.h"
 
 namespace delta {
+
+namespace {
+
+// Where A.2.1.3 places a data_declaration qualifier among the three it opens
+// one with, or -1 for a token that is none of them.
+int QualifierRank(TokenKind kind) {
+  switch (kind) {
+    case TokenKind::kKwConst:
+      return 0;
+    case TokenKind::kKwVar:
+      return 1;
+    case TokenKind::kKwStatic:
+    case TokenKind::kKwAutomatic:
+      return 2;
+    default:
+      return -1;
+  }
+}
+
+}  // namespace
+
+DataDeclQualifiers ParserDataDeclHelpers::ReadQualifiers(Parser& p) {
+  DataDeclQualifiers quals;
+  int last = -1;
+  for (int rank = QualifierRank(p.CurrentToken().kind); rank >= 0;
+       rank = QualifierRank(p.CurrentToken().kind)) {
+    const Token kTok = p.Consume();
+    if (rank <= last) {
+      p.diag_.Error(kTok.loc,
+                    "'" + std::string(kTok.text) +
+                        "' is out of place: a data declaration writes "
+                        "'const', then 'var', then its lifetime, each at most "
+                        "once",
+                    Subclause("A.2.1.3"));
+    }
+    last = std::max(last, rank);
+    if (kTok.kind == TokenKind::kKwConst) {
+      quals.is_const = true;
+    } else if (kTok.kind == TokenKind::kKwVar) {
+      quals.has_var = true;
+    } else {
+      quals.is_automatic = kTok.kind == TokenKind::kKwAutomatic;
+      quals.is_static = !quals.is_automatic;
+      quals.lifetime_loc = kTok.loc;
+    }
+  }
+  return quals;
+}
 
 bool Parser::IsBlockVarDeclStart() {
   auto saved = lexer_.SavePos();
@@ -171,14 +222,8 @@ bool Parser::IsScopedCallOrAssignStmt() {
 
 void Parser::ParseBlockDataDecl(std::vector<Stmt*>& stmts,
                                 const std::vector<Attribute>& attrs) {
-  bool is_const = Match(TokenKind::kKwConst);
-  bool is_automatic = Match(TokenKind::kKwAutomatic);
-  bool is_static = !is_automatic && Match(TokenKind::kKwStatic);
-  bool saw_var = Match(TokenKind::kKwVar);
-  if (!is_automatic && !is_static && saw_var) {
-    is_automatic = Match(TokenKind::kKwAutomatic);
-    is_static = !is_automatic && Match(TokenKind::kKwStatic);
-  }
+  const DataDeclQualifiers kQuals =
+      ParserDataDeclHelpers::ReadQualifiers(*this);
   // An inline enum, struct or union type is read here, as ParseDataType
   // leaves its keyword unread and OpensBlockDeclOutright hands the block item
   // back on that keyword. A type reference is read here as well (§6.23), which
@@ -193,7 +238,7 @@ void Parser::ParseBlockDataDecl(std::vector<Stmt*>& stmts,
     // is the one Parser::ParseTypedItemOrInst files at module level. The
     // declaration is read in full either way, so its declarators draw no
     // report of their own.
-    if (!saw_var) {
+    if (!kQuals.has_var) {
       diag_.Error(CurrentLoc(),
                   "type_reference in a variable declaration must be "
                   "preceded by the 'var' keyword",
@@ -206,12 +251,13 @@ void Parser::ParseBlockDataDecl(std::vector<Stmt*>& stmts,
   } else if (!TryParseInlineAggregateType(dtype)) {
     dtype = ParseDeclaredDataType();
   }
-  if (saw_var && dtype.kind == DataTypeKind::kImplicit &&
+  if (kQuals.has_var && dtype.kind == DataTypeKind::kImplicit &&
       Check(TokenKind::kLBracket)) {
     ParsePackedDims(dtype);
   }
 
-  if (!saw_var && !is_type_ref && dtype.kind == DataTypeKind::kImplicit) {
+  if (!kQuals.has_var && !is_type_ref &&
+      dtype.kind == DataTypeKind::kImplicit) {
     diag_.Error(CurrentLoc(),
                 "data_declaration without an explicit data type requires "
                 "the 'var' keyword",
@@ -222,9 +268,9 @@ void Parser::ParseBlockDataDecl(std::vector<Stmt*>& stmts,
     s->kind = StmtKind::kVarDecl;
     s->range.start = CurrentLoc();
     s->var_decl_type = dtype;
-    s->var_is_const = is_const;
-    s->var_is_automatic = is_automatic;
-    s->var_is_static = is_static;
+    s->var_is_const = kQuals.is_const;
+    s->var_is_automatic = kQuals.is_automatic;
+    s->var_is_static = kQuals.is_static;
     s->var_name = ExpectIdentifier(Subclause("6.8")).text;
     s->attrs = attrs;
     ParseUnpackedDims(s->var_unpacked_dims);

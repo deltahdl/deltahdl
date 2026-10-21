@@ -33,6 +33,9 @@ class TypeNameScope;
 // §19.3: the state a covergroup body is read with; defined in
 // parser/parser_covergroup_internal.h.
 struct CovergroupBodyState;
+// A.2.1.3: a data_declaration's qualifiers; defined in
+// parser/parser_data_decl_internal.h.
+struct DataDeclQualifiers;
 
 // A.1.11: the report on an item an anonymous program does not admit.
 inline constexpr char kAnonymousProgramItemsMessage[] =
@@ -90,6 +93,7 @@ class Parser {
   friend struct ParserClassHelpers;
   friend struct ParserClassHeaderHelpers;
   friend struct ParserConstraintItemHelpers;
+  friend struct ParserDataDeclHelpers;
   friend struct ParserClassOverrideHelpers;
   friend struct ParserConfigHelpers;
   // Expect reports through the diagnostic engine and is reached from nowhere
@@ -579,9 +583,9 @@ class Parser {
   ModuleItem* ParseAlwaysBlock(AlwaysKind kind);
   ModuleItem* ParseInitialBlock();
   ModuleItem* ParseFinalBlock();
-  void ParseVarPrefixed(std::vector<ModuleItem*>& items);
+  void ParseVarPrefixed(std::vector<ModuleItem*>& items, bool is_const);
   void ParseTypedItemOrInst(std::vector<ModuleItem*>& items,
-                            bool had_lifetime = false);
+                            const DataDeclQualifiers& quals);
   void ParseImplicitTypeOrInst(std::vector<ModuleItem*>& items);
   void RejectInstInProgram(SourceLoc loc, std::string_view cell,
                            const char* msg);

@@ -189,6 +189,43 @@ TEST(PortDeclParsing, NonAnsiRefDecl) {
   EXPECT_EQ(r.cu->modules[0]->ports[1].direction, Direction::kRef);
 }
 
+// A.2.1.2 writes a non-ANSI body port with a net_port_type, whose
+// implicit_data_type takes any number of packed dimensions, so a port typed by
+// its dimensions alone keeps every one of them (#7587).
+TEST(PortDeclParsing, NonAnsiImplicitTypeWithSeveralPackedDims) {
+  auto r = Parse(
+      "module m(a, b);\n"
+      "  input [3:0][1:0] a;\n"
+      "  output [1:0][7:0][2:0] b;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  const auto& ports = r.cu->modules[0]->ports;
+  ASSERT_EQ(ports.size(), 2u);
+  EXPECT_NE(ports[0].data_type.packed_dim_left, nullptr);
+  EXPECT_EQ(ports[0].data_type.extra_packed_dims.size(), 1u);
+  EXPECT_EQ(ports[1].data_type.extra_packed_dims.size(), 2u);
+  EXPECT_TRUE(ports[0].data_type.is_net);
+}
+
+// A.2.1.2 writes a non-ANSI output declaration of a variable port with a
+// list_of_variable_port_identifiers, and A.2.3 gives each of its ports an
+// optional `= constant_expression`, kept as the port's default_value (#7588).
+TEST(PortDeclParsing, NonAnsiOutputVariablePortInitializer) {
+  auto r = Parse(
+      "module m(q, r, s);\n"
+      "  output logic q = 1'b0;\n"
+      "  output var int r = 5, s;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  const auto& ports = r.cu->modules[0]->ports;
+  ASSERT_EQ(ports.size(), 3u);
+  EXPECT_NE(ports[0].default_value, nullptr);
+  EXPECT_NE(ports[1].default_value, nullptr);
+  EXPECT_EQ(ports[2].default_value, nullptr);
+}
+
 TEST(PortDeclParsing, ErrorInputMissingIdentifier) {
   // The port_identifier following the data type is required by
   // list_of_port_identifiers; the parser must reject input declarations that

@@ -451,7 +451,7 @@ TEST(VariableDeclarations, AutomaticVarWithoutDataTypeOk) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
-      "    automatic var x = 1'b0;\n"
+      "    var automatic x = 1'b0;\n"
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);

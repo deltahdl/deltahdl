@@ -85,15 +85,14 @@ TEST(NetDeclarationSyntax, InterconnectWithSingleDelayValue) {
 TEST(NetDeclarationSyntax, InterconnectMultipleIdentifiers) {
   auto r = Parse(
       "module m;\n"
-      "  interconnect ic1, ic2, ic3;\n"
+      "  interconnect ic1, ic2;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto& items = r.cu->modules[0]->items;
-  ASSERT_EQ(items.size(), 3u);
+  ASSERT_EQ(items.size(), 2u);
   EXPECT_EQ(items[0]->name, "ic1");
   EXPECT_EQ(items[1]->name, "ic2");
-  EXPECT_EQ(items[2]->name, "ic3");
   for (auto* it : items) {
     EXPECT_TRUE(it->data_type.is_interconnect);
   }

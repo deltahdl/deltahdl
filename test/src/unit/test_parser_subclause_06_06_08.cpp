@@ -70,10 +70,10 @@ TEST(InterconnectParsing, UnsignedQualifier) {
 }
 
 TEST(InterconnectParsing, MultipleNetsOneLine) {
-  auto r = Parse("module m; interconnect a, b, c; endmodule");
+  auto r = Parse("module m; interconnect a, b; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_GE(r.cu->modules[0]->items.size(), 3u);
+  EXPECT_EQ(r.cu->modules[0]->items.size(), 2u);
 }
 
 }  // namespace

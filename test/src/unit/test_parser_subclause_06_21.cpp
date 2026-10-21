@@ -173,7 +173,7 @@ TEST(ScopeAndLifetimeParsing, StaticVarKeywordInBlock) {
   EXPECT_TRUE(
       ParseOk6("module t;\n"
                "  initial begin\n"
-               "    static var logic x;\n"
+               "    var static logic x;\n"
                "  end\n"
                "endmodule\n"));
 }

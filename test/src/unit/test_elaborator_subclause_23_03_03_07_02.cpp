@@ -61,7 +61,8 @@ TEST(InterconnectPrimitiveTerminalElaboration,
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
-      "  interconnect ic_a, ic_b, ic_y;\n"
+      "  interconnect ic_a, ic_b;\n"
+      "  interconnect ic_y;\n"
       "  and (ic_y, ic_a, ic_b);\n"
       "endmodule\n",
       f);
@@ -124,7 +125,8 @@ TEST(InterconnectPrimitiveTerminalElaboration,
       "  endtable\n"
       "endprimitive\n"
       "module top;\n"
-      "  interconnect ic_y, ic_a, ic_b;\n"
+      "  interconnect ic_y, ic_a;\n"
+      "  interconnect ic_b;\n"
       "  my_udp u(ic_y, ic_a, ic_b);\n"
       "endmodule\n",
       f);

@@ -12,6 +12,7 @@
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
 #include "parser/parser.h"
+#include "parser/parser_data_decl_internal.h"
 #include "parser/parser_prototype_validate.h"
 #include "parser/parser_token_skips.h"
 
@@ -398,7 +399,16 @@ void Parser::ParseInterconnectItem(std::vector<ModuleItem*>& items) {
                   Subclause("10.3"));
     }
   }
+  // A.2.1.3 and §6.7's Syntax 6-2 write one net_identifier and an optional
+  // second one after a comma, so a net after the second is reported where it
+  // stands and still read.
+  const size_t kFirst = items.size();
   ParseVarDeclList(items, dtype);
+  for (size_t i = kFirst + 2; i < items.size(); ++i) {
+    diag_.Error(items[i]->loc,
+                "an interconnect declaration names one net, or two",
+                Subclause("A.2.1.3"));
+  }
 }
 
 // C.4.2 tells two forms of assignment apart by where they are placed: a
@@ -642,28 +652,29 @@ void Parser::ParseModuleItem(std::vector<ModuleItem*>& items) {
 
 void Parser::ParseDataDeclItem(std::vector<ModuleItem*>& items, size_t before,
                                const std::vector<Attribute>& attrs) {
-  SourceLoc lifetime_loc = CurrentLoc();
-  bool is_automatic = Match(TokenKind::kKwAutomatic);
-  if (is_automatic) {
-    diag_.Error(lifetime_loc,
+  // A.1.8 writes a checker's `rand` before the whole data_declaration.
+  bool is_rand = Match(TokenKind::kKwRand);
+  const DataDeclQualifiers kQuals =
+      ParserDataDeclHelpers::ReadQualifiers(*this);
+  if (kQuals.is_automatic) {
+    diag_.Error(kQuals.lifetime_loc,
                 "'automatic' is not allowed in a data_declaration outside "
                 "a procedural context",
                 Subclause("6.8"));
   }
-  bool is_static = !is_automatic && Match(TokenKind::kKwStatic);
-  bool is_rand = Match(TokenKind::kKwRand);
 
-  ParseTypedItemOrInst(items, is_automatic || is_static);
+  ParseTypedItemOrInst(items, kQuals);
   for (size_t i = before; i < items.size(); ++i) {
     if (is_rand) items[i]->is_rand = true;
-    if (is_automatic) items[i]->is_automatic = true;
-    if (is_static) items[i]->is_static = true;
+    if (kQuals.is_automatic) items[i]->is_automatic = true;
+    if (kQuals.is_static) items[i]->is_static = true;
   }
   AttachAttrs(items, before, attrs);
 }
 
-// Each declarator of the declaration is marked as written after `var`.
-void Parser::ParseVarPrefixed(std::vector<ModuleItem*>& items) {
+// Each declarator of the declaration is marked as written after `var`, and its
+// type as const where `is_const` says the declaration opened with `const`.
+void Parser::ParseVarPrefixed(std::vector<ModuleItem*>& items, bool is_const) {
   const size_t kFirst = items.size();
   if (!TryParseTypeRef(items)) {
     DataType dtype;
@@ -679,6 +690,7 @@ void Parser::ParseVarPrefixed(std::vector<ModuleItem*>& items) {
         ParsePackedDims(dtype);
       }
     }
+    if (is_const) dtype.is_const = true;
     ParseVarDeclList(items, dtype);
   }
   for (size_t i = kFirst; i < items.size(); ++i) {
@@ -688,11 +700,11 @@ void Parser::ParseVarPrefixed(std::vector<ModuleItem*>& items) {
 
 // §6.8, footnote 14 of Syntax 6-3: a data declaration whose type is implicit,
 // written as a sign, a packed range or nothing at all behind `const`, declares
-// a variable only after `var`, which `const var` writes after the `const`.
-static void ReportImplicitTypeWithoutVar(const DataType& dtype,
-                                         bool var_follows, SourceLoc loc,
+// a variable only after `var`. A declaration that wrote `var` is read by
+// ParseVarPrefixed instead, so one that reaches here wrote none.
+static void ReportImplicitTypeWithoutVar(const DataType& dtype, SourceLoc loc,
                                          DiagEngine& diag) {
-  if (dtype.kind != DataTypeKind::kImplicit || var_follows) return;
+  if (dtype.kind != DataTypeKind::kImplicit) return;
   diag.Error(loc,
              "data_declaration without an explicit data type requires the "
              "'var' keyword",
@@ -700,9 +712,9 @@ static void ReportImplicitTypeWithoutVar(const DataType& dtype,
 }
 
 void Parser::ParseTypedItemOrInst(std::vector<ModuleItem*>& items,
-                                  bool had_lifetime) {
-  if (Match(TokenKind::kKwVar)) {
-    ParseVarPrefixed(items);
+                                  const DataDeclQualifiers& quals) {
+  if (quals.has_var) {
+    ParseVarPrefixed(items, quals.is_const);
     return;
   }
 
@@ -725,25 +737,27 @@ void Parser::ParseTypedItemOrInst(std::vector<ModuleItem*>& items,
   }
   if (Check(TokenKind::kKwEnum)) {
     auto dtype = ParseEnumType();
+    dtype.is_const = quals.is_const;
     ParseVarDeclList(items, dtype);
     return;
   }
   if (Check(TokenKind::kKwStruct) || Check(TokenKind::kKwUnion)) {
     auto dtype = ParseStructOrUnionType();
     ParsePackedDims(dtype);
+    dtype.is_const = quals.is_const;
     ParseVarDeclList(items, dtype);
     return;
   }
   auto dtype = ParseDataType();
+  if (quals.is_const) dtype.is_const = true;
   if (dtype.kind != DataTypeKind::kImplicit || dtype.packed_dim_left ||
       dtype.signing_written || dtype.is_const) {
-    ReportImplicitTypeWithoutVar(dtype, Check(TokenKind::kKwVar), CurrentLoc(),
-                                 diag_);
+    ReportImplicitTypeWithoutVar(dtype, CurrentLoc(), diag_);
     ParseVarDeclList(items, dtype);
     return;
   }
 
-  if (had_lifetime) {
+  if (quals.is_automatic || quals.is_static) {
     diag_.Error(CurrentLoc(),
                 "data_declaration without an explicit data type requires "
                 "the 'var' keyword",

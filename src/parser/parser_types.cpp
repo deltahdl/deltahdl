@@ -694,31 +694,24 @@ void Parser::ParseUnpackedDims(std::vector<Expr*>& dims) {
 
 void Parser::ParseVarDeclList(std::vector<ModuleItem*>& items,
                               const DataType& dtype) {
-  DataType actual_dtype = dtype;
-
-  // Handle "const var type" case: if we have const with implicit type,
-  // the actual type follows the var keyword.
-  if (actual_dtype.kind == DataTypeKind::kImplicit && actual_dtype.is_const &&
-      Check(TokenKind::kKwVar)) {
-    Consume();  // consume "var"
-    actual_dtype = ParseDataType();
-    actual_dtype.is_const = true;  // preserve const flag
-    if (actual_dtype.kind == DataTypeKind::kImplicit &&
-        Check(TokenKind::kLBracket)) {
-      ParsePackedDims(actual_dtype);
-    }
-  }
-
   Expr* nd1 = nullptr;
   Expr* nd2 = nullptr;
   Expr* nd3 = nullptr;
-  bool nettype_named = actual_dtype.kind == DataTypeKind::kNamed &&
-                       known_nettypes_.count(actual_dtype.type_name) != 0;
+  bool nettype_named = dtype.kind == DataTypeKind::kNamed &&
+                       known_nettypes_.count(dtype.type_name) != 0;
   // §6.7 states the net declaration and §6.8 the variable declaration, and this
   // list is one or the other according to the type that heads it.
-  Subclause subclause(actual_dtype.is_net ? "6.7" : "6.8");
-  if (actual_dtype.is_net || nettype_named) {
+  Subclause subclause(dtype.is_net ? "6.7" : "6.8");
+  if (dtype.is_net || nettype_named) {
+    const SourceLoc kDelayLoc = CurrentLoc();
     ParseGateDelay(nd1, nd2, nd3);
+    // A.2.1.3 gives a net of a user-defined nettype a delay_control, a single
+    // delay, and the delay3 of up to three to a net_type keyword's net alone.
+    if (nettype_named && nd2 != nullptr) {
+      diag_.Error(kDelayLoc,
+                  "a net of a user-defined nettype takes a single delay",
+                  Subclause("A.2.1.3"));
+    }
     // §10.3.4 puts the drive strength before the delay on a net declaration as
     // well as on an `assign`, so a strength standing here breaks the same rule.
     // Parser::ParseNetStrength read the legal position, back in ParseDataType.
@@ -730,15 +723,15 @@ void Parser::ParseVarDeclList(std::vector<ModuleItem*>& items,
   bool first = true;
   do {
     auto* item = arena_.Create<ModuleItem>();
-    item->kind = actual_dtype.is_net ? ModuleItemKind::kNetDecl
-                                     : ModuleItemKind::kVarDecl;
+    item->kind =
+        dtype.is_net ? ModuleItemKind::kNetDecl : ModuleItemKind::kVarDecl;
     item->fsm_enum = kFsmEnum;
     item->first_in_decl_list = first;
     first = false;
     item->loc = CurrentLoc();
-    item->data_type = actual_dtype;
-    item->drive_strength0 = actual_dtype.drive_strength0;
-    item->drive_strength1 = actual_dtype.drive_strength1;
+    item->data_type = dtype;
+    item->drive_strength0 = dtype.drive_strength0;
+    item->drive_strength1 = dtype.drive_strength1;
     item->net_delay = nd1;
     item->net_delay_fall = nd2;
     item->net_delay_decay = nd3;

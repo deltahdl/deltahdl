@@ -3,7 +3,6 @@
 #include <gtest/gtest.h>
 
 #include "fixture_parser.h"
-#include "helpers_reported_error.h"
 #include "parser/ast_type.h"
 
 using namespace delta;
@@ -39,20 +38,20 @@ TEST(DefaultPortValueParsing, OutputWithDefaultValue) {
   EXPECT_NE(port.default_value, nullptr);
 }
 
-TEST(DefaultPortValueParsing, NonAnsiPortDefaultRejected) {
-  // §23.2.2.4: a default value may be given only in ANSI-style declarations.
-  // The non-ANSI port grammar carries no "= constant_expression" production, so
-  // attaching a default to a non-ANSI body port declaration is rejected here at
-  // the parser stage (the trailing "=" has nowhere to bind and breaks the
-  // declaration). Contrast with the ANSI-style defaults above, which parse
-  // cleanly.
+// §23.2.2.4: a default value may be given only in ANSI-style declarations.
+// A.2.3 gives the list of an output declaration of a variable port
+// `= constant_expression`, so the parser reads one behind every non-ANSI port
+// and keeps it, and the elaborator, which knows the port's kind, reports it
+// where it is a default (#7588).
+TEST(DefaultPortValueParsing, NonAnsiPortDefaultIsReadForTheElaborator) {
   auto r = Parse(
       "module m(a);\n"
       "  input logic a = 1'b0;\n"
       "endmodule\n");
-  // The `=` has nowhere to bind in the non-ANSI body declaration §23.2.2.1
-  // states, so the declaration's terminator is what the report names.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got '='", 2, "23.2.2.1"));
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules[0]->ports.size(), 1u);
+  EXPECT_NE(r.cu->modules[0]->ports[0].default_value, nullptr);
 }
 
 }  // namespace
