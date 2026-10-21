@@ -16,10 +16,10 @@ class SimContext;
 struct RtlirDesign;
 struct Variable;
 
-// §40.2.2: count the bits of every instance's nets and variables as its
-// coverable toggle items, and watch them. A real, a string, an event, a class
-// handle, a virtual interface and an unpacked aggregate hold no bits that
-// toggle between 0 and 1 and are left out.
+// §40.2.2: count the bits of every instance's ports, nets and variables as
+// its coverable toggle items, and watch them. A real, a string, an event, a
+// class handle, a virtual interface and an unpacked aggregate hold no bits
+// that toggle between 0 and 1 and are left out.
 void AttachToggleCoverage(const RtlirDesign* design, SimContext& ctx);
 
 // §40.5.2: the bits of the signal `var` of the instance `scope`: how many

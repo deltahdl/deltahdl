@@ -360,6 +360,31 @@ TEST_F(ItemCoverageRun, ASignalHandleCountsItsBitsAndTheirToggles) {
   EXPECT_EQ(vpi_get(vpiCoveredCount, v), 3);
 }
 
+// §40.5.2 on a port's handle: a port is a signal of its instance and stands
+// for its bits. An inout port is one net with its connection, which each
+// instance holding it still counts on its own (#7542).
+TEST_F(ItemCoverageRun, APortHandleCountsItsBits) {
+  Run("module leaf(input logic [1:0] p, inout wire [1:0] q);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic [1:0] v;\n"
+      "  wire [1:0] w = v;\n"
+      "  leaf a(v, w);\n"
+      "  leaf b(v, w);\n"
+      "  initial begin\n"
+      "    v = 2'b00; #1 v = 2'b01;\n"
+      "  end\n"
+      "endmodule\n");
+  vpiHandle p = Named(vpiNet, By("top.a"), "p");
+  vpiHandle q = Named(vpiNet, By("top.b"), "q");
+  ASSERT_NE(p, nullptr);
+  ASSERT_NE(q, nullptr);
+  EXPECT_EQ(vpi_get(vpiCoveredMax, p), 2);
+  EXPECT_EQ(vpi_get(vpiCovered, p), 1);
+  EXPECT_EQ(vpi_get(vpiCoveredMax, q), 2);
+  EXPECT_EQ(vpi_get(vpiCovered, q), 1);
+}
+
 // §40.5.2: a signal's bits are counted as its own, so a bit of a variable or
 // of a net is no item of its own and answers no coverage, while the signal
 // holding it does.
@@ -395,18 +420,43 @@ TEST_F(ItemCoverageRun, AnInstanceReachesItsFsms) {
   EXPECT_EQ(KindsOf(vpiFsm, By("top")), std::vector<int>{vpiFsm});
 }
 
+// A module declaring an FSM of two legal states, for instances below the top.
+constexpr const char* kLeafFsm =
+    "module leaf;\n"
+    "  parameter [1:0] /* tool enum fsm_e */ IDLE = 0, RUN = 1;\n"
+    "  /* tool state_vector st enum fsm_e */\n"
+    "  logic [1:0] st;\n"
+    "endmodule\n";
+
 // §40.5.2: an instance below the top reaches the FSMs its module declares
 // just as the top does.
 TEST_F(ItemCoverageRun, AnInstanceBelowTheTopReachesItsFsms) {
-  Run("module leaf;\n"
-      "  parameter [1:0] /* tool enum fsm_e */ IDLE = 0, RUN = 1;\n"
-      "  /* tool state_vector st enum fsm_e */\n"
-      "  logic [1:0] st;\n"
-      "endmodule\n"
+  Run(std::string(kLeafFsm) +
       "module top;\n"
       "  leaf u();\n"
       "endmodule\n");
   EXPECT_EQ(NamesOf(vpiFsm, By("top.u")), std::vector<std::string>{"st"});
+}
+
+// §40.5.2 with §27.5: an instance a generate block holds reaches its FSMs as
+// well, each reaching the signal of that instance holding its state and its
+// legal states (#7543).
+TEST_F(ItemCoverageRun, AnInstanceInAGenerateBlockReachesItsFsms) {
+  Run(std::string(kLeafFsm) +
+      "module top;\n"
+      "  if (1) begin : g\n"
+      "    leaf u();\n"
+      "  end\n"
+      "endmodule\n");
+  vpiHandle u = By("top.g.u");
+  ASSERT_NE(u, nullptr);
+  vpiHandle fsm = Named(vpiFsm, u, "st");
+  ASSERT_NE(fsm, nullptr);
+  vpiHandle signal = vpi_handle(vpiFsmStateExpression, fsm);
+  ASSERT_NE(signal, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, signal), "top.g.u.st");
+  EXPECT_EQ(NamesOf(vpiFsmStates, fsm),
+            (std::vector<std::string>{"IDLE", "RUN"}));
 }
 
 // §40.5.2: vpi_handle(vpiFsmStateExpression, fsm) reaches the signal holding

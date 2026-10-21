@@ -103,7 +103,7 @@ Variable* SignalNamed(const std::string& prefix, std::string_view name,
 }
 
 // The signals of the instance of `mod` keyed `prefix` that hold toggling
-// bits, each once.
+// bits, each once: its ports' and the nets and variables its body declares.
 std::vector<Variable*> InstanceSignals(const RtlirModule& mod,
                                        const std::string& prefix,
                                        SimContext& ctx) {
@@ -115,6 +115,9 @@ std::vector<Variable*> InstanceSignals(const RtlirModule& mod,
       signals.push_back(var);
     }
   };
+  for (const RtlirPort& port : mod.ports) {
+    if (port.num_unpacked_dims == 0) add(port.name);
+  }
   for (const RtlirNet& net : mod.nets) add(net.name);
   for (const RtlirVariable& var : mod.variables) {
     if (!var.is_enum_constant && var.num_unpacked_dims == 0) add(var.name);

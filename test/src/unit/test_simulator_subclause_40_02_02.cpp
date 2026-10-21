@@ -328,6 +328,28 @@ TEST(CoverageNomenclature, AResetBitHasHeldNeitherValue) {
   EXPECT_EQ(kOut, "2 1 0\n");
 }
 
+// §40.2.2 toggle coverage over an instance's ports: a port is a signal of its
+// instance, so the two bits of `p` are its coverable items, the one that held
+// both values covered (#7542).
+TEST(CoverageNomenclature, AnInstanceCountsTheBitsOfItsPorts) {
+  SimFixture f;
+  const std::string kOut = RunCapture(
+      "module leaf(input logic [1:0] p);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic [1:0] v;\n"
+      "  leaf u(v);\n"
+      "  initial begin\n"
+      "    v = 2'b00; #1 v = 2'b01;\n"
+      "    #1 $display(\"%0d %0d\", $coverage_get_max(23, 10, u),\n"
+      "                $coverage_get(23, 10, u));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(kOut, "2 1\n");
+}
+
 // §40.4: an FSM is identified by the signal its pragma names, so a pragma
 // naming no signal of the module identifies none, and the instance offers no
 // FSM state coverage, `SV_COV_NOCOV (0) to a check (#7531).

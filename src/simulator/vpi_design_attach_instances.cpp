@@ -348,7 +348,7 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
     AttachParameters(design, object_map_, call_objects_.unit_typespecs,
                      *sim_ctx_, kBuild);
     // §40.5.1: the FSMs whose coverage the run counts, and their states.
-    AttachFsms(object_map_, *sim_ctx_, kBuild);
+    AttachFsms(design, object_map_, *sim_ctx_, kBuild);
     AttachAttributes(design, object_map_, *sim_ctx_, kBuild);
     call_objects_.design = design;
     AttachClassVarTypespecs(design, object_map_, call_objects_.classes,
