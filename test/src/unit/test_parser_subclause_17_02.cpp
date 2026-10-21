@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <string>
 #include <vector>
 
 #include "fixture_parser.h"
@@ -408,6 +410,113 @@ TEST(CheckerDeclaration, OutputPortInitialValueParses) {
   ASSERT_GE(r.cu->checkers[0]->ports.size(), 1u);
   EXPECT_EQ(r.cu->checkers[0]->ports[0].direction, Direction::kOutput);
   EXPECT_NE(r.cu->checkers[0]->ports[0].default_value, nullptr);
+}
+
+// §17.2: the direction a checker formal is written with is input or output,
+// the two alternatives of A.1.8's checker_port_direction. The input and output
+// formals beside them are not reported.
+TEST(CheckerDeclaration, InoutOrRefFormalIsError) {
+  auto r = Parse(
+      "checker c(input logic a, inout logic b,\n"
+      "          output bit o, ref logic d);\n"
+      "endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "checker formal 'b' is declared 'inout'; a "
+                            "checker formal's direction is input or output",
+                            1, "17.2"));
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "checker formal 'd' is declared 'ref'; a "
+                            "checker formal's direction is input or output",
+                            2, "17.2"));
+  EXPECT_FALSE(
+      ReportedError(r.diags, "checker formal 'a' is declared", 1, "17.2"));
+  EXPECT_FALSE(
+      ReportedError(r.diags, "checker formal 'o' is declared", 2, "17.2"));
+}
+
+// The rule is the one the formal is written with: a formal after an inout one
+// that writes no direction of its own inherits it, and the report made at the
+// first formal is not made again at the second.
+TEST(CheckerDeclaration, FormalInheritingInoutIsNotReportedAgain) {
+  auto r = Parse("checker c(inout logic a, logic b); endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(ReportedError(r.diags, "checker formal 'a' is declared 'inout'",
+                            1, "17.2"));
+  EXPECT_FALSE(ReportedError(r.diags, "checker formal 'b' is declared 'inout'",
+                             1, "17.2"));
+}
+
+// §17.2 makes the legal types of a checker formal those §16.12 makes legal for
+// a property formal, and A.1.8 writes them as a property_formal_type: a net
+// type, `var` and an interface port header are port kinds of A.1.3 that none
+// of its forms reaches. An input formal of a data type is not reported, though
+// a module's input port of that type is an implicit net.
+TEST(CheckerDeclaration, NetOrVarFormalIsError) {
+  auto r = Parse(
+      "checker c(input wire a, input tri logic b,\n"
+      "          input var logic v, input logic d);\n"
+      "endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "checker formal 'a' is declared as a net; its type "
+                            "shall be one a property formal can take",
+                            1, "17.2"));
+  EXPECT_TRUE(ReportedError(r.diags, "checker formal 'b' is declared as a net",
+                            1, "17.2"));
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "checker formal 'v' is declared with 'var'; its "
+                            "type shall be one a property formal can take",
+                            2, "17.2"));
+  EXPECT_FALSE(
+      ReportedError(r.diags, "checker formal 'd' is declared", 2, "17.2"));
+}
+
+// The interface port header in its three spellings: the keyword alone, the
+// keyword with a modport, and an interface's name with a modport, with or
+// without a direction before it.
+TEST(CheckerDeclaration, InterfacePortFormalIsError) {
+  auto r = Parse(
+      "interface ifc; logic s; modport mp(input s); endinterface\n"
+      "checker c(interface i,\n"
+      "          interface.mp j,\n"
+      "          ifc.mp k,\n"
+      "          input ifc.mp m);\n"
+      "endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  struct Formal {
+    const char* name;
+    uint32_t line;
+  };
+  for (const Formal& formal :
+       {Formal{"i", 2}, Formal{"j", 3}, Formal{"k", 4}, Formal{"m", 5}}) {
+    EXPECT_TRUE(ReportedError(r.diags,
+                              std::string("checker formal '") + formal.name +
+                                  "' is declared as an interface port; its "
+                                  "type shall be one a property formal can "
+                                  "take",
+                              formal.line, "17.2"));
+  }
+}
+
+// A name and an identifier with nothing between them read the same whether
+// the name is an interface's or a type's the parser has not yet seen, so the
+// formal is not reported as an interface port on that reading alone.
+TEST(CheckerDeclaration, FormalOfAnUnseenTypeNameIsNotAnInterfacePort) {
+  auto r = Parse("checker c(T x); endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(
+      ReportedError(r.diags, "is declared as an interface port", 1, "17.2"));
+}
+
+// The rules are a checker's: a module's ports may be all of these.
+TEST(CheckerDeclaration, ModulePortsOfTheseKindsAreNotReported) {
+  auto r = Parse(
+      "interface ifc; endinterface\n"
+      "module m(interface i, inout wire a, ref logic d, input var logic v);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
 }
 
 }  // namespace

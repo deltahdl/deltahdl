@@ -134,6 +134,7 @@ class Parser {
   void ParsePortList(ModuleDecl& mod);
   void ParseOnePortOfList(ModuleDecl& mod, const PortDecl* prev,
                           bool is_checker);
+  void DiagnoseCheckerFormalAsWritten(const PortDecl& port);
   void ParseNonAnsiPortList(ModuleDecl& mod);
   PortDecl ParsePortDecl();
   void ParseModuleBody(ModuleDecl& mod);

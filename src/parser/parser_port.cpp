@@ -743,21 +743,13 @@ void Parser::ParsePortList(ModuleDecl& mod) {
 
 // One port of an ANSI port list, read, given the direction and type it
 // inherits from `prev`, and checked as a checker's formal when the list is a
-// checker's. A.1.8's checker_port_item names its formal with an identifier
-// alone, where A.1.3's ansi_port_declaration also admits `. port_identifier
-// ( [ expression ] )`, so a checker formal written that way is reported.
+// checker's: first as written, by Parser::DiagnoseCheckerFormalAsWritten in
+// parser_verify.cpp, and then for §17.2's rules on its type.
 void Parser::ParseOnePortOfList(ModuleDecl& mod, const PortDecl* prev,
                                 bool is_checker) {
   mod.ports.push_back(ParsePortDecl());
   PortDecl& port = mod.ports.back();
-  if (is_checker && port.is_explicit_named) {
-    diag_.Error(port.loc,
-                std::format("checker formal '{}' is named by an identifier "
-                            "alone; a checker_port_item has no '.name(...)' "
-                            "form",
-                            port.name),
-                Subclause("A.1.8"));
-  }
+  if (is_checker) DiagnoseCheckerFormalAsWritten(port);
   bool type_omitted = FormalTypeOmitted(port);
   bool direction_written = port.direction != Direction::kNone;
   ResolvePortDefaults(port, prev, is_checker);
