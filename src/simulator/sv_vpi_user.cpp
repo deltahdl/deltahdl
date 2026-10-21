@@ -23,9 +23,6 @@ vpiHandle vpi_register_assertion_cb(vpiHandle assertion, PLI_INT32 reason,
 
 namespace delta {
 
-// Maps a coverage property identifier from sv_vpi_user.h to the abstract
-// CoverageProperty used by the §40.5.2 query helpers. Returns nullopt for an
-// identifier that is not a coverage property.
 std::optional<CoverageProperty> CoveragePropertyFromVpi(int property) {
   switch (property) {
     case vpiAssertCoverage:

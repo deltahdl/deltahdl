@@ -278,4 +278,70 @@ TEST(CoverageNomenclature, AnFsmCountsTheDistinctTransitionsItMade) {
   EXPECT_EQ(kOut, "6 3\n");
 }
 
+// §40.3.2.1 `SV_COV_RESET (2) over statement coverage: the statements that ran
+// before it count as never executed, so the task's assignment, run again after
+// it, is covered once more - beside the second call and the assignment that
+// reads the figure, three in all (#7528).
+TEST(CoverageNomenclature, AResetStatementRunsAgainCountsAsExecuted) {
+  SimFixture f;
+  const std::string kOut = RunCapture(
+      "module top;\n"
+      "  int x, r1, r2;\n"
+      "  task automatic step(); x = x + 1; endtask\n"
+      "  initial begin\n"
+      "    step();\n"
+      "    r1 = $coverage_control(2, 22, 10, \"top\");\n"
+      "    step();\n"
+      "    r2 = $coverage_get(22, 10, \"top\");\n"
+      "    $display(\"%0d %0d\", r1, r2);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(kOut, "1 3\n");
+}
+
+// §40.3.2.1 `SV_COV_RESET over toggle coverage: a reset bit has held neither
+// value, so the two bits covered before it are not covered by the 1 they move
+// to after it, nor is the third bit, which never held a 0 since (#7529).
+TEST(CoverageNomenclature, AResetBitHasHeldNeitherValue) {
+  SimFixture f;
+  const std::string kOut = RunCapture(
+      "module leaf;\n"
+      "  logic [3:0] v;\n"
+      "  initial begin\n"
+      "    v = 4'b0000; #1 v = 4'b0011; #2 v = 4'b0111;\n"
+      "  end\n"
+      "endmodule\n"
+      "module top;\n"
+      "  leaf u1();\n"
+      "  int r1, r2, r3;\n"
+      "  initial begin\n"
+      "    #2 r1 = $coverage_get(23, 10, u1);\n"
+      "    r2 = $coverage_control(2, 23, 10, u1);\n"
+      "    #2 r3 = $coverage_get(23, 10, u1);\n"
+      "    $display(\"%0d %0d %0d\", r1, r2, r3);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(kOut, "2 1 0\n");
+}
+
+// §40.4: an FSM is identified by the signal its pragma names, so a pragma
+// naming no signal of the module identifies none, and the instance offers no
+// FSM state coverage, `SV_COV_NOCOV (0) to a check (#7531).
+TEST(CoverageNomenclature, APragmaNamingNoSignalIdentifiesNoFsm) {
+  SimFixture f;
+  const std::string kOut = RunCapture(
+      "module top;\n"
+      "  parameter [1:0] /* tool enum fsm_e */ IDLE = 0, RUN = 1;\n"
+      "  /* tool state_vector nosuch enum fsm_e */\n"
+      "  initial $display(\"%0d\", $coverage_control(3, 21, 10, \"top\"));\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(kOut, "0\n");
+}
+
 }  // namespace

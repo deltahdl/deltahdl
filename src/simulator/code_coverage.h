@@ -8,6 +8,7 @@
 // what §40.5.2's vpi_get() reads one statement, one signal, one assertion, one
 // FSM or one FSM state out of.
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <deque>
@@ -162,10 +163,8 @@ Tally* TallyIn(const std::unordered_map<const Stmt*, std::vector<Tally*>>& map,
                const Stmt* stmt, const std::string& prefix) {
   auto found = map.find(stmt);
   if (found == map.end()) return nullptr;
-  for (Tally* tally : found->second) {
-    if (tally->prefix == prefix) return tally;
-  }
-  return nullptr;
+  auto held = std::ranges::find(found->second, prefix, &Tally::prefix);
+  return held == found->second.end() ? nullptr : *held;
 }
 
 // The instance key a running process names its instance by, without the

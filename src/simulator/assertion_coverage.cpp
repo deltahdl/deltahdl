@@ -93,7 +93,6 @@ std::vector<const Stmt*> InstanceAssertions(const RtlirModule& mod) {
     ForEachCoverableStmt(proc.body, kAdd);
   }
   auto subroutine = [&](const ModuleItem* item) {
-    if (item == nullptr) return;
     for (const Stmt* stmt : item->func_body_stmts) {
       ForEachCoverableStmt(stmt, kAdd);
     }

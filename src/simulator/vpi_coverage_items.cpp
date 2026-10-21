@@ -42,39 +42,20 @@ std::optional<int> EntityProperty(int property, CoverageHandleKind kind,
 // §40.5.2 on an assertion handle. vpiCovered is true once the assertion has
 // been attempted, has succeeded at least once and has never failed; it is
 // covered by each nonvacuous success, or each match of a cover sequence,
-// which vpiCoveredCount counts; and it is one entity.
-std::optional<int> AssertionProperty(int property,
-                                     const AssertionCoverageCounters& c) {
-  std::optional<CoverageProperty> status;
-  switch (property) {
-    case vpiCovered:
-      return AssertionCovered(c) ? 1 : 0;
-    case vpiCoveredCount:
-      return static_cast<int>(AssertSuccessCovered(c));
-    case vpiCoveredMax:
-      return static_cast<int>(CoveredMax(CoverageHandleKind::kAssertion, {}));
-    case vpiAssertAttemptCovered:
-      status = CoverageProperty::kAssertAttemptCovered;
-      break;
-    case vpiAssertSuccessCovered:
-      status = CoverageProperty::kAssertSuccessCovered;
-      break;
-    case vpiAssertVacuousSuccessCovered:
-      status = CoverageProperty::kAssertVacuousSuccessCovered;
-      break;
-    case vpiAssertDisableCovered:
-      status = CoverageProperty::kAssertDisableCovered;
-      break;
-    case vpiAssertKillCovered:
-      status = CoverageProperty::kAssertKillCovered;
-      break;
-    case vpiAssertFailureCovered:
-      status = CoverageProperty::kAssertFailureCovered;
-      break;
-    default:
-      return std::nullopt;
+// which vpiCoveredCount counts; it is one entity; and each assertion-specific
+// property reads its own tally. `property` is one IsItemCoverageProperty
+// accepts.
+int AssertionProperty(int property, const AssertionCoverageCounters& c) {
+  if (property == vpiCovered) return AssertionCovered(c) ? 1 : 0;
+  if (property == vpiCoveredCount) {
+    return static_cast<int>(AssertSuccessCovered(c));
   }
-  return static_cast<int>(AssertionStatusQuery(*status, c));
+  if (property == vpiCoveredMax) {
+    return static_cast<int>(CoveredMax(CoverageHandleKind::kAssertion, {}));
+  }
+  return static_cast<int>(AssertionStatusQuery(
+      CoveragePropertyFromVpi(property).value_or(CoverageProperty::kCovered),
+      c));
 }
 
 // §40.5.1's coverage status properties and its assertion-specific ones.

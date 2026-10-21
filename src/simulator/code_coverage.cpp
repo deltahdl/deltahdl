@@ -15,7 +15,6 @@ std::string CoverageInstancePrefix(std::string prefix) {
 }
 
 void AttachCodeCoverage(const RtlirDesign* design, SimContext& ctx) {
-  if (design == nullptr) return;
   AttachStatementCoverage(design, ctx);
   AttachToggleCoverage(design, ctx);
   AttachAssertionCoverage(design, ctx);

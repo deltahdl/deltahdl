@@ -261,8 +261,9 @@ using AssertionControlRun = VpiDesignRun;
 // handle. Stopped before either succeeds, `first` gathers no coverage while
 // `second`, in the same instance, still does, so the instance counts one
 // covered assertion; a check through the handle answers what the instance
-// offers, and a type controlled per instance alone is a bad argument on an
-// assertion handle (#7540).
+// offers, a type controlled per instance alone is a bad argument on an
+// assertion handle, and a reset through it clears that assertion's coverage,
+// which the instance then counts no more (#7540).
 TEST_F(AssertionControlRun, AnAssertionHandleControlsThatAssertionAlone) {
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
@@ -293,6 +294,27 @@ TEST_F(AssertionControlRun, AnAssertionHandleControlsThatAssertionAlone) {
             static_cast<int>(CoverageStatus::kOk));
   EXPECT_EQ(vpi_control(vpiCoverageStart, vpiStatementCoverage, first),
             static_cast<int>(CoverageStatus::kError));
+
+  EXPECT_EQ(vpi_control(vpiCoverageReset, vpiAssertCoverage, first),
+            static_cast<int>(CoverageStatus::kOk));
+  EXPECT_EQ(vpi_control(vpiCoverageReset, vpiAssertCoverage, second),
+            static_cast<int>(CoverageStatus::kOk));
+  EXPECT_EQ(vpi_get(vpiCovered, second), 0);
+  EXPECT_EQ(vpi_get(vpiAssertSuccessCovered, second), 0);
+  EXPECT_EQ(
+      vpi_get(vpiAssertCoverage, vpi_handle_by_name(VpiText("top"), nullptr)),
+      0);
+}
+
+// C1: an assertion's coverage is collected as part of its instance's, so an
+// assertion handle standing in no instance that offers assertion coverage
+// controls nothing: the check of its instance's coverage answers
+// `SV_COV_ERROR, as for a scope that does not exist (#7540).
+TEST_F(VpiCoverageControlSim, AnAssertionInNoInstanceControlsNothing) {
+  VpiHandle assertion = vpi_ctx_.CreateAssertion("top.dut.a1", vpiAssert);
+
+  EXPECT_EQ(vpi_control(vpiCoverageStart, vpiAssertCoverage, assertion),
+            Status(CoverageStatus::kError));
 }
 
 }  // namespace

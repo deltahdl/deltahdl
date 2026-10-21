@@ -201,7 +201,6 @@ void AttachInstance(const RtlirModule& mod, const std::string& prefix,
 }  // namespace
 
 void AttachFsmCoverage(const RtlirDesign* design, SimContext& ctx) {
-  if (design == nullptr) return;
   WalkInstancePaths(design,
                     [&ctx](const RtlirModule* mod, const std::string& prefix) {
                       if (!mod->fsms.empty()) AttachInstance(*mod, prefix, ctx);

@@ -252,12 +252,14 @@ constexpr const char* kFsmDesign =
     "endmodule\n";
 
 // §40.5.2 on an assertion handle: an assertion that held at every attempt is
-// covered, its successes counted, and one that failed at every attempt is not,
-// its failures counted; each is one coverable entity (#7532).
+// covered, its successes counted, one that failed at every attempt is not,
+// its failures counted, and one whose clock never ticked has no tally at all;
+// each is one coverable entity (#7532).
 TEST_F(ItemCoverageRun, AnAssertionHandleReadsItsOwnTallies) {
   Run("module top;\n"
-      "  logic clk = 0, a = 1, b = 0;\n"
+      "  logic clk = 0, a = 1, b = 0, never = 0;\n"
       "  ok: assert property (@(posedge clk) a);\n"
+      "  idle: assert property (@(posedge never) a);\n"
       "  bad: assert property (@(posedge clk) b) else $display(\"bad\");\n"
       "  initial begin\n"
       "    #1 clk = 1; #1 clk = 0; #1 clk = 1; #1 clk = 0;\n"
@@ -280,6 +282,11 @@ TEST_F(ItemCoverageRun, AnAssertionHandleReadsItsOwnTallies) {
   EXPECT_EQ(vpi_get(vpiAssertSuccessCovered, bad), 0);
   EXPECT_EQ(vpi_get(vpiCovered, bad), 0);
   EXPECT_EQ(vpi_get(vpiCoveredMax, bad), 1);
+
+  vpiHandle idle = Named(vpiAssertion, By("top"), "idle");
+  ASSERT_NE(idle, nullptr);
+  EXPECT_EQ(vpi_get(vpiAssertAttemptCovered, idle), 0);
+  EXPECT_EQ(vpi_get(vpiCovered, idle), 0);
 }
 
 // §40.5.2 on a statement handle: a block stands for the statements it holds,
@@ -333,8 +340,9 @@ TEST_F(ItemCoverageRun, AnInstanceReachesItsFsms) {
 }
 
 // §40.5.2: vpi_handle(vpiFsmStateExpression, fsm) reaches the signal holding
-// the FSM's state, and, where a part-select holds it, that part-select of the
-// signal with the bounds the pragma wrote (#7536).
+// the FSM's state; where a part-select holds it, that part-select of the
+// signal with the bounds the pragma wrote; and where several signals do, their
+// concatenation, the signals its operands in the order written (#7536).
 TEST_F(ItemCoverageRun, AnFsmReachesTheExpressionHoldingItsState) {
   Run("module top;\n"
       "  parameter [1:0] /* tool enum fsm_e */ IDLE = 0, RUN = 1;\n"
@@ -343,6 +351,9 @@ TEST_F(ItemCoverageRun, AnFsmReachesTheExpressionHoldingItsState) {
       "  parameter [1:0] /* tool enum sel_e */ A = 0, B = 3;\n"
       "  /* tool state_vector bus[5:4] sel_fsm enum sel_e */\n"
       "  logic [7:0] bus;\n"
+      "  parameter [1:0] /* tool enum cat_e */ P = 0, Q = 3;\n"
+      "  /* tool state_vector {hi, lo} cat_fsm enum cat_e */\n"
+      "  logic hi, lo;\n"
       "endmodule\n");
   vpiHandle st = Named(vpiFsm, By("top"), "st");
   ASSERT_NE(st, nullptr);
@@ -362,6 +373,16 @@ TEST_F(ItemCoverageRun, AnFsmReachesTheExpressionHoldingItsState) {
   left.format = vpiIntVal;
   vpi_get_value(vpi_handle(vpiLeftRange, select), &left);
   EXPECT_EQ(left.value.integer, 5);
+
+  vpiHandle cat = Named(vpiFsm, By("top"), "cat_fsm");
+  ASSERT_NE(cat, nullptr);
+  vpiHandle concat = vpi_handle(vpiFsmStateExpression, cat);
+  EXPECT_EQ(OpOf(concat), vpiConcatOp);
+  std::vector<std::string> operands;
+  for (vpiHandle operand : OperandsOf(concat)) {
+    operands.emplace_back(vpi_get_str(vpiName, operand));
+  }
+  EXPECT_EQ(operands, (std::vector<std::string>{"hi", "lo"}));
 }
 
 // §40.5.2: vpi_iterate(vpiFsmStates, fsm) reaches the FSM's legal states, of
@@ -406,6 +427,17 @@ TEST_F(ItemCoverageRun, FsmAndStateHandlesReadTheStatesReached) {
   EXPECT_EQ(vpi_get(vpiCoveredCount, idle), 2);
   EXPECT_EQ(vpi_get(vpiCoveredMax, done), 1);
   EXPECT_EQ(vpi_get(vpiCovered, done), 0);
+}
+
+// §40.5.2: the assertion-specific properties are an assertion handle's alone,
+// and an instance handle is no single coverable item, so neither an FSM's nor
+// the instance's answers through them; vpi_get() falls back to 0 (#7539).
+TEST_F(ItemCoverageRun, OnlyItemHandlesAnswerItemCoverage) {
+  Run(kFsmDesign);
+  vpiHandle fsm = Named(vpiFsm, By("top"), "st");
+  ASSERT_NE(fsm, nullptr);
+  EXPECT_EQ(vpi_get(vpiAssertAttemptCovered, fsm), 0);
+  EXPECT_EQ(vpi_get(vpiCovered, By("top")), 0);
 }
 
 }  // namespace

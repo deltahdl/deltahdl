@@ -39,13 +39,9 @@ void ForEachRandsequenceCode(const Stmt* stmt,
   }
 }
 
-// The statements of the subroutine `item`, where it is a task or a function.
+// The statements of the task or function `item`.
 void ForEachSubroutineStmt(const ModuleItem* item,
                            const std::function<void(const Stmt*)>& fn) {
-  if (item == nullptr || (item->kind != ModuleItemKind::kFunctionDecl &&
-                          item->kind != ModuleItemKind::kTaskDecl)) {
-    return;
-  }
   for (const Stmt* stmt : item->func_body_stmts) ForEachCoverableStmt(stmt, fn);
 }
 

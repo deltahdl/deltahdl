@@ -79,6 +79,10 @@ enum class CoverageProperty : std::uint8_t {
   kAssertKillCovered,
 };
 
+// The CoverageProperty a §40.5.1 property identifier from sv_vpi_user.h names;
+// nothing for an identifier that is no coverage property.
+std::optional<CoverageProperty> CoveragePropertyFromVpi(int property);
+
 // Running tallies for one assertion's evaluation history. These back the
 // per-assertion status properties a client reads from an assertion handle.
 //
