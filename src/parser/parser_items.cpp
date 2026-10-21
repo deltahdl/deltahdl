@@ -233,22 +233,6 @@ bool Parser::TryParseProcessBlock(std::vector<ModuleItem*>& items) {
   return false;
 }
 
-bool Parser::IsAtClassDecl() {
-  if (Check(TokenKind::kKwClass)) return true;
-  if (!Check(TokenKind::kKwVirtual) && !Check(TokenKind::kKwInterface)) {
-    return false;
-  }
-  auto saved = lexer_.SavePos();
-  const bool kVirtual = Check(TokenKind::kKwVirtual);
-  Consume();
-  // A.1.2 writes no `virtual interface class`; it is read as a class all the
-  // same, so that Parser::ParseClassDecl reports the `virtual`.
-  if (kVirtual) Match(TokenKind::kKwInterface);
-  bool result = Check(TokenKind::kKwClass);
-  lexer_.RestorePos(saved);
-  return result;
-}
-
 // True when a method qualifier stands on a subroutine declared outside a class
 // body. §13.3 Syntax 13-1 and §13.4 Syntax 13-2 admit no qualifier before
 // `task` or `function`, and A.1.9 gives `method_qualifier ::= [ pure ] virtual

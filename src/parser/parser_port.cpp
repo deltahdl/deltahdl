@@ -15,6 +15,7 @@
 #include "parser/param_port_list.h"
 #include "parser/parser.h"
 #include "parser/parser_dpi_validate.h"
+#include "parser/parser_headers.h"
 #include "parser/parser_token_skips.h"
 
 namespace delta {
@@ -524,45 +525,6 @@ static const char* HeaderImportSubclause(ModuleDeclKind kind) {
       return "25.3";
     default:
       return "23.2.1";
-  }
-}
-
-// Where the parts of a design element's header that A.1.2 can leave out were
-// written, each invalid where it was not.
-struct HeaderPartLocs {
-  SourceLoc import_loc = SourceLoc::None();
-  SourceLoc params_loc = SourceLoc::None();
-  SourceLoc ports_loc = SourceLoc::None();
-};
-
-// A.1.2: a checker's header is its name and an optional port list alone, the
-// ( .* ) header of a module, an interface or a program writes nothing between
-// the name and ( .* ), and an extern declaration's header has no ( .* ) form,
-// since that form takes its ports from the extern declaration (§23.5).
-static void ReportUnwrittenHeaderParts(const ModuleDecl& decl,
-                                       const HeaderPartLocs& at,
-                                       DiagEngine& diag) {
-  const bool kChecker = decl.decl_kind == ModuleDeclKind::kChecker;
-  if (!kChecker && !decl.has_wildcard_ports) return;
-  const std::string_view kWhose =
-      kChecker ? "a checker header" : "a ( .* ) header";
-  if (at.import_loc.IsValid()) {
-    diag.Error(at.import_loc,
-               std::format("{} writes no package import declaration", kWhose),
-               Subclause("A.1.2"));
-  }
-  if (at.params_loc.IsValid()) {
-    diag.Error(at.params_loc,
-               std::format("{} writes no parameter port list", kWhose),
-               Subclause("A.1.2"));
-  }
-  if (kChecker && decl.has_wildcard_ports) {
-    diag.Error(at.ports_loc, "a checker header has no ( .* ) form",
-               Subclause("A.1.2"));
-  } else if (decl.is_extern && decl.has_wildcard_ports) {
-    diag.Error(at.ports_loc,
-               "an extern declaration's header has no ( .* ) form",
-               Subclause("A.1.2"));
   }
 }
 

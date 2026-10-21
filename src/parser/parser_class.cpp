@@ -8,11 +8,11 @@
 #include "common/source_loc.h"
 #include "lexer/token.h"
 #include "parser/ast_class.h"
-#include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
 #include "parser/param_port_list.h"
 #include "parser/parser.h"
+#include "parser/parser_headers.h"
 #include "parser/parser_token_skips.h"
 #include "parser/parser_type_name_scope.h"
 
@@ -113,99 +113,6 @@ ModuleDecl* Parser::ParseProgramDecl() {
   return decl;
 }
 
-void Parser::ParseExtendsArgList(ClassDecl* decl) {
-  Consume();
-  if (Match(TokenKind::kKwDefault)) {
-    decl->extends_has_default = true;
-  } else if (!Check(TokenKind::kRParen)) {
-    do {
-      decl->extends_args.push_back(ParseExpr());
-    } while (Match(TokenKind::kComma));
-  }
-  Expect(TokenKind::kRParen, Subclause("8.17"));
-}
-
-namespace {
-
-// Record one base, `ref`, named in a class's extends/implements clause onto
-// decl. The first non-implements base becomes the class's primary base_class
-// (and carries its type parameters into base_class_type_params when
-// has_type_params is set); every other entry is collected as an implemented
-// interface or an additional extended interface. has_type_params distinguishes
-// 'base #(...)' from a bare 'base' so the no-parameter case leaves
-// base_class_type_params untouched. Each keeps the scope written before its
-// name's last '::'. Returns whether this base was the primary base, so the
-// caller can route its following '(...)' argument list correctly.
-bool RecordClassExtendsBase(ClassDecl* decl, InterfaceRef ref,
-                            bool is_implements, bool has_type_params) {
-  bool is_first_base = !is_implements && decl->base_class.empty();
-  if (is_first_base) {
-    decl->base_class = ref.name;
-    decl->base_class_scope = ref.scope;
-  }
-  if (has_type_params && is_first_base) {
-    decl->base_class_type_params = ref.type_params;
-  }
-  if (is_implements) {
-    decl->implements_types.push_back(std::move(ref));
-  } else if (!is_first_base) {
-    decl->extends_interfaces.push_back(std::move(ref));
-  }
-  return is_first_base;
-}
-
-}  // namespace
-
-void Parser::ParseClassExtendsClause(ClassDecl* decl, bool is_implements) {
-  // §8.13 states the extends clause and §8.26.2 the implements clause, so which
-  // rule a malformed base name breaches depends on which clause is being read.
-  Subclause subclause(is_implements ? "8.26.2" : "8.13");
-  while (true) {
-    std::string_view scope;
-    auto name = Expect(TokenKind::kIdentifier, subclause).text;
-    while (Match(TokenKind::kColonColon)) {
-      scope = name;
-      name = Expect(TokenKind::kIdentifier, subclause).text;
-    }
-    std::vector<DataType> tparams;
-    bool has_type_params = Check(TokenKind::kHash);
-    if (has_type_params) {
-      Consume();
-      tparams = ParseTypeParamList();
-    }
-    RecordClassExtendsBase(decl, {name, std::move(tparams), scope},
-                           is_implements, has_type_params);
-
-    if (Check(TokenKind::kLParen)) {
-      // A.1.2: an interface class type, implemented or extended, takes no
-      // arguments; the list is still read so the header ends where it should.
-      if (is_implements || decl->is_interface) {
-        diag_.Error(CurrentLoc(),
-                    std::format("an interface class type in an {} clause "
-                                "takes no arguments",
-                                is_implements ? "implements" : "extends"),
-                    Subclause("A.1.2"));
-      }
-      if (is_implements) {
-        std::vector<Expr*> discard;
-        ParseParenList(discard);
-      } else {
-        ParseExtendsArgList(decl);
-      }
-    }
-    const SourceLoc kCommaLoc = CurrentLoc();
-    if (!Match(TokenKind::kComma)) break;
-    // A.1.2: a class extends one class type, and only an interface class
-    // extends a list of them.
-    if (!is_implements && !decl->is_interface) {
-      diag_.Error(kCommaLoc,
-                  "a class extends one class type; only an interface class "
-                  "extends several",
-                  Subclause("A.1.2"));
-    }
-  }
-}
-
 // Makes the type names of the classes decl derives from type names in decl's
 // own body. §8.13 gives a subclass the base class's members, and §8.26.3 gives
 // an extending interface class the parameters and typedefs of the interface
@@ -251,34 +158,7 @@ void Parser::AdoptMethodClassTypeNames(std::string_view class_name) {
 ClassDecl* Parser::ParseClassDecl() {
   auto* decl = arena_.Create<ClassDecl>();
   decl->range.start = CurrentLoc();
-  decl->is_virtual = Match(TokenKind::kKwVirtual);
-  decl->is_interface = Match(TokenKind::kKwInterface);
-  // A.1.2's interface_class_declaration writes neither `virtual` before it nor
-  // a final_specifier after `class`; both are reported and passed over.
-  if (decl->is_virtual && decl->is_interface) {
-    diag_.Error(decl->range.start, "an interface class is not declared virtual",
-                Subclause("A.1.2"));
-  }
-  Expect(TokenKind::kKwClass, Subclause("8.3"));
-
-  if (Match(TokenKind::kColon)) {
-    if (decl->is_interface) {
-      diag_.Error(CurrentLoc(), "an interface class takes no final specifier",
-                  Subclause("A.1.2"));
-    }
-    Expect(TokenKind::kKwFinal, Subclause("8.13"));
-    decl->is_final = true;
-  }
-  // Syntax 8-1 gives a class no lifetime, so one written here is reported and
-  // passed over, and the class name after it is still read.
-  if (Check(TokenKind::kKwAutomatic) || Check(TokenKind::kKwStatic)) {
-    diag_.Error(CurrentLoc(),
-                std::format("a class declaration takes no lifetime; '{}' "
-                            "stands where its name belongs",
-                            CurrentToken().text),
-                Subclause("8.3"));
-    Consume();
-  }
+  ParserClassHeaderHelpers::ParseHeadKeywords(*this, decl);
   decl->name = Expect(TokenKind::kIdentifier, Subclause("8.3")).text;
   // §8.3 makes a class a type, so its own name is registered here, ahead of the
   // scope below, and is a type name wherever the declaration is written.

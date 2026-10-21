@@ -88,6 +88,7 @@ class Parser {
   friend struct ParserPropertyGrammar;
   friend struct ParserSeqLinearHelpers;
   friend struct ParserClassHelpers;
+  friend struct ParserClassHeaderHelpers;
   friend struct ParserConstraintItemHelpers;
   friend struct ParserClassOverrideHelpers;
   friend struct ParserConfigHelpers;
