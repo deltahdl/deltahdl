@@ -558,9 +558,13 @@ void Parser::ParseFuncName(ModuleItem* item) {
     return;
   }
 
+  // A class this parse does not know, `Other` in `function Other::new();`, is
+  // read as no type at all and left for the name walk below, so a return type
+  // was written only where the reader consumed something.
   const SourceLoc kTypeLoc = CurrentLoc();
+  const auto kTypeStart = lexer_.SavePos().pos;
   item->return_type = ParseFunctionReturnType();
-  bool type_written = true;
+  bool type_written = lexer_.SavePos().pos != kTypeStart;
 
   if (item->return_type.kind == DataTypeKind::kNamed &&
       Check(TokenKind::kColonColon)) {
