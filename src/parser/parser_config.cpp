@@ -62,10 +62,10 @@ void Parser::ParseNamedParamAssignment(ConfigRule* rule) {
 }
 
 // §33.4.1.6 use_clause: `[ library_identifier . ] cell_identifier` followed by
-// its named parameter assignments. Form 3 lets an assignment directly follow
-// the cell_identifier with no separating comma ('use lib.cell .p(v), .q(w)'),
-// any further ones being comma-separated; a leading comma
-// ('use lib.cell , .p(v)') is tolerated as a lenient continuation.
+// its named parameter assignments. A.1.5's third form writes the first
+// assignment directly after the cell_identifier ('use lib.cell .p(v), .q(w)'),
+// any further ones being comma-separated, so a comma before the first
+// ('use lib.cell , .p(v)') is reported and the assignments are still read.
 // True when the '.' the parser is sitting on opens a named_parameter_assignment
 // rather than separating a library from a cell. Both spellings put a '.' and an
 // identifier after the first identifier of a use_clause -- `lib.cell` and
@@ -97,6 +97,12 @@ void Parser::ParseUseClauseCell(ConfigRule* rule) {
       ParseNamedParamAssignment(rule);
     } while (Match(TokenKind::kComma));
     return;
+  }
+  if (Check(TokenKind::kComma)) {
+    diag_.Error(CurrentLoc(),
+                "a use clause's first parameter assignment follows its cell "
+                "with no comma",
+                Subclause("A.1.5"));
   }
   while (Match(TokenKind::kComma)) {
     ParseNamedParamAssignment(rule);

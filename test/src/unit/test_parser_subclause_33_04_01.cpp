@@ -293,12 +293,13 @@ TEST(ConfigUseClauseParsing, BareNamedParameterAssignmentList) {
 }
 
 // use_clause ::= use [ library_identifier . ] cell_identifier
-//   { , named_parameter_assignment } [ : config ]
+//   named_parameter_assignment { , named_parameter_assignment } [ : config ]
+// with the : config suffix closing it.
 TEST(ConfigUseClauseParsing, CellFollowedByNamedParameterAssignments) {
   auto r = Parse(
       "config c;\n"
       "  design top;\n"
-      "  instance top.a use gateLib.adder, .W(8) : config;\n"
+      "  instance top.a use gateLib.adder .W(8) : config;\n"
       "endconfig\n");
   ASSERT_FALSE(r.has_errors);
   auto* rule = r.cu->configs[0]->rules[0];

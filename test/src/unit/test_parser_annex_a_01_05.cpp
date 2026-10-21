@@ -365,12 +365,12 @@ TEST(ConfigSourceText, UseClauseConfigSuffix) {
 }
 
 // Third alternative: a cell_identifier followed by a named_parameter_assignment
-// list.
+// list, the first assignment directly after the cell.
 TEST(ConfigSourceText, UseClauseCellWithNamedParams) {
   auto r = Parse(
       "config cfg;\n"
       "  design top;\n"
-      "  instance top.u1 use work.alt, .W(16), .D(4);\n"
+      "  instance top.u1 use work.alt .W(16), .D(4);\n"
       "endconfig\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -403,7 +403,7 @@ TEST(ConfigSourceText, UseClauseParamsWithConfigSuffix) {
   auto r = Parse(
       "config cfg;\n"
       "  design top;\n"
-      "  cell adder use work.fast_add, .W(32) : config;\n"
+      "  cell adder use work.fast_add .W(32) : config;\n"
       "endconfig\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -471,6 +471,20 @@ TEST(ConfigSourceText, UseClauseParamsAloneIsKept) {
   auto* rule = r.cu->configs[0]->rules[0];
   EXPECT_TRUE(rule->use_cell.empty());
   ASSERT_EQ(rule->use_params.size(), 1u);
+}
+
+// A.1.5 writes the third form's first named_parameter_assignment directly
+// after the cell_identifier, so a comma between them is reported (#7558).
+TEST(ConfigSourceText, UseClauseCommaBeforeTheFirstAssignmentIsReported) {
+  auto r = Parse(
+      "config cfg;\n"
+      "  design lib.top;\n"
+      "  instance top.a1 use lib.adder , .W(4);\n"
+      "endconfig\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "a use clause's first parameter assignment follows "
+                            "its cell with no comma",
+                            3, "A.1.5"));
 }
 
 }  // namespace
