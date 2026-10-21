@@ -238,12 +238,18 @@ TEST(CoverageMerge, AFileThatIsNoDatabaseIsAnError) {
   EXPECT_EQ(RunMerge(f, kToggle, "cut.cov"), kError);
 }
 
-// §40.3.2.4: a call that left the name out locates no database (#7524).
+// §40.3.2.4: a call that left the name out locates no database (#7524),
+// whether it left the name's place empty or stopped after the coverage type.
 TEST(CoverageMerge, AMissingNameIsAnError) {
   SimFixture f;
-  auto* call =
+  auto* empty_name =
       MkSysCall(f.arena, "$coverage_merge", {MkInt(f.arena, kToggle), nullptr});
-  EXPECT_EQ(static_cast<int32_t>(EvalExpr(call, f.ctx, f.arena).ToUint64()),
+  auto* no_name =
+      MkSysCall(f.arena, "$coverage_merge", {MkInt(f.arena, kToggle)});
+  EXPECT_EQ(
+      static_cast<int32_t>(EvalExpr(empty_name, f.ctx, f.arena).ToUint64()),
+      kError);
+  EXPECT_EQ(static_cast<int32_t>(EvalExpr(no_name, f.ctx, f.arena).ToUint64()),
             kError);
 }
 
