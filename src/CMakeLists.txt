@@ -396,6 +396,10 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/statement_assign_nonblocking.cpp
     simulator/assertion_read_names.cpp
     simulator/fsm_coverage.cpp
+    simulator/assertion_coverage.cpp
+    simulator/code_coverage.cpp
+    simulator/statement_coverage.cpp
+    simulator/toggle_coverage.cpp
     simulator/lowerer.cpp
     simulator/lowerer_net_arrays.cpp
     simulator/lowerer_params.cpp
@@ -785,6 +789,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/vpi_design_attach_elements.cpp
     simulator/vpi_design_attach_gen_scopes.cpp
     simulator/vpi_design_attach_instances.cpp
+    simulator/vpi_design_attach_fsms.cpp
     simulator/vpi_design_attach_interface_tf_decls.cpp
     simulator/vpi_design_attach_members.cpp
     simulator/vpi_design_attach_net_decls.cpp
@@ -807,6 +812,8 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/vpi_design_viewports.cpp
     simulator/vpi_expr_decompile.cpp
     simulator/vpi_handle.cpp
+    simulator/vpi_handle_instance.cpp
+    simulator/vpi_coverage_items.cpp
     simulator/vpi_handle_statements.cpp
     simulator/vpi_handle_timing.cpp
     simulator/vpi_helpers_assertions.cpp

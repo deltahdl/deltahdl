@@ -4,6 +4,7 @@
 
 #include "simulator/vpi_class_typespecs.h"
 #include "simulator/vpi_coverage.h"
+#include "simulator/vpi_coverage_items.h"
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_io_decl_stand_in.h"
 #include "simulator/vpi_user.h"
@@ -799,6 +800,12 @@ int VpiContext::Get(int property, VpiHandle obj) {
   if (std::optional<int> coverage_type = CoverageTypeForVpiProperty(property)) {
     return GetCoverageControlState().CoverageGet(CoverageScopeName(obj),
                                                  *coverage_type);
+  }
+  // §40.5.2: the coverage of the one assertion, statement, signal, FSM or FSM
+  // state a handle stands for.
+  if (std::optional<int> covered = VpiItemCoverage(obj, property, stmt_objects_,
+                                                   GetCoverageControlState())) {
+    return *covered;
   }
   // §37.33 detail 2: a class var reports the identifier of the object its
   // value names now.

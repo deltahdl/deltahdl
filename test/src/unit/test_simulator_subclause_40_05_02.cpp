@@ -9,8 +9,13 @@
 
 #include <cstdint>
 #include <optional>
+#include <string>
+#include <vector>
 
+#include "fixture_vpi_run.h"
+#include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_coverage.h"
+#include "simulator/vpi_user.h"
 
 namespace delta {
 namespace {
@@ -228,6 +233,179 @@ TEST(CoverageInformationQueries, InstanceCoverageSelectsByCoverageType) {
   EXPECT_EQ(InstanceCoverageCount(CoverageProperty::kToggleCoverage, inst), 4U);
   // A property that is not a coverage type selects nothing.
   EXPECT_EQ(InstanceCoverageCount(CoverageProperty::kCovered, inst), 0U);
+}
+
+// A design run with its VPI model built, whose coverable items are read back
+// through vpi_get() once the run is over.
+using ItemCoverageRun = VpiDesignRun;
+
+// An FSM of three legal states, entering IDLE twice and RUN once and never
+// reaching DONE.
+constexpr const char* kFsmDesign =
+    "module top;\n"
+    "  parameter [1:0] /* tool enum fsm_e */ IDLE = 0, RUN = 1, DONE = 2;\n"
+    "  /* tool state_vector st enum fsm_e */\n"
+    "  logic [1:0] st;\n"
+    "  initial begin\n"
+    "    st = IDLE; #1 st = RUN; #1 st = IDLE;\n"
+    "  end\n"
+    "endmodule\n";
+
+// §40.5.2 on an assertion handle: an assertion that held at every attempt is
+// covered, its successes counted, and one that failed at every attempt is not,
+// its failures counted; each is one coverable entity (#7532).
+TEST_F(ItemCoverageRun, AnAssertionHandleReadsItsOwnTallies) {
+  Run("module top;\n"
+      "  logic clk = 0, a = 1, b = 0;\n"
+      "  ok: assert property (@(posedge clk) a);\n"
+      "  bad: assert property (@(posedge clk) b) else $display(\"bad\");\n"
+      "  initial begin\n"
+      "    #1 clk = 1; #1 clk = 0; #1 clk = 1; #1 clk = 0;\n"
+      "  end\n"
+      "endmodule\n");
+  vpiHandle ok = Named(vpiAssertion, By("top"), "ok");
+  vpiHandle bad = Named(vpiAssertion, By("top"), "bad");
+  ASSERT_NE(ok, nullptr);
+  ASSERT_NE(bad, nullptr);
+
+  const int kAttempts = vpi_get(vpiAssertAttemptCovered, ok);
+  EXPECT_GT(kAttempts, 0);
+  EXPECT_EQ(vpi_get(vpiAssertSuccessCovered, ok), kAttempts);
+  EXPECT_EQ(vpi_get(vpiAssertFailureCovered, ok), 0);
+  EXPECT_EQ(vpi_get(vpiCovered, ok), 1);
+  EXPECT_EQ(vpi_get(vpiCoveredCount, ok), kAttempts);
+  EXPECT_EQ(vpi_get(vpiCoveredMax, ok), 1);
+
+  EXPECT_EQ(vpi_get(vpiAssertFailureCovered, bad), kAttempts);
+  EXPECT_EQ(vpi_get(vpiAssertSuccessCovered, bad), 0);
+  EXPECT_EQ(vpi_get(vpiCovered, bad), 0);
+  EXPECT_EQ(vpi_get(vpiCoveredMax, bad), 1);
+}
+
+// §40.5.2 on a statement handle: a block stands for the statements it holds,
+// the then branch among them, which never ran; any other statement stands for
+// itself and the statements it holds (#7533).
+TEST_F(ItemCoverageRun, AStatementHandleCountsTheStatementsItHolds) {
+  Run("module top;\n"
+      "  int x;\n"
+      "  initial begin\n"
+      "    x = 1;\n"
+      "    if (x == 0) x = 2;\n"
+      "  end\n"
+      "endmodule\n");
+  const std::vector<vpiHandle> kProcs = ObjectsOf(vpiProcess, By("top"));
+  ASSERT_EQ(kProcs.size(), 1u);
+  vpiHandle block = vpi_handle(vpiStmt, kProcs.front());
+  ASSERT_NE(block, nullptr);
+  EXPECT_EQ(vpi_get(vpiCoveredMax, block), 3);
+  EXPECT_EQ(vpi_get(vpiCovered, block), 2);
+  EXPECT_EQ(vpi_get(vpiCoveredCount, block), 2);
+
+  const std::vector<vpiHandle> kStmts = ObjectsOf(vpiStmt, block);
+  ASSERT_EQ(kStmts.size(), 2u);
+  EXPECT_EQ(vpi_get(vpiCoveredMax, kStmts[1]), 2);
+  EXPECT_EQ(vpi_get(vpiCovered, kStmts[1]), 1);
+}
+
+// §40.5.2 on a signal handle: a signal stands for its bits, a bit covered once
+// it has held both values, and its covered count is the toggles of its bits
+// summed - bit 0 moved once and bit 1 twice (#7534).
+TEST_F(ItemCoverageRun, ASignalHandleCountsItsBitsAndTheirToggles) {
+  Run("module top;\n"
+      "  logic [3:0] v;\n"
+      "  initial begin\n"
+      "    v = 4'b0000; #1 v = 4'b0011; #1 v = 4'b0001;\n"
+      "  end\n"
+      "endmodule\n");
+  vpiHandle v = By("top.v");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(vpi_get(vpiCoveredMax, v), 4);
+  EXPECT_EQ(vpi_get(vpiCovered, v), 2);
+  EXPECT_EQ(vpi_get(vpiCoveredCount, v), 3);
+}
+
+// §40.5.2: vpi_iterate(vpiFsm, instance) reaches the FSMs of the instance,
+// each named by its state signal where no fsm_name is written (#7535).
+TEST_F(ItemCoverageRun, AnInstanceReachesItsFsms) {
+  Run(kFsmDesign);
+  EXPECT_EQ(NamesOf(vpiFsm, By("top")), std::vector<std::string>{"st"});
+  EXPECT_EQ(KindsOf(vpiFsm, By("top")), std::vector<int>{vpiFsm});
+}
+
+// §40.5.2: vpi_handle(vpiFsmStateExpression, fsm) reaches the signal holding
+// the FSM's state, and, where a part-select holds it, that part-select of the
+// signal with the bounds the pragma wrote (#7536).
+TEST_F(ItemCoverageRun, AnFsmReachesTheExpressionHoldingItsState) {
+  Run("module top;\n"
+      "  parameter [1:0] /* tool enum fsm_e */ IDLE = 0, RUN = 1;\n"
+      "  /* tool state_vector st enum fsm_e */\n"
+      "  logic [1:0] st;\n"
+      "  parameter [1:0] /* tool enum sel_e */ A = 0, B = 3;\n"
+      "  /* tool state_vector bus[5:4] sel_fsm enum sel_e */\n"
+      "  logic [7:0] bus;\n"
+      "endmodule\n");
+  vpiHandle st = Named(vpiFsm, By("top"), "st");
+  ASSERT_NE(st, nullptr);
+  vpiHandle signal = vpi_handle(vpiFsmStateExpression, st);
+  ASSERT_NE(signal, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, signal), "top.st");
+
+  vpiHandle sel = Named(vpiFsm, By("top"), "sel_fsm");
+  ASSERT_NE(sel, nullptr);
+  vpiHandle select = vpi_handle(vpiFsmStateExpression, sel);
+  ASSERT_NE(select, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, select), vpiPartSelect);
+  vpiHandle parent = vpi_handle(vpiParent, select);
+  ASSERT_NE(parent, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, parent), "top.bus");
+  s_vpi_value left = {};
+  left.format = vpiIntVal;
+  vpi_get_value(vpi_handle(vpiLeftRange, select), &left);
+  EXPECT_EQ(left.value.integer, 5);
+}
+
+// §40.5.2: vpi_iterate(vpiFsmStates, fsm) reaches the FSM's legal states, of
+// the second FSM handle type §40.5.1 names (#7537).
+TEST_F(ItemCoverageRun, AnFsmReachesItsStates) {
+  Run(kFsmDesign);
+  vpiHandle fsm = Named(vpiFsm, By("top"), "st");
+  ASSERT_NE(fsm, nullptr);
+  EXPECT_EQ(NamesOf(vpiFsmStates, fsm),
+            (std::vector<std::string>{"DONE", "IDLE", "RUN"}));
+  EXPECT_EQ(KindsOf(vpiFsmStates, fsm),
+            (std::vector<int>{vpiFsmHandle, vpiFsmHandle, vpiFsmHandle}));
+}
+
+// §40.5.2: vpi_get_value() on an FSM state handle reads the value of the
+// state's parameter (#7538).
+TEST_F(ItemCoverageRun, AStateHandleHoldsItsParameterValue) {
+  Run(kFsmDesign);
+  vpiHandle fsm = Named(vpiFsm, By("top"), "st");
+  ASSERT_NE(fsm, nullptr);
+  s_vpi_value value = {};
+  value.format = vpiIntVal;
+  vpi_get_value(Named(vpiFsmStates, fsm, "DONE"), &value);
+  EXPECT_EQ(value.value.integer, 2);
+}
+
+// §40.5.2 on FSM handles: an FSM stands for its states, two of the three
+// reached and entered three times in all; a state is one entity, reached or
+// not, its count the times the FSM entered it (#7539).
+TEST_F(ItemCoverageRun, FsmAndStateHandlesReadTheStatesReached) {
+  Run(kFsmDesign);
+  vpiHandle fsm = Named(vpiFsm, By("top"), "st");
+  ASSERT_NE(fsm, nullptr);
+  EXPECT_EQ(vpi_get(vpiCoveredMax, fsm), 3);
+  EXPECT_EQ(vpi_get(vpiCovered, fsm), 2);
+  EXPECT_EQ(vpi_get(vpiCoveredCount, fsm), 3);
+
+  vpiHandle idle = Named(vpiFsmStates, fsm, "IDLE");
+  vpiHandle done = Named(vpiFsmStates, fsm, "DONE");
+  EXPECT_EQ(vpi_get(vpiCoveredMax, idle), 1);
+  EXPECT_EQ(vpi_get(vpiCovered, idle), 1);
+  EXPECT_EQ(vpi_get(vpiCoveredCount, idle), 2);
+  EXPECT_EQ(vpi_get(vpiCoveredMax, done), 1);
+  EXPECT_EQ(vpi_get(vpiCovered, done), 0);
 }
 
 }  // namespace

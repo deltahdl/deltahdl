@@ -24,6 +24,7 @@
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
+#include "simulator/statement_coverage.h"
 #include "simulator/stmt_exec.h"
 #include "simulator/stmt_exec_internal.h"
 #include "simulator/vpi_design_attach.h"
@@ -443,6 +444,9 @@ static FuncFlow ExecFuncRandsequence(const Stmt* stmt,
 
 FuncFlow ExecFuncStmt(const Stmt* stmt, const FuncExecCtx& exec) {
   if (!stmt) return FuncFlow::kNext;
+  // §40.2.2: a function's statement executing counts for statement coverage
+  // as one a process runs does.
+  NoteStatementExecuted(stmt, exec.ctx);
   switch (stmt->kind) {
     case StmtKind::kReturn:
       if (stmt->expr) ExecFuncReturn(stmt, exec);

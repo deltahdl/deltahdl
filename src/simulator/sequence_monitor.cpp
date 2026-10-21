@@ -933,15 +933,16 @@ std::vector<uint64_t> PendingSequenceStarts(
   return starts;
 }
 
-void AbortSequencePropertyAttempts(SequencePropertyState& state) {
-  state.attempts.clear();
+std::size_t AbortSequencePropertyAttempts(SequencePropertyState& state) {
+  return std::exchange(state.attempts, {}).size();
 }
 
-void AbortSequencePropertyAttemptAt(SequencePropertyState& state,
-                                    uint64_t started) {
-  std::erase_if(state.attempts, [started](const FirstMatchAttempt& attempt) {
-    return attempt.started == started;
-  });
+std::size_t AbortSequencePropertyAttemptAt(SequencePropertyState& state,
+                                           uint64_t started) {
+  return std::erase_if(state.attempts,
+                       [started](const FirstMatchAttempt& attempt) {
+                         return attempt.started == started;
+                       });
 }
 
 }  // namespace delta

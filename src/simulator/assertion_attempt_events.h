@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -12,9 +13,12 @@
 
 // What the events of one attempt of an assertion statement reach as the run
 // evaluates it: the results §16.14.3 keeps of a concurrent cover, and the
-// callbacks §39.4.2 has an application place on the assertion.
+// callbacks §39.4.2 has an application place on the assertion, and the
+// coverage §40.2.2 and §40.5.2 count of it.
 
 namespace delta {
+
+struct Process;
 
 // §39.3.1: the key the assertion API keeps `stmt` under as it runs in the
 // scope named `scope`: AssertionKey over that scope and the statement's
@@ -39,6 +43,11 @@ void NoteAttemptVerdict(const Stmt* stmt, const PropertyVerdict& verdict,
 // disable condition drops at the current time calls each
 // cbAssertionDisabledEvaluation callback placed on the assertion.
 void NoteAttemptDisabled(const Stmt* stmt, uint64_t started, SimContext& ctx);
+
+// §40.5.2: `killed` attempts of `stmt` the process `proc` kept in flight,
+// aborted by a kill, counted for the assertion's coverage.
+void NoteAttemptsKilled(const Stmt* stmt, const Process& proc,
+                        std::size_t killed, SimContext& ctx);
 
 // §39.4.2: calls each `reason` control callback placed on the assertion the
 // API keeps under `key`, with the current time as cb_time: at once, or,

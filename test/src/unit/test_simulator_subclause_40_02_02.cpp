@@ -184,4 +184,98 @@ TEST(CoverageNomenclature, StatementGranularityFollowsTheQuery) {
   EXPECT_EQ(CoveredMax(CoverageHandleKind::kAggregate, statement), 1u);
 }
 
+// §40.2.2, statement coverage, collected: every statement of an instance's
+// procedures is one of its coverable items, and one is covered once it has
+// executed. The block, its assignment, the if and its else branch, and the two
+// assignments reading the figures have run when the second figure is read; the
+// then branch never runs. `SV_COV_STATEMENT is 22 and `SV_COV_MODULE 10
+// (#7528).
+TEST(CoverageNomenclature, AnInstanceCountsTheStatementsThatRan) {
+  SimFixture f;
+  const std::string kOut = RunCapture(
+      "module top;\n"
+      "  int a, r1, r2;\n"
+      "  initial begin\n"
+      "    a = 1;\n"
+      "    if (a == 0) a = 2;\n"
+      "    else a = 3;\n"
+      "    r1 = $coverage_get_max(22, 10, \"top\");\n"
+      "    r2 = $coverage_get(22, 10, \"top\");\n"
+      "    $display(\"%0d %0d\", r1, r2);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(kOut, "8 6\n");
+}
+
+// §40.2.2, toggle coverage, collected: each bit of a signal is a coverable
+// item, covered once it has held both 0 and 1. Of the four bits of `v`, the
+// two that moved from 0 to 1 are covered, however often they move after; the
+// x the signal starts at is neither value. `SV_COV_TOGGLE is 23 (#7529).
+TEST(CoverageNomenclature, AnInstanceCountsTheBitsThatHeldBothValues) {
+  SimFixture f;
+  const std::string kOut = RunCapture(
+      "module leaf;\n"
+      "  logic [3:0] v;\n"
+      "  initial begin\n"
+      "    #1 v = 4'b0000; #1 v = 4'b0011; #1 v = 4'b0001;\n"
+      "  end\n"
+      "endmodule\n"
+      "module top;\n"
+      "  leaf u1();\n"
+      "  initial #5 $display(\"%0d %0d\", $coverage_get_max(23, 10, u1),\n"
+      "                      $coverage_get(23, 10, u1));\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(kOut, "4 2\n");
+}
+
+// §40.2.2, assertion coverage, collected: each assertion of an instance is a
+// coverable item, covered once it has succeeded. Of the three, the assert that
+// held is covered; the one that failed and the cover that never matched are
+// not. `SV_COV_ASSERTION is 20 (#7530).
+TEST(CoverageNomenclature, AnInstanceCountsTheAssertionsThatSucceeded) {
+  SimFixture f;
+  const std::string kOut = RunCapture(
+      "module top;\n"
+      "  logic a = 1, b = 0;\n"
+      "  int r1, r2;\n"
+      "  initial begin\n"
+      "    #1 assert (a);\n"
+      "    assert (b) else $display(\"failed\");\n"
+      "    cover (b);\n"
+      "    r1 = $coverage_get_max(20, 10, \"top\");\n"
+      "    r2 = $coverage_get(20, 10, \"top\");\n"
+      "    $display(\"%0d %0d\", r1, r2);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(kOut, "failed\n3 1\n");
+}
+
+// §40.2.1 lists FSM transition coverage beside state coverage, kept here under
+// the implementation-defined coverage type 24, which §40.3.1 leaves room for.
+// Three legal states allow six distinct moves between two of them; the FSM
+// makes three, IDLE to RUN twice among them, which counts once (#7531).
+TEST(CoverageNomenclature, AnFsmCountsTheDistinctTransitionsItMade) {
+  SimFixture f;
+  const std::string kOut = RunCapture(
+      "module top;\n"
+      "  parameter [1:0] /* tool enum fsm_e */ IDLE = 0, RUN = 1, DONE = 2;\n"
+      "  /* tool state_vector st enum fsm_e */\n"
+      "  logic [1:0] st;\n"
+      "  initial begin\n"
+      "    st = IDLE; #1 st = RUN; #1 st = IDLE; #1 st = RUN; #1 st = DONE;\n"
+      "    #1 $display(\"%0d %0d\", $coverage_get_max(24, 11, \"top\"),\n"
+      "                $coverage_get(24, 11, \"top\"));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(kOut, "6 3\n");
+}
+
 }  // namespace

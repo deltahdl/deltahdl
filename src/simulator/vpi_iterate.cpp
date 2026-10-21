@@ -451,6 +451,8 @@ bool VpiIterateMatches(VpiHandle obj, int type, VpiHandle ref,
   // §37.x: the vpiAssertion relation reaches every assertion kind, checked
   // between the two grouped mode blocks exactly as in the original order.
   if (type == vpiAssertion) return VpiIsAssertionType(obj->type);
+  // §40.5.2: vpiFsmStates reaches an FSM's states, of type vpiFsmHandle.
+  if (type == vpiFsmStates) return obj->type == vpiFsmHandle;
   if (VpiIterateMatchesClass(type, obj->type, matched)) return matched;
   // §37.20 detail 1: vpiMemory is a method returning vpiRegArray objects.
   if (type == vpiMemory) return obj->type == VpiMemoryIterationItemType();

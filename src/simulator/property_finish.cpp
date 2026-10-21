@@ -259,12 +259,15 @@ std::vector<PropertyVerdict> FinishPropertyTree(PropertyTreeState& state) {
   return verdicts;
 }
 
-void AbortPropertyTreeAttempts(PropertyTreeState& state) {
+std::size_t AbortPropertyTreeAttempts(PropertyTreeState& state) {
+  const std::size_t kAborted = state.attempts.size();
   state.attempts.clear();
+  return kAborted;
 }
 
-void AbortPropertyTreeAttemptAt(PropertyTreeState& state, uint64_t started) {
-  std::erase_if(state.attempts, [started](const NodeState* attempt) {
+std::size_t AbortPropertyTreeAttemptAt(PropertyTreeState& state,
+                                       uint64_t started) {
+  return std::erase_if(state.attempts, [started](const NodeState* attempt) {
     return attempt->started == started;
   });
 }

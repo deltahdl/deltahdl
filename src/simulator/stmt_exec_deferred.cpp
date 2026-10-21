@@ -809,13 +809,17 @@ static void AbortProcessAttempts(Process& proc, const AssertControlCall& call,
   if (proc.future_gclk_attempt_of != nullptr &&
       selects(proc.future_gclk_attempt_of)) {
     proc.active = false;
+    NoteAttemptsKilled(proc.future_gclk_attempt_of, proc, 1, ctx);
   }
   for (auto& [stmt, state] : proc.property_tree_states) {
-    if (state != nullptr && selects(stmt)) AbortPropertyTreeAttempts(*state);
+    if (state != nullptr && selects(stmt)) {
+      NoteAttemptsKilled(stmt, proc, AbortPropertyTreeAttempts(*state), ctx);
+    }
   }
   for (auto& [stmt, state] : proc.sequence_property_states) {
     if (state != nullptr && selects(stmt)) {
-      AbortSequencePropertyAttempts(*state);
+      NoteAttemptsKilled(stmt, proc, AbortSequencePropertyAttempts(*state),
+                         ctx);
     }
   }
   FlushKilledQueues(proc, selects);
@@ -832,26 +836,6 @@ static void AbortProcessAttempts(Process& proc, const AssertControlCall& call,
 void AbortKilledAttempts(const AssertControlCall& call, SimContext& ctx) {
   for (Process* proc : ctx.GetScheduler().Threads()) {
     AbortProcessAttempts(*proc, call, ctx);
-  }
-}
-
-void AbortAttemptStartedAt(std::string_view key, uint64_t started,
-                           SimContext& ctx) {
-  for (Process* proc : ctx.GetScheduler().Threads()) {
-    const std::string kScope = ProcessHierName(*proc, ctx);
-    auto keyed = [&](const Stmt* stmt) {
-      return RunAssertionKey(stmt, kScope, ctx) == key;
-    };
-    for (auto& [stmt, state] : proc->property_tree_states) {
-      if (state != nullptr && keyed(stmt)) {
-        AbortPropertyTreeAttemptAt(*state, started);
-      }
-    }
-    for (auto& [stmt, state] : proc->sequence_property_states) {
-      if (state != nullptr && keyed(stmt)) {
-        AbortSequencePropertyAttemptAt(*state, started);
-      }
-    }
   }
 }
 

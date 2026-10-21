@@ -27,13 +27,13 @@
 #include "simulator/awaiters.h"
 #include "simulator/awaiters_event_control.h"
 #include "simulator/class_object.h"
+#include "simulator/code_coverage.h"
 #include "simulator/coverage_control.h"
 #include "simulator/dpi_export.h"
 #include "simulator/dpi_formal_type.h"
 #include "simulator/dpi_runtime.h"
 #include "simulator/evaluation.h"
 #include "simulator/expr_walk.h"
-#include "simulator/fsm_coverage.h"
 #include "simulator/lowerer_always_comb.h"
 #include "simulator/lowerer_child.h"
 #include "simulator/lowerer_register.h"
@@ -903,9 +903,9 @@ void Lowerer::Lower(const RtlirDesign* design) {
   InitializeStaticLocals();
 
   AttachDesignClocking();
-  // §40.2.2 with §40.4: the FSMs the design's pragmas identify are counted
-  // from here, every module and its variables lowered.
-  AttachFsmCoverage(design, ctx_);
+  // §40.2.2 with §40.4: the design's statements, signals, assertions and the
+  // FSMs its pragmas identify are counted from here, every module lowered.
+  AttachCodeCoverage(design, ctx_);
   LinkCheckerInstantiations();
 
   RegisterDesignAssertionSampling();

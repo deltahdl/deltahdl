@@ -1,5 +1,6 @@
 #include "simulator/assertion_attempt_events.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -11,13 +12,16 @@
 #include "common/types.h"
 #include "parser/ast_stmt.h"
 #include "simulator/assertion_api.h"
+#include "simulator/assertion_coverage.h"
 #include "simulator/awaiters_event_control.h"
+#include "simulator/code_coverage.h"
 #include "simulator/cover_results.h"
 #include "simulator/cover_statement.h"
 #include "simulator/process.h"
 #include "simulator/property_attempts.h"
 #include "simulator/scheduler.h"
 #include "simulator/scope_hier_name.h"
+#include "simulator/sequence_monitor.h"
 #include "simulator/sim_context.h"
 #include "simulator/stmt_exec_assertion_internal.h"
 #include "simulator/sv_vpi_user.h"
@@ -78,6 +82,18 @@ std::string KeyHere(const Stmt* stmt, SimContext& ctx) {
     scope.resize(scope.size() - stmt->label.size() - 1);
   }
   return RunAssertionKey(stmt, scope, ctx);
+}
+
+// §40.2.2 with §40.5.2: one `outcome` of the assertion `stmt` the current
+// process evaluates, counted for its coverage; nothing is looked up for a
+// statement no instance counts.
+void NoteCoverageHere(const Stmt* stmt, AssertionOutcome outcome,
+                      SimContext& ctx) {
+  CoverageControlState& cov = ctx.GetCoverageControlState();
+  if (!cov.Code().assertions.contains(stmt)) return;
+  NoteAssertionOutcome(
+      stmt, CoverageInstancePrefix(ctx.ActiveInstancePrefix()), outcome, 1,
+      [&] { return KeyHere(stmt, ctx); }, cov);
 }
 
 // §39.4.2: calls each `reason` callback placed on the assertion `stmt`,
@@ -179,6 +195,7 @@ std::string RunAssertionKey(const Stmt* stmt, std::string_view scope,
 }
 
 void NoteAttemptBegun(const Stmt* stmt, SimContext& ctx) {
+  NoteCoverageHere(stmt, AssertionOutcome::kAttempt, ctx);
   if (ConcurrentCoverResult* record = ConcurrentCoverRecord(stmt, ctx)) {
     record->attempted += stmt->cover_sequence
                              ? CoverSequenceAttemptDelta()
@@ -200,17 +217,51 @@ void NoteAttemptVerdict(const Stmt* stmt, const PropertyVerdict& verdict,
   RecordConcurrentCoverVerdict(stmt, verdict, ctx);
   AssertionAttemptInfo info = AttemptBegunAt(verdict.started);
   int reason = cbAssertionFailure;
+  AssertionOutcome outcome = AssertionOutcome::kFailure;
   if (verdict.holds) {
     reason = verdict.vacuous ? cbAssertionVacuousSuccess : cbAssertionSuccess;
+    outcome = verdict.vacuous ? AssertionOutcome::kVacuousSuccess
+                              : AssertionOutcome::kSuccess;
   } else {
     info.fail_expr = TextOf(verdict.failed_at);
   }
+  NoteCoverageHere(stmt, outcome, ctx);
   RaiseAttemptEvent(stmt, reason, info, ctx);
 }
 
 void NoteAttemptDisabled(const Stmt* stmt, uint64_t started, SimContext& ctx) {
+  NoteCoverageHere(stmt, AssertionOutcome::kDisabled, ctx);
   RaiseAttemptEvent(stmt, cbAssertionDisabledEvaluation,
                     AttemptBegunAt(started), ctx);
+}
+
+void NoteAttemptsKilled(const Stmt* stmt, const Process& proc,
+                        std::size_t killed, SimContext& ctx) {
+  NoteAssertionOutcome(
+      stmt, CoverageInstancePrefix(proc.inst_prefix), AssertionOutcome::kKilled,
+      killed, [] { return std::string(); }, ctx.GetCoverageControlState());
+}
+
+void AbortAttemptStartedAt(std::string_view key, uint64_t started,
+                           SimContext& ctx) {
+  for (Process* proc : ctx.GetScheduler().Threads()) {
+    const std::string kScope = ProcessHierName(*proc, ctx);
+    auto keyed = [&](const Stmt* stmt) {
+      return RunAssertionKey(stmt, kScope, ctx) == key;
+    };
+    for (auto& [stmt, state] : proc->property_tree_states) {
+      if (state != nullptr && keyed(stmt)) {
+        NoteAttemptsKilled(stmt, *proc,
+                           AbortPropertyTreeAttemptAt(*state, started), ctx);
+      }
+    }
+    for (auto& [stmt, state] : proc->sequence_property_states) {
+      if (state != nullptr && keyed(stmt)) {
+        NoteAttemptsKilled(
+            stmt, *proc, AbortSequencePropertyAttemptAt(*state, started), ctx);
+      }
+    }
+  }
 }
 
 void RaiseAssertionControlCallback(std::string_view key, int reason,

@@ -17,6 +17,7 @@
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
 #include "simulator/vpi_coverage.h"
+#include "simulator/vpi_coverage_items.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers1.h"
@@ -195,14 +196,15 @@ int VpiContext::ControlCoverage(int operation, int coverage_type,
     case vpiCoverageStop:
     case vpiCoverageReset:
     case vpiCoverageCheck: {
-      // §40.5.3: Start/Stop/Reset/Check control the collection of coverage over
-      // a scope, with the semantics of $coverage_control() (§40.3.2.1). The
-      // coverage type selects the kind of coverage being controlled, put in
-      // the §40.3.1 terms the state keys it by, and since statement, toggle,
-      // and FSM coverage are not individually controllable, the control acts
-      // on the instance (or assertion) the handle names as a whole rather than
-      // on any sub-object of it.
+      // §40.5.3: Start/Stop/Reset/Check with $coverage_control()'s semantics
+      // (§40.3.2.1), the type put in §40.3.1's terms. Statement, toggle and
+      // FSM coverage are not individually controllable, so they act on the
+      // instance whole; an assertion handle controls that one assertion.
       CoverageControl control = CoverageControlForOperation(operation);
+      if (scope_handle != nullptr && VpiIsAssertionType(scope_handle->type)) {
+        return VpiControlAssertionCoverage(
+            control, coverage_type, *scope_handle, GetCoverageControlState());
+      }
       std::string scope = CoverageScopeName(scope_handle);
       return static_cast<int>(GetCoverageControlState().Control(
           control,

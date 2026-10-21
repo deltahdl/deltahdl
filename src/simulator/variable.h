@@ -18,6 +18,11 @@ struct DataType;
 
 struct Expr;
 struct StructTypeInfo;
+struct ToggleSignal;
+
+// §40.2.2 toggle coverage: look at the bits of the signal `signal` records
+// now that it may have changed (defined in toggle_coverage.cpp).
+void ObserveToggle(ToggleSignal& signal);
 
 // §10.6.1/§11.4.12: which bits of a procedural continuous assignment's
 // right-hand value a variable owns, and where in the variable they land. A
@@ -324,12 +329,18 @@ struct Variable {
   std::function<void()> cont_assign_reevaluate;
 
   std::vector<std::function<bool()>> watchers;
+  // §40.2.2: the toggle coverage record of this signal's bits, looked at on
+  // each change alongside the watchers; null for a variable no instance counts
+  // the toggles of. It is kept apart from the watchers so that every signal
+  // of a design can carry one without each write rebuilding the watcher list.
+  ToggleSignal* toggle = nullptr;
 
   void AddWatcher(std::function<bool()> cb) {
     watchers.push_back(std::move(cb));
   }
 
   void NotifyWatchers() {
+    if (toggle != nullptr) ObserveToggle(*toggle);
     auto pending = std::move(watchers);
     for (auto& cb : pending) {
       if (!cb()) watchers.push_back(std::move(cb));

@@ -1,16 +1,19 @@
 #include <gtest/gtest.h>
 
 #include <string>
+#include <string_view>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "fixture_vpi_run.h"
 #include "simulator/coverage_control.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -77,32 +80,6 @@ TEST_F(VpiCoverageControlSim, StartControlsCoverageOverTheInstanceHandle) {
   EXPECT_EQ(
       vpi_ctx_.GetCoverageControlState().StartCount("top.dut", kSvCovAssertion),
       1u);
-}
-
-// C1: the third argument of vpi_control() may be an assertion handle as well as
-// an instance handle. Control through an assertion handle acts on that
-// assertion's own scope, independently of an enclosing instance: assertion
-// coverage is not confined to instance-level control the way statement, toggle,
-// and FSM coverage are (§40.5.3). The same control rules are applied, just to
-// the scope the assertion handle names.
-TEST_F(VpiCoverageControlSim, ControlAcceptsAnAssertionHandle) {
-  vpi_ctx_.GetCoverageControlState().SetAvailability(
-      "top.dut", kSvCovAssertion, CoverageAvailability::kFull);
-  vpi_ctx_.GetCoverageControlState().SetAvailability(
-      "top.dut.a1", kSvCovAssertion, CoverageAvailability::kFull);
-  // vpiAssertion is the class the assertion kinds are grouped under; an
-  // assertion object carries one of those kinds, and vpiAssert is the one a
-  // concurrent assert directive carries.
-  VpiHandle assertion = vpi_ctx_.CreateAssertion("top.dut.a1", vpiAssert);
-
-  EXPECT_EQ(vpi_control(vpiCoverageStart, vpiAssertCoverage, assertion),
-            Status(CoverageStatus::kOk));
-  EXPECT_TRUE(vpi_ctx_.GetCoverageControlState().IsCollecting("top.dut.a1",
-                                                              kSvCovAssertion));
-  // Controlling the assertion did not implicitly start its enclosing instance;
-  // the action was scoped to the assertion the handle names.
-  EXPECT_FALSE(vpi_ctx_.GetCoverageControlState().IsCollecting(
-      "top.dut", kSvCovAssertion));
 }
 
 // C2: vpiCoverageStop stops collection and vpiCoverageReset clears collected
@@ -254,6 +231,68 @@ TEST_F(VpiCoverageControlSim, MergeAppliesCoverageMergeRules) {
   EXPECT_EQ(vpi_control(vpiCoverageMerge, vpiAssertCoverage, "missing"),
             Status(CoverageStatus::kError));
   EXPECT_EQ(vpi_ctx_.GetCoverageControlState().MergeCount("missing"), 0u);
+}
+
+// The status the control applied from inside the run below answered.
+int g_stop_status = 0;
+
+// The assertion of `top` named `name`, null for none.
+vpiHandle TopAssertion(std::string_view name) {
+  vpiHandle it =
+      vpi_iterate(vpiAssertion, vpi_handle_by_name(VpiText("top"), nullptr));
+  while (vpiHandle obj = it == nullptr ? nullptr : vpi_scan(it)) {
+    const char* own = vpi_get_str(vpiName, obj);
+    if (own != nullptr && name == own) return obj;
+  }
+  return nullptr;
+}
+
+// What the design's $stop_first runs: a stop of the assertion coverage of
+// `first` alone, through its handle.
+PLI_INT32 StopFirstCalltf(PLI_BYTE8* /*user_data*/) {
+  g_stop_status =
+      vpi_control(vpiCoverageStop, vpiAssertCoverage, TopAssertion("first"));
+  return 0;
+}
+
+using AssertionControlRun = VpiDesignRun;
+
+// C1: §40.5.3 controls assertion coverage one assertion at a time through its
+// handle. Stopped before either succeeds, `first` gathers no coverage while
+// `second`, in the same instance, still does, so the instance counts one
+// covered assertion; a check through the handle answers what the instance
+// offers, and a type controlled per instance alone is a bad argument on an
+// assertion handle (#7540).
+TEST_F(AssertionControlRun, AnAssertionHandleControlsThatAssertionAlone) {
+  s_vpi_systf_data data = {};
+  data.type = vpiSysTask;
+  data.tfname = VpiText("$stop_first");
+  data.calltf = &StopFirstCalltf;
+  ASSERT_NE(vpi_register_systf(&data), nullptr);
+  Run("module top;\n"
+      "  logic clk = 0, a = 1;\n"
+      "  first: assert property (@(posedge clk) a);\n"
+      "  second: assert property (@(posedge clk) a);\n"
+      "  initial begin\n"
+      "    $stop_first;\n"
+      "    #1 clk = 1; #1 clk = 0;\n"
+      "  end\n"
+      "endmodule\n");
+  vpiHandle first = TopAssertion("first");
+  vpiHandle second = TopAssertion("second");
+  ASSERT_NE(first, nullptr);
+  ASSERT_NE(second, nullptr);
+
+  EXPECT_EQ(g_stop_status, static_cast<int>(CoverageStatus::kOk));
+  EXPECT_EQ(vpi_get(vpiCovered, first), 0);
+  EXPECT_EQ(vpi_get(vpiCovered, second), 1);
+  EXPECT_EQ(
+      vpi_get(vpiAssertCoverage, vpi_handle_by_name(VpiText("top"), nullptr)),
+      1);
+  EXPECT_EQ(vpi_control(vpiCoverageCheck, vpiAssertCoverage, first),
+            static_cast<int>(CoverageStatus::kOk));
+  EXPECT_EQ(vpi_control(vpiCoverageStart, vpiStatementCoverage, first),
+            static_cast<int>(CoverageStatus::kError));
 }
 
 }  // namespace

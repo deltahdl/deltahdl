@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <vector>
@@ -84,11 +85,13 @@ void ForEachPropertyActual(
 // false and a weak one true, and reaches its verdict.
 std::vector<PropertyVerdict> FinishPropertyTree(PropertyTreeState& state);
 
-// §20.11: Kill aborts every attempt in flight, which reaches no verdict.
-void AbortPropertyTreeAttempts(PropertyTreeState& state);
+// §20.11: Kill aborts every attempt in flight, which reaches no verdict; the
+// number aborted, which §40.5.2 counts as killed.
+std::size_t AbortPropertyTreeAttempts(PropertyTreeState& state);
 
 // §39.5.2: the attempt in flight that began at `started`, in ticks, aborted,
-// reaching no verdict.
-void AbortPropertyTreeAttemptAt(PropertyTreeState& state, uint64_t started);
+// reaching no verdict; the number aborted.
+std::size_t AbortPropertyTreeAttemptAt(PropertyTreeState& state,
+                                       uint64_t started);
 
 }  // namespace delta

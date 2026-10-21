@@ -26,6 +26,8 @@
 #include <utility>
 #include <vector>
 
+#include "simulator/code_coverage.h"
+
 namespace delta {
 
 // §40.3.1 control-constant values accepted in the first argument.
@@ -334,6 +336,10 @@ class CoverageControlState {
   void SetDatabaseDirectory(std::string directory) {
     database_directory_ = std::move(directory);
   }
+
+  // §40.2.2: the statements, signals, assertions and FSMs whose coverage the
+  // run collects into this state, item by item.
+  CodeCoverage& Code() { return code_; }
 
   bool IsCollecting(const std::string& scope, int coverage_type) const {
     const TypeState* t = FindType(scope, coverage_type);
@@ -699,6 +705,7 @@ class CoverageControlState {
   // §40.3.2.4 and §40.3.2.5: the directory databases are kept in as files;
   // empty where they are kept in this state alone.
   std::string database_directory_;
+  CodeCoverage code_;
 
   // The rest is defined in coverage_control_db.cpp.
 

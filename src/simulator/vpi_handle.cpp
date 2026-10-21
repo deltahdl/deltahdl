@@ -22,9 +22,11 @@
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_constraint_relations.h"
 #include "simulator/vpi_context.h"
+#include "simulator/vpi_coverage_items.h"
 #include "simulator/vpi_data_structs.h"
 #include "simulator/vpi_design_prefixed_refs.h"
 #include "simulator/vpi_design_walk.h"
+#include "simulator/vpi_handle_instance.h"
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_io_decl_stand_in.h"
 #include "simulator/vpi_model_helpers1.h"
@@ -821,32 +823,6 @@ bool TryResolveTimingAndNettypeRelation(int type, VpiHandle ref,
   return TryResolveNettypeRelation(type, ref, out);
 }
 
-// §37.10 detail 3: vpi_handle(vpiInstance, obj) resolves to the immediate
-// enclosing instance - the nearest package, module, interface, or program the
-// object is instantiated in. The relation is not stored as a designated pointer
-// on the object; it is derived by walking outward through the scope chain, so
-// it is resolved here rather than by the generic single-level parent/child walk
-// below (which would miss any intervening non-instance scope such as a named
-// begin block). A null result is the correct answer when no instance encloses
-// the object, so this always claims the relation. Detail 2's vpiModule is
-// derived the same way: the module the object is inside, through a begin
-// block, a generate scope or an interface or program instance between, and
-// null where it is inside none.
-bool TryResolveInstanceRelation(int type, VpiHandle ref, VpiHandle& out) {
-  if (type == vpiInstance) {
-    out = VpiInstanceOf(ref);
-  } else if (type == kVpiModule) {
-    out = VpiModuleOf(ref);
-  } else if (type == vpiInstanceArray || type == vpiModuleArray ||
-             type == vpiPrimitiveArray) {
-    // §37.5 and §37.11: an element reaches the array it belongs to.
-    out = VpiInstanceArrayOf(ref, type);
-  } else {
-    return false;
-  }
-  return true;
-}
-
 // Runs the designated-pointer relation groups in their original order, stopping
 // at the first group that resolves the relation. Returns true (with the result
 // in `out`) when one fired; false when none did, leaving the caller to fall
@@ -872,6 +848,7 @@ bool TryResolveDesignatedRelation(int type, VpiHandle ref,
          TryResolvePrefixWithRelation(type, ref, out) ||
          TryResolveTimingAndNettypeRelation(type, ref, out) ||
          TryResolveInstanceRelation(type, ref, out) ||
+         TryResolveFsmRelation(type, ref, out) ||
          TryResolveCallbackRelation(type, ref, out);
 }
 

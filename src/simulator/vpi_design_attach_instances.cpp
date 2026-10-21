@@ -19,6 +19,7 @@
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_design_attach_assertion_decls.h"
 #include "simulator/vpi_design_attach_build.h"
+#include "simulator/vpi_design_attach_fsms.h"
 #include "simulator/vpi_design_attach_interconnects.h"
 #include "simulator/vpi_design_attach_interface_tf_decls.h"
 #include "simulator/vpi_design_attach_nets.h"
@@ -346,6 +347,8 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
         design, object_map_, call_objects_.classes, *sim_ctx_, kBuild);
     AttachParameters(design, object_map_, call_objects_.unit_typespecs,
                      *sim_ctx_, kBuild);
+    // §40.5.1: the FSMs whose coverage the run counts, and their states.
+    AttachFsms(object_map_, *sim_ctx_, kBuild);
     AttachAttributes(design, object_map_, *sim_ctx_, kBuild);
     call_objects_.design = design;
     AttachClassVarTypespecs(design, object_map_, call_objects_.classes,

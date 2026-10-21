@@ -1,8 +1,8 @@
 #include "simulator/fsm_coverage.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
-#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -14,6 +14,7 @@
 #include "common/types.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast_fsm.h"
+#include "simulator/code_coverage.h"
 #include "simulator/coverage_control.h"
 #include "simulator/lowerer_child.h"
 #include "simulator/sim_context.h"
@@ -23,24 +24,6 @@
 namespace delta {
 
 namespace {
-
-// One FSM of one instance: the signals holding its current state, the bits of
-// the one signal a part-select holds it in, its legal state values and those
-// of them it has reached.
-struct FsmCount {
-  std::vector<Variable*> signals;
-  std::optional<std::pair<int64_t, int64_t>> select;  // low and high offset
-  std::unordered_set<uint64_t> legal;
-  std::unordered_set<uint64_t> reached;
-};
-
-// The FSMs of one instance, counted together as the instance's coverage, and
-// the number of resets of the instance already applied to their counts.
-struct InstanceFsms {
-  std::string scope;
-  std::vector<FsmCount> fsms;
-  std::uint64_t resets = 0;
-};
 
 // The value `var` holds, or nothing where any bit of it is x or z, which no
 // legal state is.
@@ -71,37 +54,78 @@ std::optional<uint64_t> StateOf(const FsmCount& fsm) {
   return kLow >= 64 ? 0 : (state >> kLow) & kMask;
 }
 
-// §40.3.2.3 with §40.3.2.1: count the state each FSM of `inst` holds where
-// it is a legal one and the instance is collecting, starting the count over
-// where the instance was reset since, and report the states reached so far.
-void Count(InstanceFsms& inst, CoverageControlState& cov) {
-  if (cov.ResetCount(inst.scope, kCoverageTypeFsmState) != inst.resets) {
-    inst.resets = cov.ResetCount(inst.scope, kCoverageTypeFsmState);
-    for (FsmCount& fsm : inst.fsms) fsm.reached.clear();
-  }
-  if (!cov.IsCollecting(inst.scope, kCoverageTypeFsmState)) return;
-  std::int64_t reached = 0;
-  for (FsmCount& fsm : inst.fsms) {
-    const std::optional<uint64_t> kState = StateOf(fsm);
-    if (kState && fsm.legal.contains(*kState)) fsm.reached.insert(*kState);
-    reached += static_cast<std::int64_t>(fsm.reached.size());
-  }
-  cov.SetCoveredItems(inst.scope, kCoverageTypeFsmState, reached);
+// §40.4.6: whether `state` is one of the legal states of `fsm`.
+bool IsLegal(const FsmCount& fsm, uint64_t state) {
+  return std::ranges::any_of(
+      fsm.states, [state](const auto& named) { return named.second == state; });
 }
 
-// §40.4.6: the legal state values of `decl` in the instance keyed `prefix`,
-// the values its state parameters hold there, each once.
-std::unordered_set<uint64_t> LegalStates(const FsmDecl& decl,
-                                         const std::string& prefix,
-                                         SimContext& ctx) {
-  std::unordered_set<uint64_t> legal;
+// §40.4.6: the number of legal states of `fsm`, each value once.
+std::int64_t LegalCount(const FsmCount& fsm) {
+  std::unordered_set<uint64_t> values;
+  for (const auto& named : fsm.states) values.insert(named.second);
+  return static_cast<std::int64_t>(values.size());
+}
+
+// §40.3.2.1 `SV_COV_RESET: a reset of FSM state coverage forgets the states
+// reached and how often, and one of transition coverage the moves made, each
+// in every FSM of `inst`, where it was reset since last looked at.
+void ApplyResets(InstanceFsms& inst, CoverageControlState& cov) {
+  const std::uint64_t kStates =
+      cov.ResetCount(inst.scope, kCoverageTypeFsmState);
+  const std::uint64_t kMoves =
+      cov.ResetCount(inst.scope, kCoverageTypeFsmTransition);
+  for (FsmCount& fsm : inst.fsms) {
+    if (kStates != inst.state_resets) fsm.visits.clear();
+    if (kMoves != inst.transition_resets) fsm.transitions.clear();
+  }
+  inst.state_resets = kStates;
+  inst.transition_resets = kMoves;
+}
+
+// §40.3.2.3 with §40.3.2.1: look at the state each FSM of `inst` holds. A
+// legal state it enters, or holds as the first look since a reset, is a visit
+// counted where the instance collects FSM state coverage, and a move into it
+// from the legal state it held before is a transition counted where it
+// collects transition coverage; report the states reached and the distinct
+// transitions made so far.
+void Count(InstanceFsms& inst, CoverageControlState& cov) {
+  ApplyResets(inst, cov);
+  const bool kStates = cov.IsCollecting(inst.scope, kCoverageTypeFsmState);
+  const bool kMoves = cov.IsCollecting(inst.scope, kCoverageTypeFsmTransition);
+  std::int64_t reached = 0;
+  std::int64_t moved = 0;
+  for (FsmCount& fsm : inst.fsms) {
+    const std::optional<uint64_t> kState = StateOf(fsm);
+    if (kState && IsLegal(fsm, *kState)) {
+      const bool kEntered = fsm.last != kState;
+      if (kStates && (kEntered || !fsm.visits.contains(*kState))) {
+        ++fsm.visits[*kState];
+      }
+      if (kMoves && kEntered && fsm.last) {
+        fsm.transitions.emplace(*fsm.last, *kState);
+      }
+      fsm.last = kState;
+    }
+    reached += static_cast<std::int64_t>(fsm.visits.size());
+    moved += static_cast<std::int64_t>(fsm.transitions.size());
+  }
+  cov.SetCoveredItems(inst.scope, kCoverageTypeFsmState, reached);
+  cov.SetCoveredItems(inst.scope, kCoverageTypeFsmTransition, moved);
+}
+
+// §40.4.6: the legal states of `decl` in the instance keyed `prefix`, each
+// state parameter by name with the value it holds there.
+std::vector<std::pair<std::string_view, uint64_t>> LegalStates(
+    const FsmDecl& decl, const std::string& prefix, SimContext& ctx) {
+  std::vector<std::pair<std::string_view, uint64_t>> states;
   for (std::string_view state : decl.states) {
     const Variable* param = ctx.FindVariable(VpiFlatName(prefix, state));
     const std::optional<uint64_t> kValue =
         param != nullptr ? KnownValue(*param) : std::nullopt;
-    if (kValue) legal.insert(*kValue);
+    if (kValue) states.emplace_back(state, *kValue);
   }
-  return legal;
+  return states;
 }
 
 // The FSM `decl` of the instance keyed `prefix`, built from the run's
@@ -109,6 +133,7 @@ std::unordered_set<uint64_t> LegalStates(const FsmDecl& decl,
 std::optional<FsmCount> FsmOf(const FsmDecl& decl, const std::string& prefix,
                               SimContext& ctx) {
   FsmCount fsm;
+  fsm.decl = decl;
   for (std::string_view name : decl.state_signals) {
     Variable* signal = ctx.FindVariable(VpiFlatName(prefix, name));
     if (signal == nullptr) return std::nullopt;
@@ -120,39 +145,57 @@ std::optional<FsmCount> FsmOf(const FsmDecl& decl, const std::string& prefix,
     const int64_t kLsb = kRange.OffsetOf(decl.lsb);
     fsm.select = std::make_pair(std::min(kMsb, kLsb), std::max(kMsb, kLsb));
   }
-  fsm.legal = LegalStates(decl, prefix, ctx);
+  fsm.states = LegalStates(decl, prefix, ctx);
   return fsm;
 }
 
-// Arm the counting of the FSMs of the instance of `mod` keyed `prefix`.
+// §40.3.2.1 and §40.3.2.2: give the instance's FSMs to its scope as coverable
+// items of `type`, `count` of them, with full availability, and start
+// collecting them.
+void ArmType(const InstanceFsms& inst, int type, std::int64_t count,
+             CoverageControlState& cov) {
+  cov.SetCoverableItems(inst.scope, type, count);
+  cov.SetAvailability(inst.scope, type, CoverageAvailability::kFull);
+  cov.Control(CoverageControl::kStart, type, inst.scope,
+              /*include_below=*/false);
+}
+
+// Arm the counting of the FSMs of the instance of `mod` keyed `prefix`. An
+// FSM of n legal states can make n * (n - 1) distinct transitions.
 void AttachInstance(const RtlirModule& mod, const std::string& prefix,
                     SimContext& ctx) {
-  auto inst = std::make_shared<InstanceFsms>();
-  inst->scope = CoverageScopeOfInstanceKey(prefix, ctx);
+  CoverageControlState& cov = ctx.GetCoverageControlState();
+  InstanceFsms& inst = cov.Code().fsm_instances.emplace_back();
+  inst.prefix = prefix;
+  inst.scope = CoverageScopeOfInstanceKey(prefix, ctx);
   std::int64_t legal = 0;
+  std::int64_t moves = 0;
   for (const FsmDecl& decl : mod.fsms) {
     std::optional<FsmCount> fsm = FsmOf(decl, prefix, ctx);
     if (!fsm) continue;
-    legal += static_cast<std::int64_t>(fsm->legal.size());
-    inst->fsms.push_back(std::move(*fsm));
+    const std::int64_t kLegal = LegalCount(*fsm);
+    legal += kLegal;
+    moves += kLegal * (kLegal - 1);
+    inst.fsms.push_back(std::move(*fsm));
   }
-  if (inst->fsms.empty()) return;
-  CoverageControlState& cov = ctx.GetCoverageControlState();
-  cov.SetCoverableItems(inst->scope, kCoverageTypeFsmState, legal);
-  cov.SetAvailability(inst->scope, kCoverageTypeFsmState,
-                      CoverageAvailability::kFull);
-  cov.Control(CoverageControl::kStart, kCoverageTypeFsmState, inst->scope,
-              /*include_below=*/false);
-  inst->resets = cov.ResetCount(inst->scope, kCoverageTypeFsmState);
-  for (const FsmCount& fsm : inst->fsms) {
+  if (inst.fsms.empty()) {
+    cov.Code().fsm_instances.pop_back();
+    return;
+  }
+  ArmType(inst, kCoverageTypeFsmState, legal, cov);
+  ArmType(inst, kCoverageTypeFsmTransition, moves, cov);
+  inst.state_resets = cov.ResetCount(inst.scope, kCoverageTypeFsmState);
+  inst.transition_resets =
+      cov.ResetCount(inst.scope, kCoverageTypeFsmTransition);
+  for (const FsmCount& fsm : inst.fsms) {
     for (Variable* signal : fsm.signals) {
-      signal->AddWatcher([inst, &cov]() {
-        Count(*inst, cov);
+      signal->AddWatcher([&inst, &cov]() {
+        Count(inst, cov);
         return false;
       });
     }
   }
-  Count(*inst, cov);
+  Count(inst, cov);
 }
 
 }  // namespace
@@ -163,6 +206,24 @@ void AttachFsmCoverage(const RtlirDesign* design, SimContext& ctx) {
                     [&ctx](const RtlirModule* mod, const std::string& prefix) {
                       if (!mod->fsms.empty()) AttachInstance(*mod, prefix, ctx);
                     });
+}
+
+EntityCoverage FsmHandleCoverage(const FsmHandleRef& handle,
+                                 CoverageControlState& cov) {
+  ApplyResets(*handle.instance, cov);
+  const FsmCount& fsm = handle.instance->fsms[handle.fsm];
+  EntityCoverage states;
+  if (handle.state) {
+    auto found = fsm.visits.find(*handle.state);
+    states.total = 1;
+    states.covered = found != fsm.visits.end() ? 1 : 0;
+    states.hit_count = found != fsm.visits.end() ? found->second : 0;
+    return states;
+  }
+  states.total = static_cast<std::uint64_t>(LegalCount(fsm));
+  states.covered = fsm.visits.size();
+  for (const auto& visit : fsm.visits) states.hit_count += visit.second;
+  return states;
 }
 
 }  // namespace delta

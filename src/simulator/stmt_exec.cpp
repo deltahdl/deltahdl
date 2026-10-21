@@ -32,6 +32,7 @@
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
+#include "simulator/statement_coverage.h"
 #include "simulator/stmt_exec_internal.h"
 #include "simulator/stmt_result.h"
 #include "simulator/vcd_dump_state.h"
@@ -919,6 +920,8 @@ ExecTask ExecStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   // §38.36.1.1: a cbStmt placed on the statement is called just before it
   // executes, and §37.43 detail 4 makes it the active frame's statement.
   GetGlobalVpiContext().NoteStmtExecuting(stmt, ctx.ActiveInstancePrefix());
+  // §40.2.2: and it counts as executed for statement coverage.
+  NoteStatementExecuted(stmt, ctx);
   // Named begin/end and fork blocks push their own label scope (ExecBlock /
   // ExecFork); every other labeled statement gets the scope wrapper here.
   if (!stmt->label.empty() && stmt->kind != StmtKind::kBlock &&

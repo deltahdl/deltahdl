@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -109,12 +110,13 @@ std::vector<SequenceOutcome> AdvanceSequenceProperty(
 // property has fail when the run ends.
 std::vector<uint64_t> PendingSequenceStarts(const SequencePropertyState& state);
 
-// §20.11: Kill aborts every attempt in flight, which reaches no verdict.
-void AbortSequencePropertyAttempts(SequencePropertyState& state);
+// §20.11: Kill aborts every attempt in flight, which reaches no verdict; the
+// number aborted, which §40.5.2 counts as killed.
+std::size_t AbortSequencePropertyAttempts(SequencePropertyState& state);
 
 // §39.5.2: the attempt in flight that began at `started`, in ticks, aborted,
-// reaching no verdict.
-void AbortSequencePropertyAttemptAt(SequencePropertyState& state,
-                                    uint64_t started);
+// reaching no verdict; the number aborted.
+std::size_t AbortSequencePropertyAttemptAt(SequencePropertyState& state,
+                                           uint64_t started);
 
 }  // namespace delta
