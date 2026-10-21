@@ -848,45 +848,4 @@ double CoverageApi::GetValue(std::string_view key) const {
   return it->second;
 }
 
-void DataReadApi::StoreVariable(std::string_view name,
-                                const DataReadValue& val) {
-  variables_[std::string(name)] = val;
-}
-
-DataReadValue DataReadApi::GetValue(std::string_view name,
-                                    DataReadFormat fmt) const {
-  auto it = variables_.find(std::string(name));
-  if (it == variables_.end()) return DataReadValue{fmt, 0, 0.0, "", 0, {}};
-  DataReadValue result = it->second;
-  result.format = fmt;
-  return result;
-}
-
-void DataReadApi::PutValue(std::string_view name, const DataReadValue& val) {
-  variables_[std::string(name)] = val;
-  NotifyValueChange(name, val);
-}
-
-void DataReadApi::RegisterValueChangeCb(std::string_view name,
-                                        ValueChangeCb cb) {
-  change_cbs_[std::string(name)].push_back(std::move(cb));
-}
-
-void DataReadApi::NotifyValueChange(std::string_view name,
-                                    const DataReadValue& val) {
-  auto it = change_cbs_.find(std::string(name));
-  if (it == change_cbs_.end()) return;
-  for (auto& cb : it->second) {
-    cb(name, val);
-  }
-}
-
-uint32_t DataReadApi::ValueChangeCbCount() const {
-  uint32_t total = 0;
-  for (const auto& [key, cbs] : change_cbs_) {
-    total += static_cast<uint32_t>(cbs.size());
-  }
-  return total;
-}
-
 }  // namespace delta

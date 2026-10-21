@@ -10,15 +10,14 @@
 #include <vector>
 
 #include "simulator/coverage_control.h"
-#include "simulator/dpi_arg_value.h"
 #include "simulator/sva_engine_sequences.h"
 
 namespace delta {
 
-// The assertion, coverage and data-read models the VPI's assertion (§39),
-// coverage (§40) and data-read APIs stand on. They lived in dpi_runtime.h
-// beside the DPI runtime, which includes this header so that a translation
-// unit reaching them through it still does.
+// The assertion and coverage models the VPI's assertion (§39) and coverage
+// (§40) APIs stand on. They lived in dpi_runtime.h beside the DPI runtime,
+// which includes this header so that a translation unit reaching them
+// through it still does.
 
 enum class AssertionAction : uint8_t {
   kNone = 0,
@@ -443,47 +442,6 @@ class CoverageApi {
   uint32_t max_bins_ = 64;
   bool active_ = true;
   std::unordered_map<std::string, double> values_;
-};
-
-enum class DataReadFormat : uint8_t {
-  kBinStr = 1,
-  kOctStr = 2,
-  kHexStr = 3,
-  kScalar = 4,
-  kInt = 5,
-  kReal = 6,
-  kString = 7,
-  kVector = 8,
-  kStrength = 9,
-};
-
-struct DataReadValue {
-  DataReadFormat format = DataReadFormat::kInt;
-  int32_t int_val = 0;
-  double real_val = 0.0;
-  std::string str_val;
-  uint32_t scalar_val = 0;
-  std::vector<SvLogicVecVal> vector_val;
-};
-
-using ValueChangeCb =
-    std::function<void(std::string_view, const DataReadValue&)>;
-
-class DataReadApi {
- public:
-  DataReadValue GetValue(std::string_view name, DataReadFormat fmt) const;
-
-  void PutValue(std::string_view name, const DataReadValue& val);
-
-  void RegisterValueChangeCb(std::string_view name, ValueChangeCb cb);
-  void NotifyValueChange(std::string_view name, const DataReadValue& val);
-  uint32_t ValueChangeCbCount() const;
-
-  void StoreVariable(std::string_view name, const DataReadValue& val);
-
- private:
-  std::unordered_map<std::string, DataReadValue> variables_;
-  std::unordered_map<std::string, std::vector<ValueChangeCb>> change_cbs_;
 };
 
 }  // namespace delta

@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(DataReadApiParsing, CoverageGetSystemCall) {
+TEST(CoverageSystemFunctionParsing, CoverageGetSystemCall) {
   EXPECT_TRUE(ParseOk(R"(
     module m;
       initial begin
