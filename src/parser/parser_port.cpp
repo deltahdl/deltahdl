@@ -87,7 +87,15 @@ struct ParserPortHelpers {
     sel->range.start = ref->range.start;
     sel->base = ref;
     sel->index = idx;
-    if (p.Match(TokenKind::kColon)) {
+    // A.1.3: the constant_part_select_range of a port_reference is a range or
+    // an indexed range, the latter's width held in index_end as §11.5.1's is.
+    if (p.Match(TokenKind::kPlusColon)) {
+      sel->is_part_select_plus = true;
+      sel->index_end = p.ParseExpr();
+    } else if (p.Match(TokenKind::kMinusColon)) {
+      sel->is_part_select_minus = true;
+      sel->index_end = p.ParseExpr();
+    } else if (p.Match(TokenKind::kColon)) {
       sel->index_end = p.ParseExpr();
     }
     p.Expect(TokenKind::kRBracket, Subclause("23.2.2.1"));

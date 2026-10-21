@@ -378,6 +378,28 @@ TEST(ModuleParametersAndPorts, PortReferenceWithSelect) {
   EXPECT_EQ(mod->ports[0].port_expr->kind, ExprKind::kSelect);
 }
 
+// A.1.3: a port_reference's constant_select writes its part-select as a
+// constant_part_select_range, whose constant_indexed_range is the +: and -:
+// forms, each held as an indexed select with its width in index_end (#7552).
+TEST(ModuleParametersAndPorts, PortReferenceWithIndexedPartSelects) {
+  auto r = Parse("module m (c[1+:3], d[2-:2]); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->ports.size(), 2u);
+  const Expr* plus = mod->ports[0].port_expr;
+  ASSERT_NE(plus, nullptr);
+  EXPECT_EQ(plus->kind, ExprKind::kSelect);
+  EXPECT_TRUE(plus->is_part_select_plus);
+  EXPECT_FALSE(plus->is_part_select_minus);
+  ASSERT_NE(plus->index_end, nullptr);
+  const Expr* minus = mod->ports[1].port_expr;
+  ASSERT_NE(minus, nullptr);
+  EXPECT_TRUE(minus->is_part_select_minus);
+  EXPECT_FALSE(minus->is_part_select_plus);
+  ASSERT_NE(minus->index_end, nullptr);
+}
+
 // port_expression may be a braced concatenation of port_references.
 TEST(ModuleParametersAndPorts, PortExpressionConcatenation) {
   auto r = Parse("module m ({a, b}, c); endmodule");
