@@ -21,10 +21,12 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <filesystem>
 #include <string>
 #include <string_view>
 
 #include "builders_systask.h"
+#include "fixture_scratch_dir.h"
 #include "fixture_simulator.h"
 #include "helpers_coverage_syscall.h"
 #include "simulator/coverage_control.h"
@@ -176,6 +178,73 @@ TEST(CoverageMerge, AMergeThatIsNotPerformedLoadsNothing) {
   EXPECT_EQ(RunMerge(f, kToggle, kName), kError);
 
   EXPECT_EQ(Cov(f).CoverageGet("top.dut", kToggle), kNoCov);
+}
+
+// A run that finds its coverage databases as files in `scratch`, its design
+// one instance, `top`, of the module `definition`.
+void FindDatabasesIn(SimFixture& f, const ScratchDir& scratch,
+                     const std::string& definition) {
+  Cov(f).SetDatabaseDirectory(scratch.dir.string());
+  Cov(f).SetModuleDefinition("top", definition);
+}
+
+// §40.3.2.4: a database an earlier run left in a file is found by its name and
+// merged; it holds toggle coverage and no assertion coverage, so a merge of the
+// one is `SV_COV_OK, carrying in the count, and of the other `SV_COV_NOCOV
+// (#7527).
+TEST(CoverageMerge, ADatabaseFileOfThisDesignIsMerged) {
+  ScratchDir scratch;
+  scratch.Write(std::string(kName),
+                "deltahdl-coverage-database 1\n"
+                "instance top top\n"
+                "type 23\n"
+                "covered top 23 4\n");
+  SimFixture f;
+  FindDatabasesIn(f, scratch, "top");
+
+  EXPECT_EQ(RunMerge(f, kAssertion, kName), kNoCov);
+  EXPECT_EQ(RunMerge(f, kToggle, kName), kOk);
+  EXPECT_EQ(Cov(f).CoverageGet("top", kToggle), 4);
+}
+
+// §40.3.2.4: a database saved from another design is an error to merge. The
+// file's instance `top` was of `top`, where this design's is of `other`
+// (#7527).
+TEST(CoverageMerge, ADatabaseFileOfAnotherDesignIsAnError) {
+  ScratchDir scratch;
+  scratch.Write(std::string(kName),
+                "deltahdl-coverage-database 1\n"
+                "instance top top\n"
+                "type 23\n");
+  SimFixture f;
+  FindDatabasesIn(f, scratch, "other");
+
+  EXPECT_EQ(RunMerge(f, kToggle, kName), kError);
+}
+
+// §40.3.2.4: a file the name maps to that is no coverage database, or one
+// broken partway, holds nothing to load, which is the error a database not
+// found is (#7527).
+TEST(CoverageMerge, AFileThatIsNoDatabaseIsAnError) {
+  ScratchDir scratch;
+  scratch.Write("text.cov", "a note\n");
+  scratch.Write("broken.cov", "deltahdl-coverage-database 1\ntype x\n");
+  scratch.Write("cut.cov", "deltahdl-coverage-database 1\ncovered top\n");
+  SimFixture f;
+  FindDatabasesIn(f, scratch, "top");
+
+  EXPECT_EQ(RunMerge(f, kToggle, "text.cov"), kError);
+  EXPECT_EQ(RunMerge(f, kToggle, "broken.cov"), kError);
+  EXPECT_EQ(RunMerge(f, kToggle, "cut.cov"), kError);
+}
+
+// §40.3.2.4: a call that left the name out locates no database (#7524).
+TEST(CoverageMerge, AMissingNameIsAnError) {
+  SimFixture f;
+  auto* call =
+      MkSysCall(f.arena, "$coverage_merge", {MkInt(f.arena, kToggle), nullptr});
+  EXPECT_EQ(static_cast<int32_t>(EvalExpr(call, f.ctx, f.arena).ToUint64()),
+            kError);
 }
 
 }  // namespace

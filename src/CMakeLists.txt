@@ -346,6 +346,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/eval_systask_bits.cpp
     simulator/eval_typename.cpp
     simulator/eval_systask_cast.cpp
+    simulator/eval_systask_coverage.cpp
     simulator/eval_expr.cpp
     simulator/eval_hierarchical_name.cpp
     simulator/eval_expr_assign_ops.cpp
@@ -654,6 +655,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/constraint_solver_soft.cpp
     simulator/constraint_solver_solve.cpp
     simulator/coverage_bins.cpp
+    simulator/coverage_control_db.cpp
     simulator/coverage_cross.cpp
     simulator/coverage_db.cpp
     simulator/coverage_options.cpp

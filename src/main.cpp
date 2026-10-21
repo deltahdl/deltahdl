@@ -45,6 +45,7 @@
 #include "preprocessor/protect_cli.h"
 #include "preprocessor/protect_processing.h"
 #include "simulator/cover_results.h"
+#include "simulator/coverage_control.h"
 #include "simulator/dpi_binding.h"
 #include "simulator/foreign_code.h"
 #include "simulator/lowerer.h"
@@ -457,6 +458,10 @@ int SimulateDesign(const delta::CliOptions& opts,
   // in force before lowering registers the design's module paths, each of which
   // derives its pulse limits from the percentages as it is registered.
   delta::ApplyPulseControlOptions(opts, sim_ctx.AcquireSpecifyManager());
+  // §40.3.2.4 and §40.3.2.5: a coverage database $coverage_save names is a
+  // file in the directory the run starts in, where a later run's
+  // $coverage_merge finds it.
+  sim_ctx.GetCoverageControlState().SetDatabaseDirectory(".");
   delta::Lowerer lowerer(sim_ctx, arena, diag);
   lowerer.Lower(design);
   // §35.4: the imports lowering registered are bound to the global symbols

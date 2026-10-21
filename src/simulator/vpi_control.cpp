@@ -197,14 +197,17 @@ int VpiContext::ControlCoverage(int operation, int coverage_type,
     case vpiCoverageCheck: {
       // §40.5.3: Start/Stop/Reset/Check control the collection of coverage over
       // a scope, with the semantics of $coverage_control() (§40.3.2.1). The
-      // coverage type selects the kind of coverage being controlled but, since
-      // statement, toggle, and FSM coverage are not individually controllable,
-      // the control acts on the instance (or assertion) the handle names as a
-      // whole rather than on any sub-object of it.
+      // coverage type selects the kind of coverage being controlled, put in
+      // the §40.3.1 terms the state keys it by, and since statement, toggle,
+      // and FSM coverage are not individually controllable, the control acts
+      // on the instance (or assertion) the handle names as a whole rather than
+      // on any sub-object of it.
       CoverageControl control = CoverageControlForOperation(operation);
       std::string scope = CoverageScopeName(scope_handle);
-      return static_cast<int>(
-          GetCoverageControlState().Control(control, scope));
+      return static_cast<int>(GetCoverageControlState().Control(
+          control,
+          CoverageTypeForVpiProperty(coverage_type).value_or(coverage_type),
+          scope));
     }
     case vpiCoverageSave:
       // §40.5.3: save the current coverage of the requested type to the named

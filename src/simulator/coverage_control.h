@@ -20,6 +20,7 @@
 #include <cstdint>
 #include <limits>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -47,6 +48,10 @@ constexpr int kCoverageTypeAssertion = 20;
 constexpr int kCoverageTypeFsmState = 21;
 constexpr int kCoverageTypeStatement = 22;
 constexpr int kCoverageTypeToggle = 23;
+
+// §40.3.2.1 Table 40-2: the name a call reaches the root of the design by,
+// above every top-level instance (Figure 40-1).
+constexpr std::string_view kCoverageRootScope = "$root";
 
 // §40.3.1 status values returned by $coverage_control. The numeric values match
 // the `SV_COV_* `define macros.
@@ -89,14 +94,19 @@ inline bool CoverageControlFromInt(int value, CoverageControl* out) {
 }
 
 // Tracks the coverage-collection state of the named hierarchy scopes and
-// applies the §40.3.2.1 control rules to them.
+// applies the §40.3.2.1 control rules to them. §40.3.2.1 has each control act
+// on the coverage type its call names, so a scope's availability, collection
+// and resets are kept per §40.3.1 coverage type: stopping toggle coverage
+// leaves FSM state coverage collecting, and a check of a type the scope offers
+// none of reports none whatever else it offers.
 class CoverageControlState {
  public:
-  // Registers (or updates) the coverage a named scope offers, mirroring what a
-  // real coverage engine determines for the design. A scope that has never been
-  // registered is treated as a nonexisting module.
-  void SetAvailability(const std::string& scope, CoverageAvailability a) {
-    scopes_[scope].availability = a;
+  // Registers (or updates) the coverage of `coverage_type` a named scope
+  // offers, mirroring what a real coverage engine determines for the design. A
+  // scope that has never been registered is treated as a nonexisting module.
+  void SetAvailability(const std::string& scope, int coverage_type,
+                       CoverageAvailability a) {
+    scopes_[scope].types[coverage_type].availability = a;
   }
 
   bool IsRegistered(const std::string& scope) const {
@@ -219,6 +229,10 @@ class CoverageControlState {
   //                   design.
   CoverageStatus CoverageMerge(int coverage_type, const std::string& name) {
     auto it = databases_.find(name);
+    // A database an earlier run saved is found in its file.
+    if (it == databases_.end() && ReadDatabaseFile(name)) {
+      it = databases_.find(name);
+    }
     // The name does not exist: no database to load. §40.3.2.4 requires an
     // error.
     if (it == databases_.end()) {
@@ -250,18 +264,6 @@ class CoverageControlState {
   std::uint64_t MergeCount(const std::string& name) const {
     auto it = databases_.find(name);
     return it == databases_.end() ? 0 : it->second.merges;
-  }
-
-  // §40.3.2.5: records which §40.3.1 coverage types are currently available to
-  // be saved from this design, mirroring what a real coverage engine has
-  // collected. $coverage_save reports `SV_COV_NOCOV (and saves nothing) for a
-  // type that is not available here.
-  void SetCoverageAvailableForSave(int coverage_type, bool available) {
-    if (available) {
-      savable_coverage_types_.insert(coverage_type);
-    } else {
-      savable_coverage_types_.erase(coverage_type);
-    }
   }
 
   // §40.3.2.5: forces the next save to report an error, mirroring a tool-side
@@ -300,15 +302,12 @@ class CoverageControlState {
     // preserve database integrity. This also discards any entry a previous
     // successful save left under the same name.
     if (coverage_save_should_fail_) {
-      databases_.erase(name);
+      RemoveDatabase(name);
       return CoverageStatus::kError;
     }
     // No coverage of the requested type is available in this design: nothing is
     // saved and no entry is written.
-    if (savable_coverage_types_.find(coverage_type) ==
-        savable_coverage_types_.end()) {
-      return CoverageStatus::kNoCoverage;
-    }
+    if (!AnyScopeOffers(coverage_type)) return CoverageStatus::kNoCoverage;
     // Write (or overwrite) the entry to reflect the current state: it belongs
     // to this design, holds the saved coverage type, and carries the coverage
     // that stood at the moment of the save, which §40.3.2.5 requires back from
@@ -317,26 +316,42 @@ class CoverageControlState {
     db.from_this_design = true;
     db.coverage_types = {coverage_type};
     SaveCurrentCoverage(db, coverage_type);
+    // A database that cannot be written to its file is an error during the
+    // save, and the entry goes as the error path above removes it.
+    if (!WriteDatabaseFile(name)) {
+      RemoveDatabase(name);
+      return CoverageStatus::kError;
+    }
     ++db.saves;
     return CoverageStatus::kOk;
   }
 
-  bool IsCollecting(const std::string& scope) const {
-    auto it = scopes_.find(scope);
-    return it != scopes_.end() && it->second.collecting;
+  // §40.3.2.4 and §40.3.2.5: keeps each named database as a file in
+  // `directory`, so that what one run saves a later run can merge. The name is
+  // the file's path relative to the directory, and the format is deltahdl's
+  // own, both being left to the tool. With no directory, which is where a
+  // state starts, the databases live in this state alone.
+  void SetDatabaseDirectory(std::string directory) {
+    database_directory_ = std::move(directory);
   }
 
-  // Genuine state transitions a scope has undergone. These make observable the
-  // rule that a call asking for the state a scope is already in changes
-  // nothing: a redundant start, stop, or reset must not advance them.
-  std::uint64_t StartCount(const std::string& scope) const {
-    return Field(scope, &ScopeState::started);
+  bool IsCollecting(const std::string& scope, int coverage_type) const {
+    const TypeState* t = FindType(scope, coverage_type);
+    return t != nullptr && t->collecting;
   }
-  std::uint64_t StopCount(const std::string& scope) const {
-    return Field(scope, &ScopeState::stopped);
+
+  // Genuine state transitions a scope's coverage of one type has undergone.
+  // These make observable the rule that a call asking for the state a scope is
+  // already in changes nothing: a redundant start, stop, or reset must not
+  // advance them.
+  std::uint64_t StartCount(const std::string& scope, int coverage_type) const {
+    return Field(scope, coverage_type, &TypeState::started);
   }
-  std::uint64_t ResetCount(const std::string& scope) const {
-    return Field(scope, &ScopeState::resets);
+  std::uint64_t StopCount(const std::string& scope, int coverage_type) const {
+    return Field(scope, coverage_type, &TypeState::stopped);
+  }
+  std::uint64_t ResetCount(const std::string& scope, int coverage_type) const {
+    return Field(scope, coverage_type, &TypeState::resets);
   }
 
   // §40.3.2.1 Table 40-2: how far below a root one call reaches depends on the
@@ -351,11 +366,12 @@ class CoverageControlState {
            candidate[root.size()] == '.';
   }
 
-  // Performs the §40.3.2.1 action selected by `control` over every scope
-  // `scope` names - one instance, or every instance of a module definition -
-  // and returns the resulting §40.3.1 status of the whole of it.
-  CoverageStatus Control(CoverageControl control, const std::string& scope,
-                         bool include_below = true) {
+  // Performs the §40.3.2.1 action selected by `control` on the coverage of
+  // `coverage_type` over every scope `scope` names - one instance, or every
+  // instance of a module definition - and returns the resulting §40.3.1 status
+  // of the whole of it.
+  CoverageStatus Control(CoverageControl control, int coverage_type,
+                         const std::string& scope, bool include_below = true) {
     std::vector<std::string> roots = NamedScopes(scope);
     // A string that names no scope is a bad argument: §40.3.2.1 reports
     // `SV_COV_ERROR for errors such as a nonexisting module.
@@ -363,29 +379,37 @@ class CoverageControlState {
       return CoverageStatus::kError;
     }
     CoverageStatus status =
-        ControlHierarchy(control, roots.front(), include_below);
+        ControlHierarchy(control, coverage_type, roots.front(), include_below);
     // Table 40-2's definition-name column applies the operation to all
     // instances of the module, so the status reported is of all of them
     // together, on the same reading of a partly covered hierarchy.
     for (std::size_t i = 1; i < roots.size(); ++i) {
       status = CombineHierarchyStatus(
-          status, ControlHierarchy(control, roots[i], include_below));
+          status,
+          ControlHierarchy(control, coverage_type, roots[i], include_below));
     }
     return status;
   }
 
  private:
-  struct ScopeState {
-    // §40.3.2.1 Table 40-2: the module definition this scope is an instance of,
-    // which is the name the table's definition-name column reaches it by. Empty
-    // where nothing registered one.
-    std::string definition;
+  // §40.3.2.1: the collection state of one coverage type in one scope.
+  struct TypeState {
     CoverageAvailability availability = CoverageAvailability::kNone;
     bool collecting = false;
     bool has_data = false;  // coverage accumulated since the last reset
     std::uint64_t started = 0;
     std::uint64_t stopped = 0;
     std::uint64_t resets = 0;
+  };
+
+  struct ScopeState {
+    // §40.3.2.1 Table 40-2: the module definition this scope is an instance of,
+    // which is the name the table's definition-name column reaches it by. Empty
+    // where nothing registered one.
+    std::string definition;
+    // The collection state of each coverage type, keyed by the §40.3.1
+    // coverage-type constant; a type with no entry offers no coverage here.
+    std::unordered_map<int, TypeState> types;
     // §40.3.2.2: coverable-item counts per coverage type, used to compute the
     // 100% (maximum) coverage value. Keyed by the §40.3.1 coverage-type
     // constant (`SV_COV_ASSERTION, `SV_COV_FSM_STATE, ...).
@@ -406,21 +430,29 @@ class CoverageControlState {
   // that is neither names nothing, which is the nonexisting module §40.3.2.1
   // calls a bad argument; the empty string of a call that named no scope at all
   // is one of those, rather than a definition every undeclared instance shares.
+  //
+  // `$root`, which Figure 40-1 puts above every top-level instance, names
+  // those instances, as a definition name names its instances; no module is
+  // named with a leading `$`, so the name is no definition's.
   std::vector<std::string> NamedScopes(const std::string& name) const {
     if (name.empty()) return {};
     if (scopes_.find(name) != scopes_.end()) return {name};
     std::vector<std::string> instances;
     for (const auto& entry : scopes_) {
-      if (entry.second.definition == name) instances.push_back(entry.first);
+      const bool kNamed = name == kCoverageRootScope
+                              ? entry.first.find('.') == std::string::npos
+                              : entry.second.definition == name;
+      if (kNamed) instances.push_back(entry.first);
     }
     return instances;
   }
 
   // The action over one root scope and, where the scope_def argument said to
   // include it, the hierarchy below that root.
-  CoverageStatus ControlHierarchy(CoverageControl control,
+  CoverageStatus ControlHierarchy(CoverageControl control, int coverage_type,
                                   const std::string& root, bool include_below) {
-    CoverageStatus status = ControlOne(control, scopes_.find(root)->second);
+    CoverageStatus status =
+        ControlOne(control, coverage_type, scopes_.find(root)->second);
     if (!include_below) return status;
     // §40.3.2.1: over a hierarchy, the operation is applied to everything in it
     // and the status reported is of the hierarchy - `SV_COV_PARTIAL says that
@@ -428,15 +460,17 @@ class CoverageControlState {
     // below the named one reporting something else makes of a start or a check.
     for (auto& entry : scopes_) {
       if (!ScopeIsBelow(root, entry.first)) continue;
-      status =
-          CombineHierarchyStatus(status, ControlOne(control, entry.second));
+      status = CombineHierarchyStatus(
+          status, ControlOne(control, coverage_type, entry.second));
     }
     return status;
   }
 
   // The one-scope control, which the hierarchy walk above applies to each scope
-  // it names.
-  CoverageStatus ControlOne(CoverageControl control, ScopeState& s) {
+  // it names, acting on that scope's coverage of `coverage_type` alone.
+  CoverageStatus ControlOne(CoverageControl control, int coverage_type,
+                            ScopeState& scope) {
+    TypeState& s = scope.types[coverage_type];
     switch (control) {
       case CoverageControl::kStart:
         // `SV_COV_START starts collection where coverage is available. Starting
@@ -474,9 +508,9 @@ class CoverageControlState {
         // same whole after a reset as before one. The reset has no effect when
         // there is nothing collected to clear, so repeated resets do nothing
         // after the first.
-        if (s.has_data || !s.covered_items.empty()) {
+        if (s.has_data || scope.covered_items.contains(coverage_type)) {
           s.has_data = false;
-          s.covered_items.clear();
+          scope.covered_items.erase(coverage_type);
           ++s.resets;
         }
         return CoverageStatus::kOk;
@@ -571,7 +605,7 @@ class CoverageControlState {
   // Begins collection on a scope that is not already collecting. A scope
   // already collecting is left untouched so that a repeated start has no
   // effect.
-  static void StartCollecting(ScopeState& s) {
+  static void StartCollecting(TypeState& s) {
     if (!s.collecting) {
       s.collecting = true;
       s.has_data = true;
@@ -631,20 +665,58 @@ class CoverageControlState {
     return it == items.end() ? 0 : it->second;
   }
 
-  std::uint64_t Field(const std::string& scope,
-                      std::uint64_t ScopeState::* member) const {
+  // §40.3.2.5: whether the design has coverage of `coverage_type` to save -
+  // whether any scope offers some, as a check of that type over it would find.
+  bool AnyScopeOffers(int coverage_type) const {
+    return std::any_of(scopes_.begin(), scopes_.end(), [&](const auto& entry) {
+      auto it = entry.second.types.find(coverage_type);
+      return it != entry.second.types.end() &&
+             it->second.availability != CoverageAvailability::kNone;
+    });
+  }
+
+  // The state of `coverage_type` in `scope`, null where neither was
+  // registered.
+  const TypeState* FindType(const std::string& scope, int coverage_type) const {
     auto it = scopes_.find(scope);
-    return it == scopes_.end() ? 0 : it->second.*member;
+    if (it == scopes_.end()) return nullptr;
+    auto type_it = it->second.types.find(coverage_type);
+    return type_it == it->second.types.end() ? nullptr : &type_it->second;
+  }
+
+  std::uint64_t Field(const std::string& scope, int coverage_type,
+                      std::uint64_t TypeState::* member) const {
+    const TypeState* t = FindType(scope, coverage_type);
+    return t == nullptr ? 0 : t->*member;
   }
 
   std::unordered_map<std::string, ScopeState> scopes_;
   // §40.3.2.4: named coverage databases available to $coverage_merge, and
   // §40.3.2.5: written by $coverage_save.
   std::unordered_map<std::string, CoverageDatabase> databases_;
-  // §40.3.2.5: coverage types currently available to save from this design.
-  std::unordered_set<int> savable_coverage_types_;
   // §40.3.2.5: when set, the next save reports an error.
   bool coverage_save_should_fail_ = false;
+  // §40.3.2.4 and §40.3.2.5: the directory databases are kept in as files;
+  // empty where they are kept in this state alone.
+  std::string database_directory_;
+
+  // The rest is defined in coverage_control_db.cpp.
+
+  // The file the database `name` is kept in.
+  std::string DatabasePath(const std::string& name) const;
+  // The instances of the design, each with its definition, one per line,
+  // in path order: what tells one design's database from another's.
+  std::string DesignSignature() const;
+  // §40.3.2.5: writes the database `name` to its file; true where there is no
+  // directory to write to or the file was written whole.
+  bool WriteDatabaseFile(const std::string& name) const;
+  // §40.3.2.4: loads the database `name` from its file, true where one was
+  // found and read whole. A database another design saved loads as one that
+  // is not from this design.
+  bool ReadDatabaseFile(const std::string& name);
+  // §40.3.2.5: removes the database `name`, its file included, which an error
+  // during a save requires to keep the database whole.
+  void RemoveDatabase(const std::string& name);
 };
 
 }  // namespace delta

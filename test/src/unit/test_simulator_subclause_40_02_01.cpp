@@ -70,7 +70,10 @@ int RunGetMax(SimFixture& f, int coverage_type, std::string_view scope) {
 TEST(CoverageApiCriteria, OneInterfaceServesEveryCoverageType) {
   SimFixture f;
   CoverageControlState& cov = f.ctx.GetCoverageControlState();
-  cov.SetAvailability(std::string(kScope), CoverageAvailability::kFull);
+  cov.SetAvailability(std::string(kScope), kStatement,
+                      CoverageAvailability::kFull);
+  cov.SetAvailability(std::string(kScope), kToggle,
+                      CoverageAvailability::kFull);
   cov.SetCoverableItems(std::string(kScope), kStatement, 40);
   cov.SetCoveredItems(std::string(kScope), kStatement, 10);
   cov.SetCoverableItems(std::string(kScope), kToggle, 8);
@@ -114,8 +117,10 @@ TEST(CoverageApiCriteria, TheVpiSideNamesTheSameMinimumTypes) {
   VpiContext vpi_ctx;
   vpi_ctx.Attach(f.ctx);
   SetGlobalVpiContext(&vpi_ctx);
-  f.ctx.GetCoverageControlState().SetAvailability(std::string(kScope),
-                                                  CoverageAvailability::kFull);
+  for (int coverage_type : {kAssertion, kFsmState, kStatement, kToggle}) {
+    f.ctx.GetCoverageControlState().SetAvailability(
+        std::string(kScope), coverage_type, CoverageAvailability::kFull);
+  }
   VpiHandle dut = vpi_ctx.CreateModule("dut", std::string(kScope));
 
   for (int coverage_type : {vpiAssertCoverage, vpiFsmStateCoverage,
@@ -136,7 +141,8 @@ TEST(CoverageApiCriteria, TheVpiSideNamesTheSameMinimumTypes) {
 TEST(CoverageApiCriteria, AnUnknownCoverageTypeBreaksNoExistingUsage) {
   SimFixture f;
   CoverageControlState& cov = f.ctx.GetCoverageControlState();
-  cov.SetAvailability(std::string(kScope), CoverageAvailability::kFull);
+  cov.SetAvailability(std::string(kScope), kToggle,
+                      CoverageAvailability::kFull);
   cov.SetCoveredItems(std::string(kScope), kToggle, 5);
   constexpr int kVendorCoverageType = 99;
 
@@ -144,7 +150,7 @@ TEST(CoverageApiCriteria, AnUnknownCoverageTypeBreaksNoExistingUsage) {
   EXPECT_EQ(RunGet(f, kVendorCoverageType, kScope),
             static_cast<int>(CoverageStatus::kNoCoverage));
   EXPECT_EQ(RunControl(f, kStart, kVendorCoverageType, kScope),
-            static_cast<int>(CoverageStatus::kOk));
+            static_cast<int>(CoverageStatus::kNoCoverage));
 
   // The type that was there before is unchanged by the one that was not.
   EXPECT_EQ(RunGet(f, kToggle, kScope), 5);

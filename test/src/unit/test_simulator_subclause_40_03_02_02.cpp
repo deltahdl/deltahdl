@@ -123,7 +123,8 @@ TEST(CoverageGetMax, CountExceedingIntegerRangeOverflows) {
 TEST(CoverageGetMax, MaximumStaysConstantAcrossCollectionChanges) {
   SimFixture f;
   Cov(f).SetCoverableItems(std::string(kScope), kToggle, 48);
-  Cov(f).SetAvailability(std::string(kScope), CoverageAvailability::kFull);
+  Cov(f).SetAvailability(std::string(kScope), kToggle,
+                         CoverageAvailability::kFull);
 
   const int kBefore = RunGetMax(f, kToggle, kHier, kScope);
   RunControl(f, kStart, kScope);

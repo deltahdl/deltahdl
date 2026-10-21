@@ -9,8 +9,10 @@
 #include <cstddef>
 #include <cstdint>
 #include <iosfwd>
+#include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "common/source_loc.h"
 #include "common/types.h"
@@ -76,6 +78,20 @@ std::string EvalStringArg(const Expr* arg, SimContext& ctx, Arena& arena);
 // matches its scope arguments against it; $readmem and $writemem (§21.4,
 // §21.5) find a memory named hierarchically the same way.
 std::string FlattenHierPath(const Expr* arg);
+// §20.11: the full hierarchical names a scope argument may stand for where it
+// is written in the scope `caller`: the name as written, and the name as read
+// from `caller` and from each scope above it, as §23.8 resolves a name upward.
+// Defined in eval_systask_verif.cpp, where the assertion control tasks match
+// their scope list against it; §40.3.2.1's coverage functions find the
+// instance a hierarchical path names with it in eval_systask_coverage.cpp.
+std::vector<std::string> ScopeItemNames(const Expr* item,
+                                        std::string_view caller);
+// §40.3.2: the coverage query and control system functions, the result where
+// `name` is one of the $coverage_* family and nothing otherwise. Defined in
+// eval_systask_coverage.cpp.
+std::optional<Logic4Vec> EvalCoverageSysCall(const Expr* expr, SimContext& ctx,
+                                             Arena& arena,
+                                             std::string_view name);
 
 // §20.6.2 with §7.4.4: the bits the type the typedef `name` declares holds.
 // A typedef of a fixed-size unpacked array, `typedef bit Bits [36:1]`, holds

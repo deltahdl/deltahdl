@@ -38,6 +38,8 @@ class VpiCoverageControlSim : public ::testing::Test {
   // §40.5.1's properties name the same types to vpi_control(), so a case that
   // primes the state names the type here and asks for it there.
   static constexpr int kSvCovAssertion = 20;
+  static constexpr int kSvCovStatement = 22;
+  static constexpr int kSvCovToggle = 23;
 
   SourceManager mgr_;
   Arena arena_;
@@ -55,20 +57,26 @@ class VpiCoverageControlSim : public ::testing::Test {
 // afresh.
 TEST_F(VpiCoverageControlSim, StartControlsCoverageOverTheInstanceHandle) {
   vpi_ctx_.GetCoverageControlState().SetAvailability(
-      "top.dut", CoverageAvailability::kFull);
+      "top.dut", kSvCovAssertion, CoverageAvailability::kFull);
   VpiHandle dut = vpi_ctx_.CreateModule("dut", "top.dut");
 
-  EXPECT_FALSE(vpi_ctx_.GetCoverageControlState().IsCollecting("top.dut"));
+  EXPECT_FALSE(vpi_ctx_.GetCoverageControlState().IsCollecting(
+      "top.dut", kSvCovAssertion));
   int result = vpi_control(vpiCoverageStart, vpiAssertCoverage, dut);
   EXPECT_EQ(result, Status(CoverageStatus::kOk));
-  EXPECT_TRUE(vpi_ctx_.GetCoverageControlState().IsCollecting("top.dut"));
-  EXPECT_EQ(vpi_ctx_.GetCoverageControlState().StartCount("top.dut"), 1u);
+  EXPECT_TRUE(vpi_ctx_.GetCoverageControlState().IsCollecting("top.dut",
+                                                              kSvCovAssertion));
+  EXPECT_EQ(
+      vpi_ctx_.GetCoverageControlState().StartCount("top.dut", kSvCovAssertion),
+      1u);
 
   // A redundant start has no effect: it still succeeds, but collection does not
   // start a second time.
   EXPECT_EQ(vpi_control(vpiCoverageStart, vpiAssertCoverage, dut),
             Status(CoverageStatus::kOk));
-  EXPECT_EQ(vpi_ctx_.GetCoverageControlState().StartCount("top.dut"), 1u);
+  EXPECT_EQ(
+      vpi_ctx_.GetCoverageControlState().StartCount("top.dut", kSvCovAssertion),
+      1u);
 }
 
 // C1: the third argument of vpi_control() may be an assertion handle as well as
@@ -79,9 +87,9 @@ TEST_F(VpiCoverageControlSim, StartControlsCoverageOverTheInstanceHandle) {
 // the scope the assertion handle names.
 TEST_F(VpiCoverageControlSim, ControlAcceptsAnAssertionHandle) {
   vpi_ctx_.GetCoverageControlState().SetAvailability(
-      "top.dut", CoverageAvailability::kFull);
+      "top.dut", kSvCovAssertion, CoverageAvailability::kFull);
   vpi_ctx_.GetCoverageControlState().SetAvailability(
-      "top.dut.a1", CoverageAvailability::kFull);
+      "top.dut.a1", kSvCovAssertion, CoverageAvailability::kFull);
   // vpiAssertion is the class the assertion kinds are grouped under; an
   // assertion object carries one of those kinds, and vpiAssert is the one a
   // concurrent assert directive carries.
@@ -89,10 +97,12 @@ TEST_F(VpiCoverageControlSim, ControlAcceptsAnAssertionHandle) {
 
   EXPECT_EQ(vpi_control(vpiCoverageStart, vpiAssertCoverage, assertion),
             Status(CoverageStatus::kOk));
-  EXPECT_TRUE(vpi_ctx_.GetCoverageControlState().IsCollecting("top.dut.a1"));
+  EXPECT_TRUE(vpi_ctx_.GetCoverageControlState().IsCollecting("top.dut.a1",
+                                                              kSvCovAssertion));
   // Controlling the assertion did not implicitly start its enclosing instance;
   // the action was scoped to the assertion the handle names.
-  EXPECT_FALSE(vpi_ctx_.GetCoverageControlState().IsCollecting("top.dut"));
+  EXPECT_FALSE(vpi_ctx_.GetCoverageControlState().IsCollecting(
+      "top.dut", kSvCovAssertion));
 }
 
 // C2: vpiCoverageStop stops collection and vpiCoverageReset clears collected
@@ -100,19 +110,24 @@ TEST_F(VpiCoverageControlSim, ControlAcceptsAnAssertionHandle) {
 // system function applies, reached now through vpi_control().
 TEST_F(VpiCoverageControlSim, StopAndResetApplyTheControlRules) {
   vpi_ctx_.GetCoverageControlState().SetAvailability(
-      "top.dut", CoverageAvailability::kFull);
+      "top.dut", kSvCovAssertion, CoverageAvailability::kFull);
   VpiHandle dut = vpi_ctx_.CreateModule("dut", "top.dut");
   ASSERT_EQ(vpi_control(vpiCoverageStart, vpiAssertCoverage, dut),
             Status(CoverageStatus::kOk));
 
   EXPECT_EQ(vpi_control(vpiCoverageStop, vpiAssertCoverage, dut),
             Status(CoverageStatus::kOk));
-  EXPECT_FALSE(vpi_ctx_.GetCoverageControlState().IsCollecting("top.dut"));
-  EXPECT_EQ(vpi_ctx_.GetCoverageControlState().StopCount("top.dut"), 1u);
+  EXPECT_FALSE(vpi_ctx_.GetCoverageControlState().IsCollecting(
+      "top.dut", kSvCovAssertion));
+  EXPECT_EQ(
+      vpi_ctx_.GetCoverageControlState().StopCount("top.dut", kSvCovAssertion),
+      1u);
 
   EXPECT_EQ(vpi_control(vpiCoverageReset, vpiAssertCoverage, dut),
             Status(CoverageStatus::kOk));
-  EXPECT_EQ(vpi_ctx_.GetCoverageControlState().ResetCount("top.dut"), 1u);
+  EXPECT_EQ(
+      vpi_ctx_.GetCoverageControlState().ResetCount("top.dut", kSvCovAssertion),
+      1u);
 }
 
 // C2: vpiCoverageCheck reports whether coverage can be obtained without
@@ -121,9 +136,9 @@ TEST_F(VpiCoverageControlSim, StopAndResetApplyTheControlRules) {
 // `SV_COV_NOCOV; neither query starts collection.
 TEST_F(VpiCoverageControlSim, CheckReportsAvailabilityWithoutChangingState) {
   vpi_ctx_.GetCoverageControlState().SetAvailability(
-      "top.full", CoverageAvailability::kFull);
+      "top.full", kSvCovStatement, CoverageAvailability::kFull);
   vpi_ctx_.GetCoverageControlState().SetAvailability(
-      "top.none", CoverageAvailability::kNone);
+      "top.none", kSvCovStatement, CoverageAvailability::kNone);
   VpiHandle full = vpi_ctx_.CreateModule("full", "top.full");
   VpiHandle none = vpi_ctx_.CreateModule("none", "top.none");
 
@@ -132,7 +147,8 @@ TEST_F(VpiCoverageControlSim, CheckReportsAvailabilityWithoutChangingState) {
   EXPECT_EQ(vpi_control(vpiCoverageCheck, vpiStatementCoverage, none),
             Status(CoverageStatus::kNoCoverage));
   // Checking is a pure query: it does not begin collection.
-  EXPECT_FALSE(vpi_ctx_.GetCoverageControlState().IsCollecting("top.full"));
+  EXPECT_FALSE(vpi_ctx_.GetCoverageControlState().IsCollecting(
+      "top.full", kSvCovStatement));
 }
 
 // C1/C2: a control request whose handle names a scope the design does not
@@ -148,27 +164,29 @@ TEST_F(VpiCoverageControlSim, ControlOnUnknownScopeIsAnError) {
 }
 
 // C3: statement, toggle, and FSM coverage are controllable only at the instance
-// level, not on a per-statement, per-signal, or per-FSM basis. Control applies
-// to the instance the handle names as a whole: starting with one coverage type
-// and stopping with a different type over the same instance handle act on one
-// shared instance-level collection state.
-TEST_F(VpiCoverageControlSim, CoverageIsControllableOnlyAtInstanceLevel) {
-  vpi_ctx_.GetCoverageControlState().SetAvailability(
-      "top.dut", CoverageAvailability::kFull);
+// level, not on a per-statement, per-signal, or per-FSM basis, and with the
+// semantics of $coverage_control(), whose control acts on the coverage type
+// the call names. Control applies to the instance the handle names as a whole,
+// one coverage type at a time: stopping toggle coverage over the instance
+// leaves the statement coverage started there collecting (#7525).
+TEST_F(VpiCoverageControlSim, InstanceLevelControlActsOnTheNamedTypeAlone) {
+  CoverageControlState& cov = vpi_ctx_.GetCoverageControlState();
+  cov.SetAvailability("top.dut", kSvCovStatement, CoverageAvailability::kFull);
+  cov.SetAvailability("top.dut", kSvCovToggle, CoverageAvailability::kFull);
   VpiHandle dut = vpi_ctx_.CreateModule("dut", "top.dut");
 
-  // Start statement coverage on the instance.
   ASSERT_EQ(vpi_control(vpiCoverageStart, vpiStatementCoverage, dut),
             Status(CoverageStatus::kOk));
-  EXPECT_TRUE(vpi_ctx_.GetCoverageControlState().IsCollecting("top.dut"));
+  ASSERT_EQ(vpi_control(vpiCoverageStart, vpiToggleCoverage, dut),
+            Status(CoverageStatus::kOk));
 
-  // Stopping toggle coverage over the same instance handle stops the very same
-  // instance-level collection - the control is not bound to an individual
-  // statement, signal, or FSM.
   EXPECT_EQ(vpi_control(vpiCoverageStop, vpiToggleCoverage, dut),
             Status(CoverageStatus::kOk));
-  EXPECT_FALSE(vpi_ctx_.GetCoverageControlState().IsCollecting("top.dut"));
-  EXPECT_EQ(vpi_ctx_.GetCoverageControlState().StopCount("top.dut"), 1u);
+  EXPECT_FALSE(cov.IsCollecting("top.dut", kSvCovToggle));
+  EXPECT_TRUE(cov.IsCollecting("top.dut", kSvCovStatement));
+  EXPECT_EQ(cov.StopCount("top.dut", kSvCovStatement), 0u);
+  // Nor was any other type started there.
+  EXPECT_FALSE(cov.IsCollecting("top.dut", kSvCovAssertion));
 }
 
 // C3 read the way the sentence is written: the control takes an instance handle
@@ -181,18 +199,23 @@ TEST_F(VpiCoverageControlSim, CoverageIsControllableOnlyAtInstanceLevel) {
 // reported `SV_COV_OK for it.
 TEST_F(VpiCoverageControlSim, ASignalHandleIsNotAScopeCoverageIsControlledAt) {
   vpi_ctx_.GetCoverageControlState().SetAvailability(
-      "top.dut.sig", CoverageAvailability::kFull);
+      "top.dut.sig", kSvCovToggle, CoverageAvailability::kFull);
   VpiHandle sig = vpi_ctx_.CreateNetObj("top.dut.sig", nullptr, 8);
 
   EXPECT_EQ(vpi_control(vpiCoverageStart, vpiToggleCoverage, sig),
             Status(CoverageStatus::kError));
-  EXPECT_FALSE(vpi_ctx_.GetCoverageControlState().IsCollecting("top.dut.sig"));
-  EXPECT_EQ(vpi_ctx_.GetCoverageControlState().StartCount("top.dut.sig"), 0u);
+  EXPECT_FALSE(vpi_ctx_.GetCoverageControlState().IsCollecting("top.dut.sig",
+                                                               kSvCovToggle));
+  EXPECT_EQ(vpi_ctx_.GetCoverageControlState().StartCount("top.dut.sig",
+                                                          kSvCovToggle),
+            0u);
 
   // Nor the reset that handle would have applied to that one signal.
   EXPECT_EQ(vpi_control(vpiCoverageReset, vpiToggleCoverage, sig),
             Status(CoverageStatus::kError));
-  EXPECT_EQ(vpi_ctx_.GetCoverageControlState().ResetCount("top.dut.sig"), 0u);
+  EXPECT_EQ(vpi_ctx_.GetCoverageControlState().ResetCount("top.dut.sig",
+                                                          kSvCovToggle),
+            0u);
 }
 
 // C4: vpi_control(vpiCoverageSave, <coverageType>, name) saves the current
@@ -200,15 +223,15 @@ TEST_F(VpiCoverageControlSim, ASignalHandleIsNotAScopeCoverageIsControlledAt) {
 // `SV_COV_OK and a recorded save when the type is available, `SV_COV_NOCOV and
 // nothing saved when it is not.
 TEST_F(VpiCoverageControlSim, SaveAppliesCoverageSaveRules) {
-  vpi_ctx_.GetCoverageControlState().SetCoverageAvailableForSave(
-      kSvCovAssertion, true);
+  vpi_ctx_.GetCoverageControlState().SetAvailability(
+      "top.dut", kSvCovAssertion, CoverageAvailability::kFull);
 
   EXPECT_EQ(vpi_control(vpiCoverageSave, vpiAssertCoverage, "covdb"),
             Status(CoverageStatus::kOk));
   EXPECT_EQ(vpi_ctx_.GetCoverageControlState().SaveCount("covdb"), 1u);
 
   // A type with no coverage available to save records nothing: only the
-  // assertion type above was made savable, and vpiToggleCoverage names another.
+  // assertion type above is available, and vpiToggleCoverage names another.
   EXPECT_EQ(vpi_control(vpiCoverageSave, vpiToggleCoverage, "toggledb"),
             Status(CoverageStatus::kNoCoverage));
   EXPECT_EQ(vpi_ctx_.GetCoverageControlState().SaveCount("toggledb"), 0u);

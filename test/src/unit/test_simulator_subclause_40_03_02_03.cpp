@@ -189,8 +189,8 @@ TEST(CoverageGet, ADefinitionNameSumsOverEveryInstanceOfThatModule) {
 // is below the named instance and nothing outside it.
 TEST(CoverageGet, ResettingCoverageClearsTheCurrentValue) {
   SimFixture f;
-  Cov(f).SetAvailability("top.dut", CoverageAvailability::kFull);
-  Cov(f).SetAvailability("top.dut.u1", CoverageAvailability::kFull);
+  Cov(f).SetAvailability("top.dut", kToggle, CoverageAvailability::kFull);
+  Cov(f).SetAvailability("top.dut.u1", kToggle, CoverageAvailability::kFull);
   Cov(f).SetCoveredItems("top.dut", kToggle, 5);
   Cov(f).SetCoveredItems("top.dut.u1", kToggle, 3);
   Cov(f).SetCoveredItems("top.other", kToggle, 100);
@@ -210,7 +210,8 @@ TEST(CoverageGet, ResettingCoverageClearsTheCurrentValue) {
 // read 0% rather than become undefined.
 TEST(CoverageGet, ResettingTheCurrentValueLeavesTheMaximumStanding) {
   SimFixture f;
-  Cov(f).SetAvailability(std::string(kScope), CoverageAvailability::kFull);
+  Cov(f).SetAvailability(std::string(kScope), kToggle,
+                         CoverageAvailability::kFull);
   Cov(f).SetCoverableItems(std::string(kScope), kToggle, 48);
   Cov(f).SetCoveredItems(std::string(kScope), kToggle, 30);
 

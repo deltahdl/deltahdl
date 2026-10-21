@@ -75,11 +75,11 @@ std::optional<uint64_t> StateOf(const FsmCount& fsm) {
 // it is a legal one and the instance is collecting, starting the count over
 // where the instance was reset since, and report the states reached so far.
 void Count(InstanceFsms& inst, CoverageControlState& cov) {
-  if (cov.ResetCount(inst.scope) != inst.resets) {
-    inst.resets = cov.ResetCount(inst.scope);
+  if (cov.ResetCount(inst.scope, kCoverageTypeFsmState) != inst.resets) {
+    inst.resets = cov.ResetCount(inst.scope, kCoverageTypeFsmState);
     for (FsmCount& fsm : inst.fsms) fsm.reached.clear();
   }
-  if (!cov.IsCollecting(inst.scope)) return;
+  if (!cov.IsCollecting(inst.scope, kCoverageTypeFsmState)) return;
   std::int64_t reached = 0;
   for (FsmCount& fsm : inst.fsms) {
     const std::optional<uint64_t> kState = StateOf(fsm);
@@ -139,9 +139,11 @@ void AttachInstance(const RtlirModule& mod, const std::string& prefix,
   if (inst->fsms.empty()) return;
   CoverageControlState& cov = ctx.GetCoverageControlState();
   cov.SetCoverableItems(inst->scope, kCoverageTypeFsmState, legal);
-  cov.SetAvailability(inst->scope, CoverageAvailability::kFull);
-  cov.Control(CoverageControl::kStart, inst->scope, /*include_below=*/false);
-  inst->resets = cov.ResetCount(inst->scope);
+  cov.SetAvailability(inst->scope, kCoverageTypeFsmState,
+                      CoverageAvailability::kFull);
+  cov.Control(CoverageControl::kStart, kCoverageTypeFsmState, inst->scope,
+              /*include_below=*/false);
+  inst->resets = cov.ResetCount(inst->scope, kCoverageTypeFsmState);
   for (const FsmCount& fsm : inst->fsms) {
     for (Variable* signal : fsm.signals) {
       signal->AddWatcher([inst, &cov]() {

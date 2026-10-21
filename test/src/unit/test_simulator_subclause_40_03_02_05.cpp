@@ -23,10 +23,12 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <filesystem>
 #include <string>
 #include <string_view>
 
 #include "builders_systask.h"
+#include "fixture_scratch_dir.h"
 #include "fixture_simulator.h"
 #include "helpers_coverage_syscall.h"
 #include "simulator/coverage_control.h"
@@ -64,7 +66,7 @@ CoverageControlState& Cov(SimFixture& f) {
 // is not merely reported — so the save count for that database advances.
 TEST(CoverageSave, AvailableTypeIsSavedAndReportsOk) {
   SimFixture f;
-  Cov(f).SetCoverageAvailableForSave(kToggle, true);
+  Cov(f).SetAvailability("top.dut", kToggle, CoverageAvailability::kFull);
 
   EXPECT_EQ(RunSave(f, kToggle, kName), kOk);
   EXPECT_EQ(Cov(f).SaveCount(std::string(kName)), 1u);
@@ -78,12 +80,12 @@ TEST(CoverageSave, AvailableTypeIsSavedAndReportsOk) {
 // database as the only place the levels reported afterwards can have come from.
 TEST(CoverageSave, SavedDataAreRetrievableByMergeWithTheSameName) {
   SimFixture f;
-  Cov(f).SetCoverageAvailableForSave(kToggle, true);
+  Cov(f).SetAvailability("top.dut", kToggle, CoverageAvailability::kFull);
   Cov(f).SetCoveredItems("top.dut", kToggle, 6);
   Cov(f).SetCoveredItems("top.dut.u1", kToggle, 4);
 
   ASSERT_EQ(RunSave(f, kToggle, kName), kOk);
-  Cov(f).Control(CoverageControl::kReset, "top.dut");
+  Cov(f).Control(CoverageControl::kReset, kToggle, "top.dut");
   ASSERT_EQ(Cov(f).CoverageGet("top.dut", kToggle), kNoCov);
 
   EXPECT_EQ(RunMerge(f, kToggle, kName), kOk);
@@ -99,7 +101,7 @@ TEST(CoverageSave, SavedDataAreRetrievableByMergeWithTheSameName) {
 TEST(CoverageSave, TheEntryHoldsTheCoverageAsItStoodAtTheSave) {
   SimFixture f;
   const std::string kScope = "top.dut";
-  Cov(f).SetCoverageAvailableForSave(kToggle, true);
+  Cov(f).SetAvailability("top.dut", kToggle, CoverageAvailability::kFull);
   Cov(f).SetCoveredItems(kScope, kToggle, 6);
 
   ASSERT_EQ(RunSave(f, kToggle, kName), kOk);
@@ -107,7 +109,7 @@ TEST(CoverageSave, TheEntryHoldsTheCoverageAsItStoodAtTheSave) {
   // Collection carries on past the save, and then the simulation's own coverage
   // is cleared, leaving only what the entry holds to come back.
   Cov(f).SetCoveredItems(kScope, kToggle, 9);
-  Cov(f).Control(CoverageControl::kReset, kScope);
+  Cov(f).Control(CoverageControl::kReset, kToggle, kScope);
 
   ASSERT_EQ(RunMerge(f, kToggle, kName), kOk);
   EXPECT_EQ(Cov(f).CoverageGet(kScope, kToggle), 6);
@@ -119,12 +121,12 @@ TEST(CoverageSave, TheEntryHoldsTheCoverageAsItStoodAtTheSave) {
 TEST(CoverageSave, SavesOnlyTheCoverageTypeTheCallNames) {
   SimFixture f;
   const std::string kScope = "top.dut";
-  Cov(f).SetCoverageAvailableForSave(kToggle, true);
+  Cov(f).SetAvailability("top.dut", kToggle, CoverageAvailability::kFull);
   Cov(f).SetCoveredItems(kScope, kToggle, 6);
   Cov(f).SetCoveredItems(kScope, kAssertion, 3);
 
   ASSERT_EQ(RunSave(f, kToggle, kName), kOk);
-  Cov(f).Control(CoverageControl::kReset, kScope);
+  Cov(f).Control(CoverageControl::kReset, kToggle, kScope);
 
   EXPECT_EQ(RunMerge(f, kAssertion, kName), kNoCov);
   ASSERT_EQ(RunMerge(f, kToggle, kName), kOk);
@@ -138,7 +140,7 @@ TEST(CoverageSave, SavesOnlyTheCoverageTypeTheCallNames) {
 TEST(CoverageSave, UnavailableTypeReportsNoCoverageAndSavesNothing) {
   SimFixture f;
   // Toggle coverage is available, but assertion coverage is not.
-  Cov(f).SetCoverageAvailableForSave(kToggle, true);
+  Cov(f).SetAvailability("top.dut", kToggle, CoverageAvailability::kFull);
 
   EXPECT_EQ(RunSave(f, kAssertion, kName), kNoCov);
   EXPECT_EQ(Cov(f).SaveCount(std::string(kName)), 0u);
@@ -151,7 +153,7 @@ TEST(CoverageSave, UnavailableTypeReportsNoCoverageAndSavesNothing) {
 // is then no longer retrievable by a merge.
 TEST(CoverageSave, ErrorRemovesTheEntryForTheName) {
   SimFixture f;
-  Cov(f).SetCoverageAvailableForSave(kToggle, true);
+  Cov(f).SetAvailability("top.dut", kToggle, CoverageAvailability::kFull);
   // A prior successful save leaves an entry under the name.
   ASSERT_EQ(RunSave(f, kToggle, kName), kOk);
   ASSERT_EQ(RunMerge(f, kToggle, kName), kOk);
@@ -168,7 +170,7 @@ TEST(CoverageSave, ErrorRemovesTheEntryForTheName) {
 // rewrite.
 TEST(CoverageSave, OverwritingAnExistingNameIsNotAnError) {
   SimFixture f;
-  Cov(f).SetCoverageAvailableForSave(kToggle, true);
+  Cov(f).SetAvailability("top.dut", kToggle, CoverageAvailability::kFull);
   ASSERT_EQ(RunSave(f, kToggle, kName), kOk);
 
   EXPECT_EQ(RunSave(f, kToggle, kName), kOk);
@@ -182,19 +184,18 @@ TEST(CoverageSave, OverwritingAnExistingNameIsNotAnError) {
 TEST(CoverageSave, SavingDoesNotAffectCollectionState) {
   SimFixture f;
   const std::string kScope = "top";
-  Cov(f).SetAvailability(kScope, CoverageAvailability::kFull);
-  Cov(f).Control(CoverageControl::kStart, kScope);
+  Cov(f).SetAvailability(kScope, kToggle, CoverageAvailability::kFull);
+  Cov(f).Control(CoverageControl::kStart, kToggle, kScope);
   Cov(f).SetCoveredItems(kScope, kToggle, 7);
-  Cov(f).SetCoverageAvailableForSave(kToggle, true);
 
-  const bool kCollectingBefore = Cov(f).IsCollecting(kScope);
-  const auto kStartsBefore = Cov(f).StartCount(kScope);
+  const bool kCollectingBefore = Cov(f).IsCollecting(kScope, kToggle);
+  const auto kStartsBefore = Cov(f).StartCount(kScope, kToggle);
   const int kLevelBefore = Cov(f).CoverageGet(kScope, kToggle);
 
   ASSERT_EQ(RunSave(f, kToggle, kName), kOk);
 
-  EXPECT_EQ(Cov(f).IsCollecting(kScope), kCollectingBefore);
-  EXPECT_EQ(Cov(f).StartCount(kScope), kStartsBefore);
+  EXPECT_EQ(Cov(f).IsCollecting(kScope, kToggle), kCollectingBefore);
+  EXPECT_EQ(Cov(f).StartCount(kScope, kToggle), kStartsBefore);
   EXPECT_EQ(Cov(f).CoverageGet(kScope, kToggle), kLevelBefore);
 }
 
@@ -205,6 +206,110 @@ TEST(CoverageSave, MissingArgumentsIsBadArgument) {
   auto* call = MkSysCall(f.arena, "$coverage_save", {});
   EXPECT_EQ(static_cast<int32_t>(EvalExpr(call, f.ctx, f.arena).ToUint64()),
             kError);
+}
+
+// A module whose FSM has reached one of its three legal states before `body`
+// runs and sets r1 to r3, which are then displayed. The §40.3.1 constants are
+// written as their values: `SV_COV_ASSERTION 20, `SV_COV_FSM_STATE 21.
+std::string FsmSaveDesign(const std::string& body) {
+  return "module top;\n"
+         "  parameter [1:0] /* tool enum s_e */ P = 0, Q = 1, R = 2;\n"
+         "  /* tool state_vector cur enum s_e */\n"
+         "  logic [1:0] cur;\n"
+         "  string db;\n"
+         "  int r1, r2, r3;\n"
+         "  initial begin\n"
+         "    cur = Q; #1\n" +
+         body +
+         "    $display(\"%0d %0d %0d\", r1, r2, r3);\n"
+         "  end\n"
+         "endmodule\n";
+}
+
+// §40.3.2.5: a design that has collected FSM state coverage has that coverage
+// to save, so the save answers `SV_COV_OK and a merge of the same name finds
+// it; only a type the design holds none of - assertions here, which a check of
+// that type has already found none of - answers `SV_COV_NOCOV (#7526).
+TEST(CoverageSave, CoverageTheDesignCollectedIsThereToSave) {
+  SimFixture f;
+  const std::string kOut = RunCapture(
+      FsmSaveDesign("    r1 = $coverage_save(21, \"fsm.cov\");\n"
+                    "    r2 = $coverage_merge(21, \"fsm.cov\");\n"
+                    "    r3 = $coverage_control(3, 20, 10, \"top\");\n"
+                    "    r3 = $coverage_save(20, \"none.cov\");\n"),
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(kOut, "1 1 0\n");
+}
+
+// §40.3.2.5: the name a save is given is a string, and a string variable gives
+// the one it holds, so the database is found again by that name and the empty
+// name locates none (#7524).
+TEST(CoverageSave, AStringVariableNamesTheDatabase) {
+  SimFixture f;
+  const std::string kOut =
+      RunCapture(FsmSaveDesign("    db = \"var.cov\";\n"
+                               "    r1 = $coverage_save(21, db);\n"
+                               "    r2 = $coverage_merge(21, \"var.cov\");\n"
+                               "    r3 = $coverage_merge(21, \"\");\n"),
+                 f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(kOut, "1 1 -1\n");
+}
+
+// A run that keeps its coverage databases as files in `scratch`, its design
+// one instance, `top`, of the module `top`, offering toggle coverage.
+void KeepDatabasesIn(SimFixture& f, const ScratchDir& scratch) {
+  Cov(f).SetDatabaseDirectory(scratch.dir.string());
+  Cov(f).SetModuleDefinition("top", "top");
+  Cov(f).SetAvailability("top", kToggle, CoverageAvailability::kFull);
+}
+
+// §40.3.2.5 with §40.3.2.4: a saved database is a file the name maps to, so a
+// later run - a second simulation with nothing in common with the first but
+// the directory and the design - merges it, and the counts it saved come back,
+// the one of a scope below `top` as well as `top`'s own (#7527).
+TEST(CoverageSave, ASavedDatabaseOutlivesTheRunThatSavedIt) {
+  ScratchDir scratch;
+  {
+    SimFixture first;
+    KeepDatabasesIn(first, scratch);
+    Cov(first).SetCoveredItems("top", kToggle, 6);
+    Cov(first).SetCoveredItems("top.inner", kToggle, 1);
+    ASSERT_EQ(RunSave(first, kToggle, kName), kOk);
+  }
+  SimFixture later;
+  KeepDatabasesIn(later, scratch);
+
+  EXPECT_EQ(RunMerge(later, kToggle, kName), kOk);
+  EXPECT_EQ(Cov(later).CoverageGet("top", kToggle, /*include_below=*/false), 6);
+  EXPECT_EQ(Cov(later).CoverageGet("top", kToggle), 7);
+}
+
+// §40.3.2.5: a database file that cannot be written is an error during the
+// save, and the entry goes with it, so the name merges nothing (#7527).
+TEST(CoverageSave, ADatabaseThatCannotBeWrittenIsAnError) {
+  ScratchDir scratch;
+  SimFixture f;
+  KeepDatabasesIn(f, scratch);
+  Cov(f).SetDatabaseDirectory((scratch.dir / "absent").string());
+
+  EXPECT_EQ(RunSave(f, kToggle, kName), kError);
+  EXPECT_EQ(RunMerge(f, kToggle, kName), kError);
+}
+
+// §40.3.2.5: an error during a save removes the database entry for the name,
+// and the entry is a file, so the file an earlier save wrote is gone (#7527).
+TEST(CoverageSave, AFailedSaveRemovesTheDatabaseFile) {
+  ScratchDir scratch;
+  SimFixture f;
+  KeepDatabasesIn(f, scratch);
+  ASSERT_EQ(RunSave(f, kToggle, kName), kOk);
+  ASSERT_TRUE(std::filesystem::exists(scratch.dir / std::string(kName)));
+
+  Cov(f).SetCoverageSaveShouldFail(true);
+  EXPECT_EQ(RunSave(f, kToggle, kName), kError);
+  EXPECT_FALSE(std::filesystem::exists(scratch.dir / std::string(kName)));
 }
 
 }  // namespace

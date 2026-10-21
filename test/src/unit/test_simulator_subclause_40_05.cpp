@@ -81,7 +81,8 @@ class VpiCoverageExtensions : public ::testing::Test {
 // `SV_COV_ASSERTION is a difference of spelling between two clauses, not of
 // which coverage is meant.
 TEST_F(VpiCoverageExtensions, WhatTheSystemFunctionSavedTheVpiMergeLoads) {
-  Cov().SetCoverageAvailableForSave(kSvCovAssertion, true);
+  Cov().SetAvailability("top.dut", kSvCovAssertion,
+                        CoverageAvailability::kFull);
   ASSERT_EQ(
       RunCoverageSysCall(f_, "$coverage_save", kSvCovAssertion, "run.cov"),
       kOk);
@@ -96,7 +97,7 @@ TEST_F(VpiCoverageExtensions, WhatTheSystemFunctionSavedTheVpiMergeLoads) {
 // have said `SV_COV_NOCOV - the database was found but holds no coverage of the
 // type asked for - over the coverage the other had just written into it.
 TEST_F(VpiCoverageExtensions, WhatTheVpiSaveWroteTheSystemFunctionMerges) {
-  Cov().SetCoverageAvailableForSave(kSvCovToggle, true);
+  Cov().SetAvailability("top.dut", kSvCovToggle, CoverageAvailability::kFull);
   ASSERT_EQ(vpi_control(vpiCoverageSave, vpiToggleCoverage, "vpi.cov"), kOk);
 
   EXPECT_EQ(RunMerge(f_, kSvCovToggle, "vpi.cov"), kOk);
@@ -107,7 +108,7 @@ TEST_F(VpiCoverageExtensions, WhatTheVpiSaveWroteTheSystemFunctionMerges) {
 // agreement is about which type is meant rather than about answering `SV_COV_OK
 // to everything: only the toggle type was made available above.
 TEST_F(VpiCoverageExtensions, AVpiSaveOfATypeWithNoCoverageStillSavesNothing) {
-  Cov().SetCoverageAvailableForSave(kSvCovToggle, true);
+  Cov().SetAvailability("top.dut", kSvCovToggle, CoverageAvailability::kFull);
 
   EXPECT_EQ(vpi_control(vpiCoverageSave, vpiStatementCoverage, "vpi.cov"),
             kNoCov);
@@ -136,7 +137,8 @@ TEST_F(VpiCoverageExtensions, TheVpiQueryReportsTheCoverageTheLanguageReports) {
 // control had cleared them, and the language's own function would disagree with
 // it.
 TEST_F(VpiCoverageExtensions, TheVpiControlResetsWhatTheVpiQueryReports) {
-  Cov().SetAvailability("top.dut", CoverageAvailability::kFull);
+  Cov().SetAvailability("top.dut", kSvCovStatement,
+                        CoverageAvailability::kFull);
   Cov().SetCoverableItems("top.dut", kSvCovStatement, 12);
   Cov().SetCoveredItems("top.dut", kSvCovStatement, 7);
   VpiHandle dut = vpi_ctx_.CreateModule("dut", "top.dut");

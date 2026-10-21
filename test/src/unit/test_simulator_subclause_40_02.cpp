@@ -51,13 +51,13 @@ int RunGet(SimFixture& f, std::string_view scope) {
 // its own coverage through the language and needs no PLI application to do it.
 TEST(CoverageApiOverview, TheLanguageDrivesCoverageOnItsOwn) {
   SimFixture f;
-  f.ctx.GetCoverageControlState().SetAvailability(std::string(kScope),
+  f.ctx.GetCoverageControlState().SetAvailability(std::string(kScope), kToggle,
                                                   CoverageAvailability::kFull);
 
   EXPECT_EQ(RunControl(f, 0 /* `SV_COV_START */, kScope),
             static_cast<int>(CoverageStatus::kOk));
-  EXPECT_TRUE(
-      f.ctx.GetCoverageControlState().IsCollecting(std::string(kScope)));
+  EXPECT_TRUE(f.ctx.GetCoverageControlState().IsCollecting(std::string(kScope),
+                                                           kToggle));
 
   f.ctx.GetCoverageControlState().SetCoveredItems(std::string(kScope), kToggle,
                                                   7);
@@ -74,7 +74,7 @@ TEST(CoverageApiOverview, TheVpiExtensionStartsTheRunsOwnCoverage) {
   vpi_ctx.Attach(f.ctx);
   SetGlobalVpiContext(&vpi_ctx);
 
-  f.ctx.GetCoverageControlState().SetAvailability(std::string(kScope),
+  f.ctx.GetCoverageControlState().SetAvailability(std::string(kScope), kToggle,
                                                   CoverageAvailability::kFull);
   VpiHandle dut = vpi_ctx.CreateModule("dut", std::string(kScope));
 
@@ -83,8 +83,8 @@ TEST(CoverageApiOverview, TheVpiExtensionStartsTheRunsOwnCoverage) {
 
   // The design sees what the application started: its own state is collecting,
   // and the count it reads back is the one collection accumulated.
-  EXPECT_TRUE(
-      f.ctx.GetCoverageControlState().IsCollecting(std::string(kScope)));
+  EXPECT_TRUE(f.ctx.GetCoverageControlState().IsCollecting(std::string(kScope),
+                                                           kToggle));
   f.ctx.GetCoverageControlState().SetCoveredItems(std::string(kScope), kToggle,
                                                   4);
   EXPECT_EQ(RunGet(f, kScope), 4);
@@ -102,17 +102,17 @@ TEST(CoverageApiOverview, TheLanguagesControlsReachTheVpiSide) {
   vpi_ctx.Attach(f.ctx);
   SetGlobalVpiContext(&vpi_ctx);
 
-  f.ctx.GetCoverageControlState().SetAvailability(std::string(kScope),
+  f.ctx.GetCoverageControlState().SetAvailability(std::string(kScope), kToggle,
                                                   CoverageAvailability::kFull);
   ASSERT_EQ(RunControl(f, 0 /* `SV_COV_START */, kScope),
             static_cast<int>(CoverageStatus::kOk));
-  ASSERT_TRUE(
-      vpi_ctx.GetCoverageControlState().IsCollecting(std::string(kScope)));
+  ASSERT_TRUE(vpi_ctx.GetCoverageControlState().IsCollecting(
+      std::string(kScope), kToggle));
 
   ASSERT_EQ(RunControl(f, 1 /* `SV_COV_STOP */, kScope),
             static_cast<int>(CoverageStatus::kOk));
-  EXPECT_FALSE(
-      vpi_ctx.GetCoverageControlState().IsCollecting(std::string(kScope)));
+  EXPECT_FALSE(vpi_ctx.GetCoverageControlState().IsCollecting(
+      std::string(kScope), kToggle));
 
   SetGlobalVpiContext(nullptr);
 }

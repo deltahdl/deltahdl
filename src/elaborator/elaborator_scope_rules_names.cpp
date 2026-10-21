@@ -62,6 +62,19 @@ bool CallArgsNameNoValue(const Expr* e) {
          e->lhs->rhs != nullptr && e->lhs->rhs->text == "randomize";
 }
 
+// §40.3.2.1 Table 40-2: the argument of a coverage system function that says
+// which hierarchy it acts on may be an instance written as a hierarchical
+// path, and a path naming an instance of the current scope needs no dot, so a
+// bare identifier there names an instance rather than a value. That argument
+// is the fourth of $coverage_control and the third of $coverage_get_max and
+// $coverage_get, which take their scope as $coverage_control does.
+bool ArgNamesCoverageScope(const Expr* e, std::size_t index) {
+  if (e->kind != ExprKind::kSystemCall) return false;
+  if (e->callee == "$coverage_control") return index == 3;
+  return (e->callee == "$coverage_get_max" || e->callee == "$coverage_get") &&
+         index == 2;
+}
+
 // §18.17.7: a production yields a readable value only where it declares a
 // non-void return type. A production written with no return type takes void as
 // its return type, so it declares no implicit variable at all and a read of its
@@ -329,7 +342,9 @@ static void CollectBareIdentOperands(const Expr* e,
   CollectBareIdents(e->false_expr, out);
   CollectBareIdents(e->repeat_count, out);
   if (!CallArgsNameNoValue(e)) {
-    for (const auto* a : e->args) CollectBareIdents(a, out);
+    for (std::size_t i = 0; i < e->args.size(); ++i) {
+      if (!ArgNamesCoverageScope(e, i)) CollectBareIdents(e->args[i], out);
+    }
   }
   for (const auto* el : e->elements) CollectBareIdents(el, out);
 }

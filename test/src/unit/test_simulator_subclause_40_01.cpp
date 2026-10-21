@@ -38,7 +38,7 @@ constexpr int kToggle = 23;  // §40.3.1 SV_COV_TOGGLE
 // the collection and a query reads back what has been covered.
 TEST(CoverageApiGeneral, TheApiIsTheBuiltInAccessFunctions) {
   SimFixture f;
-  f.ctx.GetCoverageControlState().SetAvailability(std::string(kScope),
+  f.ctx.GetCoverageControlState().SetAvailability(std::string(kScope), kToggle,
                                                   CoverageAvailability::kFull);
 
   auto* control = MkSysCall(
@@ -48,8 +48,8 @@ TEST(CoverageApiGeneral, TheApiIsTheBuiltInAccessFunctions) {
        MkInt(f.arena, 11 /* `SV_COV_HIER */), MkStr(f.arena, kScope)});
   EXPECT_EQ(static_cast<int32_t>(EvalExpr(control, f.ctx, f.arena).ToUint64()),
             static_cast<int>(CoverageStatus::kOk));
-  EXPECT_TRUE(
-      f.ctx.GetCoverageControlState().IsCollecting(std::string(kScope)));
+  EXPECT_TRUE(f.ctx.GetCoverageControlState().IsCollecting(std::string(kScope),
+                                                           kToggle));
 
   f.ctx.GetCoverageControlState().SetCoveredItems(std::string(kScope), kToggle,
                                                   12);
@@ -82,12 +82,13 @@ TEST(CoverageApiGeneral, TheVpiRoutinesControlTheSameCollection) {
   SetGlobalVpiContext(&vpi_ctx);
 
   vpi_ctx.GetCoverageControlState().SetAvailability(
-      "top.dut", CoverageAvailability::kFull);
+      "top.dut", kToggle, CoverageAvailability::kFull);
   VpiHandle dut = vpi_ctx.CreateModule("dut", "top.dut");
 
   EXPECT_EQ(vpi_control(vpiCoverageStart, vpiToggleCoverage, dut),
             static_cast<int>(CoverageStatus::kOk));
-  EXPECT_TRUE(vpi_ctx.GetCoverageControlState().IsCollecting("top.dut"));
+  EXPECT_TRUE(
+      vpi_ctx.GetCoverageControlState().IsCollecting("top.dut", kToggle));
 
   SetGlobalVpiContext(nullptr);
 }
