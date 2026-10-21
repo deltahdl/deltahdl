@@ -84,8 +84,8 @@ TEST(PropertySpecGrammar, AWellWrittenConstructIsReadPast) {
       });
 }
 
-// A clocking event, a disable condition or a cycle delay broken where the
-// line after the first starts.
+// A clocking event, a disable condition or a cycle delay, between operands
+// or before the first, broken where the line after the first starts.
 TEST(PropertySpecGrammar, ABrokenClockConditionOrDelayIsReportedWhereItBreaks) {
   ExpectNotAdmitted("assert property",
                     {
@@ -101,6 +101,8 @@ TEST(PropertySpecGrammar, ABrokenClockConditionOrDelayIsReportedWhereItBreaks) {
                         {"a ##[1:\n] b ##1\nc dist zz", 3},
                         {"a ##[1:2\nb ##1\nc dist zz", 3},
                         {"a ##\n] b ##1\nc dist zz", 3},
+                        {"##[1:2\nb ##1\nc dist zz", 3},
+                        {"##1\n] ##1\nb dist zz", 3},
                         {"a ##1 @(posedge clk\n] b ##1\nc dist zz", 3},
                         {"a ##1 @(posedge clk)\n] ##1\nc dist zz", 3},
                     });
@@ -281,14 +283,18 @@ TEST(PropertySpecGrammar, ThroughoutTakesAnExpressionOnItsLeft) {
 
 // Specs Table 16-3's grouping admits and a flat or a left-to-right reading
 // would not: the implications group to the right, not, nexttime and the and
-// or the or before an implication take only what binds tighter, always runs
-// to the end, and a cycle delay binds tighter than throughout. Each holds a
+// or the or before an implication take only what binds tighter, with a
+// bracket after nexttime as well, always, s_always and accept_on run to the
+// end, and a cycle delay binds tighter than throughout. Each holds a
 // subroutine call beside an and or an or, which the evaluation does not read,
 // so the grammar is held to it.
 TEST(PropertySpecGrammar, AnOperandIsGroupedByPrecedence) {
   const std::vector<std::string> kSpecs = {
       "a |-> b |=> (c, $display(\"m\"))",
       "nexttime a ##1 b and (c, $display(\"m\"))",
+      "nexttime [2] a and (b, $display(\"m\"))",
+      "s_always [1:2] a and (b, $display(\"m\"))",
+      "accept_on (r) a or (b, $display(\"m\"))",
       "not a and (b, $display(\"m\"))",
       "(a, $display(\"m\")) or b |-> c",
       "s(a ##1 b) and (c, $display(\"m\")) |-> d",
