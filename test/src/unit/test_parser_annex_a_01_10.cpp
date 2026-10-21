@@ -612,7 +612,7 @@ TEST(ConstraintItemsParsing, MultipleConstraintBlockItems) {
       "  constraint all {\n"
       "    a > 0;\n"
       "    soft b == 1;\n"
-      "    a > 5 -> { b < 10; c > 0; };\n"
+      "    a > 5 -> { b < 10; c > 0; }\n"
       "    if (d > 0) a < 100; else a < 50;\n"
       "    foreach (c[i]) c[i] > 0;\n"
       "    unique { a, b };\n"
@@ -626,16 +626,74 @@ TEST(ConstraintItemsParsing, MultipleConstraintBlockItems) {
   EXPECT_EQ(r.cu->classes[0]->members[4]->name, "all");
 }
 
-TEST(ConstraintItemsParsing, StaticExternConstraintPrototype) {
+// constraint_prototype ::= [ constraint_prototype_qualifier ] [ static ]
+// constraint ...: the `extern` or `pure` stands before `static`, so
+// `static extern constraint c;` is no prototype A.1.10 writes, while the
+// qualifier first is one, and is still read as static (#7582).
+TEST(ConstraintItemsParsing, StaticBeforePrototypeQualifierIsError) {
   auto r = Parse(
-      "class C;\n"
+      "virtual class C;\n"
       "  rand int x;\n"
-      "  static extern constraint c;\n"
+      "  static extern constraint c1;\n"
+      "  static pure constraint c2;\n"
+      "  extern static constraint c3;\n"
+      "  pure static constraint c4;\n"
       "endclass\n");
-  ASSERT_FALSE(r.has_errors);
+  const char* const kMsg =
+      "a constraint prototype's 'static' is written before its 'extern' or "
+      "'pure'";
+  EXPECT_TRUE(ReportedError(r.diags, kMsg, 3, "A.1.10"));
+  EXPECT_TRUE(ReportedError(r.diags, kMsg, 4, "A.1.10"));
+  EXPECT_FALSE(ReportedError(r.diags, kMsg, 5, "A.1.10"));
+  EXPECT_FALSE(ReportedError(r.diags, kMsg, 6, "A.1.10"));
   ASSERT_EQ(r.cu->classes.size(), 1u);
-  EXPECT_EQ(r.cu->classes[0]->members[1]->name, "c");
-  EXPECT_TRUE(r.cu->classes[0]->members[1]->is_static);
+  const auto& members = r.cu->classes[0]->members;
+  ASSERT_EQ(members.size(), 5u);
+  EXPECT_EQ(members[1]->name, "c1");
+  EXPECT_TRUE(members[1]->is_static);
+  EXPECT_TRUE(members[3]->is_static);
+}
+
+// constraint_declaration ::= [ static ] constraint ... constraint_block: a
+// constraint written with a block takes no qualifier but `static`, the
+// constraint_prototype_qualifier being the prototype's alone (#7581).
+TEST(ConstraintItemsParsing, ExternOrPureConstraintWithABlockIsError) {
+  auto r = Parse(
+      "virtual class C;\n"
+      "  rand int x;\n"
+      "  extern constraint c1 { x > 0; }\n"
+      "  pure constraint c2 { x < 9; }\n"
+      "  static constraint c3 { x != 5; }\n"
+      "endclass\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "'extern' is no qualifier of a constraint written with a block",
+      3, "A.1.10"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "'pure' is no qualifier of a constraint written with a block", 4,
+      "A.1.10"));
+  EXPECT_FALSE(
+      ReportedError(r.diags, "is no qualifier of a constraint", 5, "A.1.10"));
+}
+
+// constraint_prototype_qualifier ::= extern | pure, and a prototype takes one
+// of them at most (#7583).
+TEST(ConstraintItemsParsing, ExternAndPureConstraintPrototypeIsError) {
+  auto r = Parse(
+      "virtual class C;\n"
+      "  rand int x;\n"
+      "  extern pure constraint c1;\n"
+      "  pure extern constraint c2;\n"
+      "  pure constraint c3;\n"
+      "  extern constraint c4;\n"
+      "endclass\n");
+  const char* const kMsg =
+      "a constraint prototype takes 'extern' or 'pure', not both";
+  EXPECT_TRUE(ReportedError(r.diags, kMsg, 3, "A.1.10"));
+  EXPECT_TRUE(ReportedError(r.diags, kMsg, 4, "A.1.10"));
+  EXPECT_FALSE(ReportedError(r.diags, kMsg, 5, "A.1.10"));
+  EXPECT_FALSE(ReportedError(r.diags, kMsg, 6, "A.1.10"));
+  EXPECT_FALSE(
+      ReportedError(r.diags, "is written before its 'extern'", 4, "A.1.10"));
 }
 
 TEST(ConstraintItemsParsing, NestedBracesInConstraintBlock) {
@@ -728,6 +786,97 @@ TEST(ConstraintItemsParsing, ErrorDistDefaultEqualWeight) {
                             "a distribution's default specification takes its "
                             "weight through :/ and nothing else",
                             3, "18.5.3"));
+}
+
+constexpr const char* kItemsDoNotParse =
+    "the constraint block's items do not parse from here";
+
+// constraint_block ::= { { constraint_block_item } }: text from which A.1.10
+// derives no item is reported where the block's parse breaks off, once per
+// block (#7580).
+TEST(ConstraintItemsParsing, ItemOutsideTheGrammarIsError) {
+  auto r = Parse(
+      "class C;\n"
+      "  rand int x, y;\n"
+      "  constraint c1 { x > ; }\n"
+      "  constraint c2 { if x > 0 y < 4; }\n"
+      "  constraint c3 { x dist ; }\n"
+      "  constraint c4 { solve x y; }\n"
+      "  constraint c5 { x < y; y < 9; }\n"
+      "  constraint c6 { foreach ([i]) x > 0; }\n"
+      "endclass\n");
+  EXPECT_TRUE(ReportedError(r.diags, kItemsDoNotParse, 3, "A.1.10"));
+  EXPECT_TRUE(ReportedError(r.diags, kItemsDoNotParse, 4, "A.1.10"));
+  EXPECT_TRUE(ReportedError(r.diags, kItemsDoNotParse, 5, "A.1.10"));
+  EXPECT_TRUE(ReportedError(r.diags, kItemsDoNotParse, 6, "A.1.10"));
+  EXPECT_FALSE(ReportedError(r.diags, kItemsDoNotParse, 7, "A.1.10"));
+  EXPECT_TRUE(ReportedError(r.diags, kItemsDoNotParse, 8, "A.1.10"));
+}
+
+// An out-of-block constraint's block and the inline block of a
+// randomize() with are read by the same parse (#7580).
+TEST(ConstraintItemsParsing, OutOfBlockAndInlineItemOutsideTheGrammarIsError) {
+  auto r = Parse(
+      "class C;\n"
+      "  rand int x;\n"
+      "  extern constraint e;\n"
+      "endclass\n"
+      "constraint C::e { x < ; }\n"
+      "module m;\n"
+      "  C obj;\n"
+      "  initial void'(obj.randomize() with { x dist ; });\n"
+      "  initial void'(obj.randomize() with { x < 4; });\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, kItemsDoNotParse, 5, "A.1.10"));
+  EXPECT_TRUE(ReportedError(r.diags, kItemsDoNotParse, 8, "A.1.10"));
+  EXPECT_FALSE(ReportedError(r.diags, kItemsDoNotParse, 9, "A.1.10"));
+}
+
+// constraint_set ::= constraint_expression | { { constraint_expression } }:
+// a solve-before is an item of the block alone, never one of a set (#7580).
+TEST(ConstraintItemsParsing, SolveBeforeInAConstraintSetIsError) {
+  auto r = Parse(
+      "class C;\n"
+      "  rand int x, y;\n"
+      "  constraint c1 { if (x > 0) { solve x before y; } }\n"
+      "  constraint c2 { x > 0 -> solve x before y; }\n"
+      "  constraint c3 { solve x before y; if (x > 0) y < 3; }\n"
+      "endclass\n");
+  EXPECT_TRUE(ReportedError(r.diags, kItemsDoNotParse, 3, "A.1.10"));
+  EXPECT_TRUE(ReportedError(r.diags, kItemsDoNotParse, 4, "A.1.10"));
+  EXPECT_FALSE(ReportedError(r.diags, kItemsDoNotParse, 5, "A.1.10"));
+}
+
+// A constraint_set written in braces ends its item at the '}', so a ';' after
+// it stands where no item A.1.10 writes begins (#7580).
+TEST(ConstraintItemsParsing, SemicolonAfterAConstraintSetIsError) {
+  auto r = Parse(
+      "class C;\n"
+      "  rand int a, b;\n"
+      "  constraint c1 { a > 5 -> { b < 10; }; }\n"
+      "  constraint c2 { a > 5 -> { b < 10; } }\n"
+      "endclass\n");
+  EXPECT_TRUE(ReportedError(r.diags, kItemsDoNotParse, 3, "A.1.10"));
+  EXPECT_FALSE(ReportedError(r.diags, kItemsDoNotParse, 4, "A.1.10"));
+}
+
+// ps_or_hierarchical_array_identifier opens with an implicit_class_handle,
+// super as well as this, so a foreach over a base class's array parses
+// (#7580).
+TEST(ConstraintItemsParsing, ForeachOverASuperArrayParses) {
+  auto r = Parse(
+      "class B;\n"
+      "  rand int arr [4];\n"
+      "endclass\n"
+      "class C extends B;\n"
+      "  constraint c { foreach (super.arr[i]) super.arr[i] < 4; }\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 2u);
+  const auto* member = r.cu->classes[1]->members[0];
+  ASSERT_TRUE(member->constraint_items_parsed);
+  ASSERT_EQ(member->constraint_items.size(), 1u);
+  EXPECT_EQ(member->constraint_items[0]->kind, ConstraintItemKind::kForeach);
 }
 
 }  // namespace

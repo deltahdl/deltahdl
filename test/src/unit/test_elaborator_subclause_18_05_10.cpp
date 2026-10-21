@@ -147,7 +147,7 @@ TEST(StaticConstraint, StaticPureOverriddenByStaticAccepted) {
   EXPECT_TRUE(
       ElabOk("virtual class B;\n"
              "  rand int x;\n"
-             "  static pure constraint c;\n"
+             "  pure static constraint c;\n"
              "endclass\n"
              "class D extends B;\n"
              "  static constraint c { x > 0; }\n"
@@ -164,7 +164,7 @@ TEST(StaticConstraint, StaticPureOverriddenByNonStaticRejected) {
   EXPECT_FALSE(
       ElabOk("virtual class B;\n"
              "  rand int x;\n"
-             "  static pure constraint c;\n"
+             "  pure static constraint c;\n"
              "endclass\n"
              "class D extends B;\n"
              "  constraint c { x > 0; }\n"

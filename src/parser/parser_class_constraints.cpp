@@ -500,11 +500,46 @@ void Parser::ScanConstraintBodyRelations(ClassMember* member) {
   }
 }
 
+static void ReportBlockQualifier(const ClassMember& m, const char* keyword,
+                                 DiagEngine& diag) {
+  diag.Error(m.loc,
+             std::string("'") + keyword +
+                 "' is no qualifier of a constraint written with a block",
+             Subclause("A.1.10"));
+}
+
+// A.1.10: `extern` and `pure` are a constraint_prototype's qualifier, one of
+// the two at most and written before its `static`; a constraint_declaration,
+// written with a block, takes `static` alone, so either one read before a
+// block is reported and dropped.
+static void RejectConstraintQualifiers(ClassMember* m, DiagEngine& diag) {
+  if (!m->is_constraint_prototype) {
+    if (m->is_constraint_extern) ReportBlockQualifier(*m, "extern", diag);
+    if (m->is_pure_virtual) ReportBlockQualifier(*m, "pure", diag);
+    m->is_constraint_extern = false;
+    m->is_pure_virtual = false;
+    return;
+  }
+  if (m->is_constraint_extern && m->is_pure_virtual) {
+    diag.Error(m->loc,
+               "a constraint prototype takes 'extern' or 'pure', not both",
+               Subclause("A.1.10"));
+  } else if (m->is_static &&
+             (m->extern_follows_qualifier || m->pure_follows_qualifier)) {
+    diag.Error(m->loc,
+               "a constraint prototype's 'static' is written before its "
+               "'extern' or 'pure'",
+               Subclause("A.1.10"));
+  }
+}
+
 ClassMember* Parser::ParseConstraintStub(ClassMember* member) {
   member->kind = ClassMemberKind::kConstraint;
   Consume();
 
-  if (ParseConstraintHeader(member)) return member;
+  const bool kPrototype = ParseConstraintHeader(member);
+  RejectConstraintQualifiers(member, diag_);
+  if (kPrototype) return member;
 
   ScanConstraintBodyRelations(member);
   return member;

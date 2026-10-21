@@ -1,8 +1,10 @@
+#include <cstdint>
 #include <string_view>
 #include <utility>
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "lexer/token.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
@@ -12,25 +14,37 @@
 
 namespace delta {
 
+// A block whose items do not parse, or parse only through a suppressed
+// report, is no constraint_block A.1.10 writes, and is reported where the
+// parse broke off.
 void ParserConstraintItemHelpers::Capture(Parser& p, ClassMember* member) {
   if (member == nullptr) return;
   auto saved = p.lexer_.SavePos();
+  const uint32_t kErrors = p.diag_.SuppressedErrorCount();
   p.diag_.PushSuppress();
   std::vector<ConstraintItem*> items;
-  const bool kParsed = ParseItemsToBrace(p, items);
+  const bool kParsed = ParseItemsToBrace(p, items, false);
   p.diag_.PopSuppress();
+  const bool kClean = p.diag_.SuppressedErrorCount() == kErrors;
+  const SourceLoc kBreak =
+      kClean ? p.CurrentLoc() : p.diag_.LastSuppressedErrorLoc();
   p.lexer_.RestorePos(saved);
-  if (!kParsed) return;
+  if (!kParsed || !kClean) {
+    p.diag_.Error(kBreak, "the constraint block's items do not parse from here",
+                  Subclause("A.1.10"));
+    return;
+  }
   member->constraint_items = std::move(items);
   member->constraint_items_parsed = true;
 }
 
-// The items of a block or a braced constraint_set through its '}'.
+// The items of a block, or with `in_set` of a braced constraint_set, through
+// its '}'.
 bool ParserConstraintItemHelpers::ParseItemsToBrace(
-    Parser& p, std::vector<ConstraintItem*>& out) {
+    Parser& p, std::vector<ConstraintItem*>& out, bool in_set) {
   while (!p.Match(TokenKind::kRBrace)) {
     if (p.AtEnd()) return false;
-    ConstraintItem* item = ParseExpressionItem(p);
+    ConstraintItem* item = in_set ? ParseSetItem(p) : ParseExpressionItem(p);
     if (item == nullptr) return false;
     out.push_back(item);
   }
@@ -62,12 +76,19 @@ ConstraintItem* ParserConstraintItemHelpers::ParseExpressionItem(Parser& p) {
   return parsed ? item : nullptr;
 }
 
+// A.1.10: one constraint_expression of a constraint_set, which, unlike an
+// item of the block, is never a solve-before; null where it does not parse.
+ConstraintItem* ParserConstraintItemHelpers::ParseSetItem(Parser& p) {
+  if (p.Check(TokenKind::kKwSolve)) return nullptr;
+  return ParseExpressionItem(p);
+}
+
 // A.1.10: a constraint_set, a braced list of constraint expressions or one
 // constraint expression alone.
 bool ParserConstraintItemHelpers::ParseSet(Parser& p,
                                            std::vector<ConstraintItem*>& out) {
-  if (p.Match(TokenKind::kLBrace)) return ParseItemsToBrace(p, out);
-  ConstraintItem* item = ParseExpressionItem(p);
+  if (p.Match(TokenKind::kLBrace)) return ParseItemsToBrace(p, out, true);
+  ConstraintItem* item = ParseSetItem(p);
   if (item == nullptr) return false;
   out.push_back(item);
   return true;
@@ -86,12 +107,16 @@ bool ParserConstraintItemHelpers::ParseIfElse(Parser& p, ConstraintItem& item) {
 }
 
 // §18.5.7.1: foreach ( array [ loop_variables ] ) constraint_set, a loop
-// variable left out keeping its place as an empty name.
+// variable left out keeping its place as an empty name, and the array opening
+// with a name or with this or super, A.6.8's implicit_class_handle.
 bool ParserConstraintItemHelpers::ParseForeach(Parser& p,
                                                ConstraintItem& item) {
   item.kind = ConstraintItemKind::kForeach;
   if (!p.Match(TokenKind::kLParen)) return false;
-  if (!p.CheckIdentifier() && !p.Check(TokenKind::kKwThis)) return false;
+  if (!p.CheckIdentifier() && !p.Check(TokenKind::kKwThis) &&
+      !p.Check(TokenKind::kKwSuper)) {
+    return false;
+  }
   item.expr = p.ParseMemberAccessChain(p.Consume());
   if (!p.Match(TokenKind::kLBracket)) return false;
   do {

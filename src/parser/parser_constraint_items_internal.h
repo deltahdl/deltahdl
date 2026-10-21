@@ -14,10 +14,13 @@ class Parser;
 // the block's other tables and leaving the scan where it found it. A friend of
 // Parser, defined in src/parser/parser_constraint_items.cpp.
 struct ParserConstraintItemHelpers {
-  // The items from just past the block's '{' through its '}', into `member`.
+  // The items from just past the block's '{' through its '}', into `member`,
+  // or a report under A.1.10 where they do not parse.
   static void Capture(Parser& p, ClassMember* member);
-  static bool ParseItemsToBrace(Parser& p, std::vector<ConstraintItem*>& out);
+  static bool ParseItemsToBrace(Parser& p, std::vector<ConstraintItem*>& out,
+                                bool in_set);
   static ConstraintItem* ParseExpressionItem(Parser& p);
+  static ConstraintItem* ParseSetItem(Parser& p);
   static bool ParseSet(Parser& p, std::vector<ConstraintItem*>& out);
   static bool ParseIfElse(Parser& p, ConstraintItem& item);
   static bool ParseForeach(Parser& p, ConstraintItem& item);
