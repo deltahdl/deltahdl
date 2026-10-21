@@ -461,4 +461,29 @@ TEST(PackageImportSim, ReadBeforeTheWildcardImportReachesTheUnitsData) {
       "y=7 z=2\n");
 }
 
+// §26.3 with §6.6.7: a net declared with a nettype imported from a package is
+// a net of that nettype, its drivers resolved through the package's function:
+// P's pres ANDs 3 and 5 to 1. The import used to leave the nettype out, and n
+// was elaborated as a variable with no resolution function (#7599).
+TEST(PackageImportSim, NetOfAnImportedNettypeResolvesThroughThePackagesFunc) {
+  EXPECT_EQ(RunAndGet("package P;\n"
+                      "  function automatic logic [3:0] pres(input logic [3:0] "
+                      "d[]);\n"
+                      "    pres = 4'hf;\n"
+                      "    foreach (d[i]) pres = pres & d[i];\n"
+                      "  endfunction\n"
+                      "  nettype logic [3:0] nt with pres;\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  import P::*;\n"
+                      "  nt n;\n"
+                      "  logic [3:0] y;\n"
+                      "  assign n = 4'h3;\n"
+                      "  assign n = 4'h5;\n"
+                      "  initial #1 y = n;\n"
+                      "endmodule\n",
+                      "y"),
+            1u);
+}
+
 }  // namespace

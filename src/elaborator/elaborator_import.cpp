@@ -6,6 +6,7 @@
 
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/nettype_registration.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
 #include "elaborator/sensitivity.h"
@@ -34,7 +35,31 @@ struct ImportScope {
   // §13.4.3: the functions the constant-expression folder may call, which an
   // imported package function joins under its bare name.
   std::unordered_map<std::string_view, const ModuleItem*>& func_decls;
+  // §6.6.7: the nettypes of the importing scope, which an imported package
+  // nettype joins under its bare name.
+  NettypeTables nettypes;
 };
+
+// §26.3 with §6.6.7: an imported package nettype is that nettype under its bare
+// name. RegisterPackageNettypes (src/elaborator/nettype_registration.cpp)
+// recorded the nettype under its "P::nt" key, and each of those entries is
+// entered under `name` as well. A net declared with the name is then a net of
+// the package's nettype: it resolves through the package's function and, under
+// §6.22.6, matches the package's nettype, being that nettype.
+void RegisterImportedNettype(std::string_view pkg, std::string_view nettype,
+                             std::string_view name, const ImportScope& scope) {
+  const std::string kKey = std::string(pkg) + "::" + std::string(nettype);
+  auto td = scope.typedefs.find(kKey);
+  if (td == scope.typedefs.end()) return;
+  scope.typedefs[name] = td->second;
+  scope.nettypes.names.insert(name);
+  auto fit = scope.nettypes.resolve_funcs.find(kKey);
+  if (fit != scope.nettypes.resolve_funcs.end())
+    scope.nettypes.resolve_funcs[name] = fit->second;
+  auto cit = scope.nettypes.canonical.find(kKey);
+  if (cit != scope.nettypes.canonical.end())
+    scope.nettypes.canonical[name] = cit->second;
+}
 
 // Register a single imported package item into a module's elaboration scopes:
 // typedefs become available by name, const parameters are entered into the
@@ -51,6 +76,8 @@ void RegisterImportItem(const ModuleItem* pi, const PackageDecl& pkg,
   } else if (pi->kind == ModuleItemKind::kFunctionDecl &&
              pi->method_class.empty()) {
     scope.func_decls[name] = pi;
+  } else if (pi->kind == ModuleItemKind::kNettypeDecl) {
+    RegisterImportedNettype(pkg.name, pi->name, name, scope);
   } else if (pi->kind == ModuleItemKind::kTypedef) {
     scope.typedefs[name] = InPackageScope(pi->typedef_type, pkg);
     // §6.18: an import is what gives a package's typedef its bare name in this
@@ -136,8 +163,13 @@ void Elaborator::ApplyCompilationUnitImports(const ModuleDecl* decl,
     if (item->kind != ModuleItemKind::kImportDecl) continue;
     const ImportItem& imp = item->import_item;
     ApplyImport(imp, unit_,
-                {typedefs_, aggregate_typedef_names_, cu_param_scope_,
-                 class_names_, parameterized_class_names_, func_decls_});
+                {typedefs_,
+                 aggregate_typedef_names_,
+                 cu_param_scope_,
+                 class_names_,
+                 parameterized_class_names_,
+                 func_decls_,
+                 {nettype_names_, nettype_resolve_funcs_, nettype_canonical_}});
     mod->imports.push_back(RtlirImport{imp.package_name, imp.item_name,
                                        imp.is_wildcard, std::string_view()});
   }
@@ -152,8 +184,13 @@ void Elaborator::ApplyHeaderImports(const ModuleDecl* decl) {
     if (item->kind != ModuleItemKind::kImportDecl) continue;
     if (!item->import_item.is_header) continue;
     ApplyImport(item->import_item, unit_,
-                {typedefs_, aggregate_typedef_names_, cu_param_scope_,
-                 class_names_, parameterized_class_names_, func_decls_});
+                {typedefs_,
+                 aggregate_typedef_names_,
+                 cu_param_scope_,
+                 class_names_,
+                 parameterized_class_names_,
+                 func_decls_,
+                 {nettype_names_, nettype_resolve_funcs_, nettype_canonical_}});
   }
 }
 
@@ -170,8 +207,13 @@ void Elaborator::ApplyHeaderImports(const ModuleDecl* decl) {
 void Elaborator::ApplyBodyImport(const ImportItem& import_item) {
   if (import_item.is_header) return;
   ApplyImport(import_item, unit_,
-              {typedefs_, aggregate_typedef_names_, cu_param_scope_,
-               class_names_, parameterized_class_names_, func_decls_});
+              {typedefs_,
+               aggregate_typedef_names_,
+               cu_param_scope_,
+               class_names_,
+               parameterized_class_names_,
+               func_decls_,
+               {nettype_names_, nettype_resolve_funcs_, nettype_canonical_}});
   // §9.2.2.2.1: a function the import brings in is one an always_comb below it
   // may call, and the table the inference reads was filled ahead of the walk
   // (ElaborateItems).

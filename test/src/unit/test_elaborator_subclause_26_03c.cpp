@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <string_view>
+#include <utility>
+
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
@@ -352,6 +355,44 @@ TEST(PackageScopeReference, FunctionBodyImportElaborates) {
              "    return v + c;\n"
              "  endfunction\n"
              "endmodule\n"));
+}
+
+// §26.3 has an import make a package's declarations visible by their own
+// names, a nettype among them, and §6.6.7 makes a declaration written with a
+// nettype's name a net of that nettype. So n, under a wildcard import, and w,
+// under an explicit one, are nets of P's nt resolving through P's pres. Under
+// §6.22.6 n is of P's nt itself, so the pass switch joining it to a net of a
+// nettype renaming P::nt joins nets of one nettype (#7599).
+TEST(PackageImport, ImportedNettypeDeclaresANetOfThePackagesNettype) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "package P;\n"
+      "  function automatic logic pres(input logic d[]);\n"
+      "    return d[0] & d[1];\n"
+      "  endfunction\n"
+      "  nettype logic nt with pres;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  import P::*;\n"
+      "  nettype P::nt pnt;\n"
+      "  nt n;\n"
+      "  pnt a;\n"
+      "  tran sw(n, a);\n"
+      "endmodule\n"
+      "module e;\n"
+      "  import P::nt;\n"
+      "  nt w;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  for (const auto& [mod, name] :
+       {std::pair<std::string_view, std::string_view>{"m", "n"}, {"e", "w"}}) {
+    const RtlirNet* net = FindNet(design, mod, name);
+    ASSERT_NE(net, nullptr) << name;
+    EXPECT_TRUE(net->is_user_nettype) << name;
+    EXPECT_EQ(net->resolve_func, "P::pres") << name;
+  }
 }
 
 }  // namespace
