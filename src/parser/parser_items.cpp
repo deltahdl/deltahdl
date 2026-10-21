@@ -735,21 +735,21 @@ void Parser::ParseTypedItemOrInst(std::vector<ModuleItem*>& items,
     ParseGateInst(items);
     return;
   }
-  if (Check(TokenKind::kKwEnum)) {
-    auto dtype = ParseEnumType();
-    dtype.is_const = quals.is_const;
-    ParseVarDeclList(items, dtype);
-    return;
-  }
-  if (Check(TokenKind::kKwStruct) || Check(TokenKind::kKwUnion)) {
-    auto dtype = ParseStructOrUnionType();
+  if (Check(TokenKind::kKwEnum) || Check(TokenKind::kKwStruct) ||
+      Check(TokenKind::kKwUnion)) {
+    // ParseEnumType reads an enum's packed dimensions itself, so the second
+    // reading finds none after one.
+    auto dtype =
+        Check(TokenKind::kKwEnum) ? ParseEnumType() : ParseStructOrUnionType();
     ParsePackedDims(dtype);
     dtype.is_const = quals.is_const;
     ParseVarDeclList(items, dtype);
     return;
   }
+  // The qualifiers have taken every `const`, so none is left for
+  // ParseDataType to read.
   auto dtype = ParseDataType();
-  if (quals.is_const) dtype.is_const = true;
+  dtype.is_const = quals.is_const;
   if (dtype.kind != DataTypeKind::kImplicit || dtype.packed_dim_left ||
       dtype.signing_written || dtype.is_const) {
     ReportImplicitTypeWithoutVar(dtype, CurrentLoc(), diag_);

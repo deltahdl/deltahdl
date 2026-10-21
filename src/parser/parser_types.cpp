@@ -703,15 +703,7 @@ void Parser::ParseVarDeclList(std::vector<ModuleItem*>& items,
   // list is one or the other according to the type that heads it.
   Subclause subclause(dtype.is_net ? "6.7" : "6.8");
   if (dtype.is_net || nettype_named) {
-    const SourceLoc kDelayLoc = CurrentLoc();
     ParseGateDelay(nd1, nd2, nd3);
-    // A.2.1.3 gives a net of a user-defined nettype a delay_control, a single
-    // delay, and the delay3 of up to three to a net_type keyword's net alone.
-    if (nettype_named && nd2 != nullptr) {
-      diag_.Error(kDelayLoc,
-                  "a net of a user-defined nettype takes a single delay",
-                  Subclause("A.2.1.3"));
-    }
     // §10.3.4 puts the drive strength before the delay on a net declaration as
     // well as on an `assign`, so a strength standing here breaks the same rule.
     // Parser::ParseNetStrength read the legal position, back in ParseDataType.

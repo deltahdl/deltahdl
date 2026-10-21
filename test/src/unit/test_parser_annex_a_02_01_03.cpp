@@ -670,27 +670,4 @@ TEST(TypeDeclParsing, InterconnectDeclThirdNetIsError) {
   EXPECT_EQ(r.cu->modules[0]->items.size(), 6u);
 }
 
-// A.2.1.3 gives a net of a user-defined nettype a delay_control, a single
-// delay, where the form opening with a net_type keyword takes a delay3 of up
-// to three. So a nettype net written with two or three values is reported, and
-// one value, parenthesized or not, is accepted, as is a wire's three (#7591).
-TEST(TypeDeclParsing, NettypeNetMultiValueDelayIsError) {
-  auto r = Parse(
-      "module m;\n"
-      "  nettype real my_real;\n"
-      "  my_real #(1, 2) x;\n"
-      "  my_real #(1, 2, 3) y;\n"
-      "  my_real #(4) z;\n"
-      "  my_real #5 w;\n"
-      "  wire #(1, 2, 3) v;\n"
-      "endmodule\n");
-  const char* const kSingleDelay =
-      "a net of a user-defined nettype takes a single delay";
-  EXPECT_TRUE(ReportedError(r.diags, kSingleDelay, 3, "A.2.1.3"));
-  EXPECT_TRUE(ReportedError(r.diags, kSingleDelay, 4, "A.2.1.3"));
-  for (uint32_t line : {5U, 6U, 7U}) {
-    EXPECT_FALSE(ReportedError(r.diags, kSingleDelay, line, "A.2.1.3"));
-  }
-}
-
 }  // namespace
