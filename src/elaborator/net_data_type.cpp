@@ -253,8 +253,10 @@ static std::string NamedTypeKey(const DataType& type) {
 
 bool IsLegalNettypeDataType(const DataType& dtype,
                             const TypeShapeTables& tables) {
+  // A name resolving to nothing ends the walk as a cyclic chain does, with
+  // nothing left to judge.
   const DataType* type = &dtype;
-  for (int hops = 0; hops < kMaxTypedefHops; ++hops) {
+  for (int hops = 0; type != nullptr && hops < kMaxTypedefHops; ++hops) {
     if (type->kind != DataTypeKind::kNamed)
       return IsLegalNettypeElement(*type, tables);
     const std::string kKey = NamedTypeKey(*type);
@@ -264,8 +266,7 @@ bool IsLegalNettypeDataType(const DataType& dtype,
         !AllFixedSize(dims->second, tables))
       return false;
     auto it = tables.typedefs.find(kKey);
-    if (it == tables.typedefs.end()) return true;
-    type = &it->second;
+    type = it != tables.typedefs.end() ? &it->second : nullptr;
   }
   return true;
 }
