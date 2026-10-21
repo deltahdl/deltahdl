@@ -654,4 +654,90 @@ TEST(DesignBuildingBlockParsing, TimeunitBeforeNonAnsiPortDeclAccepted) {
   EXPECT_EQ(r.cu->modules[0]->time_unit_magnitude, 10);
 }
 
+// §3.14.2.2: the time scope's timeunit and timeprecision declarations precede
+// every other item, A.10 footnote 3 making one written later legal only as a
+// matching repeat. A null item, an anonymous program, a modport and a bind
+// directive are items like any other, though none is kept in the body's item
+// list, so a declaration after one is a later item (#7586).
+TEST(DesignBuildingBlockParsing, TimeunitAfterAnUnlistedItemIsALaterItem) {
+  auto r = Parse(
+      "package p1;\n"
+      "  ;\n"
+      "  timeunit 1ns;\n"
+      "endpackage\n"
+      "package p2;\n"
+      "  program;\n"
+      "  endprogram\n"
+      "  timeunit 1ns;\n"
+      "endpackage\n"
+      "module m1;\n"
+      "  ;\n"
+      "  timeprecision 1ps;\n"
+      "endmodule\n"
+      "interface i1;\n"
+      "  modport mp (input x);\n"
+      "  timeunit 1ns;\n"
+      "endinterface\n"
+      "program pr1;\n"
+      "  ;\n"
+      "  timeunit 1ns;\n"
+      "endprogram\n"
+      "module m2;\n"
+      "  bind m1 m3 u ();\n"
+      "  timeunit 1ns;\n"
+      "endmodule\n");
+  const char* const kUnit =
+      "timeunit as a later item requires a matching prior declaration in the "
+      "same time scope";
+  EXPECT_TRUE(ReportedError(r.diags, kUnit, 3, "3.14.2.2"));
+  EXPECT_TRUE(ReportedError(r.diags, kUnit, 8, "3.14.2.2"));
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "timeprecision as a later item requires a matching "
+                            "prior declaration in the same time scope",
+                            12, "3.14.2.2"));
+  EXPECT_TRUE(ReportedError(r.diags, kUnit, 16, "3.14.2.2"));
+  EXPECT_TRUE(ReportedError(r.diags, kUnit, 20, "3.14.2.2"));
+  EXPECT_TRUE(ReportedError(r.diags, kUnit, 24, "3.14.2.2"));
+}
+
+// The declaration that opens the body is the scope's first, and a null item
+// after it leaves a matching repeat legal (#7586).
+TEST(DesignBuildingBlockParsing, TimeunitBeforeANullItemIsTheFirst) {
+  auto r = Parse(
+      "timeunit 1ns;\n"
+      ";\n"
+      "timeunit 1ns;\n"
+      "package p;\n"
+      "  timeunit 1ns;\n"
+      "  ;\n"
+      "  timeunit 1ns;\n"
+      "endpackage\n"
+      "interface i;\n"
+      "  timeunit 1ns;\n"
+      "  modport mp (input x);\n"
+      "endinterface\n"
+      "module m;\n"
+      "  timeprecision 1ps;\n"
+      "  ;\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+}
+
+// The compilation-unit scope is a time scope of its own, and the null item and
+// a bind directive written in it are items that leave none of its lists longer
+// (#7586).
+TEST(DesignBuildingBlockParsing, TimeunitAfterAnUnlistedCuItemIsALaterItem) {
+  const char* const kUnit =
+      "timeunit as a later item requires a matching prior declaration in the "
+      "same time scope";
+  auto after_null = Parse(
+      ";\n"
+      "timeunit 1ns;\n");
+  EXPECT_TRUE(ReportedError(after_null.diags, kUnit, 2, "3.14.2.2"));
+  auto after_bind = Parse(
+      "bind m1 m3 u ();\n"
+      "timeunit 1ns;\n");
+  EXPECT_TRUE(ReportedError(after_bind.diags, kUnit, 2, "3.14.2.2"));
+}
+
 }  // namespace

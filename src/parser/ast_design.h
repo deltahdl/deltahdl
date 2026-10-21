@@ -208,6 +208,14 @@ struct CompilationUnit {
   SourceLoc cu_timeunit_loc;
   bool has_cu_timeprecision = false;
   SourceLoc cu_timeprecision_loc;
+  // Whether this file has read an item of the compilation-unit scope other
+  // than a timeunits_declaration, set by Parser::NoteItemAndMatchNull for
+  // CaptureCuTimeunitState in src/parser/parser.cpp. The null item, a bind
+  // directive and an anonymous program with an empty body leave the lists
+  // above as they were, though §3.14.2.2 counts each as an item the scope's
+  // timeunit and timeprecision declarations precede. The check it serves
+  // reads one file, so AppendCompilationUnitDeclarations does not carry it.
+  bool has_read_cu_item = false;
 
   // Every time literal the unit's source wrote, with its time scope. The
   // parser can scale one only provisionally, by the element's own declared

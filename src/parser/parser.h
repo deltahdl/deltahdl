@@ -166,6 +166,7 @@ class Parser {
   bool TryParseMiscKeywordItem(std::vector<ModuleItem*>& items);
   void RejectProceduralContinuousAssignItem();
   void ParseTimeunitItem();
+  bool NoteItemAndMatchNull(bool& has_read_item);
   void ParseInterconnectItem(std::vector<ModuleItem*>& items);
   bool TryParseNonPortItem(std::vector<ModuleItem*>& items);
   bool TryParseClassOrVerification(std::vector<ModuleItem*>& items);

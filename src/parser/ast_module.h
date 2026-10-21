@@ -800,10 +800,12 @@ struct ModuleDecl {
   bool is_automatic = false;
   bool has_wildcard_ports = false;
   bool is_non_ansi_ports = false;
-  // Whether the body holds a non-ANSI port declaration, `input a;`. Those are
-  // read into `ports` rather than `items`, but A.1.2 makes each a module_item,
-  // and §3.14.2.2 has a timeunits_declaration precede every module_item.
-  bool has_body_port_decls = false;
+  // Whether the body has read an item other than a timeunits_declaration, set
+  // by Parser::NoteItemAndMatchNull. §3.14.2.2 has the time scope's timeunit
+  // and timeprecision declarations precede every other item in it, and several
+  // items leave `items` as it was: a non-ANSI port declaration, `input a;`,
+  // read into `ports`, a modport, a bind directive and the null item `;`.
+  bool has_read_body_item = false;
   std::string_view name;
   SourceRange range;
   std::vector<Attribute> attrs;
@@ -888,6 +890,10 @@ struct PackageDecl {
   // and precision it does not declare.
   bool has_directive_timescale = false;
   TimeScale directive_timescale;
+  // Whether the body has read an item other than a timeunits_declaration, as
+  // ModuleDecl::has_read_body_item records it. The null item and an anonymous
+  // program with an empty body leave `items` as it was.
+  bool has_read_body_item = false;
 };
 
 }  // namespace delta

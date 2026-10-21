@@ -200,7 +200,7 @@ ModuleDecl* Parser::ParseInterfaceDecl() {
   auto* prev_module = current_module_;
   current_module_ = decl;
   while (!Check(TokenKind::kKwEndinterface) && !AtEnd()) {
-    if (Match(TokenKind::kSemicolon)) continue;
+    if (NoteItemAndMatchNull(decl->has_read_body_item)) continue;
     if (Check(TokenKind::kKwModport)) {
       ParseModportDecl(decl->modports);
     } else if (!non_ansi || !TryParseBodyPortDecl(*decl)) {
@@ -224,7 +224,7 @@ ModuleDecl* Parser::ParseProgramDecl() {
   auto* prev_module = current_module_;
   current_module_ = decl;
   while (!Check(TokenKind::kKwEndprogram) && !AtEnd()) {
-    if (Match(TokenKind::kSemicolon)) continue;
+    if (NoteItemAndMatchNull(decl->has_read_body_item)) continue;
     if (!non_ansi || !TryParseBodyPortDecl(*decl)) ParseModuleItem(decl->items);
   }
   current_module_ = prev_module;

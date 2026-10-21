@@ -71,7 +71,7 @@ TimeScopeRefs CollectTimeScopeRefs(ModuleDecl* mod, PackageDecl* pkg) {
     refs.prec = &mod->time_prec;
     refs.unit_mag = &mod->time_unit_magnitude;
     refs.prec_mag = &mod->time_prec_magnitude;
-    refs.has_other_items = !mod->items.empty() || mod->has_body_port_decls;
+    refs.has_other_items = !mod->items.empty() || mod->has_read_body_item;
   } else if (validate_pkg) {
     refs.active = true;
     refs.has_unit = &pkg->has_timeunit;
@@ -80,7 +80,7 @@ TimeScopeRefs CollectTimeScopeRefs(ModuleDecl* mod, PackageDecl* pkg) {
     refs.prec = &pkg->time_prec;
     refs.unit_mag = &pkg->time_unit_magnitude;
     refs.prec_mag = &pkg->time_prec_magnitude;
-    refs.has_other_items = !pkg->items.empty();
+    refs.has_other_items = !pkg->items.empty() || pkg->has_read_body_item;
   }
   refs.was_unit_set = refs.has_unit && *refs.has_unit;
   refs.was_prec_set = refs.has_prec && *refs.has_prec;
@@ -357,6 +357,21 @@ void Parser::ParseTimeunitItem() {
   ParseTimeunitDecl(current_module_, nullptr,
                     validate_pkg ? current_package_ : nullptr);
   ValidateTimeScopeAfterParse(refs, diag_, loc);
+}
+
+// The first step of each pass of a body loop, the compilation unit's among
+// them. Unless a timeunit or timeprecision keyword stands, it records in
+// `has_read_item` that the body has read an item, for CollectTimeScopeRefs and
+// CaptureCuTimeunitState to read: §3.14.2.2 has the time scope's
+// timeunits_declaration precede every other item, and the null item, a
+// modport, a bind directive and an anonymous program are items that leave the
+// body's item list as it was. Answers whether the item is the null item, and
+// consumes it if so.
+bool Parser::NoteItemAndMatchNull(bool& has_read_item) {
+  if (!Check(TokenKind::kKwTimeunit) && !Check(TokenKind::kKwTimeprecision)) {
+    has_read_item = true;
+  }
+  return Match(TokenKind::kSemicolon);
 }
 
 // Parses an `interconnect` net declaration (§6.6.8), including its optional

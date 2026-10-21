@@ -117,7 +117,7 @@ CuTimeunitSnapshot CaptureCuTimeunitState(const CompilationUnit* unit) {
                          !unit->interfaces.empty() || !unit->programs.empty() ||
                          !unit->classes.empty() || !unit->udps.empty() ||
                          !unit->checkers.empty() || !unit->configs.empty() ||
-                         !unit->cu_items.empty();
+                         !unit->cu_items.empty() || unit->has_read_cu_item;
   return snap;
 }
 
@@ -606,7 +606,7 @@ std::vector<Attribute>* AttributesOfNewest(CompilationUnit& unit,
 
 void Parser::ParseTopLevel(CompilationUnit* unit) {
   current_compilation_unit_ = unit;
-  if (Match(TokenKind::kSemicolon)) return;
+  if (NoteItemAndMatchNull(unit->has_read_cu_item)) return;
   auto top_attrs = ParseAttributes();
   const TopLevelSizes kBefore = SizesOf(*unit);
   if (TryParsePrimaryTopLevel(unit)) {
@@ -869,7 +869,7 @@ PackageDecl* Parser::ParsePackageDecl() {
   current_package_ = pkg;
   ++package_body_depth_;
   while (!Check(TokenKind::kKwEndpackage) && !AtEnd()) {
-    if (Match(TokenKind::kSemicolon)) continue;
+    if (NoteItemAndMatchNull(pkg->has_read_body_item)) continue;
 
     if (Check(TokenKind::kKwSpecify)) {
       diag_.Error(CurrentLoc(),
