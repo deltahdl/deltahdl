@@ -117,7 +117,8 @@ TEST(CoverageSave, TheEntryHoldsTheCoverageAsItStoodAtTheSave) {
 
 // The call names one coverage type, and that is the state it saves: what the
 // design has covered of another type is no part of the entry, so a merge of the
-// same name does not find that type there and brings none of it back.
+// same name does not find that type there and brings none of it back. A reset
+// clears one type, so both are reset to leave only what the merge brings.
 TEST(CoverageSave, SavesOnlyTheCoverageTypeTheCallNames) {
   SimFixture f;
   const std::string kScope = "top.dut";
@@ -127,6 +128,7 @@ TEST(CoverageSave, SavesOnlyTheCoverageTypeTheCallNames) {
 
   ASSERT_EQ(RunSave(f, kToggle, kName), kOk);
   Cov(f).Control(CoverageControl::kReset, kToggle, kScope);
+  Cov(f).Control(CoverageControl::kReset, kAssertion, kScope);
 
   EXPECT_EQ(RunMerge(f, kAssertion, kName), kNoCov);
   ASSERT_EQ(RunMerge(f, kToggle, kName), kOk);

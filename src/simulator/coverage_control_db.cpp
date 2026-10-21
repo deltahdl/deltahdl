@@ -49,7 +49,8 @@ std::string CoverageControlState::DesignSignature() const {
   std::sort(instances.begin(), instances.end());
   std::string signature;
   for (const auto& [path, definition] : instances) {
-    signature += "instance " + path + " " + definition + "\n";
+    signature.append("instance ").append(path).append(" ");
+    signature.append(definition).append("\n");
   }
   return signature;
 }
