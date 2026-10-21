@@ -650,6 +650,139 @@ TEST(ClassItems, NestedVirtualClassKeepsItsVirtual) {
   EXPECT_FALSE(c->members[1]->nested_class->is_virtual);
 }
 
+// --- the order of the qualifiers ---------------------------------------------
+// class_method's extern forms open with `extern`, before every method
+// qualifier, and no other form has one (#7575).
+TEST(ClassItems, ExternAfterAnotherQualifierIsError) {
+  auto r = Parse(
+      "class C;\n"
+      "  local extern function void h();\n"
+      "  virtual extern task t();\n"
+      "  static extern function int s();\n"
+      "  extern local function void k();\n"
+      "  extern protected virtual function void v();\n"
+      "endclass\n");
+  const char* const kMsg = "'extern' is written after another qualifier";
+  EXPECT_TRUE(ReportedError(r.diags, kMsg, 2, "A.1.9"));
+  EXPECT_TRUE(ReportedError(r.diags, kMsg, 3, "A.1.9"));
+  EXPECT_TRUE(ReportedError(r.diags, kMsg, 4, "A.1.9"));
+  EXPECT_FALSE(ReportedError(r.diags, kMsg, 5, "A.1.9"));
+  EXPECT_FALSE(ReportedError(r.diags, kMsg, 6, "A.1.9"));
+}
+
+// method_qualifier is `[ pure ] virtual`, so `pure` stands directly before
+// `virtual`, and the bodiless form `pure virtual { class_item_qualifier }
+// method_prototype ;` opens with the pair unless `extern` comes first (#7578).
+TEST(ClassItems, PureApartFromVirtualIsError) {
+  auto r = Parse(
+      "virtual class C;\n"
+      "  virtual pure function void f();\n"
+      "  pure local virtual task t();\n"
+      "  protected pure virtual function void g();\n"
+      "  pure virtual protected function void p();\n"
+      "  extern protected pure virtual function void e();\n"
+      "endclass\n");
+  const char* const kApart = "'pure' is written apart from 'virtual'";
+  const char* const kOpens = "a pure virtual method prototype opens with";
+  EXPECT_TRUE(ReportedError(r.diags, kApart, 2, "A.1.9"));
+  EXPECT_FALSE(ReportedError(r.diags, kOpens, 2, "A.1.9"));
+  EXPECT_TRUE(ReportedError(r.diags, kApart, 3, "A.1.9"));
+  EXPECT_TRUE(ReportedError(r.diags, kOpens, 4, "A.1.9"));
+  EXPECT_FALSE(ReportedError(r.diags, kApart, 4, "A.1.9"));
+  EXPECT_FALSE(ReportedError(r.diags, kApart, 5, "A.1.9"));
+  EXPECT_FALSE(ReportedError(r.diags, kOpens, 5, "A.1.9"));
+  EXPECT_FALSE(ReportedError(r.diags, kApart, 6, "A.1.9"));
+  EXPECT_FALSE(ReportedError(r.diags, kOpens, 6, "A.1.9"));
+}
+
+// `{ method_qualifier } function_declaration` takes `pure virtual` after
+// another qualifier, so a method written that way with a body draws §8.21's
+// report on the body and none on the order.
+TEST(ClassItems, PureVirtualWithABodyIsNotReportedForItsOrder) {
+  auto r = Parse(
+      "virtual class C;\n"
+      "  protected pure virtual function void g();\n"
+      "  endfunction\n"
+      "endclass\n");
+  EXPECT_TRUE(ReportedError(r.diags, "a pure virtual method shall not have", 2,
+                            "8.21"));
+  EXPECT_FALSE(ReportedError(
+      r.diags, "a pure virtual method prototype opens with", 2, "A.1.9"));
+}
+
+// class_property's first form puts every property qualifier before the
+// data_declaration's own `const`, and its const form takes only class item
+// qualifiers after `const` (#7579).
+TEST(ClassItems, RandomQualifierAfterConstIsError) {
+  auto r = Parse(
+      "class C;\n"
+      "  const rand int x = 1;\n"
+      "  const static randc bit [3:0] y = 2;\n"
+      "  rand const int z = 3;\n"
+      "  static const int w = 4;\n"
+      "endclass\n");
+  const char* const kMsg = "a random qualifier is written after 'const'";
+  EXPECT_TRUE(ReportedError(r.diags, kMsg, 2, "A.1.9"));
+  EXPECT_TRUE(ReportedError(r.diags, kMsg, 3, "A.1.9"));
+  EXPECT_FALSE(ReportedError(r.diags, kMsg, 4, "A.1.9"));
+  EXPECT_FALSE(ReportedError(r.diags, kMsg, 5, "A.1.9"));
+}
+
+// interface_class_item: an interface_class_method is `pure virtual
+// method_prototype ;`, with no class_item_qualifier and no `extern`, and a
+// type_declaration there takes no qualifier at all. `static` on the method is
+// §8.10's to report (#7576).
+TEST(ClassItems, InterfaceClassItemQualifiersAreErrors) {
+  auto r = Parse(
+      "interface class I;\n"
+      "  pure virtual protected function void f();\n"
+      "  pure virtual local task t();\n"
+      "  extern pure virtual function void g();\n"
+      "  protected typedef int T;\n"
+      "  rand typedef bit B;\n"
+      "  pure virtual function void ok();\n"
+      "  typedef int U;\n"
+      "  localparam type L = int;\n"
+      "  parameter int P = 1;\n"
+      "endclass\n");
+  const char* const kMethod = "is no qualifier of a method of an interface";
+  const char* const kType =
+      "is no qualifier of a type declaration in an interface";
+  EXPECT_TRUE(ReportedError(
+      r.diags, "'protected' is no qualifier of a method of an interface class",
+      2, "A.1.9"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "'local' is no qualifier of a method of an interface class", 3,
+      "A.1.9"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "'extern' is no qualifier of a method of an interface class", 4,
+      "A.1.9"));
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "'protected' is no qualifier of a type declaration "
+                            "in an interface class",
+                            5, "A.1.9"));
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "'rand' is no qualifier of a type declaration in an interface class", 6,
+      "A.1.9"));
+  EXPECT_FALSE(ReportedError(r.diags, kMethod, 7, "A.1.9"));
+  EXPECT_FALSE(ReportedError(r.diags, kType, 8, "A.1.9"));
+  EXPECT_FALSE(ReportedError(r.diags, "is no qualifier", 9, "A.1.9"));
+  EXPECT_FALSE(ReportedError(r.diags, "is no qualifier", 10, "A.1.9"));
+}
+
+// The same items in a class that is no interface class take those qualifiers.
+TEST(ClassItems, OrdinaryClassItemsTakeTheseQualifiers) {
+  EXPECT_TRUE(
+      ParseOk("virtual class V;\n"
+              "  pure virtual protected function void f();\n"
+              "  pure virtual local task t();\n"
+              "  extern pure virtual function void g();\n"
+              "  protected typedef int T;\n"
+              "  rand typedef bit B;\n"
+              "endclass\n"));
+}
+
 // --- class_constructor_arg
 // ----------------------------------------------------- class_constructor_arg
 // ::= tf_port_item | default. The `default` argument is a class constructor's;

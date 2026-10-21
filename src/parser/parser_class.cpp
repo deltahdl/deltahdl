@@ -65,6 +65,128 @@ struct ParserClassHelpers {
     p.MatchEndLabel(decl->name);
     decl->range.end = p.CurrentLoc();
   }
+
+  // Reads one qualifier before a class member, if one stands there, into `m`;
+  // `proto` is set by the two that mark a method with no body.
+  static bool ConsumeQualifier(Parser& p, ClassMember* m, bool& proto) {
+    if (p.TryConsumeAccessQualifier(m) ||
+        p.TryConsumeClassQualifier(m, TokenKind::kKwStatic,
+                                   &ClassMember::is_static,
+                                   "duplicate 'static' qualifier") ||
+        p.TryConsumeVirtualQualifier(m) || p.TryConsumeRandQualifier(m) ||
+        p.TryConsumeClassQualifier(m, TokenKind::kKwConst,
+                                   &ClassMember::is_const,
+                                   "duplicate 'const' qualifier")) {
+      return true;
+    }
+    if (p.Match(TokenKind::kKwPure)) {
+      m->is_pure_virtual = true;
+      proto = true;
+      return true;
+    }
+    if (!p.Match(TokenKind::kKwExtern)) return false;
+    proto = true;
+    // 18.5.1: 'extern constraint name;' is the explicit prototype form. The
+    // flag is only meaningful for constraint members.
+    m->is_constraint_extern = true;
+    return true;
+  }
+
+  // Records on `m` where `kw`, the qualifier just read and the `index`th of
+  // the member's, stands among the others, for the order A.1.9 gives `extern`,
+  // `pure` and the random qualifiers; `extern_first` carries whether the first
+  // one read was `extern`.
+  static void NoteQualifierOrder(Parser& p, ClassMember* m, TokenKind kw,
+                                 int index, bool& extern_first) {
+    if (kw == TokenKind::kKwExtern) {
+      extern_first = index == 0;
+      m->extern_follows_qualifier = !extern_first;
+    } else if (kw == TokenKind::kKwPure) {
+      m->pure_apart_from_virtual = !p.Check(TokenKind::kKwVirtual);
+      m->pure_follows_qualifier = index > 0 && !extern_first;
+    } else if (kw == TokenKind::kKwRand || kw == TokenKind::kKwRandc) {
+      if (m->is_const) m->random_follows_const = true;
+    }
+  }
+
+  // A.1.9's class_method: its two extern forms open with `extern`, before
+  // every method qualifier, and method_qualifier writes `pure` directly before
+  // `virtual`. A `pure` with no `virtual` at all is reported on its own.
+  static void RejectMethodQualifierOrder(Parser& p, const ClassMember& m) {
+    if (m.extern_follows_qualifier) {
+      p.diag_.Error(m.loc,
+                    "'extern' is written after another qualifier; it stands "
+                    "before every qualifier of a method",
+                    Subclause("A.1.9"));
+    }
+    if (m.is_virtual && m.pure_apart_from_virtual) {
+      p.diag_.Error(m.loc,
+                    "'pure' is written apart from 'virtual'; it stands "
+                    "directly before it",
+                    Subclause("A.1.9"));
+    }
+  }
+
+  // A.1.9's bodiless form of class_method, `pure virtual {
+  // class_item_qualifier } method_prototype ;`, opens with the pair, which
+  // only `extern` may precede. A method written with a body may take other
+  // qualifiers first, as `{ method_qualifier } function_declaration`, so this
+  // is asked of one with none. A `pure` apart from its `virtual` is already
+  // reported by RejectMethodQualifierOrder.
+  static void RejectPureVirtualPrototypeOrder(Parser& p, const ClassMember& m) {
+    if (!m.pure_follows_qualifier || m.pure_apart_from_virtual) return;
+    p.diag_.Error(m.loc,
+                  "a pure virtual method prototype opens with 'pure virtual'; "
+                  "another qualifier is written before it",
+                  Subclause("A.1.9"));
+  }
+
+  // A.1.9's class_property: its first form puts every property qualifier
+  // before the data_declaration's own `const`, and its const form takes only
+  // class item qualifiers after `const`, so neither writes a random qualifier
+  // after `const`.
+  static void RejectPropertyQualifiers(Parser& p, const ClassMember& m) {
+    p.RejectMisplacedClassQualifiers(
+        m,
+        Parser::kQualRand | Parser::kQualRandc | Parser::kQualStatic |
+            Parser::kQualProtected | Parser::kQualLocal | Parser::kQualConst,
+        "class property");
+    if (!m.random_follows_const) return;
+    p.diag_.Error(m.loc,
+                  "a random qualifier is written after 'const'; neither form "
+                  "of a class property writes one there",
+                  Subclause("A.1.9"));
+  }
+
+  // A.1.9's interface_class_item: an interface_class_method takes no qualifier
+  // but `pure virtual`, and a type_declaration takes none, where a class's
+  // items take more. Each member `decl` gained from `first` on is reported
+  // only for the qualifiers its item in a class that is no interface class
+  // admits, the others having been reported there already. `static` on a
+  // method is left to §8.10, since an interface class's methods are virtual.
+  static void RejectInterfaceClassItemQualifiers(Parser& p,
+                                                 const ClassDecl& decl,
+                                                 size_t first) {
+    if (!decl.is_interface) return;
+    for (size_t i = first; i < decl.members.size(); ++i) {
+      const ClassMember& m = *decl.members[i];
+      if (m.kind == ClassMemberKind::kMethod) {
+        p.RejectMisplacedClassQualifiers(
+            m,
+            static_cast<uint16_t>(~(Parser::kQualProtected |
+                                    Parser::kQualLocal | Parser::kQualExtern)),
+            "method of an interface class");
+      } else if (m.kind == ClassMemberKind::kTypedef &&
+                 !m.typedef_item->is_localparam) {
+        p.RejectMisplacedClassQualifiers(
+            m,
+            static_cast<uint16_t>(
+                ~(Parser::kQualRand | Parser::kQualRandc | Parser::kQualStatic |
+                  Parser::kQualProtected | Parser::kQualLocal)),
+            "type declaration in an interface class");
+      }
+    }
+  }
 };
 
 ModuleDecl* Parser::ParseInterfaceDecl() {
@@ -188,7 +310,10 @@ ClassDecl* Parser::ParseClassDecl() {
   while (!Check(TokenKind::kKwEndclass) && !AtEnd()) {
     if (Match(TokenKind::kSemicolon)) continue;
     auto before = lexer_.SavePos().pos;
+    const size_t kFirstNew = decl->members.size();
     ParseClassMembers(decl->members);
+    ParserClassHelpers::RejectInterfaceClassItemQualifiers(*this, *decl,
+                                                           kFirstNew);
 
     if (lexer_.SavePos().pos == before) Consume();
   }
@@ -291,30 +416,12 @@ bool Parser::TryConsumeVirtualQualifier(ClassMember* m) {
 
 bool Parser::ParseClassQualifiers(ClassMember* m) {
   bool proto = false;
-  while (true) {
-    if (TryConsumeAccessQualifier(m)) continue;
-    if (TryConsumeClassQualifier(m, TokenKind::kKwStatic,
-                                 &ClassMember::is_static,
-                                 "duplicate 'static' qualifier"))
-      continue;
-    if (TryConsumeVirtualQualifier(m)) continue;
-    if (Match(TokenKind::kKwPure)) {
-      m->is_pure_virtual = true;
-      proto = true;
-      continue;
-    }
-    if (TryConsumeRandQualifier(m)) continue;
-    if (TryConsumeClassQualifier(m, TokenKind::kKwConst, &ClassMember::is_const,
-                                 "duplicate 'const' qualifier"))
-      continue;
-    if (Match(TokenKind::kKwExtern)) {
-      proto = true;
-      // 18.5.1: 'extern constraint name;' is the explicit prototype form. The
-      // flag is only meaningful for constraint members.
-      m->is_constraint_extern = true;
-      continue;
-    }
-    break;
+  bool extern_first = false;
+  for (int index = 0;; ++index) {
+    const TokenKind kKeyword = CurrentToken().kind;
+    if (!ParserClassHelpers::ConsumeQualifier(*this, m, proto)) break;
+    ParserClassHelpers::NoteQualifierOrder(*this, m, kKeyword, index,
+                                           extern_first);
   }
   return proto;
 }
@@ -425,6 +532,7 @@ void Parser::RejectPureVirtualMethodBody(const ClassMember* member,
   }
   if (!found) {
     lexer_.RestorePos(saved);
+    ParserClassHelpers::RejectPureVirtualPrototypeOrder(*this, *member);
     return;
   }
   diag_.Error(member->method->loc,
@@ -451,6 +559,7 @@ bool Parser::TryParseMethodOrConstraint(std::vector<ClassMember*>& members,
                   "virtual",
                   Subclause("A.1.9"));
     }
+    ParserClassHelpers::RejectMethodQualifierOrder(*this, *member);
     member->kind = ClassMemberKind::kMethod;
     member->method = is_func ? ParseFunctionDecl(proto) : ParseTaskDecl(proto);
     // Mirror the method name onto the ClassMember, like every other member kind
@@ -624,10 +733,7 @@ void Parser::ParseClassMembers(std::vector<ClassMember*>& members) {
   // (6.19/7.2) a class property may use an inline enum/struct/union data type,
   // which ParseDataType() does not consume; dispatch those here first, as every
   // other data-type caller must.
-  RejectMisplacedClassQualifiers(*member,
-                                 kQualRand | kQualRandc | kQualStatic |
-                                     kQualProtected | kQualLocal | kQualConst,
-                                 "class property");
+  ParserClassHelpers::RejectPropertyQualifiers(*this, *member);
   // §8.5 puts no restriction on the property's data type, so the
   // package-scoped `pk::t` of §26.3 is read as a declaration's type is.
   DataType dtype;

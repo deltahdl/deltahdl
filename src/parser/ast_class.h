@@ -182,6 +182,15 @@ struct ClassMember {
   bool is_randc = false;
   bool is_const = false;
   bool is_pure_virtual = false;
+  // A.1.9 fixes where three of the qualifiers stand, and these record how
+  // Parser::ParseClassQualifiers found them: `extern` read after another
+  // qualifier; `pure` not directly followed by `virtual`; `pure` read after
+  // another qualifier with no `extern` first; and `rand` or `randc` read after
+  // `const`. Which of them is a defect depends on the item that follows.
+  bool extern_follows_qualifier = false;
+  bool pure_apart_from_virtual = false;
+  bool pure_follows_qualifier = false;
+  bool random_follows_const = false;
   // §6.20/§8.25: this member is a parameter or localparam declaration (carried
   // with kind kProperty). Distinguished from a data property so that, e.g.,
   // §8.26 interface-class validation does not flag a parameter as a data
