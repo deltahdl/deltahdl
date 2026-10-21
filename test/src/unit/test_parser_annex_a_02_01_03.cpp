@@ -756,4 +756,31 @@ TEST(TypeDeclParsing, NettypeWithClauseOfUnitAloneIsError) {
       ReportedError(r.diags, "expected identifier, got ';'", 4, "6.6.7"));
 }
 
+// A.2.2.1 lets a data_type open with a package_scope, and A.2.1.3's second
+// nettype form names its source nettype through one, so a nettype may take a
+// type a package declares and may rename a package's nettype. Neither package
+// name is a type the parser knows, and each declaration is still read whole,
+// its scope kept (#7593).
+TEST(TypeDeclParsing, NettypeOfAPackageScopedTypeOrNettype) {
+  auto r = Parse(
+      "package P;\n"
+      "  typedef struct { real r; } T;\n"
+      "  nettype real nt;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  nettype P::T tnet;\n"
+      "  nettype P::nt alias_nt;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& items = r.cu->modules[0]->items;
+  ASSERT_EQ(items.size(), 2u);
+  EXPECT_EQ(items[0]->name, "tnet");
+  EXPECT_EQ(items[0]->typedef_type.scope_name, "P");
+  EXPECT_EQ(items[0]->typedef_type.type_name, "T");
+  EXPECT_EQ(items[1]->name, "alias_nt");
+  EXPECT_EQ(items[1]->typedef_type.scope_name, "P");
+  EXPECT_EQ(items[1]->typedef_type.type_name, "nt");
+}
+
 }  // namespace

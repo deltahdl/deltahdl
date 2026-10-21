@@ -301,7 +301,11 @@ ModuleItem* Parser::ParseNettypeDecl() {
   item->kind = ModuleItemKind::kNettypeDecl;
   item->loc = CurrentLoc();
   Expect(TokenKind::kKwNettype, Subclause("6.6.7"));
-  item->typedef_type = ParseDataType();
+  // A.2.2.1's data_type and A.2.1.3's second form, which renames a nettype, may
+  // each name the type through a package, `P::T`, whose name is no type the
+  // parser knows; ParseDeclaredDataType reads such a scoped name as a data
+  // declaration's type is read.
+  item->typedef_type = ParseDeclaredDataType();
   item->name = Expect(TokenKind::kIdentifier, Subclause("6.6.7")).text;
 
   // §6.6.7 / A.2.1.3: a nettype declaration requires an explicit data type
