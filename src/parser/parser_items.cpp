@@ -239,7 +239,11 @@ bool Parser::IsAtClassDecl() {
     return false;
   }
   auto saved = lexer_.SavePos();
+  const bool kVirtual = Check(TokenKind::kKwVirtual);
   Consume();
+  // A.1.2 writes no `virtual interface class`; it is read as a class all the
+  // same, so that Parser::ParseClassDecl reports the `virtual`.
+  if (kVirtual) Match(TokenKind::kKwInterface);
   bool result = Check(TokenKind::kKwClass);
   lexer_.RestorePos(saved);
   return result;

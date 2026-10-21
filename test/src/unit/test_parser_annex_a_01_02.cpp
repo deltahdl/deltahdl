@@ -670,4 +670,140 @@ TEST(SourceText, TimeprecisionWithSlashIsReportedOnce) {
   EXPECT_EQ(r.diags.size(), 1u);
 }
 
+// A.1.2's ( .* ) forms of module_declaration, interface_declaration and
+// program_declaration write nothing between the element's name and ( .* ),
+// whose ports and parameters come from its extern declaration (§23.5), so a
+// parameter port list or a package import before it is reported (#7544).
+TEST(SourceText, AWildcardHeaderWritesNoParameterPortList) {
+  auto r = Parse(
+      "module m #(parameter int W = 1) (.*);\n"
+      "endmodule\n"
+      "program q #(parameter int N = 2) (.*);\n"
+      "endprogram\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a ( .* ) header writes no parameter port list", 1, "A.1.2"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a ( .* ) header writes no parameter port list", 3, "A.1.2"));
+}
+
+TEST(SourceText, AWildcardHeaderWritesNoPackageImport) {
+  auto r = Parse(
+      "package p; endpackage\n"
+      "interface i import p::*; (.*);\n"
+      "endinterface\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "a ( .* ) header writes no package import "
+                            "declaration",
+                            2, "A.1.2"));
+}
+
+// A.1.2: the ( .* ) header with nothing before it is still a module's.
+TEST(SourceText, AWildcardHeaderAloneIsAccepted) {
+  auto r = Parse(
+      "module m(.*);\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.diags.empty());
+}
+
+// A.1.2 writes an extern declaration with a non-ANSI or an ANSI header, and
+// neither has the ( .* ) form (#7545).
+TEST(SourceText, AnExternHeaderHasNoWildcardForm) {
+  auto r = Parse(
+      "extern module m(.*);\n"
+      "extern interface i(.*);\n"
+      "extern program q(.*);\n");
+  for (int line = 1; line <= 3; ++line) {
+    EXPECT_TRUE(ReportedError(
+        r.diags, "an extern declaration's header has no ( .* ) form", line,
+        "A.1.2"));
+  }
+}
+
+// A.1.2 gives a lifetime to the ( .* ) form of a module alone (#7546).
+TEST(SourceText, AWildcardInterfaceOrProgramHeaderTakesNoLifetime) {
+  auto r = Parse(
+      "interface automatic i(.*);\n"
+      "endinterface\n"
+      "program static q(.*);\n"
+      "endprogram\n"
+      "module automatic m(.*);\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "an interface ( .* ) header takes no lifetime", 1, "A.1.2"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a program ( .* ) header takes no lifetime", 3, "A.1.2"));
+  EXPECT_EQ(r.diags.size(), 2u);
+}
+
+// A.1.2's checker_declaration writes the checker's name and an optional port
+// list alone: no package import, no parameter port list and no ( .* ) (#7547).
+TEST(SourceText, ACheckerHeaderWritesNoImportParametersOrWildcard) {
+  auto r = Parse(
+      "package p; endpackage\n"
+      "checker c1 import p::*; (logic a);\n"
+      "endchecker\n"
+      "checker c2 #(parameter int N = 1) (logic a);\n"
+      "endchecker\n"
+      "checker c3(.*);\n"
+      "endchecker\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "a checker header writes no package import "
+                            "declaration",
+                            2, "A.1.2"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a checker header writes no parameter port list", 4, "A.1.2"));
+  EXPECT_TRUE(ReportedError(r.diags, "a checker header has no ( .* ) form", 6,
+                            "A.1.2"));
+}
+
+// A.1.2: a class's extends clause names one class type, and only an interface
+// class's names a list (#7548).
+TEST(SourceText, AClassExtendsOneClassType) {
+  auto r = Parse(
+      "class A; endclass\n"
+      "class B; endclass\n"
+      "class C extends A, B;\n"
+      "endclass\n"
+      "interface class I; endclass\n"
+      "interface class J; endclass\n"
+      "interface class K extends I, J;\n"
+      "endclass\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "a class extends one class type; only an interface "
+                            "class extends several",
+                            3, "A.1.2"));
+  EXPECT_EQ(r.diags.size(), 1u);
+}
+
+// A.1.2: an interface class type in an implements clause takes no arguments,
+// which were read and dropped unreported (#7549).
+TEST(SourceText, AnImplementedInterfaceClassTakesNoArguments) {
+  auto r = Parse(
+      "interface class I; endclass\n"
+      "class C implements I(1, 2);\n"
+      "endclass\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "an interface class type in an implements clause "
+                            "takes no arguments",
+                            2, "A.1.2"));
+}
+
+// A.1.2's interface_class_declaration writes no `virtual`, no final specifier
+// and no arguments after an extended interface class type (#7550).
+TEST(SourceText, AnInterfaceClassHeaderWritesNoClassOnlyParts) {
+  auto r = Parse(
+      "interface class J; endclass\n"
+      "virtual interface class I1; endclass\n"
+      "interface class : final I2; endclass\n"
+      "interface class I3 extends J(1); endclass\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "an interface class is not declared virtual", 2, "A.1.2"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "an interface class takes no final specifier", 3, "A.1.2"));
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "an interface class type in an extends clause "
+                            "takes no arguments",
+                            4, "A.1.2"));
+}
+
 }  // namespace

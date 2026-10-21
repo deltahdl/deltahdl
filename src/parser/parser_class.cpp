@@ -31,12 +31,24 @@ struct ParserClassHelpers {
                         Subclause subclause) {
     p.Expect(keyword, subclause);
 
+    const SourceLoc kLifetimeLoc = p.CurrentLoc();
     decl->is_automatic = p.Match(TokenKind::kKwAutomatic);
-    if (!decl->is_automatic) p.Match(TokenKind::kKwStatic);
+    const bool kHasLifetime =
+        decl->is_automatic || p.Match(TokenKind::kKwStatic);
 
     decl->name = p.Expect(TokenKind::kIdentifier, subclause).text;
     p.declared_design_elements_.insert(decl->name);
     p.ParseParamsPortsAndSemicolon(*decl);
+    // A.1.2 gives a lifetime to the ( .* ) form of a module alone; that of an
+    // interface or a program is its keyword and its name.
+    if (kHasLifetime && decl->has_wildcard_ports) {
+      p.diag_.Error(
+          kLifetimeLoc,
+          std::format("{} ( .* ) header takes no lifetime",
+                      keyword == TokenKind::kKwInterface ? "an interface"
+                                                         : "a program"),
+          Subclause("A.1.2"));
+    }
     return !decl->ports.empty() && decl->ports[0].direction == Direction::kNone;
   }
 
@@ -148,7 +160,7 @@ void Parser::ParseClassExtendsClause(ClassDecl* decl, bool is_implements) {
   // §8.13 states the extends clause and §8.26.2 the implements clause, so which
   // rule a malformed base name breaches depends on which clause is being read.
   Subclause subclause(is_implements ? "8.26.2" : "8.13");
-  do {
+  while (true) {
     std::string_view scope;
     auto name = Expect(TokenKind::kIdentifier, subclause).text;
     while (Match(TokenKind::kColonColon)) {
@@ -165,6 +177,15 @@ void Parser::ParseClassExtendsClause(ClassDecl* decl, bool is_implements) {
                            is_implements, has_type_params);
 
     if (Check(TokenKind::kLParen)) {
+      // A.1.2: an interface class type, implemented or extended, takes no
+      // arguments; the list is still read so the header ends where it should.
+      if (is_implements || decl->is_interface) {
+        diag_.Error(CurrentLoc(),
+                    std::format("an interface class type in an {} clause "
+                                "takes no arguments",
+                                is_implements ? "implements" : "extends"),
+                    Subclause("A.1.2"));
+      }
       if (is_implements) {
         std::vector<Expr*> discard;
         ParseParenList(discard);
@@ -172,7 +193,17 @@ void Parser::ParseClassExtendsClause(ClassDecl* decl, bool is_implements) {
         ParseExtendsArgList(decl);
       }
     }
-  } while (Match(TokenKind::kComma));
+    const SourceLoc kCommaLoc = CurrentLoc();
+    if (!Match(TokenKind::kComma)) break;
+    // A.1.2: a class extends one class type, and only an interface class
+    // extends a list of them.
+    if (!is_implements && !decl->is_interface) {
+      diag_.Error(kCommaLoc,
+                  "a class extends one class type; only an interface class "
+                  "extends several",
+                  Subclause("A.1.2"));
+    }
+  }
 }
 
 // Makes the type names of the classes decl derives from type names in decl's
@@ -222,9 +253,19 @@ ClassDecl* Parser::ParseClassDecl() {
   decl->range.start = CurrentLoc();
   decl->is_virtual = Match(TokenKind::kKwVirtual);
   decl->is_interface = Match(TokenKind::kKwInterface);
+  // A.1.2's interface_class_declaration writes neither `virtual` before it nor
+  // a final_specifier after `class`; both are reported and passed over.
+  if (decl->is_virtual && decl->is_interface) {
+    diag_.Error(decl->range.start, "an interface class is not declared virtual",
+                Subclause("A.1.2"));
+  }
   Expect(TokenKind::kKwClass, Subclause("8.3"));
 
   if (Match(TokenKind::kColon)) {
+    if (decl->is_interface) {
+      diag_.Error(CurrentLoc(), "an interface class takes no final specifier",
+                  Subclause("A.1.2"));
+    }
     Expect(TokenKind::kKwFinal, Subclause("8.13"));
     decl->is_final = true;
   }
