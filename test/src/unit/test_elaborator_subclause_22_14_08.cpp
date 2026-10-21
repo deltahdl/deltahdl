@@ -353,11 +353,21 @@ TEST(SystemVerilog2012KeywordElaboration, AddedSoftQualifierReachesTheDesign) {
                             plain_rand, "m");
   EXPECT_FALSE(plain_rand.has_errors);
 
-  // Under everything this version includes the word qualifies nothing, so the
-  // rule never attaches and the very same source elaborates clean.
+  // Under everything this version includes the word is an ordinary
+  // identifier, so the rule never attaches. A name standing before the relation
+  // leaves an item A.1.10 does not write, so the very same source is reported
+  // there by ParserConstraintItemHelpers::Capture in
+  // src/parser/parser_constraint_items.cpp.
   ElabFixture constraint_included;
-  ElaborateWithPreprocessor(In("1800-2009", kCyclic), constraint_included, "m");
-  EXPECT_FALSE(constraint_included.has_errors);
+  ElaborateWithPreprocessorAllowingParseErrors(In("1800-2009", kCyclic),
+                                               constraint_included, "m");
+  EXPECT_FALSE(ReportedError(constraint_included.diag.Diagnostics(),
+                             "a soft constraint may not be specified on randc",
+                             LineInRegion(3), "18.5.13.1"));
+  EXPECT_TRUE(ReportedError(constraint_included.diag.Diagnostics(),
+                            "the constraint block's items do not parse from "
+                            "here",
+                            LineInRegion(3), "A.1.10"));
 }
 
 // Table 22-1 doing its work, read back as elaborated structure. The net types

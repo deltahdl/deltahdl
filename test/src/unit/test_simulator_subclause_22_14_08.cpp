@@ -188,15 +188,14 @@ TEST(SystemVerilog2012KeywordSimulation, AddedSoftUnionOverlaysStorage) {
   EXPECT_EQ(reversed, 43u);
 }
 
-// The added word's other keyword role, and the sharpest runtime evidence in
-// this subclause: the same source runs to a different number under the two
-// lists. Qualifying a constraint marks it as one the solver honours when it
-// can and drops when it must, so the run lands on the preferred value; under
-// "1800-2009", the union of everything this version includes, the word is an
-// ordinary identifier, the relation is never recorded as a preference, and the
-// solver picks from the range the hard constraints leave it. Both the
-// preference winning and the later preference outranking the earlier one are
-// here, along with the directive that discards a preference outright.
+// The added word's other keyword role, run. Qualifying a constraint marks it
+// as one the solver honours when it can and drops when it must, so the run
+// lands on the preferred value. Under "1800-2009", the union of everything this
+// version includes, the word is an ordinary identifier, and a name standing
+// before the relation leaves an item A.1.10 does not write, so that source has
+// no run to compare; the elaborator's cases for this subclause read its report.
+// Both the preference winning and the later preference outranking the earlier
+// one are here, along with the directive that discards a preference outright.
 TEST(SystemVerilog2012KeywordSimulation,
      AddedSoftConstraintsSteerRandomization) {
   const std::string kPreferred =
@@ -214,8 +213,6 @@ TEST(SystemVerilog2012KeywordSimulation,
       "  end\n"
       "endmodule\n";
   EXPECT_EQ(RunSystemVerilog2012(kPreferred, "result"), 43u);
-  EXPECT_NE(RunIncludedLists(kPreferred, "result"), 43u)
-      << "an ordinary identifier states no preference";
 
   // Two preferences on the same variable: the later one outranks the earlier.
   auto later_wins = RunSystemVerilog2012(
@@ -276,10 +273,7 @@ TEST(SystemVerilog2012KeywordSimulation,
 
 // The distribution form of the constraint qualifier, run rather than merely
 // captured. A qualified distribution is a preference like a qualified relation,
-// so the run lands on the weighted value under this version; under the union of
-// everything it includes the word qualifies nothing and the solver picks from
-// the range the hard constraints leave it, which is a different number from the
-// same source.
+// so the run lands on the weighted value under this version.
 TEST(SystemVerilog2012KeywordSimulation, AddedSoftDistributionSteersSolver) {
   const std::string kSrc =
       "class c;\n"
@@ -296,8 +290,6 @@ TEST(SystemVerilog2012KeywordSimulation, AddedSoftDistributionSteersSolver) {
       "  end\n"
       "endmodule\n";
   EXPECT_EQ(RunSystemVerilog2012(kSrc, "result"), 43u);
-  EXPECT_NE(RunIncludedLists(kSrc, "result"), 43u)
-      << "an ordinary identifier weights nothing";
 }
 
 // The union qualifier written straight into a data declaration rather than
