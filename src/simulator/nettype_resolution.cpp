@@ -1,5 +1,6 @@
 #include "simulator/nettype_resolution.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <string_view>
 #include <vector>
@@ -20,14 +21,49 @@ namespace {
 // a source description can write, so the name is the resolution's alone.
 constexpr std::string_view kDriversName = "$nettype.drivers";
 
+Expr* Identifier(std::string_view text, Arena& arena) {
+  auto* id = arena.Create<Expr>();
+  id->kind = ExprKind::kIdentifier;
+  id->text = text;
+  return id;
+}
+
+// The name `C::res`, `p::C::res` or `p::f` as the parser writes it before a
+// call's arguments: `::` operators nested from the left, each a member access
+// marked as a scope resolution.
+Expr* ScopedName(std::string_view qualified, Arena& arena) {
+  size_t sep = qualified.find("::");
+  Expr* name = Identifier(qualified.substr(0, sep), arena);
+  while (sep != std::string_view::npos) {
+    const size_t kStart = sep + 2;
+    sep = qualified.find("::", kStart);
+    auto* access = arena.Create<Expr>();
+    access->kind = ExprKind::kMemberAccess;
+    access->lhs = name;
+    // With no `::` left, the length runs past the end and substr stops there.
+    access->rhs = Identifier(qualified.substr(kStart, sep - kStart), arena);
+    access->is_scope_resolution = true;
+    name = access;
+  }
+  return name;
+}
+
+// §6.6.7 lets the with clause name the function through a package or a class,
+// and the elaborator hands such a name over qualified. A call through `::` is
+// built as the parser builds `C::res(d)`, with no callee text and the scoped
+// name as its base, since that is the shape a class's static method is called
+// by (TryEvalClassScopeCall) and a package's subroutine is looked up by
+// (TryPackageScopedCallee); a class method is held in no table a callee's text
+// is looked up in.
 Expr* DriversCall(std::string_view func_name, Arena& arena) {
-  auto* arg = arena.Create<Expr>();
-  arg->kind = ExprKind::kIdentifier;
-  arg->text = kDriversName;
   auto* call = arena.Create<Expr>();
   call->kind = ExprKind::kCall;
-  call->callee = func_name;
-  call->args.push_back(arg);
+  if (func_name.find("::") == std::string_view::npos) {
+    call->callee = func_name;
+  } else {
+    call->lhs = ScopedName(func_name, arena);
+  }
+  call->args.push_back(Identifier(kDriversName, arena));
   return call;
 }
 

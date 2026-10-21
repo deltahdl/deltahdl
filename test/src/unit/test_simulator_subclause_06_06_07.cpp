@@ -350,3 +350,57 @@ TEST(UserNettypeSim, ClassStructThroughATypedefOfASpecialization) {
                  f),
       "96 64 32 5 2.500000 100000003\n");
 }
+
+// §6.6.7 lets a nettype resolve through a class's static method, named in the
+// with clause through the class: by its own name, `with C::res`, through the
+// package declaring it, and through a typedef of a specialization, as §6.6.7's
+// own `with MyBaseT::Tsum` does. Each net takes what its method returns for
+// its two drivers: C::res ORs them, 0f | f0 = ff; P::Q::res sums them, 3 + 4 =
+// 7; and Base#(32)'s Tsum adds its own parameter to their sum, 32 + 1 + 2 = 35,
+// where the generic class's default would leave 4. A resolution call that
+// finds no function reads none of these (#7594).
+TEST(UserNettypeSim, ResolutionThroughAClassStaticMethod) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("class C;\n"
+                 "  static function logic [7:0] res(input logic [7:0] d[]);\n"
+                 "    res = 0;\n"
+                 "    foreach (d[i]) res = res | d[i];\n"
+                 "  endfunction\n"
+                 "endclass\n"
+                 "package P;\n"
+                 "  class Q;\n"
+                 "    static function int res(input int d[]);\n"
+                 "      res = 0;\n"
+                 "      foreach (d[i]) res += d[i];\n"
+                 "    endfunction\n"
+                 "  endclass\n"
+                 "endpackage\n"
+                 "class Base #(parameter p = 1);\n"
+                 "  static function int Tsum(input int d[]);\n"
+                 "    Tsum = p;\n"
+                 "    foreach (d[i]) Tsum += d[i];\n"
+                 "  endfunction\n"
+                 "endclass\n"
+                 "typedef Base#(32) MyBaseT;\n"
+                 "module t;\n"
+                 "  nettype logic [7:0] wc with C::res;\n"
+                 "  nettype int wq with P::Q::res;\n"
+                 "  nettype int wb with MyBaseT::Tsum;\n"
+                 "  wc nc;\n"
+                 "  wq nq;\n"
+                 "  wb nb;\n"
+                 "  assign nc = 8'h0f;\n"
+                 "  assign nc = 8'hf0;\n"
+                 "  assign nq = 3;\n"
+                 "  assign nq = 4;\n"
+                 "  assign nb = 1;\n"
+                 "  assign nb = 2;\n"
+                 "  initial begin\n"
+                 "    #1;\n"
+                 "    $display(\"%0h %0d %0d\", nc, nq, nb);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "ff 7 35\n");
+}
