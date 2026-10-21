@@ -140,6 +140,49 @@ TEST(ObtainAssertionHandles, HandleByNameResolvesAssertionInNestedScope) {
   EXPECT_EQ(ctx.HandleByName("dut.absent_p", &root), nullptr);
 }
 
+// Step c with §9.3.5: a label on an assertion written in a procedure also opens
+// a named begin around it, whose full name is the assertion's own. The name is
+// the assertion's to answer: vpi_handle_by_name() returns the assertion, not
+// the begin that holds it.
+TEST(ObtainAssertionHandles, HandleByNameAnswersTheAssertionItsLabelWraps) {
+  VpiContext ctx;
+  VpiObject root;
+  root.type = vpiModule;
+  VpiObject begin;
+  begin.type = vpiNamedBegin;
+  begin.name = "i1";
+  begin.full_name = "top.i1";
+  VpiObject assertion;
+  assertion.type = vpiImmediateAssert;
+  assertion.name = "i1";
+  assertion.full_name = "top.i1";
+  begin.children = {&assertion};
+  root.children = {&begin};
+
+  EXPECT_EQ(ctx.HandleByName("i1", &root), &assertion);
+}
+
+// Step c with §9.3.5, the boundary: a named begin of the source's own names
+// itself, the statements in it, an unnamed assertion among them, sharing
+// nothing of its name.
+TEST(ObtainAssertionHandles, HandleByNameAnswersABeginHoldingAnUnnamedOne) {
+  VpiContext ctx;
+  VpiObject root;
+  root.type = vpiModule;
+  VpiObject begin;
+  begin.type = vpiNamedBegin;
+  begin.name = "b";
+  begin.full_name = "top.b";
+  VpiObject statement;
+  statement.type = vpiAssignment;
+  VpiObject unnamed;
+  unnamed.type = vpiImmediateAssert;
+  begin.children = {&statement, &unnamed};
+  root.children = {&begin};
+
+  EXPECT_EQ(ctx.HandleByName("b", &root), &begin);
+}
+
 // Step d: an assertion of a specific kind is obtained by walking the assertion
 // class and keeping the handles whose vpi_get(vpiType) equals the wanted kind
 // (here vpiCover), as the LRM's concurrent cover example shows.

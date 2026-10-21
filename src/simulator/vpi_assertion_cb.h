@@ -23,6 +23,13 @@ namespace delta {
 // scope and the place it starts at (AssertionKey).
 std::string VpiAssertionKeyOf(const VpiObject& obj);
 
+// §39.3.1 with §9.3.5: the object a full name that resolved to `found` names.
+// A label on an assertion written in a procedure also opens a named begin
+// around it whose full name is the assertion's own; that name answers the
+// assertion, the begin staying the scope names below it resolve through. Any
+// other object answers itself.
+VpiHandle VpiLabelledAssertionOr(VpiHandle found);
+
 // §39.4.2: place `cb_rtn` on `assertion` for `reason`, with `user_data` carried
 // through to every call of it. A placement that succeeds answers a handle to
 // the callback, and one that fails answers NULL: no assertion, no routine to

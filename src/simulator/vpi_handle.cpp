@@ -16,6 +16,7 @@
 // the SystemVerilog VPI header alongside the §37.10 vpiInstance relation.
 #include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_assertion_cb.h"
 #include "simulator/vpi_class_objects.h"
 #include "simulator/vpi_collection_elements.h"
 #include "simulator/vpi_constants.h"
@@ -147,7 +148,7 @@ VpiHandle VpiContext::HandleByName(const char* name, VpiHandle scope) {
   // §37.10 detail 6: imported items and compilation-unit objects must not be
   // reachable by name even when an object happens to be registered under it.
   if (!VpiHandleByNameAccessible(*current)) return nullptr;
-  return current;
+  return VpiLabelledAssertionOr(current);
 }
 
 VpiHandle VpiContext::HandleByIndex(int index, VpiHandle parent) {

@@ -110,24 +110,43 @@ static bool DeferredReportCancelled(const Process* proc,
          proc->cancelled_deferred_labels.count(label) != 0;
 }
 
-// §16.4.1 and §16.4.2: queues one pending assertion report -- an action
-// block's subroutine call, the default $error, or a deferred cover's result --
-// in the Reactive region for an observed deferred assertion and the Postponed
-// region for a final one, where `run` executes it. The process and its report
-// generation are captured now; if a flush point bumps the generation before
-// the region fires (the process resumes, or an always_comb re-triggers in the
-// same time step), the queued report has been flushed and is skipped, as it
-// is when §16.4.4's `disable <assertion_label>` has cancelled it.
-static void SchedulePendingReport(bool is_final_deferred,
-                                  std::string_view assertion_label,
-                                  SimContext& ctx, std::function<void()> run) {
-  Region region = is_final_deferred ? Region::kPostponed : Region::kReactive;
+// §16.4 with §20.11 and §39.5.3: whether the report `proc` queued for
+// `stmt` under the generation `gen`, numbered `number`, has been flushed: by
+// a flush point of the process, which bumped the generation, or by a Kill
+// selecting the assertion since the report was queued.
+static bool DeferredReportFlushed(const Process* proc, uint64_t gen,
+                                  const Stmt* stmt, uint64_t number) {
+  if (proc == nullptr) return false;
+  return proc->deferred_report_generation != gen ||
+         number <= proc->queued_deferred_reports.at(stmt).flushed_through;
+}
+
+// §16.4.1 and §16.4.2: queues one pending report of the deferred assertion
+// `stmt` -- an action block's subroutine call, the default $error, or a
+// deferred cover's result -- in the Reactive region for an observed deferred
+// assertion and the Postponed region for a final one, where `run` executes
+// it. The process and its report generation are captured now; if a flush
+// point bumps the generation before the region fires (the process resumes, or
+// an always_comb re-triggers in the same time step), or a Kill selects the
+// assertion (§20.11, §39.5.3), the queued report has been flushed and is
+// skipped, as it is when §16.4.4's `disable <assertion_label>` has cancelled
+// it.
+static void SchedulePendingReport(const Stmt* stmt, SimContext& ctx,
+                                  std::function<void()> run) {
+  Region region =
+      stmt->is_final_deferred ? Region::kPostponed : Region::kReactive;
   PendingReportScope scope = PendingReportScope::Capture(ctx);
   uint64_t gen = ctx.CurrentDeferredReportGeneration();
-  std::string label(assertion_label);
+  uint64_t number = 0;
+  if (scope.proc != nullptr) {
+    number = ++scope.proc->deferred_reports_queued;
+    scope.proc->queued_deferred_reports[stmt].latest = number;
+  }
+  std::string label(stmt->label);
   auto* ev = ctx.GetScheduler().GetEventPool().Acquire();
-  ev->callback = [scope, gen, label, run = std::move(run), &ctx]() {
-    if (scope.proc && scope.proc->deferred_report_generation != gen) return;
+  ev->callback = [scope, gen, stmt, number, label, run = std::move(run),
+                  &ctx]() {
+    if (DeferredReportFlushed(scope.proc, gen, stmt, number)) return;
     if (DeferredReportCancelled(scope.proc, label)) return;
     PendingReportScope saved;
     scope.Install(ctx, saved);
@@ -137,16 +156,14 @@ static void SchedulePendingReport(bool is_final_deferred,
   ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), region, ev);
 }
 
-static void ScheduleDeferredAction(const Stmt* action, bool is_final_deferred,
-                                   std::string_view assertion_label,
+static void ScheduleDeferredAction(const Stmt* action, const Stmt* stmt,
                                    SimContext& ctx, Arena& arena) {
   if (!action) return;
   DeferredArgSnapshots snaps = SnapshotDeferredCallArgs(action, ctx, arena);
-  SchedulePendingReport(is_final_deferred, assertion_label, ctx,
-                        [action, snaps = std::move(snaps), &ctx, &arena]() {
-                          RunDeferredActionWithSnapshots(action, snaps, ctx,
-                                                         arena);
-                        });
+  SchedulePendingReport(
+      stmt, ctx, [action, snaps = std::move(snaps), &ctx, &arena]() {
+        RunDeferredActionWithSnapshots(action, snaps, ctx, arena);
+      });
 }
 
 // §16.4.1: when a deferred assertion fails with no else clause, its default
@@ -154,10 +171,9 @@ static void ScheduleDeferredAction(const Stmt* action, bool is_final_deferred,
 // Like the action-block subroutine call, it is not emitted where the assertion
 // is processed; it is deferred and executed with the rest of the process's
 // pending reports.
-static void ScheduleDeferredSeverityReport(bool is_final_deferred,
-                                           std::string_view assertion_label,
-                                           SourceLoc loc, SimContext& ctx) {
-  SchedulePendingReport(is_final_deferred, assertion_label, ctx, [loc, &ctx]() {
+static void ScheduleDeferredSeverityReport(const Stmt* stmt, SourceLoc loc,
+                                           SimContext& ctx) {
+  SchedulePendingReport(stmt, ctx, [loc, &ctx]() {
     EmitSeverityHeader(ctx, "ERROR", "Assertion failed.", std::cerr, loc);
   });
 }
@@ -170,8 +186,7 @@ static bool TryScheduleDeferredAssertAction(const Stmt* action,
                                             const Stmt* stmt, SimContext& ctx,
                                             Arena& arena) {
   if (!stmt->is_deferred) return false;
-  ScheduleDeferredAction(action, stmt->is_final_deferred, stmt->label, ctx,
-                         arena);
+  ScheduleDeferredAction(action, stmt, ctx, arena);
   return true;
 }
 
@@ -294,10 +309,9 @@ static void RecordCoverImmediateSample(const Stmt* stmt, bool is_true,
     ctx.ImmediateCovers().Record(scope, line, is_true);
     return;
   }
-  SchedulePendingReport(stmt->is_final_deferred, stmt->label, ctx,
-                        [scope, line, is_true, &ctx]() {
-                          ctx.ImmediateCovers().Record(scope, line, is_true);
-                        });
+  SchedulePendingReport(stmt, ctx, [scope, line, is_true, &ctx]() {
+    ctx.ImmediateCovers().Record(scope, line, is_true);
+  });
 }
 
 // §20.11: the Table 20-6 assertion_type bit that identifies an assertion
@@ -368,8 +382,7 @@ static void ReportDefaultAssertionFailure(const Stmt* stmt, SimContext& ctx) {
   // statement, as it carries a severity task's own.
   SourceLoc loc = stmt->range.start;
   if (stmt->is_deferred) {
-    ScheduleDeferredSeverityReport(stmt->is_final_deferred, stmt->label, loc,
-                                   ctx);
+    ScheduleDeferredSeverityReport(stmt, loc, ctx);
     return;
   }
   EmitSeverityHeader(ctx, "ERROR", "Assertion failed.", std::cerr, loc);
@@ -768,6 +781,19 @@ void ExecConcurrentAssertionTick(const Stmt* stmt,
   }
 }
 
+// §20.11 and §39.5.3: a Kill also flushes the pending reports `proc` queued
+// for the deferred assertions it `selects` and the pending instances of the
+// procedural concurrent ones, neither of which has matured.
+static void FlushKilledQueues(Process& proc,
+                              const std::function<bool(const Stmt*)>& selects) {
+  for (auto& [stmt, queued] : proc.queued_deferred_reports) {
+    if (selects(stmt)) queued.flushed_through = queued.latest;
+  }
+  for (auto& [stmt, state] : proc.procedural_assertions) {
+    if (selects(stmt)) state->pending.clear();
+  }
+}
+
 // The attempts in flight that `proc` keeps of the assertions the Kill `call`
 // selects and no Lock holds, aborted. §16.9.4: an attempt waiting in a
 // process of its own for the global clocking tick is aborted with the
@@ -794,6 +820,7 @@ static void AbortProcessAttempts(Process& proc, const AssertControlCall& call,
       AbortSequencePropertyAttempts(*state);
     }
   }
+  FlushKilledQueues(proc, selects);
   // §20.11: a Kill also flushes the queued violation reports of the types it
   // selects (§12.4.2.1, §12.5.3.1) that have not yet matured.
   std::erase_if(proc.pending_violations,

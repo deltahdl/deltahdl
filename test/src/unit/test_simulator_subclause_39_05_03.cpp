@@ -1,9 +1,13 @@
 #include <gtest/gtest.h>
 
+#include <functional>
+
+#include "helpers_assertion_run.h"
 #include "simulator/assertion_api.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -223,6 +227,99 @@ TEST_F(DeferredAssertionQueueThroughVpiControl, TheSystemControlsDivideAlike) {
             1);
   EXPECT_EQ(api_.PendingAssertionReportCount(kA), 0u);
   EXPECT_EQ(api_.PendingAssertionReportCount(kB), 0u);
+}
+
+// -----------------------------------------------------------------------------
+// §39.5.3 in a run: the queues are the run's own, a deferred assertion's
+// pending reports and a procedural concurrent assertion's pending instances,
+// and a control reaches them through the handle the design's assertion has.
+// -----------------------------------------------------------------------------
+
+// A deferred assertion a1 that fails once, its fail action a subroutine call
+// counting the failure, the design calling $arm after it has executed and
+// before its report matures in the Reactive region.
+constexpr const char* kDeferredFailing =
+    "module top;\n"
+    "  logic x = 0;\n"
+    "  int failed = 0;\n"
+    "  function void fail(); failed++; endfunction\n"
+    "  initial begin\n"
+    "    a1: assert #0 (x) else fail();\n"
+    "    $arm;\n"
+    "  end\n"
+    "endmodule\n";
+
+// Calls vpi_control(`operation`) on the assertion `full_name` names, or on
+// the whole system where it names none.
+std::function<void()> Control(int operation, const char* full_name) {
+  return [operation, full_name] {
+    vpiHandle target = full_name == nullptr
+                           ? nullptr
+                           : vpi_handle_by_name(VpiText(full_name), nullptr);
+    EXPECT_EQ(vpi_control(operation, target), 1);
+  };
+}
+
+// §39.5.3: vpiAssertionReset discards the deferred assertion's attempts, and
+// with them the report its failure queued, which never matures (#7514).
+TEST_F(AssertionRun, ResetFlushesADeferredAssertionsQueuedReport) {
+  ArmInTurn({Control(vpiAssertionReset, "top.a1")});
+  Run(kDeferredFailing);
+
+  EXPECT_EQ(IntOf("top.failed"), 0);
+}
+
+// §39.5.3: vpiAssertionSysKill discards every attempt in progress, the
+// reports queued for them among them (#7514).
+TEST_F(AssertionRun, SysKillFlushesADeferredAssertionsQueuedReport) {
+  ArmInTurn({Control(vpiAssertionSysKill, nullptr)});
+  Run(kDeferredFailing);
+
+  EXPECT_EQ(IntOf("top.failed"), 0);
+}
+
+// §39.5.3: vpiAssertionDisable leaves the attempts in progress, so the report
+// already queued matures and the fail action runs (#7514).
+TEST_F(AssertionRun, DisableLeavesADeferredAssertionsQueuedReport) {
+  ArmInTurn({Control(vpiAssertionDisable, "top.a1")});
+  Run(kDeferredFailing);
+
+  EXPECT_EQ(IntOf("top.failed"), 1);
+}
+
+// A procedural concurrent assertion c1 that fails at each of two clock ticks,
+// the procedure calling $arm after queuing each instance, before it matures in
+// the Observed region.
+constexpr const char* kProceduralFailing =
+    "module top;\n"
+    "  logic clk = 0, a = 0;\n"
+    "  int failed = 0;\n"
+    "  always @(posedge clk) begin\n"
+    "    c1: assert property (a) else failed++;\n"
+    "    $arm;\n"
+    "  end\n"
+    "  initial begin\n"
+    "    #5 clk = 1;\n"
+    "    #5 clk = 0;\n"
+    "    #5 clk = 1;\n"
+    "  end\n"
+    "endmodule\n";
+
+// §39.5.3: vpiAssertionReset flushes the procedural assertion's pending
+// instance, which begins no attempt; the instance the procedure queues at the
+// next tick fails as before (#7514).
+TEST_F(AssertionRun, ResetFlushesAProceduralAssertionsPendingInstance) {
+  ArmInTurn({Control(vpiAssertionReset, "top.c1")});
+  Run(kProceduralFailing);
+
+  EXPECT_EQ(IntOf("top.failed"), 1);
+}
+
+// With no control both instances begin attempts that fail.
+TEST_F(AssertionRun, WithNoControlEachPendingInstanceFails) {
+  Run(kProceduralFailing);
+
+  EXPECT_EQ(IntOf("top.failed"), 2);
 }
 
 }  // namespace

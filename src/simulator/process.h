@@ -225,6 +225,21 @@ struct Process {
   // leaks past the activation that issued the disable.
   std::unordered_set<std::string> cancelled_deferred_labels;
 
+  // §20.11 and §39.5.3: a Kill flushes the pending reports of the deferred
+  // assertions it selects that have not matured, leaving the process's other
+  // reports queued. Each report this process queues is numbered from
+  // `deferred_reports_queued`; for each assertion that has queued one,
+  // `latest` is the number of its last and `flushed_through` that of the last
+  // a Kill flushed, a report numbered no higher being skipped when its region
+  // is reached.
+  struct QueuedDeferredReports {
+    uint64_t latest = 0;
+    uint64_t flushed_through = 0;
+  };
+  uint64_t deferred_reports_queued = 0;
+  std::unordered_map<const Stmt*, QueuedDeferredReports>
+      queued_deferred_reports;
+
   // §16.12.2: the attempts in flight of each sequential property this
   // process evaluates, keyed by the assertion statement; created at the
   // statement's first tick.

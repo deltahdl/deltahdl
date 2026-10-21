@@ -169,15 +169,9 @@ TEST_F(AssertionRun, ASequencePropertysAttemptsReachTheirCallbacks) {
 // executes and succeeds or fails there and then (#7490, #7491, #7493).
 TEST_F(AssertionRun, AnImmediateAssertionsAttemptsReachTheirCallbacks) {
   AssertionArmer() = [] {
-    // The assertion stands inside a procedure, and is found by walking the
-    // instance's assertions to the one of that name.
-    vpiHandle it =
-        vpi_iterate(vpiAssertion, vpi_handle_by_name(VpiText("top"), nullptr));
-    vpiHandle i1 = nullptr;
-    while (vpiHandle obj = it == nullptr ? nullptr : vpi_scan(it)) {
-      const char* name = vpi_get_str(vpiName, obj);
-      if (name != nullptr && std::string(name) == "i1") i1 = obj;
-    }
+    // §39.3.1: the assertion stands inside a procedure and is found by its
+    // full name, which the named begin its label opens shares (§9.3.5).
+    vpiHandle i1 = vpi_handle_by_name(VpiText("top.i1"), nullptr);
     ASSERT_NE(i1, nullptr);
     EXPECT_EQ(vpi_get(vpiType, i1), vpiImmediateAssert);
     EXPECT_STREQ(vpi_get_str(vpiFullName, i1), "top.i1");

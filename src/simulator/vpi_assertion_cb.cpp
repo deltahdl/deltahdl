@@ -10,6 +10,7 @@
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
@@ -136,6 +137,17 @@ std::string VpiAssertionKeyOf(const VpiObject& obj) {
   return AssertionKey(scope != nullptr ? scope->full_name : "", {},
                       static_cast<uint32_t>(obj.start_line),
                       static_cast<uint32_t>(obj.column));
+}
+
+VpiHandle VpiLabelledAssertionOr(VpiHandle found) {
+  if (found->type != vpiNamedBegin) return found;
+  for (VpiObject* child : found->children) {
+    if (VpiIsAssertionType(child->type) &&
+        child->full_name == found->full_name) {
+      return child;
+    }
+  }
+  return found;
 }
 
 VpiHandle VpiRegisterAssertionCb(VpiHandle assertion, int reason,
