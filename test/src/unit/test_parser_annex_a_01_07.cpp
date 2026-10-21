@@ -78,6 +78,38 @@ TEST(ProgramItem, PortDeclarationAndNonPortItemsCoexist) {
   EXPECT_TRUE(HasItemOfKind(ProgItems(r), ModuleItemKind::kInitialBlock));
 }
 
+// A.1.2's ( .* ) form of program_declaration holds { program_item } as well, so
+// its body declares the directions of the ports the extern declaration lists,
+// as §23.5 shows for a module.
+TEST(ProgramItem, WildcardHeaderBodyPortDeclaration) {
+  auto r = Parse(
+      "extern program p(a);\n"
+      "program p(.*);\n"
+      "  input a;\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 2u);
+  ASSERT_EQ(r.cu->programs[1]->ports.size(), 1u);
+  EXPECT_EQ(r.cu->programs[1]->ports[0].name, "a");
+  EXPECT_EQ(r.cu->programs[1]->ports[0].direction, Direction::kInput);
+}
+
+// A.1.3 opens every port_declaration with { attribute_instance }.
+TEST(ProgramItem, AttributedNonAnsiPortDeclaration) {
+  auto r = Parse(
+      "program p(a);\n"
+      "  (* keep *) input a;\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  ASSERT_EQ(r.cu->programs[0]->ports.size(), 1u);
+  EXPECT_EQ(r.cu->programs[0]->ports[0].direction, Direction::kInput);
+  ASSERT_EQ(r.cu->programs[0]->ports[0].attrs.size(), 1u);
+  EXPECT_EQ(r.cu->programs[0]->ports[0].attrs[0].name, "keep");
+}
+
 // --- non_port_program_item ---
 // non_port_program_item ::=
 //     { attribute_instance } continuous_assign
@@ -156,6 +188,31 @@ TEST(NonPortProgramItem, TimeunitsDeclaration) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->programs.size(), 1u);
   EXPECT_TRUE(r.cu->programs[0]->has_timeunit);
+}
+
+// A port_declaration is a program_item, so a timeunits_declaration after one is
+// a non_port_program_item, which footnote 3 of A.10 admits only as a matching
+// repeat of an earlier one.
+TEST(NonPortProgramItem, TimeunitsAfterPortDeclarationRejected) {
+  auto r = Parse(
+      "program p(a);\n"
+      "  input a;\n"
+      "  timeunit 10ns;\n"
+      "endprogram\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "timeunit as a later item requires a matching "
+                            "prior declaration in the same time scope",
+                            3, "3.14.2.2"));
+}
+
+TEST(NonPortProgramItem, TimeunitsBeforePortDeclarationAccepted) {
+  auto r = Parse(
+      "program p(a);\n"
+      "  timeunit 10ns;\n"
+      "  input a;\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
 }
 
 // The first five alternatives permit a leading run of attribute_instances; the
@@ -239,6 +296,28 @@ TEST(ProgramGenerateItem, ElaborationSeveritySystemTask) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_TRUE(HasItemOfKind(ProgItems(r), ModuleItemKind::kElabSystemTask));
+}
+
+// non_port_program_item writes no { attribute_instance } before a
+// program_generate_item, and a program reaches its generate constructs and
+// elaboration system tasks through that item alone.
+TEST(ProgramGenerateItem, AttributeBeforeAProgramGenerateItemRejected) {
+  auto r = Parse(
+      "program p;\n"
+      "  (* a *) if (1) begin : g end\n"
+      "  (* b *) for (genvar k = 0; k < 2; k++) begin : h end\n"
+      "  (* c *) case (1) default: begin : c end endcase\n"
+      "  (* d *) $info(\"x\");\n"
+      "  (* e *) generate endgenerate\n"
+      "endprogram\n");
+  for (int line : {2, 3, 4, 5}) {
+    EXPECT_TRUE(ReportedError(r.diags,
+                              "a generate construct or elaboration system task "
+                              "of a program takes no attribute instance",
+                              line, "A.1.7"));
+  }
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a generate region takes no attribute instance", 6, "A.1.7"));
 }
 
 // --- non_port_program_item admits no specify_block or specparam_declaration
@@ -336,6 +415,24 @@ TEST(NonPortProgramItem, ErrorDeferredImmediateAssertionInProgramIsRejected) {
   EXPECT_TRUE(ReportedError(
       r.diags, "a deferred immediate assertion is not an item of a program", 3,
       "A.1.7"));
+}
+
+// non_port_program_item reaches no interface_declaration or
+// program_declaration, whose extern forms A.1.2 makes alternatives of both,
+// and §24.3 keeps declarations of interfaces and other programs out of a
+// program. Each is read as the declaration it is, not as A.1.6's extern task
+// or function prototype.
+TEST(NonPortProgramItem, ErrorExternInterfaceOrProgramDeclarationIsRejected) {
+  auto r = Parse(
+      "program t;\n"
+      "  extern interface i(input logic c);\n"
+      "  extern program p(input logic d);\n"
+      "endprogram\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "interface declarations not allowed in programs", 2, "24.3"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "program declarations not allowed in programs", 3, "24.3"));
+  for (const auto& diag : r.diags) EXPECT_NE(diag.subclause, "A.1.6");
 }
 
 // A concurrent_assertion_item reaches A.4.1.4's checker_instantiation, and

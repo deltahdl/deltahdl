@@ -134,6 +134,68 @@ TEST(InterfaceItem, NonAnsiPortDeclarationAndNonPortItem) {
   EXPECT_TRUE(HasItemOfKind(iface->items, ModuleItemKind::kContAssign));
 }
 
+// A.1.2's ( .* ) form of interface_declaration holds { interface_item }, so
+// its body declares the directions of the extern declaration's ports.
+TEST(InterfaceItem, WildcardHeaderBodyPortDeclaration) {
+  auto r = Parse(
+      "extern interface i(b);\n"
+      "interface i(.*);\n"
+      "  output b;\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 2u);
+  ASSERT_EQ(r.cu->interfaces[1]->ports.size(), 1u);
+  EXPECT_EQ(r.cu->interfaces[1]->ports[0].name, "b");
+  EXPECT_EQ(r.cu->interfaces[1]->ports[0].direction, Direction::kOutput);
+}
+
+// A.1.3 opens every port_declaration with { attribute_instance }.
+TEST(InterfaceItem, AttributedNonAnsiPortDeclaration) {
+  auto r = Parse(
+      "interface i(b);\n"
+      "  (* tag = 2 *) output b;\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  ASSERT_EQ(r.cu->interfaces[0]->ports.size(), 1u);
+  EXPECT_EQ(r.cu->interfaces[0]->ports[0].direction, Direction::kOutput);
+  ASSERT_EQ(r.cu->interfaces[0]->ports[0].attrs.size(), 1u);
+  EXPECT_EQ(r.cu->interfaces[0]->ports[0].attrs[0].name, "tag");
+}
+
+// After a port_declaration, a timeunits_declaration is a
+// non_port_interface_item, which footnote 3 of A.10 admits only as a matching
+// repeat of an earlier one.
+TEST(NonPortInterfaceItem, TimeprecisionAfterPortDeclarationRejected) {
+  auto r = Parse(
+      "interface i(b);\n"
+      "  output b;\n"
+      "  timeprecision 1ps;\n"
+      "endinterface\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "timeprecision as a later item requires a "
+                            "matching prior declaration in the same time scope",
+                            3, "3.14.2.2"));
+}
+
+// non_port_interface_item writes no { attribute_instance } before a
+// generate_region or a timeunits_declaration.
+TEST(NonPortInterfaceItem, AttributeBeforeAnItemThatTakesNoneRejected) {
+  auto r = Parse(
+      "interface i;\n"
+      "  (* a *) generate endgenerate\n"
+      "  (* b *) timeprecision 1ps;\n"
+      "endinterface\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a generate region takes no attribute instance", 2, "A.1.6"));
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "a timeunits declaration takes no attribute "
+                            "instance",
+                            3, "A.1.6"));
+}
+
 // --- non_port_interface_item ---
 // non_port_interface_item ::= generate_region | interface_or_generate_item
 //   | program_declaration | modport_declaration | interface_declaration
@@ -189,6 +251,26 @@ TEST(NonPortInterfaceItem, NestedProgramDeclaration) {
   ASSERT_NE(item, nullptr);
   ASSERT_NE(item->nested_module_decl, nullptr);
   EXPECT_EQ(item->nested_module_decl->decl_kind, ModuleDeclKind::kProgram);
+}
+
+// interface_declaration and program_declaration are non_port_interface_items
+// in their extern forms too, which A.1.2 makes alternatives of both.
+TEST(NonPortInterfaceItem, NestedExternInterfaceAndProgramDeclaration) {
+  auto r = Parse(
+      "interface j;\n"
+      "  extern interface k(input logic c);\n"
+      "  extern program q(input logic d);\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(IfaceItems(r).size(), 2u);
+  for (auto* item : IfaceItems(r)) {
+    ASSERT_NE(item->nested_module_decl, nullptr);
+    EXPECT_TRUE(item->nested_module_decl->is_extern);
+  }
+  EXPECT_EQ(IfaceItems(r)[0]->nested_module_decl->name, "k");
+  EXPECT_EQ(IfaceItems(r)[1]->nested_module_decl->decl_kind,
+            ModuleDeclKind::kProgram);
 }
 
 TEST(NonPortInterfaceItem, TimeunitsDeclaration) {

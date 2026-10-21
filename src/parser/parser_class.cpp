@@ -14,7 +14,6 @@
 #include "parser/param_port_list.h"
 #include "parser/parser.h"
 #include "parser/parser_headers.h"
-#include "parser/parser_token_skips.h"
 #include "parser/parser_type_name_scope.h"
 
 namespace delta {
@@ -24,10 +23,12 @@ namespace delta {
 // tail either one reads are parsed in one place here.
 struct ParserClassHelpers {
   // The keyword, the optional lifetime, the name, and the parameter and port
-  // lists. Returns true when the ports were written in the non-ANSI style, in
-  // which case the body still has their directions to read. The subclause is
-  // the caller's, since the two declarations this reads are stated in different
-  // places: §25.3 gives the interface syntax and §24.3 the program construct.
+  // lists. Returns true when the ports were written in the non-ANSI style or
+  // as ( .* ), in which case the body still has their directions to read: A.1.2
+  // gives both forms a body of program_items or interface_items, whose first
+  // alternative is a port_declaration. The subclause is the caller's, since
+  // the two declarations this reads are stated in different places: §25.3
+  // gives the interface syntax and §24.3 the program construct.
   static bool ParseHead(Parser& p, ModuleDecl* decl, TokenKind keyword,
                         Subclause subclause) {
     p.Expect(keyword, subclause);
@@ -50,7 +51,9 @@ struct ParserClassHelpers {
                                                          : "a program"),
           Subclause("A.1.2"));
     }
-    return !decl->ports.empty() && decl->ports[0].direction == Direction::kNone;
+    return decl->has_wildcard_ports ||
+           (!decl->ports.empty() &&
+            decl->ports[0].direction == Direction::kNone);
   }
 
   // The end keyword, the optional label repeating the name, and the end of the
@@ -78,9 +81,7 @@ ModuleDecl* Parser::ParseInterfaceDecl() {
     if (Match(TokenKind::kSemicolon)) continue;
     if (Check(TokenKind::kKwModport)) {
       ParseModportDecl(decl->modports);
-    } else if (non_ansi && IsPortDirection(CurrentToken().kind)) {
-      ParseNonAnsiPortDecls(*decl);
-    } else {
+    } else if (!non_ansi || !TryParseBodyPortDecl(*decl)) {
       ParseModuleItem(decl->items);
     }
   }
@@ -102,11 +103,7 @@ ModuleDecl* Parser::ParseProgramDecl() {
   current_module_ = decl;
   while (!Check(TokenKind::kKwEndprogram) && !AtEnd()) {
     if (Match(TokenKind::kSemicolon)) continue;
-    if (non_ansi && IsPortDirection(CurrentToken().kind)) {
-      ParseNonAnsiPortDecls(*decl);
-    } else {
-      ParseModuleItem(decl->items);
-    }
+    if (!non_ansi || !TryParseBodyPortDecl(*decl)) ParseModuleItem(decl->items);
   }
   current_module_ = prev_module;
   ParserClassHelpers::ParseTail(*this, decl, TokenKind::kKwEndprogram,

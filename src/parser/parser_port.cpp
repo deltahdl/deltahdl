@@ -852,14 +852,22 @@ void Parser::ParseModuleBody(ModuleDecl& mod) {
   }
   while (!Check(TokenKind::kKwEndmodule) && !AtEnd()) {
     if (Match(TokenKind::kSemicolon)) continue;
-    if (non_ansi &&
-        ParserPortHelpers::TryParseNonAnsiBodyPortDecl(*this, mod)) {
-      mod.has_body_port_decls = true;
-      continue;
-    }
+    if (non_ansi && TryParseBodyPortDecl(mod)) continue;
     ParseModuleItem(mod.items);
   }
   current_module_ = prev_module;
+}
+
+// A.1.4's module_item, A.1.6's interface_item and A.1.7's program_item each
+// open with `port_declaration ;`, one production in all three bodies, so all
+// three read it here: an attributed declaration included, and recorded as an
+// item, which makes a timeunits_declaration after it a later one that
+// §3.14.2.2 holds to a matching earlier declaration. Answers whether one
+// stood.
+bool Parser::TryParseBodyPortDecl(ModuleDecl& mod) {
+  if (!ParserPortHelpers::TryParseNonAnsiBodyPortDecl(*this, mod)) return false;
+  mod.has_body_port_decls = true;
+  return true;
 }
 
 // Whether a non-ANSI port declaration with direction `dir` and data type

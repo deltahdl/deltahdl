@@ -596,6 +596,38 @@ TEST(NonPortModuleItem, TimeunitsDeclaration) {
   EXPECT_TRUE(r.cu->modules[0]->has_timeprecision);
 }
 
+// non_port_module_item writes no { attribute_instance } before a
+// generate_region, a specify_block or a timeunits_declaration.
+TEST(NonPortModuleItem, AttributeBeforeAnItemThatTakesNoneRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  (* a *) generate endgenerate\n"
+      "  (* b *) specify endspecify\n"
+      "  (* c *) timeunit 1ns;\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a generate region takes no attribute instance", 2, "A.1.4"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a specify block takes no attribute instance", 3, "A.1.4"));
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "a timeunits declaration takes no attribute "
+                            "instance",
+                            4, "A.1.4"));
+}
+
+// module_or_generate_item gives { attribute_instance } to every
+// module_common_item, a conditional generate construct and an elaboration
+// system task among them.
+TEST(ModuleOrGenerateItem, AttributeBeforeACommonItemAccepted) {
+  auto r = Parse(
+      "module m;\n"
+      "  (* a *) if (1) begin : g end\n"
+      "  (* b *) $info(\"x\");\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 TEST(NonPortModuleItem, NestedProgramAndInterfaceDeclaration) {
   auto r = Parse(
       "module m;\n"
@@ -615,6 +647,29 @@ TEST(NonPortModuleItem, NestedProgramAndInterfaceDeclaration) {
   }
   EXPECT_TRUE(saw_program);
   EXPECT_TRUE(saw_interface);
+}
+
+// A.1.2 makes the extern forms alternatives of interface_declaration and
+// program_declaration, both of which non_port_module_item admits.
+TEST(NonPortModuleItem, NestedExternInterfaceAndProgramDeclaration) {
+  auto r = Parse(
+      "module m;\n"
+      "  extern interface i(input logic a);\n"
+      "  extern program p(input logic b);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  const auto& items = r.cu->modules[0]->items;
+  ASSERT_EQ(items.size(), 2u);
+  ASSERT_EQ(items[0]->kind, ModuleItemKind::kNestedModuleDecl);
+  EXPECT_TRUE(items[0]->nested_module_decl->is_extern);
+  EXPECT_EQ(items[0]->nested_module_decl->decl_kind,
+            ModuleDeclKind::kInterface);
+  EXPECT_EQ(items[0]->nested_module_decl->name, "i");
+  ASSERT_EQ(items[1]->kind, ModuleItemKind::kNestedModuleDecl);
+  EXPECT_TRUE(items[1]->nested_module_decl->is_extern);
+  EXPECT_EQ(items[1]->nested_module_decl->decl_kind, ModuleDeclKind::kProgram);
+  EXPECT_EQ(items[1]->nested_module_decl->ports.size(), 1u);
 }
 
 // --- error conditions / edge cases ---

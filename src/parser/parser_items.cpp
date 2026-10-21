@@ -17,19 +17,6 @@
 
 namespace delta {
 
-static bool IsElabSeverityTask(TokenKind kind, std::string_view text) {
-  return kind == TokenKind::kSystemIdentifier &&
-         (text == "$fatal" || text == "$error" || text == "$warning" ||
-          text == "$info");
-}
-
-// True for the two keywords that head a §3.14.2 time-scope declaration.
-// Factored out so the misc-keyword dispatcher tests one predicate instead of an
-// inline disjunction.
-static bool IsTimeunitKeyword(TokenKind kind) {
-  return kind == TokenKind::kKwTimeunit || kind == TokenKind::kKwTimeprecision;
-}
-
 static std::optional<AlwaysKind> TokenToAlwaysKind(TokenKind tk) {
   switch (tk) {
     case TokenKind::kKwAlways:
@@ -297,20 +284,14 @@ bool Parser::TryParseDeclKeywordItem(std::vector<ModuleItem*>& items) {
   if (Check(TokenKind::kKwExtern)) {
     SourceLoc extern_loc = CurrentLoc();
     Consume();
-    // §23.5: an extern module (or macromodule) declaration can appear at any
-    // level of the instantiation hierarchy, so one may be nested inside a
-    // module body. Route it to the extern-module parser and store it as a
-    // nested module declaration; the extern keyword only declares the ports
-    // here, it does not define the module. A program is no such level: §24.3
-    // keeps every module declaration out of one, the extern form included.
-    if (Check(TokenKind::kKwModule) || Check(TokenKind::kKwMacromodule)) {
-      if (InProgramBlock())
-        diag_.Error(extern_loc, "module declarations not allowed in programs",
-                    Subclause("24.3"));
+    // An extern declaration of a module, an interface or a program is kept as
+    // a nested declaration; the extern keyword only declares the ports here,
+    // it does not define the element.
+    if (ModuleDecl* decl = TryParseNestedExternDecl(extern_loc)) {
       auto* item = arena_.Create<ModuleItem>();
       item->kind = ModuleItemKind::kNestedModuleDecl;
-      item->loc = CurrentLoc();
-      item->nested_module_decl = ParseExternModuleDecl();
+      item->loc = decl->range.start;
+      item->nested_module_decl = decl;
       items.push_back(item);
       return true;
     }
@@ -594,7 +575,9 @@ std::string_view Parser::TryParseAssertionItemLabel() {
 }
 
 void Parser::ParseModuleItem(std::vector<ModuleItem*>& items) {
+  const SourceLoc kAttrLoc = CurrentLoc();
   auto attrs = ParseAttributes();
+  if (!attrs.empty()) RejectAttributesBeforeItem(kAttrLoc);
   size_t before = items.size();
 
   // §A.6.10 deferred_immediate_assertion_item permits an optional

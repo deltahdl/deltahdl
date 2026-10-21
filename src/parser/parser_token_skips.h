@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string_view>
+
 #include "lexer/lexer.h"
 #include "lexer/token.h"
 
@@ -12,6 +14,18 @@ namespace delta {
 inline bool IsPortDirection(TokenKind tk) {
   return tk == TokenKind::kKwInput || tk == TokenKind::kKwOutput ||
          tk == TokenKind::kKwInout || tk == TokenKind::kKwRef;
+}
+
+// The system task names of A.1.4's elaboration_severity_system_task.
+inline bool IsElabSeverityTask(TokenKind kind, std::string_view text) {
+  return kind == TokenKind::kSystemIdentifier &&
+         (text == "$fatal" || text == "$error" || text == "$warning" ||
+          text == "$info");
+}
+
+// True for the two keywords that head a §3.14.2 time-scope declaration.
+inline bool IsTimeunitKeyword(TokenKind kind) {
+  return kind == TokenKind::kKwTimeunit || kind == TokenKind::kKwTimeprecision;
 }
 
 // Reads past the ';' that ends the construct at the current position, or to

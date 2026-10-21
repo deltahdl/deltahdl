@@ -730,31 +730,11 @@ void Parser::ParseExternTopLevel(CompilationUnit* unit) {
     return;
   }
   if (Check(TokenKind::kKwInterface)) {
-    TypeNameScope type_scope(*this);
-    auto* decl = arena_.Create<ModuleDecl>();
-    decl->decl_kind = ModuleDeclKind::kInterface;
-    decl->is_extern = true;
-    decl->range.start = CurrentLoc();
-    Consume();
-    Match(TokenKind::kKwAutomatic) || Match(TokenKind::kKwStatic);
-    decl->name = Expect(TokenKind::kIdentifier, Subclause("25.3")).text;
-    declared_design_elements_.insert(decl->name);
-    ParseParamsPortsAndSemicolon(*decl);
-    unit->interfaces.push_back(decl);
+    unit->interfaces.push_back(ParseExternInterfaceOrProgramDecl());
     return;
   }
   if (Check(TokenKind::kKwProgram)) {
-    TypeNameScope type_scope(*this);
-    auto* decl = arena_.Create<ModuleDecl>();
-    decl->decl_kind = ModuleDeclKind::kProgram;
-    decl->is_extern = true;
-    decl->range.start = CurrentLoc();
-    Consume();
-    Match(TokenKind::kKwAutomatic) || Match(TokenKind::kKwStatic);
-    decl->name = Expect(TokenKind::kIdentifier, Subclause("24.3")).text;
-    declared_design_elements_.insert(decl->name);
-    ParseParamsPortsAndSemicolon(*decl);
-    unit->programs.push_back(decl);
+    unit->programs.push_back(ParseExternInterfaceOrProgramDecl());
     return;
   }
   if (Check(TokenKind::kKwPrimitive)) {
@@ -774,6 +754,28 @@ void Parser::ParseExternTopLevel(CompilationUnit* unit) {
     return;
   }
   SkipToSemicolon(lexer_);
+}
+
+// A.1.2's `extern interface_nonansi_header`, `extern interface_ansi_header`
+// and the program pair, with `extern` already read and the parser standing at
+// `interface` or `program`: the header alone, which §23.5 has declare the
+// element's ports without defining it, read wherever it stands.
+ModuleDecl* Parser::ParseExternInterfaceOrProgramDecl() {
+  TypeNameScope type_scope(*this);
+  const bool kIsInterface = Check(TokenKind::kKwInterface);
+  auto* decl = arena_.Create<ModuleDecl>();
+  decl->decl_kind =
+      kIsInterface ? ModuleDeclKind::kInterface : ModuleDeclKind::kProgram;
+  decl->is_extern = true;
+  decl->range.start = CurrentLoc();
+  Consume();
+  Match(TokenKind::kKwAutomatic) || Match(TokenKind::kKwStatic);
+  decl->name =
+      Expect(TokenKind::kIdentifier, Subclause(kIsInterface ? "25.3" : "24.3"))
+          .text;
+  declared_design_elements_.insert(decl->name);
+  ParseParamsPortsAndSemicolon(*decl);
+  return decl;
 }
 
 ModuleDecl* Parser::ParseExternModuleDecl() {

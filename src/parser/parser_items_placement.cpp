@@ -9,6 +9,7 @@
 // inside the limit assert-no-oversized-source-files enforces.
 
 #include <cstddef>
+#include <format>
 #include <string_view>
 #include <vector>
 
@@ -65,9 +66,69 @@ void Parser::RejectInProgramBody(SourceLoc loc, const char* msg) {
   diag_.Error(loc, msg, Subclause("A.1.7"));
 }
 
+// A.1.4, A.1.6 and A.1.7 write { attribute_instance } before most of a body's
+// items but leave it off a few: a module's generate_region, specify_block and
+// timeunits_declaration, an interface's generate_region and
+// timeunits_declaration, and a program's timeunits_declaration and
+// program_generate_item. A program reaches its loop and conditional generate
+// constructs, its generate regions and its elaboration system tasks through
+// program_generate_item alone, where a module and an interface reach all but
+// the regions through module_common_item, which takes attributes. §5.12's list
+// of what an attribute can be attached to names no production, and read as a
+// grant over every item it would leave those omissions nothing to govern, so
+// the productions decide. Attributes read before such an item are reported at
+// the first `(*` under the body's subclause, and the item is still read. A
+// specify block takes none in any of the three bodies, though only a module
+// admits one at all. A checker's and a package's items are A.1.8's and
+// A.1.11's to rule on.
+void Parser::RejectAttributesBeforeItem(SourceLoc attr_loc) {
+  if (!InModuleBody() && !InInterfaceBody() && !InProgramBlock()) return;
+  Token tok = CurrentToken();
+  const char* item = nullptr;
+  if (tok.kind == TokenKind::kKwGenerate) {
+    item = "a generate region";
+  } else if (tok.kind == TokenKind::kKwSpecify) {
+    item = "a specify block";
+  } else if (IsTimeunitKeyword(tok.kind)) {
+    item = "a timeunits declaration";
+  } else if (InProgramBlock() &&
+             (tok.kind == TokenKind::kKwIf || tok.kind == TokenKind::kKwFor ||
+              tok.kind == TokenKind::kKwCase ||
+              IsElabSeverityTask(tok.kind, tok.text))) {
+    item = "a generate construct or elaboration system task of a program";
+  }
+  if (item == nullptr) return;
+  const char* subclause = "A.1.7";
+  if (InModuleBody()) {
+    subclause = "A.1.4";
+  } else if (InInterfaceBody()) {
+    subclause = "A.1.6";
+  }
+  diag_.Error(attr_loc, std::format("{} takes no attribute instance", item),
+              Subclause(subclause));
+}
+
 bool Parser::InModuleBody() const {
   return current_module_ &&
          current_module_->decl_kind == ModuleDeclKind::kModule;
+}
+
+bool Parser::InProgramBlock() const {
+  return current_module_ &&
+         current_module_->decl_kind == ModuleDeclKind::kProgram;
+}
+
+bool Parser::InInterfaceBody() const {
+  return current_module_ &&
+         current_module_->decl_kind == ModuleDeclKind::kInterface;
+}
+
+// True inside a checker body, a generate block of it included: A.1.8's
+// footnote 6 forbids a checker_generate_item every item a checker_declaration
+// forbids outside one, so the block admits what the body admits.
+bool Parser::InCheckerBody() const {
+  return current_module_ &&
+         current_module_->decl_kind == ModuleDeclKind::kChecker;
 }
 
 // A.1.6's interface_item is a port_declaration or a non_port_interface_item,
@@ -83,6 +144,37 @@ bool Parser::InModuleBody() const {
 void Parser::RejectInInterfaceBody(const char* msg) {
   if (!InInterfaceBody()) return;
   diag_.Error(CurrentLoc(), msg, Subclause("A.1.6"));
+}
+
+// The declaration after an `extern` standing as a body item when it declares
+// a module, an interface or a program, or null for anything else, which is
+// A.1.6's extern_tf_declaration. A.1.2 makes the extern forms alternatives of
+// module_declaration, interface_declaration and program_declaration; A.1.4's
+// non_port_module_item admits all three and A.1.6's non_port_interface_item
+// the last two, and §23.5 lets an extern declaration appear at any level of
+// the instantiation hierarchy, visible only at its own. A program is no such
+// level: §24.3 keeps every declaration of a module, an interface or another
+// program out of one, the extern forms included, so in a program the report a
+// plain nested declaration of the kind gets is made at `extern`. The
+// declaration is read either way.
+ModuleDecl* Parser::TryParseNestedExternDecl(SourceLoc extern_loc) {
+  const bool kIsModule =
+      Check(TokenKind::kKwModule) || Check(TokenKind::kKwMacromodule);
+  const char* program_report = nullptr;
+  if (kIsModule) {
+    program_report = "module declarations not allowed in programs";
+  } else if (Check(TokenKind::kKwInterface)) {
+    program_report = "interface declarations not allowed in programs";
+  } else if (Check(TokenKind::kKwProgram)) {
+    program_report = "program declarations not allowed in programs";
+  } else {
+    return nullptr;
+  }
+  if (InProgramBlock()) {
+    diag_.Error(extern_loc, program_report, Subclause("24.3"));
+  }
+  return kIsModule ? ParseExternModuleDecl()
+                   : ParseExternInterfaceOrProgramDecl();
 }
 
 // A gate instantiation stands in a module body alone: §24.3 leaves it out of

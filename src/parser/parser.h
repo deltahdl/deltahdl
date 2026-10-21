@@ -122,6 +122,8 @@ class Parser {
 
   ModuleDecl* ParseModuleDecl();
   ModuleDecl* ParseExternModuleDecl();
+  ModuleDecl* ParseExternInterfaceOrProgramDecl();
+  ModuleDecl* TryParseNestedExternDecl(SourceLoc extern_loc);
   PackageDecl* ParsePackageDecl();
   bool TryParsePackageBodyItem(std::vector<ModuleItem*>& items);
   void ParseImportDecl(std::vector<ModuleItem*>& items);
@@ -135,6 +137,7 @@ class Parser {
   void ParseNonAnsiPortList(ModuleDecl& mod);
   PortDecl ParsePortDecl();
   void ParseModuleBody(ModuleDecl& mod);
+  bool TryParseBodyPortDecl(ModuleDecl& mod);
   // §5.12: `attrs` are those written before the declaration.
   void ParseNonAnsiPortDecls(ModuleDecl& mod,
                              std::vector<Attribute> attrs = {});
@@ -151,6 +154,7 @@ class Parser {
   void RejectInInterfaceBody(const char* msg);
   void RejectMisplacedGate();
   void RejectInPackageBody(const char* msg);
+  void RejectAttributesBeforeItem(SourceLoc attr_loc);
   void FilterPackageItems(std::vector<ModuleItem*>& items, size_t before);
   bool TryRejectBodyPortDecl();
   bool TryParseSpecifyItem(std::vector<ModuleItem*>& items);
@@ -875,23 +879,10 @@ class Parser {
   ModuleDecl* current_module_ = nullptr;
   PackageDecl* current_package_ = nullptr;
   CompilationUnit* current_compilation_unit_ = nullptr;
-  bool InProgramBlock() const {
-    return current_module_ &&
-           current_module_->decl_kind == ModuleDeclKind::kProgram;
-  }
+  bool InProgramBlock() const;
   bool InModuleBody() const;
-  bool InInterfaceBody() const {
-    return current_module_ &&
-           current_module_->decl_kind == ModuleDeclKind::kInterface;
-  }
-  // True inside a checker body, a generate block of it included: A.1.8's
-  // footnote 6 forbids a checker_generate_item every item a
-  // checker_declaration forbids outside one, so the block admits what the body
-  // admits.
-  bool InCheckerBody() const {
-    return current_module_ &&
-           current_module_->decl_kind == ModuleDeclKind::kChecker;
-  }
+  bool InInterfaceBody() const;
+  bool InCheckerBody() const;
   // True while a package's own items are read: not a design element declared
   // inside the package, whose body is that element's, and not an anonymous
   // program in it, which FilterAnonymousProgramItems in parser.cpp holds to
