@@ -886,7 +886,8 @@ std::vector<SequenceOutcome> AdvanceSequenceProperty(
     Arena& arena) {
   std::vector<SequenceOutcome> outcomes;
   for (const Expr* site : state.past_sites) EvalExpr(site, ctx, arena);
-  SimTime now = ctx.CurrentTime();
+  // §16.9.4: a deferred step stands in the time step of its own tick.
+  SimTime now = ctx.AssertionSamples().StepTime(ctx.CurrentTime());
   // §16.12: a disable condition true at any tick of an attempt disables it,
   // and the attempts beginning at this tick with it.
   if (tick.disabled) return DisableSequenceAttempts(state, tick, now);

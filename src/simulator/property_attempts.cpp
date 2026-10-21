@@ -861,8 +861,9 @@ PropertyTick AdvancePropertyTree(PropertyTreeState& state, bool disabled,
                                  SimContext& ctx, Arena& arena) {
   PropertyTick tick;
   // §16.13: which clocks ticked at this time step; a second wake at one
-  // time step, by another of the clocks, advances nothing again.
-  SimTime now = ctx.CurrentTime();
+  // time step, by another of the clocks, advances nothing again. A step
+  // §16.9.4 defers stands in the time step of its own tick.
+  SimTime now = ctx.AssertionSamples().StepTime(ctx.CurrentTime());
   if (state.clocks.multiclock && state.advanced_at == now) return tick;
   // §16.14.6.3: a second pass of the Active region in one time step, after
   // the Reactive region wrote what a procedure reads, may queue instances

@@ -269,6 +269,10 @@ const std::vector<Logic4Vec>* AssertionSampleStore::ReadQueueWithinProperty(
 
 const Logic4Vec* AssertionSampleStore::Read(const Variable* var,
                                             SimTime t) const {
+  if (snapshot_ != nullptr) {
+    auto taken = snapshot_->values.find(var);
+    if (taken != snapshot_->values.end()) return &taken->second;
+  }
   auto it = entries_.find(var);
   if (it == entries_.end()) return nullptr;
   // SampleStaticVariable carries §16.5.1's split between time 0, which reads
@@ -279,6 +283,18 @@ const Logic4Vec* AssertionSampleStore::Read(const Variable* var,
   SampledValue decision = SampleStaticVariable(0, t, 0);
   return decision.mode == SampleMode::kDefault ? &it->second.default_value
                                                : &it->second.preponed_value;
+}
+
+const AssertionSampleStore::Snapshot* AssertionSampleStore::TakeSnapshot(
+    SimTime t, Arena& arena) const {
+  auto* snapshot = arena.Create<Snapshot>();
+  snapshot->at = t;
+  snapshot->values.reserve(entries_.size());
+  for (const auto& entry : entries_) {
+    snapshot->values.emplace(entry.first,
+                             OwnedSample(*Read(entry.first, t), arena));
+  }
+  return snapshot;
 }
 
 const Logic4Vec* AssertionSampleStore::PastValue(const SampleSite& site,

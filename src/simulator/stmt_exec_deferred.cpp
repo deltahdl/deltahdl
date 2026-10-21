@@ -11,7 +11,6 @@
 #include "common/arena.h"
 #include "common/source_loc.h"
 #include "common/types.h"
-#include "elaborator/global_clocking_sampled_value.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
@@ -21,7 +20,6 @@
 #include "simulator/cover_results.h"
 #include "simulator/evaluation.h"
 #include "simulator/exec_task.h"
-#include "simulator/expr_walk.h"
 #include "simulator/instance_bindings.h"
 #include "simulator/instance_prefix_override.h"
 #include "simulator/procedural_assertion.h"
@@ -454,13 +452,15 @@ static const Stmt* JudgeAssertion(const Stmt* stmt, SimContext& ctx,
   // action on this activation.
   if (!AssertionControlStatus(stmt, ctx).checking) return nullptr;
   NoteAttemptBegun(stmt, ctx);
+  const uint64_t kStarted =
+      ctx.AssertionSamples().StepTime(ctx.CurrentTime()).ticks;
 
   // §16.12: an attempt at which the disable condition, read as the variables
   // stand rather than sampled, is true is disabled: it neither succeeds nor
   // fails, so no action block runs and no failure is reported.
   if (stmt->assert_disable_iff != nullptr &&
       EvalExpr(stmt->assert_disable_iff, ctx, arena).IsTruthy()) {
-    NoteAttemptDisabled(stmt, ctx.CurrentTime().ticks, ctx);
+    NoteAttemptDisabled(stmt, kStarted, ctx);
     return nullptr;
   }
 
@@ -468,7 +468,7 @@ static const Stmt* JudgeAssertion(const Stmt* stmt, SimContext& ctx,
   bool is_true = EvalAssertionCondition(stmt, ctx, arena);
   PropertyVerdict verdict;
   verdict.holds = is_true != stmt->assert_negated;
-  verdict.started = ctx.CurrentTime().ticks;
+  verdict.started = kStarted;
   verdict.failed_at = stmt->assert_expr;
   return ConcludeAssertion(stmt, verdict, ctx, arena);
 }
@@ -560,8 +560,9 @@ static AttemptInstances BegunAttempts(const Stmt* stmt,
 
 static void ExecPropertyTreeTick(const Stmt* stmt,
                                  const AttemptInstances& instances,
-                                 SimContext& ctx, Arena& arena) {
-  Process* proc = ctx.CurrentProcess();
+                                 SimContext& ctx, Arena& arena,
+                                 Process* owner) {
+  Process* proc = owner != nullptr ? owner : ctx.CurrentProcess();
   if (proc == nullptr) return;
   PropertyTreeState*& state = proc->property_tree_states[stmt];
   if (state == nullptr) {
@@ -600,8 +601,9 @@ static void ExecPropertyTreeTick(const Stmt* stmt,
 
 static void ExecSequencePropertyTick(const Stmt* stmt,
                                      const AttemptInstances& instances,
-                                     SimContext& ctx, Arena& arena) {
-  Process* proc = ctx.CurrentProcess();
+                                     SimContext& ctx, Arena& arena,
+                                     Process* owner) {
+  Process* proc = owner != nullptr ? owner : ctx.CurrentProcess();
   if (proc == nullptr) return;
   SequencePropertyState*& state = proc->sequence_property_states[stmt];
   if (state == nullptr) {
@@ -650,109 +652,79 @@ static void ExecSequencePropertyTick(const Stmt* stmt,
   }
 }
 
-// §16.9.4: the value each of the five future sampled value functions names is
-// the argument's sampled value at the next global clocking tick, and the four
-// predicates beside $future_gclk compare it with the value at the tick the
-// function was called in. That second value is what this takes, one per call
-// site under `root`, before the attempt waits for the global clocking tick that
-// answers the first. The values are copied out of the variables they were read
-// from, because the attempt keeps them across a tick the variables may change
-// in.
-using FutureGclkSamples = std::vector<std::pair<const Expr*, Logic4Vec>>;
-static FutureGclkSamples* SampleFutureGclkOperands(const Expr* root,
-                                                   SimContext& ctx,
-                                                   Arena& arena) {
-  auto* samples = arena.Create<FutureGclkSamples>();
-  ForEachSubExpr(root, [&](const Expr* e) {
-    GlobalClockingSampledFunction fn = GlobalClockingSampledFunction::kPastGclk;
-    if (e->kind != ExprKind::kSystemCall) return;
-    if (e->args.empty() || e->args[0] == nullptr) return;
-    if (!ClassifyGlobalClockingSampledFunction(e->callee, fn)) return;
-    if (!IsGlobalClockingFutureFunction(fn)) return;
-    samples->emplace_back(e,
-                          AssertionSampleStore::OwnedSample(
-                              EvalSampledArg(e->args[0], ctx, arena), arena));
-  });
-  return samples;
-}
-
-// §16.9.4: one attempt of an assertion whose property names a future sampled
-// value function, from its own tick to the global clocking tick that answers
-// it. The attempt waits for that tick, evaluates the whole property there, and
-// schedules its action block there, which is where the subclause has the
-// action block of such an assertion run -- delayed to the global clocking tick
-// that follows the last tick of the assertion clock for the attempt.
-//
-// What the attempt sampled at its own tick is written into the call sites'
-// tick history just before the evaluation, so that EvalFutureGclk reads it
-// back as the value one tick before the one it samples now. The history is
-// written here rather than at the attempt's tick because an attempt the next
-// tick starts would record over it before this one is answered: the sites are
-// shared by every attempt of the assertion, and the tick history keeps one
-// value per site.
-//
-// The whole property is evaluated at the later tick, so an operand of it that
-// is not an argument of one of the five reads its sampled value there rather
-// than at the assertion's tick. §16.9.4 puts the attempt's interval at the
-// assertion clock, as though the future sampled values were known in advance,
-// so a property mixing a future function with a plain operand reads the plain
-// one a tick late. What that costs is one tick of a value the property also
-// names directly, and what it buys is the five functions answering at all.
-// One attempt of an assertion holding a future function: the statement, the
-// values its future call sites sampled at the assertion's own tick, and the
-// process and named scopes the assertion stands in, its label among them,
-// captured where the attempt starts so that the verdict's report names the
-// assertion as §20.10 has it.
+// §16.9.4: one step of an assertion whose property names a future sampled
+// value function, from its tick of the assertion clock to the global clocking
+// tick that answers it: the statement, the process that keeps its attempts in
+// flight, what was sampled at its tick, and the process and named scopes the
+// assertion stands in, its label among them, captured where the step starts so
+// that the verdict's report names the assertion as §20.10 has it.
 struct FutureGclkAttempt {
   const Stmt* stmt;
-  const FutureGclkSamples* samples;
+  Process* owner;
+  const AssertionSampleStore::Snapshot* own_tick;
   PendingReportScope scope;
 };
 
+// The step waits for that tick and is taken there, which is where the clause
+// has the action block of such an assertion run -- delayed to the global
+// clocking tick that follows the last tick of the assertion clock for the
+// attempt. The clause puts the attempt's interval at the assertion clock, as
+// though the future values were known in advance, so the step reads what was
+// sampled at its own tick and stands in that time step; a future function
+// alone reads its argument past the snapshot, for the value at this tick. A
+// boolean property is one attempt decided here; a property of operators and a
+// sequence advance each attempt the owner keeps by the one tick, so their
+// steps are taken one after another, in the order of their ticks.
 static SimCoroutine FutureGclkAttemptCoroutine(
     FutureGclkAttempt attempt, const std::vector<EventExpr>& gclk_event,
     SimContext& ctx, Arena& arena) {
-  // The values were sampled at the assertion's own tick, and are recorded
-  // under that time step so that the evaluation at the global clocking tick
-  // that follows reads them as the tick before its own.
-  uint64_t sampled_at = ctx.CurrentTime().ticks;
   co_await EventAwaiter{ctx, gclk_event, arena};
   co_await RegionAwaiter{ctx, Region::kObserved};
-  auto& store = ctx.AssertionSamples();
-  for (const auto& [site, at_tick] : *attempt.samples) {
-    store.RecordTick(SampleSite{site, 0, sampled_at}, at_tick, 1, arena);
-  }
   // The statement carries a concurrent assertion's property, so the verdict's
   // action block is scheduled into the Reactive region rather than handed back
   // to be run here.
   attempt.scope.proc = ctx.CurrentProcess();
   PendingReportScope saved;
   attempt.scope.Install(ctx, saved);
-  JudgeAssertion(attempt.stmt, ctx, arena);
+  const Stmt* stmt = attempt.stmt;
+  AttemptInstances one{nullptr};
+  ctx.AssertionSamples().SetSnapshot(attempt.own_tick);
+  if (stmt->assert_property != nullptr) {
+    ExecPropertyTreeTick(stmt, one, ctx, arena, attempt.owner);
+  } else if (stmt->assert_sequence != nullptr) {
+    ExecSequencePropertyTick(stmt, one, ctx, arena, attempt.owner);
+  } else {
+    JudgeAssertion(stmt, ctx, arena);
+  }
+  ctx.AssertionSamples().SetSnapshot(nullptr);
   PendingReportScope::Restore(ctx, saved);
 }
 
-// §16.9.4: starts the attempt above in a process of its own, so that the
-// process carrying the assertion is back at its clocking event for the next
-// tick while this attempt waits for the global clocking tick that answers it.
-// An attempt started at every tick of the assertion clock is what the
-// subclause's interval asks for; an assertion that waited in its own process
-// would start one attempt per two ticks, the wait consuming the tick between.
+// §16.9.4: starts the step above in a process of its own, so that the process
+// carrying the assertion is back at its clocking event for the next tick while
+// this one waits for the global clocking tick that answers it. A step started
+// at every tick of the assertion clock is what the subclause's interval asks
+// for; an assertion that waited in its own process would take one step per two
+// ticks, the wait consuming the tick between.
 //
 // The process is marked as carrying a concurrent assertion so that §16.5's
 // rule resumes it in the Observed region of the global clocking tick, which is
 // also where it starts: the asserting process is there already, and starting
-// in the same region arms the wait before the tick can arrive.
-static void StartFutureGclkAttempt(const Stmt* stmt, const Process& asserting,
+// in the same region arms the wait before the tick can arrive. A boolean
+// property's step is its one attempt, which a Kill aborts with the process; a
+// step of the other two advances every attempt in flight, which a Kill aborts
+// where the owner keeps them.
+static void StartFutureGclkAttempt(const Stmt* stmt, Process& asserting,
                                    SimContext& ctx, Arena& arena) {
-  auto* samples = SampleFutureGclkOperands(stmt->assert_expr, ctx, arena);
+  const auto* own_tick =
+      ctx.AssertionSamples().TakeSnapshot(ctx.CurrentTime(), arena);
   auto* p = CreateAssertionChildProcess(ctx, arena, Region::kObserved);
   p->is_concurrent_clocked = true;
-  p->future_gclk_attempt_of = stmt;
-  // The coroutine's body runs only when the attempt is first resumed, by
-  // which time the scopes the assertion stands in have been popped, so they
-  // are captured here.
-  FutureGclkAttempt attempt{stmt, samples, PendingReportScope::Capture(ctx)};
+  if (stmt->assert_property == nullptr && stmt->assert_sequence == nullptr) {
+    p->future_gclk_attempt_of = stmt;
+  }
+  FutureGclkAttempt attempt{stmt, &asserting, own_tick,
+                            PendingReportScope::Capture(ctx)};
   p->coro = FutureGclkAttemptCoroutine(std::move(attempt),
                                        asserting.gclk_future_event, ctx, arena)
                 .Release();
@@ -763,9 +735,9 @@ void ExecConcurrentAssertionTick(const Stmt* stmt,
                                  const AttemptInstances& instances,
                                  SimContext& ctx, Arena& arena) {
   if (stmt->assert_property != nullptr) {
-    ExecPropertyTreeTick(stmt, instances, ctx, arena);
+    ExecPropertyTreeTick(stmt, instances, ctx, arena, nullptr);
   } else if (stmt->assert_sequence != nullptr) {
-    ExecSequencePropertyTick(stmt, instances, ctx, arena);
+    ExecSequencePropertyTick(stmt, instances, ctx, arena, nullptr);
   } else {
     // A boolean property is decided at its own tick, so each attempt is one
     // evaluation, reading what its instance saved (§16.14.6.1); its action
@@ -871,11 +843,12 @@ ExecTask ExecImmediateAssert(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   }
 
   if (stmt->assert_property != nullptr) {
-    ExecPropertyTreeTick(stmt, AttemptInstances{nullptr}, ctx, arena);
+    ExecPropertyTreeTick(stmt, AttemptInstances{nullptr}, ctx, arena, nullptr);
     co_return StmtResult::kDone;
   }
   if (stmt->assert_sequence != nullptr) {
-    ExecSequencePropertyTick(stmt, AttemptInstances{nullptr}, ctx, arena);
+    ExecSequencePropertyTick(stmt, AttemptInstances{nullptr}, ctx, arena,
+                             nullptr);
     co_return StmtResult::kDone;
   }
 

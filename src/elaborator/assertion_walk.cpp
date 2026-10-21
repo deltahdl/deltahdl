@@ -108,6 +108,18 @@ void ForEachTreeExpr(const PropertyExprNode* node,
   });
 }
 
+bool TreeNamesClocks(const PropertyExprNode* node) {
+  bool named = false;
+  ForEachTreeNode(node, [&named](const PropertyExprNode& n) {
+    named = named || !n.clock.empty();
+    if (n.sequence == nullptr) return;
+    ForEachBody(n.sequence->seq_linear, [&named](const SeqLinearBody& b) {
+      for (const auto& clock : b.clocks) named = named || !clock.empty();
+    });
+  });
+  return named;
+}
+
 const ModuleItem* InstantiatedDecl(const Expr* e, const NamedDecls& decls) {
   std::string_view name = e->kind == ExprKind::kCall ? e->callee : e->text;
   auto it = decls.find(name);

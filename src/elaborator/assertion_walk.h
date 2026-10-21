@@ -66,6 +66,10 @@ void ForEachTreeNode(const PropertyExprNode* node,
 void ForEachTreeExpr(const PropertyExprNode* node,
                      const std::function<void(const Expr*)>& fn);
 
+// Whether a node of the property tree under `node`, or a sequence one holds,
+// is written with a clocking event of its own (§16.13.2).
+bool TreeNamesClocks(const PropertyExprNode* node);
+
 // The declaration in `decls` that `e` instantiates, written as a call or as
 // a bare name; null where it names none.
 const ModuleItem* InstantiatedDecl(const Expr* e, const NamedDecls& decls);

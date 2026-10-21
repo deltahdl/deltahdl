@@ -359,4 +359,93 @@ TEST(GlobalClockingFutureSim, AnAttemptStartsAtEveryTickWhileOneIsWaiting) {
   EXPECT_EQ(last->value.ToUint64(), 45u);
 }
 
+// §16.9.4 puts no condition on the property's shape. An implication's
+// attempt at t=5 reads $falling_gclk(a) as a falls by the global tick at t=10,
+// so its antecedent holds, and its consequent b at the assertion tick t=15,
+// where b is 0. The failure's action block runs at the global tick after that
+// last assertion tick, t=20; one evaluated at the assertion's own ticks runs it
+// at t=15, or never, its antecedent not knowing what a does next.
+TEST(GlobalClockingFutureSim, AnImplicationFailsAtTheGlobalTickAfterItsLast) {
+  SimFixture f;
+  auto* when = RunAndFindVar(
+      "module t;\n"
+      "  logic aclk = 1'b0, gclk = 1'b0, a = 1'b1, b = 1'b0;\n"
+      "  int when = 0;\n"
+      "  global clocking gc @(posedge gclk); endclocking\n"
+      "  assert property (@(posedge aclk) $falling_gclk(a) |=> b)\n"
+      "    else when = $time;\n"
+      "  initial begin\n"
+      "    #5 aclk = 1'b1;\n"
+      "    #2 a = 1'b0;\n"
+      "    #3 gclk = 1'b1; aclk = 1'b0;\n"
+      "    #5 gclk = 1'b0; aclk = 1'b1;\n"
+      "    #5 gclk = 1'b1;\n"
+      "    #5 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "when");
+  ASSERT_NE(when, nullptr);
+  EXPECT_EQ(when->value.ToUint64(), 20u);
+}
+
+// §16.9.4, a sequence of two cycles: the attempt at t=5 sees a rise by the
+// global tick at t=10 and b at t=15, and passes; the attempt at t=15 sees a
+// hold at 1 and fails at once. Both verdicts are taken at the global tick
+// after t=15, so each action block runs once, at t=20.
+TEST(GlobalClockingFutureSim, ASequencesVerdictsComeAtTheGlobalTickAfterThem) {
+  SimFixture f;
+  auto* passes = RunAndFindVar(
+      "module t;\n"
+      "  logic aclk = 1'b0, gclk = 1'b0, a = 1'b0, b = 1'b1;\n"
+      "  int passes = 0, fails = 0, when = 0;\n"
+      "  global clocking gc @(posedge gclk); endclocking\n"
+      "  assert property (@(posedge aclk) $rising_gclk(a) ##1 b)\n"
+      "    passes = passes + 1;\n"
+      "    else begin fails = fails + 1; when = $time; end\n"
+      "  initial begin\n"
+      "    #5 aclk = 1'b1;\n"
+      "    #2 a = 1'b1;\n"
+      "    #3 gclk = 1'b1; aclk = 1'b0;\n"
+      "    #5 gclk = 1'b0; aclk = 1'b1;\n"
+      "    #5 gclk = 1'b1;\n"
+      "    #5 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "passes");
+  ASSERT_NE(passes, nullptr);
+  EXPECT_EQ(passes->value.ToUint64(), 1u);
+  auto* fails = f.ctx.FindVariable("fails");
+  ASSERT_NE(fails, nullptr);
+  EXPECT_EQ(fails->value.ToUint64(), 1u);
+  auto* when = f.ctx.FindVariable("when");
+  ASSERT_NE(when, nullptr);
+  EXPECT_EQ(when->value.ToUint64(), 20u);
+}
+
+// §16.9.4 times the attempt's interval as though the future values were known
+// in advance, so an operand beside the future function is the one sampled at
+// the attempt's own tick. en is 1 at t=5 and 0 by the global tick at t=10 that
+// answers $rising_gclk(req), so the property holds; reading en at that later
+// tick makes it fail.
+TEST(GlobalClockingFutureSim, AnOperandBesideAFutureFunctionIsReadAtItsTick) {
+  SimFixture f;
+  auto* hits = RunAndFindVar(
+      "module t;\n"
+      "  logic aclk = 1'b0, gclk = 1'b0, req = 1'b0, en = 1'b1;\n"
+      "  int hits = 0;\n"
+      "  global clocking gc @(posedge gclk); endclocking\n"
+      "  assert property (@(posedge aclk) $rising_gclk(req) && en)\n"
+      "    hits = hits + 1;\n"
+      "  initial begin\n"
+      "    #5 aclk = 1'b1;\n"
+      "    #2 req = 1'b1; en = 1'b0;\n"
+      "    #3 gclk = 1'b1;\n"
+      "    #5 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 1u);
+}
+
 }  // namespace

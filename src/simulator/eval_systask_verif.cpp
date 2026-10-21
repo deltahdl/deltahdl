@@ -836,12 +836,11 @@ static std::string_view PastAnalogueOfFutureFunction(std::string_view name) {
 }
 
 // §16.9.4's five future functions, evaluated at the global clock tick that
-// follows the assertion's own. The argument's sampled value here is the one the
-// clause calls the value at the next global clock tick; the value at the
-// assertion's tick was sampled by the attempt at that tick and written into
-// this call site's history just before this evaluation (see
-// FutureGclkAttemptCoroutine in stmt_exec_deferred.cpp), so PastValue reads it
-// back. A site with no history is one whose attempt did not go through that
+// follows the assertion's own, with what was sampled at that tick installed
+// (see FutureGclkAttemptCoroutine in stmt_exec_deferred.cpp). The argument's
+// sampled value here, read past that snapshot, is the one the clause calls the
+// value at the next global clock tick, and read through it, the value at the
+// assertion's tick. An evaluation with none installed did not go through that
 // wait, and the clause's own fallback for a comparison with no prior tick is
 // the expression's default sampled value.
 static Logic4Vec EvalFutureGclk(const Expr* expr, SimContext& ctx, Arena& arena,
@@ -849,12 +848,14 @@ static Logic4Vec EvalFutureGclk(const Expr* expr, SimContext& ctx, Arena& arena,
   if (expr->args.empty() || expr->args[0] == nullptr) {
     return MakeLogic4VecVal(arena, name == "$future_gclk" ? 32 : 1, 0);
   }
+  auto& samples = ctx.AssertionSamples();
+  const AssertionSampleStore::Snapshot* own_tick = samples.InstalledSnapshot();
+  samples.SetSnapshot(nullptr);
   auto next_val = EvalSampledArg(expr->args[0], ctx, arena);
+  samples.SetSnapshot(own_tick);
   if (name == "$future_gclk") return next_val;
-  const Logic4Vec* at_tick = ctx.AssertionSamples().PastValue(
-      SampleSite{expr, 0, ctx.CurrentTime().ticks}, 1);
-  Logic4Vec cur_val = at_tick != nullptr
-                          ? *at_tick
+  Logic4Vec cur_val = own_tick != nullptr
+                          ? EvalSampledArg(expr->args[0], ctx, arena)
                           : EvalDefaultSampledArg(expr->args[0], ctx, arena);
   return ValueChangeAnswer(PastAnalogueOfFutureFunction(name), next_val,
                            cur_val, arena);

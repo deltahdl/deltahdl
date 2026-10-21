@@ -322,6 +322,24 @@ class AssertionSampleStore {
   void SetClockTicks(uint32_t ticked) { clock_ticks_ = ticked; }
   uint32_t ClockTicks() const { return clock_ticks_; }
 
+  // §16.9.4: an attempt of an assertion naming a global clocking future
+  // sampled value function is answered at the global clocking tick after its
+  // own, yet its interval is the assertion clock's, as though the future
+  // values were known in advance, so every other operand it reads is the one
+  // sampled at its own tick. A snapshot keeps each enrolled variable's sampled
+  // value at that tick, `at`; while one is installed a read answers from it,
+  // and an attempt stepped stands in its time step.
+  struct Snapshot {
+    SimTime at;
+    std::unordered_map<const Variable*, Logic4Vec> values;
+  };
+  const Snapshot* TakeSnapshot(SimTime t, Arena& arena) const;
+  void SetSnapshot(const Snapshot* snapshot) { snapshot_ = snapshot; }
+  const Snapshot* InstalledSnapshot() const { return snapshot_; }
+  SimTime StepTime(SimTime now) const {
+    return snapshot_ != nullptr ? snapshot_->at : now;
+  }
+
   // §16.9.3: called no later than the time step of the first clocking event,
   // these functions compare the expression's sampled value with its default
   // sampled value. Raised around one evaluation of a value-change function's
@@ -361,9 +379,9 @@ class AssertionSampleStore {
   // A copy of `sampled` that owns its words, for a caller that keeps a sampled
   // value past the tick it read it at: the value a read of a variable answers
   // shares the variable's words, and the tick history above is kept by copy
-  // for the same reason. §16.9.4's attempts are the caller, each keeping what
-  // its future call sites sampled at its own tick until the global clocking
-  // tick that answers it.
+  // for the same reason. §16.9.4's snapshot is the caller, keeping what an
+  // attempt sampled at its own tick until the global clocking tick that
+  // answers it.
   static Logic4Vec OwnedSample(const Logic4Vec& sampled, Arena& arena);
 
  private:
@@ -409,6 +427,7 @@ class AssertionSampleStore {
   uint32_t clock_ticks_ = ~0u;
   std::vector<OperandRead>* operand_log_ = nullptr;
   uint64_t attempt_started_ = 0;
+  const Snapshot* snapshot_ = nullptr;
 };
 
 }  // namespace delta

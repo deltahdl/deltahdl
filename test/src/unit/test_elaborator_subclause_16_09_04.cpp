@@ -1,6 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <vector>
+
 #include "elaborator/global_clocking_sampled_value.h"
+#include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -748,6 +751,37 @@ TEST(GlobalClockingElab, GclkFunctionsInATreeAndASequenceAreAccepted) {
       "endmodule\n",
       f);
   EXPECT_FALSE(f.has_errors);
+}
+
+// §16.9.4: an assertion naming a future function is answered at the global
+// clocking tick, so its process carries the global clocking event, whether
+// its property is an implication (a1) or a sequence of two cycles (a2); a3
+// names none and carries nothing. A property naming a clock of its own, on an
+// operand (a4) or in a sequence (a5), is not yet carried to the global tick
+// (#7518) and carries nothing either.
+TEST(GlobalClockingElab, TheProcessOfAFutureAssertionCarriesTheGlobalEvent) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic clk, clk2, a, b;\n"
+      "  global clocking gc @(posedge clk); endclocking\n"
+      "  a1: assert property (@(posedge clk) $rising_gclk(a) |=> b);\n"
+      "  a2: assert property (@(posedge clk) $rising_gclk(a) ##1 b);\n"
+      "  a3: assert property (@(posedge clk) a |=> b);\n"
+      "  a4: assert property (@(posedge clk) $rising_gclk(a) |=>\n"
+      "        @(posedge clk2) b);\n"
+      "  a5: assert property (@(posedge clk) $rising_gclk(a) ##1\n"
+      "        @(posedge clk2) b |=> b);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  ASSERT_FALSE(design->top_modules.empty());
+  std::vector<bool> carries;
+  for (const RtlirProcess& p : design->top_modules[0]->processes) {
+    if (p.is_concurrent_clocked)
+      carries.push_back(!p.gclk_future_event.empty());
+  }
+  EXPECT_EQ(carries, (std::vector<bool>{true, true, false, false, false}));
 }
 
 // §16.9.4 also places the future functions, confining $future_gclk,
