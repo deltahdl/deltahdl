@@ -418,7 +418,10 @@ struct ParserPortHelpers {
     port.loc = p.CurrentLoc();
     port.name = p.ExpectIdentifier(Subclause("23.2.2.2")).text;
     p.ParseUnpackedDims(port.unpacked_dims);
-    if (p.Match(TokenKind::kEq)) port.default_value = p.ParseExpr();
+    if (p.Match(TokenKind::kEq)) {
+      port.default_value =
+          is_checker ? p.ParseCheckerFormalDefault() : p.ParseExpr();
+    }
     if (!prev.is_explicit_named) {
       port.direction = prev.direction;
       port.data_type = prev.data_type;
@@ -747,7 +750,7 @@ void Parser::ParsePortList(ModuleDecl& mod) {
 // parser_verify.cpp, and then for §17.2's rules on its type.
 void Parser::ParseOnePortOfList(ModuleDecl& mod, const PortDecl* prev,
                                 bool is_checker) {
-  mod.ports.push_back(ParsePortDecl());
+  mod.ports.push_back(ParsePortDecl(is_checker));
   PortDecl& port = mod.ports.back();
   if (is_checker) DiagnoseCheckerFormalAsWritten(port);
   bool type_omitted = FormalTypeOmitted(port);
@@ -772,7 +775,9 @@ void Parser::ParseNonAnsiPortList(ModuleDecl& mod) {
   Expect(TokenKind::kRParen, Subclause("23.2.2.1"));
 }
 
-PortDecl Parser::ParsePortDecl() {
+// A checker's formal has its default read by ParseCheckerFormalDefault, in
+// parser_verify.cpp, and any other port's as an expression.
+PortDecl Parser::ParsePortDecl(bool is_checker) {
   PortDecl port;
 
   // §A.1.3: each ansi_port_declaration in a list_of_port_declarations may be
@@ -816,7 +821,7 @@ PortDecl Parser::ParsePortDecl() {
   ParseUnpackedDims(port.unpacked_dims);
 
   if (Match(TokenKind::kEq)) {
-    port.default_value = ParseExpr();
+    port.default_value = is_checker ? ParseCheckerFormalDefault() : ParseExpr();
   }
   return port;
 }

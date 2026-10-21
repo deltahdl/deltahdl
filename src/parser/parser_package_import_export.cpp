@@ -82,10 +82,22 @@ ModuleItem* Parser::ParseImportItem() {
   return item;
 }
 
+// A DPI import or export declaration is A.1.11's dpi_import_export, a
+// package_or_generate_item_declaration, which a module, an interface, a
+// program, a package and a generate block reach. A.1.8's
+// checker_or_generate_item_declaration does not list it, and §17.2's list of
+// what a checker body may contain names no DPI declaration, so one written in a
+// checker is reported at its keyword and still read, so that the body resumes
+// after it.
 void Parser::ParseImportDecl(std::vector<ModuleItem*>& items) {
+  const auto kLoc = CurrentLoc();
   Expect(TokenKind::kKwImport, Subclause("26.3"));
 
   if (Check(TokenKind::kStringLiteral)) {
+    if (InCheckerBody()) {
+      diag_.Error(kLoc, "a DPI import declaration is not an item of a checker",
+                  Subclause("A.1.8"));
+    }
     items.push_back(ParseDpiImport());
     return;
   }
@@ -101,6 +113,10 @@ void Parser::ParseExportDecl(std::vector<ModuleItem*>& items) {
   Expect(TokenKind::kKwExport, Subclause("26.6"));
 
   if (Check(TokenKind::kStringLiteral)) {
+    if (InCheckerBody()) {
+      diag_.Error(loc, "a DPI export declaration is not an item of a checker",
+                  Subclause("A.1.8"));
+    }
     items.push_back(ParseDpiExport(loc));
     return;
   }

@@ -135,8 +135,9 @@ class Parser {
   void ParseOnePortOfList(ModuleDecl& mod, const PortDecl* prev,
                           bool is_checker);
   void DiagnoseCheckerFormalAsWritten(const PortDecl& port);
+  Expr* ParseCheckerFormalDefault();
   void ParseNonAnsiPortList(ModuleDecl& mod);
-  PortDecl ParsePortDecl();
+  PortDecl ParsePortDecl(bool is_checker);
   void ParseModuleBody(ModuleDecl& mod);
   bool TryParseBodyPortDecl(ModuleDecl& mod);
   // §5.12: `attrs` are those written before the declaration.

@@ -3,9 +3,11 @@
 
 #include "common/diagnostic.h"
 #include "lexer/token.h"
+#include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
 #include "parser/parser.h"
+#include "parser/parser_property_spec_internal.h"
 #include "parser/parser_type_name_scope.h"
 
 namespace delta {
@@ -64,6 +66,17 @@ void Parser::DiagnoseCheckerFormalAsWritten(const PortDecl& port) {
                             port.name, kind),
                 Subclause("17.2"));
   }
+}
+
+// A.1.8 ends a checker_port_item with `= property_actual_arg`, which an event
+// expression, a sequence or a property can be as well as an expression, and
+// §17.2 has a checker declare a formal's default as §16.8 has a sequence
+// declare one. So the default is read as a sequence's or a property's formal's
+// is, and as an expression where it reads as no actual argument, which
+// §16.14.7's inferred-value functions are left to be.
+Expr* Parser::ParseCheckerFormalDefault() {
+  Expr* actual = ParserPropertySpecHelpers::ParseFormalDefault(*this);
+  return actual != nullptr ? actual : ParseExpr();
 }
 
 ModuleDecl* Parser::ParseCheckerDecl() {

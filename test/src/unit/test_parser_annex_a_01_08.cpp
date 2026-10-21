@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
@@ -784,6 +786,103 @@ TEST(CheckerItemsParsing, CheckerGenerateBlockAdmitsCheckerItemsOnly) {
       "endchecker\n");
   EXPECT_TRUE(ReportedError(
       r.diags, "a task declaration is not an item of a checker", 3, "A.1.8"));
+}
+
+// checker_or_generate_item_declaration has no dpi_import_export, which A.1.11
+// reaches only through package_or_generate_item_declaration, and §17.2's list
+// of what a checker body may contain names no DPI declaration either. So an
+// import and an export are each reported at their keyword, and the function
+// between them, which the body admits, is not.
+TEST(CheckerItemsParsing, CheckerDpiImportAndExportRejected) {
+  auto r = Parse(
+      "checker c;\n"
+      "  import \"DPI-C\" function int f();\n"
+      "  function int g(); return 0; endfunction\n"
+      "  export \"DPI-C\" function g;\n"
+      "endchecker\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "a DPI import declaration is not an item of a "
+                            "checker",
+                            2, "A.1.8"));
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "a DPI export declaration is not an item of a "
+                            "checker",
+                            4, "A.1.8"));
+  EXPECT_FALSE(
+      ReportedError(r.diags, "is not an item of a checker", 3, "A.1.8"));
+}
+
+// checker_port_item ends with `= property_actual_arg`, which is a property_expr
+// or a sequence_actual_arg -- an event_expression, a sequence_expr or `$` -- as
+// well as an expression, and §17.2 has a checker declare its defaults as §16.8
+// has a sequence declare them. §16.14.7's $inferred_clock is a default too.
+TEST(CheckerItemsParsing, CheckerFormalDefaultIsAnActualArgument) {
+  auto r = Parse(
+      "checker c(logic a, logic b, sequence s = a ##1 b,\n"
+      "          event e = posedge a, event clk = $inferred_clock,\n"
+      "          int n = 3);\n"
+      "  cover property (@e s);\n"
+      "endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  const auto& ports = r.cu->checkers[0]->ports;
+  ASSERT_EQ(ports.size(), 6u);
+  for (size_t i = 2; i < ports.size(); ++i) {
+    EXPECT_NE(ports[i].default_value, nullptr) << ports[i].name;
+  }
+}
+
+// A formal that takes its type from the one before it has its default read the
+// same way, as a module port that does so has its default read as an
+// expression.
+TEST(CheckerItemsParsing, InheritedTypeFormalDefaultIsAnActualArgument) {
+  auto r = Parse(
+      "checker c(logic a, logic b, sequence s1 = a ##1 b, s2 = b ##2 a);\n"
+      "endchecker\n"
+      "module m(input int x = 1, y = 2);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  ASSERT_EQ(r.cu->checkers[0]->ports.size(), 4u);
+  EXPECT_NE(r.cu->checkers[0]->ports[3].default_value, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  ASSERT_EQ(r.cu->modules[0]->ports.size(), 2u);
+  EXPECT_NE(r.cu->modules[0]->ports[1].default_value, nullptr);
+}
+
+// A checker's generate block admits what its body admits, footnote 6 to
+// checker_generate_item, so a DPI import there is reported as well.
+TEST(CheckerItemsParsing, CheckerGenerateBlockDpiImportRejected) {
+  auto r = Parse(
+      "checker c;\n"
+      "  if (1) begin : g\n"
+      "    import \"DPI-C\" function void f();\n"
+      "  end\n"
+      "endchecker\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "a DPI import declaration is not an item of a "
+                            "checker",
+                            3, "A.1.8"));
+}
+
+// The rule is a checker's: a module body reaches dpi_import_export through
+// module_common_item, and a checker's package import is a data_declaration,
+// which its body admits.
+TEST(CheckerItemsParsing,
+     ModuleDpiDeclarationsAndCheckerPackageImportAccepted) {
+  auto r = Parse(
+      "package p; int v; endpackage\n"
+      "module m;\n"
+      "  import \"DPI-C\" function int f();\n"
+      "  function int g(); return 0; endfunction\n"
+      "  export \"DPI-C\" function g;\n"
+      "endmodule\n"
+      "checker c;\n"
+      "  import p::*;\n"
+      "endchecker\n");
+  EXPECT_FALSE(r.has_errors);
 }
 
 }  // namespace
