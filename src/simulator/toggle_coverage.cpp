@@ -19,6 +19,7 @@
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
 #include "simulator/variable.h"
+#include "simulator/vpi_coverage.h"
 #include "simulator/vpi_design_walk.h"
 
 namespace delta {

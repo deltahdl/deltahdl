@@ -53,14 +53,14 @@ std::uint64_t CollectionEpoch(const std::string& scope,
 // through its handle left it, where its instance's collection has not changed
 // since, and otherwise as its instance's is.
 bool IsCollected(const AssertionTally& tally, CoverageControlState& cov) {
-  const std::string& kScope = tally.instance->scope;
+  const std::string& scope = tally.instance->scope;
   const auto& overrides = cov.Code().assertion_overrides;
   auto found = overrides.find(tally.key);
   if (!tally.key.empty() && found != overrides.end() &&
-      found->second.epoch == CollectionEpoch(kScope, cov)) {
+      found->second.epoch == CollectionEpoch(scope, cov)) {
     return found->second.collecting;
   }
-  return cov.IsCollecting(kScope, kCoverageTypeAssertion);
+  return cov.IsCollecting(scope, kCoverageTypeAssertion);
 }
 
 // The tally `outcome` adds to.
@@ -131,17 +131,17 @@ void AttachAssertionCoverage(const RtlirDesign* design, SimContext& ctx) {
 }
 
 void NoteAssertionOutcome(const Stmt* stmt, const std::string& prefix,
-                          AssertionOutcome outcome, std::uint64_t count,
+                          AssertionOutcomes outcomes,
                           const std::function<std::string()>& key,
                           CoverageControlState& cov) {
   AssertionTally* tally = TallyIn(cov.Code().assertions, stmt, prefix);
-  if (tally == nullptr || count == 0) return;
+  if (tally == nullptr || outcomes.count == 0) return;
   if (tally->key.empty()) tally->key = key();
   CoverageInstanceItems<AssertionTally>& inst = *tally->instance;
   ApplyCoverageResets(inst, kCoverageTypeAssertion, cov, ClearTallies);
   if (!IsCollected(*tally, cov)) return;
   const bool kWasCovered = Covers(tally->counts);
-  TallyFor(tally->counts, outcome) += count;
+  TallyFor(tally->counts, outcomes.outcome) += outcomes.count;
   if (!kWasCovered && Covers(tally->counts)) {
     CountCoveredItem(inst, kCoverageTypeAssertion, cov);
   }

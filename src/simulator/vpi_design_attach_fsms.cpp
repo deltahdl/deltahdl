@@ -62,6 +62,21 @@ VpiObject* StateExpression(const FsmDecl& decl, const std::string& prefix,
   return select;
 }
 
+// §40.5.2: the legal states of the `index`th FSM of `inst`, each a child of
+// `fsm` reading its parameter's value.
+void AttachFsmStates(VpiObject* fsm, InstanceFsms& inst, std::size_t index,
+                     SimContext& ctx, const VpiAttachBuild& build) {
+  CodeCoverage& code = ctx.GetCoverageControlState().Code();
+  for (const auto& [state_name, value] : inst.fsms[index].states) {
+    VpiObject* state = ChildObject(fsm, vpiFsmHandle, state_name, build);
+    state->var = ctx.FindVariable(VpiFlatName(inst.prefix, state_name));
+    if (state->var != nullptr) {
+      state->size = static_cast<int>(state->var->value.width);
+    }
+    code.fsm_handles[state] = {&inst, index, value, nullptr};
+  }
+}
+
 }  // namespace
 
 void AttachFsms(const VpiObjectMap& objects, SimContext& ctx,
@@ -80,14 +95,7 @@ void AttachFsms(const VpiObjectMap& objects, SimContext& ctx,
       code.fsm_handles[fsm] = {
           &inst, i, std::nullopt,
           StateExpression(count.decl, inst.prefix, objects, build)};
-      for (const auto& [state_name, value] : count.states) {
-        VpiObject* state = ChildObject(fsm, vpiFsmHandle, state_name, build);
-        state->var = ctx.FindVariable(VpiFlatName(inst.prefix, state_name));
-        if (state->var != nullptr) {
-          state->size = static_cast<int>(state->var->value.width);
-        }
-        code.fsm_handles[state] = {&inst, i, value, nullptr};
-      }
+      AttachFsmStates(fsm, inst, i, ctx, build);
     }
   }
 }

@@ -35,12 +35,18 @@ enum class AssertionOutcome : std::uint8_t {
   kKilled,
 };
 
-// §40.2.2 with §40.5.2: `count` outcomes of the assertion `stmt` in the
-// instance keyed `prefix`, counted while its coverage is collected; the first
-// nonvacuous success covers it. `key` gives the name the assertion API
-// keeps the assertion under, asked for once.
+// `count` attempts of one assertion that came to `outcome`.
+struct AssertionOutcomes {
+  AssertionOutcome outcome = AssertionOutcome::kAttempt;
+  std::uint64_t count = 1;
+};
+
+// §40.2.2 with §40.5.2: `outcomes` of the assertion `stmt` in the instance
+// keyed `prefix`, counted while its coverage is collected; the first
+// nonvacuous success covers it. `key` gives the name the assertion API keeps
+// the assertion under, asked for once.
 void NoteAssertionOutcome(const Stmt* stmt, const std::string& prefix,
-                          AssertionOutcome outcome, std::uint64_t count,
+                          AssertionOutcomes outcomes,
                           const std::function<std::string()>& key,
                           CoverageControlState& cov);
 

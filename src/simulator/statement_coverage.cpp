@@ -15,6 +15,7 @@
 #include "simulator/coverage_control.h"
 #include "simulator/lowerer_child.h"
 #include "simulator/sim_context.h"
+#include "simulator/vpi_coverage.h"
 #include "simulator/vpi_design_walk.h"
 
 namespace delta {

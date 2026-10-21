@@ -92,7 +92,7 @@ void NoteCoverageHere(const Stmt* stmt, AssertionOutcome outcome,
   CoverageControlState& cov = ctx.GetCoverageControlState();
   if (!cov.Code().assertions.contains(stmt)) return;
   NoteAssertionOutcome(
-      stmt, CoverageInstancePrefix(ctx.ActiveInstancePrefix()), outcome, 1,
+      stmt, CoverageInstancePrefix(ctx.ActiveInstancePrefix()), {outcome, 1},
       [&] { return KeyHere(stmt, ctx); }, cov);
 }
 
@@ -238,8 +238,9 @@ void NoteAttemptDisabled(const Stmt* stmt, uint64_t started, SimContext& ctx) {
 void NoteAttemptsKilled(const Stmt* stmt, const Process& proc,
                         std::size_t killed, SimContext& ctx) {
   NoteAssertionOutcome(
-      stmt, CoverageInstancePrefix(proc.inst_prefix), AssertionOutcome::kKilled,
-      killed, [] { return std::string(); }, ctx.GetCoverageControlState());
+      stmt, CoverageInstancePrefix(proc.inst_prefix),
+      {AssertionOutcome::kKilled, killed}, [] { return std::string(); },
+      ctx.GetCoverageControlState());
 }
 
 void AbortAttemptStartedAt(std::string_view key, uint64_t started,

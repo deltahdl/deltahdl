@@ -234,8 +234,9 @@ TEST(CoverageGetMax, AFailedQueryIsANegativeInteger) {
 }
 
 // §40.3.2.1 with §40.3.2.2: an instance the design elaborates is a scope the
-// queries take by name, offering no coverage until a type is counted for it,
-// while a name the design lacks is still a bad argument (#4662).
+// queries take by name, offering the statements its procedure holds - the
+// block, the three assignments and the $display - in full, while a name the
+// design lacks is still a bad argument (#4662, #7528).
 TEST(CoverageGetMax, AnInstanceOfTheDesignIsAScopeTheQueriesName) {
   SimFixture f;
   const std::string kOut = PreprocessAndCapture(
@@ -252,7 +253,7 @@ TEST(CoverageGetMax, AnInstanceOfTheDesignIsAScopeTheQueriesName) {
       "endmodule\n",
       f);
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_EQ(kOut, "0 -1 0\n");
+  EXPECT_EQ(kOut, "5 -1 1\n");
 }
 
 // §40.3.2.1 Table 40-2: a module definition name reaches every instance of
