@@ -404,3 +404,38 @@ TEST(UserNettypeSim, ResolutionThroughAClassStaticMethod) {
                  f),
       "ff 7 35\n");
 }
+
+// A nettype renaming a package's nettype through the package is that nettype,
+// so a net of it resolves through the package's function: P's pres ANDs the
+// two drivers, 3 & 5 = 1, where the module's own nt, which mres resolves,
+// would OR them to 7 (#7597).
+TEST(UserNettypeSim, RenamedPackageNettypeResolvesThroughThePackagesFunction) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("package P;\n"
+                 "  function automatic logic [3:0] pres(input logic [3:0] "
+                 "d[]);\n"
+                 "    pres = 4'hf;\n"
+                 "    foreach (d[i]) pres = pres & d[i];\n"
+                 "  endfunction\n"
+                 "  nettype logic [3:0] nt with pres;\n"
+                 "endpackage\n"
+                 "module t;\n"
+                 "  function automatic logic [3:0] mres(input logic [3:0] "
+                 "d[]);\n"
+                 "    mres = 0;\n"
+                 "    foreach (d[i]) mres = mres | d[i];\n"
+                 "  endfunction\n"
+                 "  nettype logic [3:0] nt with mres;\n"
+                 "  nettype P::nt pnt;\n"
+                 "  pnt n;\n"
+                 "  assign n = 4'h3;\n"
+                 "  assign n = 4'h5;\n"
+                 "  initial begin\n"
+                 "    #1;\n"
+                 "    $display(\"%0h\", n);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "1\n");
+}

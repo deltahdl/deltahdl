@@ -19,6 +19,7 @@
 #include "elaborator/elaborator_enum_constants.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
+#include "elaborator/nettype_registration.h"
 #include "elaborator/rtlir_scopes.h"
 #include "elaborator/std_package.h"
 #include "elaborator/type_eval.h"
@@ -403,6 +404,24 @@ void ClassifyCuScopeItem(ModuleItem* item, CuScope& scope) {
   }
 }
 
+// Records each class a package declares in the class-name set under its
+// "P::C" key, the name §26.3 reaches it by whether or not the package is
+// imported, as RegisterPackageTypedefs records a package's typedefs. An import
+// gives the class its bare name besides (RegisterImportItem in
+// src/elaborator/elaborator_import.cpp).
+static void RegisterPackageClassNames(
+    const CompilationUnit* unit,
+    std::unordered_set<std::string_view>& class_names, Arena& arena) {
+  for (const auto* pkg : unit->packages) {
+    for (const auto* item : pkg->items) {
+      if (item->kind != ModuleItemKind::kClassDecl || !item->class_decl)
+        continue;
+      class_names.insert(*arena.Create<std::string>(
+          std::string(pkg->name) + "::" + std::string(item->class_decl->name)));
+    }
+  }
+}
+
 // Records each compilation-unit class declaration in the class-name and scope
 // sets, flagging parameterized classes (§8.25).
 void RegisterCuClasses(
@@ -502,6 +521,15 @@ void Elaborator::RegisterCuScopeItems() {
   // registered ahead of the walk that folds the unit's: `parameter int X =
   // p::P` reads the "p.P" key RegisterPackageParams records.
   RegisterPackageTypedefs(unit_, typedefs_, td_array_dims_, arena_);
+  // §6.6.7 with A.2.1.3 and A.2.2.1: a nettype's data type or renamed source
+  // may be written through a package, `nettype P::T n;` or `nettype P::nt
+  // alias;`, and may name a typedef, a class or a nettype P declares, so P's
+  // nettypes and classes are recorded under their "P::" keys as its typedefs
+  // are.
+  RegisterPackageNettypes(
+      unit_, typedefs_,
+      {nettype_names_, nettype_resolve_funcs_, nettype_canonical_}, arena_);
+  RegisterPackageClassNames(unit_, class_names_, arena_);
   MarkPackageStagedArrays(unit_);
   RegisterPackageParams(unit_, cu_param_scope_, arena_);
   for (auto* item : unit_->cu_items) {

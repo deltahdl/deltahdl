@@ -23,6 +23,7 @@
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/interface_port_typedef.h"
 #include "elaborator/net_data_type.h"
+#include "elaborator/nettype_registration.h"
 #include "elaborator/nettype_resolution_lookup.h"
 #include "elaborator/resolution_function_body.h"
 #include "elaborator/rtlir.h"
@@ -689,43 +690,14 @@ void Elaborator::CheckNettypeResolutionFunction(const ModuleItem* item) {
       Subclause("6.6.7"));
 }
 
-// §6.6.7: record the nettype's resolution function and its canonical (source)
-// nettype. A nettype declared with `with f` resolves with f and is its own
-// canonical source; a simple nettype that renames another inherits both that
-// nettype's resolution function and its canonical name, so §6.22.6 matching
-// reduces to comparing canonical names.
-// §6.6.7: the resolution function's name as the with clause wrote it, qualifier
-// included. The bare name alone cannot tell `with C::res` from `with res`, so a
-// net of either nettype carried the same name into the simulator and two
-// nettypes resolving through same-named functions in different scopes were
-// indistinguishable there.
-static std::string_view NettypeResolveFuncName(const ModuleItem* item,
-                                               Arena& arena) {
-  if (item->nettype_resolve_scope == nullptr) return item->nettype_resolve_func;
-  auto* qname =
-      arena.Create<std::string>(NettypeScopeText(*item->nettype_resolve_scope) +
-                                "::" + std::string(item->nettype_resolve_func));
-  return *qname;
-}
-
+// §6.6.7 with §6.22.6: records the nettype's resolution function and the
+// nettype it matches, under its own name, as RegisterNettype in
+// nettype_registration.cpp records a module's, the compilation unit's and a
+// package's nettypes alike.
 void Elaborator::RegisterNettypeResolutionAndCanonical(const ModuleItem* item) {
-  if (!item->nettype_resolve_func.empty()) {
-    nettype_resolve_funcs_[item->name] = NettypeResolveFuncName(item, arena_);
-    nettype_canonical_[item->name] = item->name;
-    return;
-  }
-  if (item->typedef_type.kind != DataTypeKind::kNamed) {
-    nettype_canonical_[item->name] = item->name;
-    return;
-  }
-  auto it = nettype_resolve_funcs_.find(item->typedef_type.type_name);
-  if (it != nettype_resolve_funcs_.end()) {
-    nettype_resolve_funcs_[item->name] = it->second;
-  }
-  auto cit = nettype_canonical_.find(item->typedef_type.type_name);
-  nettype_canonical_[item->name] = (cit != nettype_canonical_.end())
-                                       ? cit->second
-                                       : item->typedef_type.type_name;
+  RegisterNettype(*item, item->name, {},
+                  {nettype_names_, nettype_resolve_funcs_, nettype_canonical_},
+                  arena_);
 }
 
 // §6.22.6 Matching nettypes: a nettype matches itself (and the nettype of nets

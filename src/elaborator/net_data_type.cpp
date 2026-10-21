@@ -1,6 +1,7 @@
 #include "elaborator/net_data_type.h"
 
 #include <array>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -239,15 +240,34 @@ static bool IsLegalNettypeElement(const DataType& type,
   return true;
 }
 
+// The key the named type `type` is recorded under: its own name, or
+// "Scope::name" for one written through a package or a class. That is how
+// RegisterPackageTypedefs and RegisterClassTypedefs record a scope's typedefs,
+// and RegisterPackageNettypes and RegisterPackageClassNames a package's
+// nettypes and classes. §26.3 has such a name reach that scope's declaration
+// and no same-named one elsewhere.
+static std::string NamedTypeKey(const DataType& type) {
+  if (type.scope_name.empty()) return std::string(type.type_name);
+  return std::string(type.scope_name) + "::" + std::string(type.type_name);
+}
+
 bool IsLegalNettypeDataType(const DataType& dtype,
                             const TypeShapeTables& tables) {
-  std::vector<std::string_view> names;
-  const DataType* type = FollowTypedefs(dtype, tables.typedefs, names);
-  for (std::string_view name : names) {
-    if (tables.class_names.count(name) != 0) return false;
+  const DataType* type = &dtype;
+  for (int hops = 0; hops < kMaxTypedefHops; ++hops) {
+    if (type->kind != DataTypeKind::kNamed)
+      return IsLegalNettypeElement(*type, tables);
+    const std::string kKey = NamedTypeKey(*type);
+    if (tables.class_names.count(kKey) != 0) return false;
+    auto dims = tables.typedef_dims.find(kKey);
+    if (dims != tables.typedef_dims.end() &&
+        !AllFixedSize(dims->second, tables))
+      return false;
+    auto it = tables.typedefs.find(kKey);
+    if (it == tables.typedefs.end()) return true;
+    type = &it->second;
   }
-  if (!TypedefDimsAreFixedSize(dtype, tables)) return false;
-  return type == nullptr || IsLegalNettypeElement(*type, tables);
+  return true;
 }
 
 }  // namespace delta

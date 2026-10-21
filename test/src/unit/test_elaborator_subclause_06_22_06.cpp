@@ -104,4 +104,26 @@ TEST(MatchingNettypes, SiblingAliasesOfSameNettypeMatch) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §6.22.6 names the only two ways nettypes match, and a nettype declared over
+// a data type is neither a renaming of that type nor of any other nettype
+// declared over it: foo_t and bar_t are two nettypes, each over the typedef T,
+// so the pass switch joining their nets is reported as §28.8 has it (#7598).
+TEST(MatchingNettypes, NettypesDeclaredOverOneTypedefDoNotMatch) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  typedef logic T;\n"
+      "  nettype T foo_t;\n"
+      "  nettype T bar_t;\n"
+      "  foo_t a;\n"
+      "  bar_t b;\n"
+      "  tran sw(a, b);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot connect different user-defined nettypes "
+                            "('foo_t' and 'bar_t')",
+                            7, "28.8"));
+}
+
 }  // namespace

@@ -568,6 +568,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_scope_rules_names.cpp
     elaborator/elaborator_enum_constants.cpp
     elaborator/elaborator_typedef.cpp
+    elaborator/nettype_registration.cpp
     elaborator/nettype_resolution_lookup.cpp
     elaborator/elaborator_validate_class_array_assign.cpp
     elaborator/elaborator_validate_array_args.cpp

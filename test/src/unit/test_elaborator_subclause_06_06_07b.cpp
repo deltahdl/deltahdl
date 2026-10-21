@@ -7,8 +7,10 @@
 #include <string_view>
 #include <utility>
 
+#include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
+#include "helpers_rtlir_lookup.h"
 
 using namespace delta;
 
@@ -373,6 +375,122 @@ TEST(NettypeElaboration, NettypeNamedAtUnitOrPackageScopeRejected) {
     EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "may declare only a net",
                                line, "6.6.7"));
   }
+}
+
+// --- A nettype's type or source named through a package (§6.6.7) ---
+
+// A.2.2.1 lets a nettype's data type be written through a package, and the
+// name means the type that package declares and no same-named one elsewhere:
+// P's T is a structure of a real, which §6.6.7 admits, though the compilation
+// unit declares a class T, which it would not (#7596).
+TEST(NettypeElaboration, NettypeOfAPackageTypeIsJudgedAsThePackagesType) {
+  ElabFixture f;
+  Elaborate(
+      "class T;\n"
+      "endclass\n"
+      "package P;\n"
+      "  typedef struct { real r; } T;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  nettype P::T n;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// The same reading rejects what the package declares: P's C is a class and
+// P's DA a dynamic array, neither of which §6.6.7 admits, though nothing else
+// in the design is named C or DA (#7596).
+TEST(NettypeElaboration, NettypeOfAPackageClassOrDynamicArrayRejected) {
+  ElabFixture f;
+  Elaborate(
+      "package P;\n"
+      "  class C;\n"
+      "  endclass\n"
+      "  typedef real DA[];\n"
+      "endpackage\n"
+      "module m;\n"
+      "  nettype P::C nc;\n"
+      "  nettype P::DA nd;\n"
+      "endmodule\n",
+      f);
+  for (const auto& [name, line] :
+       {std::pair<std::string_view, int>{"nc", 7}, {"nd", 8}}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              std::format("data type of user-defined nettype "
+                                          "'{}' is not a legal nettype data "
+                                          "type",
+                                          name),
+                              line, "6.6.7"));
+  }
+}
+
+// A.2.1.3's renaming form may name its source through a package, and the new
+// name is that package's nettype: pnt resolves through P's pres, though the
+// module declares an nt of its own resolved by mres, and under §6.22.6 pnt
+// matches P's nt alone, so a pass switch joining a net of pnt to one of the
+// module's nt joins two different nettypes, which §28.8 reports (#7597).
+TEST(NettypeElaboration, NettypeRenamingAPackagesNettypeIsThatNettype) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "package P;\n"
+      "  function automatic logic pres(input logic d[]);\n"
+      "    return d[0] & d[1];\n"
+      "  endfunction\n"
+      "  nettype logic nt with pres;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  function automatic logic mres(input logic d[]);\n"
+      "    return d[0] | d[1];\n"
+      "  endfunction\n"
+      "  nettype logic nt with mres;\n"
+      "  nettype P::nt pnt;\n"
+      "  pnt n;\n"
+      "  nt w;\n"
+      "  tran sw(n, w);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  const RtlirNet* net = FindNet(design, "m", "n");
+  ASSERT_NE(net, nullptr);
+  EXPECT_EQ(net->resolve_func, "P::pres");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot connect different user-defined nettypes "
+                            "('pnt' and 'nt')",
+                            15, "28.8"));
+}
+
+// A package's declarations see each other by their bare names, so P's nt2,
+// renaming P's nt, resolves through P's pres, as a module's nettype renaming
+// nt2 through P does; P's tn, declared over P's typedef T, is a nettype of its
+// own, with no resolution function (#7597).
+TEST(NettypeElaboration, NettypeRenamingWithinAPackageIsReachedThroughIt) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "package P;\n"
+      "  function automatic logic pres(input logic d[]);\n"
+      "    return d[0] & d[1];\n"
+      "  endfunction\n"
+      "  typedef logic T;\n"
+      "  nettype logic nt with pres;\n"
+      "  nettype nt nt2;\n"
+      "  nettype T tn;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  nettype P::nt2 a2;\n"
+      "  nettype P::tn atn;\n"
+      "  a2 n;\n"
+      "  atn w;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  const RtlirNet* n = FindNet(design, "m", "n");
+  ASSERT_NE(n, nullptr);
+  EXPECT_EQ(n->resolve_func, "P::pres");
+  const RtlirNet* w = FindNet(design, "m", "w");
+  ASSERT_NE(w, nullptr);
+  EXPECT_TRUE(w->is_user_nettype);
+  EXPECT_EQ(w->resolve_func, "");
 }
 
 }  // namespace

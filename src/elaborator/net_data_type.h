@@ -72,8 +72,10 @@ void ValidateNetTypedefDims(const DataType& dtype,
 // be a 4-state or 2-state integral type, `real` or `shortreal`, or a fixed-size
 // unpacked array, structure or union each of whose elements is one of these.
 // Judges `dtype` as the type its typedef names stand for, so a typedef of a
-// string or a class is no more legal than the type written out. A name that
-// resolves to nothing in `tables` leaves nothing to judge and is accepted.
+// string or a class is no more legal than the type written out. A name written
+// through a package or a class, `P::T`, stands for what that scope declares.
+// A name that resolves to nothing in `tables` leaves nothing to judge and is
+// accepted.
 bool IsLegalNettypeDataType(const DataType& dtype,
                             const TypeShapeTables& tables);
 
