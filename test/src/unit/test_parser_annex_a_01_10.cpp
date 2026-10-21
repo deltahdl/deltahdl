@@ -886,4 +886,55 @@ TEST(ConstraintItemsParsing, ForeachOverASuperArrayParses) {
   EXPECT_EQ(member->constraint_items[0]->kind, ConstraintItemKind::kForeach);
 }
 
+// disable soft constraint_primary ; and solve_before_list ::=
+// constraint_primary { , constraint_primary }: what stands there is a name with
+// its selects and at most an empty (), never another expression (#7585).
+TEST(ConstraintItemsParsing, NonPrimaryInDisableSoftOrSolveBeforeIsError) {
+  auto r = Parse(
+      "class C;\n"
+      "  rand int x, y;\n"
+      "  rand int a [4];\n"
+      "  constraint c1 { disable soft x + 1; }\n"
+      "  constraint c2 { solve x + y before a[0]; }\n"
+      "  constraint c3 { solve 3 before x; }\n"
+      "  constraint c4 { disable soft a.find(x); }\n"
+      "  constraint c5 { solve x before {x, y}; }\n"
+      "  constraint c6 { disable soft $size(a); }\n"
+      "  constraint c7 { solve x before y; disable soft x; }\n"
+      "endclass\n");
+  EXPECT_TRUE(ReportedError(r.diags, kItemsDoNotParse, 4, "A.1.10"));
+  EXPECT_TRUE(ReportedError(r.diags, kItemsDoNotParse, 5, "A.1.10"));
+  EXPECT_TRUE(ReportedError(r.diags, kItemsDoNotParse, 6, "A.1.10"));
+  EXPECT_TRUE(ReportedError(r.diags, kItemsDoNotParse, 7, "A.1.10"));
+  EXPECT_TRUE(ReportedError(r.diags, kItemsDoNotParse, 8, "A.1.10"));
+  EXPECT_TRUE(ReportedError(r.diags, kItemsDoNotParse, 9, "A.1.10"));
+  EXPECT_FALSE(ReportedError(r.diags, kItemsDoNotParse, 10, "A.1.10"));
+}
+
+// A constraint_primary opens with this., super. or a class scope, reaches a
+// member through '.', takes selects, part selects among them, and may end in
+// an empty () (#7585).
+TEST(ConstraintItemsParsing, PrimaryFormsInDisableSoftAndSolveBeforeParse) {
+  auto r = Parse(
+      "class B;\n"
+      "  rand int z;\n"
+      "endclass\n"
+      "class C extends B;\n"
+      "  rand int x, y;\n"
+      "  rand bit [7:0] a [4];\n"
+      "  rand int q [$];\n"
+      "  constraint c1 { solve this.x, a[1][3:0], C::y before super.z; }\n"
+      "  constraint c2 { disable soft q.size(); disable soft a[0]; }\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 2u);
+  const auto& members = r.cu->classes[1]->members;
+  ASSERT_EQ(members.size(), 6u);
+  ASSERT_TRUE(members[4]->constraint_items_parsed);
+  ASSERT_EQ(members[4]->constraint_items.size(), 1u);
+  EXPECT_EQ(members[4]->constraint_items[0]->exprs.size(), 3u);
+  ASSERT_TRUE(members[5]->constraint_items_parsed);
+  EXPECT_EQ(members[5]->constraint_items.size(), 2u);
+}
+
 }  // namespace

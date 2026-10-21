@@ -14,6 +14,24 @@
 
 namespace delta {
 
+namespace {
+
+// A.1.10: a constraint_primary short of its optional `()`: a name, reached
+// through '.' or '::' from another, with its selects.
+bool IsPrimaryName(const Expr* e) {
+  if (e == nullptr) return false;
+  switch (e->kind) {
+    case ExprKind::kMemberAccess:
+      return IsPrimaryName(e->lhs);
+    case ExprKind::kSelect:
+      return IsPrimaryName(e->base);
+    default:
+      return e->kind == ExprKind::kIdentifier;
+  }
+}
+
+}  // namespace
+
 // A block whose items do not parse, or parse only through a suppressed
 // report, is no constraint_block A.1.10 writes, and is reported where the
 // parse broke off.
@@ -67,7 +85,7 @@ ConstraintItem* ParserConstraintItemHelpers::ParseExpressionItem(Parser& p) {
   } else if (p.Match(TokenKind::kKwDisable)) {
     // §18.5.13.2: disable soft constraint_primary ;
     item->kind = ConstraintItemKind::kDisableSoft;
-    item->expr = p.Match(TokenKind::kKwSoft) ? p.ParseExpr() : nullptr;
+    item->expr = p.Match(TokenKind::kKwSoft) ? ParsePrimary(p) : nullptr;
     parsed = item->expr != nullptr && p.Match(TokenKind::kSemicolon);
   } else {
     item->soft = p.Match(TokenKind::kKwSoft);
@@ -145,8 +163,8 @@ bool ParserConstraintItemHelpers::ParseUnique(Parser& p, ConstraintItem& item) {
 bool ParserConstraintItemHelpers::ParseSolveBefore(Parser& p,
                                                    ConstraintItem& item) {
   item.kind = ConstraintItemKind::kSolveBefore;
-  return ParseExprList(p, item.exprs) && p.Match(TokenKind::kKwBefore) &&
-         ParseExprList(p, item.after) && p.Match(TokenKind::kSemicolon);
+  return ParsePrimaryList(p, item.exprs) && p.Match(TokenKind::kKwBefore) &&
+         ParsePrimaryList(p, item.after) && p.Match(TokenKind::kSemicolon);
 }
 
 // §18.5.5 and §18.5.3: an expression followed by `->` and the constraint_set
@@ -185,13 +203,29 @@ bool ParserConstraintItemHelpers::ParseDistList(Parser& p,
   return p.Match(TokenKind::kRBrace);
 }
 
-// A comma separated list of expressions.
-bool ParserConstraintItemHelpers::ParseExprList(Parser& p,
-                                                std::vector<Expr*>& out) {
+// A.1.10: a constraint_primary, read as an expression and kept only in its
+// shape, a name ending in at most an empty `()`; null otherwise, with the
+// lexer back where the primary began.
+Expr* ParserConstraintItemHelpers::ParsePrimary(Parser& p) {
+  auto saved = p.lexer_.SavePos();
+  Expr* e = p.ParseExpr();
+  const Expr* name = e;
+  if (e != nullptr && e->kind == ExprKind::kCall && e->args.empty() &&
+      e->with_expr == nullptr) {
+    name = e->lhs;
+  }
+  if (IsPrimaryName(name)) return e;
+  p.lexer_.RestorePos(saved);
+  return nullptr;
+}
+
+// A.1.10: a solve_before_list, constraint_primary { , constraint_primary }.
+bool ParserConstraintItemHelpers::ParsePrimaryList(Parser& p,
+                                                   std::vector<Expr*>& out) {
   do {
-    Expr* expr = p.ParseExpr();
-    if (expr == nullptr) return false;
-    out.push_back(expr);
+    Expr* primary = ParsePrimary(p);
+    if (primary == nullptr) return false;
+    out.push_back(primary);
   } while (p.Match(TokenKind::kComma));
   return true;
 }

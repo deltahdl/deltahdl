@@ -28,7 +28,8 @@ struct ParserConstraintItemHelpers {
   static bool ParseSolveBefore(Parser& p, ConstraintItem& item);
   static bool ParseExpressionOrDist(Parser& p, ConstraintItem& item);
   static bool ParseDistList(Parser& p, ConstraintItem& item);
-  static bool ParseExprList(Parser& p, std::vector<Expr*>& out);
+  static Expr* ParsePrimary(Parser& p);
+  static bool ParsePrimaryList(Parser& p, std::vector<Expr*>& out);
 };
 
 }  // namespace delta
