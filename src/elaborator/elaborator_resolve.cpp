@@ -404,22 +404,47 @@ void ClassifyCuScopeItem(ModuleItem* item, CuScope& scope) {
   }
 }
 
+// §3.12.1 with A.2.2.1: `$unit::T` names the compilation unit's own T even
+// where a module declares a T of its own, so a typedef or nettype of the unit
+// is recorded under its "$unit::" key as well, as a package's are under "P::":
+// a typedef by RegisterScopedTypedef, its unpacked dimensions with it, and a
+// nettype by CopyNettype, as the same nettype as its bare name.
+static void RegisterUnitScopedType(
+    const ModuleItem& item, TypedefMap& typedefs,
+    std::unordered_map<std::string_view, std::vector<Expr*>>& td_array_dims,
+    const NettypeTables& nettypes, Arena& arena) {
+  if (item.kind == ModuleItemKind::kTypedef) {
+    std::string_view key = RegisterScopedTypedef(
+        "$unit", item.name, item.typedef_type, typedefs, arena);
+    if (!item.unpacked_dims.empty()) td_array_dims[key] = item.unpacked_dims;
+  } else if (item.kind == ModuleItemKind::kNettypeDecl) {
+    CopyNettype(item.name,
+                *arena.Create<std::string>("$unit::" + std::string(item.name)),
+                typedefs, nettypes);
+  }
+}
+
 // Records each class a package declares in the class-name set under its
 // "P::C" key, the name §26.3 reaches it by whether or not the package is
 // imported, as RegisterPackageTypedefs records a package's typedefs. An import
 // gives the class its bare name besides (RegisterImportItem in
-// src/elaborator/elaborator_import.cpp).
-static void RegisterPackageClassNames(
+// src/elaborator/elaborator_import.cpp). A class of the compilation unit is
+// recorded under "$unit::C", the name §3.12.1 reaches it by where a local
+// declaration hides its bare one.
+static void RegisterScopedClassNames(
     const CompilationUnit* unit,
     std::unordered_set<std::string_view>& class_names, Arena& arena) {
+  auto record = [&](std::string_view scope, std::string_view name) {
+    class_names.insert(*arena.Create<std::string>(std::string(scope) +
+                                                  "::" + std::string(name)));
+  };
   for (const auto* pkg : unit->packages) {
     for (const auto* item : pkg->items) {
-      if (item->kind != ModuleItemKind::kClassDecl || !item->class_decl)
-        continue;
-      class_names.insert(*arena.Create<std::string>(
-          std::string(pkg->name) + "::" + std::string(item->class_decl->name)));
+      if (item->kind == ModuleItemKind::kClassDecl && item->class_decl)
+        record(pkg->name, item->class_decl->name);
     }
   }
+  for (const auto* cls : unit->classes) record("$unit", cls->name);
 }
 
 // Records each compilation-unit class declaration in the class-name and scope
@@ -529,7 +554,7 @@ void Elaborator::RegisterCuScopeItems() {
   RegisterPackageNettypes(
       unit_, typedefs_,
       {nettype_names_, nettype_resolve_funcs_, nettype_canonical_}, arena_);
-  RegisterPackageClassNames(unit_, class_names_, arena_);
+  RegisterScopedClassNames(unit_, class_names_, arena_);
   MarkPackageStagedArrays(unit_);
   RegisterPackageParams(unit_, cu_param_scope_, arena_);
   for (auto* item : unit_->cu_items) {
@@ -550,6 +575,9 @@ void Elaborator::RegisterCuScopeItems() {
       nettype_names_.insert(item->name);
       RegisterNettypeResolutionAndCanonical(item);
     }
+    RegisterUnitScopedType(
+        *item, typedefs_, td_array_dims_,
+        {nettype_names_, nettype_resolve_funcs_, nettype_canonical_}, arena_);
   }
   RegisterCuClasses(unit_, class_names_, cu_scope_names_,
                     parameterized_class_names_);

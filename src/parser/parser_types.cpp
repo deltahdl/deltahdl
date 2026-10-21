@@ -12,6 +12,7 @@
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
 #include "parser/parser.h"
+#include "parser/parser_data_decl_internal.h"
 
 namespace delta {
 
@@ -519,8 +520,11 @@ DataType Parser::ParseDataType() {
     return ParseVirtualInterfaceType();
   }
 
-  bool is_named = Check(TokenKind::kIdentifier) &&
-                  known_types_.count(CurrentToken().text) != 0;
+  // ParseNamedType keeps `$unit` as the outermost scope of a type named
+  // through it.
+  bool is_named = (Check(TokenKind::kIdentifier) &&
+                   known_types_.count(CurrentToken().text) != 0) ||
+                  ParserDataDeclHelpers::AtUnitScopedTypeName(*this);
   if (is_named) {
     auto named = ParseNamedType();
     named.is_const = dtype.is_const;

@@ -42,23 +42,14 @@ struct ImportScope {
 
 // §26.3 with §6.6.7: an imported package nettype is that nettype under its bare
 // name. RegisterPackageNettypes (src/elaborator/nettype_registration.cpp)
-// recorded the nettype under its "P::nt" key, and each of those entries is
-// entered under `name` as well. A net declared with the name is then a net of
-// the package's nettype: it resolves through the package's function and, under
-// §6.22.6, matches the package's nettype, being that nettype.
+// recorded the nettype under its "P::nt" key, and CopyNettype enters it under
+// `name` as well. A net declared with the name is then a net of the package's
+// nettype: it resolves through the package's function and, under §6.22.6,
+// matches the package's nettype, being that nettype.
 void RegisterImportedNettype(std::string_view pkg, std::string_view nettype,
                              std::string_view name, const ImportScope& scope) {
-  const std::string kKey = std::string(pkg) + "::" + std::string(nettype);
-  auto td = scope.typedefs.find(kKey);
-  if (td == scope.typedefs.end()) return;
-  scope.typedefs[name] = td->second;
-  scope.nettypes.names.insert(name);
-  auto fit = scope.nettypes.resolve_funcs.find(kKey);
-  if (fit != scope.nettypes.resolve_funcs.end())
-    scope.nettypes.resolve_funcs[name] = fit->second;
-  auto cit = scope.nettypes.canonical.find(kKey);
-  if (cit != scope.nettypes.canonical.end())
-    scope.nettypes.canonical[name] = cit->second;
+  CopyNettype(std::string(pkg) + "::" + std::string(nettype), name,
+              scope.typedefs, scope.nettypes);
 }
 
 // An imported package parameter, entered in the compilation-unit parameter

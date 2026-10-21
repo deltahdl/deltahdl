@@ -74,6 +74,18 @@ DataDeclQualifiers ParserDataDeclHelpers::ReadQualifiers(Parser& p) {
   return quals;
 }
 
+bool ParserDataDeclHelpers::AtUnitScopedTypeName(Parser& p) {
+  if (!p.Check(TokenKind::kSystemIdentifier) ||
+      p.CurrentToken().text != "$unit")
+    return false;
+  auto saved = p.lexer_.SavePos();
+  p.Consume();
+  bool is_type = p.Match(TokenKind::kColonColon) && p.CheckIdentifier() &&
+                 p.known_types_.count(p.CurrentToken().text) != 0;
+  p.lexer_.RestorePos(saved);
+  return is_type;
+}
+
 bool Parser::IsBlockVarDeclStart() {
   auto saved = lexer_.SavePos();
   while (Check(TokenKind::kAttrStart)) {
@@ -131,6 +143,10 @@ bool Parser::IsBlockVarDeclStartCore() {
     lexer_.RestorePos(saved);
     return is_decl;
   }
+  // `$unit::T v;` declares v of the compilation unit's T, where `$unit::x = 1;`
+  // and `$unit::f();` are statements.
+  if (ParserDataDeclHelpers::AtUnitScopedTypeName(*this))
+    return !IsScopedCallOrAssignStmt();
   if (!Check(TokenKind::kIdentifier)) return false;
   // §17.3: `pkg::chk c(a);` is a checker instantiation, which no
   // data_declaration spells: a declarator takes no port-connection list.

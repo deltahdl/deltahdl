@@ -81,6 +81,18 @@ void RegisterNettype(const ModuleItem& item, std::string_view key,
   if (cit != tables.canonical.end()) tables.canonical[key] = cit->second;
 }
 
+void CopyNettype(std::string_view from, std::string_view to,
+                 TypedefMap& typedefs, const NettypeTables& tables) {
+  auto td = typedefs.find(from);
+  if (td == typedefs.end()) return;
+  typedefs[to] = td->second;
+  tables.names.insert(to);
+  auto fit = tables.resolve_funcs.find(from);
+  if (fit != tables.resolve_funcs.end()) tables.resolve_funcs[to] = fit->second;
+  auto cit = tables.canonical.find(from);
+  if (cit != tables.canonical.end()) tables.canonical[to] = cit->second;
+}
+
 void RegisterPackageNettypes(const CompilationUnit* unit, TypedefMap& typedefs,
                              const NettypeTables& tables, Arena& arena) {
   for (const PackageDecl* pkg : unit->packages) {

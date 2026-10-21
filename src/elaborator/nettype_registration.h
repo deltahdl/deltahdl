@@ -36,6 +36,15 @@ void RegisterNettype(const ModuleItem& item, std::string_view key,
                      std::string_view home, const NettypeTables& tables,
                      Arena& arena);
 
+// Enters the nettype recorded under `from` under `to` as well, with its data
+// type in `typedefs`, its resolution function and its canonical nettype, so
+// that the two names are one nettype, which §6.22.6 matches to itself. An
+// import gives a package's nettype its bare name this way (§26.3), and
+// `$unit ::` reaches a compilation-unit nettype (§3.12.1). Nothing is entered
+// when no nettype is recorded under `from`.
+void CopyNettype(std::string_view from, std::string_view to,
+                 TypedefMap& typedefs, const NettypeTables& tables);
+
 // Records each nettype a package declares under "P::nt" in `tables`, and its
 // data type under the same key in `typedefs`. §26.3 reaches a package's
 // declaration by that name whether or not the package is imported, and

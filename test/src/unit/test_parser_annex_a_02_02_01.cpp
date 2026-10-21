@@ -794,4 +794,56 @@ TEST(NetAndVariableTypeParsing, InterfaceClassTypeInImplementsClause) {
   EXPECT_FALSE(c->implements_types[0].type_params.empty());
 }
 
+// A.2.2.1 lets a data_type open with a package_scope, and A.9.3 makes `$unit
+// ::` one, so a type the compilation unit declares is named through it
+// (§3.12.1) wherever a data_type stands: here a port's, a module item's, a
+// typedef's, a structure member's, a function argument's, a function's and a
+// procedure's local, and a class property's. `$unit` is a system identifier
+// and no type the parser knows, and each declaration is read whole with
+// `$unit` kept as the scope, outermost where a class scope follows it (#7595).
+TEST(NetAndVariableTypeParsing, DataTypeNamedThroughTheUnitScope) {
+  auto r = Parse(
+      "typedef logic [3:0] T;\n"
+      "class C;\n"
+      "  typedef int U;\n"
+      "endclass\n"
+      "module m(input $unit::T p);\n"
+      "  typedef byte T;\n"
+      "  $unit::T a;\n"
+      "  $unit::C::U b;\n"
+      "  typedef $unit::T U2;\n"
+      "  typedef struct { $unit::T f; } S;\n"
+      "  function void fn(input $unit::T x);\n"
+      "    $unit::T v;\n"
+      "    v = x;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    $unit::T w;\n"
+      "    w = a;\n"
+      "  end\n"
+      "endmodule\n"
+      "class D;\n"
+      "  $unit::T q;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  const auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->ports.size(), 1u);
+  EXPECT_EQ(mod->ports[0].data_type.scope_name, "$unit");
+  EXPECT_EQ(mod->ports[0].data_type.type_name, "T");
+  ASSERT_GE(mod->items.size(), 3u);
+  EXPECT_EQ(mod->items[1]->name, "a");
+  EXPECT_EQ(mod->items[1]->data_type.scope_name, "$unit");
+  EXPECT_EQ(mod->items[1]->data_type.type_name, "T");
+  const DataType& b = mod->items[2]->data_type;
+  EXPECT_EQ(mod->items[2]->name, "b");
+  ASSERT_EQ(b.outer_scope_names.size(), 1u);
+  EXPECT_EQ(b.outer_scope_names[0], "$unit");
+  EXPECT_EQ(b.scope_name, "C");
+  EXPECT_EQ(b.type_name, "U");
+  ASSERT_GE(r.cu->classes.size(), 2u);
+  ASSERT_EQ(r.cu->classes[1]->members.size(), 1u);
+  EXPECT_EQ(r.cu->classes[1]->members[0]->data_type.scope_name, "$unit");
+}
+
 }  // namespace

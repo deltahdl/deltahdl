@@ -2,7 +2,15 @@
 
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <format>
+#include <string_view>
+#include <utility>
+
+#include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
+#include "helpers_rtlir_lookup.h"
 
 using namespace delta;
 
@@ -200,6 +208,59 @@ TEST(NetAndVariableTypeElaboration, ConstDeclarationElaborates) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+}
+
+// A.2.2.1's package_scope includes `$unit ::`, through which §3.12.1 names a
+// compilation-unit declaration a local one hides: m's own T is a byte, and
+// `$unit::T a` is the unit's 4-bit T all the same, as `$unit::C::U b` is the
+// int the unit's class C declares (#7595).
+TEST(NetAndVariableTypeElaboration, TypeNamedThroughTheUnitScopeIsTheUnits) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "typedef logic [3:0] T;\n"
+      "class C;\n"
+      "  typedef int U;\n"
+      "endclass\n"
+      "module m;\n"
+      "  typedef byte T;\n"
+      "  $unit::T a;\n"
+      "  $unit::C::U b;\n"
+      "  T c;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  for (const auto& [name, width] :
+       {std::pair<std::string_view, uint32_t>{"a", 4}, {"b", 32}, {"c", 8}}) {
+    const RtlirVariable* var = FindVar(design, "m", name);
+    ASSERT_NE(var, nullptr) << name;
+    EXPECT_EQ(var->width, width) << name;
+  }
+}
+
+// A nettype's data type named through `$unit ::` is judged as the compilation
+// unit's type: §6.6.7 bars a class and a dynamic array from a nettype, and the
+// unit's C and DA are those, whatever a module would name C or DA (#7595).
+TEST(NetAndVariableTypeElaboration, NettypeOfAUnitClassOrDynamicArrayRejected) {
+  ElabFixture f;
+  Elaborate(
+      "class C;\n"
+      "endclass\n"
+      "typedef real DA[];\n"
+      "module m;\n"
+      "  nettype $unit::C nc;\n"
+      "  nettype $unit::DA nd;\n"
+      "endmodule\n",
+      f);
+  for (const auto& [name, line] :
+       {std::pair<std::string_view, int>{"nc", 5}, {"nd", 6}}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              std::format("data type of user-defined nettype "
+                                          "'{}' is not a legal nettype data "
+                                          "type",
+                                          name),
+                              line, "6.6.7"));
+  }
 }
 
 }  // namespace
