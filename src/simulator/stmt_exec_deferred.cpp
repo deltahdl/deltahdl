@@ -101,24 +101,25 @@ static void RunDeferredActionWithSnapshots(const Stmt* action,
 }
 
 // §16.4.4: reports whether a pending deferred report has been individually
-// cancelled by a `disable <assertion_label>` statement in its process (see
+// cancelled by a `disable <assertion_label>` statement in `proc` (see
 // Process::cancelled_deferred_labels). An unlabeled assertion cannot be named
 // by a disable, so an empty label is never cancelled.
-static bool DeferredReportCancelled(const Process* proc,
-                                    const std::string& label) {
-  return proc && !label.empty() &&
-         proc->cancelled_deferred_labels.count(label) != 0;
+static bool DeferredReportCancelled(const Process& proc,
+                                    std::string_view label) {
+  return !label.empty() &&
+         proc.cancelled_deferred_labels.count(std::string(label)) != 0;
 }
 
-// §16.4 with §20.11 and §39.5.3: whether the report `proc` queued for
-// `stmt` under the generation `gen`, numbered `number`, has been flushed: by
-// a flush point of the process, which bumped the generation, or by a Kill
-// selecting the assertion since the report was queued.
-static bool DeferredReportFlushed(const Process* proc, uint64_t gen,
+// §16.4 with §20.11 and §39.5.3: whether the report `proc` queued for `stmt`
+// under the generation `gen`, numbered `number`, is no longer to run: flushed
+// by a flush point of the process, which bumped the generation, or by a Kill
+// selecting the assertion since the report was queued, or cancelled.
+static bool DeferredReportDropped(const Process* proc, uint64_t gen,
                                   const Stmt* stmt, uint64_t number) {
   if (proc == nullptr) return false;
   return proc->deferred_report_generation != gen ||
-         number <= proc->queued_deferred_reports.at(stmt).flushed_through;
+         number <= proc->queued_deferred_reports.at(stmt).flushed_through ||
+         DeferredReportCancelled(*proc, stmt->label);
 }
 
 // §16.4.1 and §16.4.2: queues one pending report of the deferred assertion
@@ -142,12 +143,9 @@ static void SchedulePendingReport(const Stmt* stmt, SimContext& ctx,
     number = ++scope.proc->deferred_reports_queued;
     scope.proc->queued_deferred_reports[stmt].latest = number;
   }
-  std::string label(stmt->label);
   auto* ev = ctx.GetScheduler().GetEventPool().Acquire();
-  ev->callback = [scope, gen, stmt, number, label, run = std::move(run),
-                  &ctx]() {
-    if (DeferredReportFlushed(scope.proc, gen, stmt, number)) return;
-    if (DeferredReportCancelled(scope.proc, label)) return;
+  ev->callback = [scope, gen, stmt, number, run = std::move(run), &ctx]() {
+    if (DeferredReportDropped(scope.proc, gen, stmt, number)) return;
     PendingReportScope saved;
     scope.Install(ctx, saved);
     run();

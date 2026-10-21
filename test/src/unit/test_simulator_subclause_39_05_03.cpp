@@ -235,16 +235,18 @@ TEST_F(DeferredAssertionQueueThroughVpiControl, TheSystemControlsDivideAlike) {
 // and a control reaches them through the handle the design's assertion has.
 // -----------------------------------------------------------------------------
 
-// A deferred assertion a1 that fails once, its fail action a subroutine call
-// counting the failure, the design calling $arm after it has executed and
-// before its report matures in the Reactive region.
+// Two deferred assertions, a1 and a2, that fail once each, their fail actions
+// subroutine calls counting the failures, the design calling $arm after both
+// have executed and before their reports mature in the Reactive region.
 constexpr const char* kDeferredFailing =
     "module top;\n"
     "  logic x = 0;\n"
-    "  int failed = 0;\n"
-    "  function void fail(); failed++; endfunction\n"
+    "  int failed1 = 0, failed2 = 0;\n"
+    "  function void fail1(); failed1++; endfunction\n"
+    "  function void fail2(); failed2++; endfunction\n"
     "  initial begin\n"
-    "    a1: assert #0 (x) else fail();\n"
+    "    a1: assert #0 (x) else fail1();\n"
+    "    a2: assert #0 (x) else fail2();\n"
     "    $arm;\n"
     "  end\n"
     "endmodule\n";
@@ -261,12 +263,14 @@ std::function<void()> Control(int operation, const char* full_name) {
 }
 
 // §39.5.3: vpiAssertionReset discards the deferred assertion's attempts, and
-// with them the report its failure queued, which never matures (#7514).
+// with them the report its failure queued, which never matures; the report
+// the assertion beside it queued in the same process matures (#7514).
 TEST_F(AssertionRun, ResetFlushesADeferredAssertionsQueuedReport) {
   ArmInTurn({Control(vpiAssertionReset, "top.a1")});
   Run(kDeferredFailing);
 
-  EXPECT_EQ(IntOf("top.failed"), 0);
+  EXPECT_EQ(IntOf("top.failed1"), 0);
+  EXPECT_EQ(IntOf("top.failed2"), 1);
 }
 
 // §39.5.3: vpiAssertionSysKill discards every attempt in progress, the
@@ -275,7 +279,8 @@ TEST_F(AssertionRun, SysKillFlushesADeferredAssertionsQueuedReport) {
   ArmInTurn({Control(vpiAssertionSysKill, nullptr)});
   Run(kDeferredFailing);
 
-  EXPECT_EQ(IntOf("top.failed"), 0);
+  EXPECT_EQ(IntOf("top.failed1"), 0);
+  EXPECT_EQ(IntOf("top.failed2"), 0);
 }
 
 // §39.5.3: vpiAssertionDisable leaves the attempts in progress, so the report
@@ -284,18 +289,20 @@ TEST_F(AssertionRun, DisableLeavesADeferredAssertionsQueuedReport) {
   ArmInTurn({Control(vpiAssertionDisable, "top.a1")});
   Run(kDeferredFailing);
 
-  EXPECT_EQ(IntOf("top.failed"), 1);
+  EXPECT_EQ(IntOf("top.failed1"), 1);
+  EXPECT_EQ(IntOf("top.failed2"), 1);
 }
 
-// A procedural concurrent assertion c1 that fails at each of two clock ticks,
-// the procedure calling $arm after queuing each instance, before it matures in
-// the Observed region.
+// Two procedural concurrent assertions, c1 and c2, that fail at each of two
+// clock ticks, the procedure calling $arm after queuing their instances,
+// before they mature in the Observed region.
 constexpr const char* kProceduralFailing =
     "module top;\n"
     "  logic clk = 0, a = 0;\n"
-    "  int failed = 0;\n"
+    "  int failed1 = 0, failed2 = 0;\n"
     "  always @(posedge clk) begin\n"
-    "    c1: assert property (a) else failed++;\n"
+    "    c1: assert property (a) else failed1++;\n"
+    "    c2: assert property (a) else failed2++;\n"
     "    $arm;\n"
     "  end\n"
     "  initial begin\n"
@@ -307,19 +314,22 @@ constexpr const char* kProceduralFailing =
 
 // §39.5.3: vpiAssertionReset flushes the procedural assertion's pending
 // instance, which begins no attempt; the instance the procedure queues at the
-// next tick fails as before (#7514).
+// next tick fails as before, and so does each of the assertion's beside it
+// in the same procedure (#7514).
 TEST_F(AssertionRun, ResetFlushesAProceduralAssertionsPendingInstance) {
   ArmInTurn({Control(vpiAssertionReset, "top.c1")});
   Run(kProceduralFailing);
 
-  EXPECT_EQ(IntOf("top.failed"), 1);
+  EXPECT_EQ(IntOf("top.failed1"), 1);
+  EXPECT_EQ(IntOf("top.failed2"), 2);
 }
 
-// With no control both instances begin attempts that fail.
+// With no control every instance begins an attempt that fails.
 TEST_F(AssertionRun, WithNoControlEachPendingInstanceFails) {
   Run(kProceduralFailing);
 
-  EXPECT_EQ(IntOf("top.failed"), 2);
+  EXPECT_EQ(IntOf("top.failed1"), 2);
+  EXPECT_EQ(IntOf("top.failed2"), 2);
 }
 
 }  // namespace
