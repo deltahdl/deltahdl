@@ -367,4 +367,91 @@ TEST(CoverageNomenclature, ADeferredAssertionsActionCountsAsExecuted) {
   EXPECT_EQ(kOut, "7 6 1\n");
 }
 
+// §40.3.2.1 `SV_COV_RESET over FSM state and transition coverage: what was
+// reached and moved before it is forgotten, so the state `sa` still holds
+// counts as reached again when its FSM is next looked at, as `sb` moves -
+// two states reached and one move made since.
+TEST(CoverageNomenclature, AResetFsmCountsTheStateItHoldsAsReached) {
+  SimFixture f;
+  const std::string kOut = RunCapture(
+      "module top;\n"
+      "  parameter [1:0] /* tool enum a_e */ A0 = 0, A1 = 1;\n"
+      "  /* tool state_vector sa enum a_e */\n"
+      "  logic [1:0] sa;\n"
+      "  parameter [1:0] /* tool enum b_e */ B0 = 0, B1 = 1;\n"
+      "  /* tool state_vector sb enum b_e */\n"
+      "  logic [1:0] sb;\n"
+      "  int r1, r2;\n"
+      "  initial begin\n"
+      "    sa = A0; sb = B0; #1 sa = A1;\n"
+      "    #1 r1 = $coverage_control(2, 21, 10, \"top\");\n"
+      "    r2 = $coverage_control(2, 24, 10, \"top\");\n"
+      "    sb = B1;\n"
+      "    #1 $display(\"%0d %0d %0d %0d\", r1, r2,\n"
+      "                $coverage_get(21, 10, \"top\"),\n"
+      "                $coverage_get(24, 10, \"top\"));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(kOut, "1 1 2 1\n");
+}
+
+// §40.3.2.1 `SV_COV_STOP over transition coverage alone: the move the FSM
+// makes after it is not counted, while the state it enters still is.
+TEST(CoverageNomenclature, AStoppedScopeCountsNoFurtherMoves) {
+  SimFixture f;
+  const std::string kOut = RunCapture(
+      "module top;\n"
+      "  parameter [1:0] /* tool enum fsm_e */ IDLE = 0, RUN = 1;\n"
+      "  /* tool state_vector st enum fsm_e */\n"
+      "  logic [1:0] st;\n"
+      "  int r;\n"
+      "  initial begin\n"
+      "    st = IDLE; #1 r = $coverage_control(1, 24, 10, \"top\");\n"
+      "    st = RUN; #1\n"
+      "    $display(\"%0d %0d\", $coverage_get(24, 10, \"top\"),\n"
+      "             $coverage_get(21, 10, \"top\"));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(kOut, "0 2\n");
+}
+
+// §40.4.6: a legal state is a value a state parameter holds, and one with an
+// x bit holds none a state can equal, so the FSM has one legal state, not two.
+TEST(CoverageNomenclature, AStateParameterHoldingXIsNoLegalState) {
+  SimFixture f;
+  const std::string kOut = RunCapture(
+      "module top;\n"
+      "  parameter [1:0] /* tool enum fsm_e */ IDLE = 0, BAD = 2'bx;\n"
+      "  /* tool state_vector st enum fsm_e */\n"
+      "  logic [1:0] st;\n"
+      "  initial $display(\"%0d\", $coverage_get_max(21, 10, \"top\"));\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(kOut, "1\n");
+}
+
+// §40.3.2.1 `SV_COV_STOP over toggle coverage: the bits that move to 1 after
+// it, having held 0 before it, are not counted as having held both values.
+TEST(CoverageNomenclature, AStoppedScopeCountsNoFurtherToggles) {
+  SimFixture f;
+  const std::string kOut = RunCapture(
+      "module top;\n"
+      "  logic [1:0] v;\n"
+      "  int r;\n"
+      "  initial begin\n"
+      "    v = 2'b00; #1 r = $coverage_control(1, 23, 10, \"top\");\n"
+      "    v = 2'b11;\n"
+      "    #1 $display(\"%0d %0d\", r, $coverage_get(23, 10, \"top\"));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(kOut, "1 0\n");
+}
+
 }  // namespace

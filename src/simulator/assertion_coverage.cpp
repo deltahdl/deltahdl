@@ -134,7 +134,7 @@ void NoteAssertionOutcome(const Stmt* stmt, const std::string& prefix,
                           const std::function<std::string()>& key,
                           CoverageControlState& cov) {
   AssertionTally* tally = TallyIn(cov.Code().assertions, stmt, prefix);
-  if (tally == nullptr || outcomes.count == 0) return;
+  if (tally == nullptr) return;
   if (tally->key.empty()) tally->key = key();
   CoverageInstanceItems<AssertionTally>& inst = *tally->instance;
   ApplyCoverageResets(inst, kCoverageTypeAssertion, cov, ClearTallies);
@@ -164,9 +164,7 @@ CoverageStatus ControlAssertionCoverage(CoverageControl control,
   const CoverageStatus kOffered =
       cov.Control(CoverageControl::kCheck, kCoverageTypeAssertion, scope,
                   /*include_below=*/false);
-  if (kOffered != CoverageStatus::kOk && kOffered != CoverageStatus::kPartial) {
-    return kOffered;
-  }
+  if (kOffered != CoverageStatus::kOk) return kOffered;
   CodeCoverage& code = cov.Code();
   if (control == CoverageControl::kStart || control == CoverageControl::kStop) {
     code.assertion_overrides[key] = {control == CoverageControl::kStart,

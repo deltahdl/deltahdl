@@ -43,15 +43,17 @@ std::optional<uint64_t> StateOf(const FsmCount& fsm) {
   for (const Variable* signal : fsm.signals) {
     const std::optional<uint64_t> kValue = KnownValue(*signal);
     if (!kValue) return std::nullopt;
+    // Shifted in two halves, so that a signal of 64 bits shifts the state
+    // held so far out whole rather than by an undefined amount.
     const uint32_t kWidth = std::min<uint32_t>(signal->value.width, 64);
-    state = kWidth >= 64 ? *kValue : (state << kWidth) | *kValue;
+    state = ((state << (kWidth / 2)) << (kWidth - (kWidth / 2))) | *kValue;
   }
   if (!fsm.select) return state;
-  const int64_t kLow = fsm.select->first;
-  const int64_t kSpan = fsm.select->second - kLow + 1;
-  const uint64_t kMask =
-      kSpan >= 64 ? ~uint64_t{0} : (uint64_t{1} << kSpan) - 1;
-  return kLow >= 64 ? 0 : (state >> kLow) & kMask;
+  const int64_t kLow = std::min<int64_t>(fsm.select->first, 64);
+  const int64_t kSpan =
+      std::min<int64_t>(fsm.select->second - fsm.select->first + 1, 64);
+  const uint64_t kMask = ~uint64_t{0} >> (64 - kSpan);
+  return ((state >> (kLow / 2)) >> (kLow - (kLow / 2))) & kMask;
 }
 
 // §40.4.6: whether `state` is one of the legal states of `fsm`.
@@ -120,9 +122,8 @@ std::vector<std::pair<std::string_view, uint64_t>> LegalStates(
     const FsmDecl& decl, const std::string& prefix, SimContext& ctx) {
   std::vector<std::pair<std::string_view, uint64_t>> states;
   for (std::string_view state : decl.states) {
-    const Variable* param = ctx.FindVariable(VpiFlatName(prefix, state));
     const std::optional<uint64_t> kValue =
-        param != nullptr ? KnownValue(*param) : std::nullopt;
+        KnownValue(*ctx.FindVariable(VpiFlatName(prefix, state)));
     if (kValue) states.emplace_back(state, *kValue);
   }
   return states;

@@ -16,7 +16,6 @@
 #include "simulator/code_coverage_items.h"
 #include "simulator/coverage_control.h"
 #include "simulator/lowerer_child.h"
-#include "simulator/net.h"
 #include "simulator/sim_context.h"
 #include "simulator/variable.h"
 #include "simulator/vpi_coverage.h"
@@ -87,8 +86,7 @@ void Observe(ToggleSignal& signal) {
 // event, class handle or virtual interface does.
 bool HasToggleBits(const Variable* var, SimContext& ctx) {
   if (var == nullptr || var->is_real || var->is_string || var->is_event ||
-      var->is_virtual_interface || var->value.width == 0 ||
-      var->value.words == nullptr) {
+      var->is_virtual_interface || var->value.width == 0) {
     return false;
   }
   const DataType* type = var->declared_type;
@@ -100,10 +98,8 @@ bool HasToggleBits(const Variable* var, SimContext& ctx) {
 // it has none to count, an unpacked aggregate's elements being kept apart.
 Variable* SignalNamed(const std::string& prefix, std::string_view name,
                       SimContext& ctx) {
-  const std::string kFlat = VpiFlatName(prefix, name);
-  if (Variable* var = ctx.FindVariable(kFlat)) return var;
-  Net* net = ctx.FindNet(kFlat);
-  return net != nullptr ? net->resolved : nullptr;
+  // A net's storage is registered under its name as a variable's is.
+  return ctx.FindVariable(VpiFlatName(prefix, name));
 }
 
 // The signals of the instance of `mod` keyed `prefix` that hold toggling
@@ -121,16 +117,13 @@ std::vector<Variable*> InstanceSignals(const RtlirModule& mod,
   };
   for (const RtlirNet& net : mod.nets) add(net.name);
   for (const RtlirVariable& var : mod.variables) {
-    if (!var.is_enum_constant && var.num_unpacked_dims == 0 &&
-        !var.is_dynamic && !var.is_queue) {
-      add(var.name);
-    }
+    if (!var.is_enum_constant && var.num_unpacked_dims == 0) add(var.name);
   }
   return signals;
 }
 
-// The record of `var`'s bits for the instance `inst`, chained after the one
-// another instance keeps of the same variable.
+// The record of `var`'s bits for the instance `inst`, chained right after the
+// first one another instance keeps of the same variable.
 ToggleSignal& AddSignal(Variable* var,
                         CoverageInstanceItems<ToggleSignal>& inst,
                         CoverageControlState& cov) {
@@ -147,9 +140,8 @@ ToggleSignal& AddSignal(Variable* var,
   if (added) {
     var->toggle = &signal;
   } else {
-    ToggleSignal* tail = first->second;
-    while (tail->next != nullptr) tail = tail->next;
-    tail->next = &signal;
+    signal.next = first->second->next;
+    first->second->next = &signal;
   }
   inst.items.push_back(&signal);
   return signal;
@@ -191,9 +183,7 @@ EntityCoverage SignalToggleCoverage(const Variable* var,
                                     const std::string& scope,
                                     CoverageControlState& cov) {
   CodeCoverage& code = cov.Code();
-  auto found = code.toggles.find(var);
-  if (found == code.toggles.end()) return {};
-  ToggleSignal* signal = found->second;
+  ToggleSignal* signal = code.toggles.at(var);
   for (ToggleSignal* each = signal; each != nullptr; each = each->next) {
     if (each->instance->scope == scope) signal = each;
   }

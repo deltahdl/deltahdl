@@ -16,8 +16,8 @@
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_model_helpers1.h"
+#include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
-#include "simulator/vpi_user.h"
 
 namespace delta {
 
@@ -90,9 +90,7 @@ const VpiStmtObjects::key_type* StatementOf(const VpiObject* obj,
 // toggles of, rather than of a bit or a part of one.
 bool IsCountedSignal(const VpiObject* obj, const CodeCoverage& code) {
   return obj->var != nullptr && code.toggles.contains(obj->var) &&
-         obj->type != vpiRegBit && obj->type != vpiNetBit &&
-         obj->type != vpiVarSelect && obj->type != vpiPartSelect &&
-         obj->type != vpiIndexedPartSelect;
+         !VpiIsBitObjectType(obj->type);
 }
 
 // The hierarchical name of the instance `obj` is in; empty where it is in

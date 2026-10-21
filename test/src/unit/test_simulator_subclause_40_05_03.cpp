@@ -255,6 +255,15 @@ PLI_INT32 StopFirstCalltf(PLI_BYTE8* /*user_data*/) {
   return 0;
 }
 
+// Registers $stop_first, which runs StopFirstCalltf.
+bool RegisterStopFirst() {
+  s_vpi_systf_data data = {};
+  data.type = vpiSysTask;
+  data.tfname = VpiText("$stop_first");
+  data.calltf = &StopFirstCalltf;
+  return vpi_register_systf(&data) != nullptr;
+}
+
 using AssertionControlRun = VpiDesignRun;
 
 // C1: §40.5.3 controls assertion coverage one assertion at a time through its
@@ -265,11 +274,7 @@ using AssertionControlRun = VpiDesignRun;
 // assertion handle, and a reset through it clears that assertion's coverage,
 // which the instance then counts no more (#7540).
 TEST_F(AssertionControlRun, AnAssertionHandleControlsThatAssertionAlone) {
-  s_vpi_systf_data data = {};
-  data.type = vpiSysTask;
-  data.tfname = VpiText("$stop_first");
-  data.calltf = &StopFirstCalltf;
-  ASSERT_NE(vpi_register_systf(&data), nullptr);
+  ASSERT_TRUE(RegisterStopFirst());
   Run("module top;\n"
       "  logic clk = 0, a = 1;\n"
       "  first: assert property (@(posedge clk) a);\n"
@@ -304,6 +309,32 @@ TEST_F(AssertionControlRun, AnAssertionHandleControlsThatAssertionAlone) {
   EXPECT_EQ(
       vpi_get(vpiAssertCoverage, vpi_handle_by_name(VpiText("top"), nullptr)),
       0);
+}
+
+// C1 with §40.3.2.1: a stop through an assertion's handle holds until its
+// instance's own collection is next stopped or started, so once the design
+// stops and starts the whole instance, `first` gathers coverage again; a
+// start through its handle is answered `SV_COV_OK (#7540).
+TEST_F(AssertionControlRun, AnInstanceControlEndsAnAssertionsOwnStop) {
+  ASSERT_TRUE(RegisterStopFirst());
+  Run("module top;\n"
+      "  logic clk = 0, a = 1;\n"
+      "  int r;\n"
+      "  first: assert property (@(posedge clk) a);\n"
+      "  initial begin\n"
+      "    $stop_first;\n"
+      "    r = $coverage_control(1, 20, 10, \"top\");\n"
+      "    r = $coverage_control(0, 20, 10, \"top\");\n"
+      "    #1 clk = 1; #1 clk = 0;\n"
+      "  end\n"
+      "endmodule\n");
+  vpiHandle first = TopAssertion("first");
+  ASSERT_NE(first, nullptr);
+
+  EXPECT_EQ(g_stop_status, static_cast<int>(CoverageStatus::kOk));
+  EXPECT_EQ(vpi_get(vpiCovered, first), 1);
+  EXPECT_EQ(vpi_control(vpiCoverageStart, vpiAssertCoverage, first),
+            static_cast<int>(CoverageStatus::kOk));
 }
 
 // C1: an assertion's coverage is collected as part of its instance's, so an

@@ -168,7 +168,7 @@ Tally* TallyIn(const std::unordered_map<const Stmt*, std::vector<Tally*>>& map,
 }
 
 // The instance key a running process names its instance by, without the
-// trailing dot it carries.
+// trailing dot it carries wherever it is not empty.
 std::string CoverageInstancePrefix(std::string prefix);
 
 // §40.2.2: arm the collection of statement, toggle, FSM and assertion

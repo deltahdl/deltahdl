@@ -10,7 +10,7 @@
 namespace delta {
 
 std::string CoverageInstancePrefix(std::string prefix) {
-  if (!prefix.empty() && prefix.back() == '.') prefix.pop_back();
+  if (!prefix.empty()) prefix.pop_back();
   return prefix;
 }
 

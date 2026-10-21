@@ -254,13 +254,15 @@ constexpr const char* kFsmDesign =
 // §40.5.2 on an assertion handle: an assertion that held at every attempt is
 // covered, its successes counted, one that failed at every attempt is not,
 // its failures counted, and one whose clock never ticked has no tally at all;
-// each is one coverable entity (#7532).
+// one whose antecedent never held succeeded vacuously at every attempt, which
+// covers nothing; each is one coverable entity (#7532).
 TEST_F(ItemCoverageRun, AnAssertionHandleReadsItsOwnTallies) {
   Run("module top;\n"
       "  logic clk = 0, a = 1, b = 0, never = 0;\n"
       "  ok: assert property (@(posedge clk) a);\n"
       "  idle: assert property (@(posedge never) a);\n"
       "  bad: assert property (@(posedge clk) b) else $display(\"bad\");\n"
+      "  vac: assert property (@(posedge clk) b |-> a);\n"
       "  initial begin\n"
       "    #1 clk = 1; #1 clk = 0; #1 clk = 1; #1 clk = 0;\n"
       "  end\n"
@@ -277,6 +279,9 @@ TEST_F(ItemCoverageRun, AnAssertionHandleReadsItsOwnTallies) {
   EXPECT_EQ(vpi_get(vpiCovered, ok), 1);
   EXPECT_EQ(vpi_get(vpiCoveredCount, ok), kAttempts);
   EXPECT_EQ(vpi_get(vpiCoveredMax, ok), 1);
+  EXPECT_EQ(vpi_get(vpiAssertVacuousSuccessCovered, ok), 0);
+  EXPECT_EQ(vpi_get(vpiAssertDisableCovered, ok), 0);
+  EXPECT_EQ(vpi_get(vpiAssertKillCovered, ok), 0);
 
   EXPECT_EQ(vpi_get(vpiAssertFailureCovered, bad), kAttempts);
   EXPECT_EQ(vpi_get(vpiAssertSuccessCovered, bad), 0);
@@ -287,6 +292,11 @@ TEST_F(ItemCoverageRun, AnAssertionHandleReadsItsOwnTallies) {
   ASSERT_NE(idle, nullptr);
   EXPECT_EQ(vpi_get(vpiAssertAttemptCovered, idle), 0);
   EXPECT_EQ(vpi_get(vpiCovered, idle), 0);
+
+  vpiHandle vac = Named(vpiAssertion, By("top"), "vac");
+  ASSERT_NE(vac, nullptr);
+  EXPECT_EQ(vpi_get(vpiAssertVacuousSuccessCovered, vac), kAttempts);
+  EXPECT_EQ(vpi_get(vpiCovered, vac), 0);
 }
 
 // §40.5.2 on a statement handle: a block stands for the statements it holds,
@@ -314,6 +324,25 @@ TEST_F(ItemCoverageRun, AStatementHandleCountsTheStatementsItHolds) {
   EXPECT_EQ(vpi_get(vpiCovered, kStmts[1]), 1);
 }
 
+// §40.5.2 on a statement handle: a fork, as a block does, stands for the
+// statements it holds, both of which ran.
+TEST_F(ItemCoverageRun, AForkHandleCountsTheStatementsItHolds) {
+  Run("module top;\n"
+      "  int x, y;\n"
+      "  initial fork\n"
+      "    x = 1;\n"
+      "    y = 2;\n"
+      "  join\n"
+      "endmodule\n");
+  const std::vector<vpiHandle> kProcs = ObjectsOf(vpiProcess, By("top"));
+  ASSERT_EQ(kProcs.size(), 1u);
+  vpiHandle fork = vpi_handle(vpiStmt, kProcs.front());
+  ASSERT_NE(fork, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, fork), vpiFork);
+  EXPECT_EQ(vpi_get(vpiCoveredMax, fork), 2);
+  EXPECT_EQ(vpi_get(vpiCovered, fork), 2);
+}
+
 // §40.5.2 on a signal handle: a signal stands for its bits, a bit covered once
 // it has held both values, and its covered count is the toggles of its bits
 // summed - bit 0 moved once and bit 1 twice (#7534).
@@ -331,12 +360,53 @@ TEST_F(ItemCoverageRun, ASignalHandleCountsItsBitsAndTheirToggles) {
   EXPECT_EQ(vpi_get(vpiCoveredCount, v), 3);
 }
 
+// §40.5.2: a signal's bits are counted as its own, so a bit of a variable or
+// of a net is no item of its own and answers no coverage, while the signal
+// holding it does.
+TEST_F(ItemCoverageRun, ABitHandleAnswersNoCoverage) {
+  Run("module top;\n"
+      "  logic [1:0] v;\n"
+      "  wire [1:0] w = v;\n"
+      "  initial begin\n"
+      "    v = 2'b00; #1 v = 2'b11;\n"
+      "  end\n"
+      "endmodule\n");
+  vpiHandle v = By("top.v");
+  vpiHandle w = By("top.w");
+  ASSERT_NE(v, nullptr);
+  ASSERT_NE(w, nullptr);
+  EXPECT_EQ(vpi_get(vpiCovered, v), 2);
+  EXPECT_EQ(vpi_get(vpiCovered, w), 2);
+  vpiHandle v_bit = vpi_handle_by_index(v, 0);
+  vpiHandle w_bit = vpi_handle_by_index(w, 0);
+  ASSERT_NE(v_bit, nullptr);
+  ASSERT_NE(w_bit, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, v_bit), vpiRegBit);
+  EXPECT_EQ(vpi_get(vpiType, w_bit), vpiNetBit);
+  EXPECT_EQ(vpi_get(vpiCoveredMax, v_bit), 0);
+  EXPECT_EQ(vpi_get(vpiCoveredMax, w_bit), 0);
+}
+
 // §40.5.2: vpi_iterate(vpiFsm, instance) reaches the FSMs of the instance,
 // each named by its state signal where no fsm_name is written (#7535).
 TEST_F(ItemCoverageRun, AnInstanceReachesItsFsms) {
   Run(kFsmDesign);
   EXPECT_EQ(NamesOf(vpiFsm, By("top")), std::vector<std::string>{"st"});
   EXPECT_EQ(KindsOf(vpiFsm, By("top")), std::vector<int>{vpiFsm});
+}
+
+// §40.5.2: an instance below the top reaches the FSMs its module declares
+// just as the top does.
+TEST_F(ItemCoverageRun, AnInstanceBelowTheTopReachesItsFsms) {
+  Run("module leaf;\n"
+      "  parameter [1:0] /* tool enum fsm_e */ IDLE = 0, RUN = 1;\n"
+      "  /* tool state_vector st enum fsm_e */\n"
+      "  logic [1:0] st;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  leaf u();\n"
+      "endmodule\n");
+  EXPECT_EQ(NamesOf(vpiFsm, By("top.u")), std::vector<std::string>{"st"});
 }
 
 // §40.5.2: vpi_handle(vpiFsmStateExpression, fsm) reaches the signal holding
@@ -431,13 +501,15 @@ TEST_F(ItemCoverageRun, FsmAndStateHandlesReadTheStatesReached) {
 
 // §40.5.2: the assertion-specific properties are an assertion handle's alone,
 // and an instance handle is no single coverable item, so neither an FSM's nor
-// the instance's answers through them; vpi_get() falls back to 0 (#7539).
+// the instance's answers through them; vpi_get() falls back to 0, and an
+// instance, holding no state, reaches no state expression (#7539).
 TEST_F(ItemCoverageRun, OnlyItemHandlesAnswerItemCoverage) {
   Run(kFsmDesign);
   vpiHandle fsm = Named(vpiFsm, By("top"), "st");
   ASSERT_NE(fsm, nullptr);
   EXPECT_EQ(vpi_get(vpiAssertAttemptCovered, fsm), 0);
   EXPECT_EQ(vpi_get(vpiCovered, By("top")), 0);
+  EXPECT_EQ(vpi_handle(vpiFsmStateExpression, By("top")), nullptr);
 }
 
 }  // namespace

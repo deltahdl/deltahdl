@@ -44,15 +44,14 @@ VpiObject* StateExpression(const FsmDecl& decl, const std::string& prefix,
     concat->type = vpiOperation;
     concat->op_type = vpiConcatOp;
     for (std::string_view name : decl.state_signals) {
-      VpiObject* signal =
-          FindObjectForFlatName(objects, VpiFlatName(prefix, name));
-      if (signal != nullptr) concat->children.push_back(signal);
+      concat->children.push_back(
+          FindObjectForFlatName(objects, VpiFlatName(prefix, name)));
     }
     return concat;
   }
   VpiObject* signal = FindObjectForFlatName(
       objects, VpiFlatName(prefix, decl.state_signals.front()));
-  if (!decl.has_part_select || signal == nullptr) return signal;
+  if (!decl.has_part_select) return signal;
   VpiObject* select = build.alloc();
   select->type = vpiPartSelect;
   select->name = signal->name;
@@ -70,9 +69,7 @@ void AttachFsmStates(VpiObject* fsm, InstanceFsms& inst, std::size_t index,
   for (const auto& [state_name, value] : inst.fsms[index].states) {
     VpiObject* state = ChildObject(fsm, vpiFsmHandle, state_name, build);
     state->var = ctx.FindVariable(VpiFlatName(inst.prefix, state_name));
-    if (state->var != nullptr) {
-      state->size = static_cast<int>(state->var->value.width);
-    }
+    state->size = static_cast<int>(state->var->value.width);
     code.fsm_handles[state] = {&inst, index, value, nullptr};
   }
 }
