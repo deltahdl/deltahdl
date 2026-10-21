@@ -1,5 +1,6 @@
 #include "elaborator/checker_procedure_rules.h"
 
+#include <algorithm>
 #include <format>
 #include <string_view>
 #include <unordered_set>
@@ -8,6 +9,8 @@
 #include "elaborator/assertion_walk.h"
 #include "elaborator/concurrent_assertion_expr.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "elaborator/net_data_type.h"
+#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
@@ -193,6 +196,29 @@ void ValidateCheckerFormalDefaults(const ModuleDecl* decl, DiagEngine& diag) {
                std::format("checker formal '{}' is not singular, so it may "
                            "take no default or initial value",
                            port.name),
+               Subclause("17.2"));
+  }
+}
+
+void ValidateCheckerInterfaceFormals(const ModuleDecl* decl,
+                                     const CompilationUnit* unit,
+                                     const TypeShapeTables& types,
+                                     DiagEngine& diag) {
+  if (decl->decl_kind != ModuleDeclKind::kChecker) return;
+  for (const PortDecl& port : decl->ports) {
+    const std::string_view kName = port.data_type.type_name;
+    if (!port.is_interface_port || types.typedefs.count(kName) != 0 ||
+        types.class_names.count(kName) != 0) {
+      continue;
+    }
+    const bool kNamesInterface = std::ranges::any_of(
+        unit->interfaces,
+        [kName](const ModuleDecl* ifc) { return ifc->name == kName; });
+    if (!kNamesInterface) continue;
+    diag.Error(port.loc,
+               std::format("checker formal '{}' names interface '{}'; its "
+                           "type shall be one a property formal can take",
+                           port.name, kName),
                Subclause("17.2"));
   }
 }

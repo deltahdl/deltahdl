@@ -5,6 +5,9 @@
 
 namespace delta {
 
+struct CompilationUnit;
+struct TypeShapeTables;
+
 // §17.6: reports each variable declared in a procedure of the checker `decl`
 // whose type is a covergroup the checker declares; a covergroup instance
 // belongs in the checker body, never in its procedures. Runs only on checker
@@ -35,5 +38,17 @@ bool FunctionIsImpure(const ModuleItem* fn);
 // reports each formal of the checker `decl` with either that is an unpacked
 // array, structure or union. Runs only on checker declarations.
 void ValidateCheckerFormalDefaults(const ModuleDecl* decl, DiagEngine& diag);
+
+// §17.2 with A.1.8: a checker formal's type is one §16.12 gives a property
+// formal, which an interface is not. The parser reports a formal written with
+// the `interface` keyword or a modport, and reads a name followed by the
+// formal's identifier alone as an interface port whatever the name, since a
+// type declared later reads the same there. So each formal read that way is
+// reported here when its name is no typedef or class of `types` and is an
+// interface `unit` declares. Runs only on checker declarations.
+void ValidateCheckerInterfaceFormals(const ModuleDecl* decl,
+                                     const CompilationUnit* unit,
+                                     const TypeShapeTables& types,
+                                     DiagEngine& diag);
 
 }  // namespace delta

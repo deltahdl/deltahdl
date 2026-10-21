@@ -211,6 +211,7 @@ void Elaborator::ValidateSequenceEventArgs(const ModuleDecl* decl,
   ValidateLocalVariableFlow(decl, diag_);
   ValidateCheckerFormalDefaults(decl, diag_);
   const TypeShapeTables kShapeTables{typedefs_, td_array_dims_, class_names_};
+  ValidateCheckerInterfaceFormals(decl, unit_, kShapeTables, diag_);
   ValidateCheckerEnclosingRefs(decl, kShapeTables, func_decls_, diag_);
   if (sequence_names_.empty()) return;
   // §16.8 actual-argument checks need each named sequence's formals, so map the

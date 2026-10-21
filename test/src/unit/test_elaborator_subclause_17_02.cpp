@@ -328,4 +328,48 @@ TEST(CheckerDeclaration, ATypedefIndexAndAPackageClassAreDynamic) {
                             12, "17.2"));
 }
 
+// §17.2: a checker formal's type is one §16.12 gives a property formal, which
+// an interface is not. A name followed by the formal's identifier alone is
+// read before it is known to be an interface's, so the report is made once
+// the name resolves: `i` names interface ifc, while `a` is a logic and `j`
+// names a module, no interface.
+TEST(CheckerDeclaration, AFormalNamingAnInterfaceIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface other; endinterface\n"
+      "interface ifc; logic s; endinterface\n"
+      "module m; endmodule\n"
+      "checker c(logic a, ifc i, m j);\n"
+      "endchecker\n",
+      f, "c");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "checker formal 'i' names interface 'ifc'; its "
+                            "type shall be one a property formal can take",
+                            4, "17.2"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "checker formal 'j' names",
+                             4, "17.2"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "checker formal 'a' names",
+                             4, "17.2"));
+}
+
+// A typedef or a class of the compilation unit declared after the checker is
+// a type the formal's name resolves to, though an interface shares the name,
+// since an interface's name is in the definitions name space (§3.13) and the
+// formal's type is looked up in the checker's scope.
+TEST(CheckerDeclaration, AFormalNamingALaterTypedefOrClassIsNotReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface T; endinterface\n"
+      "interface C; endinterface\n"
+      "checker c(T x, C y);\n"
+      "endchecker\n"
+      "typedef logic T;\n"
+      "class C; endclass\n",
+      f, "c");
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "checker formal 'x' names",
+                             3, "17.2"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "checker formal 'y' names",
+                             3, "17.2"));
+}
+
 }  // namespace
