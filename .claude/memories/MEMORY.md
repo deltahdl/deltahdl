@@ -76,6 +76,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 - [Per-line coverage from CI artifacts](per-line-coverage-from-ci-artifacts.md) — the coverage log counts misses per file; read the missed lines from the run's coverage-simulator and profdata-unit-shard artifacts with a local llvm-cov.
 - [Fetching a failed job's log](fetching-a-failed-job-log.md) — when `--log-failed` breaks off or comes back empty, fetch each failed job through `gh api --allow-escape-sequences .../actions/jobs/<id>/logs`.
 - [gh run list --commit takes a full SHA](gh-run-list-commit-takes-a-full-sha.md) — pass `$(git rev-parse HEAD)`; a short SHA lists no run, and a watcher waiting on it never ends.
+- [A push that starts no run](a-push-that-starts-no-run.md) — a pushed commit with no check suite gets its run from `gh workflow run deltahdl.yml --ref main`; waiting brings none.
 - [A push starts a run per workflow](a-push-starts-a-run-per-workflow.md) — `deltahdl` and `scripts` can both run for one commit, and `--limit 1` picks only one; watch every run the commit lists, or filter with `--workflow deltahdl`.
 - [Watching a run in the background](watching-a-run-in-the-background.md) — a background shell or a Monitor, never a foreground `gh run watch`, and `--interval 60`: the 3-second default trips the rate limit.
 - [Force-cancelling a hung run](force-cancelling-a-hung-run.md) — a job hung in a step ignores a plain cancel and cannot be deleted while in progress; `gh run cancel --force`, then `gh run rerun --failed`.
