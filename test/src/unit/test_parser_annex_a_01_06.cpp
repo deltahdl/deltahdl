@@ -435,4 +435,63 @@ TEST(InterfaceItemParsing, AModuleTakesADefparamAndAGate) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// --- The prototype in an extern_tf_declaration ---
+// A.2.7's task_prototype and A.2.6's function_prototype write no lifetime,
+// name the subroutine with an identifier alone, and give a function a
+// data_type_or_void for its result. Those are what a declaration's head adds,
+// and a prototype read through that head is reported when it carries them.
+TEST(ExternTfDeclaration, ALifetimeInAPrototypeIsReported) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  extern task automatic put(input int d);\n"
+      "  extern forkjoin task static get();\n"
+      "  extern function automatic int peek();\n"
+      "endinterface\n");
+  for (int line : {2, 3, 4}) {
+    EXPECT_TRUE(ReportedError(r.diags,
+                              "a task or function prototype takes no lifetime",
+                              line, "A.1.6"));
+  }
+}
+
+TEST(ExternTfDeclaration, AScopedNameInAPrototypeIsReported) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  extern task b.put(input int d);\n"
+      "  extern function int C::peek();\n"
+      "endinterface\n");
+  for (int line : {2, 3}) {
+    EXPECT_TRUE(ReportedError(r.diags,
+                              "a task or function prototype names its task or "
+                              "function with an identifier alone",
+                              line, "A.1.6"));
+  }
+}
+
+TEST(ExternTfDeclaration, AnImplicitResultTypeInAPrototypeIsReported) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  extern function peek(input int a);\n"
+      "  extern function [7:0] pop();\n"
+      "endinterface\n");
+  for (int line : {2, 3}) {
+    EXPECT_TRUE(ReportedError(r.diags,
+                              "an extern function prototype writes its result "
+                              "type out, a data type or void",
+                              line, "A.1.6"));
+  }
+}
+
+TEST(ExternTfDeclaration, PrototypesAsA26AndA27WriteThemAreAccepted) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  extern task put(input int d);\n"
+      "  extern forkjoin task get();\n"
+      "  extern function void poke(input int a);\n"
+      "  extern function logic [7:0] top();\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

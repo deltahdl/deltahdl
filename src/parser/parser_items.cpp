@@ -12,6 +12,7 @@
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
 #include "parser/parser.h"
+#include "parser/parser_prototype_validate.h"
 #include "parser/parser_token_skips.h"
 
 namespace delta {
@@ -343,6 +344,7 @@ ModuleItem* Parser::ParseExternTfDeclaration(SourceLoc extern_loc) {
   }
   item->is_extern = true;
   item->is_forkjoin = forkjoin;
+  ValidateExternTfPrototype(diag_, item);
   return item;
 }
 
