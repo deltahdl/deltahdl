@@ -472,16 +472,15 @@ TEST(CheckerDeclaration, NetOrVarFormalIsError) {
       ReportedError(r.diags, "checker formal 'd' is declared", 2, "17.2"));
 }
 
-// The interface port header in its three spellings: the keyword alone, the
-// keyword with a modport, and an interface's name with a modport, with or
-// without a direction before it.
+// The interface port header in the three spellings that say it is one: the
+// keyword alone, the keyword with a modport, and an interface's name with a
+// modport. A.1.3 writes no direction before any of them.
 TEST(CheckerDeclaration, InterfacePortFormalIsError) {
   auto r = Parse(
       "interface ifc; logic s; modport mp(input s); endinterface\n"
       "checker c(interface i,\n"
       "          interface.mp j,\n"
-      "          ifc.mp k,\n"
-      "          input ifc.mp m);\n"
+      "          ifc.mp k);\n"
       "endchecker\n");
   ASSERT_NE(r.cu, nullptr);
   struct Formal {
@@ -489,7 +488,7 @@ TEST(CheckerDeclaration, InterfacePortFormalIsError) {
     uint32_t line;
   };
   for (const Formal& formal :
-       {Formal{"i", 2}, Formal{"j", 3}, Formal{"k", 4}, Formal{"m", 5}}) {
+       {Formal{"i", 2}, Formal{"j", 3}, Formal{"k", 4}}) {
     EXPECT_TRUE(ReportedError(r.diags,
                               std::string("checker formal '") + formal.name +
                                   "' is declared as an interface port; its "
