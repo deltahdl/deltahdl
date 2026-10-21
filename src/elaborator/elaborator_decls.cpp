@@ -554,7 +554,7 @@ static void ValidateNetDeclDataType(
     const std::unordered_set<std::string_view>& nettype_names,
     const TypeShapeTables& tables, DiagEngine& diag) {
   if (item->data_type.kind == DataTypeKind::kNamed &&
-      nettype_names.count(item->data_type.type_name) != 0) {
+      nettype_names.count(NamedTypeKey(item->data_type)) != 0) {
     return;
   }
   ValidateNetDataTypeIs4State(item->data_type, tables.typedefs, diag,

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
@@ -67,6 +68,15 @@ void ValidateNetDataTypeIs4State(const DataType& dtype,
 void ValidateNetTypedefDims(const DataType& dtype,
                             const TypeShapeTables& tables, DiagEngine& diag,
                             SourceLoc loc);
+
+// The key the named type `type` is recorded under: its own name, or
+// "Scope::name" for one written through a package, `$unit` or a class. That is
+// how RegisterPackageTypedefs and RegisterClassTypedefs record a scope's
+// typedefs, RegisterPackageNettypes a package's nettypes, and
+// RegisterScopedClassNames a package's or the compilation unit's classes.
+// §26.3 and §3.12.1 have such a name reach that scope's declaration and no
+// same-named one elsewhere.
+std::string NamedTypeKey(const DataType& type);
 
 // §6.6.7 (printed pages 97–98): the data type of a user-defined nettype shall
 // be a 4-state or 2-state integral type, `real` or `shortreal`, or a fixed-size

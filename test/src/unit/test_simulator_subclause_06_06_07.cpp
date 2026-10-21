@@ -439,3 +439,62 @@ TEST(UserNettypeSim, RenamedPackageNettypeResolvesThroughThePackagesFunction) {
                  f),
       "1\n");
 }
+
+// A declaration naming a package's nettype through the package declares a net
+// of that nettype, imported or not: P::nt n resolves its two drivers through
+// P's pres, 3 & 5 = 1, where a variable of P's data type could take no second
+// continuous assignment (#7600).
+TEST(UserNettypeSim, NetOfAPackageScopedNettypeResolvesThroughThePackagesFunc) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("package P;\n"
+                 "  function automatic logic [3:0] pres(input logic [3:0] "
+                 "d[]);\n"
+                 "    pres = 4'hf;\n"
+                 "    foreach (d[i]) pres = pres & d[i];\n"
+                 "  endfunction\n"
+                 "  nettype logic [3:0] nt with pres;\n"
+                 "endpackage\n"
+                 "module t;\n"
+                 "  P::nt n;\n"
+                 "  assign n = 4'h3;\n"
+                 "  assign n = 4'h5;\n"
+                 "  initial begin\n"
+                 "    #1;\n"
+                 "    $display(\"%0h\", n);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "1\n");
+}
+
+// A net declared through `$unit ::` is of the compilation unit's nettype though
+// the module declares one of the same name: n resolves through the unit's
+// ures, 3 & 5 = 1, and not through the module's mres, which would give 7
+// (#7600).
+TEST(UserNettypeSim, NetOfAUnitScopedNettypeResolvesThroughTheUnitsFunc) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("function automatic logic [3:0] ures(input logic [3:0] d[]);\n"
+                 "  ures = 4'hf;\n"
+                 "  foreach (d[i]) ures = ures & d[i];\n"
+                 "endfunction\n"
+                 "nettype logic [3:0] nt with ures;\n"
+                 "module t;\n"
+                 "  function automatic logic [3:0] mres(input logic [3:0] "
+                 "d[]);\n"
+                 "    mres = 0;\n"
+                 "    foreach (d[i]) mres = mres | d[i];\n"
+                 "  endfunction\n"
+                 "  nettype logic [3:0] nt with mres;\n"
+                 "  $unit::nt n;\n"
+                 "  assign n = 4'h3;\n"
+                 "  assign n = 4'h5;\n"
+                 "  initial begin\n"
+                 "    #1;\n"
+                 "    $display(\"%0h\", n);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "1\n");
+}

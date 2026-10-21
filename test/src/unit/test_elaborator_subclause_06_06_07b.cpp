@@ -493,4 +493,26 @@ TEST(NettypeElaboration, NettypeRenamingWithinAPackageIsReachedThroughIt) {
   EXPECT_EQ(w->resolve_func, "");
 }
 
+// A declaration naming a package's nettype through the package declares a net
+// of that nettype: r is a net of P's rnt, and the real it carries is the
+// nettype's data type, which §6.7.1's rule for a built-in net's data type does
+// not judge (#7600).
+TEST(NettypeElaboration, NetOfAPackageScopedNettypeIsANetOfThatNettype) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "package P;\n"
+      "  nettype real rnt;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  P::rnt r;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const RtlirNet* net = FindNet(design, "m", "r");
+  ASSERT_NE(net, nullptr);
+  EXPECT_TRUE(net->is_user_nettype);
+  EXPECT_EQ(net->nettype_name, "P::rnt");
+}
+
 }  // namespace

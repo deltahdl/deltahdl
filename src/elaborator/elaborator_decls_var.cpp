@@ -475,15 +475,16 @@ void SetVariableKindFlags(const ModuleItem* item, RtlirVariable& var,
                  item->data_type.kind == DataTypeKind::kRealtime);
 }
 
-// §6.6.7: tag a net produced from a user-defined nettype with its nettype name
-// and resolution function (if any).
+// §6.6.7: tag a net produced from a user-defined nettype with its nettype, by
+// the key `nettype` the nettype is recorded under, and its resolution function
+// (if any).
 void TagUserNettypeNet(
-    const ModuleItem* item, RtlirNet& net,
+    std::string_view nettype, RtlirNet& net,
     const std::unordered_map<std::string_view, std::string_view>&
         resolve_funcs) {
   net.is_user_nettype = true;
-  net.nettype_name = item->data_type.type_name;
-  auto it = resolve_funcs.find(item->data_type.type_name);
+  net.nettype_name = nettype;
+  auto it = resolve_funcs.find(nettype);
   if (it != resolve_funcs.end()) {
     net.resolve_func = it->second;
   }
@@ -798,9 +799,13 @@ void Elaborator::ReportUndeclaredTypeName(const ModuleItem* item) {
 // declaration, with `const`, `var` or a lifetime, so the same declaration
 // written with any of them declares a variable of the nettype, which is
 // reported and elaborated as a variable of the data type the nettype names.
+// A nettype written through a package or `$unit` (A.2.1.3) is that scope's,
+// found under the key NamedTypeKey gives, whatever a bare name would reach.
 bool Elaborator::ElaborateUserNettypeNet(ModuleItem* item, RtlirModule* mod) {
   if (item->data_type.kind != DataTypeKind::kNamed) return false;
-  if (nettype_names_.count(item->data_type.type_name) == 0) return false;
+  auto it = nettype_names_.find(NamedTypeKey(item->data_type));
+  if (it == nettype_names_.end()) return false;
+  std::string_view nettype = *it;
   if (WrittenAsDataDeclaration(item)) {
     ReportNettypeNotNet(item->data_type.type_name,
                         std::format("variable '{}'", item->name), item->loc,
@@ -818,7 +823,7 @@ bool Elaborator::ElaborateUserNettypeNet(ModuleItem* item, RtlirModule* mod) {
   item->kind = ModuleItemKind::kNetDecl;
   nettype_net_names_.insert(item->name);
   ElaborateNetDecl(item, mod);
-  TagUserNettypeNet(item, mod->nets.back(), nettype_resolve_funcs_);
+  TagUserNettypeNet(nettype, mod->nets.back(), nettype_resolve_funcs_);
   return true;
 }
 

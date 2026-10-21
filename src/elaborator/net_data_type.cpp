@@ -240,13 +240,7 @@ static bool IsLegalNettypeElement(const DataType& type,
   return true;
 }
 
-// The key the named type `type` is recorded under: its own name, or
-// "Scope::name" for one written through a package or a class. That is how
-// RegisterPackageTypedefs and RegisterClassTypedefs record a scope's typedefs,
-// and RegisterPackageNettypes and RegisterPackageClassNames a package's
-// nettypes and classes. §26.3 has such a name reach that scope's declaration
-// and no same-named one elsewhere.
-static std::string NamedTypeKey(const DataType& type) {
+std::string NamedTypeKey(const DataType& type) {
   if (type.scope_name.empty()) return std::string(type.type_name);
   return std::string(type.scope_name) + "::" + std::string(type.type_name);
 }

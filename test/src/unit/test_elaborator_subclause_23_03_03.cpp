@@ -202,4 +202,33 @@ TEST(PortConnectionRulesElaboration, AnUnwrittenConnectionIsMarkedUnconnected) {
   EXPECT_TRUE(saw_a);
 }
 
+// A port of a user-defined nettype is connected to a net of a matching nettype,
+// and a nettype written through its package is that package's on either side:
+// c's port of P::nt meets m's net of P::nt2, a different nettype, which is
+// reported, and m's net of P::nt, which is not (#7600).
+TEST(PortConnectionRulesElaboration, PackageScopedNettypesMatchedAcrossAPort) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package P;\n"
+      "  nettype logic [3:0] nt;\n"
+      "  nettype logic [3:0] nt2;\n"
+      "endpackage\n"
+      "module c(input P::nt p);\n"
+      "endmodule\n"
+      "module m;\n"
+      "  P::nt a;\n"
+      "  P::nt2 b;\n"
+      "  c u1(.p(a));\n"
+      "  c u2(.p(b));\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "port 'p' connects user-defined nettype 'P::nt' on "
+                    "the instance side to non-matching nettype 'P::nt2'",
+                    11, "23.3.3"));
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), "port 'p' connects", 10, "23.3.3"));
+}
+
 }  // namespace

@@ -17,6 +17,7 @@
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/elaborator_port_binding_internal.h"
+#include "elaborator/net_data_type.h"
 #include "elaborator/property_instance.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
@@ -110,17 +111,18 @@ static std::string_view SignalNettypeName(std::string_view name,
   return {};
 }
 
-// §23.3.3: the user-defined nettype a child port is declared with, or an empty
-// view when the port is not declared with one.
+// §23.3.3: the user-defined nettype a child port is declared with, by the key
+// it is recorded under, which a net's RtlirNet::nettype_name holds too, or an
+// empty view when the port is not declared with one.
 static std::string_view InternalPortNettype(
     const ModuleDecl* child_decl, std::string_view port_name,
     const std::unordered_map<std::string_view, std::string_view>&
         nettype_canonical) {
   for (const auto& port : child_decl->ports) {
     if (port.name != port_name) continue;
-    if (port.data_type.kind == DataTypeKind::kNamed &&
-        nettype_canonical.count(port.data_type.type_name))
-      return port.data_type.type_name;
+    if (port.data_type.kind != DataTypeKind::kNamed) break;
+    auto it = nettype_canonical.find(NamedTypeKey(port.data_type));
+    if (it != nettype_canonical.end()) return it->first;
     break;
   }
   return {};
