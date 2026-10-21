@@ -50,7 +50,8 @@ bool Fits(Kind kind, Kind most) {
 // sequence_expr; an expression_or_dist and a sequence_expr, throughout's
 // (§16.9.9); either, `and` and `or`; a sequence_expr and a property_expr, an
 // implication's or a followed-by's (§16.12.7, §16.12.9); or two
-// property_exprs.
+// property_exprs. Those from kSequenceProperty on make a property_expr, so a
+// sequence_expr has none of them.
 enum class Operands : uint8_t {
   kSequences,
   kBooleanSequence,
@@ -88,7 +89,7 @@ constexpr std::array<JoinForm, 16> kJoins = {{
 }};
 
 // Table 16-3's row of not, nexttime and s_nexttime, between intersect's and
-// and's; the rows below and's are the property operators.
+// and's.
 constexpr int kNotPrecedence = 5;
 
 // The binary operator `kind` is, joining two operands of a chain read as a
@@ -98,7 +99,7 @@ const JoinForm* FindJoin(TokenKind kind, bool sequence) {
   auto found = std::find_if(
       kJoins.begin(), kJoins.end(), [kind, sequence](const JoinForm& join) {
         return join.kind == kind &&
-               !(sequence && join.precedence < kNotPrecedence);
+               (!sequence || join.operands < Operands::kSequenceProperty);
       });
   return found == kJoins.end() ? nullptr : &*found;
 }

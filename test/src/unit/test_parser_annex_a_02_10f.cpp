@@ -281,20 +281,20 @@ TEST(PropertySpecGrammar, ThroughoutTakesAnExpressionOnItsLeft) {
 
 // Specs Table 16-3's grouping admits and a flat or a left-to-right reading
 // would not: the implications group to the right, not, nexttime and the and
-// before an implication take only what binds tighter, always and strong's
-// group run to the end, and a cycle delay binds tighter than throughout. Each
-// holds a subroutine call the evaluation does not read, so the grammar is
-// held to it.
+// or the or before an implication take only what binds tighter, always runs
+// to the end, and a cycle delay binds tighter than throughout. Each holds a
+// subroutine call beside an and or an or, which the evaluation does not read,
+// so the grammar is held to it.
 TEST(PropertySpecGrammar, AnOperandIsGroupedByPrecedence) {
   const std::vector<std::string> kSpecs = {
       "a |-> b |=> (c, $display(\"m\"))",
-      "nexttime a ##1 (b, $display(\"m\"))",
+      "nexttime a ##1 b and (c, $display(\"m\"))",
       "not a and (b, $display(\"m\"))",
       "(a, $display(\"m\")) or b |-> c",
       "s(a ##1 b) and (c, $display(\"m\")) |-> d",
-      "a throughout b ##1 (c, $display(\"m\"))",
-      "always (a, $display(\"m\")) ##1 b |-> c",
-      "strong((a, $display(\"m\")) ##1 b) until c",
+      "a throughout b ##1 c or (d, $display(\"m\"))",
+      "always a ##1 b or (c, $display(\"m\")) |-> d",
+      "strong(a ##1 b) until c or (d, $display(\"m\"))",
   };
   for (const std::string& spec : kSpecs) {
     SCOPED_TRACE(spec);
