@@ -701,6 +701,55 @@ TEST(GlobalClockingElab,
       "16.9.4"));
 }
 
+// §16.9.4 puts no condition on where in a property the call stands. The
+// parser keeps a property of operators as a tree and a sequence of more than
+// one cycle apart from the statement's own expressions, so the report has to
+// read both: a $past_gclk in an implication's antecedent and a $rising_gclk in
+// a sequence's first cycle.
+TEST(GlobalClockingElab,
+     GclkFunctionInAPropertyTreeWithoutGlobalClockingErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk, a, b;\n"
+      "  assert property (@(posedge clk) $past_gclk(a) |=> b);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "requires a global clocking declaration in an enclosing scope", 3,
+      "16.9.4"));
+}
+
+TEST(GlobalClockingElab, GclkFunctionInASequenceWithoutGlobalClockingErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk, a, b;\n"
+      "  assert property (@(posedge clk) $rising_gclk(a) ##1 b);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "requires a global clocking declaration in an enclosing scope", 3,
+      "16.9.4"));
+}
+
+// With a global clocking declared, the same two properties stand: the
+// future function stands in a property expression, where §16.9.4 admits it.
+TEST(GlobalClockingElab, GclkFunctionsInATreeAndASequenceAreAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk, a, b;\n"
+      "  global clocking gc @(posedge clk); endclocking\n"
+      "  assert property (@(posedge clk) $past_gclk(a) |=> b);\n"
+      "  assert property (@(posedge clk) $rising_gclk(a) ##1 b);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
 // §16.9.4 also places the future functions, confining $future_gclk,
 // $rising_gclk, $falling_gclk, $steady_gclk and $changing_gclk to property and
 // sequence expressions, and ValidateFutureGclkPlacement reads the same walk,

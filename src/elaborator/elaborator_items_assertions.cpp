@@ -818,7 +818,14 @@ void Elaborator::ElaborateAssertPropertyItem(ModuleItem* item,
     // functions, and ValidateGclkRequiresGlobalClocking reports a text that
     // names one without; where that report has been made there is no event to
     // carry, and the assertion is left alone rather than parked forever.
+    //
+    // The run's deferred attempt judges a boolean property alone, so a
+    // property of operators or a sequence of more than one cycle, which it
+    // cannot yet carry to the global clocking tick (#7517), carries no event.
+    const Stmt* assertion = item->body;
     if (module_global_clocking_event_ != nullptr &&
+        assertion->assert_property == nullptr &&
+        assertion->assert_sequence == nullptr &&
         FindGclkFunctionRefInItem(item, IsGlobalClockingFutureFunction,
                                   /*include_property_slot=*/true) != nullptr) {
       mod->processes.back().gclk_future_event = *module_global_clocking_event_;

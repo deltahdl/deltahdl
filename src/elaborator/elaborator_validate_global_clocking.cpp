@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "elaborator/assertion_walk.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/global_clocking_sampled_value.h"
@@ -260,6 +261,25 @@ const Expr* PropertySlotOfStmt(const Stmt* s) {
   return s->is_concurrent_clocked ? s->assert_expr : nullptr;
 }
 
+// The parser keeps a property of operators as a tree (Stmt::assert_property)
+// and a sequence of more than one cycle (Stmt::assert_sequence) apart from the
+// statement's expressions, leaving the property slot a placeholder, so the
+// calls those two hold are reached through the walks that read every
+// expression of each. They are the property slot as much as a boolean property
+// is, and are passed over where it is.
+const Expr* FindGclkFunctionRefInPropertyShapes(const Stmt* s,
+                                                GclkKindPredicate match) {
+  const Expr* found = nullptr;
+  auto search = [&](const Expr* e) {
+    if (found == nullptr) found = FindGclkFunctionRef(e, match);
+  };
+  ForEachTreeExpr(s->assert_property, search);
+  if (s->assert_sequence != nullptr) {
+    ForEachBodyExpr(s->assert_sequence->seq_linear, search);
+  }
+  return found;
+}
+
 const Expr* FindGclkFunctionRefInOwnExprs(const Stmt* s,
                                           GclkKindPredicate match,
                                           bool include_property_slot) {
@@ -269,6 +289,9 @@ const Expr* FindGclkFunctionRefInOwnExprs(const Stmt* s,
     if (found || (skip != nullptr && e == skip)) return;
     found = FindGclkFunctionRef(e, match);
   });
+  if (found == nullptr && include_property_slot) {
+    found = FindGclkFunctionRefInPropertyShapes(s, match);
+  }
   return found;
 }
 
