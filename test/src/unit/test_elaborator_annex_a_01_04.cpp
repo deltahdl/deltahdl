@@ -110,21 +110,8 @@ TEST(ElaborationSeverityTaskElab, FatalWithAFinishNumberAndMessageIsValid) {
                              2, "A.1.4"));
 }
 
-// How many children named `bound` the instance of the design's top holds that
-// `inst_name` names, or, for a generate loop instance, that `simple` names in
-// the iteration `index` of its innermost generate block.
-int BoundIn(const RtlirDesign* design, std::string_view inst_name,
-            std::string_view bound) {
-  int count = 0;
-  for (const auto& ch : design->top_modules[0]->children) {
-    if (ch.inst_name != inst_name || ch.resolved == nullptr) continue;
-    for (const auto& gch : ch.resolved->children) {
-      if (gch.inst_name == bound) ++count;
-    }
-  }
-  return count;
-}
-
+// How many children named `bound` the instance `simple` of the design's top
+// holds in the iteration `index` of its innermost generate block.
 int BoundInIteration(const RtlirDesign* design, std::string_view simple,
                      int64_t index, std::string_view bound) {
   int count = 0;
@@ -144,7 +131,6 @@ constexpr const char* kBindTargets =
     "module chk; endmodule\n"
     "module leaf; endmodule\n"
     "module top;\n"
-    "  leaf u[0:1] ();\n"
     "  for (genvar i = 0; i < 2; i++) begin : g\n"
     "    leaf v ();\n"
     "  end\n"
@@ -152,18 +138,14 @@ constexpr const char* kBindTargets =
 
 // A.1.4's bind_target_instance ends in a constant_bit_select, and A.9.3 lets
 // each level of its hierarchical_identifier carry one, so a select names one
-// element of an instance array or one iteration of a loop generate block
-// (#7553).
+// iteration of a loop generate block (#7553). One naming an element of an
+// instance array reaches every element, which share a module (#7557).
 TEST(BindDirectiveElab, ABindTargetSelectNamesOneInstance) {
   ElabFixture f;
-  auto* design = ElaborateSrc(std::string(kBindTargets) +
-                                  "bind top.u[1] chk c1();\n"
-                                  "bind top.g[1].v chk c2();\n",
-                              f, "top");
+  auto* design = ElaborateSrc(
+      std::string(kBindTargets) + "bind top.g[1].v chk c2();\n", f, "top");
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
-  EXPECT_EQ(BoundIn(design, "u[1]", "c1"), 1);
-  EXPECT_EQ(BoundIn(design, "u[0]", "c1"), 0);
   EXPECT_EQ(BoundInIteration(design, "v", 1, "c2"), 1);
   EXPECT_EQ(BoundInIteration(design, "v", 0, "c2"), 0);
 }
@@ -171,11 +153,12 @@ TEST(BindDirectiveElab, ABindTargetSelectNamesOneInstance) {
 TEST(BindDirectiveElab, AnInstanceListEntrySelectNamesOneInstance) {
   ElabFixture f;
   auto* design = ElaborateSrc(
-      std::string(kBindTargets) + "bind leaf : top.u[1] chk c3();\n", f, "top");
+      std::string(kBindTargets) + "bind leaf : top.g[1].v chk c3();\n", f,
+      "top");
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
-  EXPECT_EQ(BoundIn(design, "u[1]", "c3"), 1);
-  EXPECT_EQ(BoundIn(design, "u[0]", "c3"), 0);
+  EXPECT_EQ(BoundInIteration(design, "v", 1, "c3"), 1);
+  EXPECT_EQ(BoundInIteration(design, "v", 0, "c3"), 0);
 }
 
 // The select is a constant_bit_select, so a variable index is reported
@@ -204,14 +187,16 @@ TEST(BindDirectiveElab, ABindTargetSelectByAParameterSelects) {
       "module leaf; endmodule\n"
       "module top;\n"
       "  parameter int P = 1;\n"
-      "  leaf u[0:1] ();\n"
-      "  bind u[P] chk c();\n"
+      "  for (genvar i = 0; i < 2; i++) begin : g\n"
+      "    leaf v ();\n"
+      "  end\n"
+      "  bind g[P].v chk c();\n"
       "endmodule\n",
       f, "top");
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
-  EXPECT_EQ(BoundIn(design, "u[1]", "c"), 1);
-  EXPECT_EQ(BoundIn(design, "u[0]", "c"), 0);
+  EXPECT_EQ(BoundInIteration(design, "v", 1, "c"), 1);
+  EXPECT_EQ(BoundInIteration(design, "v", 0, "c"), 0);
 }
 
 }  // namespace
