@@ -1,9 +1,14 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
+#include <string_view>
 
+#include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
+
+using namespace delta;
 
 namespace {
 
@@ -103,6 +108,80 @@ TEST(BindVisibility, ABoundInstancesParameterIsNoConstantOutsideIt) {
     EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), message, line, "23.11"))
         << line;
   }
+}
+
+// How many children named `bound` the element `elem` of the design's top's
+// instance array holds.
+int BoundInElement(const RtlirDesign* design, std::string_view elem,
+                   std::string_view bound) {
+  int count = 0;
+  for (const auto& ch : design->top_modules[0]->children) {
+    if (ch.inst_name != elem || ch.resolved == nullptr) continue;
+    for (const auto& gch : ch.resolved->children) {
+      if (gch.inst_name == bound) ++count;
+    }
+  }
+  return count;
+}
+
+constexpr const char* kArrayOfLeaf =
+    "module chk; endmodule\n"
+    "module leaf; endmodule\n"
+    "module top;\n"
+    "  leaf u[0:1] ();\n"
+    "endmodule\n";
+
+// §23.11 with §23.3.3.5: the second form binds into the one instance its
+// target names, so a target naming one element of an instance array binds
+// into that element alone, though the elements share one elaborated module
+// until then (#7557).
+TEST(BindDirective, ABindIntoOneArrayElementBindsThereAlone) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      std::string(kArrayOfLeaf) + "bind top.u[1] chk c1();\n", f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(BoundInElement(design, "u[1]", "c1"), 1);
+  EXPECT_EQ(BoundInElement(design, "u[0]", "c1"), 0);
+}
+
+// An entry of a bind_target_instance_list names one instance as well.
+TEST(BindDirective, AnInstanceListEntryNamingOneArrayElementBindsThereAlone) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      std::string(kArrayOfLeaf) + "bind leaf : top.u[1] chk c3();\n", f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(BoundInElement(design, "u[1]", "c3"), 1);
+  EXPECT_EQ(BoundInElement(design, "u[0]", "c3"), 0);
+}
+
+// A target scope with no instance list binds into every instance of the
+// scope, each element of the array among them.
+TEST(BindDirective, AScopeBindReachesEveryArrayElement) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      std::string(kArrayOfLeaf) + "bind leaf chk c4();\n", f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(BoundInElement(design, "u[1]", "c4"), 1);
+  EXPECT_EQ(BoundInElement(design, "u[0]", "c4"), 1);
+}
+
+// A scope bind and a bind into one element together: the element that gets a
+// module of its own still holds the scope's instance once.
+TEST(BindDirective, AScopeBindAndAnElementBindTogether) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(std::string(kArrayOfLeaf) +
+                                  "bind leaf chk c4();\n"
+                                  "bind top.u[1] chk c1();\n",
+                              f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(BoundInElement(design, "u[1]", "c4"), 1);
+  EXPECT_EQ(BoundInElement(design, "u[0]", "c4"), 1);
+  EXPECT_EQ(BoundInElement(design, "u[1]", "c1"), 1);
+  EXPECT_EQ(BoundInElement(design, "u[0]", "c1"), 0);
 }
 
 }  // namespace

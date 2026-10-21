@@ -289,6 +289,26 @@ static std::string BindChildPath(const std::string& hier_path,
   return path;
 }
 
+// §23.11 with §23.3.3.5: the elements of an instance array share one
+// module, and a directive that names one element binds into it alone, so
+// whether a directive names the element `elem` at `path`, which then needs a
+// module of its own. One whose target is a whole scope binds into every
+// element, and leaves them sharing.
+static bool BindNamesArrayElement(const RtlirModuleInst& elem,
+                                  const std::string& path,
+                                  const CompilationUnit* unit,
+                                  BindWalkState& ctx) {
+  if (elem.array.name.empty()) return false;
+  return std::ranges::any_of(ctx.binds, [&](const BindDirectiveSite& site) {
+    const BindDirective* bd = site.bd;
+    if (IsBindTargetScope(bd->target.path, unit) &&
+        bd->target_instances.empty()) {
+      return false;
+    }
+    return BindAppliesToModule(site, elem.resolved, path, unit, ctx);
+  });
+}
+
 void Elaborator::WalkForBind(RtlirModule* mod, const std::string& hier_path,
                              bool under_bind, BindWalkCtx& ctx) {
   if (!mod) return;
@@ -309,6 +329,15 @@ void Elaborator::WalkForBind(RtlirModule* mod, const std::string& hier_path,
     ApplyBindInstance(site.bd, mod);
   }
 
+  // Every element a directive names gets its module before any child is
+  // walked, so that the copy does not carry what a directive binding the whole
+  // scope has put in the shared module already, and then get it again.
+  for (auto& c : mod->children) {
+    if (c.resolved &&
+        BindNamesArrayElement(c, BindChildPath(hier_path, c), unit_, ctx)) {
+      IsolateArrayElement(*mod, c, arena_);
+    }
+  }
   for (auto& c : mod->children) {
     if (!c.resolved) continue;
     bool child_under_bind = under_bind || c.is_bound;
