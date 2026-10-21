@@ -606,9 +606,12 @@ void ValidateDpiScopeGlobalNames(const std::vector<ModuleItem*>& items,
 // §35.4 and §35.7 state their rules over the scope a DPI declaration is written
 // in, so this returns the item list of every scope one can be written in.
 // A.1.11 makes dpi_import_export a package_or_generate_item_declaration and so
-// a package_item, and A.1.4's module_common_item carries the same production
-// into a module, an interface, a program and a checker; the parser fills all
-// four through Parser::ParseModuleItem and a package body through it as well.
+// a package_item, and A.1.4's module_or_generate_item_declaration carries the
+// same production into a module, an interface and a program. A.1.8 gives a
+// checker none, and Parser::ParseImportDecl and Parser::ParseExportDecl report
+// one written there, but still read it into the checker's items, so those are
+// walked too; the parser fills all four through Parser::ParseModuleItem and a
+// package body through it as well.
 // §3.12.1's compilation-unit scope holds every declaration outside any other
 // scope and comes last, since a declaration reaches it only by being in none of
 // the others; where each file is a unit of its own, `separate_units` holds the

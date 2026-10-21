@@ -81,4 +81,31 @@ TEST(CheckerProcedures, CheckerWithMultipleItemsElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// A.1.8: a checker's items, checker_or_generate_item, reach no instantiation
+// but a checker's, through assertion_item, and never the udp_instantiation
+// only A.1.4's module_or_generate_item reaches. A UDP instance reads as a
+// module instance until its name resolves, so it is the elaborator that
+// reports one standing among a checker's items, under A.1.8 rather than §24.3,
+// which keeps primitives out of a program (#7569).
+TEST(CheckerOrGenerateItem, AUdpInstanceIsNoCheckerItem) {
+  ElabFixture f;
+  ElaborateSrc(
+      "checker c(logic a, logic z);\n"
+      "  inv u(z, a);\n"
+      "endchecker\n"
+      "primitive inv(output o, input i);\n"
+      "  table 0 : 1; 1 : 0; endtable\n"
+      "endprimitive\n"
+      "module top; logic x, y; c k(x, y); endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "primitive cannot be instantiated inside checker "
+                            "'c'",
+                            2, "A.1.8"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "primitive cannot be instantiated inside checker "
+                             "'c'",
+                             2, "24.3"));
+}
+
 }  // namespace

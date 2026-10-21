@@ -151,17 +151,26 @@ void CheckNestedDeclItemRules(
   }
 }
 
-// §24.3: a program or checker instantiates no user-defined primitive. A.1.6:
-// nor does an interface, whose items, a generate block's among them, never
-// reach the udp_instantiation only A.1.4's module items do.
+// §24.3: a program instantiates no user-defined primitive. Nor does an
+// interface or a checker, whose items, a generate block's among them, never
+// reach the udp_instantiation only A.1.4's module items do: A.1.6's
+// interface_or_generate_item and A.1.8's checker_or_generate_item, which
+// reaches no instantiation but a checker's.
 void CheckUdpInstParentRule(const ModuleItem* item, const ModuleDecl* decl,
                             const ParentScopeKind& parent, DiagEngine& diag) {
-  if (!parent.is_program && !parent.is_checker && !parent.is_interface) return;
+  const char* subclause = "24.3";
+  if (parent.is_interface) {
+    subclause = "A.1.6";
+  } else if (parent.is_checker) {
+    subclause = "A.1.8";
+  } else if (!parent.is_program) {
+    return;
+  }
   diag.Error(item->loc,
              std::format("primitive cannot be instantiated inside "
                          "{} '{}'",
                          parent.kind_word, decl->name),
-             Subclause(parent.is_interface ? "A.1.6" : "24.3"));
+             Subclause(subclause));
 }
 
 void CheckProgramCheckerItemRules(

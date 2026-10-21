@@ -98,7 +98,7 @@ TEST(DesignElementPlacement, EarlierUdpInstanceInACheckerGenerateBlock) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "primitive cannot be instantiated inside checker "
                             "'c'",
-                            6, "24.3"));
+                            6, "A.1.8"));
 }
 
 }  // namespace
