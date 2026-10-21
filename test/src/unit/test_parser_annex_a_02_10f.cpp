@@ -2,8 +2,8 @@
 // of a concurrent assertion statement wherever the evaluation's own parse,
 // Parser::TryParseSimpleConcurrentProperty, gives it up: a spec the grammar
 // admits is reported as one this tool does not evaluate (§16.14), and one it
-// does not admit is an error, reported at the furthest point no reading of it
-// gets past.
+// does not admit is an error, reported at an operand of a kind its operator
+// does not take, or else at the furthest point no reading of it gets past.
 //
 // Each malformed spec below writes the point the report stands at on a line
 // of its own, so a reading that broke off sooner or got further reports on
@@ -66,12 +66,12 @@ TEST(PropertySpecGrammar, AWellWrittenConstructIsReadPast) {
            "s_always [1:2] eventually [1:2] accept_on (r) reject_on (r) "
            "sync_accept_on (r) sync_reject_on (r) a ##1\nb dist zz",
            3},
-          {"strong(a ##1 b) and weak(c) ##1\nd dist zz", 3},
+          {"strong(a ##1 b) and weak(c) until\nd dist zz", 3},
           {"first_match(a ##1 b, x = 1) ##1\nc dist zz", 3},
           {"if (a) b else c ##1\nd dist zz", 3},
-          {"(if (a) b) ##1\nc dist zz", 3},
-          {"(if (a) b else c) ##1\nd dist zz", 3},
-          {"(case (s) 1, 2: a; default: b; endcase) ##1\nc dist zz", 3},
+          {"(if (a) b) until\nc dist zz", 3},
+          {"(if (a) b else c) until\nd dist zz", 3},
+          {"(case (s) 1, 2: a; default: b; endcase) until\nc dist zz", 3},
           {"(a, x = 1, y += 2, z++, ++w, --v, $display(\"m\"), f(q)) ##1\n"
            "b dist zz",
            3},
@@ -213,6 +213,96 @@ TEST(PropertySpecGrammar, AnAdmittedSpecIsReportedAsNotEvaluatedOnly) {
       procedural.diags, "procedural concurrent assertion is not evaluated", 2,
       "16.14.6"));
   EXPECT_FALSE(procedural.has_errors);
+}
+
+// Table 16-3 groups a spec by precedence and associativity, and each
+// operator takes the kinds of operand §A.2.10 gives it: a property where only
+// a sequence stands, or a sequence where only an expression_or_dist does, is
+// reported at the operand, before a break written after it.
+constexpr const char* kPropertyForSequence =
+    "a property stands where the grammar admits only a sequence";
+constexpr const char* kSequenceForBoolean =
+    "a sequence stands where the grammar admits only an expression_or_dist";
+
+void ExpectMisplaced(const char* message, const std::vector<Malformed>& cases) {
+  for (const Malformed& c : cases) {
+    SCOPED_TRACE(c.spec);
+    auto r = ParseSpec("assert property", c.spec);
+    EXPECT_TRUE(ReportedError(r.diags, message, c.line, "A.2.10"));
+  }
+}
+
+// §16.12.7 and §16.12.9: an implication and a followed-by take a sequence on
+// their left; not binds tighter than either, so `not a #=# b` puts a property
+// there.
+TEST(PropertySpecGrammar, AnImplicationTakesASequenceOnItsLeft) {
+  ExpectMisplaced(kPropertyForSequence,
+                  {
+                      {"@(posedge clk)\n(a |-> b) |-> c ##1\nd dist zz", 3},
+                      {"@(posedge clk)\nnot a #=# b ##1\nc dist zz", 3},
+                  });
+}
+
+// §16.12.2 and §16.9.8: strong, weak and first_match take a sequence.
+TEST(PropertySpecGrammar, StrongWeakAndFirstMatchTakeASequence) {
+  ExpectMisplaced(kPropertyForSequence,
+                  {
+                      {"strong(\na |-> b) ##1\nc dist zz", 3},
+                      {"weak(\nnexttime a) ##1\nb dist zz", 3},
+                      {"first_match(\na until b, x = 1) ##1\nc dist zz", 3},
+                  });
+}
+
+// §16.9: a cycle delay, intersect, within, a repetition and a sequence's
+// match items take sequences on either side.
+TEST(PropertySpecGrammar, ASequenceOperatorTakesSequences) {
+  ExpectMisplaced(
+      kPropertyForSequence,
+      {
+          {"@(posedge clk)\n(not a) ##1 b ##1\nc dist zz", 3},
+          {"a ##1\n(b implies c) ##1\nd dist zz", 3},
+          {"##1\n(always a) ##1\nb dist zz", 3},
+          {"@(posedge clk)\n(a |=> b) intersect c ##1\nd dist zz", 3},
+          {"a within\n(b |-> c) or\nd dist zz", 3},
+          {"x ##1\n(a |-> b)[*2] ##1\nc dist zz", 3},
+          {"(\na |-> b, x = 1) ##1\nc dist zz", 3},
+      });
+}
+
+// §16.9.9: throughout takes an expression_or_dist on its left, and a cycle
+// delay binds tighter, so `a ##1 b throughout c` puts a sequence there.
+TEST(PropertySpecGrammar, ThroughoutTakesAnExpressionOnItsLeft) {
+  ExpectMisplaced(kSequenceForBoolean,
+                  {
+                      {"x or\n(a ##1 b) throughout c ##1\nd dist zz", 3},
+                      {"x or\na ##1 b throughout c ##1\nd dist zz", 3},
+                  });
+}
+
+// Specs Table 16-3's grouping admits and a flat or a left-to-right reading
+// would not: the implications group to the right, not, nexttime and the and
+// before an implication take only what binds tighter, always and strong's
+// group run to the end, and a cycle delay binds tighter than throughout. Each
+// holds a subroutine call the evaluation does not read, so the grammar is
+// held to it.
+TEST(PropertySpecGrammar, AnOperandIsGroupedByPrecedence) {
+  const std::vector<std::string> kSpecs = {
+      "a |-> b |=> (c, $display(\"m\"))",
+      "nexttime a ##1 (b, $display(\"m\"))",
+      "not a and (b, $display(\"m\"))",
+      "(a, $display(\"m\")) or b |-> c",
+      "s(a ##1 b) and (c, $display(\"m\")) |-> d",
+      "a throughout b ##1 (c, $display(\"m\"))",
+      "always (a, $display(\"m\")) ##1 b |-> c",
+      "strong((a, $display(\"m\")) ##1 b) until c",
+  };
+  for (const std::string& spec : kSpecs) {
+    SCOPED_TRACE(spec);
+    auto r = ParseSpec("assert property", "@(posedge clk) " + spec);
+    EXPECT_TRUE(ReportedWarning(
+        r.diags, "concurrent assertion is not evaluated", 2, "16.14"));
+    EXPECT_FALSE(r.has_errors);
+  }
 }
 
 }  // namespace

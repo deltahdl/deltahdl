@@ -622,6 +622,15 @@ Stmt* Parser::ParseAssignmentOrExprNoSemi() {
   } else {
     stmt->kind = StmtKind::kExprStmt;
     stmt->expr = ParseInfixBp(lhs_expr, 0);
+    // A.6.9: a subroutine call statement is a call, and a `new` is no call:
+    // §8.7 calls a constructor from the right-hand side of an assignment or
+    // as `super.new`.
+    if (IsNewExpr(stmt->expr)) {
+      diag_.Error(stmt->expr->range.start,
+                  "'new' is no subroutine call; a constructor is called from "
+                  "the right-hand side of an assignment",
+                  Subclause("A.6.9"));
+    }
   }
   return stmt;
 }
@@ -641,7 +650,11 @@ Stmt* Parser::ParseVoidCastCallStmt() {
   Expect(TokenKind::kApostrophe, Subclause("A.6.9"));
   Expect(TokenKind::kLParen, Subclause("A.6.9"));
   Expr* call = ParseExpr();
-  if (call->kind != ExprKind::kCall && call->kind != ExprKind::kSystemCall) {
+  // A.8.2: an array manipulation call or a randomize call may be written with
+  // its `with` clause and no argument list, which the expression keeps on the
+  // name it is written on rather than as a call.
+  if (call->kind != ExprKind::kCall && call->kind != ExprKind::kSystemCall &&
+      call->with_expr == nullptr && call->inline_constraint == nullptr) {
     diag_.Error(call->range.start,
                 "a void cast discards a function call's return value; "
                 "void'(...) wraps a function_subroutine_call and no other "

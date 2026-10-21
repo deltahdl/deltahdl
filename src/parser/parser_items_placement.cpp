@@ -65,6 +65,37 @@ void Parser::RejectInProgramBody(SourceLoc loc, const char* msg) {
   diag_.Error(loc, msg, Subclause("A.1.7"));
 }
 
+bool Parser::InModuleBody() const {
+  return current_module_ &&
+         current_module_->decl_kind == ModuleDeclKind::kModule;
+}
+
+// A.1.6's interface_item is a port_declaration or a non_port_interface_item,
+// whose items come through interface_or_generate_item: a module_common_item or
+// an extern_tf_declaration. A.1.4's module_or_generate_item reaches more -- a
+// parameter_override, a gate_instantiation and a udp_instantiation -- and
+// §27.3's footnote 35 holds a generate block in an interface to the
+// interface's items, so an item on that wider list is reported here under
+// A.1.6 when the body being read is an interface's, a generate block of it
+// included, and still read so that the body resumes after it. A UDP instance,
+// which reads as a module instance until its name is resolved, is the
+// elaborator's to report.
+void Parser::RejectInInterfaceBody(const char* msg) {
+  if (!InInterfaceBody()) return;
+  diag_.Error(CurrentLoc(), msg, Subclause("A.1.6"));
+}
+
+// A gate instantiation stands in a module body alone: §24.3 leaves it out of
+// a program, A.1.8 out of a checker and A.1.6 out of an interface.
+void Parser::RejectMisplacedGate() {
+  if (InProgramBlock()) {
+    diag_.Error(CurrentLoc(), "primitive instances not allowed in programs",
+                Subclause("24.3"));
+  }
+  RejectInCheckerBody("a gate instantiation is not an item of a checker");
+  RejectInInterfaceBody("a gate instantiation is not an item of an interface");
+}
+
 // A.1.11's package_item is a package_or_generate_item_declaration, an
 // anonymous_program, a package_export_declaration or a timeunits_declaration,
 // and package_or_generate_item_declaration is a net_declaration, a

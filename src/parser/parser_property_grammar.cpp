@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <initializer_list>
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
@@ -16,50 +17,94 @@
 // §A.2.10's property_spec, property_expr and sequence_expr, recognized
 // rather than parsed: the spec is read as a chain of operands joined by the
 // binary operators of the two productions, each operand with the operators
-// and the cycle delays written before it. The precedence and associativity
-// of Tables 16-1 and 16-3 decide how an admitted spec groups, never whether
-// it is admitted, so the chain is read flat. Where the grammar asks for a
-// sequence_expr, the left of an implication or the operand of strong, an
-// operand that is only a property_expr is not told apart; the one place the
-// difference is read is a cover sequence statement's spec, which no
-// property operator may stand in.
+// and the cycle delays written before it, grouped by the precedence and
+// associativity of Table 16-3, which places §16.9's sequence operators above
+// §16.12's property operators. Each operand reports what it is: an
+// expression_or_dist, a sequence_expr, or a property_expr, which only a
+// property operator makes; an instance of a named sequence or property is
+// either, since its declaration is not read here. Where the grammar asks for
+// a sequence_expr -- an operand of a sequence operator, the left of an
+// implication, the operand of strong, weak and first_match, a repeated
+// operand and one with match items -- a property_expr is reported, as a
+// sequence_expr is on the left of throughout, which takes an
+// expression_or_dist. A cover sequence statement's spec reads no property
+// operator at all.
 
 namespace delta {
 
 namespace {
 
-// The binary operators of the chain: §16.9's, joining two sequences, and
-// the property operators of §16.12, joining two properties.
-struct JoinForm {
-  TokenKind kind;
-  bool property;
+// What an operand or a chain of them is: an expression_or_dist, a
+// sequence_expr, an instance, which may be any of them, or a property_expr.
+// Each is admitted where the grammar admits an earlier one, an instance
+// aside, and an `and` or an `or` makes the latest of its operands' kinds.
+enum class Kind : uint8_t { kBoolean, kSequence, kInstance, kProperty };
+
+// Whether `kind` stands where the grammar admits `most`, an
+// expression_or_dist or a sequence_expr, and what is below it.
+bool Fits(Kind kind, Kind most) {
+  return kind == Kind::kInstance || kind <= most;
+}
+
+// What a binary operator takes and makes: two sequence_exprs and a
+// sequence_expr; an expression_or_dist and a sequence_expr, throughout's
+// (§16.9.9); either, `and` and `or`; a sequence_expr and a property_expr, an
+// implication's or a followed-by's (§16.12.7, §16.12.9); or two
+// property_exprs.
+enum class Operands : uint8_t {
+  kSequences,
+  kBooleanSequence,
+  kEither,
+  kSequenceProperty,
+  kProperties,
 };
 
-constexpr std::array<JoinForm, 15> kJoins = {{
-    {TokenKind::kKwAnd, false},
-    {TokenKind::kKwOr, false},
-    {TokenKind::kKwIntersect, false},
-    {TokenKind::kKwWithin, false},
-    {TokenKind::kKwThroughout, false},
-    {TokenKind::kPipeDashGt, true},
-    {TokenKind::kPipeEqGt, true},
-    {TokenKind::kHashMinusHash, true},
-    {TokenKind::kHashEqHash, true},
-    {TokenKind::kKwUntil, true},
-    {TokenKind::kKwSUntil, true},
-    {TokenKind::kKwUntilWith, true},
-    {TokenKind::kKwSUntilWith, true},
-    {TokenKind::kKwImplies, true},
-    {TokenKind::kKwIff, true},
+// The binary operators of the chain, each with its Table 16-3 row, a higher
+// one binding tighter, whether it groups to the right, and its operands.
+struct JoinForm {
+  TokenKind kind;
+  int precedence;
+  bool right;
+  Operands operands;
+};
+
+constexpr std::array<JoinForm, 16> kJoins = {{
+    {TokenKind::kHashHash, 9, false, Operands::kSequences},
+    {TokenKind::kKwThroughout, 8, true, Operands::kBooleanSequence},
+    {TokenKind::kKwWithin, 7, false, Operands::kSequences},
+    {TokenKind::kKwIntersect, 6, false, Operands::kSequences},
+    {TokenKind::kKwAnd, 4, false, Operands::kEither},
+    {TokenKind::kKwOr, 3, false, Operands::kEither},
+    {TokenKind::kKwIff, 2, true, Operands::kProperties},
+    {TokenKind::kKwUntil, 1, true, Operands::kProperties},
+    {TokenKind::kKwSUntil, 1, true, Operands::kProperties},
+    {TokenKind::kKwUntilWith, 1, true, Operands::kProperties},
+    {TokenKind::kKwSUntilWith, 1, true, Operands::kProperties},
+    {TokenKind::kKwImplies, 1, true, Operands::kProperties},
+    {TokenKind::kPipeDashGt, 0, true, Operands::kSequenceProperty},
+    {TokenKind::kPipeEqGt, 0, true, Operands::kSequenceProperty},
+    {TokenKind::kHashMinusHash, 0, true, Operands::kSequenceProperty},
+    {TokenKind::kHashEqHash, 0, true, Operands::kSequenceProperty},
 }};
 
-// Whether `kind` joins two operands of a chain read as a sequence_expr where
-// `sequence` is set and as a property_expr otherwise.
+// Table 16-3's row of not, nexttime and s_nexttime, between intersect's and
+// and's; the rows below and's are the property operators.
+constexpr int kNotPrecedence = 5;
+
+// The binary operator `kind` is, joining two operands of a chain read as a
+// sequence_expr where `sequence` is set and as a property_expr otherwise;
+// null where it is none.
+const JoinForm* FindJoin(TokenKind kind, bool sequence) {
+  auto found = std::find_if(
+      kJoins.begin(), kJoins.end(), [kind, sequence](const JoinForm& join) {
+        return join.kind == kind &&
+               !(sequence && join.precedence < kNotPrecedence);
+      });
+  return found == kJoins.end() ? nullptr : &*found;
+}
+
 bool IsJoin(TokenKind kind, bool sequence) {
-  return std::any_of(kJoins.begin(), kJoins.end(),
-                     [kind, sequence](const JoinForm& join) {
-                       return join.kind == kind && !(sequence && join.property);
-                     });
+  return FindJoin(kind, sequence) != nullptr;
 }
 
 // What stands in a bracket: one constant_expression, a range `lo : hi`, or
@@ -80,14 +125,17 @@ enum class Opener : uint8_t {
 };
 
 // An operator written before its operand: the bracket it takes, with the
-// bounds the bracket holds and whether a range in it may end in `$`, and
-// whether only a property_expr has the operator.
+// bounds the bracket holds and whether a range in it may end in `$`, whether
+// only a property_expr has the operator, and whether its operand runs to the
+// end of the chain, as Table 16-3's last row has it, where not, nexttime and
+// s_nexttime take only what their row binds tighter.
 struct PrefixForm {
   TokenKind kind;
   Opener opener;
   Bounds bounds;
   bool dollar;
   bool property;
+  bool lowest;
 };
 
 // §16.12.2, §16.12.3, §16.12.6, §16.12.10, §16.12.11, §16.12.13,
@@ -97,29 +145,34 @@ struct PrefixForm {
 // constant_range, the aborts with their condition, strong and weak, if and
 // case; and §16.9.8's first_match, which a sequence_expr has as well.
 constexpr std::array<PrefixForm, 16> kPrefixForms = {{
-    {TokenKind::kKwNot, Opener::kNone, Bounds::kSingle, false, true},
+    {TokenKind::kKwNot, Opener::kNone, Bounds::kSingle, false, true, false},
     {TokenKind::kKwNexttime, Opener::kOptionalBracket, Bounds::kSingle, false,
-     true},
+     true, false},
     {TokenKind::kKwSNexttime, Opener::kOptionalBracket, Bounds::kSingle, false,
-     true},
-    {TokenKind::kKwAlways, Opener::kOptionalBracket, Bounds::kRange, true,
+     true, false},
+    {TokenKind::kKwAlways, Opener::kOptionalBracket, Bounds::kRange, true, true,
      true},
     {TokenKind::kKwSEventually, Opener::kOptionalBracket, Bounds::kRange, true,
+     true, true},
+    {TokenKind::kKwSAlways, Opener::kBracket, Bounds::kRange, false, true,
      true},
-    {TokenKind::kKwSAlways, Opener::kBracket, Bounds::kRange, false, true},
-    {TokenKind::kKwEventually, Opener::kBracket, Bounds::kRange, false, true},
-    {TokenKind::kKwAcceptOn, Opener::kCondition, Bounds::kSingle, false, true},
-    {TokenKind::kKwRejectOn, Opener::kCondition, Bounds::kSingle, false, true},
+    {TokenKind::kKwEventually, Opener::kBracket, Bounds::kRange, false, true,
+     true},
+    {TokenKind::kKwAcceptOn, Opener::kCondition, Bounds::kSingle, false, true,
+     true},
+    {TokenKind::kKwRejectOn, Opener::kCondition, Bounds::kSingle, false, true,
+     true},
     {TokenKind::kKwSyncAcceptOn, Opener::kCondition, Bounds::kSingle, false,
-     true},
+     true, true},
     {TokenKind::kKwSyncRejectOn, Opener::kCondition, Bounds::kSingle, false,
+     true, true},
+    {TokenKind::kKwStrong, Opener::kStrength, Bounds::kSingle, false, true,
      true},
-    {TokenKind::kKwStrong, Opener::kStrength, Bounds::kSingle, false, true},
-    {TokenKind::kKwWeak, Opener::kStrength, Bounds::kSingle, false, true},
+    {TokenKind::kKwWeak, Opener::kStrength, Bounds::kSingle, false, true, true},
     {TokenKind::kKwFirstMatch, Opener::kFirstMatch, Bounds::kSingle, false,
-     false},
-    {TokenKind::kKwIf, Opener::kIf, Bounds::kSingle, false, true},
-    {TokenKind::kKwCase, Opener::kCase, Bounds::kSingle, false, true},
+     false, true},
+    {TokenKind::kKwIf, Opener::kIf, Bounds::kSingle, false, true, true},
+    {TokenKind::kKwCase, Opener::kCase, Bounds::kSingle, false, true, true},
 }};
 
 // The operator `kind` is, written before an operand of a chain read as a
@@ -169,6 +222,15 @@ uint64_t Order(SourceLoc loc) {
   return (uint64_t{loc.line} << 32) | loc.column;
 }
 
+// A parenthesized chain: whether it is read as a sequence_expr, whether
+// sequence_match_items may follow it (§16.10), and whether the grammar admits
+// only a sequence_expr in it, as strong, weak and first_match do.
+struct Group {
+  bool sequence;
+  bool match_items;
+  bool sequence_only;
+};
+
 // What an operand's expression is read as: an expression, an
 // expression_or_dist, or the constant_primary of a cycle delay.
 enum class Reading : uint8_t { kExpression, kExpressionOrDist, kPrimary };
@@ -187,12 +249,17 @@ class ParserPropertyGrammar::Scan {
   bool Spec() {
     if (p_.Check(TokenKind::kAt) && !ClockingEvent()) return false;
     if (p_.Match(TokenKind::kKwDisable) && !DisableIff()) return false;
-    if (!Chain(sequence_)) return false;
+    Kind kind = Kind::kBoolean;
+    if (!Chain(sequence_, kind)) return false;
     if (p_.Check(TokenKind::kRParen)) return true;
     return Fail();
   }
 
   void Report() const {
+    if (misplaced_ != nullptr) {
+      p_.diag_.Error(misplaced_at_, misplaced_, Subclause("A.2.10"));
+      return;
+    }
     p_.diag_.Error(furthest_,
                    "this concurrent assertion's spec is not one the grammar "
                    "admits: no reading of it gets past this point",
@@ -208,6 +275,19 @@ class ParserPropertyGrammar::Scan {
   }
 
   bool Fail() { return FailAt(p_.CurrentToken().loc); }
+
+  // Whether an operand of `kind` that starts at `at` stands where the grammar
+  // admits `most`; where it does not, notes why, which is the report made.
+  bool Require(Kind kind, Kind most, SourceLoc at) {
+    if (Fits(kind, most)) return true;
+    misplaced_at_ = at;
+    misplaced_ = most == Kind::kBoolean
+                     ? "a sequence stands where the grammar admits only an "
+                       "expression_or_dist"
+                     : "a property stands where the grammar admits only a "
+                       "sequence";
+    return false;
+  }
 
   // Reads the current token where it is `kind`; notes a failure where it is
   // not.
@@ -258,51 +338,124 @@ class ParserPropertyGrammar::Scan {
   }
 
   // An operand and every operand the chain's binary operators and cycle
-  // delays join to it.
-  bool Chain(bool sequence) {
-    while (Operand(sequence)) {
-      if (p_.Check(TokenKind::kHashHash)) continue;
-      if (!IsJoin(p_.CurrentToken().kind, sequence)) return true;
-      p_.Consume();
+  // delays join to it, what they make kept in `kind`.
+  bool Chain(bool sequence, Kind& kind) { return Climb(sequence, 0, kind); }
+
+  // An operand and every operand an operator of Table 16-3's row `lowest` or
+  // a higher one joins to it, grouped as the rows have them.
+  bool Climb(bool sequence, int lowest, Kind& kind) {
+    const SourceLoc kAt = p_.CurrentToken().loc;
+    if (!Operand(sequence, kind)) return false;
+    for (;;) {
+      const JoinForm* join = FindJoin(p_.CurrentToken().kind, sequence);
+      if (join == nullptr || join->precedence < lowest) return true;
+      if (!TakesLeft(*join, kind, kAt) || !Operator(*join)) return false;
+      const SourceLoc kRightAt = p_.CurrentToken().loc;
+      Kind right = Kind::kBoolean;
+      const int kNext = join->right ? join->precedence : join->precedence + 1;
+      if (!Climb(sequence, kNext, right) ||
+          !TakesRight(*join, kind, right, kRightAt)) {
+        return false;
+      }
     }
-    return false;
+  }
+
+  // The binary operator `join`, from the current token: the token alone, or
+  // a cycle delay with its range.
+  bool Operator(const JoinForm& join) {
+    if (join.kind == TokenKind::kHashHash) return CycleDelay();
+    p_.Consume();
+    return true;
+  }
+
+  // Whether `join` takes `left`, which starts at `at`, as its left operand;
+  // asked before the right one is read, so a break in it is not reported
+  // first.
+  bool TakesLeft(const JoinForm& join, Kind left, SourceLoc at) {
+    switch (join.operands) {
+      case Operands::kBooleanSequence:
+        return Require(left, Kind::kBoolean, at);
+      case Operands::kSequences:
+      case Operands::kSequenceProperty:
+        return Require(left, Kind::kSequence, at);
+      default:
+        return true;
+    }
+  }
+
+  // Whether `join` takes `right`, which starts at `at`, as its right
+  // operand, what it makes of the two kept in `left`.
+  bool TakesRight(const JoinForm& join, Kind& left, Kind right, SourceLoc at) {
+    switch (join.operands) {
+      case Operands::kSequences:
+      case Operands::kBooleanSequence:
+        left = Kind::kSequence;
+        return Require(right, Kind::kSequence, at);
+      case Operands::kEither:
+        left = std::max({left, right, Kind::kSequence});
+        return true;
+      default:
+        left = Kind::kProperty;
+        return true;
+    }
   }
 
   // One operand with the cycle delays, the clocking events and the
-  // operators written before it.
-  bool Operand(bool sequence) {
-    while (p_.Check(TokenKind::kHashHash)) {
+  // operators written before it, what it is kept in `kind`.
+  bool Operand(bool sequence, Kind& kind) {
+    if (p_.Check(TokenKind::kHashHash)) {
       if (!CycleDelay()) return false;
+      const SourceLoc kAt = p_.CurrentToken().loc;
+      if (!Operand(sequence, kind) || !Require(kind, Kind::kSequence, kAt)) {
+        return false;
+      }
+      kind = Kind::kSequence;
+      return true;
     }
-    if (p_.Check(TokenKind::kAt)) return ClockingEvent() && Operand(sequence);
+    if (p_.Check(TokenKind::kAt)) {
+      return ClockingEvent() && Operand(sequence, kind);
+    }
     const PrefixForm* form = FindPrefixForm(p_.CurrentToken().kind, sequence);
-    return form != nullptr ? Prefixed(*form) : Primary(sequence);
+    return form != nullptr ? Prefixed(*form, kind) : Primary(sequence, kind);
   }
 
   // The operand of an operator written before it, or what the operator
-  // stands for whole, the operator read from the current token.
-  bool Prefixed(const PrefixForm& form) {
+  // stands for whole, the operator read from the current token; what it
+  // makes kept in `kind`.
+  bool Prefixed(const PrefixForm& form, Kind& kind) {
     p_.Consume();
+    kind = form.property ? Kind::kProperty : Kind::kSequence;
+    Kind inner = Kind::kBoolean;
     switch (form.opener) {
       case Opener::kOptionalBracket:
-        if (!p_.Check(TokenKind::kLBracket)) return Operand(false);
-        return Bracket(form.bounds, form.dollar) && Operand(false);
+        if (!p_.Check(TokenKind::kLBracket)) return PrefixOperand(form);
+        return Bracket(form.bounds, form.dollar) && PrefixOperand(form);
       case Opener::kBracket:
-        return Bracket(form.bounds, form.dollar) && Operand(false);
+        return Bracket(form.bounds, form.dollar) && PrefixOperand(form);
       case Opener::kCondition:
-        return Condition() && Operand(false);
+        return Condition() && PrefixOperand(form);
       case Opener::kStrength:
-        return Parenthesis(true, false);
+        return Parenthesis({false, false, true}, inner);
       case Opener::kFirstMatch:
-        return Parenthesis(true, true);
-      case Opener::kIf:
-        return Condition() && Chain(false) &&
-               (!p_.Match(TokenKind::kKwElse) || Chain(false));
+        return Parenthesis({false, true, true}, inner);
+      case Opener::kIf: {
+        Kind branch = Kind::kBoolean;
+        return Condition() && Chain(false, branch) &&
+               (!p_.Match(TokenKind::kKwElse) || Chain(false, branch));
+      }
       case Opener::kCase:
         return Condition() && CaseItem();
       default:
-        return Operand(false);
+        return PrefixOperand(form);
     }
+  }
+
+  // The property_expr an operator written before it takes: the rest of the
+  // chain for an operator of Table 16-3's last row, and for not, nexttime
+  // and s_nexttime what the rows above theirs join.
+  bool PrefixOperand(const PrefixForm& form) {
+    Kind operand = Kind::kBoolean;
+    return Climb(false, form.lowest ? 0 : kNotPrecedence + 1, operand);
   }
 
   // An operand no operator stands before: an expression_or_dist, a
@@ -310,16 +463,21 @@ class ParserPropertyGrammar::Scan {
   // to a token an operand ends at, `(a) + b` being an expression, or an
   // instance whose actual arguments no expression reads; with the
   // repetition after it.
-  bool Primary(bool sequence) {
+  bool Primary(bool sequence, Kind& kind) {
+    const SourceLoc kAt = p_.CurrentToken().loc;
     auto saved = p_.lexer_.SavePos();
     if (Read(Reading::kExpressionOrDist) != nullptr && AtOperandEnd()) {
-      return Repetition(true);
+      kind = Kind::kBoolean;
+      return Repetition(kind, kAt);
     }
     p_.lexer_.RestorePos(saved);
     if (p_.Check(TokenKind::kLParen)) {
-      return Parenthesis(sequence, true) && Repetition(false);
+      return Parenthesis({sequence, true, false}, kind) &&
+             Repetition(kind, kAt);
     }
-    return p_.Check(TokenKind::kIdentifier) && Instance() && Repetition(false);
+    kind = Kind::kInstance;
+    return p_.Check(TokenKind::kIdentifier) && Instance() &&
+           Repetition(kind, kAt);
   }
 
   bool AtOperandEnd() {
@@ -332,12 +490,21 @@ class ParserPropertyGrammar::Scan {
     return Fail();
   }
 
-  // `( chain )`, with the sequence_match_items after the chain where
-  // `match_items` is set (§16.10).
-  bool Parenthesis(bool sequence, bool match_items) {
+  // `( chain )`, with the sequence_match_items after the chain where the
+  // group takes them (§16.10), what it holds kept in `kind`. A chain that
+  // match items follow, or that the group admits only as a sequence_expr,
+  // is one.
+  bool Parenthesis(Group group, Kind& kind) {
     if (!p_.Match(TokenKind::kLParen)) return Fail();
-    if (!Chain(sequence)) return false;
-    while (match_items && p_.Match(TokenKind::kComma)) {
+    const SourceLoc kAt = p_.CurrentToken().loc;
+    if (!Chain(group.sequence, kind)) return false;
+    const bool kItems = group.match_items && p_.Check(TokenKind::kComma);
+    if ((group.sequence_only || kItems) &&
+        !Require(kind, Kind::kSequence, kAt)) {
+      return false;
+    }
+    if (kItems) kind = Kind::kSequence;
+    while (group.match_items && p_.Match(TokenKind::kComma)) {
       if (!MatchItem()) return false;
     }
     return Expect(TokenKind::kRParen);
@@ -384,7 +551,8 @@ class ParserPropertyGrammar::Scan {
         kEdges.end()) {
       return EdgeEvent();
     }
-    return Chain(false);
+    Kind kind = Kind::kBoolean;
+    return Chain(false, kind);
   }
 
   // `name ( [actual] )`, its `.` read.
@@ -414,7 +582,8 @@ class ParserPropertyGrammar::Scan {
     } else if (!CaseLabels()) {
       return false;
     }
-    if (!Chain(false)) return false;
+    Kind kind = Kind::kBoolean;
+    if (!Chain(false, kind)) return false;
     if (!p_.Match(TokenKind::kSemicolon)) return Fail();
     return p_.Match(TokenKind::kKwEndcase) || CaseItem();
   }
@@ -461,10 +630,15 @@ class ParserPropertyGrammar::Scan {
                      kKind) != kRepetitionOpeners.end();
   }
 
-  // §16.9.2: the repetition after an operand, if any: consecutive on any
-  // operand, and goto and nonconsecutive on a `boolean` one alone.
-  bool Repetition(bool boolean) {
+  // §16.9.2: the repetition after an operand of `kind` that starts at `at`,
+  // if any: consecutive on a sequence_expr, and goto and nonconsecutive on
+  // an expression_or_dist alone; what it makes, a sequence_expr, kept in
+  // `kind`.
+  bool Repetition(Kind& kind, SourceLoc at) {
     if (!AtRepetition()) return true;
+    if (!Require(kind, Kind::kSequence, at)) return false;
+    const bool kBoolean = kind == Kind::kBoolean;
+    kind = Kind::kSequence;
     p_.Consume();
     if (p_.Match(TokenKind::kPlus)) {
       return Expect(TokenKind::kRBracket);
@@ -473,7 +647,7 @@ class ParserPropertyGrammar::Scan {
       return p_.Match(TokenKind::kRBracket) ||
              BracketBody(Bounds::kEither, true);
     }
-    if (!boolean) return Fail();
+    if (!kBoolean) return Fail();
     p_.Consume();
     return BracketBody(Bounds::kEither, true);
   }
@@ -505,6 +679,10 @@ class ParserPropertyGrammar::Scan {
   Parser& p_;
   bool sequence_;
   SourceLoc furthest_;
+  // Where an operand stands that the grammar does not admit there, and the
+  // report made of it, which a misreading of the spec does not override.
+  SourceLoc misplaced_at_;
+  const char* misplaced_ = nullptr;
 };
 
 bool ParserPropertyGrammar::CheckPropertySpec(Parser& p, bool sequence) {

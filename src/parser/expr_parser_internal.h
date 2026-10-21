@@ -38,6 +38,13 @@ Expr* MakeIdentifierNode(Arena& arena, std::string_view text, SourceLoc loc);
 Expr* MakeTextCast(Arena& arena, std::string_view type_text, SourceLoc start,
                    Expr* value);
 
+// Whether `arg` is a class_new or a dynamic_array_new (A.2.4) that
+// ParsePrimaryExpr read where an expression starts: a `new` with no class
+// scope, which stands only on the right-hand side of a blocking assignment
+// (A.6.2). Defined in expr_parser_aux.cpp, and shared with the statement
+// parser in parser_stmt.cpp, which takes no such `new` as a statement.
+bool IsNewExpr(const Expr* arg);
+
 // Builds a postfix increment/decrement node wrapping an already-parsed operand,
 // using the already-consumed operator's kind. Pure node construction; defined
 // in expr_parser.cpp after the primaries that use it, ParseThisOrSuperExpr and

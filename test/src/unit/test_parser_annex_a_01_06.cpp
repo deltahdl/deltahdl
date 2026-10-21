@@ -382,4 +382,57 @@ TEST(NonPortInterfaceItem, SpecifyBlockAndSpecparamInModuleAreAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// A.1.6's interface_or_generate_item reaches a module_common_item and an
+// extern_tf_declaration; a parameter_override comes only from A.1.4's
+// module_or_generate_item, so a defparam is no item of an interface, and
+// §27.3's footnote 35 holds a generate block in one to the same items. Each is
+// reported and still read, so the body goes on (#6771).
+TEST(InterfaceItemParsing, ADefparamIsNoInterfaceItem) {
+  auto r = Parse(
+      "interface ifc;\n"
+      "  defparam top.u.P = 2;\n"
+      "  if (1) begin : g\n"
+      "    defparam top.u.P = 3;\n"
+      "  end\n"
+      "  logic after;\n"
+      "endinterface\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a defparam statement is not an item of an interface", 2,
+      "A.1.6"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a defparam statement is not an item of an interface", 4,
+      "A.1.6"));
+}
+
+// A.1.6 leaves a gate_instantiation out of an interface as it leaves a
+// parameter_override, in the body and in a generate block of it (#5915).
+TEST(InterfaceItemParsing, AGateIsNoInterfaceItem) {
+  auto r = Parse(
+      "interface ifc;\n"
+      "  wire a, b, y, z;\n"
+      "  and g(y, a, b);\n"
+      "  if (1) begin : gb\n"
+      "    not n(z, a);\n"
+      "  end\n"
+      "endinterface\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a gate instantiation is not an item of an interface", 3,
+      "A.1.6"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a gate instantiation is not an item of an interface", 5,
+      "A.1.6"));
+}
+
+// A module body takes both, as A.1.4's module_or_generate_item gives them.
+TEST(InterfaceItemParsing, AModuleTakesADefparamAndAGate) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire a, b, y;\n"
+      "  defparam top.u.P = 2;\n"
+      "  and g(y, a, b);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

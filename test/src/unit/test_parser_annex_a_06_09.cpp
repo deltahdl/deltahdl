@@ -158,4 +158,65 @@ TEST(SubroutineCallStatementParsing, VoidCastOfEveryCallForm) {
   EXPECT_EQ(block->stmts[2]->label, "lbl");
 }
 
+// A.8.2 gives an array manipulation call an optional argument list and an
+// optional `with ( expression )`, and a randomize call an optional argument
+// list and an optional `with constraint_block`: either, written with the
+// clause and no argument list, is a function_subroutine_call the cast takes
+// as it takes the call written with parentheses (#5833).
+TEST(SubroutineCallStatementParsing, VoidCastOfACallWithAClauseAndNoParens) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    void'(q.find with (item > 1));\n"
+      "    void'(q.sum with (item * 2));\n"
+      "    void'(obj.randomize with { x > 0; });\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* block = InitialBody(r);
+  ASSERT_NE(block, nullptr);
+  ASSERT_EQ(block->stmts.size(), 3u);
+  for (auto* stmt : block->stmts) {
+    ASSERT_NE(stmt->expr, nullptr);
+    EXPECT_EQ(stmt->expr->kind, ExprKind::kCast);
+  }
+}
+
+// A.6.9's subroutine_call is a task, function, system, method or randomize
+// call, and a bare `new`, a copy or an array's `new[]` is none of them: §8.7
+// calls a constructor from the right-hand side of an assignment, and as
+// `super.new` from a derived class's own. Each was taken as a statement and
+// ran (#5780).
+TEST(SubroutineCallStatementParsing, ABareNewIsNoStatement) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    new;\n"
+      "    new c;\n"
+      "    new[4];\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "'new' is no subroutine call", 3, "A.6.9"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "'new' is no subroutine call", 4, "A.6.9"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "'new' is no subroutine call", 5, "A.6.9"));
+}
+
+// The constructor call a derived class makes of its base, `super.new(...)`,
+// stays a statement (§8.17).
+TEST(SubroutineCallStatementParsing, SuperNewIsAStatement) {
+  auto r = Parse(
+      "class B; function new(int x); endfunction endclass\n"
+      "class D extends B;\n"
+      "  function new();\n"
+      "    super.new(3);\n"
+      "  endfunction\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

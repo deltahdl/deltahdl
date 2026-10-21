@@ -73,7 +73,7 @@ Expr* Parser::ParseStreamingConcat(TokenKind dir) {
 // neither can be an argument. ParsePrimaryExpr reads `new` wherever an
 // expression starts, for the assignment forms it stands in, so an argument is
 // told apart here: `q.push_back(new(7))` was accepted and pushed a null handle.
-static bool IsNewExpr(const Expr* arg) {
+bool IsNewExpr(const Expr* arg) {
   return arg != nullptr && arg->kind == ExprKind::kCall && arg->text == "new" &&
          arg->callee.empty();
 }

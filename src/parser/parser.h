@@ -147,6 +147,8 @@ class Parser {
   bool TryParseDeclKeywordItem(std::vector<ModuleItem*>& items);
   void RejectInCheckerBody(const char* msg);
   void RejectInProgramBody(SourceLoc loc, const char* msg);
+  void RejectInInterfaceBody(const char* msg);
+  void RejectMisplacedGate();
   void RejectInPackageBody(const char* msg);
   void FilterPackageItems(std::vector<ModuleItem*>& items, size_t before);
   bool TryRejectBodyPortDecl();
@@ -876,10 +878,7 @@ class Parser {
     return current_module_ &&
            current_module_->decl_kind == ModuleDeclKind::kProgram;
   }
-  bool InModuleBody() const {
-    return current_module_ &&
-           current_module_->decl_kind == ModuleDeclKind::kModule;
-  }
+  bool InModuleBody() const;
   bool InInterfaceBody() const {
     return current_module_ &&
            current_module_->decl_kind == ModuleDeclKind::kInterface;

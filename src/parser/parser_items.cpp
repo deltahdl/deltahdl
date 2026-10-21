@@ -635,6 +635,8 @@ void Parser::ParseModuleItem(std::vector<ModuleItem*>& items) {
     RejectInCheckerBody("a defparam statement is not an item of a checker");
     RejectInProgramBody(CurrentLoc(),
                         "a defparam statement is not an item of a program");
+    RejectInInterfaceBody(
+        "a defparam statement is not an item of an interface");
     items.push_back(ParseDefparam());
   } else if (Check(TokenKind::kKwImport)) {
     ParseImportDecl(items);
@@ -732,10 +734,7 @@ void Parser::ParseTypedItemOrInst(std::vector<ModuleItem*>& items,
     return;
   }
   if (IsAtGateKeyword()) {
-    if (InProgramBlock())
-      diag_.Error(CurrentLoc(), "primitive instances not allowed in programs",
-                  Subclause("24.3"));
-    RejectInCheckerBody("a gate instantiation is not an item of a checker");
+    RejectMisplacedGate();
     ParseGateInst(items);
     return;
   }
