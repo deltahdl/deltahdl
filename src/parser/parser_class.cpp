@@ -8,6 +8,7 @@
 #include "common/source_loc.h"
 #include "lexer/token.h"
 #include "parser/ast_class.h"
+#include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
 #include "parser/param_port_list.h"
