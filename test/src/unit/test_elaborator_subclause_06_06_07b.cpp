@@ -515,4 +515,101 @@ TEST(NettypeElaboration, NetOfAPackageScopedNettypeIsANetOfThatNettype) {
   EXPECT_EQ(net->nettype_name, "P::rnt");
 }
 
+// A nettype written through its package, or through `$unit`, is the nettype
+// it names wherever it is written, so naming one as the type of anything but a
+// net is reported as naming it bare is, under the name it is written with: a
+// structure member, a function's return and argument, a parameter, a class
+// property, a procedural variable and a cast (#7601).
+TEST(NettypeElaboration,
+     NettypeWrittenThroughAScopeNamedAsANonNetTypeRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package P;\n"
+      "  nettype logic [3:0] nt;\n"
+      "endpackage\n"
+      "nettype logic [3:0] cu_nt;\n"
+      "module top;\n"
+      "  typedef struct { P::nt m; $unit::cu_nt k; } s_t;\n"
+      "  function P::nt f(P::nt a); return a; endfunction\n"
+      "  parameter P::nt Q = 0;\n"
+      "  logic [3:0] x;\n"
+      "  class C;\n"
+      "    P::nt p;\n"
+      "  endclass\n"
+      "  initial begin\n"
+      "    P::nt b;\n"
+      "    $unit::cu_nt c;\n"
+      "    x = P::nt'(x);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "top");
+  const std::pair<uint32_t, std::string_view> kUses[] = {
+      {6,
+       "'P::nt' may declare only a net, and is named here as the type of "
+       "member 'm'"},
+      {6,
+       "'$unit::cu_nt' may declare only a net, and is named here as the "
+       "type of member 'k'"},
+      {7,
+       "'P::nt' may declare only a net, and is named here as the type of "
+       "the return of function 'f'"},
+      {7,
+       "'P::nt' may declare only a net, and is named here as the type of "
+       "argument 'a' of 'f'"},
+      {8,
+       "'P::nt' may declare only a net, and is named here as the type of "
+       "parameter 'Q'"},
+      {11,
+       "'P::nt' may declare only a net, and is named here as the type of "
+       "property 'p'"},
+      {14,
+       "'P::nt' may declare only a net, and is named here as the type of "
+       "variable 'b'"},
+      {15,
+       "'$unit::cu_nt' may declare only a net, and is named here as the "
+       "type of variable 'c'"},
+      {16,
+       "'P::nt' may declare only a net, and is named here as the type of "
+       "a cast"}};
+  for (const auto& [line, message] : kUses) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), message, line, "6.6.7"));
+  }
+}
+
+// The same report at the compilation unit's scope and in another package, which
+// reach P's nettype through P as a module does: a member of the unit's
+// structure, the return of its function, its class's property, and a parameter
+// of package Q (#7601).
+TEST(NettypeElaboration, NettypeWrittenThroughAPackageAtUnitScopeRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package P;\n"
+      "  nettype logic [3:0] nt;\n"
+      "endpackage\n"
+      "typedef struct { P::nt m; } s_t;\n"
+      "function P::nt f(); return 0; endfunction\n"
+      "class C;\n"
+      "  P::nt p;\n"
+      "endclass\n"
+      "package Q;\n"
+      "  parameter P::nt R = 0;\n"
+      "endpackage\n"
+      "module top;\n"
+      "endmodule\n",
+      f, "top");
+  const std::pair<uint32_t, std::string_view> kUses[] = {
+      {4, "member 'm'"},
+      {5, "the return of function 'f'"},
+      {7, "property 'p'"},
+      {10, "parameter 'R'"}};
+  for (const auto& [line, use] : kUses) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        std::format("nettype 'P::nt' may declare only a net, and is named "
+                    "here as the type of {}",
+                    use),
+        line, "6.6.7"));
+  }
+}
+
 }  // namespace

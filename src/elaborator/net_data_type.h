@@ -75,7 +75,9 @@ void ValidateNetTypedefDims(const DataType& dtype,
 // typedefs, RegisterPackageNettypes a package's nettypes, and
 // RegisterScopedClassNames a package's or the compilation unit's classes.
 // §26.3 and §3.12.1 have such a name reach that scope's declaration and no
-// same-named one elsewhere.
+// same-named one elsewhere. The first form takes the scope, empty for none,
+// and the name apart, as a structure member keeps them.
+std::string NamedTypeKey(std::string_view scope, std::string_view name);
 std::string NamedTypeKey(const DataType& type);
 
 // §6.6.7 (printed pages 97–98): the data type of a user-defined nettype shall

@@ -240,9 +240,13 @@ static bool IsLegalNettypeElement(const DataType& type,
   return true;
 }
 
+std::string NamedTypeKey(std::string_view scope, std::string_view name) {
+  if (scope.empty()) return std::string(name);
+  return std::string(scope) + "::" + std::string(name);
+}
+
 std::string NamedTypeKey(const DataType& type) {
-  if (type.scope_name.empty()) return std::string(type.type_name);
-  return std::string(type.scope_name) + "::" + std::string(type.type_name);
+  return NamedTypeKey(type.scope_name, type.type_name);
 }
 
 bool IsLegalNettypeDataType(const DataType& dtype,

@@ -807,9 +807,8 @@ bool Elaborator::ElaborateUserNettypeNet(ModuleItem* item, RtlirModule* mod) {
   if (it == nettype_names_.end()) return false;
   std::string_view nettype = *it;
   if (WrittenAsDataDeclaration(item)) {
-    ReportNettypeNotNet(item->data_type.type_name,
-                        std::format("variable '{}'", item->name), item->loc,
-                        diag_);
+    ReportNettypeNotNet(nettype, std::format("variable '{}'", item->name),
+                        item->loc, diag_);
     return false;
   }
   // Syntax 10-1 and §10.3.3 give such a declaration one delay at most.

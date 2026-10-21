@@ -279,7 +279,7 @@ void Elaborator::ValidatePerDeclarationRulesInUnitScopes() {
   for (const auto* pkg : unit_->packages) {
     if (pkg != nullptr) run_over(pkg->items);
   }
-  CheckUnitNettypeUses(unit_, diag_);
+  CheckUnitNettypeUses(unit_, nettype_names_, diag_);
   // §7.2 to §7.3.2 and §7.8.5 for the same two scopes, whose parameters are
   // not at hand to judge a member default's constancy against.
   const TypeShapeTables kShapeTables{typedefs_, td_array_dims_, class_names_};
