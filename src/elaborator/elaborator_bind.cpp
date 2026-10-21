@@ -1,7 +1,9 @@
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <format>
 #include <functional>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -13,6 +15,7 @@
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_bind_params.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/elaborator_modport_imports.h"
@@ -118,7 +121,39 @@ struct BindWalkState {
   std::unordered_set<const BindDirective*> applied;
   std::unordered_set<const BindTargetInstance*> matched;
   std::unordered_map<std::string, std::string_view> path_modules;
+  // Each target's path with its selects evaluated, as SelectedTargetPath
+  // gives it.
+  std::unordered_map<const BindTargetInstance*, std::string> paths;
 };
+
+// A.1.4 with A.9.3: the path `target` names, each select of each of its levels
+// evaluated against `scope` as the constant_bit_select it is written as, so
+// that `u[1]` and `g[1].v` read as the walk spells an element of an instance
+// array and an instance in a loop generate block. A select that is no
+// constant is reported at `loc`, and the path then names no instance.
+static std::string SelectedTargetPath(const BindTargetInstance& target,
+                                      const ScopeMap& scope, SourceLoc loc,
+                                      DiagEngine& diag) {
+  std::string path;
+  for (const BindTargetSegment& segment : target.segments) {
+    if (!path.empty()) path.push_back('.');
+    path.append(segment.name);
+    for (const Expr* select : segment.selects) {
+      std::optional<int64_t> index;
+      if (IsConstantExpr(select, scope)) index = ConstEvalInt(select, scope);
+      if (!index) {
+        diag.Error(loc,
+                   "a bind target selects with an expression that is not "
+                   "constant",
+                   Subclause("A.1.4"));
+        path.append("[]");
+        continue;
+      }
+      path += std::format("[{}]", *index);
+    }
+  }
+  return path;
+}
 
 struct Elaborator::BindWalkCtx : BindWalkState {};
 
@@ -151,92 +186,20 @@ static void ReportUnmatchedBindTargets(const BindWalkState& ctx,
   }
 }
 
-// §23.11: whether the dotted name `e`, read from `mod`, passes through an
-// instance a bind put there: its leading names are instances one below the
-// other, and one of them was bound.
-static bool DottedNameCrossesBind(const Expr* e, const RtlirModule* mod) {
-  std::vector<std::string_view> steps;
-  const Expr* head = e;
-  while (head->kind == ExprKind::kMemberAccess && !head->is_scope_resolution) {
-    steps.push_back(head->rhs->text);
-    head = head->lhs;
-  }
-  if (head->kind != ExprKind::kIdentifier) return false;
-  steps.push_back(head->text);
-  for (size_t i = steps.size(); i-- > 1 && mod != nullptr;) {
-    auto child = std::ranges::find_if(mod->children, [&](const auto& c) {
-      return c.simple_inst_name == steps[i];
-    });
-    if (child == mod->children.end()) return false;
-    if (child->is_bound) return true;
-    mod = child->resolved;
-  }
-  return false;
-}
-
-// §23.11: whether some dotted name within `e` crosses a bind (above).
-static bool ExprCrossesBind(const Expr* e, const RtlirModule* mod) {
-  if (e == nullptr) return false;
-  if (e->kind == ExprKind::kMemberAccess) return DottedNameCrossesBind(e, mod);
-  bool found = false;
-  ForEachExprChild(e, [&](const Expr* child) {
-    found = found || ExprCrossesBind(child, mod);
-  });
-  return found;
-}
-
-// The packed range a declaration in a module's body writes, the constant
-// expressions there a hierarchical name can reach a bind instance's parameter
-// from; a parameter's value is held to §6.20.2's rule against any hierarchical
-// reference already.
-static std::vector<const Expr*> ItemConstantExprs(const ModuleItem* item) {
-  if (item->kind != ModuleItemKind::kVarDecl &&
-      item->kind != ModuleItemKind::kNetDecl) {
-    return {};
-  }
-  std::vector<const Expr*> exprs{item->data_type.packed_dim_left,
-                                 item->data_type.packed_dim_right};
-  for (const auto& [left, right] : item->data_type.extra_packed_dims) {
-    exprs.push_back(left);
-    exprs.push_back(right);
-  }
-  return exprs;
-}
-
-// §23.11: the packed ranges of the declaration `decl` gives module `mod` that
-// reach a bind instance's parameter, each reported at its declaration.
-static void ReportBindParamsInModule(const ModuleDecl* decl,
-                                     const RtlirModule* mod, DiagEngine& diag) {
-  for (const ModuleItem* item : decl->items) {
-    auto exprs = ItemConstantExprs(item);
-    if (std::ranges::none_of(
-            exprs, [mod](const Expr* e) { return ExprCrossesBind(e, mod); })) {
-      continue;
-    }
-    diag.Error(item->loc,
-               "a parameter of an instance a bind made is reached by a "
-               "hierarchical name where a constant expression is required",
-               Subclause("23.11"));
-  }
-}
-
-// §23.11: a bind instance's parameters reached by a hierarchical name are no
-// constant outside the instance; reported where a module's packed range
-// reaches one. `find_module` answers a module's declaration.
-static void ReportBindParamsInConstants(
-    const std::vector<RtlirModule*>& tops,
-    const std::function<const ModuleDecl*(std::string_view)>& find_module,
-    DiagEngine& diag) {
+// An elaborated instance of the module `name` at or below `tops`, whose
+// parameters a bind directive written in that module selects its targets with.
+static const RtlirModule* AnInstanceOf(const std::vector<RtlirModule*>& tops,
+                                       std::string_view name) {
   std::vector<const RtlirModule*> pending(tops.begin(), tops.end());
   std::unordered_set<const RtlirModule*> seen;
   while (!pending.empty()) {
     const RtlirModule* mod = pending.back();
     pending.pop_back();
     if (mod == nullptr || !seen.insert(mod).second) continue;
+    if (mod->name == name) return mod;
     for (const auto& child : mod->children) pending.push_back(child.resolved);
-    const ModuleDecl* decl = find_module(mod->name);
-    if (decl != nullptr) ReportBindParamsInModule(decl, mod, diag);
   }
+  return nullptr;
 }
 
 void Elaborator::ApplyBindDirectives(const std::vector<RtlirModule*>& tops) {
@@ -248,7 +211,18 @@ void Elaborator::ApplyBindDirectives(const std::vector<RtlirModule*>& tops) {
   });
   generate_binds_.clear();
   if (binds.empty()) return;
-  BindWalkCtx ctx{{binds, {}, {}, {}, {}}};
+  BindWalkCtx ctx{{binds, {}, {}, {}, {}, {}}};
+  for (const auto& site : binds) {
+    const RtlirModule* owner =
+        site.owner.empty() ? nullptr : AnInstanceOf(tops, site.owner);
+    const ScopeMap kScope = owner ? BuildParamScope(owner) : ScopeMap{};
+    const BindDirective* bd = site.bd;
+    ctx.paths[&bd->target] =
+        SelectedTargetPath(bd->target, kScope, bd->loc, diag_);
+    for (const auto& inst : bd->target_instances) {
+      ctx.paths[&inst] = SelectedTargetPath(inst, kScope, bd->loc, diag_);
+    }
+  }
   for (auto* top : tops) {
     if (top) WalkForBind(top, std::string(top->name), false, ctx);
   }
@@ -263,18 +237,19 @@ void Elaborator::ApplyBindDirectives(const std::vector<RtlirModule*>& tops) {
 // a directive written in module `owner`, from an instance of that module, as
 // `bind sub: s2` written in top names top's s2: the instance at `hier_path`
 // less the written path is then one of `owner`.
-static bool TargetInstanceNames(
-    const BindTargetInstance& target, std::string_view owner,
-    const std::string& hier_path,
-    const std::unordered_map<std::string, std::string_view>& path_modules) {
+static bool TargetInstanceNames(const BindTargetInstance& target,
+                                std::string_view owner,
+                                const std::string& hier_path,
+                                const BindWalkState& ctx) {
   std::string_view path = hier_path;
-  if (path == target.path) return true;
+  std::string_view written = ctx.paths.at(&target);
+  if (path == written) return true;
   if (target.from_root || owner.empty()) return false;
-  if (path.size() <= target.path.size() + 1) return false;
-  size_t cut = path.size() - target.path.size() - 1;
-  if (path[cut] != '.' || path.substr(cut + 1) != target.path) return false;
-  auto it = path_modules.find(std::string(path.substr(0, cut)));
-  return it != path_modules.end() && it->second == owner;
+  if (path.size() <= written.size() + 1) return false;
+  size_t cut = path.size() - written.size() - 1;
+  if (path[cut] != '.' || path.substr(cut + 1) != written) return false;
+  auto it = ctx.path_modules.find(std::string(path.substr(0, cut)));
+  return it != ctx.path_modules.end() && it->second == owner;
 }
 
 static bool BindAppliesToModule(const BindDirectiveSite& site,
@@ -284,15 +259,13 @@ static bool BindAppliesToModule(const BindDirectiveSite& site,
                                 BindWalkState& ctx) {
   const BindDirective* bd = site.bd;
   if (!IsBindTargetScope(bd->target.path, unit)) {
-    return TargetInstanceNames(bd->target, site.owner, hier_path,
-                               ctx.path_modules);
+    return TargetInstanceNames(bd->target, site.owner, hier_path, ctx);
   }
   if (mod->name != bd->target.path) return false;
   if (bd->target_instances.empty()) return true;
   bool named = false;
   for (const auto& inst : bd->target_instances) {
-    if (!TargetInstanceNames(inst, site.owner, hier_path, ctx.path_modules))
-      continue;
+    if (!TargetInstanceNames(inst, site.owner, hier_path, ctx)) continue;
     ctx.matched.insert(&inst);
     named = true;
   }

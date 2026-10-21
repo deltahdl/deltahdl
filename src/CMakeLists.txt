@@ -514,6 +514,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     synthesizer/adv_synth.cpp
     synthesizer/mem_infer.cpp
     elaborator/elaborator_bind.cpp
+    elaborator/elaborator_bind_params.cpp
     elaborator/elaborator_cont_assign.cpp
     elaborator/elaborator_decls.cpp
     elaborator/elaborator_decls_element.cpp

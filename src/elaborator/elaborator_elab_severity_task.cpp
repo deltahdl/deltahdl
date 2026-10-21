@@ -31,23 +31,23 @@ namespace {
 // Syntax 20-11 in §20.10 writes finish_number ::= 0 | 1 | 2, and §20.10.1 gives
 // the elaboration severity system tasks the same syntax as the run-time ones,
 // so the first argument of an elaboration-time $fatal is an optional
-// finish_number held to that enumeration. Returns the index of the first
-// message-list argument: 1 when a leading integer literal was consumed as the
-// finish_number, else 0.
+// finish_number held to that enumeration. A.1.4 writes it first whenever the
+// call has parentheses, so any other expression there is reported as well,
+// and is still not read as the message. Returns the index of the first
+// message-list argument: 1 when the call has a first argument, else 0.
 size_t CheckFatalFinishNumber(const Expr* expr, bool is_fatal,
                               DiagEngine& diag) {
-  if (is_fatal && !expr->args.empty()) {
-    auto* first_arg = expr->args[0];
-    if (first_arg->kind == ExprKind::kIntegerLiteral) {
-      auto val = first_arg->int_val;
-      if (val > 2) {
-        diag.Error(first_arg->range.start, "finish_number must be 0, 1, or 2",
-                   Subclause("20.10"));
-      }
-      return 1;
-    }
+  if (!is_fatal || expr->args.empty()) return 0;
+  const Expr* first_arg = expr->args[0];
+  if (first_arg->kind != ExprKind::kIntegerLiteral) {
+    diag.Error(first_arg->range.start,
+               "the first argument of $fatal is a finish_number, 0, 1 or 2",
+               Subclause("A.1.4"));
+  } else if (first_arg->int_val > 2) {
+    diag.Error(first_arg->range.start, "finish_number must be 0, 1, or 2",
+               Subclause("20.10"));
   }
-  return 0;
+  return 1;
 }
 
 // Per §20.10.1, list_of_arguments may only contain a formatting string and
