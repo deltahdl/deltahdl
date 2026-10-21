@@ -1,5 +1,6 @@
 #include "simulator/property_clocks.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <vector>
@@ -11,6 +12,7 @@
 #include "simulator/awaiters_event_control.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
+#include "simulator/sva_engine_sampling.h"
 #include "simulator/variable.h"
 
 namespace delta {
@@ -71,14 +73,14 @@ void WatchEvent(PropertyClocks& clocks, WatchedEvent watched,
     // §15.5.1: a named event holds no value that changes; each trigger is
     // what `@(ev)` waits for, and so a tick of the clock.
     if (var->is_event) {
-      clocks.ticked_at[watched.clock] = ctx.CurrentTime();
+      clocks.ticks[watched.clock].push_back(ctx.CurrentTime());
       return false;
     }
     bool now = EvalExpr(ev.signal, ctx, arena).IsTruthy();
     bool was = clocks.was_true[watched.slot];
     clocks.was_true[watched.slot] = now;
     if (EdgeHappened(ev.edge, was, now)) {
-      clocks.ticked_at[watched.clock] = ctx.CurrentTime();
+      clocks.ticks[watched.clock].push_back(ctx.CurrentTime());
     }
     return false;
   });
@@ -100,13 +102,13 @@ void InstallClockWatchers(PropertyClocks& clocks, SimContext& ctx,
   if (clocks.clocks.size() < 2) return;
   if (!clocks.multiclock) {
     clocks.multiclock = true;
-    clocks.installed_at = ctx.CurrentTime();
+    clocks.installed_at = ctx.AssertionSamples().StepTime(ctx.CurrentTime());
   }
   // The clocks not yet watched, from the first where the property has just
   // met its second, so a clock an expansion brings is watched from then.
-  while (clocks.ticked_at.size() < clocks.clocks.size()) {
-    size_t i = clocks.ticked_at.size();
-    clocks.ticked_at.push_back(PropertyClocks::kNever);
+  while (clocks.ticks.size() < clocks.clocks.size()) {
+    size_t i = clocks.ticks.size();
+    clocks.ticks.emplace_back();
     for (const EventExpr& ev : clocks.clocks[i]) {
       clocks.was_true.push_back(false);
       WatchEvent(clocks, {static_cast<int>(i), clocks.was_true.size() - 1}, ev,
@@ -135,10 +137,18 @@ bool WokenByAnotherClock(const PropertyClocks& clocks, const EventExpr& woke) {
 uint32_t ClocksTicked(const PropertyClocks& clocks, SimTime now) {
   if (!clocks.multiclock) return ~0u;
   uint32_t ticked = now == clocks.installed_at ? 1u : 0u;
-  for (size_t i = 0; i < clocks.ticked_at.size() && i < 32; ++i) {
-    if (clocks.ticked_at[i] == now) ticked |= 1u << i;
+  for (size_t i = 0; i < clocks.ticks.size() && i < 32; ++i) {
+    if (std::ranges::find(clocks.ticks[i], now) != clocks.ticks[i].end()) {
+      ticked |= 1u << i;
+    }
   }
   return ticked;
+}
+
+void ForgetTicksBefore(PropertyClocks& clocks, SimTime now) {
+  for (std::vector<SimTime>& ticks : clocks.ticks) {
+    std::erase_if(ticks, [now](SimTime tick) { return tick < now; });
+  }
 }
 
 }  // namespace delta

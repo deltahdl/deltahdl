@@ -414,7 +414,8 @@ bool ExpandInstance(const PropertyExprNode* node, NodeState& state,
   // step, which the step's mask, read before the clock was met, would say
   // of every clock, so the mask is read again for the operands on it to
   // begin at its first tick.
-  sc.ticked = ClocksTicked(sc.tree.clocks, sc.ctx.CurrentTime());
+  sc.ticked = ClocksTicked(
+      sc.tree.clocks, sc.ctx.AssertionSamples().StepTime(sc.ctx.CurrentTime()));
   sc.ctx.AssertionSamples().SetClockTicks(sc.ticked);
   state.expansion = body;
   state.operands.push_back(NewNodeState(body, sc.tree, state.clock, sc.arena));
@@ -873,6 +874,7 @@ PropertyTick AdvancePropertyTree(PropertyTreeState& state, bool disabled,
   bool again = state.advanced_at == now;
   state.advanced_at = now;
   uint32_t ticked = ClocksTicked(state.clocks, now);
+  ForgetTicksBefore(state.clocks, now);
   if (ticked == 0) return tick;
   size_t beginning = (ticked & 1u) != 0 ? instances.size() : 0;
   tick.attempted = static_cast<uint32_t>(beginning);

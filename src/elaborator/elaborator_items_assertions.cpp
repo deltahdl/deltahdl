@@ -8,7 +8,6 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "elaborator/assertion_rules.h"
-#include "elaborator/assertion_walk.h"
 #include "elaborator/concurrent_assertion_expr.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
@@ -819,13 +818,7 @@ void Elaborator::ElaborateAssertPropertyItem(ModuleItem* item,
     // functions, and ValidateGclkRequiresGlobalClocking reports a text that
     // names one without; where that report has been made there is no event to
     // carry, and the assertion is left alone rather than parked forever.
-    //
-    // The run defers a step of the property to that tick and takes it there
-    // as of its own; a property naming a clock of its own reads which of its
-    // clocks ticked at that time step, which the run does not keep past the
-    // next tick, so it carries no event.
     if (module_global_clocking_event_ != nullptr &&
-        !TreeNamesClocks(item->body->assert_property) &&
         FindGclkFunctionRefInItem(item, IsGlobalClockingFutureFunction,
                                   /*include_property_slot=*/true) != nullptr) {
       mod->processes.back().gclk_future_event = *module_global_clocking_event_;

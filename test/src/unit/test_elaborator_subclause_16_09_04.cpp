@@ -755,10 +755,9 @@ TEST(GlobalClockingElab, GclkFunctionsInATreeAndASequenceAreAccepted) {
 
 // §16.9.4: an assertion naming a future function is answered at the global
 // clocking tick, so its process carries the global clocking event, whether
-// its property is an implication (a1) or a sequence of two cycles (a2); a3
-// names none and carries nothing. A property naming a clock of its own, on an
-// operand (a4) or in a sequence (a5), is not yet carried to the global tick
-// (#7518) and carries nothing either.
+// its property is an implication (a1), a sequence of two cycles (a2) or a
+// property naming a clock of its own, on an operand (a4) or in a sequence
+// (a5); a3 names none and carries nothing.
 TEST(GlobalClockingElab, TheProcessOfAFutureAssertionCarriesTheGlobalEvent) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -781,7 +780,7 @@ TEST(GlobalClockingElab, TheProcessOfAFutureAssertionCarriesTheGlobalEvent) {
     if (p.is_concurrent_clocked)
       carries.push_back(!p.gclk_future_event.empty());
   }
-  EXPECT_EQ(carries, (std::vector<bool>{true, true, false, false, false}));
+  EXPECT_EQ(carries, (std::vector<bool>{true, true, false, true, true}));
 }
 
 // §16.9.4 also places the future functions, confining $future_gclk,

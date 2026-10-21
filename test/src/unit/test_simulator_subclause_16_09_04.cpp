@@ -448,4 +448,35 @@ TEST(GlobalClockingFutureSim, AnOperandBesideAFutureFunctionIsReadAtItsTick) {
   EXPECT_EQ(hits->value.ToUint64(), 1u);
 }
 
+// §16.9.4 with §16.13: a property of two clocks is deferred the same way. The
+// attempt at clk's tick t=5 reads $rising_gclk(a) as a rises by the global
+// tick at t=10, and its consequent b at clk2's next tick, t=15, where b is 0;
+// the failure's action block runs at the global tick after t=15, t=20. The
+// step for t=15 is taken at t=20 and reads that clk2, not clk, ticked at
+// t=15; evaluated at its own ticks, the attempt reads a before it rises and
+// never fails.
+TEST(GlobalClockingFutureSim, AMulticlockedImplicationFailsAtTheGlobalTick) {
+  SimFixture f;
+  auto* when = RunAndFindVar(
+      "module t;\n"
+      "  logic clk = 1'b0, clk2 = 1'b0, gclk = 1'b0, a = 1'b0, b = 1'b0;\n"
+      "  int when = 0;\n"
+      "  global clocking gc @(posedge gclk); endclocking\n"
+      "  assert property (@(posedge clk) $rising_gclk(a) |=>\n"
+      "                   @(posedge clk2) b)\n"
+      "    else when = $time;\n"
+      "  initial begin\n"
+      "    #5 clk = 1'b1;\n"
+      "    #2 a = 1'b1;\n"
+      "    #3 gclk = 1'b1;\n"
+      "    #5 gclk = 1'b0; clk2 = 1'b1;\n"
+      "    #5 gclk = 1'b1;\n"
+      "    #5 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "when");
+  ASSERT_NE(when, nullptr);
+  EXPECT_EQ(when->value.ToUint64(), 20u);
+}
+
 }  // namespace

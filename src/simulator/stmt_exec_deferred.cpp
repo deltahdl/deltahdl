@@ -558,17 +558,17 @@ static AttemptInstances BegunAttempts(const Stmt* stmt,
   return {};
 }
 
-static void ExecPropertyTreeTick(const Stmt* stmt,
-                                 const AttemptInstances& instances,
-                                 SimContext& ctx, Arena& arena,
-                                 Process* owner) {
-  Process* proc = owner != nullptr ? owner : ctx.CurrentProcess();
-  if (proc == nullptr) return;
-  PropertyTreeState*& state = proc->property_tree_states[stmt];
+// The attempts of the property tree `stmt` carries that `proc` keeps, made
+// at the first tick it is reached at, where the watchers on its clocks are
+// installed and its final evaluation is registered; nullptr where the tree
+// cannot be read.
+static PropertyTreeState* PropertyTreeStateOf(const Stmt* stmt, Process& proc,
+                                              SimContext& ctx, Arena& arena) {
+  PropertyTreeState*& state = proc.property_tree_states[stmt];
   if (state == nullptr) {
     state = CreatePropertyTreeState(stmt->assert_property, stmt->assert_clock,
                                     stmt->cover_sequence, ctx, arena);
-    if (state == nullptr) return;
+    if (state == nullptr) return nullptr;
     auto* p = CreateAssertionChildProcess(ctx, arena, Region::kActive);
     p->kind = ProcessKind::kFinal;
     p->coro = PropertyTreeFinalCoroutine(
@@ -576,6 +576,17 @@ static void ExecPropertyTreeTick(const Stmt* stmt,
                   .Release();
     ctx.RegisterFinalProcess(p);
   }
+  return state;
+}
+
+static void ExecPropertyTreeTick(const Stmt* stmt,
+                                 const AttemptInstances& instances,
+                                 SimContext& ctx, Arena& arena,
+                                 Process* owner) {
+  Process* proc = owner != nullptr ? owner : ctx.CurrentProcess();
+  if (proc == nullptr) return;
+  PropertyTreeState* state = PropertyTreeStateOf(stmt, *proc, ctx, arena);
+  if (state == nullptr) return;
   bool disabled = stmt->assert_disable_iff != nullptr &&
                   EvalExpr(stmt->assert_disable_iff, ctx, arena).IsTruthy();
   auto& samples = ctx.AssertionSamples();
@@ -716,6 +727,11 @@ static SimCoroutine FutureGclkAttemptCoroutine(
 // where the owner keeps them.
 static void StartFutureGclkAttempt(const Stmt* stmt, Process& asserting,
                                    SimContext& ctx, Arena& arena) {
+  // A tree's attempts are made here, at the tick, so that the watchers on its
+  // clocks record every tick from it on for the steps that read them later.
+  if (stmt->assert_property != nullptr) {
+    PropertyTreeStateOf(stmt, asserting, ctx, arena);
+  }
   const auto* own_tick =
       ctx.AssertionSamples().TakeSnapshot(ctx.CurrentTime(), arena);
   auto* p = CreateAssertionChildProcess(ctx, arena, Region::kObserved);
