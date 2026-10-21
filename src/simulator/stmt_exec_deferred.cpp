@@ -584,8 +584,8 @@ static void ExecPropertyTreeTick(const Stmt* stmt,
                                  SimContext& ctx, Arena& arena,
                                  Process* owner) {
   Process* proc = owner != nullptr ? owner : ctx.CurrentProcess();
-  if (proc == nullptr) return;
-  PropertyTreeState* state = PropertyTreeStateOf(stmt, *proc, ctx, arena);
+  PropertyTreeState* state =
+      proc == nullptr ? nullptr : PropertyTreeStateOf(stmt, *proc, ctx, arena);
   if (state == nullptr) return;
   bool disabled = stmt->assert_disable_iff != nullptr &&
                   EvalExpr(stmt->assert_disable_iff, ctx, arena).IsTruthy();
