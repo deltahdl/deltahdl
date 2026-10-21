@@ -747,15 +747,22 @@ TEST(ConstraintItemsParsing, ConstraintPrimaryClassScope) {
   EXPECT_EQ(r.cu->classes[0]->members[1]->name, "c");
 }
 
+// constraint_primary ::= ... hierarchical_identifier select [ ( ) ]: the
+// empty parentheses an array built-in method takes, which A.10 footnote 12
+// allows on no other primary; the elaborator holds that rule.
 TEST(ConstraintItemsParsing, ConstraintPrimaryWithParens) {
   auto r = Parse(
       "class C;\n"
-      "  rand int x;\n"
-      "  constraint c { disable soft randomize(); }\n"
+      "  rand int a [];\n"
+      "  constraint c { disable soft a.size(); }\n"
       "endclass\n");
   ASSERT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->classes.size(), 1u);
-  EXPECT_EQ(r.cu->classes[0]->members[1]->name, "c");
+  const auto* member = r.cu->classes[0]->members[1];
+  EXPECT_EQ(member->name, "c");
+  ASSERT_EQ(member->constraint_items.size(), 1u);
+  EXPECT_EQ(member->constraint_items[0]->kind,
+            ConstraintItemKind::kDisableSoft);
 }
 
 // uniqueness_constraint ::= unique { range_list }: the brace list is a

@@ -536,11 +536,62 @@ static void ForEachConstraintItemExpr(
   }
 }
 
+// A.10 footnote 12: whether `call`, a constraint_primary written with `()`, is
+// an array built-in method. Its receiver is judged where it is the name of a
+// property of the class: an array where the property has an unpacked
+// dimension or a named type that is no class. A receiver written otherwise is
+// not judged.
+static bool IsArrayMethodPrimary(const Expr* call,
+                                 const ConstraintOperandScope& s) {
+  const Expr* access = call->lhs;
+  if (access == nullptr || access->kind != ExprKind::kMemberAccess ||
+      access->is_scope_resolution ||
+      !IsArrayBuiltinMethodName(access->rhs->text)) {
+    return false;
+  }
+  if (access->lhs->kind != ExprKind::kIdentifier) return true;
+  const auto kFound = s.properties.find(access->lhs->text);
+  if (kFound == s.properties.end()) return true;
+  const ClassMember* prop = kFound->second;
+  return !prop->unpacked_dims.empty() ||
+         (prop->data_type.kind == DataTypeKind::kNamed &&
+          FindClassDecl(prop->data_type.type_name, s.unit) == nullptr);
+}
+
+static void CheckConstraintPrimaryCall(const Expr* e,
+                                       const ConstraintOperandScope& s) {
+  if (e->kind != ExprKind::kCall || IsArrayMethodPrimary(e, s)) return;
+  s.diag.Error(e->range.start,
+               "'()' follows a constraint_primary that is no array built-in "
+               "method",
+               Subclause("A.1.10"));
+}
+
+// A.1.10: the constraint_primary each disable soft names and each entry of a
+// solve-before's two lists, among `items` and the sets they govern.
+static void CheckConstraintPrimaryCalls(
+    const std::vector<ConstraintItem*>& items,
+    const ConstraintOperandScope& s) {
+  for (const ConstraintItem* item : items) {
+    if (item->kind == ConstraintItemKind::kDisableSoft) {
+      CheckConstraintPrimaryCall(item->expr, s);
+    } else if (item->kind == ConstraintItemKind::kSolveBefore) {
+      for (const Expr* e : item->exprs) CheckConstraintPrimaryCall(e, s);
+      for (const Expr* e : item->after) CheckConstraintPrimaryCall(e, s);
+    }
+    CheckConstraintPrimaryCalls(item->body, s);
+    CheckConstraintPrimaryCalls(item->else_body, s);
+  }
+}
+
+// 18.3 on the types of the operands of `items`, and A.10 footnote 12 on the
+// `()` of their constraint_primary operands.
 static void CheckConstraintItemOperands(
     const std::vector<ConstraintItem*>& items,
     const ConstraintOperandScope& s) {
   ForEachConstraintItemExpr(
       items, [&s](const Expr* e) { CheckConstraintOperands(e, s); });
+  CheckConstraintPrimaryCalls(items, s);
 }
 
 void ValidateInlineConstraintOperands(const Expr* call, const ClassDecl* cls,

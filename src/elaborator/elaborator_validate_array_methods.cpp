@@ -73,20 +73,31 @@ bool IsManipulationMethod(std::string_view name) {
          name == "map";
 }
 
+// §7.9: the methods an associative array has besides those of §7.12.
+bool IsAssocMethod(std::string_view name) {
+  return name == "delete" || name == "exists" || name == "first" ||
+         name == "last" || name == "next" || name == "num" || name == "prev" ||
+         name == "size";
+}
+
+// §7.10.2: the methods a queue has besides those of §7.12.
+bool IsQueueMethod(std::string_view name) {
+  return name == "delete" || name == "insert" || name == "pop_back" ||
+         name == "pop_front" || name == "push_back" || name == "push_front" ||
+         name == "size";
+}
+
+// §7.5: the methods a dynamic array has besides those of §7.12.
+bool IsDynamicMethod(std::string_view name) {
+  return name == "delete" || name == "size";
+}
+
 // §7.5, §7.9 and §7.10.2: the methods a dynamic array, an associative array or
 // a queue has besides those of §7.12. A fixed-size array has none.
 bool IsKindMethod(const Elaborator::VarArrayInfo& info, std::string_view name) {
-  if (info.is_assoc) {
-    return name == "delete" || name == "exists" || name == "first" ||
-           name == "last" || name == "next" || name == "num" ||
-           name == "prev" || name == "size";
-  }
-  if (info.is_queue) {
-    return name == "delete" || name == "insert" || name == "pop_back" ||
-           name == "pop_front" || name == "push_back" || name == "push_front" ||
-           name == "size";
-  }
-  return info.is_dynamic && (name == "delete" || name == "size");
+  if (info.is_assoc) return IsAssocMethod(name);
+  if (info.is_queue) return IsQueueMethod(name);
+  return info.is_dynamic && IsDynamicMethod(name);
 }
 
 // The words naming an array's kind and the subclause listing its methods.
@@ -377,6 +388,11 @@ void WalkStmtsForArrayMethods(const Stmt* s, const ArrayMethodScan& scan) {
 }
 
 }  // namespace
+
+bool IsArrayBuiltinMethodName(std::string_view name) {
+  return IsManipulationMethod(name) || IsAssocMethod(name) ||
+         IsQueueMethod(name) || IsDynamicMethod(name);
+}
 
 void Elaborator::ValidateArrayOrderingMethods(const ModuleDecl* decl) {
   const ValueScope kValues{var_types_,  var_named_types_, var_array_info_,

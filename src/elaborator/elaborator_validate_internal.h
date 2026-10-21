@@ -613,6 +613,9 @@ const Expr* FindGclkFunctionRefInItem(const ModuleItem* item,
 
 // Defined in elaborator_validate_matches.cpp.
 bool IsArrayQueryFunc(std::string_view callee);
+// §7.5, §7.9, §7.10.2 and §7.12: whether `name` is a built-in method of some
+// kind of array. Defined in elaborator_validate_array_methods.cpp.
+bool IsArrayBuiltinMethodName(std::string_view name);
 // §27.6: visits `item` and every item a generate construct holds under it, at
 // every depth.
 void ForEachItemAndGenerateDescendant(
