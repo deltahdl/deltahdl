@@ -436,6 +436,30 @@ TEST(ProgramItemsParsing, CannotContainNestedProgramDecl) {
       r.diags, "program declarations not allowed in programs", 2, "24.3"));
 }
 
+// A.1.2 makes the extern form an alternative of module_declaration, so §24.3
+// keeps it out of a program as well, whichever module_keyword it is written
+// with.
+TEST(ProgramItemsParsing, CannotContainExternModuleDecl) {
+  auto r = Parse(
+      "program t;\n"
+      "  extern module m(input logic a);\n"
+      "  extern macromodule n(input logic b);\n"
+      "endprogram\n");
+  for (int line : {2, 3}) {
+    EXPECT_TRUE(ReportedError(
+        r.diags, "module declarations not allowed in programs", line, "24.3"));
+  }
+}
+
+TEST(ProgramItemsParsing, ExternModuleDeclInModuleAccepted) {
+  auto r = Parse(
+      "module t;\n"
+      "  extern module m(input logic a);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 TEST(ProgramItemsParsing, GenerateRegionCannotContainAlways) {
   auto r = Parse(
       "program p;\n"

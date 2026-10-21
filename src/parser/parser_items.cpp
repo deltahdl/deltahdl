@@ -301,8 +301,12 @@ bool Parser::TryParseDeclKeywordItem(std::vector<ModuleItem*>& items) {
     // level of the instantiation hierarchy, so one may be nested inside a
     // module body. Route it to the extern-module parser and store it as a
     // nested module declaration; the extern keyword only declares the ports
-    // here, it does not define the module.
+    // here, it does not define the module. A program is no such level: §24.3
+    // keeps every module declaration out of one, the extern form included.
     if (Check(TokenKind::kKwModule) || Check(TokenKind::kKwMacromodule)) {
+      if (InProgramBlock())
+        diag_.Error(extern_loc, "module declarations not allowed in programs",
+                    Subclause("24.3"));
       auto* item = arena_.Create<ModuleItem>();
       item->kind = ModuleItemKind::kNestedModuleDecl;
       item->loc = CurrentLoc();
