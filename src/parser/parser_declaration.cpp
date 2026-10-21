@@ -536,6 +536,15 @@ static void RejectStaticOutOfBlockMethod(const ModuleItem* item,
   }
 }
 
+// Whether the token current at `after` stands elsewhere than the one current
+// at `before`, which is whether reading between them consumed a token. The
+// lexer's own saved position cannot say: a token already peeked has moved it
+// before the token is consumed.
+static bool MovedPastLoc(SourceLoc before, SourceLoc after) {
+  return before.file_id != after.file_id || before.line != after.line ||
+         before.column != after.column;
+}
+
 // §8.7 defines `new` as a function with no return type, and A.1.9's
 // class_constructor_declaration and class_constructor_prototype write none
 // between `function` and `new`. A type written there, at `type_loc`, is
@@ -560,11 +569,10 @@ void Parser::ParseFuncName(ModuleItem* item) {
 
   // A class this parse does not know, `Other` in `function Other::new();`, is
   // read as no type at all and left for the name walk below, so a return type
-  // was written only where the reader consumed something.
+  // was written only where the reader moved past a token.
   const SourceLoc kTypeLoc = CurrentLoc();
-  const auto kTypeStart = lexer_.SavePos().pos;
   item->return_type = ParseFunctionReturnType();
-  bool type_written = lexer_.SavePos().pos != kTypeStart;
+  bool type_written = MovedPastLoc(kTypeLoc, CurrentLoc());
 
   if (item->return_type.kind == DataTypeKind::kNamed &&
       Check(TokenKind::kColonColon)) {
