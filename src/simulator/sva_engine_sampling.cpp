@@ -269,18 +269,17 @@ const std::vector<Logic4Vec>* AssertionSampleStore::ReadQueueWithinProperty(
 
 const Logic4Vec* AssertionSampleStore::Read(const Variable* var,
                                             SimTime t) const {
-  if (snapshot_ != nullptr) {
-    auto taken = snapshot_->values.find(var);
-    if (taken != snapshot_->values.end()) return &taken->second;
-  }
-  auto it = entries_.find(var);
-  if (it == entries_.end()) return nullptr;
+  // Where a snapshot is installed it holds every variable enrolled at its
+  // tick, the Preponed value being that tick's, and is read as of that tick.
+  const auto& table = snapshot_ != nullptr ? snapshot_->entries : entries_;
+  auto it = table.find(var);
+  if (it == table.end()) return nullptr;
   // SampleStaticVariable carries §16.5.1's split between time 0, which reads
   // the default sampled value, and every later time slot, which reads the
   // Preponed value. Only the mode it returns is used: SampledValue::value is a
   // uint64_t and would drop the upper bits of a variable wider than 64, so the
   // answer is the stored Logic4Vec that the mode names.
-  SampledValue decision = SampleStaticVariable(0, t, 0);
+  SampledValue decision = SampleStaticVariable(0, StepTime(t), 0);
   return decision.mode == SampleMode::kDefault ? &it->second.default_value
                                                : &it->second.preponed_value;
 }
@@ -289,10 +288,11 @@ const AssertionSampleStore::Snapshot* AssertionSampleStore::TakeSnapshot(
     SimTime t, Arena& arena) const {
   auto* snapshot = arena.Create<Snapshot>();
   snapshot->at = t;
-  snapshot->values.reserve(entries_.size());
-  for (const auto& entry : entries_) {
-    snapshot->values.emplace(entry.first,
-                             OwnedSample(*Read(entry.first, t), arena));
+  snapshot->entries.reserve(entries_.size());
+  for (const auto& [var, entry] : entries_) {
+    snapshot->entries.emplace(
+        var,
+        Entry{entry.default_value, OwnedSample(entry.preponed_value, arena)});
   }
   return snapshot;
 }

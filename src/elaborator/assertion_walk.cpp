@@ -114,7 +114,9 @@ bool TreeNamesClocks(const PropertyExprNode* node) {
     named = named || !n.clock.empty();
     if (n.sequence == nullptr) return;
     ForEachBody(n.sequence->seq_linear, [&named](const SeqLinearBody& b) {
-      for (const auto& clock : b.clocks) named = named || !clock.empty();
+      for (const auto& clock : b.clocks) {
+        if (!clock.empty()) named = true;
+      }
     });
   });
   return named;

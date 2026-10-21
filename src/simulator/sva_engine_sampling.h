@@ -329,9 +329,13 @@ class AssertionSampleStore {
   // sampled at its own tick. A snapshot keeps each enrolled variable's sampled
   // value at that tick, `at`; while one is installed a read answers from it,
   // and an attempt stepped stands in its time step.
+  struct Entry {
+    Logic4Vec default_value;
+    Logic4Vec preponed_value;
+  };
   struct Snapshot {
     SimTime at;
-    std::unordered_map<const Variable*, Logic4Vec> values;
+    std::unordered_map<const Variable*, Entry> entries;
   };
   const Snapshot* TakeSnapshot(SimTime t, Arena& arena) const;
   void SetSnapshot(const Snapshot* snapshot) { snapshot_ = snapshot; }
@@ -385,11 +389,6 @@ class AssertionSampleStore {
   static Logic4Vec OwnedSample(const Logic4Vec& sampled, Arena& arena);
 
  private:
-  struct Entry {
-    Logic4Vec default_value;
-    Logic4Vec preponed_value;
-  };
-
   struct QueueEntry {
     std::vector<Logic4Vec> default_elements;
     std::vector<Logic4Vec> preponed_elements;
