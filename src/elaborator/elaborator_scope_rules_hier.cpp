@@ -731,8 +731,10 @@ void CollectHierHeads(const Expr* e, const NameSet& bound,
 
 // The same over the statement `s`, with `bound` the variables in scope where
 // it stands. §12.7.1 adds those a for loop's initialization declares for the
-// loop's own header and body, and §12.6.1 and §12.6.2 those a pattern binds
-// for the statement it guards (ForEachChildStmtWithBindings).
+// loop's own header and body, §12.6.1 and §12.6.2 those a pattern binds for
+// the statement it guards (ForEachChildStmtWithBindings), and §18.17.7 those
+// a randsequence declares for its code blocks: `op.len()` there calls a method
+// of the implicit variable op.
 void CollectStmtHierHeads(const Stmt* s, const NameSet& bound,
                           std::vector<const Expr*>& out) {
   if (s == nullptr) return;
@@ -741,9 +743,13 @@ void CollectStmtHierHeads(const Stmt* s, const NameSet& bound,
   const NameSet& inner =
       *Widened(&bound, NameSet(header.begin(), header.end()), storage);
   ForEachChildExpr(s, [&](const Expr* e) { CollectHierHeads(e, inner, out); });
+  NameSet code_block_names;
+  CollectRandsequenceDeclaredNames(s, code_block_names);
   ForEachChildStmtWithBindings(s, [&](const Stmt* sub, const NameSet& names) {
+    NameSet in_scope = code_block_names;
+    in_scope.insert(names.begin(), names.end());
     NameSet sub_storage;
-    CollectStmtHierHeads(sub, *Widened(&inner, names, sub_storage), out);
+    CollectStmtHierHeads(sub, *Widened(&inner, in_scope, sub_storage), out);
   });
 }
 

@@ -704,4 +704,40 @@ TEST(RandsequenceProductionReturns,
              "endmodule\n"));
 }
 
+// §18.17.7 gives a rule's code block an implicit variable for each production
+// it generates that returns a value, so `op.len()` calls a string method on
+// the variable op and heads no hierarchical name for §23.8 to resolve.
+TEST(RandsequenceProductionReturns,
+     AMethodOfAnImplicitVariableIsNoHierarchicalName) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  int n;\n"
+             "  initial\n"
+             "    randsequence (main)\n"
+             "      main : op { n = op.len(); } ;\n"
+             "      string op : { return \"plusminus\"; } ;\n"
+             "    endsequence\n"
+             "endmodule\n"));
+}
+
+// A production with no return type declares no implicit variable, so `p.len()`
+// in a code block still heads a hierarchical name, and p resolves to nothing.
+TEST(RandsequenceProductionReturns,
+     AVoidProductionsNameHeadsAHierarchicalName) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  int n;\n"
+      "  initial\n"
+      "    randsequence (main)\n"
+      "      main : p { n = p.len(); } ;\n"
+      "      p : { } ;\n"
+      "    endsequence\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "hierarchical name 'p' resolves to no declaration",
+                            5, "23.8"));
+}
+
 }  // namespace

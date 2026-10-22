@@ -84,30 +84,6 @@ bool ProductionDeclaresReturnValue(const RsProduction& production) {
          production.return_type.kind != DataTypeKind::kVoid;
 }
 
-// §18.17.7: the names a randsequence statement declares for its own code blocks
-// to read. A rule implicitly declares a variable for each of its productions
-// that returns a value, carrying that production's name; and a production opens
-// a scope covering all its rules and code blocks, which is what makes a
-// production's formal arguments readable throughout it.
-//
-// Collected flat over the whole statement, as every other name here is. The
-// clause scopes an implicit variable to the rules that name its production --
-// the same name is a scalar in one rule of §18.17.7's Example 2 and a 1..3
-// array in another -- and it scopes a formal to its own production. A name that
-// outlives either boundary can only suppress a report, never raise one, which
-// is the trade the collection above is already written to.
-void CollectRandsequenceDeclaredNames(
-    const Stmt* s, std::unordered_set<std::string_view>& names) {
-  for (const auto& production : s->rs_productions) {
-    if (ProductionDeclaresReturnValue(production)) {
-      names.insert(production.name);
-    }
-    for (const auto& port : production.ports) {
-      if (!port.name.empty()) names.insert(port.name);
-    }
-  }
-}
-
 // §26.5 / Table 26-1: the enumeration constants declared inside a package's
 // enum become directly visible through a wildcard import just like any other
 // package declaration (the FALSE/TRUE members of the clause's example package
@@ -298,6 +274,30 @@ bool IsValueListSystemTask(const Expr* call) {
 }
 
 }  // namespace
+
+// §18.17.7: the names a randsequence statement declares for its own code blocks
+// to read. A rule implicitly declares a variable for each of its productions
+// that returns a value, carrying that production's name; and a production opens
+// a scope covering all its rules and code blocks, which is what makes a
+// production's formal arguments readable throughout it.
+//
+// Collected flat over the whole statement, as every other name here is. The
+// clause scopes an implicit variable to the rules that name its production --
+// the same name is a scalar in one rule of §18.17.7's Example 2 and a 1..3
+// array in another -- and it scopes a formal to its own production. A name that
+// outlives either boundary can only suppress a report, never raise one, which
+// is the trade the collection above is already written to.
+void CollectRandsequenceDeclaredNames(
+    const Stmt* s, std::unordered_set<std::string_view>& names) {
+  for (const auto& production : s->rs_productions) {
+    if (ProductionDeclaresReturnValue(production)) {
+      names.insert(production.name);
+    }
+    for (const auto& port : production.ports) {
+      if (!port.name.empty()) names.insert(port.name);
+    }
+  }
+}
 
 void PopulatePackageProvidedNames(const CompilationUnit* unit,
                                   std::string_view pkg_name,

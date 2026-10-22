@@ -122,6 +122,13 @@ void CollectProcLocalNames(const Stmt* s,
 void CollectProcVariableNames(const Stmt* s,
                               std::unordered_set<std::string_view>& names);
 
+// §18.17.7: the implicit variables of the productions of the randsequence
+// statement `s` that return a value, and its productions' formal arguments,
+// the names its code blocks read beside those around it, added to `names`.
+// Nothing is added for any other statement.
+void CollectRandsequenceDeclaredNames(
+    const Stmt* s, std::unordered_set<std::string_view>& names);
+
 // The names CollectProcLocalNames collects but for the variables a for loop's
 // initialization declares, which §12.7.1 scopes to the loop: the names a read
 // anywhere in the block may resolve to. CollectProcRhsIdents admits a loop's
