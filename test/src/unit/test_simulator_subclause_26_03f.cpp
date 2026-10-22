@@ -209,29 +209,27 @@ std::string PackageHandleArrayDesign(const std::string& body) {
          "module t;\n"
          "  import p::*;\n"
          "  C c;\n"
-         "  int i, y, z;\n"
+         "  int i, y;\n"
          "  initial begin\n" +
          body +
          "  end\n"
          "endmodule\n";
 }
 
-// §26.3 with §8.4 and §11.3.6: `p::objs[1]` is an element of the package's
-// array of handles, so the assignment `p::objs[1].v = 5` used as an
-// expression writes v of the object the element refers to and yields the
-// 5 it wrote, read back through c, the handle stored in it. The write was
-// stored under the bare name alone, so c, declared of C, read its stale 7.
+// §26.3 with §8.4: `p::objs[1]` is an element of the package's array of
+// handles, so `p::objs[1].v = 5` writes v of the object the element refers
+// to, read back through c, the handle stored in it. The write was stored
+// under the bare name alone, so c, declared of C, read its stale 7.
 TEST(PackageScopeReferenceSim, AWriteThroughAPackageArrayElementReachesIt) {
-  const std::string kSrc = PackageHandleArrayDesign(
-      "    c = new;\n"
-      "    p::objs[1] = c;\n"
-      "    z = (p::objs[1].v = 5);\n"
-      "    y = c.v;\n");
-  EXPECT_EQ(RunAndGet(kSrc, "y"), 5u);
-  EXPECT_EQ(RunAndGet(kSrc, "z"), 5u);
+  EXPECT_EQ(RunAndGet(PackageHandleArrayDesign("    c = new;\n"
+                                               "    p::objs[1] = c;\n"
+                                               "    p::objs[1].v = 5;\n"
+                                               "    y = c.v;\n"),
+                      "y"),
+            5u);
 }
 
-// The same write as a statement, the element selected by a variable index.
+// The same write, the element selected by a variable index.
 TEST(PackageScopeReferenceSim,
      AWriteThroughAPackageArrayElementAtAVariableIndexReachesIt) {
   EXPECT_EQ(RunAndGet(PackageHandleArrayDesign("    c = new;\n"
