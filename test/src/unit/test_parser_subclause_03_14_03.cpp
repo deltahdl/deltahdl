@@ -9,7 +9,7 @@ using namespace delta;
 namespace {
 
 TEST(DesignBuildingBlockParsing, ConsidersTimescalePrec) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "`timescale 1ns / 1ps\n"
       "module a;\n"
       "  timeprecision 1ns;\n"
@@ -21,7 +21,7 @@ TEST(DesignBuildingBlockParsing, ConsidersTimescalePrec) {
 }
 
 TEST(DesignBuildingBlockParsing, MinAcrossAllThreeSources) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "`timescale 1us / 1ns\n"
       "module a;\n"
       "  timeunit 1ms / 1us;\n"
@@ -36,7 +36,7 @@ TEST(DesignBuildingBlockParsing, MinAcrossAllThreeSources) {
 }
 
 TEST(DesignBuildingBlockParsing, DefaultWhenNoneSpecified) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "module a;\n"
       "endmodule\n");
   EXPECT_FALSE(r.has_errors);
@@ -46,7 +46,7 @@ TEST(DesignBuildingBlockParsing, DefaultWhenNoneSpecified) {
 }
 
 TEST(DesignBuildingBlockParsing, CUScopeTimeprecisionIncluded) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "timeprecision 1fs;\n"
       "module a;\n"
       "  timeprecision 1ns;\n"
@@ -58,7 +58,7 @@ TEST(DesignBuildingBlockParsing, CUScopeTimeprecisionIncluded) {
 }
 
 TEST(DesignBuildingBlockParsing, InterfacesAndProgramsContribute) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "interface i;\n"
       "  timeprecision 1ps;\n"
       "endinterface\n"
@@ -75,7 +75,7 @@ TEST(DesignBuildingBlockParsing, InterfacesAndProgramsContribute) {
 }
 
 TEST(DesignBuildingBlockParsing, MinOfTimeprecisionStatements) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "module a;\n"
       "  timeprecision 1ns;\n"
       "endmodule\n"
@@ -92,7 +92,7 @@ TEST(DesignBuildingBlockParsing, MinOfTimeprecisionStatements) {
 }
 
 TEST(DesignBuildingBlockParsing, ConsidersTimeunitPrecArg) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "module a;\n"
       "  timeunit 1us / 1fs;\n"
       "endmodule\n"
@@ -106,7 +106,7 @@ TEST(DesignBuildingBlockParsing, ConsidersTimeunitPrecArg) {
 }
 
 TEST(DesignBuildingBlockParsing, PackageTimeprecisionContributes) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "package p;\n"
       "  timeprecision 1fs;\n"
       "endpackage\n"
@@ -120,7 +120,7 @@ TEST(DesignBuildingBlockParsing, PackageTimeprecisionContributes) {
 }
 
 TEST(DesignBuildingBlockParsing, PackageTimeunitPrecArgContributes) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "package p;\n"
       "  timeunit 1us / 1fs;\n"
       "endpackage\n"
@@ -134,7 +134,7 @@ TEST(DesignBuildingBlockParsing, PackageTimeunitPrecArgContributes) {
 }
 
 TEST(DesignBuildingBlockParsing, StepRejectedAsTimeunit) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "module m;\n"
       "  timeunit 1step;\n"
       "endmodule\n");
@@ -145,7 +145,7 @@ TEST(DesignBuildingBlockParsing, StepRejectedAsTimeunit) {
 }
 
 TEST(DesignBuildingBlockParsing, StepRejectedAsTimeprecision) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "module m;\n"
       "  timeprecision 1step;\n"
       "endmodule\n");
@@ -156,7 +156,7 @@ TEST(DesignBuildingBlockParsing, StepRejectedAsTimeprecision) {
 }
 
 TEST(DesignBuildingBlockParsing, StepRejectedAsTimeunitPrecArg) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "module m;\n"
       "  timeunit 1ns / 1step;\n"
       "endmodule\n");
@@ -167,7 +167,7 @@ TEST(DesignBuildingBlockParsing, StepRejectedAsTimeunitPrecArg) {
 }
 
 TEST(DesignBuildingBlockParsing, TimeunitWithoutPrecArgDoesNotContribute) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "`timescale 1us / 1ns\n"
       "module m;\n"
       "  timeunit 1fs;\n"
@@ -179,7 +179,7 @@ TEST(DesignBuildingBlockParsing, TimeunitWithoutPrecArgDoesNotContribute) {
 }
 
 TEST(DesignBuildingBlockParsing, StepRejectedInPackageTimeunit) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "package p;\n"
       "  timeunit 1step;\n"
       "endpackage\n");
@@ -190,7 +190,7 @@ TEST(DesignBuildingBlockParsing, StepRejectedInPackageTimeunit) {
 }
 
 TEST(DesignBuildingBlockParsing, StepRejectedInCuScopeTimeunit) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "timeunit 1step;\n"
       "module m; endmodule\n");
   EXPECT_TRUE(ReportedError(
@@ -204,7 +204,7 @@ TEST(DesignBuildingBlockParsing, StepRejectedInCuScopeTimeunit) {
 // from InterfacesAndProgramsContribute, which supplies a standalone
 // timeprecision statement.
 TEST(DesignBuildingBlockParsing, InterfaceTimeunitPrecArgContributes) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "interface i;\n"
       "  timeunit 1us / 1fs;\n"
       "endinterface\n"
@@ -222,7 +222,7 @@ TEST(DesignBuildingBlockParsing, InterfaceTimeunitPrecArgContributes) {
 // design-wide minimum must include. Distinct from CUScopeTimeprecisionIncluded,
 // which uses a standalone timeprecision statement.
 TEST(DesignBuildingBlockParsing, CuScopeTimeunitPrecArgContributes) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "timeunit 1us / 1fs;\n"
       "module m;\n"
       "  timeprecision 1ns;\n"
@@ -237,7 +237,7 @@ TEST(DesignBuildingBlockParsing, CuScopeTimeunitPrecArgContributes) {
 // inside another module, exercising the recursive descent in the collector.
 // The finer inner precision wins the design-wide minimum.
 TEST(DesignBuildingBlockParsing, NestedModuleTimeprecisionContributes) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "module outer;\n"
       "  timeprecision 1ns;\n"
       "  module inner;\n"
@@ -255,7 +255,7 @@ TEST(DesignBuildingBlockParsing, NestedModuleTimeprecisionContributes) {
 // syntactic position and the dedicated program collection loop, which no other
 // test drives to the winning value (elsewhere an interface or module wins).
 TEST(DesignBuildingBlockParsing, ProgramTimeunitPrecArgIsMinimum) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "interface i;\n"
       "  timeprecision 1ns;\n"
       "endinterface\n"

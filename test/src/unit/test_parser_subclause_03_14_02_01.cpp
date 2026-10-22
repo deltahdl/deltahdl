@@ -9,7 +9,7 @@ using namespace delta;
 namespace {
 
 TEST(DesignBuildingBlockParsing, TimescaleWithoutKeywords) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "`timescale 1ns / 1ps\n"
       "module m;\n"
       "endmodule\n");
@@ -22,7 +22,7 @@ TEST(DesignBuildingBlockParsing, TimescaleWithoutKeywords) {
 }
 
 TEST(DesignBuildingBlockParsing, KeywordsOverrideTimescale) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "`timescale 1ns / 1ps\n"
       "module m;\n"
       "  timeunit 1us;\n"
@@ -39,7 +39,7 @@ TEST(DesignBuildingBlockParsing, KeywordsOverrideTimescale) {
 }
 
 TEST(DesignBuildingBlockParsing, TimescaleSuppliesDefaultsToFollowingModule) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "`timescale 10ns / 1ns\n"
       "module m;\n"
       "endmodule\n");
@@ -60,7 +60,7 @@ TEST(DesignBuildingBlockParsing, TimescaleSuppliesDefaultsToFollowingModule) {
 // the directive fills in the missing precision.
 TEST(DesignBuildingBlockParsing,
      TimescaleSuppliesPrecisionWhenElementDeclaresOnlyUnit) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "`timescale 1ns / 1ps\n"
       "module m;\n"
       "  timeunit 1us;\n"
@@ -83,7 +83,7 @@ TEST(DesignBuildingBlockParsing,
 // while the module's precision wins.
 TEST(DesignBuildingBlockParsing,
      TimescaleSuppliesUnitWhenElementDeclaresOnlyPrecision) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "`timescale 10us / 100ns\n"
       "module m;\n"
       "  timeprecision 1ps;\n"

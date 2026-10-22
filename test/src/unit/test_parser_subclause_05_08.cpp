@@ -30,27 +30,27 @@ TEST(TimeLiteralParsing, AllUnitsInWireDelay) {
 }
 
 TEST(TimeLiteralParsing, TimeunitAllSixUnits) {
-  EXPECT_EQ(ParseTimescale31402("module m; timeunit 1s; endmodule")
+  EXPECT_EQ(PreprocessAndParse("module m; timeunit 1s; endmodule")
                 .cu->modules[0]
                 ->time_unit,
             TimeUnit::kS);
-  EXPECT_EQ(ParseTimescale31402("module m; timeunit 1ms; endmodule")
+  EXPECT_EQ(PreprocessAndParse("module m; timeunit 1ms; endmodule")
                 .cu->modules[0]
                 ->time_unit,
             TimeUnit::kMs);
-  EXPECT_EQ(ParseTimescale31402("module m; timeunit 1us; endmodule")
+  EXPECT_EQ(PreprocessAndParse("module m; timeunit 1us; endmodule")
                 .cu->modules[0]
                 ->time_unit,
             TimeUnit::kUs);
-  EXPECT_EQ(ParseTimescale31402("module m; timeunit 1ns; endmodule")
+  EXPECT_EQ(PreprocessAndParse("module m; timeunit 1ns; endmodule")
                 .cu->modules[0]
                 ->time_unit,
             TimeUnit::kNs);
-  EXPECT_EQ(ParseTimescale31402("module m; timeunit 1ps; endmodule")
+  EXPECT_EQ(PreprocessAndParse("module m; timeunit 1ps; endmodule")
                 .cu->modules[0]
                 ->time_unit,
             TimeUnit::kPs);
-  EXPECT_EQ(ParseTimescale31402("module m; timeunit 1fs; endmodule")
+  EXPECT_EQ(PreprocessAndParse("module m; timeunit 1fs; endmodule")
                 .cu->modules[0]
                 ->time_unit,
             TimeUnit::kFs);

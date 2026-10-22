@@ -30,7 +30,7 @@ TEST(Preprocessor, Timescale_GlobalPrecision) {
 }
 
 TEST(DesignBuildingBlockParsing, MultipleTimescaleDirectives) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "`timescale 1ns / 1ns\n"
       "module a; endmodule\n"
       "`timescale 1us / 1ps\n"
@@ -43,7 +43,7 @@ TEST(DesignBuildingBlockParsing, MultipleTimescaleDirectives) {
 }
 
 TEST(DesignBuildingBlockParsing, EarlierTimescaleFinerPrecision) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "`timescale 1ns / 1fs\n"
       "module a; endmodule\n"
       "`timescale 1us / 1ps\n"
@@ -92,7 +92,7 @@ TEST(Preprocessor, NoTimescaleGivesNoGlobalPrecision) {
 }
 
 TEST(DesignBuildingBlockParsing, TimescaleBeforeResetallSetsGlobalPrecision) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "`timescale 1ns / 1ps\n"
       "module a; endmodule\n"
       "`resetall\n"

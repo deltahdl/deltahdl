@@ -10,7 +10,7 @@ using namespace delta;
 namespace {
 
 TEST(DesignBuildingBlockParsing, SingleModuleTimeunitSlash) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "module m;\n"
       "  timeunit 1us / 1ps;\n"
       "endmodule\n");
@@ -21,7 +21,7 @@ TEST(DesignBuildingBlockParsing, SingleModuleTimeunitSlash) {
 }
 
 TEST(DesignBuildingBlockParsing, KeywordsSetUnitAndPrecision) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "module m;\n"
       "  timeunit 1ns;\n"
       "  timeprecision 1ps;\n"
@@ -36,7 +36,7 @@ TEST(DesignBuildingBlockParsing, KeywordsSetUnitAndPrecision) {
 }
 
 TEST(DesignBuildingBlockParsing, TimeunitSlashCombinesBoth) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "module m;\n"
       "  timeunit 1ns / 1ps;\n"
       "endmodule\n");
@@ -50,22 +50,22 @@ TEST(DesignBuildingBlockParsing, TimeunitSlashCombinesBoth) {
 }
 
 TEST(DesignBuildingBlockParsing, TimeunitAllSixUnits) {
-  auto r_s = ParseTimescale31402("module m; timeunit 1s; endmodule\n");
+  auto r_s = PreprocessAndParse("module m; timeunit 1s; endmodule\n");
   EXPECT_EQ(r_s.cu->modules[0]->time_unit, TimeUnit::kS);
-  auto r_ms = ParseTimescale31402("module m; timeunit 1ms; endmodule\n");
+  auto r_ms = PreprocessAndParse("module m; timeunit 1ms; endmodule\n");
   EXPECT_EQ(r_ms.cu->modules[0]->time_unit, TimeUnit::kMs);
-  auto r_us = ParseTimescale31402("module m; timeunit 1us; endmodule\n");
+  auto r_us = PreprocessAndParse("module m; timeunit 1us; endmodule\n");
   EXPECT_EQ(r_us.cu->modules[0]->time_unit, TimeUnit::kUs);
-  auto r_ns = ParseTimescale31402("module m; timeunit 1ns; endmodule\n");
+  auto r_ns = PreprocessAndParse("module m; timeunit 1ns; endmodule\n");
   EXPECT_EQ(r_ns.cu->modules[0]->time_unit, TimeUnit::kNs);
-  auto r_ps = ParseTimescale31402("module m; timeunit 1ps; endmodule\n");
+  auto r_ps = PreprocessAndParse("module m; timeunit 1ps; endmodule\n");
   EXPECT_EQ(r_ps.cu->modules[0]->time_unit, TimeUnit::kPs);
-  auto r_fs = ParseTimescale31402("module m; timeunit 1fs; endmodule\n");
+  auto r_fs = PreprocessAndParse("module m; timeunit 1fs; endmodule\n");
   EXPECT_EQ(r_fs.cu->modules[0]->time_unit, TimeUnit::kFs);
 }
 
 TEST(DesignBuildingBlockParsing, TimeunitSetsUnit) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "module m;\n"
       "  timeunit 1ns;\n"
       "endmodule\n");
@@ -77,7 +77,7 @@ TEST(DesignBuildingBlockParsing, TimeunitSetsUnit) {
 }
 
 TEST(DesignBuildingBlockParsing, TimeprecisionSetsPrecision) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "module m;\n"
       "  timeprecision 1ps;\n"
       "endmodule\n");
@@ -89,7 +89,7 @@ TEST(DesignBuildingBlockParsing, TimeprecisionSetsPrecision) {
 }
 
 TEST(DesignBuildingBlockParsing, SeparateDeclsWithMixedUnits) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "module D;\n"
       "  timeunit 100ps;\n"
       "  timeprecision 10fs;\n"
@@ -104,7 +104,7 @@ TEST(DesignBuildingBlockParsing, SeparateDeclsWithMixedUnits) {
 }
 
 TEST(DesignBuildingBlockParsing, SlashDeclWithMixedUnits) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "module E;\n"
       "  timeunit 100ps / 10fs;\n"
       "endmodule\n");
@@ -118,13 +118,13 @@ TEST(DesignBuildingBlockParsing, SlashDeclWithMixedUnits) {
 }
 
 TEST(DesignBuildingBlockParsing, RemovesFileOrderDependency) {
-  auto r1 = ParseTimescale31402(
+  auto r1 = PreprocessAndParse(
       "`timescale 1us / 1ns\n"
       "module m;\n"
       "  timeunit 1ps;\n"
       "  timeprecision 1fs;\n"
       "endmodule\n");
-  auto r2 = ParseTimescale31402(
+  auto r2 = PreprocessAndParse(
       "`timescale 1ms / 1us\n"
       "module m;\n"
       "  timeunit 1ps;\n"
@@ -137,7 +137,7 @@ TEST(DesignBuildingBlockParsing, RemovesFileOrderDependency) {
 }
 
 TEST(DesignBuildingBlockParsing, WorksInInterface) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "interface ifc;\n"
       "  timeunit 1us;\n"
       "  timeprecision 1ns;\n"
@@ -153,7 +153,7 @@ TEST(DesignBuildingBlockParsing, WorksInInterface) {
 }
 
 TEST(DesignBuildingBlockParsing, WorksInProgram) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "program p;\n"
       "  timeunit 10ns;\n"
       "  timeprecision 100ps;\n"
@@ -170,22 +170,22 @@ TEST(DesignBuildingBlockParsing, WorksInProgram) {
 
 TEST(DesignBuildingBlockParsing, AllThreeMagnitudes) {
   EXPECT_FALSE(
-      ParseTimescale31402("module m; timeunit 1ns; endmodule").has_errors);
+      PreprocessAndParse("module m; timeunit 1ns; endmodule").has_errors);
   EXPECT_FALSE(
-      ParseTimescale31402("module m; timeunit 10ns; endmodule").has_errors);
+      PreprocessAndParse("module m; timeunit 10ns; endmodule").has_errors);
   EXPECT_FALSE(
-      ParseTimescale31402("module m; timeunit 100ns; endmodule").has_errors);
+      PreprocessAndParse("module m; timeunit 100ns; endmodule").has_errors);
 
   EXPECT_FALSE(
-      ParseTimescale31402("module m; timeprecision 1ps; endmodule").has_errors);
-  EXPECT_FALSE(ParseTimescale31402("module m; timeprecision 10ps; endmodule")
-                   .has_errors);
-  EXPECT_FALSE(ParseTimescale31402("module m; timeprecision 100ps; endmodule")
+      PreprocessAndParse("module m; timeprecision 1ps; endmodule").has_errors);
+  EXPECT_FALSE(
+      PreprocessAndParse("module m; timeprecision 10ps; endmodule").has_errors);
+  EXPECT_FALSE(PreprocessAndParse("module m; timeprecision 100ps; endmodule")
                    .has_errors);
 }
 
 TEST(DesignBuildingBlockParsing, TimeunitAloneNoPrec) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "module m;\n"
       "  timeunit 1ns;\n"
       "endmodule\n");
@@ -195,7 +195,7 @@ TEST(DesignBuildingBlockParsing, TimeunitAloneNoPrec) {
 }
 
 TEST(DesignBuildingBlockParsing, TimeprecisionAloneNoUnit) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "module m;\n"
       "  timeprecision 1ps;\n"
       "endmodule\n");
@@ -205,7 +205,7 @@ TEST(DesignBuildingBlockParsing, TimeprecisionAloneNoUnit) {
 }
 
 TEST(DesignBuildingBlockParsing, PrecedeOtherItems) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "module m;\n"
       "  timeunit 1ns;\n"
       "  timeprecision 1ps;\n"
@@ -217,7 +217,7 @@ TEST(DesignBuildingBlockParsing, PrecedeOtherItems) {
 }
 
 TEST(DesignBuildingBlockParsing, RepeatMatchingDeclaration) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "module m;\n"
       "  timeunit 1ns;\n"
       "  timeprecision 1ps;\n"
@@ -233,7 +233,7 @@ TEST(DesignBuildingBlockParsing, RepeatMatchingDeclaration) {
 }
 
 TEST(DesignBuildingBlockParsing, SeparateModulesIndependentScope) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "module a;\n"
       "  timeunit 1ns;\n"
       "  timeprecision 1ps;\n"
@@ -252,7 +252,7 @@ TEST(DesignBuildingBlockParsing, SeparateModulesIndependentScope) {
 }
 
 TEST(DesignBuildingBlockParsing, CUTimeunitSlashSyntax) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "timeunit 100ps / 10fs;\n"
       "module m;\n"
       "endmodule\n");
@@ -550,7 +550,7 @@ TEST(DesignBuildingBlockParsing, TimeunitMatchingRepeatInProgramAccepted) {
 // parse is observed; the package case drives the distinct code path that stores
 // the slash-supplied precision onto the package declaration.
 TEST(DesignBuildingBlockParsing, TimeunitSlashInInterfaceSetsBoth) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "interface ifc;\n"
       "  timeunit 100ps / 10fs;\n"
       "endinterface\n");
@@ -565,7 +565,7 @@ TEST(DesignBuildingBlockParsing, TimeunitSlashInInterfaceSetsBoth) {
 }
 
 TEST(DesignBuildingBlockParsing, TimeunitSlashInProgramSetsBoth) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "program p;\n"
       "  timeunit 100ps / 10fs;\n"
       "endprogram\n");

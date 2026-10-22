@@ -53,7 +53,7 @@ inline PreprocTimescaleResult Preprocess(const std::string& src) {
 // has_errors stays beside them, because a case asking only whether a source was
 // accepted is asking a question the whole record does not answer more clearly
 // than the boolean does.
-struct ParseResult31402 {
+struct PreprocessedParseResult {
   SourceManager mgr;
   Arena arena;
   CompilationUnit* cu = nullptr;
@@ -67,13 +67,13 @@ struct ParseResult31402 {
 // Takes both readings of the engine at once, so no run can copy the record and
 // leave the boolean behind, or the reverse.
 inline void RecordDiagnostics(const DiagEngine& diag,
-                              ParseResult31402& result) {
+                              PreprocessedParseResult& result) {
   result.has_errors = diag.HasErrors();
   result.diags = diag.Diagnostics();
 }
 
-inline ParseResult31402 ParseTimescale31402(const std::string& src) {
-  ParseResult31402 result;
+inline PreprocessedParseResult PreprocessAndParse(const std::string& src) {
+  PreprocessedParseResult result;
   DiagEngine diag(result.mgr);
   auto fid = result.mgr.AddFile("<test>", src);
   Preprocessor preproc(result.mgr, diag, {});

@@ -12,7 +12,7 @@ using namespace delta;
 namespace {
 
 TEST(DesignBuildingBlockParsing, ExplicitTimeunitTakesPriority) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "`timescale 1us / 1ns\n"
       "module m;\n"
       "  timeunit 1ps;\n"
@@ -26,7 +26,7 @@ TEST(DesignBuildingBlockParsing, ExplicitTimeunitTakesPriority) {
 }
 
 TEST(DesignBuildingBlockParsing, ExplicitTimeprecisionTakesPriority) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "`timescale 1us / 1ns\n"
       "module m;\n"
       "  timeprecision 1fs;\n"
@@ -47,7 +47,7 @@ static ModuleDecl* FindNestedModule(const std::vector<ModuleItem*>& items) {
 }
 
 TEST(DesignBuildingBlockParsing, NestedModuleInheritsEnclosingUnit) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "module outer;\n"
       "  timeunit 1ps;\n"
       "  timeprecision 1fs;\n"
@@ -73,7 +73,7 @@ TEST(DesignBuildingBlockParsing, NestedModuleInheritsEnclosingUnit) {
 }
 
 TEST(DesignBuildingBlockParsing, NestedInterfaceInheritsEnclosingTimescale) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "interface outer_if;\n"
       "  timeunit 1us;\n"
       "  timeprecision 1ns;\n"
@@ -93,7 +93,7 @@ TEST(DesignBuildingBlockParsing, NestedInterfaceInheritsEnclosingTimescale) {
 }
 
 TEST(DesignBuildingBlockParsing, FallbackToPreviousTimescaleDirective) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "`timescale 1us / 1ps\n"
       "module m;\n"
       "endmodule\n");
@@ -109,7 +109,7 @@ TEST(DesignBuildingBlockParsing, FallbackToPreviousTimescaleDirective) {
 }
 
 TEST(DesignBuildingBlockParsing, FallbackToCompilationUnitTimeunit) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "timeunit 1ps;\n"
       "timeprecision 1fs;\n"
       "module m;\n"
@@ -129,7 +129,7 @@ TEST(DesignBuildingBlockParsing, FallbackToCompilationUnitTimeunit) {
 }
 
 TEST(DesignBuildingBlockParsing, FallbackToDefaultWhenNothingSpecified) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "module m;\n"
       "endmodule\n");
   EXPECT_FALSE(r.has_errors);
@@ -143,7 +143,7 @@ TEST(DesignBuildingBlockParsing, FallbackToDefaultWhenNothingSpecified) {
 }
 
 TEST(DesignBuildingBlockParsing, CUTimeunitOnlyByKeyword) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "`timescale 1us / 1ps\n"
       "module m;\n"
       "endmodule\n");
@@ -154,7 +154,7 @@ TEST(DesignBuildingBlockParsing, CUTimeunitOnlyByKeyword) {
 }
 
 TEST(DesignBuildingBlockParsing, FullPrecedenceChain) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "`timescale 1ms / 1us\n"
       "timeunit 1ns;\n"
       "timeprecision 1ps;\n"
@@ -185,7 +185,7 @@ TEST(DesignBuildingBlockParsing, FullPrecedenceChain) {
 }
 
 TEST(DesignBuildingBlockParsing, TimescaleBeforeCUTimeunit) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "timeunit 1fs;\n"
       "`timescale 1us / 1ps\n"
       "module m;\n"
@@ -200,7 +200,7 @@ TEST(DesignBuildingBlockParsing, TimescaleBeforeCUTimeunit) {
 }
 
 TEST(DesignBuildingBlockParsing, SameRulesForPrecision) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "module outer;\n"
       "  timeunit 1ns;\n"
       "  timeprecision 1ps;\n"
@@ -221,7 +221,7 @@ TEST(DesignBuildingBlockParsing, SameRulesForPrecision) {
 }
 
 TEST(DesignBuildingBlockParsing, CUTimeunitAppliesToInterface) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "timeunit 1ps;\n"
       "timeprecision 1fs;\n"
       "interface i;\n"
@@ -234,7 +234,7 @@ TEST(DesignBuildingBlockParsing, CUTimeunitAppliesToInterface) {
 }
 
 TEST(DesignBuildingBlockParsing, CUTimeunitAppliesToProgram) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "timeunit 1us;\n"
       "timeprecision 1ns;\n"
       "program p;\n"
@@ -247,7 +247,7 @@ TEST(DesignBuildingBlockParsing, CUTimeunitAppliesToProgram) {
 }
 
 TEST(DesignBuildingBlockParsing, ProgramsCannotBeNested) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "program p;\n"
       "endprogram\n");
   EXPECT_FALSE(r.has_errors);
@@ -258,7 +258,7 @@ TEST(DesignBuildingBlockParsing, ProgramsCannotBeNested) {
 }
 
 TEST(DesignBuildingBlockParsing, IndependentResolution) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "`timescale 1us / 1ps\n"
       "module a;\n"
       "  timeunit 1ns;\n"
@@ -280,7 +280,7 @@ TEST(DesignBuildingBlockParsing, IndependentResolution) {
 }
 
 TEST(DesignBuildingBlockParsing, NestedOverridesInheritance) {
-  auto r = ParseTimescale31402(
+  auto r = PreprocessAndParse(
       "module outer;\n"
       "  timeunit 1us;\n"
       "  timeprecision 1ns;\n"
