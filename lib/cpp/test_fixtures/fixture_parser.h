@@ -2,17 +2,72 @@
 
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "fixture_diagnosed.h"
 #include "lexer/lexer.h"
 #include "parser/ast_design.h"
 #include "parser/parser.h"
 #include "preprocessor/preprocessor.h"
 
 using namespace delta;
+
+// A member of ParseResult that notes whether the case it was handed to ever
+// read it. Every way a case reads one arrives at Get: has_errors is read
+// through its conversion to bool, in EXPECT_TRUE, EXPECT_FALSE, an `if` or a
+// `!`, and diags through its conversion to the vector ReportedError takes, its
+// size and emptiness, or the iteration FindDiag and a range-for do. Assigning
+// to it is no read, so a case handed a freshly recorded run still owes one.
+//
+// A move carries the read to the new object and counts the old one as read, so
+// a result returned or assigned by value is reported once.
+template <typename T>
+class Watched {
+ public:
+  Watched() = default;
+  Watched(Watched&& other) noexcept
+      : value_(std::move(other.value_)), read_(other.read_) {
+    other.read_ = true;
+  }
+  Watched& operator=(Watched&& other) noexcept {
+    value_ = std::move(other.value_);
+    read_ = other.read_;
+    other.read_ = true;
+    return *this;
+  }
+  Watched(const Watched&) = delete;
+  Watched& operator=(const Watched&) = delete;
+  ~Watched() = default;
+
+  Watched& operator=(T value) {
+    value_ = std::move(value);
+    read_ = false;
+    return *this;
+  }
+
+  operator const T&() const { return Get(); }
+  auto size() const { return Get().size(); }
+  bool empty() const { return Get().empty(); }
+  auto begin() const { return Get().begin(); }
+  auto end() const { return Get().end(); }
+
+  // What ParseResult looks at as it is destroyed, neither of them a read.
+  bool WasRead() const { return read_; }
+  const T& Peek() const { return value_; }
+
+ private:
+  const T& Get() const {
+    read_ = true;
+    return value_;
+  }
+
+  T value_{};
+  mutable bool read_ = false;
+};
 
 // What a run of the parser left behind for a case to make its claim about. The
 // diagnostics are a copy rather than a view: the engine that recorded them is
@@ -22,16 +77,41 @@ using namespace delta;
 // has_errors stays beside them, because a case asking only whether a source
 // was accepted is asking a question the whole record does not answer more
 // clearly than the boolean does.
+//
+// A parser that rejects a source still builds a CompilationUnit out of what it
+// recovered, so a case asserting that the unit lacks something holds whether
+// the rule it covers works or not. A case that read has_errors or diags has
+// taken the rejection into account, whatever it concluded from them. One that
+// read neither passed on a source that never parsed, and the destructor
+// reports that, the end of the result's life being the last moment anybody
+// could still have looked. Since the engine is gone by then, the record and
+// whether it was read are kept here rather than on the engine, as Diagnosed in
+// fixture_diagnosed.h keeps them for the fixtures that own their engine.
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
   CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-  std::vector<Diagnostic> diags;
+  Watched<bool> has_errors;
+  Watched<std::vector<Diagnostic>> diags;
+
+  ParseResult() = default;
+  ParseResult(ParseResult&&) noexcept = default;
+  ParseResult& operator=(ParseResult&&) noexcept = default;
+  ParseResult(const ParseResult&) = delete;
+  ParseResult& operator=(const ParseResult&) = delete;
+
+  // The report quotes the first file the run registered, which every entry
+  // point registers the case's own source as.
+  ~ParseResult() {
+    if (!has_errors.Peek() || has_errors.WasRead() || diags.WasRead()) return;
+    ReportUnreadErrors(diags.Peek(), "read has_errors or diags",
+                       mgr.FileContent(1));
+  }
 };
 
 // Takes both readings of the engine at once, so no run can copy the record and
-// leave the boolean behind, or the reverse.
+// leave the boolean behind, or the reverse. Neither assignment is a read of
+// the result, so the case it is handed to still owes one.
 inline void RecordDiagnostics(const DiagEngine& diag, ParseResult& result) {
   result.has_errors = diag.HasErrors();
   result.diags = diag.Diagnostics();

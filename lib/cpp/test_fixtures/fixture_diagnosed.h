@@ -6,10 +6,30 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include "common/diagnostic.h"
 
 using namespace delta;
+
+// Fails the running case over a source that drew an error the case never read,
+// listing each error `diags` holds and then quoting `source`, so that the
+// failure names the input rather than the harness. `remedy` says what the case
+// had to read to take the rejection into account.
+inline void ReportUnreadErrors(const std::vector<Diagnostic>& diags,
+                               std::string_view remedy,
+                               std::string_view source) {
+  testing::Message report;
+  report << "the source drew an error the case never read, so whatever it "
+            "asserted was absent may be absent because nothing was "
+            "compiled; "
+         << remedy << ":\n";
+  for (const auto& d : diags) {
+    if (d.severity != DiagSeverity::kError) continue;
+    report << "  line " << d.loc.line << ": " << d.message << "\n";
+  }
+  ADD_FAILURE() << report << source;
+}
 
 // Whether the source a fixture compiled drew an error, and whether the case it
 // was handed to ever looked.
@@ -61,16 +81,10 @@ class Diagnosed {
     bool handover_unread =
         errors_ && !asked_ && diag_->ReadCount() == reads_at_handover_;
     if (!handover_unread && !diag_->HasUnreadError()) return;
-    testing::Message report;
-    report << "the source drew an error the case never read, so whatever it "
-              "asserted was absent may be absent because nothing was "
-              "compiled; read has_errors or the engine's diagnostics after "
-              "the source is compiled:\n";
-    for (const auto& d : diag_->Diagnostics()) {
-      if (d.severity != DiagSeverity::kError) continue;
-      report << "  line " << d.loc.line << ": " << d.message << "\n";
-    }
-    ADD_FAILURE() << report << source_;
+    ReportUnreadErrors(diag_->Diagnostics(),
+                       "read has_errors or the engine's diagnostics after the "
+                       "source is compiled",
+                       source_);
   }
 
   // Marks the handover of `source`: the engine's answer as it stands, and the
