@@ -775,7 +775,6 @@ static uint32_t KeywordCastWidth(std::string_view type_name, bool* matched) {
 }
 
 static uint32_t LeadingDecimalWidth(std::string_view type_name) {
-  if (type_name.empty() || type_name[0] < '0' || type_name[0] > '9') return 0;
   uint32_t w = 0;
   for (char c : type_name) {
     if (c >= '0' && c <= '9')

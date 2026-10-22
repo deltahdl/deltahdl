@@ -29,7 +29,6 @@
 #include "simulator/scope_hier_name.h"
 #include "simulator/sequence_monitor.h"
 #include "simulator/sim_context.h"
-#include "simulator/statement_assign.h"
 #include "simulator/statement_coverage.h"
 #include "simulator/stmt_exec.h"
 #include "simulator/stmt_exec_assertion_internal.h"
@@ -54,10 +53,6 @@ static void RunDeferredActionSync(const Stmt* action, SimContext& ctx,
       if (!TryExecSystemCallTask(action->expr, ctx, arena)) {
         EvalExpr(action->expr, ctx, arena);
       }
-      return;
-    case StmtKind::kBlockingAssign:
-
-      ExecBlockingAssignImpl(action, ctx, arena);
       return;
     default:
 

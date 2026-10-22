@@ -5,6 +5,7 @@
 #include <string_view>
 
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "simulator/cover_results.h"
 
 using namespace delta;
@@ -198,6 +199,27 @@ TEST(ProceduralConcurrentAssertionRun,
   EXPECT_EQ(results[0].succeeded, 4u);
   EXPECT_EQ(Count(f, "passes"), 6u);
   EXPECT_EQ(Count(f, "fails"), 0u);
+}
+
+// §16.14.6: a procedure whose only timing control is a delay infers no clock,
+// and with no default clocking an assertion in it that writes none has no
+// leading clocking event, which is reported. The assertion is then queued for
+// no tick, and the procedure around it runs on: its delay of 7 steps cnt at 7,
+// 14, ..., 119, seventeen times before the run ends at 120.
+TEST(ProceduralConcurrentAssertionRun,
+     AnAssertionNoClockReachesIsReportedAndItsProcedureRunsOn) {
+  SimFixture f;
+  RunAndFindVar(
+      ProceduralSource("  always begin\n"
+                       "    #7 cnt = cnt + 1;\n"
+                       "    a_p: assert property (r1) passes++; else fails++;\n"
+                       "  end\n"),
+      f, "cnt");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "no clock is inferred for the procedural concurrent assertion", 20,
+      "16.14.6"));
+  EXPECT_EQ(Count(f, "cnt"), 17u);
 }
 
 }  // namespace

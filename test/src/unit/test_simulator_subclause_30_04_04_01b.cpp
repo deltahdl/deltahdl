@@ -119,6 +119,16 @@ TEST(StateDependentPathConditionText,
   EXPECT_EQ(TextOfCondition("hold ? gate : keep", f), "hold ? gate : keep");
 }
 
+// §30.4.4.1: Table 30-1 does not list `<`, so a condition built from it is no
+// state-dependent path condition and has no spelling an SDF COND could match;
+// it renders as nothing, as an unconditional path does. The elaborator reports
+// such a condition, so this is the renderer's answer for the operator alone.
+TEST(StateDependentPathConditionText,
+     AnOperatorOutsideTableThirtyOneRendersEmpty) {
+  SimFixture f;
+  EXPECT_EQ(TextOfCondition("mode < 5", f), "");
+}
+
 // §32.4.1 matches a conditional entry on the condition, and the two sides write
 // one part-select condition two ways: JoinSdfCondTokens rejoins the SDF side
 // around the ':' NextSdfToken lexed on its own, where SpecifyConditionText

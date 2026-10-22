@@ -316,13 +316,13 @@ static Logic4Vec ReduceWithExpr(const ArrayCtx& ac, const Expr* expr,
   return out;
 }
 
-static Logic4Vec ArraySize(std::string_view var_name, const ArrayInfo& info,
-                           SimContext& ctx, Arena& arena) {
-  if (info.is_dynamic) {
-    auto* q = ctx.FindQueue(var_name);
-    return MakeLogic4VecVal(arena, 32, q ? q->elements.size() : 0);
-  }
-  return MakeLogic4VecVal(arena, 32, info.size);
+// §7.5.2: size() is a dynamic array's method, answering the elements its
+// queue holds. A fixed-size array has no such method, which the elaborator
+// reports (§7.12), so no fixed size is answered here.
+static Logic4Vec ArraySize(std::string_view var_name, SimContext& ctx,
+                           Arena& arena) {
+  auto* q = ctx.FindQueue(var_name);
+  return MakeLogic4VecVal(arena, 32, q ? q->elements.size() : 0);
 }
 
 // §7.12.1 with §6.11: the element max() selects where `want_max` is set and
@@ -450,7 +450,7 @@ static bool DispatchReductionExpr(std::string_view method, const ArrayCtx& ac,
 static bool DispatchQuery(std::string_view method, const ArrayCtx& ac,
                           Logic4Vec& out) {
   if (method == "size") {
-    out = ArraySize(ac.var_name, ac.info, ac.ctx, ac.arena);
+    out = ArraySize(ac.var_name, ac.ctx, ac.arena);
     return true;
   }
   if (method == "min" || method == "max") {
@@ -463,10 +463,11 @@ static bool DispatchQuery(std::string_view method, const ArrayCtx& ac,
 // §26.3 admits a package-qualified array as the receiver, `p::a.sum()`,
 // resolved by the key ExtractHandleMethodCallParts answers.
 // §7.12 with §7.2 and §7.4.2: an unpacked array member of a structure is an
-// unpacked array, so `r.v.size()` answers its element count and a reduction
-// method, `r.v.sum()`, folds its elements, the result of the element's type
-// (§7.12.3). The member names no array of its own name, so the array paths
-// below found none and answered 0. A with clause is left to those paths.
+// unpacked array, so a reduction method, `r.v.sum()`, folds its elements, the
+// result of the element's type (§7.12.3). The member names no array of its own
+// name, so the array paths below found none and answered 0. A with clause is
+// left to those paths. size() is no method of a fixed-size member (§7.12),
+// which the elaborator reports.
 static bool TryStructArrayMemberMethod(const Expr* expr, SimContext& ctx,
                                        Arena& arena, Logic4Vec& out) {
   const Expr* access = expr->lhs;
@@ -474,13 +475,9 @@ static bool TryStructArrayMemberMethod(const Expr* expr, SimContext& ctx,
       access->rhs == nullptr || expr->with_expr != nullptr)
     return false;
   std::string_view method = access->rhs->text;
-  if (method != "size" && !IsReductionMethod(method)) return false;
+  if (!IsReductionMethod(method)) return false;
   const StructFieldInfo* member = ResolveStructArrayMember(access->lhs, ctx);
   if (member == nullptr) return false;
-  if (method == "size") {
-    out = MakeLogic4VecVal(arena, 32, member->elem_count);
-    return true;
-  }
   Logic4Vec whole = EvalExpr(access->lhs, ctx, arena);
   uint32_t ew = member->width / member->elem_count;
   std::vector<uint64_t> vals;
