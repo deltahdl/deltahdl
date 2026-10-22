@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <string>
 #include <string_view>
 #include <utility>
 
@@ -457,6 +458,54 @@ TEST(PackageImport, ANestedProgramCallsATaskAnOuterModuleImports) {
       "endmodule\n",
       f);
   EXPECT_FALSE(f.has_errors);
+}
+
+// §26.3 searches an outer scope's locally visible identifiers, those an
+// explicit import makes visible among them, and for a task or function call
+// takes them to the end of the scope. So the program's call of set_v finds the
+// task the module explicitly imports below the program. It was reported as an
+// undeclared identifier.
+TEST(PackageImport, ANestedProgramCallsATaskItsModuleExplicitlyImportsBelowIt) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package pkg;\n"
+      "  task automatic set_v(output logic [7:0] o); o = 8'd99; endtask\n"
+      "endpackage\n"
+      "module top;\n"
+      "  logic [7:0] v;\n"
+      "  program p;\n"
+      "    initial set_v(v);\n"
+      "  endprogram\n"
+      "  import pkg::set_v;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// A reference other than a call reaches only what the outer scope makes
+// visible before the point of the reference (§26.3), so the program's write
+// of w, which the module imports only below the program, names nothing,
+// whether the import names w or is a wildcard import of the package
+// declaring it.
+TEST(PackageImport, ANestedProgramWritesNoVariableItsModuleImportsBelowIt) {
+  for (const char* imported : {"pkg::w", "pkg::*"}) {
+    ElabFixture f;
+    ElaborateSrc(std::string("package pkg;\n"
+                             "  int w;\n"
+                             "endpackage\n"
+                             "module top;\n"
+                             "  program p;\n"
+                             "    initial w = 1;\n"
+                             "  endprogram\n"
+                             "  import ") +
+                     imported +
+                     ";\n"
+                     "endmodule\n",
+                 f);
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "undeclared identifier 'w'",
+                              6, "23.9"))
+        << imported;
+  }
 }
 
 }  // namespace

@@ -27,10 +27,21 @@ std::unordered_set<std::string_view> EnclosingSubroutineNames(
 
 // §26.3 with §24.3: the package imports a reference written in `decl` reaches
 // once its search leaves `decl` for the scopes lexically enclosing it, where
-// `decl` is declared within another module, interface or program: those
-// each enclosing scope writes before the declaration nesting `decl`, the
-// innermost scope's first. Empty for a declaration nested in none.
-std::vector<ModuleItem*> EnclosingImportsAbove(const CompilationUnit& unit,
-                                               const ModuleDecl& decl);
+// `decl` is declared within another module, interface or program, each list
+// holding the innermost scope's first.
+struct EnclosingImports {
+  // Those each enclosing scope writes before the declaration nesting `decl`,
+  // which every reference reaches.
+  std::vector<ModuleItem*> above;
+  // The explicit imports each writes after it, which a task or function call
+  // reaches as well, its search taking a scope's locally visible identifiers
+  // to the end of the scope.
+  std::vector<ModuleItem*> explicit_below;
+};
+
+// The imports of the scopes enclosing `decl`; both lists empty for a
+// declaration nested in none.
+EnclosingImports EnclosingImportsOf(const CompilationUnit& unit,
+                                    const ModuleDecl& decl);
 
 }  // namespace delta

@@ -334,13 +334,12 @@ void Elaborator::ValidateScopeRules(const ModuleDecl* decl) {
       UnitItemsBefore(unit_, decl->range.start);
   // §26.3 with §24.3: the search for a name the module does not declare goes
   // on through the scopes lexically enclosing it, among their imports.
-  const std::vector<ModuleItem*> kEnclosingImports =
-      EnclosingImportsAbove(*unit_, *decl);
+  const EnclosingImports kEnclosingImports = EnclosingImportsOf(*unit_, *decl);
   auto target_visible = [&](std::string_view name) {
     return walk.local_names.count(name) != 0 || IsNameInModuleScope(name) ||
            ImportsProvideName(unit_, pkg_provided_names_, decl->items, name) ||
-           ImportsProvideName(unit_, pkg_provided_names_, kEnclosingImports,
-                              name) ||
+           ImportsProvideName(unit_, pkg_provided_names_,
+                              kEnclosingImports.above, name) ||
            ImportsProvideName(unit_, pkg_provided_names_, kUnitBefore, name) ||
            UnitDeclaresData(unit_, name, decl->range.start);
   };
@@ -352,13 +351,16 @@ void Elaborator::ValidateScopeRules(const ModuleDecl* decl) {
   // A bare call reaches every name an assignment target does, and the unit's
   // tasks and functions besides, which no assignment target may name.
   // §23.8: a task or function name the module does not declare is looked for
-  // in the modules enclosing its instances.
+  // in the modules enclosing its instances. §26.3: a call reaches too what an
+  // enclosing scope explicitly imports after the module's declaration.
   const std::unordered_set<std::string_view> kAbove =
       EnclosingSubroutineNames(*unit_, decl->name);
   const std::function<bool(std::string_view)> kCallVisible =
       [&](std::string_view name) {
-        return target_visible(name) || UnitDeclaresSubroutine(unit_, name) ||
-               kAbove.contains(name);
+        return target_visible(name) ||
+               ImportsProvideName(unit_, pkg_provided_names_,
+                                  kEnclosingImports.explicit_below, name) ||
+               UnitDeclaresSubroutine(unit_, name) || kAbove.contains(name);
       };
   ReportBareCallsNamingNothing(walk, kCallVisible, diag_);
   ReportCallsOfDataNames(*decl, *unit_, kCallVisible, diag_);
