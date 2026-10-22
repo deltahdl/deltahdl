@@ -513,6 +513,16 @@ static void CollectBlockEnumMemberNames(
   ForEachEnumTypeOfItem(s->decl_item, collect);
 }
 
+// §11.12 lists a sequential and a parallel block among the scopes a let may be
+// declared in, and the parser keeps such a let as a kBlockItemDecl statement
+// over the let's item (Parser::ParseBlockVarDecls).
+static void CollectBlockLetName(const Stmt* s,
+                                std::unordered_set<std::string_view>& names) {
+  if (s->kind == StmtKind::kBlockItemDecl &&
+      s->decl_item->kind == ModuleItemKind::kLetDecl)
+    names.insert(s->decl_item->name);
+}
+
 // Over-approximated set of names that are local to a procedural block: block
 // (begin/end) variable declarations, for-loop control variables, foreach index
 // variables, the two kinds of name §18.17.7 gives a randsequence statement,
@@ -543,13 +553,8 @@ static void CollectLocalNames(const Stmt* s,
   if (s->kind == StmtKind::kVarDecl && !s->var_name.empty()) {
     names.insert(s->var_name);
   }
-  // §11.12 lists a sequential and a parallel block among the scopes a let may
-  // be declared in, and the parser keeps such a let as a kBlockItemDecl
-  // statement over the let's item (Parser::ParseBlockVarDecls).
   if (with_lets_and_enum_members) {
-    if (s->kind == StmtKind::kBlockItemDecl &&
-        s->decl_item->kind == ModuleItemKind::kLetDecl)
-      names.insert(s->decl_item->name);
+    CollectBlockLetName(s, names);
     CollectBlockEnumMemberNames(s, names);
   }
   for (auto v : s->foreach_vars) names.insert(v);
