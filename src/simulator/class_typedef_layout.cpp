@@ -63,25 +63,24 @@ std::optional<uint32_t> FoldedPackedWidth(const StructMember& m,
   return width;
 }
 
-// §7.4.4: the bits a member written as a typedef name takes, the typedef's
-// width in the design's type table times the packed dimensions written on the
-// name, folded against `scope`, as SimParamTypeWidth sizes a parameter of
-// such a type; the member's own packed width where it names no integral
-// typedef the table holds.
-std::optional<uint32_t> FoldedMemberWidth(const StructMember& m,
-                                          const ScopeMap& scope,
-                                          const SimContext& ctx) {
-  if (m.type_kind == DataTypeKind::kNamed) {
-    DataType written;
-    written.kind = m.type_kind;
-    written.type_name = m.type_name;
-    written.scope_name = m.scope_name;
-    written.packed_dim_left = m.packed_dim_left;
-    written.packed_dim_right = m.packed_dim_right;
-    written.extra_packed_dims = m.extra_packed_dims;
-    if (uint32_t width = SimParamTypeWidth(written, scope, ctx)) return width;
-  }
-  return FoldedPackedWidth(m, scope);
+// The bits member `m` takes with its dimensions folded against `scope`; 0
+// where they do not fold or say nothing. Written as a typedef name, the
+// typedef's width in the design's type table times the packed dimensions
+// written on the name (§7.4.4), as SimParamTypeWidth sizes a parameter of
+// such a type -- never those dimensions alone, which are not the member's
+// width -- and 0 where the table holds no integral typedef of the name.
+uint32_t FoldedMemberWidth(const StructMember& m, const ScopeMap& scope,
+                           const SimContext& ctx) {
+  if (m.type_kind != DataTypeKind::kNamed)
+    return FoldedPackedWidth(m, scope).value_or(0);
+  DataType written;
+  written.kind = m.type_kind;
+  written.type_name = m.type_name;
+  written.scope_name = m.scope_name;
+  written.packed_dim_left = m.packed_dim_left;
+  written.packed_dim_right = m.packed_dim_right;
+  written.extra_packed_dims = m.extra_packed_dims;
+  return SimParamTypeWidth(written, scope, ctx);
 }
 
 // `type` with each member's width folded against `scope`, which the layout
@@ -91,8 +90,8 @@ DataType* FoldedAggregate(const DataType& type, const ScopeMap& scope,
   auto* folded = ctx.GetArena().Create<DataType>(type);
   for (StructMember& m : folded->struct_members) {
     if (m.nested_type != nullptr) continue;
-    if (std::optional<uint32_t> width = FoldedMemberWidth(m, scope, ctx))
-      m.resolved_width = *width;
+    if (uint32_t width = FoldedMemberWidth(m, scope, ctx))
+      m.resolved_width = width;
   }
   return folded;
 }
