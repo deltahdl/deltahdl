@@ -5,7 +5,9 @@
 #include <unordered_set>
 #include <vector>
 
+#include "common/arena.h"
 #include "common/packed_range.h"
+#include "common/types.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_attribute.h"
 #include "elaborator/rtlir_primitives.h"
@@ -14,6 +16,7 @@
 #include "parser/ast_specify.h"
 #include "simulator/instance_prefix_override.h"
 #include "simulator/sim_context.h"
+#include "simulator/variable.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_walk.h"
@@ -213,12 +216,32 @@ std::vector<VpiObject*> TerminalObjects(const ModuleItem& item,
   return terminals;
 }
 
+// §37.58: the bit at `offset` of the constant `whole` as a constant of one bit
+// of its own, of the same constant type.
+VpiObject* ConstantBit(const VpiObject& whole, int64_t offset,
+                       const VpiAttachBuild& build) {
+  VpiObject* bit = build.alloc();
+  bit->type = vpiConstant;
+  bit->const_type = whole.const_type;
+  auto* storage = build.arena.Create<Variable>();
+  storage->value = ExtractBitField(build.arena, whole.var->value,
+                                   static_cast<uint32_t>(offset), 1);
+  bit->var = storage;
+  bit->size = 1;
+  return bit;
+}
+
 // §28.3.6: what one element of an instance array connects to: the bit at
 // `offset` of a terminal as wide as the array (`length` elements), the
 // rightmost element taking the least significant bit, and a terminal of any
-// other width whole.
-VpiObject* ElementTerminal(VpiObject* whole, int64_t offset, int64_t length) {
+// other width whole. A constant's bit is one no object of the constant holds,
+// so it is made, as the elaborator gives the element a one-bit literal. The
+// whole constant stood for every element, so element 1 of `and g[1:0] (y,
+// 2'b01, c)` reported 1, the whole value, where it connects to 0.
+VpiObject* ElementTerminal(VpiObject* whole, int64_t offset, int64_t length,
+                           const VpiAttachBuild& build) {
   if (whole == nullptr || whole->size != length || length <= 1) return whole;
+  if (whole->type == vpiConstant) return ConstantBit(*whole, offset, build);
   VpiObject* bit = VpiBitAtOffset(*whole, offset);
   return bit != nullptr ? bit : whole;
 }
@@ -261,7 +284,7 @@ void MakePrimitiveArray(const PrimArraySpec& spec, const PrimSite& site,
     terminals.reserve(kWhole.size());
     for (VpiObject* whole : kWhole) {
       terminals.push_back(
-          ElementTerminal(whole, kRange.OffsetOf(index), kLength));
+          ElementTerminal(whole, kRange.OffsetOf(index), kLength, build));
     }
     const std::string kName =
         std::string(item.gate_inst_name) + "[" + std::to_string(index) + "]";
