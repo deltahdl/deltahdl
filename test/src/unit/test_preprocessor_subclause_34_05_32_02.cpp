@@ -142,6 +142,11 @@ TEST(ProtectViewportDescription, AnExpressionInNoEnvelopeIsReported) {
 TEST(ProtectViewportDescription, AnExpressionInNoEnvelopeDescribesNothing) {
   ReadingViewports reading(ViewportOf(kObject, kAccess));
   EXPECT_EQ(reading.Count(), 0U) << reading.text;
+  EXPECT_TRUE(
+      ReportedError(reading.diag.Diagnostics(),
+                    "protect pragma viewport expression stands in no protected "
+                    "envelope for its object to be contained within",
+                    1, "34.5.32.2"));
 }
 
 // ---------------------------------------------------------------------------

@@ -38,7 +38,7 @@ TEST(ConstraintModeRun, TheToggleTurnsTheBlockOffAndOnForTheCall) {
       std::string(kPacket) +
           "  int wide = 0, above = 0, off_state, on_state;\n"
           "  initial begin\n"
-          "    Packet p = new;\n"
+          "    static Packet p = new;\n"
           "    repeat (32) begin\n"
           "      p.filter1.constraint_mode(1);\n"
           "      void'(toggle_rand(p));\n"
@@ -69,7 +69,7 @@ TEST(ConstraintModeRun, TheObjectCallTurnsEveryBlockOff) {
       std::string(kPacket) +
           "  int wide = 0, first_a, first_b;\n"
           "  initial begin\n"
-          "    Packet p = new;\n"
+          "    static Packet p = new;\n"
           "    first_a = p.filter1.constraint_mode();\n"
           "    first_b = p.ceiling.constraint_mode();\n"
           "    p.constraint_mode(0);\n"

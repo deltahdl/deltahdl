@@ -206,6 +206,10 @@ TEST(ProtectKeyBlockSyntax, TheKeywordCarryingAValueSpeaksForNoLine) {
   EXPECT_FALSE(Holds(run.text, kEncodingSealedDesign)) << run.text;
   EXPECT_TRUE(Holds(run.text, BlockLineOf(EnvelopeWithAKeyBlock())))
       << run.text;
+  EXPECT_TRUE(ReportedError(
+      run.diag.Diagnostics(),
+      "protect pragma data block cannot be decrypted with the key supplied", 15,
+      "34.3.2"));
 }
 
 // §22.5.1 gives a pragma_value a parenthesized spelling as well, and it is a
@@ -216,6 +220,10 @@ TEST(ProtectKeyBlockSyntax, AListAgainstTheKeywordSpeaksForNoLine) {
       EnvelopeAnnouncing("`pragma protect key_block=(bytes=\"20\")\n"),
       ReadSource::KeysConfig(TheEntitysKey()));
   EXPECT_FALSE(Holds(run.text, kEncodingSealedDesign)) << run.text;
+  EXPECT_TRUE(ReportedError(
+      run.diag.Diagnostics(),
+      "protect pragma data block cannot be decrypted with the key supplied", 15,
+      "34.3.2"));
 }
 
 // §34.5.27.1 spells one name, and a name that merely opens with those
@@ -226,6 +234,10 @@ TEST(ProtectKeyBlockSyntax, ANameMerelyOpeningWithTheKeywordIsNotIt) {
   ReadSource run(EnvelopeAnnouncing("`pragma protect key_block_of_theirs\n"),
                  ReadSource::KeysConfig(TheEntitysKey()));
   EXPECT_FALSE(Holds(run.text, kEncodingSealedDesign)) << run.text;
+  EXPECT_TRUE(ReportedError(
+      run.diag.Diagnostics(),
+      "protect pragma data block cannot be decrypted with the key supplied", 15,
+      "34.3.2"));
 }
 
 // The '=' written after the keyword with nothing following it. The spelling

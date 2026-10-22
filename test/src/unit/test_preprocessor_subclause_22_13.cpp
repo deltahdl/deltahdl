@@ -5,6 +5,7 @@
 #include <fstream>
 
 #include "fixture_preprocessor.h"
+#include "helpers_reported_error.h"
 #include "preprocessor/preprocessor.h"
 
 using namespace delta;
@@ -154,6 +155,9 @@ TEST(FileAndLineMacroPreprocessing, File_CannotRedefine) {
   auto result = Preprocess("`__FILE__\n", f);
 
   EXPECT_NE(result.find('"'), std::string::npos);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "redefining compiler directive '__FILE__'", 1,
+                            "22.5.1"));
 }
 
 TEST(FileAndLineMacroPreprocessing, File_MultipleOnSameLine) {

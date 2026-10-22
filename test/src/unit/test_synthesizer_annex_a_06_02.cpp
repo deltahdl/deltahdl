@@ -90,12 +90,15 @@ TEST(ProceduralBlockSynthesis, FinalBlockBypassedDuringSynthCheck) {
   EXPECT_NE(aig, nullptr);
 }
 
+// The initial block writes a variable of its own: y is a net, which §10.4 bars
+// from a procedural assignment.
 TEST(ProceduralBlockSynthesis, InitialBlockBypassedDuringSynthCheck) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
                            "module m(input a, output y);\n"
+                           "  logic r;\n"
                            "  assign y = a;\n"
-                           "  initial y = 1'b0;\n"
+                           "  initial r = 1'b0;\n"
                            "endmodule\n");
   ASSERT_NE(mod, nullptr);
 

@@ -322,17 +322,18 @@ TEST(HighZStrengthResolution, LoneOneDriverAtHighZResolvesToZ) {
   EXPECT_EQ(sn.var->value.ToString(), "z");
 }
 
-// §21.2.1.4 again, from source. §10.3.4 admits highz1 and highz0 on a
-// continuous assignment to a scalar net, and the lowering turns a bit driven at
-// the level into z before the driver reaches the net -- so this case and the
-// two above reach the same answer by different routes, and the resolution is
-// shown to agree with the lowering rather than to be covered by it.
+// §21.2.1.4 again, from source. §10.3.4 admits highz0 on a continuous
+// assignment to a scalar net beside a 1 strength that is not highz1 -- the
+// pair of both is illegal -- and the lowering turns a bit driven at the level
+// into z before the driver reaches the net, so this case and the two above
+// reach the same answer by different routes, and the resolution is shown to
+// agree with the lowering rather than to be covered by it.
 TEST(HighZStrengthResolution, SourceDrivenHighZNetIsZ) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  wire w;\n"
-      "  assign (highz0, highz1) w = 1'b1;\n"
+      "  assign (highz0, strong1) w = 1'b0;\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);

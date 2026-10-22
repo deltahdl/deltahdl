@@ -558,7 +558,7 @@ TEST(ArrayIndexingAndSlicing,
 TEST(ArrayIndexingAndSlicing, PortSingleIndexSelectsAPackedElement) {
   SimFixture f;
   auto* var = RunAndFindVar(
-      "module leaf(input bit [3:0][7:0] data, output [7:0] q);\n"
+      "module leaf(input logic [3:0][7:0] data, output [7:0] q);\n"
       "  assign q = data[1];\n"
       "endmodule\n"
       "module t;\n"

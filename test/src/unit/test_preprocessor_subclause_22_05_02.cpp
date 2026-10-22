@@ -493,6 +493,8 @@ TEST(UndefPreprocessing, UndefinedMacroHasNoValue) {
 
   EXPECT_NE(result.find("`FOO"), std::string::npos);
   EXPECT_EQ(result.find("42"), std::string::npos);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "undefined macro 'FOO'", 3,
+                            "22.5.1"));
 }
 
 // Behaving as though it had never been defined is an equivalence, so the

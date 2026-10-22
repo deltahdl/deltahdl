@@ -255,6 +255,11 @@ TEST(ConfigBasicElements, DefaultLiblistLeavesUnlistedSubinstanceUnbound) {
   auto* design = u.ElaborateConfig(0);
   ASSERT_NE(SoleTopModule(design), nullptr);
   EXPECT_EQ(BoundChild(design, "a1"), nullptr);
+  EXPECT_TRUE(ReportedError(
+      u.diag.Diagnostics(),
+      "unknown module 'adder': the configuration's default library list "
+      "(rtlLib) holds no cell 'adder' for instance 'top.a1'",
+      2, "33.4.1.5"));
 }
 
 // A subinstance is an instance of whatever design element kind a library holds

@@ -54,11 +54,9 @@ TEST(AlwaysFFSimulation, NonblockingAssignSemantics) {
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic clk;\n"
-      "  logic [7:0] a, b;\n"
+      "  logic [7:0] a = 8'h11, b = 8'h22;\n"
       "  initial begin\n"
       "    clk = 0;\n"
-      "    a = 8'h11;\n"
-      "    b = 8'h22;\n"
       "    #1 clk = 1;\n"
       "    #1 $finish;\n"
       "  end\n"
@@ -93,12 +91,11 @@ TEST(AlwaysFFSimulation, IffGuardedEdgeGatesCapture) {
   auto* q = RunAndFindVar(
       "module t;\n"
       "  logic clk, en;\n"
-      "  logic [7:0] d, q;\n"
+      "  logic [7:0] d, q = 8'h00;\n"
       "  initial begin\n"
       "    clk = 0;\n"
       "    en  = 1;\n"
       "    d   = 8'h11;\n"
-      "    q   = 8'h00;\n"
       "    #1 clk = 1;\n"  // posedge with guard true: capture 0x11
       "    #1 clk = 0;\n"
       "       en  = 0;\n"

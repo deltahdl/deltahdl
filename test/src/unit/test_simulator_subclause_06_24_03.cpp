@@ -70,10 +70,10 @@ TEST(BitStreamCastSim, SingleElementArrayCast) {
   SimFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
-      "  byte arr [1];\n"
+      "  int arr [1];\n"
       "  int result;\n"
       "  initial begin\n"
-      "    arr[0] = 8'hAB;\n"
+      "    arr[0] = 32'hAB;\n"
       "    result = int'(arr);\n"
       "  end\n"
       "endmodule\n",
@@ -85,17 +85,19 @@ TEST(BitStreamCastSim, SingleElementArrayCast) {
 // §6.24.3: when the source carries any 4-state bit, the packed bit-stream is
 // itself 4-state. Pre-seed the array's high element with an X-bearing logic
 // value so that the cast result preserves an unknown bit in the expected
-// position.
+// position. The cast names a 16-bit type, since a size cast such as 16'(...)
+// takes an integral operand alone (§6.24.1).
 TEST(BitStreamCastSim, BitStreamSourceFourStatePropagates) {
   SimFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
+      "  typedef logic [15:0] w16_t;\n"
       "  logic [7:0] arr [2];\n"
       "  logic [15:0] result;\n"
       "  initial begin\n"
       "    arr[0] = 8'b1010_xxxx;\n"
       "    arr[1] = 8'h55;\n"
-      "    result = 16'(arr);\n"
+      "    result = w16_t'(arr);\n"
       "  end\n"
       "endmodule\n",
       f, "result");
@@ -131,17 +133,19 @@ TEST(BitStreamCastSim, BitStreamQueueSourceToIntPacksIndexZeroInMsb) {
 // §6.24.3: the first conversion step packs the source into a generic value that
 // is 4-state when the source carries any 4-state data. Exercise this through a
 // queue source (the dynamically sized bit-stream form) so an X in the queue's
-// leading element survives into the packed cast result.
+// leading element survives into the packed cast result. The cast names a
+// 16-bit type, since a size cast takes an integral operand alone (§6.24.1).
 TEST(BitStreamCastSim, BitStreamQueueSourceFourStatePropagates) {
   SimFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
+      "  typedef logic [15:0] w16_t;\n"
       "  logic [7:0] q [$];\n"
       "  logic [15:0] result;\n"
       "  initial begin\n"
       "    q.push_back(8'b1010_xxxx);\n"
       "    q.push_back(8'h55);\n"
-      "    result = 16'(q);\n"
+      "    result = w16_t'(q);\n"
       "  end\n"
       "endmodule\n",
       f, "result");
@@ -153,18 +157,19 @@ TEST(BitStreamCastSim, BitStreamQueueSourceFourStatePropagates) {
 // §6.24.3: the second conversion step assigns the generic packed value to the
 // destination, and where the destination designates a 2-state type the packed
 // bits are assigned as if cast to 2-state. So casting a 4-state source array
-// that carries X into a 2-state `int` destination yields a purely 2-state
-// result: the unknown bits become 0 while the known bytes survive in place.
+// that carries X into a 2-state `shortint` destination, as wide as the array
+// as §6.24.3 requires of a fixed-size source, yields a purely 2-state result:
+// the unknown bits become 0 while the known bytes survive in place.
 TEST(BitStreamCastSim, FourStateSourceIntoTwoStateDestStripsUnknown) {
   SimFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] arr [2];\n"
-      "  int result;\n"
+      "  shortint result;\n"
       "  initial begin\n"
       "    arr[0] = 8'b1010_xxxx;\n"
       "    arr[1] = 8'h55;\n"
-      "    result = int'(arr);\n"
+      "    result = shortint'(arr);\n"
       "  end\n"
       "endmodule\n",
       f, "result");
@@ -287,12 +292,13 @@ TEST(BitStreamCastSim, CastIntoAStructWithAnUnpackedArrayMember) {
                  "  typedef struct {\n"
                  "    shortint address; logic [3:0] code; byte command [2];\n"
                  "  } Control;\n"
+                 "  typedef bit [35:0] b36_t;\n"
                  "  Control q;\n"
                  "  bit [35:0] v, back;\n"
                  "  initial begin\n"
                  "    v = 36'hFFFEA1122;\n"
                  "    q = Control'(v);\n"
-                 "    back = 36'(q);\n"
+                 "    back = b36_t'(q);\n"
                  "    $display(\"%h %h %h %h %h\", q.address, q.code, "
                  "q.command[0], q.command[1], back);\n"
                  "  end\n"

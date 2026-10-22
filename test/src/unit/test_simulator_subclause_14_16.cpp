@@ -6,6 +6,7 @@
 #include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_clocking.h"
+#include "helpers_reported_error.h"
 #include "parser/ast_stmt.h"
 #include "simulator/clocking.h"
 #include "simulator/net.h"
@@ -202,6 +203,8 @@ TEST(SyncDriveSim, DriveToAnInputClockvarLeavesTheSignalAlone) {
       f, "sig");
   ASSERT_NE(sig, nullptr);
   EXPECT_EQ(sig->value.ToUint64(), 0x11u);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "write to input clockvar 'cb.sig'", 9, "14.3"));
 }
 
 // §14.16's synchronous drive, written against a block a child instance

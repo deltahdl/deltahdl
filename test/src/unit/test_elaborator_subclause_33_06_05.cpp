@@ -357,6 +357,17 @@ TEST(ConfigHierarchicalConfigExample, DelegationLeavesTheSiblingSubtreeAlone) {
   EXPECT_EQ(second->library, "aLib");
 }
 
+// The report the delegated configuration's outer-relative path draws. Both
+// configurations go into one file, cfg11 first, so its instance clause is on
+// the fourth line and that is where its report stands.
+::testing::AssertionResult ReportedOuterRelativePath(LibraryDesign& design) {
+  return ReportedError(design.diag.Diagnostics(),
+                       "instance path 'top.a2.f1' in config 'cfg11' does not "
+                       "start at a top-level cell of the config's design "
+                       "statement",
+                       4, "33.4.1.3");
+}
+
 // A path inside the delegated configuration is counted down from that
 // configuration's own design cell, so a path spelled against the enclosing
 // design is not that path read one level up: it starts at a cell the delegated
@@ -369,13 +380,7 @@ TEST(ConfigHierarchicalConfigExample, DelegatedPathAgainstOuterTopIsReported) {
   auto config = Both(kOuterRelativeInnerConfig, kDelegatingToOuterRelative);
   auto* elaborated = ElaborateNamedConfig(tmp, design, config, "cfg12");
   EXPECT_NE(elaborated, nullptr);
-  // Both configurations go into one file, cfg11 first, so its instance clause
-  // is on the fourth line and that is where its report stands.
-  EXPECT_TRUE(ReportedError(design.diag.Diagnostics(),
-                            "instance path 'top.a2.f1' in config 'cfg11' does "
-                            "not start at a top-level cell of the config's "
-                            "design statement",
-                            4, "33.4.1.3"));
+  EXPECT_TRUE(ReportedOuterRelativePath(design));
 }
 
 // And it selects nothing: the cell that path would have named had paths been
@@ -393,6 +398,7 @@ TEST(ConfigHierarchicalConfigExample, DelegatedPathAgainstOuterTopSelectsNone) {
   auto* bound = CellAt(elaborated, "a2.f1");
   ASSERT_NE(bound, nullptr);
   EXPECT_EQ(bound->library, "gateLib");
+  EXPECT_TRUE(ReportedOuterRelativePath(design));
 }
 
 // The nearest input the delegating clause has to turn away: the extension says
@@ -452,13 +458,14 @@ constexpr const char* kSoloPlainConfig =
 
 // The interface, the first kind of cell read here that is not a module, with a
 // cell of its own inside it so the same pair reads the delegated default
-// clause reaching a descendant.
+// clause reaching a descendant. §25.3 lets an interface instantiate interfaces
+// and no module, so that cell is an interface as well.
 constexpr const char* kInterfaceCellSource =
     "interface bus;\n"
     "  leaf u();\n"
     "endinterface\n"
-    "module leaf;\n"
-    "endmodule\n";
+    "interface leaf;\n"
+    "endinterface\n";
 
 constexpr const char* kInterfaceTopSource =
     "module top;\n"
@@ -595,6 +602,11 @@ TEST(ConfigHierarchicalConfigExample, WithoutDelegationTheInterfaceIsUnbound) {
   ASSERT_NE(OnlyTop(elaborated), nullptr);
   ASSERT_TRUE(DesignHoldsCell(design.unit, "bus", "gateLib"));
   EXPECT_EQ(CellAt(elaborated, "x"), nullptr);
+  EXPECT_TRUE(
+      ReportedError(design.diag.Diagnostics(),
+                    "unknown module 'bus': the configuration's default library "
+                    "list (rtlLib) holds no cell 'bus' for instance 'top.x'",
+                    2, "33.4.1.5"));
 }
 
 // And for a program: the design statement of the delegated configuration names
@@ -627,6 +639,11 @@ TEST(ConfigHierarchicalConfigExample, WithoutDelegationTheProgramIsUnbound) {
   ASSERT_NE(OnlyTop(elaborated), nullptr);
   ASSERT_TRUE(DesignHoldsCell(design.unit, "pgm", "gateLib"));
   EXPECT_EQ(CellAt(elaborated, "x"), nullptr);
+  EXPECT_TRUE(
+      ReportedError(design.diag.Diagnostics(),
+                    "unknown module 'pgm': the configuration's default library "
+                    "list (rtlLib) holds no cell 'pgm' for instance 'top.x'",
+                    2, "33.4.1.5"));
 }
 
 // And for a checker, the remaining kind a design statement can name.
@@ -657,6 +674,11 @@ TEST(ConfigHierarchicalConfigExample, WithoutDelegationTheCheckerIsUnbound) {
   ASSERT_NE(OnlyTop(elaborated), nullptr);
   ASSERT_TRUE(DesignHoldsCell(design.unit, "chk", "gateLib"));
   EXPECT_EQ(CellAt(elaborated, "x"), nullptr);
+  EXPECT_TRUE(
+      ReportedError(design.diag.Diagnostics(),
+                    "unknown module 'chk': the configuration's default library "
+                    "list (rtlLib) holds no cell 'chk' for instance 'top.x'",
+                    2, "33.4.1.5"));
 }
 
 // What the delegated configuration binds is every descendant of the instance
@@ -696,6 +718,11 @@ TEST(ConfigHierarchicalConfigExample, WithoutDelegationTheDeepCellIsUnbound) {
   auto* middle = CellAt(elaborated, "m1.s");
   ASSERT_NE(middle, nullptr);
   EXPECT_EQ(CellAt(elaborated, "m1.s.u"), nullptr);
+  EXPECT_TRUE(ReportedError(
+      design.diag.Diagnostics(),
+      "unknown module 'leaf': the configuration's default library list "
+      "(rtlLib) holds no cell 'leaf' for instance 'top.m1.s.u'",
+      8, "33.4.1.5"));
 }
 
 // The library of the cell bound at `path` when the §33.6 design is

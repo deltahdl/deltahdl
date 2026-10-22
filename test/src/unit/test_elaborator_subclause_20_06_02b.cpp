@@ -6,17 +6,19 @@
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_param_value.h"
+#include "helpers_reported_error.h"
 #include "helpers_rtlir_lookup.h"
 
 using namespace delta;
 
 namespace {
 
-// §20.6.2 (printed page 629): a typedef name that stands for a queue has no
-// fixed size, so `$bits(qt)` written in a parameter's value is left to the
-// run -- the typedef table the fold reads holds the element type alone, and
-// the name is among those the elaborator records as standing for an unpacked
-// aggregate -- rather than sized as one 8-bit element.
+// §20.6.2 (printed page 629): $bits applied directly to the name of a
+// dynamically sized type is an error, and a typedef name that stands for a
+// queue is one, so `$bits(qt)` written in a parameter's value is reported. The
+// parameter is left unresolved rather than sized as one 8-bit element -- the
+// typedef table the fold reads holds the element type alone, and the name is
+// among those the elaborator records as standing for an unpacked aggregate.
 TEST(BitsOfDeclaration, QueueTypedefNameIsLeftToTheRun) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -27,6 +29,10 @@ TEST(BitsOfDeclaration, QueueTypedefNameIsLeftToTheRun) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_TRUE(ParamUnresolved(design, "BQ"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'$bits' cannot be applied directly to dynamically sized type 'qt'", 3,
+      "20.6.2"));
 }
 
 // §11.4.3 (printed page 275): an addition carries out of bit 63 into the

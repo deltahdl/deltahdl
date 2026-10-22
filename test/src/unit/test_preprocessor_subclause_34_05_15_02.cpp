@@ -40,6 +40,7 @@
 #include "common/source_mgr.h"
 #include "fixture_preprocessor.h"
 #include "helpers_protect_block_lines.h"
+#include "helpers_reported_error.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_digest_block.h"
 #include "preprocessor/protect_processing.h"
@@ -267,6 +268,10 @@ TEST(ProtectDataBlockDescription, TheEncodedCharactersAreWhatIsReversed) {
   PreprocFixture f;
   std::string read = ReadBack(altered, f);
   EXPECT_EQ(read.find(kSealedDesign), std::string::npos) << read;
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "protect pragma data block cannot be decrypted with the key supplied", 8,
+      "34.3.2"));
 }
 
 }  // namespace

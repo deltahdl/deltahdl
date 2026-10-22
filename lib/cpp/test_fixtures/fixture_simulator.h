@@ -70,7 +70,10 @@ inline std::string_view TopNameOf(const CompilationUnit* cu) {
   return cu->modules.empty() ? std::string_view() : cu->modules.back()->name;
 }
 
-inline RtlirDesign* ElaborateSrc(const std::string& src, SimFixture& f) {
+// The body SimFixture's and SimFixtureSeeded's ElaborateSrc share: the two
+// fixtures differ only in the seed their SimContext is built with.
+template <typename Fixture>
+RtlirDesign* ElaborateSrcOn(const std::string& src, Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
@@ -79,6 +82,10 @@ inline RtlirDesign* ElaborateSrc(const std::string& src, SimFixture& f) {
   auto* design = elab.Elaborate(TopNameOf(cu));
   f.has_errors.Record(src);
   return design;
+}
+
+inline RtlirDesign* ElaborateSrc(const std::string& src, SimFixture& f) {
+  return ElaborateSrcOn(src, f);
 }
 
 // Elaborates `src` with no top named, the way the command line does: every
@@ -96,14 +103,7 @@ inline RtlirDesign* ElaborateSrcAllTops(const std::string& src, SimFixture& f) {
 }
 
 inline RtlirDesign* ElaborateSrc(const std::string& src, SimFixtureSeeded& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  auto* design = elab.Elaborate(TopNameOf(cu));
-  f.has_errors.Record(src);
-  return design;
+  return ElaborateSrcOn(src, f);
 }
 
 inline Expr* ParseExprFrom(const std::string& src, SimFixture& f) {

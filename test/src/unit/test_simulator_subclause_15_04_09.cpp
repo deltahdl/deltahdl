@@ -99,7 +99,7 @@ void ExpectStringMailboxPeekedThenTaken(const std::string& place,
       "  string r, r_peek;\n"
       "  int n, i;\n"
       "  initial begin\n"
-      "    string msg = \"abc\";\n"
+      "    static string msg = \"abc\";\n"
       "    m = new();\n" +
           place +
           "    m.peek(r_peek);\n"

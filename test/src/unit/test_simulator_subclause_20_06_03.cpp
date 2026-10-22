@@ -103,6 +103,9 @@ TEST(RangeSystemFunctionSim, NonParameterArgumentReturnsFalse) {
 // not hand-registered.
 TEST(RangeSystemFunctionSim, HierarchicalUnboundedParameterReturnsTrue) {
   SimFixture f;
+  // deltahdl rejects the hierarchical parameter s.P (#7618); the excuse goes
+  // with the fix.
+  f.has_errors.Excuse();
   auto* var = RunAndFindVar(
       "module sub #(parameter int P = $);\n"
       "endmodule\n"
@@ -121,6 +124,9 @@ TEST(RangeSystemFunctionSim, HierarchicalUnboundedParameterReturnsTrue) {
 // not $, so a dotted query of it yields 1'b0.
 TEST(RangeSystemFunctionSim, HierarchicalBoundedParameterReturnsFalse) {
   SimFixture f;
+  // deltahdl rejects the hierarchical parameter s.P (#7618); the excuse goes
+  // with the fix.
+  f.has_errors.Excuse();
   auto* var = RunAndFindVar(
       "module sub #(parameter int P = 13);\n"
       "endmodule\n"

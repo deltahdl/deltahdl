@@ -498,6 +498,12 @@ TEST(ConcatenationSim, LhsConcatZeroWidthPartSelectElementClaimsNoBits) {
   auto* b = f.ctx.FindVariable("b");
   ASSERT_NE(b, nullptr);
   EXPECT_EQ(b->value.ToUint64(), 0xC3u);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "indexed part-select width must be a constant expression", 9, "11.5.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "zero-width part-select is not allowed", 9,
+                            "11.5.1"));
 }
 
 // §11.6.1 sizes an expression by the context it stands in, and §10.7 makes an

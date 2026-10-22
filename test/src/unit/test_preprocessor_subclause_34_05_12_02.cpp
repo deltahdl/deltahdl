@@ -430,6 +430,15 @@ TEST(ProtectDataKeynameEncryptionInput,
      ARegionReachingNoKeyComesBackAsWritten) {
   SealingRun run(Region(Names(kOwner, kOtherKeyName)));
   EXPECT_NE(run.text.find(kSealedDesign), std::string::npos) << run.text;
+  EXPECT_TRUE(
+      ReportedError(run.f.diag.Diagnostics(),
+                    "protect pragma encryption envelope has no key to be "
+                    "encrypted under, so it is written out unencrypted",
+                    1, "34.3.1"));
+  EXPECT_TRUE(ReportedError(run.f.diag.Diagnostics(),
+                            "protect pragma data_keyname names no key held by "
+                            "the data_keyowner in effect",
+                            3, "34.5.12"));
 }
 
 // The control: a name the entity does hold. Without it the case above would

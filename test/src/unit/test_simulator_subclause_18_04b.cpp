@@ -36,9 +36,9 @@ std::string Design(const std::string& body) {
          "endclass\n"
          "module t;\n"
          "  initial begin\n"
-         "    Vars vars = new;\n"
-         "    Inner held = vars.in;\n"
-         "    int n = 0, m = 0;\n" +
+         "    static Vars vars = new;\n"
+         "    automatic Inner held = vars.in;\n"
+         "    static int n = 0, m = 0;\n" +
          body +
          "  end\n"
          "endmodule\n";
@@ -109,8 +109,8 @@ std::string Lone(const std::string& decl, const std::string& constraint) {
          "endclass\n"
          "module t;\n"
          "  initial begin\n"
-         "    Lone o = new;\n"
-         "    int n = 0;\n"
+         "    static Lone o = new;\n"
+         "    static int n = 0;\n"
          "    repeat (8) if (o.randomize() == 1) n++;\n"
          "    $display(\"%0d\", n);\n"
          "  end\n"

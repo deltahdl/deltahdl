@@ -4,6 +4,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "simulator/variable.h"
 
 using namespace delta;
@@ -87,12 +88,24 @@ TEST(MatchedEndPoint, MatchedStoresTheMatchUntilTheDestinationClockTicks) {
 }
 
 // §16.13.5: triggered is true at the time step of the match alone, which
-// is no tick of sysclk, so the same sequence over triggered never ends.
+// is no tick of sysclk, so the same sequence over triggered never ends. The
+// clause (printed page 471) also requires the sequence triggered is applied to
+// to end on the clock of the context reading it, so e1, ending on clk, is
+// reported where sysclk's sequence reads it.
 TEST(MatchedEndPoint, TriggeredIsNotSeenFromAnotherClock) {
-  EndPoints ends = EndPointsOf(
-      "    @(posedge sysclk) reset ##1 inst ##1 "
-      "e1(ready, proc1, proc2).triggered [->1] ##1 branch_back;\n");
-  EXPECT_EQ(ends.ends, 0u);
+  SimFixture f;
+  auto* ends = RunAndFindVar(
+      MatchedSource(
+          "    @(posedge sysclk) reset ##1 inst ##1 "
+          "e1(ready, proc1, proc2).triggered [->1] ##1 branch_back;\n"),
+      f, "ends");
+  ASSERT_NE(ends, nullptr);
+  EXPECT_EQ(ends->value.ToUint64(), 0u);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "the ending clock of 'e1' differs from the clock of "
+                    "the context its triggered stands in",
+                    17, "16.9.11"));
 }
 
 // §16.13.5: the stored match is consumed by the first read after it, so a
@@ -107,7 +120,8 @@ TEST(MatchedEndPoint, AReadConsumesTheStoredMatch) {
 // §16.13.5: each match is consumed by the first read after it, however long
 // the sequence's name: a ##1 a matches at 25 and 85 on clk, so the reads at
 // the ticks of sysclk find it at 40 and 88 alone, and none of 56, 72, 104
-// and 120 reads a match already consumed.
+// and 120 reads a match already consumed. §16.13.6 lets matched stand only in a
+// sequence expression, so the read in the always procedure is reported.
 TEST(MatchedEndPoint, AReadConsumesTheMatchOfASequenceWithALongName) {
   SimFixture f;
   auto* reads = RunAndFindVar(
@@ -136,6 +150,9 @@ TEST(MatchedEndPoint, AReadConsumesTheMatchOfASequenceWithALongName) {
   ASSERT_NE(reads, nullptr);
   EXPECT_EQ(reads->value.ToUint64(), 2u);
   EXPECT_EQ(f.ctx.FindVariable("last_read")->value.ToUint64(), 88u);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "matched may be used only in a sequence expression",
+                            10, "16.13.6"));
 }
 
 }  // namespace

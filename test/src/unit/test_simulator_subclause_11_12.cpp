@@ -50,6 +50,9 @@ TEST(LetExpansionSimulation, LetRecursionGuard) {
   auto result = EvalExpr(call, f.ctx, f.arena);
 
   EXPECT_TRUE(result.nwords > 0);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "recursive instantiation of let 'bad' is not permitted", 0, "11.12"));
 }
 
 static Expr* SLMakeId(Arena& arena, std::string_view name) {
@@ -792,6 +795,9 @@ TEST(LetSim, DefaultsReadTheDeclaringScopeAndInstancesKeepTheirHistory) {
 // let is read by the fork's own statements.
 TEST(LetSim, ReferencesReachTheInnermostVisibleLet) {
   SimFixture f;
+  // deltahdl leaves the fork block's let unresolved (#7613); the excuse goes
+  // with the fix.
+  f.has_errors.Excuse();
   EXPECT_EQ(
       RunCapture("let p = 9;\n"
                  "let q = 7;\n"

@@ -347,6 +347,11 @@ TEST(ConfigCellClauseExample, WithoutTheClauseTheInterfaceIsUnbound) {
   ASSERT_NE(top, nullptr);
   ASSERT_TRUE(DesignHoldsCell(design.unit, "bus", "gateLib"));
   EXPECT_EQ(ChildBoundTo(top, "b"), nullptr);
+  EXPECT_TRUE(
+      ReportedError(design.diag.Diagnostics(),
+                    "unknown module 'bus': the configuration's default library "
+                    "list (rtlLib) holds no cell 'bus' for instance 'top.b'",
+                    2, "33.4.1.5"));
 }
 
 // And for a program.
@@ -372,6 +377,11 @@ TEST(ConfigCellClauseExample, WithoutTheClauseTheProgramIsUnbound) {
   ASSERT_NE(top, nullptr);
   ASSERT_TRUE(DesignHoldsCell(design.unit, "pgm", "gateLib"));
   EXPECT_EQ(ChildBoundTo(top, "p"), nullptr);
+  EXPECT_TRUE(
+      ReportedError(design.diag.Diagnostics(),
+                    "unknown module 'pgm': the configuration's default library "
+                    "list (rtlLib) holds no cell 'pgm' for instance 'top.p'",
+                    2, "33.4.1.5"));
 }
 
 // And for a checker.
@@ -397,6 +407,11 @@ TEST(ConfigCellClauseExample, WithoutTheClauseTheCheckerIsUnbound) {
   ASSERT_NE(top, nullptr);
   ASSERT_TRUE(DesignHoldsCell(design.unit, "chk", "gateLib"));
   EXPECT_EQ(ChildBoundTo(top, "c1"), nullptr);
+  EXPECT_TRUE(
+      ReportedError(design.diag.Diagnostics(),
+                    "unknown module 'chk': the configuration's default library "
+                    "list (rtlLib) holds no cell 'chk' for instance 'top.c1'",
+                    2, "33.4.1.5"));
 }
 
 // And for a primitive, which the clause binds on the same terms. gateLib holds

@@ -167,7 +167,8 @@ TEST(SupplyNetStrengths, Supply1NotOverriddenByStrongOppositeSource) {
 // value driven onto a supply net of the opposite constant, which is no
 // stronger than the net's own, leaves an x at supply strength on both sides,
 // where pinning the net to its constant read the constant. `body` declares w
-// and drives it.
+// and drives it, through a gate, since §10.3.4 excepts a supply net from the
+// nets a continuous assignment's strength applies to.
 void ExpectSupplyX(const std::string& body) {
   SimFixture f;
   auto* design = ElaborateSrc("module m;\n" + body + "endmodule\n", f);
@@ -184,14 +185,14 @@ void ExpectSupplyX(const std::string& body) {
 TEST(SupplyNetStrengths, Supply0ContendedAtSupplyStrengthResolvesToX) {
   ExpectSupplyX(
       "  supply0 w;\n"
-      "  assign (supply0, supply1) w = 1'b1;\n");
+      "  buf (supply0, supply1) g (w, 1'b1);\n");
 }
 
 // The dual: a supply-strength 0 driven onto a supply1 net leaves a supply x.
 TEST(SupplyNetStrengths, Supply1ContendedAtSupplyStrengthResolvesToX) {
   ExpectSupplyX(
       "  supply1 w;\n"
-      "  assign (supply0, supply1) w = 1'b0;\n");
+      "  buf (supply0, supply1) g (w, 1'b0);\n");
 }
 
 }  // namespace

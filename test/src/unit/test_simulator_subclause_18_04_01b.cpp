@@ -21,8 +21,9 @@ std::string Design(const std::string& body, const std::string& print) {
          "module t;\n"
          "  int counts[256];\n"
          "  initial begin\n"
-         "    Uniform u = new;\n"
-         "    int repeats = 0, lower = 0, upper = 0, most = 0, drawn = 0;\n"
+         "    static Uniform u = new;\n"
+         "    static int repeats = 0, lower = 0, upper = 0, most = 0, drawn = "
+         "0;\n"
          "    bit [7:0] last;\n"
          "    for (int i = 0; i < 2048; i++) begin\n"
          "      void'(u.randomize());\n" +

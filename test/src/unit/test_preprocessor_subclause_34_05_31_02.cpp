@@ -8,6 +8,7 @@
 #include "fixture_preprocessor.h"
 #include "helpers_protect_keyword_value.h"
 #include "helpers_protect_region.h"
+#include "helpers_reported_error.h"
 #include "helpers_text_lines.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_digest.h"
@@ -298,12 +299,19 @@ TEST(ProtectResetDescription, EveryAnnouncementAwaitingItsLineIsDropped) {
 
 // The same seven envelopes without the reset, which is what makes the case
 // above about the reset rather than about seven keywords that announce nothing.
-// Each takes the line beneath it, and the design line does not come back out.
+// Each takes the line beneath it, and the design line does not come back out:
+// taken as the keyword's value, that line is no text in the encoding in effect,
+// which §34.5.9.2 has reported where it stands.
 TEST(ProtectResetDescription, WithoutItEachAnnouncementTakesTheLineBeneathIt) {
   for (std::string_view keyword : kAnnouncingKeywords) {
     PreprocFixture f;
     std::string read = Preprocess(AnnouncesThen(keyword, ""), f);
     EXPECT_FALSE(Holds(read, kLineBeneath)) << keyword << " left: " << read;
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "protect pragma value is not written in the encoding in effect", 3,
+        "34.5.9.2"))
+        << keyword;
   }
 }
 
@@ -320,6 +328,10 @@ TEST(ProtectResetDescription, TheSessionKeyTheTextHandedOverGoesBackToo) {
   std::string read =
       Preprocess(SealedUnderTheHandedOverKey("`pragma protect reset\n"), f);
   EXPECT_FALSE(Holds(read, kBlockedDesign)) << read;
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "protect pragma data block cannot be decrypted with the key supplied", 6,
+      "34.3.2"));
 }
 
 // The same envelope without the reset, which is what makes the case above about

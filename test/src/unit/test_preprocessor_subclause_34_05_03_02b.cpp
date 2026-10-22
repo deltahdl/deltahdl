@@ -170,6 +170,11 @@ TEST(ProtectBeginProtectedDescription,
   EXPECT_FALSE(Holds(run.text, kCurrentMethod));
   EXPECT_TRUE(Holds(run.text, kSealedBlockMarker));
   EXPECT_TRUE(Holds(run.text, kOuterStatement));
+  EXPECT_TRUE(
+      ReportedError(run.diag.Diagnostics(),
+                    "protect pragma encryption envelope has no key to be "
+                    "encrypted under, so it is written out unencrypted",
+                    1, "34.3.1"));
 }
 
 // What the rule is bounded by, put at its edge: the content encrypted runs up
@@ -252,6 +257,10 @@ TEST(ProtectBeginProtectedDescription,
   src.append("`pragma protect end_protected\n");
   ReadSource run(src, ReadSource::KeyConfig(kReadingExchangeKey));
   EXPECT_FALSE(Holds(run.text, kOuterStatement));
+  EXPECT_TRUE(ReportedError(
+      run.diag.Diagnostics(),
+      "protect pragma value is not written in the encoding in effect", 3,
+      "34.5.9.2"));
 }
 
 // ---------------------------------------------------------------------------

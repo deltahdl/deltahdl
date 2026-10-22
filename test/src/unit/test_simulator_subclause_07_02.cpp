@@ -347,9 +347,10 @@ TEST(StructType, ForeachOverAnArrayMember) {
 }
 
 // §7.12 with §7.2 and §7.4.2: an unpacked array member of a structure is an
-// unpacked array, so after `r.v = '{4, 5, 6}` its size() is 3 and its sum()
-// 15, while the member beside it keeps its own value. Named no array of its
-// own, the member answered 0 to both.
+// unpacked array, so after `r.v = '{4, 5, 6}` its size is 3 and its sum() 15,
+// while the member beside it keeps its own value. size() is a dynamic array's
+// method (§7.5.2), so the fixed-size member's size is read through $size
+// (§20.7). Named no array of its own, the member answered 0 to both.
 TEST(StructType, ArrayMethodsOnAnArrayMember) {
   SimFixture f;
   std::string out = RunCapture(
@@ -359,7 +360,7 @@ TEST(StructType, ArrayMethodsOnAnArrayMember) {
       "  initial begin\n"
       "    r.v = '{4, 5, 6};\n"
       "    r.n = 1;\n"
-      "    $display(\"%0d %0d %0d %0d\", r.v.sum(), r.v.size(), r.v.product(), "
+      "    $display(\"%0d %0d %0d %0d\", r.v.sum(), $size(r.v), r.v.product(), "
       "r.n);\n"
       "  end\n"
       "endmodule\n",
@@ -584,18 +585,18 @@ TEST(UnpackedStructDynamicMember, AStructAssignmentCopiesTheDynamicMember) {
   EXPECT_EQ(out, "2 4 6\n");
 }
 
-// §7.2 with §7.5: a dynamic member never written holds no element, and the
-// queue methods a dynamic array shares grow it, a copy taken before the
-// growth keeping the elements it was taken with.
+// §7.2 with §7.10: a queue member never written holds no element, and
+// push_back grows it, a copy taken before the growth keeping the elements it
+// was taken with.
 TEST(UnpackedStructDynamicMember, AnUnwrittenMemberIsEmptyAndGrowsByMethod) {
   SimFixture f;
   std::string out = RunCapture(
-      "typedef struct { byte data[]; } h_t;\n"
+      "typedef struct { byte data[$]; } h_t;\n"
       "module t;\n"
       "  h_t e, c;\n"
       "  initial begin\n"
       "    $display(\"%0d\", e.data.size());\n"
-      "    e.data = new[1];\n"
+      "    e.data = '{0};\n"
       "    c = e;\n"
       "    e.data.push_back(4);\n"
       "    $display(\"%0d %0d %0d\", e.data.size(), e.data[1], "

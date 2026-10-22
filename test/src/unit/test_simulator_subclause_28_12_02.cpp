@@ -336,15 +336,16 @@ TEST(StrengthResolutionPipeline, EqualStrengthConflictFromNetDeclInitializer) {
 // Input-form coverage: a vector operand driven end to end. §28.12.2's rule is
 // applied independently per bit, so on a multi-bit net each bit is resolved on
 // its own -- conflicting bits become x while agreeing bits keep their value.
-// The competing vector drivers come from real drive-strength cont-assign source
-// rather than a hand-built Net.
+// The competing vector drivers come from real drive-strength source rather than
+// a hand-built Net: arrays of gates, one per bit, since §10.3.4 gives a
+// continuous assignment a strength only on a scalar net.
 TEST(StrengthResolutionPipeline, EqualStrengthConflictVectorResolvesPerBit) {
   SimFixture f;
   Net* net = RunAndFindNetW(f,
                             "module t;\n"
                             "  wire [3:0] w;\n"
-                            "  assign (strong0, strong1) w = 4'b1100;\n"
-                            "  assign (strong0, strong1) w = 4'b1010;\n"
+                            "  buf (strong0, strong1) g[3:0] (w, 4'b1100);\n"
+                            "  buf (strong0, strong1) h[3:0] (w, 4'b1010);\n"
                             "endmodule\n");
   ASSERT_NE(net, nullptr);
   auto* var = f.ctx.FindVariable("w");

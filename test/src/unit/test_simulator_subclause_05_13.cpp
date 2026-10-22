@@ -12,9 +12,9 @@ TEST(BuiltinMethodSim, ArraySizeWithParens) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
-      "  logic [7:0] arr [0:3];\n"
+      "  logic [7:0] arr [];\n"
       "  logic [31:0] s;\n"
-      "  initial s = arr.size();\n"
+      "  initial begin arr = new[4]; s = arr.size(); end\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
@@ -28,9 +28,9 @@ TEST(BuiltinMethodSim, ArraySizeNoParens) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
-      "  logic [7:0] arr [0:2];\n"
+      "  logic [7:0] arr [];\n"
       "  logic [31:0] s;\n"
-      "  initial s = arr.size;\n"
+      "  initial begin arr = new[3]; s = arr.size; end\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
@@ -44,9 +44,9 @@ TEST(BuiltinMethodSim, MethodInExpression) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
-      "  logic [7:0] arr [0:4];\n"
+      "  logic [7:0] arr [];\n"
       "  logic [31:0] r;\n"
-      "  initial r = arr.size() + 32'd1;\n"
+      "  initial begin arr = new[5]; r = arr.size() + 32'd1; end\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
@@ -211,9 +211,9 @@ TEST(BuiltinMethodSim, MethodNoParensInBinaryExpr) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
-      "  logic [7:0] arr [0:4];\n"
+      "  logic [7:0] arr [];\n"
       "  logic [31:0] r;\n"
-      "  initial r = arr.size + 32'd1;\n"
+      "  initial begin arr = new[5]; r = arr.size + 32'd1; end\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);

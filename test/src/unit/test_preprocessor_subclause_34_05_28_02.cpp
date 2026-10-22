@@ -248,6 +248,11 @@ TEST(ProtectDecryptLicenseDescription, AnotherAnswerDecryptsNothing) {
   Asked asked;
   ReadSource run(EnvelopeOf(kLicense), Answering(Returning(7), &asked));
   EXPECT_FALSE(Holds(run.text, kEncodingSealedDesign)) << run.text;
+  EXPECT_TRUE(ReportedError(
+      run.diag.Diagnostics(),
+      "protect pragma decrypt_license entry function \"checkout\" in "
+      "\"liblic.so\" returned 7 for feature \"decrypt\", not the match value 1",
+      3, "34.5.28.2"));
 }
 
 // §34.5.28.2 asks before the decrypted text is processed, so a model the tool
@@ -261,6 +266,11 @@ TEST(ProtectDecryptLicenseDescription, ARefusedModelDefinesNothing) {
   ReadSource run(src, Answering(Returning(7), &asked));
   EXPECT_FALSE(Holds(run.text, "leaked")) << run.text;
   EXPECT_EQ(asked.licenses.size(), 1U);
+  EXPECT_TRUE(ReportedError(
+      run.diag.Diagnostics(),
+      "protect pragma decrypt_license entry function \"checkout\" in "
+      "\"liblic.so\" returned 7 for feature \"decrypt\", not the match value 1",
+      4, "34.5.28.2"));
 }
 
 // A licence writing no match value is held to 0, the value the NOTE closing the
@@ -283,6 +293,11 @@ TEST(ProtectDecryptLicenseDescription, NoMatchValueRefusesAnyOtherAnswer) {
   ReadSource run(EnvelopeOf(kLicenseWithoutMatch),
                  Answering(Returning(1), &asked));
   EXPECT_FALSE(Holds(run.text, kEncodingSealedDesign)) << run.text;
+  EXPECT_TRUE(ReportedError(
+      run.diag.Diagnostics(),
+      "protect pragma decrypt_license entry function \"checkout\" in "
+      "\"liblic.so\" returned 1 for feature \"decrypt\", not the match value 0",
+      3, "34.5.28.2"));
 }
 
 // An entry function that could not be called returned no value that could
@@ -307,6 +322,11 @@ TEST(ProtectDecryptLicenseDescription, AnUncalledEntryFunctionIsReported) {
 TEST(ProtectDecryptLicenseDescription, AReadingThatCannotAskDecryptsNothing) {
   ReadSource run(EnvelopeOf(kLicense), ReadSource::KeysConfig(TheKey()));
   EXPECT_FALSE(Holds(run.text, kEncodingSealedDesign)) << run.text;
+  EXPECT_TRUE(ReportedError(
+      run.diag.Diagnostics(),
+      "protect pragma decrypt_license entry function \"checkout\" in "
+      "\"liblic.so\" was not called for feature \"decrypt\"",
+      3, "34.5.28.2"));
 }
 
 // The refusal belongs to the envelope that stated the licence. An envelope
@@ -317,6 +337,11 @@ TEST(ProtectDecryptLicenseDescription, TheRefusalEndsWithItsEnvelope) {
   ReadSource run(EnvelopeOf(kLicense) + EnvelopeOf("", kLaterDesign),
                  Answering(Returning(7), &asked));
   EXPECT_TRUE(Holds(run.text, kLaterDesign)) << run.text;
+  EXPECT_TRUE(ReportedError(
+      run.diag.Diagnostics(),
+      "protect pragma decrypt_license entry function \"checkout\" in "
+      "\"liblic.so\" returned 7 for feature \"decrypt\", not the match value 1",
+      3, "34.5.28.2"));
 }
 
 // The control on where the question is put. §34.5.28.2 puts it on meeting the

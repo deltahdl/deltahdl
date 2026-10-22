@@ -86,6 +86,9 @@ TEST(HierarchicalNameSynthesis, HierarchicalRefIntoCheckerRejectedBeforeSynth) {
   if (mod) {
     SynthLower synth(f.arena, f.diag);
     (void)synth.Lower(mod);
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "a hierarchical name has no lowering in the synthesizer", 7, "23.6"));
   }
 }
 

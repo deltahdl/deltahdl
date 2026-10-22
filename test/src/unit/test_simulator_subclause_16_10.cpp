@@ -85,24 +85,26 @@ constexpr char kNibbleTypes[] =
 
 // §16.10 with §6.18: a sequence's local declared with a type name is of the
 // type the name stands for: nib_t is four 4-state unsigned bits, keeping 13
-// of 29 and x until assigned, snib_t four signed ones, below 0 at -1, bnib_t
-// four 2-state ones, 0 until assigned, and `nib_t [1:0]` two nib_t, eight
-// bits keeping 255 of 9'h1FF (#5767).
+// of 29 and x of 'x, snib_t four signed ones, below 0 at -1, bnib_t four
+// 2-state ones, keeping 0 of 'x, and `nib_t [1:0]` two nib_t, eight bits
+// keeping 255 of 9'h1FF (#5767). §16.10 bars reading a local never assigned,
+// so each is given a value.
 TEST(SequenceLocals, ALocalOfATypeNameIsTheTypeTheNameStandsFor) {
   ExpectOneEndAfterTe2("(x == 13)", "    nib_t x = 29;\n", kNibbleTypes);
-  ExpectOneEndAfterTe2("$isunknown(x)", "    nib_t x;\n", kNibbleTypes);
+  ExpectOneEndAfterTe2("$isunknown(x)", "    nib_t x = 'x;\n", kNibbleTypes);
   ExpectOneEndAfterTe2("(x < 0)", "    snib_t x = -1;\n", kNibbleTypes);
-  ExpectOneEndAfterTe2("(x == 0)", "    bnib_t x;\n", kNibbleTypes);
+  ExpectOneEndAfterTe2("(x == 0)", "    bnib_t x = 'x;\n", kNibbleTypes);
   ExpectOneEndAfterTe2("(x == 255)", "    nib_t [1:0] x = 9'h1FF;\n",
                        kNibbleTypes);
 }
 
 // §16.10 with §6.11: a sequence's time local is 64 bits, unsigned and
 // four-state: -1 is all 64 bits set, above any 32-bit value, and the local
-// is x until assigned (#5769).
+// keeps the x of 'x (#5769). §16.10 bars reading a local never assigned, so
+// it is given one.
 TEST(SequenceLocals, ATimeLocalIsSixtyFourUnsignedFourStateBits) {
   ExpectOneEndAfterTe2("(t > 64'hFFFF_FFFF)", "    time t = -1;\n");
-  ExpectOneEndAfterTe2("$isunknown(t)", "    time t;\n");
+  ExpectOneEndAfterTe2("$isunknown(t)", "    time t = 'x;\n");
 }
 
 // §16.10: the match items attached to a subsequence are performed at the end

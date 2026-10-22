@@ -64,6 +64,11 @@ TEST(ImplicitNamedPortConnectionElaboration, NoImplicitNetForUndeclaredSignal) {
   for (const auto& net : mod->nets) {
     EXPECT_NE(net.name, "a");
   }
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "implicit named port connection '.a' requires signal 'a' "
+                    "to be declared in the instantiating scope",
+                    4, "23.3.2.3"));
 }
 
 TEST(ImplicitNamedPortConnectionElaboration, MixedImplicitAndExplicitResolve) {

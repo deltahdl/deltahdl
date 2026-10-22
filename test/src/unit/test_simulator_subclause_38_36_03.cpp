@@ -11,6 +11,7 @@
 #include "common/source_mgr.h"
 #include "fixture_simulator.h"
 #include "helpers_event_callbacks.h"
+#include "helpers_reported_error.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
 #include "simulator/vpi_context.h"
@@ -442,6 +443,10 @@ TEST(UnresolvedSystfOfARun, AnUnknownSystemTaskIsReportedToTheApplication) {
   SetGlobalVpiContext(nullptr);
   EXPECT_EQ(UnresolvedNames(),
             (std::vector<std::string>{"$nobody_registered_this"}));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$nobody_registered_this is not a system task or "
+                            "system function this tool implements",
+                            1, "20.1"));
 }
 
 // The vpiTchkType of the timing check the last cbTchkViolation was given.

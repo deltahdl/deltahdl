@@ -59,6 +59,7 @@
 #include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_eval_op.h"
+#include "helpers_reported_error.h"
 #include "parser/ast_expr.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -465,6 +466,12 @@ TEST(SelectBoundaryBehavior, PartSelectWithAnUnknownWidthBoundWritesNothing) {
       f, "tgt");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), uint64_t{0xC3});
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "indexed part-select width must be a constant expression", 7, "11.5.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "zero-width part-select is not allowed", 7,
+                            "11.5.1"));
 }
 
 // §11.5.1 gives a bit-select the value of the bit it addresses, and §6.3.1

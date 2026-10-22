@@ -22,7 +22,7 @@ std::string CountingSet(const std::string& order) {
          "module t;\n"
          "  int set = 0, wrong = 0;\n"
          "  initial begin\n"
-         "    B o = new;\n"
+         "    static B o = new;\n"
          "    repeat (512) begin\n"
          "      void'(o.randomize());\n"
          "      if (o.s) set++;\n"

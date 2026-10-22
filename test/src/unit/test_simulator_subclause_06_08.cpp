@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
 #include "simulator/net.h"
@@ -414,12 +415,15 @@ TEST(VariableDeclaration, KeyedPatternUncoveredElementTakesTable67Default) {
   auto* var = f.ctx.FindVariable("a[0]");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToString(), "xxxxxxxx");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "keyed array pattern does not cover all elements",
+                            2, "10.9.1"));
 }
 
-// The run-time keyed writer answers the same question, and no elaboration rule
-// reaches a pattern written as a statement, so this branch is reachable with no
-// report at all -- which is why the two had to agree rather than one of them
-// being unreachable.
+// The run-time keyed writer answers the same question for a pattern written as
+// a statement. §10.9.1 forbids the uncovered element there as it does in the
+// declaration, and the report stands at the statement, but the run still gives
+// the element a value, and it has to be the same one.
 TEST(VariableDeclaration, KeyedPatternStatementUncoveredElementTakesTable67) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -430,6 +434,9 @@ TEST(VariableDeclaration, KeyedPatternStatementUncoveredElementTakesTable67) {
       f, "a[0]");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToString(), "xxxxxxxx");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "keyed array pattern does not cover all elements",
+                            3, "10.9.1"));
 }
 
 // Table 6-7 (printed page 107) with §13.3 and §13.4: a 4-state local of a

@@ -4,6 +4,7 @@
 
 #include "fixture_simulator.h"
 #include "helpers_lower_run.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -62,6 +63,10 @@ TEST(PlaRecognition, ExtraComponentNameIsNotDispatched) {
                            "out");
   // Not recognized: the engine never ran, so the output holds its init value.
   EXPECT_EQ(out, 0u);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$sync$and$array$extra is not a system task or "
+                            "system function this tool implements",
+                            9, "20.1"));
 }
 
 }  // namespace

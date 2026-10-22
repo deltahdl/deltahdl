@@ -40,11 +40,10 @@ TEST(NonblockingAssignSim, BlockingEventsFromNbaProcessedAfter) {
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic clk;\n"
-      "  logic q;\n"
+      "  logic q = 0;\n"
       "  logic post_q;\n"
       "  initial begin\n"
       "    clk = 0;\n"
-      "    q = 0;\n"
       "    post_q = 0;\n"
       "    #1 clk = 1;\n"
       "  end\n"

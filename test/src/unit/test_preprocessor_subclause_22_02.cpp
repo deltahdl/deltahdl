@@ -18,6 +18,9 @@ TEST(Preprocessor, DirectiveInLineCommentIgnored) {
       f);
 
   EXPECT_NE(result.find("`SHOULD_NOT_DEFINE"), std::string::npos);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "undefined macro 'SHOULD_NOT_DEFINE'", 2,
+                            "22.5.1"));
 }
 
 TEST(Preprocessor, DirectiveInBlockCommentIgnored) {
@@ -28,6 +31,9 @@ TEST(Preprocessor, DirectiveInBlockCommentIgnored) {
       f);
 
   EXPECT_NE(result.find("`SHOULD_NOT_DEFINE"), std::string::npos);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "undefined macro 'SHOULD_NOT_DEFINE'", 2,
+                            "22.5.1"));
 }
 
 TEST(Preprocessor, DirectiveInMultilineBlockCommentIgnored) {
@@ -40,6 +46,9 @@ TEST(Preprocessor, DirectiveInMultilineBlockCommentIgnored) {
       f);
 
   EXPECT_NE(result.find("`SHOULD_NOT_DEFINE"), std::string::npos);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "undefined macro 'SHOULD_NOT_DEFINE'", 4,
+                            "22.5.1"));
 }
 
 TEST(Preprocessor, MacroExpansionInLineCommentIgnored) {
@@ -672,6 +681,8 @@ TEST(Preprocessor, DirectiveDoesNotSpanOntoNextLine) {
   auto result = pp.Preprocess(fid);
   EXPECT_NE(pp.DefaultNetType(), NetType::kNone);
   EXPECT_NE(result.find("none"), std::string::npos);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "invalid net type ''", 1, "22.8"));
 }
 
 TEST(Preprocessor, DirectiveInMacroTextInConditionalBlock) {

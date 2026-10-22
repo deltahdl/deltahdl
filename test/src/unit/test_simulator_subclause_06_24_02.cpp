@@ -129,6 +129,10 @@ TEST(DynamicCastSim, TaskFormInvalidLeavesDestUnchanged) {
   auto* c = f.ctx.FindVariable("c");
   ASSERT_NE(c, nullptr);
   EXPECT_EQ(c->value.ToUint64(), 1u);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$cast task could not assign the source expression "
+                            "to the destination; assignment is invalid",
+                            6, "6.24.2"));
 }
 
 TEST(DynamicCastSim, TaskFormInvalidRaisesRuntimeError) {
@@ -409,6 +413,10 @@ TEST(DynamicCastSim, TaskFormInvalidInFunctionBodyLeavesDestUnchanged) {
   auto* c = f.ctx.FindVariable("c");
   ASSERT_NE(c, nullptr);
   EXPECT_EQ(c->value.ToUint64(), 1u);  // still GREEN
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$cast task could not assign the source expression "
+                            "to the destination; assignment is invalid",
+                            5, "6.24.2"));
 }
 
 // §6.24.2 through §8.16: a downcast written as a task inside a class method is

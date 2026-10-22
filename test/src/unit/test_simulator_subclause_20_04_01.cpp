@@ -39,6 +39,9 @@ TEST(TimescaleSystemFunctions, NoArgumentReportsCurrentScopeUnitAndPrecision) {
 // top module names itself; its declared 100us/10ns maps to -4 and -8.
 TEST(TimescaleSystemFunctions, NamedElementArgumentReportsThatElement) {
   SimFixture f;
+  // deltahdl reports the module's own name dut as an unresolved identifier
+  // (#7617); the excuse goes with the fix.
+  f.has_errors.Excuse();
   std::string out = RunCapture(
       "module dut;\n"
       "  timeunit 100us / 10ns;\n"
@@ -53,7 +56,9 @@ TEST(TimescaleSystemFunctions, NamedElementArgumentReportsThatElement) {
 
 // A named argument resolves the *named* child instance, not the calling scope:
 // the parent runs at 1ns/1ns while the instance c1 declares 100ps/10fs, so
-// $timeunit(c1)/$timeprecision(c1) report the child's -10 and -14.
+// $timeunit(c1)/$timeprecision(c1) report the child's -10 and -14. §3.14.2.3
+// bars a design where some elements declare a time unit and others do not,
+// so the parent declares its own.
 TEST(TimescaleSystemFunctions, NamedInstanceArgumentReportsChildTimescale) {
   SimFixture f;
   std::string out = RunCapture(
@@ -61,6 +66,7 @@ TEST(TimescaleSystemFunctions, NamedInstanceArgumentReportsChildTimescale) {
       "  timeunit 100ps / 10fs;\n"
       "endmodule\n"
       "module top;\n"
+      "  timeunit 1ns / 1ns;\n"
       "  child c1();\n"
       "  initial begin\n"
       "    if ($timeunit(c1) == -10) $display(\"unit_ok\");\n"
@@ -281,6 +287,9 @@ TEST(TimescaleSystemFunctions, AHierarchicalArgumentReportsTheInstanceItNames) {
 // reports the time scale it declares rather than the calling module's.
 TEST(TimescaleSystemFunctions, APackageArgumentReportsThePackage) {
   SimFixture f;
+  // deltahdl reports the package p as an unresolved identifier (#7616); the
+  // excuse goes with the fix.
+  f.has_errors.Excuse();
   std::string out = RunCapture(
       "package p;\n"
       "  timeunit 1us / 1ns;\n"

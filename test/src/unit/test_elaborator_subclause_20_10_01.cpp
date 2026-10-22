@@ -18,6 +18,9 @@ TEST(ElabSeverityTask, FatalBlocksSimulation) {
       ef);
   ASSERT_NE(design, nullptr);
   EXPECT_TRUE(design->simulation_blocked);
+  EXPECT_TRUE(ReportedError(ef.diag.Diagnostics(),
+                            "elaboration FATAL in scope 'm': abort", 2,
+                            "20.10.1"));
 }
 
 // $warning at module-item level emits but does not block simulation
@@ -117,6 +120,9 @@ TEST(ElabSeverityTask, GenerateIfTrueBranchExecutesFatal) {
       ef);
   ASSERT_NE(design, nullptr);
   EXPECT_TRUE(design->simulation_blocked);
+  EXPECT_TRUE(ReportedError(ef.diag.Diagnostics(),
+                            "elaboration FATAL in scope 'm.genblk1': reached",
+                            4, "20.10.1"));
 }
 
 // §20.10.1 — $fatal in one generate branch and $info in another: only the
@@ -159,6 +165,9 @@ TEST(ElabSeverityTask, ErrorDoesNotAbortElaboration) {
   }
   EXPECT_TRUE(found);
   EXPECT_TRUE(design->simulation_blocked);
+  EXPECT_TRUE(ReportedError(ef.diag.Diagnostics(),
+                            "elaboration ERROR in scope 'm': keep going", 2,
+                            "20.10.1"));
 }
 
 // §20.10.1 claim 13 — every elaboration severity task shall print a
@@ -172,6 +181,9 @@ TEST(ElabSeverityTask, FatalMessageRecordsSeverityTag) {
       ef);
   ASSERT_NE(design, nullptr);
   EXPECT_EQ(design->last_elab_severity, "FATAL");
+  EXPECT_TRUE(ReportedError(ef.diag.Diagnostics(),
+                            "elaboration FATAL in scope 'm': boom", 2,
+                            "20.10.1"));
 }
 
 TEST(ElabSeverityTask, ErrorMessageRecordsSeverityTag) {
@@ -183,6 +195,9 @@ TEST(ElabSeverityTask, ErrorMessageRecordsSeverityTag) {
       ef);
   ASSERT_NE(design, nullptr);
   EXPECT_EQ(design->last_elab_severity, "ERROR");
+  EXPECT_TRUE(ReportedError(ef.diag.Diagnostics(),
+                            "elaboration ERROR in scope 'm': oops", 2,
+                            "20.10.1"));
 }
 
 TEST(ElabSeverityTask, WarningMessageRecordsSeverityTag) {
@@ -220,6 +235,9 @@ TEST(ElabSeverityTask, MessageRecordsCallSiteFileAndLine) {
   ASSERT_NE(design, nullptr);
   EXPECT_NE(design->last_elab_severity_loc.file_id, 0u);
   EXPECT_EQ(design->last_elab_severity_loc.line, 2u);
+  EXPECT_TRUE(ReportedError(ef.diag.Diagnostics(),
+                            "elaboration ERROR in scope 'm': here", 2,
+                            "20.10.1"));
 }
 
 // §20.10.1 claim 13 — the message shall include the hierarchical name of
@@ -267,6 +285,9 @@ TEST(ElabSeverityTask, MessageRecordsUserDefinedText) {
       ef);
   ASSERT_NE(design, nullptr);
   EXPECT_EQ(design->last_elab_severity_msg, "parameter out of range");
+  EXPECT_TRUE(ReportedError(
+      ef.diag.Diagnostics(),
+      "elaboration ERROR in scope 'm': parameter out of range", 2, "20.10.1"));
 }
 
 // §20.10.1 claim 14 — when no user-defined message is supplied the message
@@ -294,6 +315,9 @@ TEST(ElabSeverityTask, FatalMessageRecordsUserDefinedText) {
       ef);
   ASSERT_NE(design, nullptr);
   EXPECT_EQ(design->last_elab_severity_msg, "aborting now");
+  EXPECT_TRUE(ReportedError(ef.diag.Diagnostics(),
+                            "elaboration FATAL in scope 'm': aborting now", 2,
+                            "20.10.1"));
 }
 
 // §20.10.1 claim 3 — a generate-for loop with zero iterations does not
@@ -326,6 +350,9 @@ TEST(ElabSeverityTask, GenerateForExecutesTaskOnIteration) {
       ef);
   ASSERT_NE(design, nullptr);
   EXPECT_TRUE(design->simulation_blocked);
+  EXPECT_TRUE(ReportedError(ef.diag.Diagnostics(),
+                            "elaboration FATAL in scope 'm.genblk1_0': reached",
+                            3, "20.10.1"));
 }
 
 // §20.10.1 claim 5 — a compound constant expression built from parameter
@@ -425,6 +452,9 @@ TEST(ElabSeverityTask, GenerateCaseSelectedBranchExecutesFatal) {
   ASSERT_NE(design, nullptr);
   EXPECT_TRUE(design->simulation_blocked);
   EXPECT_EQ(design->last_elab_severity, "FATAL");
+  EXPECT_TRUE(ReportedError(ef.diag.Diagnostics(),
+                            "elaboration FATAL in scope 'm.genblk1': one", 5,
+                            "20.10.1"));
 }
 
 // §20.10.1 — when the generate-case selector picks a branch that does not

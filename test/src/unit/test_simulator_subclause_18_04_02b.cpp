@@ -30,11 +30,11 @@ std::string Design(const std::string& body) {
          "  bit [255:0] visited;\n"
          "  int groups = 0, distinct = 0, confined = 0;\n"
          "  initial begin\n"
-         "    Cyclic cy = new;\n"
-         "    Wide w = new;\n"
-         "    Changing ch = new;\n"
-         "    Shared s1 = new;\n"
-         "    Shared s2 = new;\n" +
+         "    static Cyclic cy = new;\n"
+         "    static Wide w = new;\n"
+         "    static Changing ch = new;\n"
+         "    static Shared s1 = new;\n"
+         "    static Shared s2 = new;\n" +
          body +
          "  end\n"
          "endmodule\n";

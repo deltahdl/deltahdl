@@ -354,6 +354,9 @@ TEST(DollarConstantElaboration,
         << "block 'a' localparam P should not reach a module-level Q";
   }
   EXPECT_TRUE(found_q);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "localparam 'Q' initializer is not a constant expression", 7, "6.20.4"));
 }
 
 // The direction the scope test must not lose. §23.9 rules that an identifier

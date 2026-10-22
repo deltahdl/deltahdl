@@ -30,7 +30,7 @@ TEST(InlineRandomVariableControlRun, TheArgumentsAreTheRandomSetOfTheCall) {
       std::string(kCA) +
           "  int none = 0, x_only = 0, v_and_w = 0, w_and_x = 0;\n"
           "  initial begin\n"
-          "    CA a = new;\n"
+          "    static CA a = new;\n"
           "    a.v = 100;\n"
           "    a.w = -100;\n"
           "    repeat (32) begin\n"
@@ -73,7 +73,7 @@ TEST(InlineRandomVariableControlRun, ANamedNonRandPropertyIsDrawn) {
                      "  int moved = 0, held = 0;\n"
                      "  byte prev;\n"
                      "  initial begin\n"
-                     "    CA a = new;\n"
+                     "    static CA a = new;\n"
                      "    a.x = -50;\n"
                      "    a.y = 50;\n"
                      "    prev = a.v;\n"

@@ -18,8 +18,8 @@ std::string Design(const std::string& body) {
          "endclass\n"
          "module t;\n"
          "  initial begin\n"
-         "    Bus bus = new;\n"
-         "    Bus other = new;\n"
+         "    static Bus bus = new;\n"
+         "    static Bus other = new;\n"
          "    int v;\n"
          "    int taken;\n"
          "    bit ok;\n" +

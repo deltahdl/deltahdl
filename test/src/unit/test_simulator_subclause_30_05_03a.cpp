@@ -131,24 +131,30 @@ TEST(SpecifyDelaySelection, Example1SourceAMoreRecentFallIsNine) {
 }
 
 // --- LRM Example 2: five state-dependent paths reach y from the same input a.
-// Each `if (MODE < k)` condition is evaluated against the elaborated design, so
-// which paths are active is decided by the real §30.4.4.1 machinery. With
-// MODE = 2 the first three paths are active; the rule picks the smallest delay
-// for the transition being scheduled among exactly those. -------------------
+// Each condition is evaluated against the elaborated design, so which paths
+// are active is decided by the real §30.4.4.1 machinery. With MODE = 2 the
+// first three paths are active; the rule picks the smallest delay for the
+// transition being scheduled among exactly those. The example writes its
+// conditions `MODE < k`, an operator Table 30-1 (printed page 876) does not
+// list for them, and the example is informative where the table is not, so
+// below[k] holds MODE < k, computed outside the specify block, and each
+// condition reads one bit of it. --------------------------------------------
 
 std::vector<PathCandidate> BuildExample2Candidates(
     uint64_t mode_value, SimFixture& f, std::vector<PathDelay>& store) {
   std::string body =
       "  logic [7:0] MODE;\n"
+      "  wire [5:1] below = {MODE < 5, MODE < 4, MODE < 3, MODE < 2, "
+      "MODE < 1};\n"
       "  initial MODE = " +
       std::to_string(mode_value) +
       ";\n"
       "  specify\n"
-      "    if (MODE < 5) (a => y) = (5, 9);\n"
-      "    if (MODE < 4) (a => y) = (4, 8);\n"
-      "    if (MODE < 3) (a => y) = (6, 5);\n"
-      "    if (MODE < 2) (a => y) = (3, 2);\n"
-      "    if (MODE < 1) (a => y) = (7, 7);\n"
+      "    if (below[5]) (a => y) = (5, 9);\n"
+      "    if (below[4]) (a => y) = (4, 8);\n"
+      "    if (below[3]) (a => y) = (6, 5);\n"
+      "    if (below[2]) (a => y) = (3, 2);\n"
+      "    if (below[1]) (a => y) = (7, 7);\n"
       "  endspecify";
   auto p = ElaborateSpecify("input a, output y", body, f);
   LowerAndRun(p.design, f);

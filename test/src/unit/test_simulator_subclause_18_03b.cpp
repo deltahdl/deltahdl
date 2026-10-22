@@ -42,10 +42,10 @@ std::string Design(const std::string& body) {
          "    endcase\n"
          "  endfunction\n"
          "  initial begin\n"
-         "    Bus bus = new;\n"
-         "    MyBus mybus = new;\n"
-         "    PowerOfTwo p2 = new;\n"
-         "    int ok = 0, aligned = 0, ranged = 0, met = 0;\n" +
+         "    static Bus bus = new;\n"
+         "    static MyBus mybus = new;\n"
+         "    static PowerOfTwo p2 = new;\n"
+         "    static int ok = 0, aligned = 0, ranged = 0, met = 0;\n" +
          body +
          "  end\n"
          "endmodule\n";

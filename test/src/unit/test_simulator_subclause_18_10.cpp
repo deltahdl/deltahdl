@@ -37,7 +37,7 @@ TEST(DynamicConstraintModificationRun, AStateVariablePredicatesTheBlocks) {
       RunCapture(std::string(kChannel) +
                      "  int short_draws = 0, long_draws = 0;\n"
                      "  initial begin\n"
-                     "    Channel c = new;\n"
+                     "    static Channel c = new;\n"
                      "    c.fast = 1;\n"
                      "    repeat (32) begin\n"
                      "      void'(c.randomize());\n"
@@ -66,7 +66,7 @@ TEST(DynamicConstraintModificationRun, TheModeCallsChangeWhatIsSolved) {
       std::string(kChannel) +
           "  int high_off = 0, high_on = 0, near = 0;\n"
           "  initial begin\n"
-          "    Channel c = new;\n"
+          "    static Channel c = new;\n"
           "    c.cap.constraint_mode(0);\n"
           "    repeat (64) begin\n"
           "      void'(c.randomize());\n"
@@ -100,7 +100,7 @@ TEST(DynamicConstraintModificationRun, ChangedWeightsMoveTheDistribution) {
       std::string(kChannel) +
           "  int ones = 0, twos = 0, first, second, all_named = 1;\n"
           "  initial begin\n"
-          "    Channel c = new;\n"
+          "    static Channel c = new;\n"
           "    c.w_one = 9;\n"
           "    c.w_two = 1;\n"
           "    repeat (64) begin\n"

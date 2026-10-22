@@ -701,6 +701,11 @@ TEST(ProtectEndProtectedDescription, ARegionWithNoKeyLeavesTheWordWhereItIs) {
   EXPECT_FALSE(Holds(run.text, kCurrentMethod));
   EXPECT_EQ(TimesWritten(run.text, "end_protected"), 1U);
   EXPECT_TRUE(Holds(run.text, kOuterStatement));
+  EXPECT_TRUE(
+      ReportedError(run.diag.Diagnostics(),
+                    "protect pragma encryption envelope has no key to be "
+                    "encrypted under, so it is written out unencrypted",
+                    1, "34.3.1"));
 }
 
 // The subclause's current method, read off the identifier §34.5.11 defines a
@@ -725,6 +730,11 @@ TEST(ProtectEndProtectedDescription, ARegionWithNoKeyStatesNoMethodForTheWord) {
   KeylessEncryptionRun run(RegionAroundAModelNamingItsMethod(kWordDirective));
   EXPECT_FALSE(Holds(run.text, kCurrentMethod));
   EXPECT_TRUE(Holds(run.text, kSealerMethod));
+  EXPECT_TRUE(
+      ReportedError(run.diag.Diagnostics(),
+                    "protect pragma encryption envelope has no key to be "
+                    "encrypted under, so it is written out unencrypted",
+                    1, "34.3.1"));
 }
 
 // The rule over a model no test spelled. The sealed model here is what an

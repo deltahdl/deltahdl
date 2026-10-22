@@ -519,7 +519,7 @@ TEST(ValueParameterSimulation, ClassParameterOfATypedefTypeIsConverted) {
                        "endclass\n"
                        "module t;\n"
                        "  initial begin\n"
-                       "    C #() c = new;\n"
+                       "    static C #() c = new;\n"
                        "    $display(\"%0d\", c.get());\n"
                        "  end\n"
                        "endmodule\n",
@@ -558,7 +558,7 @@ TEST(ValueParameterSimulation, ClassParameterOfARealTypedefStaysReal) {
                        "endclass\n"
                        "module t;\n"
                        "  initial begin\n"
-                       "    C #() c = new;\n"
+                       "    static C #() c = new;\n"
                        "    $display(\"%g\", c.get());\n"
                        "  end\n"
                        "endmodule\n",

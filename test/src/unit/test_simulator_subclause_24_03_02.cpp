@@ -271,11 +271,13 @@ TEST(ProgramPortConnectionSim,
 // §24.3.2: a program's unpacked-array input port carries the design array
 // connected to it, element by element, and its unpacked-array output port
 // carries back what the program's code writes: the program reads d[1], 6,
-// and writes 7 into o[0], which the design reads as os[0].
+// and writes 7 into o[0], which the design reads as os[0]. An input with a
+// data type and no kind is a net (§23.2.2.3), and int is no type a net may
+// have (§6.7.1), so the input is declared var.
 TEST(ProgramPortConnectionSim, ArrayPortsCarryValuesBothWays) {
   SimFixture f;
   EXPECT_EQ(
-      RunCapture("program p(input logic clk, input int d[2],\n"
+      RunCapture("program p(input logic clk, input var int d[2],\n"
                  "          output int o[2]);\n"
                  "  initial begin @(posedge clk) o[0] = d[1] + 1; #3; end\n"
                  "endprogram\n"

@@ -19,6 +19,8 @@ TEST(ModuleInstantiationElaboration, UnknownModuleNotResolved) {
   auto* mod = design->top_modules[0];
   ASSERT_EQ(mod->children.size(), 1);
   EXPECT_EQ(mod->children[0].resolved, nullptr);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unknown module 'nonexistent'", 3, "23.3.2"));
 }
 
 TEST(ModuleInstantiationElaboration, ModuleWithChildInstanceElaborates) {

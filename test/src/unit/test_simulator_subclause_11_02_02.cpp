@@ -243,7 +243,7 @@ TEST(AggregateEqualityRun, StructuresCompareADynamicMemberByItsElements) {
       "  initial begin\n"
       "    x.a = 1; x.data = new[2]; x.data[0] = 5;\n"
       "    y.a = 1; y.data = new[2]; y.data[0] = 5;\n"
-      "    w = y; w.data.push_back(0);\n"
+      "    w = y; w.data = new[3](w.data);\n"
       "    $display(\"%0d %0d %0d\", x == y, x != y, x == w);\n"
       "    y.data[1] = 3;\n"
       "    $display(\"%0d %0d\", x == y, x != y);\n"

@@ -6,6 +6,7 @@
 #include "common/diagnostic.h"
 #include "common/types.h"
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
@@ -179,6 +180,9 @@ TEST(NestedModuleSimulation, OuterNameIsVisibleToANestedDeclarationOnly) {
   auto* seen = f.ctx.FindVariable("o1.seen");
   ASSERT_NE(seen, nullptr);
   EXPECT_NE(seen->value.ToUint64(), 42u);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to unresolved identifier 'x'", 3,
+                            "23.9"));
 }
 
 // §23.4 with §23.3: a nested declaration is a module, and each instantiation

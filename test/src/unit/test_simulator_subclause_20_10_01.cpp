@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "simulator/lowerer.h"
 
 using namespace delta;
@@ -25,6 +26,9 @@ TEST(ElabSeverityTaskSim, FatalBlocksLowering) {
   lowerer.Lower(design);
   f.scheduler.Run();
   EXPECT_EQ(f.ctx.FindVariable("x"), nullptr);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "elaboration FATAL in scope 't': abort", 4,
+                            "20.10.1"));
 }
 
 // §20.10.1 — $error at elaboration lets elaboration run to completion but
@@ -46,6 +50,9 @@ TEST(ElabSeverityTaskSim, ErrorBlocksLowering) {
   lowerer.Lower(design);
   f.scheduler.Run();
   EXPECT_EQ(f.ctx.FindVariable("x"), nullptr);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "elaboration ERROR in scope 't': bad param", 4,
+                            "20.10.1"));
 }
 
 // §20.10.1 — $warning at elaboration shall not prevent simulation from

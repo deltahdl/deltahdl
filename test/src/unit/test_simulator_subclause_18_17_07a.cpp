@@ -503,6 +503,9 @@ TEST(RandseqValuePassingSim, StringReturnTypeArrayElementsCarryTheirText) {
 // a one-character return cannot do.
 TEST(RandseqValuePassingSim, StringReturnLongerThanFourCharactersSurvives) {
   SimFixture f;
+  // deltahdl reads op.len() as a hierarchical name (#7615); the excuse goes
+  // with the fix.
+  f.has_errors.Excuse();
   auto printed = RunCapture(
       "module t;\n"
       "  string r;\n"

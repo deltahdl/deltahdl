@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "simulator/coverage.h"
 #include "simulator/coverage_types.h"
 
@@ -219,6 +220,10 @@ TEST(TypeOptionSim, ATypeOptionReadsThroughTheTypeBeforeAnyInstance) {
       "endmodule\n",
       f);
   EXPECT_EQ(out, "3 100 def 90\n80 set 0 0\n");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "type option 'strobe' can be set only in the covergroup definition", 13,
+      "19.7.1"));
 }
 
 // §19.7.1: a type option written through the type before an instance is

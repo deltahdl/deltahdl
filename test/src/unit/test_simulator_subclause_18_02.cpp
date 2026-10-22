@@ -35,8 +35,8 @@ std::string Design(const std::string& body) {
          "endclass\n"
          "module t;\n"
          "  initial begin\n"
-         "    Packet p = new;\n"
-         "    int legal = 0, solved = 0;\n" +
+         "    static Packet p = new;\n"
+         "    static int legal = 0, solved = 0;\n" +
          body +
          "  end\n"
          "endmodule\n";

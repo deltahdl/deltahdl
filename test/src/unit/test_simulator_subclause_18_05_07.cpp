@@ -19,7 +19,7 @@ std::string Counting(const std::string& decls, const std::string& constraints,
          "module t;\n"
          "  int held = 0;\n"
          "  initial begin\n"
-         "    C o = new;\n"
+         "    static C o = new;\n"
          "    repeat (" +
          std::to_string(draws) +
          ") begin\n"

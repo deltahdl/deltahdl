@@ -76,6 +76,9 @@ TEST(FineGrainProcessControlSynthesis,
   SynthLower synth(f.arena, f.diag);
   auto* aig = synth.Lower(mod);
   EXPECT_EQ(aig, nullptr);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "a process control handle has no lowering in the synthesizer", 3, "9.7"));
 }
 
 }  // namespace

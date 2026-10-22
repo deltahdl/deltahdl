@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 namespace {
 
@@ -109,6 +110,8 @@ TEST(CheckerInstantiationGrammar, ElaborationUnresolvedChecker) {
   auto* top = design->top_modules[0];
   ASSERT_GE(top->children.size(), 1u);
   EXPECT_EQ(top->children[0].resolved, nullptr);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unknown module 'nonexistent_chk'", 2, "23.3.2"));
 }
 
 }  // namespace

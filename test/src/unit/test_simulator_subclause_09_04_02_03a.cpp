@@ -309,9 +309,9 @@ TEST(ConditionalEventIffSim, AlwaysFFIffRegisterUpdate) {
   auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk, en;\n"
-      "  logic [31:0] d, q;\n"
+      "  logic [31:0] d, q = 0;\n"
       "  initial begin\n"
-      "    clk = 0; en = 1; d = 55; q = 0;\n"
+      "    clk = 0; en = 1; d = 55;\n"
       "    #1 clk = 1;\n"
       "    #1 $finish;\n"
       "  end\n"
@@ -328,9 +328,9 @@ TEST(ConditionalEventIffSim, AlwaysFFIffSuppressed) {
   auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk, en;\n"
-      "  logic [31:0] d, q;\n"
+      "  logic [31:0] d, q = 0;\n"
       "  initial begin\n"
-      "    clk = 0; en = 0; d = 55; q = 0;\n"
+      "    clk = 0; en = 0; d = 55;\n"
       "    #1 clk = 1;\n"
       "    #1 $finish;\n"
       "  end\n"

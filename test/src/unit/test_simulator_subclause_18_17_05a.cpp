@@ -4,6 +4,7 @@
 
 #include "fixture_simulator.h"
 #include "helpers_lower_run.h"
+#include "helpers_reported_error.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
@@ -11,20 +12,35 @@ using namespace delta;
 
 namespace {
 
+// A scalar variable the run left behind, read as an unsigned value.
+uint64_t ReadAfterRun(SimFixture& f, const char* var_name) {
+  auto* var = f.ctx.FindVariable(var_name);
+  EXPECT_NE(var, nullptr);
+  return var ? var->value.ToUint64() : 0;
+}
+
+// The report a rand join weight outside 0.0 to 1.0 draws before it is clamped.
+constexpr const char* kOutsideTheRange =
+    "rand join expression lies outside 0.0 to 1.0; it needs a real number in "
+    "that range";
+
 // Elaborate, lower, and run a module, then read back a scalar variable as an
 // unsigned value. The rand join tests gather statistics across many runs of a
 // randsequence wrapped in a repeat loop, so they read counters left behind in
-// module level variables.
-uint64_t RunAndRead(const char* src, const char* var_name) {
-  SimFixture f;
+// module level variables. The run is made on `f`, which the case keeps, so a
+// case whose source draws a report reads it after the run.
+uint64_t RunAndRead(const char* src, const char* var_name, SimFixture& f) {
   auto* design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto* var = f.ctx.FindVariable(var_name);
-  EXPECT_NE(var, nullptr);
-  return var ? var->value.ToUint64() : 0;
+  return ReadAfterRun(f, var_name);
+}
+
+uint64_t RunAndRead(const char* src, const char* var_name) {
+  SimFixture f;
+  return RunAndRead(src, var_name, f);
 }
 
 // 18.17.5: rand join generates every operand sequence. With two single
@@ -213,8 +229,9 @@ TEST(RandsequenceSim, RandJoinDefaultWeightIsHalf) {
 }
 
 // 18.17.5: the weight lies between 0.0 and 1.0 inclusive. A value below the
-// range is clamped to 0.0, so it produces the same bias as an explicit 0.0
-// rather than an ever stronger preference for the short sequence.
+// range is reported, each time the join is reached, and clamped to 0.0, so it
+// produces the same bias as an explicit 0.0 rather than an ever stronger
+// preference for the short sequence.
 TEST(RandsequenceSim, RandJoinWeightClampedToRange) {
   const char* tmpl =
       "module t;\n"
@@ -249,8 +266,11 @@ TEST(RandsequenceSim, RandJoinWeightClampedToRange) {
       "    end\n"
       "  end\n"
       "endmodule\n";
-  uint64_t afzero = RunAndRead(tmpl, "afzero");
-  uint64_t afneg = RunAndRead(tmpl, "afneg");
+  SimFixture f;
+  uint64_t afzero = RunAndRead(tmpl, "afzero", f);
+  uint64_t afneg = ReadAfterRun(f, "afneg");
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), kOutsideTheRange, 21, "18.17.5"));
   // Clamped to 0.0: still favors the short sequence, but not saturated the way
   // an unclamped negative exponent would make it.
   EXPECT_GT(afneg, 150u);
@@ -261,10 +281,11 @@ TEST(RandsequenceSim, RandJoinWeightClampedToRange) {
 }
 
 // 18.17.5: the weight lies between 0.0 and 1.0 inclusive. A value above the
-// range is clamped to 1.0, so it produces the same long-sequence preference as
-// an explicit 1.0 instead of a runaway exaggeration of it. Lengths 2 and 3 keep
-// the clamped bias well clear of zero so the clamp is observable: without it a
-// weight of 5.0 would drive the short sequence to lead almost never.
+// range is reported, each time the join is reached, and clamped to 1.0, so it
+// produces the same long-sequence preference as an explicit 1.0 instead of a
+// runaway exaggeration of it. Lengths 2 and 3 keep the clamped bias well clear
+// of zero so the clamp is observable: without it a weight of 5.0 would drive
+// the short sequence to lead almost never.
 TEST(RandsequenceSim, RandJoinWeightClampedToHighBound) {
   const char* tmpl =
       "module t;\n"
@@ -301,8 +322,11 @@ TEST(RandsequenceSim, RandJoinWeightClampedToHighBound) {
       "    end\n"
       "  end\n"
       "endmodule\n";
-  uint64_t afone = RunAndRead(tmpl, "afone");
-  uint64_t afhigh = RunAndRead(tmpl, "afhigh");
+  SimFixture f;
+  uint64_t afone = RunAndRead(tmpl, "afone", f);
+  uint64_t afhigh = ReadAfterRun(f, "afhigh");
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), kOutsideTheRange, 22, "18.17.5"));
   // Clamped to 1.0: the short sequence still leads a noticeable fraction of the
   // time, matching an explicit 1.0 rather than collapsing toward zero.
   EXPECT_GT(afhigh, 30u);

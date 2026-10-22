@@ -50,6 +50,7 @@
 #include "fixture_protect_read.h"
 #include "helpers_protect_block_lines.h"
 #include "helpers_protect_keys.h"
+#include "helpers_reported_error.h"
 #include "helpers_text_lines.h"
 #include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_keywords.h"
@@ -243,6 +244,10 @@ TEST(ProtectKeyBlockDescription, AReaderHoldingNeitherKeyOpensNeitherBlock) {
   ReadSource run(EnvelopeWithTwoBlocks(),
                  ReadSource::KeysConfig(ProtectKeyList()));
   EXPECT_FALSE(Holds(run.text, kEncodingSealedDesign)) << run.text;
+  EXPECT_TRUE(ReportedError(
+      run.diag.Diagnostics(),
+      "protect pragma data block cannot be decrypted with the key supplied", 20,
+      "34.3.2"));
 }
 
 // The reader between those two: it holds the second entity's key and not the

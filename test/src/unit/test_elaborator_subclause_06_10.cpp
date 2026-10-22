@@ -800,8 +800,8 @@ TEST(ImplicitDeclaration,
 // undriven wire and deliver zero to the port instead.
 //
 // The claim is about RtlirModule::nets and not about what the source is worth:
-// §6.20 leaves a continuous assignment naming a parameter to be rejected
-// elsewhere, and this case reads the same whether that report is made or not.
+// a parameter is no net or variable a continuous assignment may write, and the
+// report §10.3 has made of it stands beside the absence of the net.
 TEST(ImplicitDeclaration,
      ParameterOfTheModuleStillSuppressesAGenerateBlockImplicitNet) {
   ElabFixture f;
@@ -822,6 +822,9 @@ TEST(ImplicitDeclaration,
     if (n.name == "a_P" || n.name == "P") ++count;
   }
   EXPECT_EQ(count, 0) << "the module's parameter 'P' should suppress the net";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "continuous assignment to parameter 'P'", 5,
+                            "10.3"));
 }
 
 }  // namespace

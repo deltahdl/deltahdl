@@ -442,6 +442,11 @@ TEST(ConfigInstanceClauseExample, WithoutTheClauseTheInterfaceIsUnbound) {
   ASSERT_NE(mid, nullptr);
   ASSERT_TRUE(DesignHoldsCell(design.unit, "bus", "gateLib"));
   EXPECT_EQ(ChildBoundTo(mid, "b"), nullptr);
+  EXPECT_TRUE(
+      ReportedError(design.diag.Diagnostics(),
+                    "unknown module 'bus': the configuration's default library "
+                    "list (rtlLib) holds no cell 'bus' for instance 'top.m1.b'",
+                    5, "33.4.1.5"));
 }
 
 // And for a program.
@@ -469,6 +474,11 @@ TEST(ConfigInstanceClauseExample, WithoutTheClauseTheProgramIsUnbound) {
   ASSERT_NE(mid, nullptr);
   ASSERT_TRUE(DesignHoldsCell(design.unit, "pgm", "gateLib"));
   EXPECT_EQ(ChildBoundTo(mid, "p"), nullptr);
+  EXPECT_TRUE(
+      ReportedError(design.diag.Diagnostics(),
+                    "unknown module 'pgm': the configuration's default library "
+                    "list (rtlLib) holds no cell 'pgm' for instance 'top.m1.p'",
+                    5, "33.4.1.5"));
 }
 
 // And for a checker.
@@ -496,6 +506,11 @@ TEST(ConfigInstanceClauseExample, WithoutTheClauseTheCheckerIsUnbound) {
   ASSERT_NE(mid, nullptr);
   ASSERT_TRUE(DesignHoldsCell(design.unit, "chk", "gateLib"));
   EXPECT_EQ(ChildBoundTo(mid, "c1"), nullptr);
+  EXPECT_TRUE(ReportedError(
+      design.diag.Diagnostics(),
+      "unknown module 'chk': the configuration's default library list (rtlLib) "
+      "holds no cell 'chk' for instance 'top.m1.c1'",
+      5, "33.4.1.5"));
 }
 
 // And for a primitive, which a descendant reaches through the inherited list
@@ -568,6 +583,11 @@ TEST(ConfigInstanceClauseExample, WithoutTheClauseTheDeepCellIsUnbound) {
   auto* sub = ChildBoundTo(mid, "s");
   ASSERT_NE(sub, nullptr);
   EXPECT_EQ(ChildBoundTo(sub, "u"), nullptr);
+  EXPECT_TRUE(ReportedError(
+      design.diag.Diagnostics(),
+      "unknown module 'leaf': the configuration's default library list "
+      "(rtlLib) holds no cell 'leaf' for instance 'top.m1.s.u'",
+      8, "33.4.1.5"));
 }
 
 // The topping file of the tests below: the cell the clause names sits between
@@ -716,6 +736,11 @@ TEST(ConfigInstanceClauseExample, WithoutTheClauseTheNamedInterfaceIsUnbound) {
   ASSERT_NE(top, nullptr);
   ASSERT_TRUE(DesignHoldsCell(design.unit, "bus", "gateLib"));
   EXPECT_EQ(ChildBoundTo(top, "x"), nullptr);
+  EXPECT_TRUE(
+      ReportedError(design.diag.Diagnostics(),
+                    "unknown module 'bus': the configuration's default library "
+                    "list (rtlLib) holds no cell 'bus' for instance 'top.x'",
+                    2, "33.4.1.5"));
 }
 
 // And for an instance of a program.
@@ -741,6 +766,11 @@ TEST(ConfigInstanceClauseExample, WithoutTheClauseTheNamedProgramIsUnbound) {
   ASSERT_NE(top, nullptr);
   ASSERT_TRUE(DesignHoldsCell(design.unit, "pgm", "gateLib"));
   EXPECT_EQ(ChildBoundTo(top, "x"), nullptr);
+  EXPECT_TRUE(
+      ReportedError(design.diag.Diagnostics(),
+                    "unknown module 'pgm': the configuration's default library "
+                    "list (rtlLib) holds no cell 'pgm' for instance 'top.x'",
+                    2, "33.4.1.5"));
 }
 
 // And for an instance of a checker.
@@ -766,6 +796,11 @@ TEST(ConfigInstanceClauseExample, WithoutTheClauseTheNamedCheckerIsUnbound) {
   ASSERT_NE(top, nullptr);
   ASSERT_TRUE(DesignHoldsCell(design.unit, "chk", "gateLib"));
   EXPECT_EQ(ChildBoundTo(top, "x"), nullptr);
+  EXPECT_TRUE(
+      ReportedError(design.diag.Diagnostics(),
+                    "unknown module 'chk': the configuration's default library "
+                    "list (rtlLib) holds no cell 'chk' for instance 'top.x'",
+                    2, "33.4.1.5"));
 }
 
 // And for an instance of a primitive. An instantiation is settled as an
@@ -806,6 +841,10 @@ TEST(ConfigInstanceClauseExample, WithoutTheClauseTheNamedPrimitiveIsUnbound) {
 // The level of hierarchy the list is inherited through need not be a module
 // either: top.m1 is an instance of an interface here, and the cell that
 // interface instantiates is held only by the library the default clause omits.
+// §25.3 lets an interface instantiate interfaces and no module, so that cell is
+// an interface too.
+constexpr const char* kDeepInterfaceCell = "interface leaf;\nendinterface\n";
+
 constexpr const char* kInterfaceLevelTop =
     "module top;\n"
     "  bus m1();\n"
@@ -820,7 +859,8 @@ constexpr const char* kInterfaceLevelTop =
 TEST(ConfigInstanceClauseExample, InheritedListPassesThroughAnInterface) {
   ScratchDir tmp;
   LibraryDesign design;
-  NestedCell cell{.base = "leaf", .text = kDeepCell, .top = kInterfaceLevelTop};
+  NestedCell cell{
+      .base = "leaf", .text = kDeepInterfaceCell, .top = kInterfaceLevelTop};
   auto* elaborated =
       ElaborateNestedCell(tmp, design, cell, kInstanceClauseReachingGateLib);
   auto* bus = NamedInstanceOf(elaborated);
@@ -835,12 +875,18 @@ TEST(ConfigInstanceClauseExample, InheritedListPassesThroughAnInterface) {
 TEST(ConfigInstanceClauseExample, WithoutTheClauseTheCellBelowIsUnbound) {
   ScratchDir tmp;
   LibraryDesign design;
-  NestedCell cell{.base = "leaf", .text = kDeepCell, .top = kInterfaceLevelTop};
+  NestedCell cell{
+      .base = "leaf", .text = kDeepInterfaceCell, .top = kInterfaceLevelTop};
   auto* elaborated = ElaborateNestedCell(tmp, design, cell, kNoInstanceClause);
   auto* bus = NamedInstanceOf(elaborated);
   ASSERT_NE(bus, nullptr);
   ASSERT_TRUE(DesignHoldsCell(design.unit, "leaf", "gateLib"));
   EXPECT_EQ(ChildBoundTo(bus, "u"), nullptr);
+  EXPECT_TRUE(ReportedError(
+      design.diag.Diagnostics(),
+      "unknown module 'leaf': the configuration's default library list "
+      "(rtlLib) holds no cell 'leaf' for instance 'top.m1.u'",
+      5, "33.4.1.5"));
 }
 
 }  // namespace

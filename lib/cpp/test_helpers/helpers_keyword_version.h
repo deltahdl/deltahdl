@@ -117,6 +117,7 @@ inline TokenKind KindAfterSpecifier(const std::string& spec,
   PreprocFixture f;
   auto out = Preprocess(
       "`begin_keywords \"" + spec + "\"\n" + word + "\n`end_keywords\n", f);
+  static_cast<void>(f.diag.HasErrors());
 
   SourceManager mgr;
   DiagEngine diag(mgr);

@@ -375,11 +375,13 @@ TEST(ProgramConstructSim, NestedProgramReadsItsModuleInstanceParameter) {
 
 // Syntax 24-1's extern program header is a prototype as §23.5 describes: the
 // definition after it takes its ports through `.*`, and the instance runs
-// that definition with the port values the module connects.
+// that definition with the port values the module connects. An input with a
+// data type and no kind is a net (§23.2.2.3), and int is no type a net may
+// have (§6.7.1), so the input is declared var.
 TEST(ProgramConstructSim, ExternProgramDefinitionRunsWithPrototypePorts) {
   SimFixture f;
   auto* w = RunAndFindVar(
-      "extern program p(input int v, output int w);\n"
+      "extern program p(input var int v, output int w);\n"
       "program p(.*);\n"
       "  initial #1 w = v + 1;\n"
       "endprogram\n"

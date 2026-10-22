@@ -35,7 +35,7 @@ CoverCounts Cover(const std::string& property) {
       "  assign c = tick inside {1, 2, 3};\n"
       "  assign en = tick inside {1, 2, 3};\n"
       "  assign x = tick inside {4};\n"
-      "  c: cover property (@(posedge clk) " +
+      "  cv: cover property (@(posedge clk) " +
           property +
           ");\n"
           "  initial #60 $finish;\n"

@@ -110,6 +110,9 @@ TEST(LexicalConventionPreprocessor,
       "endmodule\n",
       f);
   EXPECT_EQ(out.find(kKeywordMarker), std::string::npos);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unexpected character 0x01 in source text", 2,
+                            "5.2"));
 }
 
 // A value given for a macro on the command line is text of the same kind, and
@@ -149,6 +152,10 @@ TEST(LexicalConventionPreprocessor,
       "endmodule\n",
       f, std::move(cfg));
   EXPECT_EQ(out.find(kKeywordMarker), std::string::npos);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "unexpected character 0x01 in the value of command-line define 'WIDTH'",
+      0, "5.2"));
 }
 
 // Lexes `src` and returns the kind of the first token whose spelling is
@@ -187,6 +194,8 @@ TEST(LexicalConventionPreprocessor,
       "endmodule\n",
       f, std::move(cfg));
   EXPECT_EQ(KindOfWordIn(out, "logic"), TokenKind::kKwLogic);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "unexpected character '\x10'",
+                            2, "5.2"));
 }
 
 // §5.2 counts a comment among the lexical tokens, so a block comment in macro

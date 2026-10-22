@@ -65,9 +65,10 @@ TEST(CastOperatorSim, VoidCastDiscardsValue) {
   auto* var = RunAndFindVar(
       "module t;\n"
       "  int x;\n"
+      "  function int next(); return x + 1; endfunction\n"
       "  initial begin\n"
       "    x = 42;\n"
-      "    void'(x);\n"
+      "    void'(next());\n"
       "  end\n"
       "endmodule\n",
       f, "x");

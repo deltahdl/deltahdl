@@ -22,7 +22,7 @@ inline std::vector<uint64_t> RunParentSeededTwoForkUrandom(
       "  int unsigned a;\n"
       "  int unsigned b;\n"
       "  initial begin\n"
-      "    process p = process::self();\n"
+      "    automatic process p = process::self();\n"
       "    p.srandom(" +
       std::to_string(parent_seed) +
       ");\n"

@@ -431,6 +431,11 @@ TEST(ConfigDefaultClauseExample, UnlistedLibraryDoesNotSupplyAnInterface) {
   ASSERT_NE(top, nullptr);
   ASSERT_TRUE(DesignHoldsCell(d.unit, "bus", "gateLib"));
   EXPECT_EQ(ChildBoundTo(top, "b"), nullptr);
+  EXPECT_TRUE(
+      ReportedError(d.diag.Diagnostics(),
+                    "unknown module 'bus': the configuration's default library "
+                    "list (rtlLib) holds no cell 'bus' for instance 'top.b'",
+                    2, "33.4.1.5"));
 }
 
 // Its companion, and with it the pass-over for a cell kind other than a
@@ -461,6 +466,11 @@ TEST(ConfigDefaultClauseExample, UnlistedLibraryDoesNotSupplyAProgram) {
   ASSERT_NE(top, nullptr);
   ASSERT_TRUE(DesignHoldsCell(d.unit, "pgm", "gateLib"));
   EXPECT_EQ(ChildBoundTo(top, "p"), nullptr);
+  EXPECT_TRUE(
+      ReportedError(d.diag.Diagnostics(),
+                    "unknown module 'pgm': the configuration's default library "
+                    "list (rtlLib) holds no cell 'pgm' for instance 'top.p'",
+                    2, "33.4.1.5"));
 }
 
 // Its companion.
@@ -485,6 +495,11 @@ TEST(ConfigDefaultClauseExample, UnlistedLibraryDoesNotSupplyAChecker) {
   ASSERT_NE(top, nullptr);
   ASSERT_TRUE(DesignHoldsCell(d.unit, "chk", "gateLib"));
   EXPECT_EQ(ChildBoundTo(top, "c1"), nullptr);
+  EXPECT_TRUE(
+      ReportedError(d.diag.Diagnostics(),
+                    "unknown module 'chk': the configuration's default library "
+                    "list (rtlLib) holds no cell 'chk' for instance 'top.c1'",
+                    2, "33.4.1.5"));
 }
 
 // Its companion.
@@ -739,6 +754,11 @@ TEST(ConfigDefaultClauseExample, NarrowerClauseDoesNotUndoTheExclusion) {
   auto* top = OnlyTop(ElaborateConfigText(tmp, d, kCfgCellClauseElsewhere));
   ASSERT_NE(top, nullptr);
   EXPECT_EQ(ChildBoundTo(top, "b"), nullptr);
+  EXPECT_TRUE(
+      ReportedError(d.diag.Diagnostics(),
+                    "unknown module 'bus': the configuration's library list "
+                    "(aLib) holds no cell 'bus' for instance 'top.b'",
+                    2, "33.4.1.5"));
 }
 
 }  // namespace

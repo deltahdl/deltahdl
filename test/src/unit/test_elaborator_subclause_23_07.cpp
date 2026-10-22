@@ -180,6 +180,10 @@ TEST(DottedNameElaboration, UnresolvedFirstComponentTreatedAsHierarchical) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "hierarchical name 'unknown_scope' resolves to no declaration", 3,
+      "23.8"));
 }
 
 // §23.7: when the first component of a dotted name resolves to a name brought

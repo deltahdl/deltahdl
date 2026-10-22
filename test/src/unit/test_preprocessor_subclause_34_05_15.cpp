@@ -125,6 +125,11 @@ TEST(ProtectDataBlockEncryptionInput, TheReportedTextIsHandedBackUnchanged) {
   src.append("endmodule\n");
   EncryptionRun run(src);
   EXPECT_EQ(run.text, src);
+  EXPECT_TRUE(
+      ReportedError(run.diag.Diagnostics(),
+                    "protect pragma data_block is written where no previously "
+                    "generated begin_protected-end_protected block contains it",
+                    2, "34.5.15"));
 }
 
 // The rule is stated of a block rather than of the first one, so a text writing

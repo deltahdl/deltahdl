@@ -144,6 +144,11 @@ TEST(OptionalSreadmemSim, MissingDataStringLeavesMemoryUnchanged) {
   EXPECT_EQ(Cell(f, "mem", 1)->value.ToUint64(), 0x00u);
   EXPECT_EQ(Cell(f, "mem", 2)->value.ToUint64(), 0x00u);
   EXPECT_EQ(Cell(f, "mem", 3)->value.ToUint64(), 0x00u);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "$sreadmemh takes a memory name, a start address, a finish "
+                    "address, and one or more strings, and this call has fewer",
+                    0, "D.14"));
 }
 
 // The cases above hand the evaluator a call built by hand. The four below run

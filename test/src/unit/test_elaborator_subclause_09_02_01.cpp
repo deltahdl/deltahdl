@@ -46,6 +46,7 @@ TEST(InitialProcedureElaboration, MultipleInitialsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
+      "  int a, b, c;\n"
       "  initial a = 0;\n"
       "  initial b = 1;\n"
       "  initial c = 2;\n"

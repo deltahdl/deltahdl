@@ -744,7 +744,9 @@ TEST(IoSystemTaskTest, DescriptorInAPackageVariableOpenedByAPackageFunction) {
 // §21.3.2 with §21.2.2 and §8.6: $fstrobe and $fmonitor called in a class
 // method write their lists at the end of the step as the method sees them --
 // the object's property bare and as this.v, a static property, and for the
-// strobe the method's local, which §13.3.2 bars from a monitor. Each wrote 0.
+// strobe the method's local, which §13.3.2 bars from a monitor. The monitor
+// writes to the module's descriptor for the same reason: the task's argument
+// is automatic as well. Each wrote 0.
 TEST(IoSystemTaskTest, FstrobeAndFmonitorInAClassMethodReadTheMethodsObject) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_test_fstrobe_method.txt";
@@ -758,7 +760,7 @@ TEST(IoSystemTaskTest, FstrobeAndFmonitorInAClassMethodReadTheMethodsObject) {
       "    task run(integer d);\n"
       "      int loc = 7;\n"
       "      $fstrobe(d, \"fs %0d %0d %0d %0d\", v, this.v, s, loc);\n"
-      "      $fmonitor(d, \"fm %0d %0d %0d\", v, this.v, s);\n"
+      "      $fmonitor(fd, \"fm %0d %0d %0d\", v, this.v, s);\n"
       "      v = 4;\n"
       "    endtask\n"
       "  endclass\n"

@@ -191,6 +191,10 @@ TEST(GenerateBlockScope,
   ASSERT_NE(s, nullptr);
   EXPECT_NE(std::string(s->resolved_string), "abcd")
       << "block 'a' localparam P should not reach a module-level defparam";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "defparam right-hand side must be a constant "
+                            "expression built from numbers and parameters",
+                            10, "23.10.1"));
 }
 
 // The direction the scope test must not lose, and the one that went red when
@@ -265,6 +269,9 @@ TEST(GenerateBlockScope,
   ASSERT_NE(n, nullptr);
   EXPECT_NE(n->resolved_value, 4)
       << "block 'a' localparam P should not be measured by len() in block 'b'";
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "localparam 'N' initializer is not a constant expression", 7, "6.20.4"));
 }
 
 // §23.9: a name referenced directly is declared locally or in a module,

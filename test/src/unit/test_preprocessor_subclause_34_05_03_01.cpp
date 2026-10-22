@@ -392,6 +392,10 @@ TEST(ProtectBeginProtectedSyntax, AParenthesizedValueAgainstTheWordIsReported) {
 TEST(ProtectBeginProtectedSyntax, TheValuedWordDescribesNoEnvelopeEither) {
   ReadSource run("`pragma protect begin_protected=\"1\"\n");
   EXPECT_TRUE(run.Pending().empty());
+  EXPECT_TRUE(ReportedError(run.diag.Diagnostics(),
+                            "protect pragma begin_protected keyword is written "
+                            "on its own and takes no pragma_value",
+                            1, "34.5.3.1"));
 }
 
 // The rejection does not stop the reading, and it does not spread: the

@@ -5,6 +5,7 @@
 #include "builders_ast.h"
 #include "common/types.h"
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "helpers_scheduler.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
@@ -202,6 +203,9 @@ TEST(FunctionReturnSim, VoidFunctionBareReturnExitsEarly) {
   EXPECT_EQ(val, 10u);
 }
 
+// §12.8 (printed page 334) requires a return in a function that returns a value
+// to carry an expression, so the bare return is reported; the call still
+// answers what the function's implicit variable holds when it returns.
 TEST(FunctionReturnSim, BareReturnUsesImplicitVar) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -217,6 +221,10 @@ TEST(FunctionReturnSim, BareReturnUsesImplicitVar) {
       "endmodule\n",
       f);
   LowerRunAndCheck(f, design, {{"x", 15u}});
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "return statement in non-void function 'compute' "
+                            "gives no value to return",
+                            5, "12.8"));
 }
 
 TEST(FunctionReturnSim, MultipleFunctionNameAssignsLastWins) {

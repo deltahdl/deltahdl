@@ -115,10 +115,9 @@ TEST(AlwaysRepeatsSim, AlwaysFfFiresOnEachClockEdge) {
   auto* count = RunAndFindVar(
       "module t;\n"
       "  reg clk;\n"
-      "  integer count;\n"
+      "  integer count = 0;\n"
       "  initial begin\n"
       "    clk = 0;\n"
-      "    count = 0;\n"
       "  end\n"
       "  initial begin\n"
       "    #5 clk = 1;\n"

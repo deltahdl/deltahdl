@@ -90,8 +90,8 @@ TEST(StructuredProcedureElaboration, ProcessBodiesNotNull) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
-      "  logic a;\n"
-      "  initial a = 0;\n"
+      "  logic a, b;\n"
+      "  initial b = 0;\n"
       "  always_comb a = 1;\n"
       "  final $display(\"end\");\n"
       "endmodule\n",

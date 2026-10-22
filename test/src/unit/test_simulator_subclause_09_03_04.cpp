@@ -120,14 +120,16 @@ TEST(BlockNameSimulation, NamedBlockVariableReadByHierarchicalName) {
 // hides, and its initializer is applied to it; the outer `x` keeps its 5.
 TEST(BlockNameSimulation, ANestedBlockDeclarationHidesTheOuterVariable) {
   SimFixture f;
-  EXPECT_EQ(RunCapture("module t; initial begin\n"
-                       "  int x; x = 5;\n"
-                       "  begin int x = 7; $display(\"%0d\", x); x = 9; end\n"
-                       "  begin int x; x = 3; end\n"
-                       "  $display(\"%0d\", x);\n"
-                       "end endmodule\n",
-                       f),
-            "7\n5\n");
+  EXPECT_EQ(
+      RunCapture(
+          "module t; initial begin\n"
+          "  int x; x = 5;\n"
+          "  begin automatic int x = 7; $display(\"%0d\", x); x = 9; end\n"
+          "  begin int x; x = 3; end\n"
+          "  $display(\"%0d\", x);\n"
+          "end endmodule\n",
+          f),
+      "7\n5\n");
 }
 
 }  // namespace

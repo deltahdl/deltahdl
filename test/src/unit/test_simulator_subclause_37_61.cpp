@@ -380,10 +380,11 @@ TEST_F(PrefixingOfARun, AStaticallyDeclaredObjectHasAnActual) {
 }
 
 // Detail 1: an expression written through a virtual interface reaches the
-// virtual interface var it is written through by vpiPrefix.
+// virtual interface var it is written through by vpiPrefix. The var is given
+// the instance, since a read through a null one is an error (§25.9).
 TEST_F(PrefixingOfARun, AnExpressionThroughAVirtualInterfaceReachesIt) {
   Run("interface ifc; logic a; endinterface\n"
-      "module top; ifc i0(); virtual ifc vif; logic y;\n"
+      "module top; ifc i0(); virtual ifc vif = i0; logic y;\n"
       "  initial y = vif.a;\n"
       "endmodule\n");
   ExpectRhsPrefixedBy(vpiVirtualInterfaceVar);

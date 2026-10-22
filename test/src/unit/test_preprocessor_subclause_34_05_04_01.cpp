@@ -518,6 +518,10 @@ TEST(ProtectEndProtectedSyntax,
   ReadSource run(RegionClosedWith("`pragma protect end_protected=\"1\"\n"));
   ASSERT_EQ(run.Open().size(), 1U);
   EXPECT_TRUE(run.Open().front().content_keywords.empty());
+  EXPECT_TRUE(ReportedError(run.diag.Diagnostics(),
+                            "protect pragma end_protected keyword is written "
+                            "on its own and takes no pragma_value",
+                            2, "34.5.4.1"));
 }
 
 // The rejection does not stop the reading, and it does not spread: the

@@ -873,6 +873,9 @@ TEST(ForceReleaseSim, CountDriversReportsANetBitSelectForceOnlyOnThatBit) {
 // `b` correct.
 TEST(ForceReleaseSim, ForceOverAConcatenationWritesAnUnpackedArrayElement) {
   SimFixture f;
+  // deltahdl reports the element select as a bit-select of a variable (#7611);
+  // the excuse goes with the fix.
+  f.has_errors.Excuse();
   auto* b = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] out [0:3];\n"
@@ -898,6 +901,9 @@ TEST(ForceReleaseSim, ForceOverAConcatenationWritesAnUnpackedArrayElement) {
 // driver and no assign standing to give it anything else.
 TEST(ForceReleaseSim, ReleaseOverAConcatenationEndsAnArrayElementsForce) {
   SimFixture f;
+  // deltahdl reports the element select as a bit-select of a variable (#7611);
+  // the excuse goes with the fix.
+  f.has_errors.Excuse();
   auto* b = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] out [0:3];\n"

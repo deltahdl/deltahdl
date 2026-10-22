@@ -231,13 +231,15 @@ TEST(ArrayLiteralSim, AConcatenationReplicationItemSizesADynamicArrayToOne) {
 
 // §11.4.5 with §10.9.1: an array compared with a pattern of one
 // concatenation replication item is compared with that one value, so the
-// one-element array holding 1212 equals it.
+// one-element array holding 1212 equals it. An operand of == is no
+// assignment-like context (§10.8), so the pattern names its type.
 TEST(ArrayLiteralSim, AnArrayEqualsAConcatenationReplicationItem) {
   SimFixture f;
   auto out = RunCapture(
       "module t;\n"
-      "  logic [15:0] c [1] = '{16'h1212};\n"
-      "  initial $display(\"%0d\", c == '{ {2{8'h12}} });\n"
+      "  typedef logic [15:0] one_t [1];\n"
+      "  one_t c = '{16'h1212};\n"
+      "  initial $display(\"%0d\", c == one_t'{ {2{8'h12}} });\n"
       "endmodule\n",
       f);
   EXPECT_EQ(out, "1\n");
@@ -417,8 +419,9 @@ TEST(ArrayLiteralSim, ABlockArrayTakesATypeKeyOfItsElementType) {
 // than its last is assigned to that dimension's subarray, so an item of the
 // subarray's unpacked array type -- a typed pattern, keyed or positional, or a
 // variable of that type -- gives the subarray its elements in order, whether it
-// is positional, index-keyed or the default. Each row read one scalar instead,
-// the same value at all three leaves.
+// is positional, index-keyed or the default. A default key's value is no
+// assignment-like context (§10.8), so a pattern there names its type. Each row
+// read one scalar instead, the same value at all three leaves.
 TEST(ArrayLiteralSim, AnUnpackedArrayItemFillsItsSubarrayElementForElement) {
   SimFixture f;
   auto out = RunCapture(
@@ -432,7 +435,7 @@ TEST(ArrayLiteralSim, AnUnpackedArrayItemFillsItsSubarrayElementForElement) {
       "  initial begin\n"
       "    a = '{default: row_t'{4, 5, 6}};\n"
       "    b = '{default: r};\n"
-      "    c = '{0: r, default: '{7, 8, 9}};\n"
+      "    c = '{0: r, default: row_t'{7, 8, 9}};\n"
       "    d = '{r, row_t'{default: 5}};\n"
       "    $display(\"%p %p\", a, b);\n"
       "    $display(\"%p %p\", c, d);\n"
@@ -521,8 +524,10 @@ TEST(ArrayLiteralSim, AQueueItemOfTheWrongSizeIsARuntimeError) {
 // §10.9.1: a declaration's initializer follows the array's dimensions as an
 // assignment does, so an item of the subarray's unpacked array type standing
 // at the first dimension -- a typed pattern, keyed or positional, or a
-// variable of that type -- gives the subarray its elements in order. Each row
-// read one scalar instead, the same value at all three leaves.
+// variable of that type -- gives the subarray its elements in order. A default
+// key's value is no assignment-like context (§10.8), so a pattern there names
+// its type. Each row read one scalar instead, the same value at all three
+// leaves.
 TEST(ArrayLiteralSim, ADeclarationsUnpackedArrayItemFillsItsSubarray) {
   SimFixture f;
   auto out = RunCapture(
@@ -531,7 +536,7 @@ TEST(ArrayLiteralSim, ADeclarationsUnpackedArrayItemFillsItsSubarray) {
       "  row_t r = '{1, 2, 3};\n"
       "  int a [2][3] = '{default: row_t'{4, 5, 6}};\n"
       "  int b [2][3] = '{default: r};\n"
-      "  int c [2][3] = '{0: r, default: '{7, 8, 9}};\n"
+      "  int c [2][3] = '{0: r, default: row_t'{7, 8, 9}};\n"
       "  int d [2][3] = '{r, row_t'{default: 5}};\n"
       "  initial begin\n"
       "    $display(\"%p %p\", a, b);\n"

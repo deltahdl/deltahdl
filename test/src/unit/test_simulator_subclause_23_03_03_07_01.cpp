@@ -41,12 +41,17 @@ TEST(InterconnectPortConnectionSimulation,
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
+// §6.6.8 lets no continuous assignment drive an interconnect, so the port is
+// driven through the wire output of a module inside the child.
 TEST(InterconnectPortConnectionSimulation,
      InternalInterconnectExternalWirePropagatesValue) {
   SimFixture f;
   auto* var = RunAndFindVar(
+      "module drv(output wire o);\n"
+      "  assign o = 1'b1;\n"
+      "endmodule\n"
       "module child(output interconnect a);\n"
-      "  assign a = 1'b1;\n"
+      "  drv d(.o(a));\n"
       "endmodule\n"
       "module top;\n"
       "  wire w;\n"

@@ -248,6 +248,10 @@ TEST(DpiImportLowering, AnImportDeclaredInAnInterfaceIsRegistered) {
   auto* dpi = f.ctx.GetDpiRuntime();
   ASSERT_NE(dpi, nullptr);
   EXPECT_TRUE(dpi->HasImport("i_sub"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "imported subroutine 'i_sub' is bound to no foreign implementation", 4,
+      "35.5.4"));
 }
 
 TEST(DpiImportLowering, AnImportDeclaredInTheCompilationUnitIsRegistered) {

@@ -529,7 +529,9 @@ TEST(InterconnectPortConnectionElaboration,
 }
 
 // §23.3.3.7.1: an output port declared with a data type alone is a variable
-// (§23.2.2.3), no net, so it gives the interconnect net no net type.
+// (§23.2.2.3), no net, so it gives the interconnect net no net type. §23.3.3.2
+// (printed page 747) makes connecting a port variable to an interconnect net
+// illegal, and the connection is reported.
 TEST(InterconnectPortConnectionElaboration,
      ExternalInterconnectOnAVariablePortGetsNoNetType) {
   ElabFixture f;
@@ -543,6 +545,10 @@ TEST(InterconnectPortConnectionElaboration,
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_EQ(InterconnectNetType(design, "top", "c"), NetType::kInterconnect);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "port variable 'q' cannot be connected to interconnect 'c'",
+                    5, "23.3.3.2"));
 }
 
 // §23.3.3.7.1: the merging is transitive, so an interconnect net that reaches

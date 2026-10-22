@@ -172,7 +172,7 @@ TEST(SequenceProperty, BareSequenceInCoverIsStrong) {
   SimFixture f;
   auto* passes = RunAndFindVar(
       SequencePropertySource(
-          "  c: cover property (@(posedge clk) b ##1 c) passes++;\n"),
+          "  cv: cover property (@(posedge clk) b ##1 c) passes++;\n"),
       f, "passes");
   ASSERT_NE(passes, nullptr);
   EXPECT_EQ(passes->value.ToUint64(), 1u);
@@ -186,7 +186,7 @@ uint64_t NamedSequenceCoverPasses(const std::string& directive) {
   auto* passes = RunAndFindVar(
       SequencePropertySource("  sequence s; @(posedge clk) b ##1 c; "
                              "endsequence\n"
-                             "  c: " +
+                             "  cv: " +
                              directive + " (s) passes++;\n"),
       f, "passes");
   if (passes == nullptr) return 0;

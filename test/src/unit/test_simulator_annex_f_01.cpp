@@ -26,8 +26,10 @@ namespace {
 // assert property, `live` for a simple immediate assertion (§16.3) in a
 // procedure the same tick wakes, and `deferred` for the observed deferred
 // immediate assertion of §16.4, whose condition is read where the statement
-// executes as the simple one's is. The rise and the tick stand in one time
-// step, which is what tells a sampled read from a live one.
+// executes as the simple one's is. §16.4 makes a deferred assertion's action a
+// single subroutine call, so that count is kept by a void function. The rise
+// and the tick stand in one time step, which is what tells a sampled read from
+// a live one.
 constexpr const char* kOneTick =
     "module m;\n"
     "  logic clk = 0;\n"
@@ -35,9 +37,10 @@ constexpr const char* kOneTick =
     "  int sampled = 0;\n"
     "  int live = 0;\n"
     "  int deferred = 0;\n"
+    "  function void bump_deferred(); deferred = deferred + 1; endfunction\n"
     "  assert property (@(posedge clk) a) sampled = sampled + 1;\n"
     "  always @(posedge clk) assert (a) live = live + 1;\n"
-    "  always @(posedge clk) assert #0 (a) deferred = deferred + 1;\n"
+    "  always @(posedge clk) assert #0 (a) bump_deferred();\n"
     "  initial begin\n"
     "    #5 a = 1;\n"
     "    clk = 1;\n"
@@ -87,9 +90,10 @@ TEST(FormalSemanticsGeneral, TheThreeAgreeWhenTheValueSettledBeforeTheTick) {
       "  int sampled = 0;\n"
       "  int live = 0;\n"
       "  int deferred = 0;\n"
+      "  function void bump_deferred(); deferred = deferred + 1; endfunction\n"
       "  assert property (@(posedge clk) a) sampled = sampled + 1;\n"
       "  always @(posedge clk) assert (a) live = live + 1;\n"
-      "  always @(posedge clk) assert #0 (a) deferred = deferred + 1;\n"
+      "  always @(posedge clk) assert #0 (a) bump_deferred();\n"
       "  initial begin\n"
       "    #5 a = 1;\n"
       "    #5 clk = 1;\n"
