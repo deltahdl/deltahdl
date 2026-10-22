@@ -295,10 +295,11 @@ static MemberNewBase MemberNewBaseClass(const Expr* base_expr,
   const auto* cls = ctx.FindClassType(base);
   if (cls == nullptr) {
     // §8.9 with §8.4: the base may be a static property holding a handle,
-    // `m_t_inst.m_tw_cb_q = new` in a static method of its class, or any
-    // other name a handle is read from; the object it refers to gives the
-    // class. Taken for a variable or a class name alone, the static handle
-    // named neither and the `new` was read as a value.
+    // `m_t_inst.m_tw_cb_q = new` in a static method of its class, an element
+    // of an array of handles, `arr[1].h = new` (§7.4), or any other name a
+    // handle is read from; the object it refers to gives the class. Taken for a
+    // variable or a class name alone, the static handle named neither and the
+    // `new` was read as a value.
     const ClassObject* obj =
         ctx.GetClassObject(EvalExpr(base_expr, ctx, arena).ToUint64());
     return obj != nullptr ? MemberNewBase{obj->type, obj} : MemberNewBase{};
@@ -313,7 +314,8 @@ static MemberNewBase MemberNewBaseClass(const Expr* base_expr,
   return {declarer, nullptr};
 }
 
-// §8.4 / §8.12: `obj.field = new` where field is a class handle, and §8.9's
+// §8.4 / §8.12: `obj.field = new` where field is a class handle, `obj` a
+// handle variable or an element of an array of handles, and §8.9's
 // `C::field = new` where field is a static class handle of C. The bare `new`
 // carries no type context, so resolve field's declared class type from the AST,
 // construct the object, and store the resulting handle through the member chain
@@ -324,8 +326,11 @@ bool TryMemberClassNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (!stmt->rhs || stmt->rhs->kind != ExprKind::kCall) return false;
   if (stmt->rhs->text != "new") return false;
   if (!stmt->lhs || stmt->lhs->kind != ExprKind::kMemberAccess) return false;
-  if (!stmt->lhs->lhs || stmt->lhs->lhs->kind != ExprKind::kIdentifier)
+  const Expr* holder = stmt->lhs->lhs;
+  if (!holder || (holder->kind != ExprKind::kIdentifier &&
+                  holder->kind != ExprKind::kSelect)) {
     return false;
+  }
   if (!stmt->lhs->rhs || stmt->lhs->rhs->kind != ExprKind::kIdentifier)
     return false;
   MemberNewBase base =

@@ -487,9 +487,6 @@ TEST_F(CallStatementsInAScope, AChainThroughAnInstanceReachesItsVariable) {
 // result or a package's variable, is a method task call reaching its class's
 // method (#5777), applied to an object it reaches through vpiPrefix (#5792).
 TEST_F(CallStatementsInAScope, ACallThroughAnExpressionReachesItsMethod) {
-  // deltahdl finds objs[0].h null and reports run through a null handle
-  // (#7620); the excuse goes with the fix.
-  f_.has_errors.Excuse();
   Run("package q; endpackage\n"
       "package p; class D; task go(); endtask endclass\n"
       "  int n; D obj = new;\n"

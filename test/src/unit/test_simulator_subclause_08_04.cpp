@@ -851,4 +851,31 @@ TEST(ClassSim, NewIntoAnElementOfATaskBodyDynamicArrayIsReadThroughIt) {
             7u);
 }
 
+// §8.4: `arr[1].h = new` constructs an object of the class the handle
+// property h is declared with and stores it in the object arr[1] refers to,
+// as `obj.h = new` does through a handle variable, so the handle read back
+// through the element reaches an N whose v is 9. The base was taken only as
+// a name, so the bare `new` was read as a value and h stayed null.
+TEST(ClassSim, NewIntoAHandlePropertyOfADeclaredArrayElementConstructsIt) {
+  EXPECT_EQ(RunAndGet("class N;\n"
+                      "  int v = 9;\n"
+                      "endclass\n"
+                      "class C;\n"
+                      "  N h;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  C arr[2];\n"
+                      "  N n;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    arr[1] = new;\n"
+                      "    arr[1].h = new;\n"
+                      "    n = arr[1].h;\n"
+                      "    y = n.v;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            9u);
+}
+
 }  // namespace
