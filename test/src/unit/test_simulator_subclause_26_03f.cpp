@@ -197,4 +197,64 @@ TEST(PackageImportSim, ModuleInitializerReadsAUnitHandle) {
             7u);
 }
 
+// A module importing package p, whose class C's v starts at 7 and whose
+// `C objs[2]` is an array of handles, running `body` in its initial block.
+std::string PackageHandleArrayDesign(const std::string& body) {
+  return "package p;\n"
+         "  class C;\n"
+         "    int v = 7;\n"
+         "  endclass\n"
+         "  C objs[2];\n"
+         "endpackage\n"
+         "module t;\n"
+         "  import p::*;\n"
+         "  C c;\n"
+         "  int i, y, z;\n"
+         "  initial begin\n" +
+         body +
+         "  end\n"
+         "endmodule\n";
+}
+
+// §26.3 with §8.4 and §11.3.6: `p::objs[1]` is an element of the package's
+// array of handles, so the assignment `p::objs[1].v = 5` used as an
+// expression writes v of the object the element refers to and yields the
+// 5 it wrote, read back through c, the handle stored in it. The write was
+// stored under the bare name alone, so c, declared of C, read its stale 7.
+TEST(PackageScopeReferenceSim, AWriteThroughAPackageArrayElementReachesIt) {
+  const std::string kSrc = PackageHandleArrayDesign(
+      "    c = new;\n"
+      "    p::objs[1] = c;\n"
+      "    z = (p::objs[1].v = 5);\n"
+      "    y = c.v;\n");
+  EXPECT_EQ(RunAndGet(kSrc, "y"), 5u);
+  EXPECT_EQ(RunAndGet(kSrc, "z"), 5u);
+}
+
+// The same write as a statement, the element selected by a variable index.
+TEST(PackageScopeReferenceSim,
+     AWriteThroughAPackageArrayElementAtAVariableIndexReachesIt) {
+  EXPECT_EQ(RunAndGet(PackageHandleArrayDesign("    c = new;\n"
+                                               "    i = 1;\n"
+                                               "    p::objs[i] = c;\n"
+                                               "    p::objs[i].v = 5;\n"
+                                               "    y = c.v;\n"),
+                      "y"),
+            5u);
+}
+
+// §8.4 with §7.4 and §26.3: `p::objs[0] = new` constructs a C into the
+// element, the class its array is declared of, and `p::objs[0].v = 3`
+// writes that object, which c then refers to: 3 read through c and 3
+// through the element, 33.
+TEST(PackageScopeReferenceSim, AnObjectConstructedThroughAPackageArrayElement) {
+  EXPECT_EQ(
+      RunAndGet(PackageHandleArrayDesign("    p::objs[0] = new;\n"
+                                         "    p::objs[0].v = 3;\n"
+                                         "    c = p::objs[0];\n"
+                                         "    y = c.v * 10 + p::objs[0].v;\n"),
+                "y"),
+      33u);
+}
+
 }  // namespace

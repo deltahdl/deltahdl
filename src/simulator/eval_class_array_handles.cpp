@@ -14,6 +14,7 @@
 #include "simulator/eval_class_array.h"
 #include "simulator/eval_class_sync.h"
 #include "simulator/eval_function_internal.h"
+#include "simulator/eval_semaphore.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
@@ -61,25 +62,37 @@ const Expr* SelectOfMemberAccess(const Expr* expr) {
 
 // §8.4 with §7.4.2 (printed pages 153-154) and §7.5 (printed 157): the key
 // of the class the elements of the declared array `base` names are handles
-// of, empty where `base` is no bare name of a fixed-size or dynamic array the
-// run holds a shape for, or the array's declaration recorded no class. The
-// declaration records the element class under the array's name as it does
-// for a variable of a class type (SetVariableClassType by Lowerer::LowerVar
-// for a module's, ExecVarDeclImpl for a block's, CreateFuncLocalVar for a
-// subroutine body's), so the name is what tells an array of handles from one
-// of values, as HandleArrayOfSelect (eval_assoc_class_handles.cpp) reads it
-// for an associative array. A queue's elements are told by the queue's own
-// flag (TryEvalQueueElementMember) and are not asked for here. §15.3 and
-// §15.4: the built-in semaphore and mailbox are classes an array may hold
-// handles of too, though no registered class answers their names
-// (BuiltinSyncKindOf); asked by the registry alone, `semaphore arr[2]` was an
-// array of values and `arr[1] = new(1)` constructed nothing.
+// of, empty where `base` is no bare or package-scoped name of a fixed-size or
+// dynamic array the run holds a shape for, or the array's declaration
+// recorded no class. The declaration records the element class under the
+// array's name as it does for a variable of a class type
+// (SetVariableClassType by Lowerer::LowerVar for a module's, ExecVarDeclImpl
+// for a block's, CreateFuncLocalVar for a subroutine body's), so the name is
+// what tells an array of handles from one of values, as HandleArrayOfSelect
+// (eval_assoc_class_handles.cpp) reads it for an associative array. A
+// queue's elements are told by the queue's own flag
+// (TryEvalQueueElementMember) and are not asked for here. §15.3 and §15.4:
+// the built-in semaphore and mailbox are classes an array may hold handles
+// of too, though no registered class answers their names
+// (BuiltinSyncKindOf); asked by the registry alone, `semaphore arr[2]` was
+// an array of values and `arr[1] = new(1)` constructed nothing.
 std::string_view DeclaredArrayElementClass(const Expr* base, SimContext& ctx) {
-  if (base == nullptr || base->kind != ExprKind::kIdentifier ||
-      ctx.FindArrayInfo(base->text) == nullptr) {
-    return {};
+  // §26.3: a package's array named through the package scope resolution
+  // operator, `p::a`, stands under "p.a" (ScopedOrBareTargetKey), the key its
+  // shape (CreatePackageArray) and its element class
+  // (RegisterPackageClassVariables) are entered under. Asked by a bare name
+  // alone, `p::objs[1].v = 5` was written under no declared class, its bare
+  // key alone, and a read through a handle declared of the class read the
+  // stale value its class-scoped key held.
+  std::string_view key;
+  if (base->kind == ExprKind::kIdentifier) {
+    key = base->text;
+  } else if (base->kind == ExprKind::kMemberAccess &&
+             base->is_scope_resolution) {
+    key = ScopedOrBareTargetKey(base, ctx.GetArena());
   }
-  std::string_view cls = ctx.GetVariableClassType(base->text);
+  if (key.empty() || ctx.FindArrayInfo(key) == nullptr) return {};
+  std::string_view cls = ctx.GetVariableClassType(key);
   bool holds_handles = ctx.FindClassType(cls) != nullptr ||
                        BuiltinSyncKindOf(cls, ctx) != SyncKind::kNone;
   return holds_handles ? cls : std::string_view{};
