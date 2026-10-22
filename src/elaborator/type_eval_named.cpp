@@ -80,27 +80,29 @@ DataType InClassScope(const DataType& type, const ClassDecl& cls) {
   return InClassScope(type, cls, cls.name);
 }
 
-// Puts behind `scope` each member of `type` that InClassScopeMembers scopes,
-// copying an inline aggregate into `arena` before scoping its own members.
-static void ScopeClassTypedefMembers(
-    DataType& type, const std::unordered_set<std::string_view>& declared,
-    std::string_view scope, Arena& arena) {
+// Puts behind its declaring class's key each member of `type` that
+// InClassScopeMembers scopes, copying an inline aggregate into `arena` before
+// scoping its own members.
+static void ScopeClassTypedefMembers(DataType& type,
+                                     const ClassTypedefScopes& scopes,
+                                     Arena& arena) {
   for (StructMember& m : type.struct_members) {
     if (m.nested_type != nullptr) {
       auto* nested = arena.Create<DataType>(*m.nested_type);
-      ScopeClassTypedefMembers(*nested, declared, scope, arena);
+      ScopeClassTypedefMembers(*nested, scopes, arena);
       m.nested_type = nested;
-    } else if (m.scope_name.empty() && declared.contains(m.type_name)) {
-      m.scope_name = scope;
+      continue;
     }
+    auto declarer = scopes.find(m.type_name);
+    if (m.scope_name.empty() && declarer != scopes.end())
+      m.scope_name = declarer->second;
   }
 }
 
-DataType InClassScopeMembers(
-    const DataType& type, const std::unordered_set<std::string_view>& declared,
-    std::string_view scope, Arena& arena) {
+DataType InClassScopeMembers(const DataType& type,
+                             const ClassTypedefScopes& scopes, Arena& arena) {
   DataType scoped = type;
-  ScopeClassTypedefMembers(scoped, declared, scope, arena);
+  ScopeClassTypedefMembers(scoped, scopes, arena);
   return scoped;
 }
 

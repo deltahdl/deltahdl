@@ -622,8 +622,8 @@ void Elaborator::ElaborateModuleClassDecl(ModuleItem* item, RtlirModule* mod) {
   // declared with the name was sized as a name nothing could resolve. They are
   // keyed ahead of the class's parameters, whose values are converted to the
   // types the class's typedefs name (§6.20.2).
-  RegisterClassTypedefKeys(item->class_decl, item->class_decl->name, typedefs_,
-                           td_array_dims_, arena_);
+  RegisterClassTypedefKeys(item->class_decl, item->class_decl->name,
+                           {unit_, typedefs_, td_array_dims_, arena_});
   RegisterModuleClassParams(item->class_decl, BuildParamScope(mod),
                             cu_param_scope_, arena_, diag_);
   // §13.3 with §7.2.1: the class's methods are reached by no item walk, so

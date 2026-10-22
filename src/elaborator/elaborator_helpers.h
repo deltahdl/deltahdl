@@ -369,6 +369,15 @@ const ModuleItem* FindClassScopedTypedefItem(std::string_view cls_name,
 bool ResolveClassScopedDeclType(DataType& dtype, const TypedefMap& typedefs,
                                 const CompilationUnit* unit);
 
+// What RegisterClassTypedefKeys records a class's typedefs into, and the unit
+// it looks the class's base classes up in.
+struct ClassTypedefTables {
+  const CompilationUnit* unit;
+  TypedefMap& typedefs;
+  std::unordered_map<std::string_view, std::vector<Expr*>>& td_array_dims;
+  Arena& arena;
+};
+
 // §8.23: records every typedef `cls` declares under its "scope::name" key, and
 // each typedef of a class nested in it, at any depth, under the nested class's
 // path, "C::N::T", so a type written through its class reaches the type the
@@ -376,13 +385,11 @@ bool ResolveClassScopedDeclType(DataType& dtype, const TypedefMap& typedefs,
 // for a class at compilation-unit scope or in a module. §7.4.4 keeps an array
 // typedef's unpacked dimensions with the type, and they are recorded in
 // `td_array_dims` under the same key. A structure's or union's members written
-// as the name of a typedef the class declares before it are recorded behind
-// the class's scope (InClassScopeMembers, §23.9). Defined in
-// elaborator_resolve.cpp.
-void RegisterClassTypedefKeys(
-    const ClassDecl* cls, std::string_view scope, TypedefMap& typedefs,
-    std::unordered_map<std::string_view, std::vector<Expr*>>& td_array_dims,
-    Arena& arena);
+// as the name of a typedef the class declares before it, or of one a base
+// class declares (§8.13), are recorded behind the declaring class's key
+// (InClassScopeMembers, §23.9). Defined in elaborator_resolve.cpp.
+void RegisterClassTypedefKeys(const ClassDecl* cls, std::string_view scope,
+                              const ClassTypedefTables& tables);
 
 // §8.23: a type name in use has to resolve to a type once elaboration is done.
 // Reports a declared type whose class scope prefix names a visible class that

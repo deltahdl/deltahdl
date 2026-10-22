@@ -322,8 +322,9 @@ void RegisterClassTypedefs(
     CompilationUnit* unit, TypedefMap& typedefs,
     std::unordered_map<std::string_view, std::vector<Expr*>>& td_array_dims,
     Arena& arena) {
+  const ClassTypedefTables kTables{unit, typedefs, td_array_dims, arena};
   for (auto* cls : unit->classes) {
-    RegisterClassTypedefKeys(cls, cls->name, typedefs, td_array_dims, arena);
+    RegisterClassTypedefKeys(cls, cls->name, kTables);
   }
 }
 
@@ -485,27 +486,43 @@ void RegisterAnonymousProgramNames(
 
 }  // namespace
 
-void RegisterClassTypedefKeys(
-    const ClassDecl* cls, std::string_view scope, TypedefMap& typedefs,
-    std::unordered_map<std::string_view, std::vector<Expr*>>& td_array_dims,
-    Arena& arena) {
-  std::unordered_set<std::string_view> declared;
+// §8.13: the typedefs `cls` inherits, each under the key of the base class
+// declaring it, the nearest base's hiding a farther one's of the same name.
+// Inheritance cycles are broken only after the typedefs are keyed
+// (BreakClassInheritanceCycles), so the walk ends at a class it has seen.
+static ClassTypedefScopes InheritedTypedefScopes(const ClassDecl* cls,
+                                                 const CompilationUnit* unit) {
+  ClassTypedefScopes scopes;
+  std::unordered_set<const ClassDecl*> seen{cls};
+  for (const ClassDecl* base = FindBaseClass(cls, unit);
+       base != nullptr && seen.insert(base).second;
+       base = FindBaseClass(base, unit)) {
+    for (const auto* m : base->members) {
+      if (m->kind == ClassMemberKind::kTypedef)
+        scopes.try_emplace(m->name, base->name);
+    }
+  }
+  return scopes;
+}
+
+void RegisterClassTypedefKeys(const ClassDecl* cls, std::string_view scope,
+                              const ClassTypedefTables& tables) {
+  ClassTypedefScopes scopes = InheritedTypedefScopes(cls, tables.unit);
   for (const auto* m : cls->members) {
     if (m->kind == ClassMemberKind::kTypedef && m->typedef_item != nullptr) {
       std::string_view key = RegisterScopedTypedef(
           scope, m->name,
-          InClassScopeMembers(m->typedef_item->typedef_type, declared, scope,
-                              arena),
-          typedefs, arena);
-      declared.insert(m->name);
+          InClassScopeMembers(m->typedef_item->typedef_type, scopes,
+                              tables.arena),
+          tables.typedefs, tables.arena);
+      scopes[m->name] = scope;
       if (!m->typedef_item->unpacked_dims.empty())
-        td_array_dims[key] = m->typedef_item->unpacked_dims;
+        tables.td_array_dims[key] = m->typedef_item->unpacked_dims;
     } else if (m->kind == ClassMemberKind::kClassDecl &&
                m->nested_class != nullptr) {
-      auto* nested = arena.Create<std::string>(
+      auto* nested = tables.arena.Create<std::string>(
           std::string(scope) + "::" + std::string(m->nested_class->name));
-      RegisterClassTypedefKeys(m->nested_class, *nested, typedefs,
-                               td_array_dims, arena);
+      RegisterClassTypedefKeys(m->nested_class, *nested, tables);
     }
   }
 }

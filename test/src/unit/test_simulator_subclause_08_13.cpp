@@ -510,4 +510,84 @@ TEST(InheritanceSimulation,
       3u);
 }
 
+// §8.13 has a derived class inherit its base's members, a typedef among them
+// (§8.23), so a structure typedef the derived class declares lays out a member
+// written `nib_t` by the base's 4-bit nib_t: S is 5 bits, and 9'h1F5 keeps its
+// low five, x reading 10 and y 1. Laid out by the compilation unit's 8-bit
+// nib_t, S was 9 bits and the line read 9 250 1.
+TEST(InheritedTypedefSim, AStructureMemberNamedByTheBaseTypedefTakesItsWidth) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("typedef logic [7:0] nib_t;\n"
+                       "class Base;\n"
+                       "  typedef logic [3:0] nib_t;\n"
+                       "endclass\n"
+                       "class Der extends Base;\n"
+                       "  typedef struct packed { nib_t x; logic y; } S;\n"
+                       "  S s;\n"
+                       "  function void show();\n"
+                       "    s = 9'h1F5;\n"
+                       "    $display(\"%0d %0d %0d\", $bits(s), s.x, s.y);\n"
+                       "  endfunction\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  Der d;\n"
+                       "  initial begin d = new; d.show(); end\n"
+                       "endmodule\n",
+                       f),
+            "5 10 1\n");
+}
+
+// The same with no typedef of the name outside the classes, which left x
+// sized by no typedef at all: one bit, S two, and the line 2 0 1.
+TEST(InheritedTypedefSim,
+     AStructureMemberNamedByTheBaseTypedefAloneTakesItsWidth) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class Base;\n"
+                       "  typedef logic [3:0] nib_t;\n"
+                       "endclass\n"
+                       "class Der extends Base;\n"
+                       "  typedef struct packed { nib_t x; logic y; } S;\n"
+                       "  S s;\n"
+                       "  function void show();\n"
+                       "    s = 9'h1F5;\n"
+                       "    $display(\"%0d %0d %0d\", $bits(s), s.x, s.y);\n"
+                       "  endfunction\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  Der d;\n"
+                       "  initial begin d = new; d.show(); end\n"
+                       "endmodule\n",
+                       f),
+            "5 10 1\n");
+}
+
+// Up a longer chain the nearest class declaring the name supplies it: Mid's
+// 4-bit nib_t hides Base's 2-bit one, and Base's tri_t, which Mid does not
+// redeclare, is reached through Mid, so S is 4 + 3 + 1 = 8 bits. Taking
+// Base's nib_t made it 6.
+TEST(InheritedTypedefSim, TheNearestBaseDeclaringTheNameSuppliesTheMember) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class Base;\n"
+                       "  typedef logic [1:0] nib_t;\n"
+                       "  typedef logic [2:0] tri_t;\n"
+                       "endclass\n"
+                       "class Mid extends Base;\n"
+                       "  typedef logic [3:0] nib_t;\n"
+                       "endclass\n"
+                       "class Der extends Mid;\n"
+                       "  typedef struct packed { nib_t x; tri_t t; logic y; } "
+                       "S;\n"
+                       "  S s;\n"
+                       "  function void show();\n"
+                       "    $display(\"%0d\", $bits(s));\n"
+                       "  endfunction\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  Der d;\n"
+                       "  initial begin d = new; d.show(); end\n"
+                       "endmodule\n",
+                       f),
+            "8\n");
+}
+
 }  // namespace
