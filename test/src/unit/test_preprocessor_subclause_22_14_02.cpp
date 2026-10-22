@@ -19,7 +19,7 @@ namespace {
 // across the standards that introduced them: 1364-2001, 1364-2005, 1800-2005,
 // 1800-2009, and 1800-2012. Under the "1364-1995" specifier every one of them
 // is an ordinary identifier.
-constexpr const char* kNotInTable221[] = {
+constexpr const char* kWordsAddedAfterVerilog1995[] = {
     "automatic", "generate", "genvar",  "localparam", "signed", "unsigned",
     "uwire",     "logic",    "bit",     "int",        "byte",   "string",
     "interface", "class",    "package", "typedef",    "enum",   "always_comb",
@@ -90,7 +90,7 @@ TEST(KeywordVersionPreprocessing, Verilog1995DirectiveEmitsItsVersionMarker) {
 // are reserved, not what a reserved word means.
 TEST(KeywordVersionPreprocessing,
      EveryVerilog1995WordStaysReservedInTheRegion) {
-  for (const char* word : kTable221) {
+  for (const char* word : kVerilog1995Keywords) {
     auto in_region = KindInsideRegion(word);
     auto by_default = KindUnderDefaultList(word);
     EXPECT_NE(in_region, TokenKind::kIdentifier) << word;
@@ -104,7 +104,7 @@ TEST(KeywordVersionPreprocessing,
 // the default list arrives as a keyword.
 TEST(KeywordVersionPreprocessing,
      WordsOutsideVerilog1995ListBecomeIdentifiers) {
-  for (const char* word : kNotInTable221) {
+  for (const char* word : kWordsAddedAfterVerilog1995) {
     EXPECT_EQ(KindInsideRegion(word), TokenKind::kIdentifier) << word;
     EXPECT_NE(KindUnderDefaultList(word), TokenKind::kIdentifier) << word;
   }

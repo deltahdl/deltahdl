@@ -40,8 +40,8 @@ TEST(Lexer, OnlyTheExactSpecifierNamesTheVerilog2001List) {
 // "1364-2001" builds on, so each one really is a word this version brings in
 // rather than one it inherits.
 TEST(Lexer, Verilog2001AdditionsYieldTheirOwnToken) {
-  EXPECT_EQ(std::size(kTable222Words), 21u);
-  for (const char* kw : kTable222Words) {
+  EXPECT_EQ(std::size(kVerilog2001AddedKeywords), 21u);
+  for (const char* kw : kVerilog2001AddedKeywords) {
     auto in_2001 = LookupKeyword(kw, KeywordVersion::kVer13642001);
     auto in_default = LookupKeyword(kw);
     ASSERT_TRUE(in_default.has_value()) << kw;
@@ -58,8 +58,8 @@ TEST(Lexer, Verilog2001AdditionsYieldTheirOwnToken) {
 // "1364-1995" list names, so all 102 of Table 22-1's words stay reserved here,
 // each still yielding its own token.
 TEST(Lexer, Verilog2001IncludesTheWholeVerilog1995List) {
-  EXPECT_EQ(std::size(kTable221), 102u);
-  for (const char* kw : kTable221) {
+  EXPECT_EQ(std::size(kVerilog1995Keywords), 102u);
+  for (const char* kw : kVerilog1995Keywords) {
     auto in_2001 = LookupKeyword(kw, KeywordVersion::kVer13642001);
     auto in_default = LookupKeyword(kw);
     ASSERT_TRUE(in_default.has_value()) << kw;
@@ -84,7 +84,9 @@ TEST(Lexer, WordsOutsideTheVerilog2001ListAreNotReserved) {
   // has -- the one word the very next version adds, and so the closest
   // reserved word to this list without being in it.
   for (const auto& table :
-       {kSweepTable223, kSweepTable224, kSweepTable225, kSweepTable226}) {
+       {kVerilog2005AddedKeywordSweep, kSystemVerilog2005AddedKeywordSweep,
+        kSystemVerilog2009AddedKeywordSweep,
+        kSystemVerilog2012AddedKeywordSweep}) {
     for (size_t i = 0; i < table.count; ++i) {
       const char* kw = table.words[i];
       EXPECT_FALSE(LookupKeyword(kw, KeywordVersion::kVer13642001).has_value())

@@ -14,13 +14,13 @@ namespace {
 // Table 22-2 split the way this subclause splits it. The `kind` column is what
 // the word lexes as under "1364-2001"; under this version the ten dropped ones
 // lex as ordinary identifiers instead and the eleven kept ones do not change.
-struct Table222Entry {
+struct Verilog2001KeywordEntry {
   const char* word;
   TokenKind kind_under_2001;
   bool dropped_by_noconfig;
 };
 
-constexpr Table222Entry kTable222[] = {
+constexpr Verilog2001KeywordEntry kVerilog2001AddedKeywordEntries[] = {
     {"automatic", TokenKind::kKwAutomatic, false},
     {"cell", TokenKind::kKwCell, true},
     {"config", TokenKind::kKwConfig, true},
@@ -84,7 +84,7 @@ TEST(KeywordVersionPreprocessing, NoconfigMarkerDiffersFromVerilog2001) {
 // "1364-2001" made them. Sweeping the table rather than sampling it is what
 // makes the exception, and not two convenient words, the thing observed.
 TEST(KeywordVersionPreprocessing, NoconfigDropsExactlyTheTenNamedWords) {
-  for (const auto& entry : kTable222) {
+  for (const auto& entry : kVerilog2001AddedKeywordEntries) {
     ExpectBeginKeywordsTokenKind("1364-2001-noconfig", entry.word,
                                  entry.dropped_by_noconfig
                                      ? TokenKind::kIdentifier
@@ -96,7 +96,7 @@ TEST(KeywordVersionPreprocessing, NoconfigDropsExactlyTheTenNamedWords) {
 // makes each of the ten an *exception* rather than a word that was never
 // reserved: under "1364-2001" every entry of the table lexes as its keyword.
 TEST(KeywordVersionPreprocessing, Verilog2001KeepsItsAdditionsReserved) {
-  for (const auto& entry : kTable222) {
+  for (const auto& entry : kVerilog2001AddedKeywordEntries) {
     ExpectBeginKeywordsTokenKind("1364-2001", entry.word,
                                  entry.kind_under_2001);
   }

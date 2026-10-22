@@ -15,7 +15,7 @@ using namespace delta;
 
 // Table 22-1 -- the reserved keywords of IEEE 1364-1995, the oldest
 // version_specifier `begin_keywords accepts.
-inline constexpr const char* kTable221[] = {
+inline constexpr const char* kVerilog1995Keywords[] = {
     "always",    "and",          "assign",     "begin",     "buf",
     "bufif0",    "bufif1",       "case",       "casex",     "casez",
     "cmos",      "deassign",     "default",    "defparam",  "disable",
@@ -40,7 +40,7 @@ inline constexpr const char* kTable221[] = {
 };
 
 // Table 22-2 -- what IEEE 1364-2001 reserves over Table 22-1.
-inline constexpr const char* kTable222Words[] = {
+inline constexpr const char* kVerilog2001AddedKeywords[] = {
     "automatic",
     "cell",
     "config",
@@ -66,13 +66,13 @@ inline constexpr const char* kTable222Words[] = {
 
 // Table 22-3 -- what IEEE 1364-2001-noconfig withholds relative to
 // 1364-2001: the configuration keywords it does not reserve.
-inline constexpr const char* kTable223[] = {
+inline constexpr const char* kVerilog2005AddedKeywords[] = {
     "uwire",
 };
 
 // Table 22-4 -- what IEEE 1364-2005 and SystemVerilog reserve over the
 // Verilog tables above.
-inline constexpr const char* kTable224Words[] = {
+inline constexpr const char* kSystemVerilog2005AddedKeywords[] = {
     "alias",         "always_comb",  "always_ff",    "always_latch",
     "assert",        "assume",       "before",       "bind",
     "bins",          "binsof",       "bit",          "break",
@@ -102,7 +102,7 @@ inline constexpr const char* kTable224Words[] = {
 
 // Table 22-5 -- what IEEE 1800-2009 reserves over the four lists it
 // includes.
-inline constexpr const char* kTable225Words[] = {
+inline constexpr const char* kSystemVerilog2009AddedKeywords[] = {
     "accept_on",      "checker",        "endchecker",   "eventually",
     "global",         "implies",        "let",          "nexttime",
     "reject_on",      "restrict",       "s_always",     "s_eventually",
@@ -112,8 +112,8 @@ inline constexpr const char* kTable225Words[] = {
 };
 
 // Table 22-6 -- what IEEE 1800-2012 and later reserve over Table 22-5.
-inline constexpr const char* kTable226Words[] = {"implements", "interconnect",
-                                                 "nettype", "soft"};
+inline constexpr const char* kSystemVerilog2012AddedKeywords[] = {
+    "implements", "interconnect", "nettype", "soft"};
 
 // A reserved word paired with the token kind the lexer folds it to once the
 // version reserving it is in force.
@@ -124,7 +124,7 @@ struct VersionedWord {
 
 // Table 22-2 -- what IEEE 1364-2001 reserves over Table 22-1. With the keyword
 // each entry names.
-inline constexpr VersionedWord kTable222[] = {
+inline constexpr VersionedWord kVerilog2001AddedKeywordTokens[] = {
     {"automatic", TokenKind::kKwAutomatic},
     {"cell", TokenKind::kKwCell},
     {"config", TokenKind::kKwConfig},
@@ -150,7 +150,7 @@ inline constexpr VersionedWord kTable222[] = {
 
 // Table 22-4 -- what IEEE 1364-2005 and SystemVerilog reserve over the
 // Verilog tables above. With the keyword each entry names.
-inline constexpr VersionedWord kTable224[] = {
+inline constexpr VersionedWord kSystemVerilog2005AddedKeywordTokens[] = {
     {"alias", TokenKind::kKwAlias},
     {"always_comb", TokenKind::kKwAlwaysComb},
     {"always_ff", TokenKind::kKwAlwaysFF},
@@ -252,7 +252,7 @@ inline constexpr VersionedWord kTable224[] = {
 
 // Table 22-5 -- what IEEE 1800-2009 reserves over the four lists it
 // includes. With the keyword each entry names.
-inline constexpr VersionedWord kTable225[] = {
+inline constexpr VersionedWord kSystemVerilog2009AddedKeywordTokens[] = {
     {"accept_on", TokenKind::kKwAcceptOn},
     {"checker", TokenKind::kKwChecker},
     {"endchecker", TokenKind::kKwEndchecker},
@@ -280,7 +280,7 @@ inline constexpr VersionedWord kTable225[] = {
 
 // Table 22-6 -- what IEEE 1800-2012 and later reserve over Table 22-5. With the
 // keyword each entry names.
-inline constexpr VersionedWord kTable226[] = {
+inline constexpr VersionedWord kSystemVerilog2012AddedKeywordTokens[] = {
     {"implements", TokenKind::kKwImplements},
     {"interconnect", TokenKind::kKwInterconnect},
     {"nettype", TokenKind::kKwNettype},

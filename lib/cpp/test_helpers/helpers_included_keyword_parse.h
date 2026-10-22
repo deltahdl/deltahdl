@@ -37,7 +37,7 @@ using namespace delta;
 // Table 22-1, the Verilog-1995 list, in its keyword role: the resolved net
 // types and drive strengths, the variable types, the gate primitives building
 // structure, and the procedural statements building control flow.
-inline void ExpectTable221ConstructsParse(const char* spec) {
+inline void ExpectVerilog1995ConstructsParse(const char* spec) {
   auto r = ParseWithPreprocessor(
       In(spec,
          "module m (input wire a, inout wire b, output wire y);\n"
@@ -80,7 +80,7 @@ inline void ExpectTable221ConstructsParse(const char* spec) {
 // construct, `automatic` qualifies a subroutine, `signed` and `unsigned`
 // qualify declarations, and the four pulse-control words are specify items --
 // each the construct its word exists to open.
-inline void ExpectTable222ConstructsParse(const char* spec) {
+inline void ExpectVerilog2001ConstructsParse(const char* spec) {
   auto r = ParseWithPreprocessor(
       In(spec,
          "module m (input wire a, output wire y);\n"
@@ -165,7 +165,7 @@ inline void ExpectConfigurationWordsParse(const char* spec) {
 
 // Table 22-3, the Verilog-2005 list, whose lone entry is a net type of its
 // own: `uwire` shall still open a net declaration and type a port.
-inline void ExpectTable223ConstructsParse(const char* spec) {
+inline void ExpectVerilog2005ConstructsParse(const char* spec) {
   auto r = ParseWithPreprocessor(In(spec,
                                     "module m (output uwire y);\n"
                                     "  uwire [3:0] resolved;\n"
@@ -187,7 +187,7 @@ inline void ExpectTable223ConstructsParse(const char* spec) {
 // interface with a `modport` in it, and `class` heads a class. A word that
 // stayed reserved but stopped heading its declaration would leave one of these
 // lists empty.
-inline void ExpectTable224DesignElementsParse(CompilationUnit* cu) {
+inline void ExpectSystemVerilog2005DesignElementsParse(CompilationUnit* cu) {
   ASSERT_EQ(cu->packages.size(), 1u);
   EXPECT_EQ(cu->packages[0]->name, "pkg");
   ASSERT_EQ(cu->interfaces.size(), 1u);
@@ -201,7 +201,7 @@ inline void ExpectTable224DesignElementsParse(CompilationUnit* cu) {
 // structure and the plain alias; `always_comb`, `always_ff`, `always_latch` and
 // `final` each build the process form their word exists to infer; and
 // `property` and `sequence` each build the declaration their word opens.
-inline void ExpectTable224TypesAndProcessesParse(
+inline void ExpectSystemVerilog2005TypesAndProcessesParse(
     const std::vector<ModuleItem*>& items) {
   for (const char* name : {"byte_t", "state_t", "pair_t"}) {
     EXPECT_TRUE(HasItemKindNamed(items, ModuleItemKind::kTypedef, name))
@@ -221,7 +221,7 @@ inline void ExpectTable224TypesAndProcessesParse(
 // below heads a variable declaration in `items`, and the declaration carries
 // the DataTypeKind its word names. Reading the kind back is what separates a
 // word that still types a declaration from one the parser merely accepted.
-inline void ExpectTable224DataTypeKindsParse(
+inline void ExpectSystemVerilog2005DataTypeKindsParse(
     const std::vector<ModuleItem*>& items) {
   struct TypedDecl {
     const char* name;
@@ -253,7 +253,7 @@ inline void ExpectTable224DataTypeKindsParse(
 // so `package` on its first line heads no top-level declaration and
 // Parser::ParseTopLevel in src/parser/parser.cpp says so. Without this leg an
 // accepting check would hold for any source that happened to parse.
-inline void ExpectTable224SourceUnwritableBeforeSystemVerilog(
+inline void ExpectSystemVerilog2005SourceUnwritableBeforeSystemVerilog(
     const std::string& src) {
   auto before = ParseWithPreprocessor(In2005(src));
   EXPECT_TRUE(ReportedError(before.diags, "expected top-level declaration",
@@ -267,7 +267,7 @@ inline void ExpectTable224SourceUnwritableBeforeSystemVerilog(
 // "1364-2005", the last specifier before this table, where none of it can be
 // written -- which is what keeps the accepting leg from being any parse that
 // happens to succeed.
-inline void ExpectTable224ConstructsParse(const char* spec) {
+inline void ExpectSystemVerilog2005ConstructsParse(const char* spec) {
   const std::string kSrc =
       "package pkg;\n"
       "  localparam int WIDTH = 8;\n"
@@ -317,11 +317,11 @@ inline void ExpectTable224ConstructsParse(const char* spec) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 
-  ExpectTable224DesignElementsParse(r.cu);
+  ExpectSystemVerilog2005DesignElementsParse(r.cu);
   auto& items = r.cu->modules[0]->items;
-  ExpectTable224TypesAndProcessesParse(items);
-  ExpectTable224DataTypeKindsParse(items);
-  ExpectTable224SourceUnwritableBeforeSystemVerilog(kSrc);
+  ExpectSystemVerilog2005TypesAndProcessesParse(items);
+  ExpectSystemVerilog2005DataTypeKindsParse(items);
+  ExpectSystemVerilog2005SourceUnwritableBeforeSystemVerilog(kSrc);
 }
 
 // The reserving half at this stage, table by table. Every entry of `t` is put

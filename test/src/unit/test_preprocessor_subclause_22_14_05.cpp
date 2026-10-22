@@ -68,8 +68,8 @@ TEST(KeywordVersionPreprocessing, Verilog2005OnlyTheExactSpecifierSelectsIt) {
 // what taking in 1364-1995's identifiers amounts to once the directive is in
 // force.
 TEST(KeywordVersionPreprocessing, Verilog2005ReservesEveryVerilog1995Keyword) {
-  EXPECT_EQ(std::size(kTable221), 102u);
-  for (const char* word : kTable221) {
+  EXPECT_EQ(std::size(kVerilog1995Keywords), 102u);
+  for (const char* word : kVerilog1995Keywords) {
     auto here = KindInRegion("1364-2005", word);
     EXPECT_NE(here, TokenKind::kIdentifier) << word << " is a reserved word";
     EXPECT_EQ(here, KindInRegion("1364-1995", word))
@@ -82,8 +82,8 @@ TEST(KeywordVersionPreprocessing, Verilog2005ReservesEveryVerilog1995Keyword) {
 // that version reserves the very same word is an ordinary identifier, so its
 // being a keyword here comes from the second list this version names.
 TEST(KeywordVersionPreprocessing, Verilog2005ReservesEveryVerilog2001Keyword) {
-  EXPECT_EQ(std::size(kTable222), 21u);
-  for (const auto& word : kTable222) {
+  EXPECT_EQ(std::size(kVerilog2001AddedKeywordTokens), 21u);
+  for (const auto& word : kVerilog2001AddedKeywordTokens) {
     EXPECT_EQ(KindInRegion("1364-2005", word.text), word.kind) << word.text;
     EXPECT_EQ(KindInRegion("1364-1995", word.text), TokenKind::kIdentifier)
         << word.text << " is an addition of the later of the two lists";

@@ -22,7 +22,8 @@ namespace {
 // entries, the thing being checked.
 TEST(CompilerDirectiveParsing,
      SystemVerilog2005ReservesEveryVerilog1995Keyword) {
-  ExpectKeywordTableIsReservedAtParse("1800-2005", kSweepTable221AtParse);
+  ExpectKeywordTableIsReservedAtParse("1800-2005",
+                                      kVerilog1995KeywordSweepAtParse);
 }
 
 // The second included list, with the leg that makes it an inclusion. Each of
@@ -31,7 +32,8 @@ TEST(CompilerDirectiveParsing,
 // version's list doing its work rather than an unrelated parse failure.
 TEST(CompilerDirectiveParsing,
      SystemVerilog2005ReservesEveryVerilog2001Keyword) {
-  ExpectKeywordTableIsReservedAtParse("1800-2005", kSweepTable222);
+  ExpectKeywordTableIsReservedAtParse("1800-2005",
+                                      kVerilog2001AddedKeywordSweep);
 }
 
 // The third included list. Its one word cannot name a variable here, names one
@@ -39,7 +41,8 @@ TEST(CompilerDirectiveParsing,
 // net declaration it exists for -- inclusion is about the keyword role
 // surviving, not only about the identifier slot closing.
 TEST(CompilerDirectiveParsing, SystemVerilog2005ReservesTheVerilog2005Word) {
-  ExpectKeywordTableIsReservedAtParse("1800-2005", kSweepTable223);
+  ExpectKeywordTableIsReservedAtParse("1800-2005",
+                                      kVerilog2005AddedKeywordSweep);
   ExpectUwireStillOpensNetDeclarations("1800-2005");
 }
 
@@ -49,7 +52,8 @@ TEST(CompilerDirectiveParsing, SystemVerilog2005ReservesTheVerilog2005Word) {
 // declaration is built and read back off the tree. Any word for which both legs
 // hold is reserved by this version_specifier and by nothing it inherits.
 TEST(CompilerDirectiveParsing, SystemVerilog2005ReservesEveryWordItAdds) {
-  ExpectKeywordTableIsReservedAtParse("1800-2005", kSweepTable224);
+  ExpectKeywordTableIsReservedAtParse("1800-2005",
+                                      kSystemVerilog2005AddedKeywordSweep);
 }
 
 // The identifier positions a variable declaration does not reach, for the three
@@ -599,7 +603,7 @@ TEST(CompilerDirectiveParsing,
 // this version_specifier.
 TEST(CompilerDirectiveParsing,
      SystemVerilog2005IncludedVerilog1995WordsStillWork) {
-  ExpectTable221ConstructsParse("1800-2005");
+  ExpectVerilog1995ConstructsParse("1800-2005");
 }
 
 // Including Table 22-2 means including the ten words a configuration is written
@@ -619,7 +623,7 @@ TEST(CompilerDirectiveParsing, SystemVerilog2005IncludesTheConfigurationWords) {
 // construct its word exists to open, all still available under this version.
 TEST(CompilerDirectiveParsing,
      SystemVerilog2005IncludedVerilog2001WordsStillWork) {
-  ExpectTable222ConstructsParse("1800-2005");
+  ExpectVerilog2001ConstructsParse("1800-2005");
 }
 
 // The negative the four tables imply, at the stage where it shows: a word none

@@ -25,7 +25,7 @@ namespace {
 // a different constant on each pass rather than merely make the loop run the
 // right number of times.
 TEST(Verilog2001KeywordElaboration, AdditionsDoTheirElaboratedJob) {
-  ExpectTable222DeclarationsElaborate("1364-2001");
+  ExpectVerilog2001DeclarationsElaborate("1364-2001");
 }
 
 // A declaration's width can come from any of the constant forms, and each
@@ -177,7 +177,7 @@ TEST(Verilog2001KeywordElaboration, FreedWordNamesModulePortsAndInstance) {
 // twenty-one rather than sampling is what makes the table, and not a handful of
 // its entries, the thing being checked.
 TEST(Verilog2001KeywordElaboration, AdditionsCannotNameElaboratedVariables) {
-  ExpectKeywordTableIsReserved("1364-2001", kSweepTable222);
+  ExpectKeywordTableIsReserved("1364-2001", kVerilog2001AddedKeywordSweep);
 }
 
 // The negative from the other direction: a word neither table lists carries no

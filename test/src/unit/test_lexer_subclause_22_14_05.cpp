@@ -53,8 +53,8 @@ TEST(Verilog2005KeywordList, SpecifierMisspellingsAreNotRecognized) {
 // keyword each word resolves to has to be the same one -- being reserved for a
 // different meaning would not be inclusion.
 TEST(Verilog2005KeywordList, IncludesEveryVerilog1995Keyword) {
-  EXPECT_EQ(std::size(kTable221), 102u);
-  for (const char* word : kTable221) {
+  EXPECT_EQ(std::size(kVerilog1995Keywords), 102u);
+  for (const char* word : kVerilog1995Keywords) {
     auto under_1995 = LookupKeyword(word, KeywordVersion::kVer13641995);
     ASSERT_TRUE(under_1995.has_value())
         << word << " is one of the words the included list reserves";
@@ -73,8 +73,8 @@ TEST(Verilog2005KeywordList, IncludesEveryVerilog1995Keyword) {
 // This one is included entire: the ten configuration words a neighbouring
 // version_specifier drops are reserved here along with the other eleven.
 TEST(Verilog2005KeywordList, IncludesEveryVerilog2001Keyword) {
-  EXPECT_EQ(std::size(kTable222Words), 21u);
-  for (const char* word : kTable222Words) {
+  EXPECT_EQ(std::size(kVerilog2001AddedKeywords), 21u);
+  for (const char* word : kVerilog2001AddedKeywords) {
     auto under_2001 = LookupKeyword(word, KeywordVersion::kVer13642001);
     ASSERT_TRUE(under_2001.has_value())
         << word << " is one of the words the included list adds";
@@ -96,8 +96,8 @@ TEST(Verilog2005KeywordList, IncludesEveryVerilog2001Keyword) {
 // contain, being reserved here but not under "1364-2001" happens for this word
 // and for no other, so Table 22-3 accounts for the whole difference.
 TEST(Verilog2005KeywordList, AddsExactlyOneWordOfItsOwn) {
-  ASSERT_EQ(std::size(kTable223), 1u);
-  const char* added = kTable223[0];
+  ASSERT_EQ(std::size(kVerilog2005AddedKeywords), 1u);
+  const char* added = kVerilog2005AddedKeywords[0];
 
   auto here = LookupKeyword(added, KeywordVersion::kVer13642005);
   ASSERT_TRUE(here.has_value());
@@ -110,13 +110,13 @@ TEST(Verilog2005KeywordList, AddsExactlyOneWordOfItsOwn) {
       << added << " is not reserved by the later of the two included lists";
 
   size_t newly_reserved = 0;
-  for (const char* word : kTable221) {
+  for (const char* word : kVerilog1995Keywords) {
     if (!LookupKeyword(word, KeywordVersion::kVer13642001).has_value() &&
         LookupKeyword(word, KeywordVersion::kVer13642005).has_value()) {
       ++newly_reserved;
     }
   }
-  for (const char* word : kTable222Words) {
+  for (const char* word : kVerilog2001AddedKeywords) {
     if (!LookupKeyword(word, KeywordVersion::kVer13642001).has_value() &&
         LookupKeyword(word, KeywordVersion::kVer13642005).has_value()) {
       ++newly_reserved;
@@ -130,22 +130,23 @@ TEST(Verilog2005KeywordList, AddsExactlyOneWordOfItsOwn) {
 // none of them repeats a word another already holds. Without this the sweeps
 // above could each pass while between them covering only part of the list.
 TEST(Verilog2005KeywordList, TheListIsTheThreeTablesTogether) {
-  EXPECT_EQ(
-      std::size(kTable221) + std::size(kTable222Words) + std::size(kTable223),
-      124u);
+  EXPECT_EQ(std::size(kVerilog1995Keywords) +
+                std::size(kVerilog2001AddedKeywords) +
+                std::size(kVerilog2005AddedKeywords),
+            124u);
 
-  auto in_table221 = [](const std::string& word) {
-    for (const char* w : kTable221) {
+  auto in_verilog1995_keywords = [](const std::string& word) {
+    for (const char* w : kVerilog1995Keywords) {
       if (word == w) return true;
     }
     return false;
   };
-  for (const char* word : kTable222Words) {
-    EXPECT_FALSE(in_table221(word)) << word << " is counted twice";
+  for (const char* word : kVerilog2001AddedKeywords) {
+    EXPECT_FALSE(in_verilog1995_keywords(word)) << word << " is counted twice";
   }
-  for (const char* word : kTable223) {
-    EXPECT_FALSE(in_table221(word)) << word << " is counted twice";
-    for (const char* w : kTable222Words) {
+  for (const char* word : kVerilog2005AddedKeywords) {
+    EXPECT_FALSE(in_verilog1995_keywords(word)) << word << " is counted twice";
+    for (const char* w : kVerilog2001AddedKeywords) {
       EXPECT_NE(std::string(word), w) << word << " is counted twice";
     }
   }

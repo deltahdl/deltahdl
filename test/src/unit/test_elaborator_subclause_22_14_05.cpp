@@ -157,8 +157,8 @@ TEST(Verilog2005KeywordElaboration, AddedWordTypesEveryDeclarationForm) {
 // what keeps the accepting legs from being any elaboration that happens to
 // succeed.
 TEST(Verilog2005KeywordElaboration, AddedWordCannotNameAnElaboratedVariable) {
-  ASSERT_EQ(std::size(kTable223), 1u);
-  const char* added = kTable223[0];
+  ASSERT_EQ(std::size(kVerilog2005AddedKeywords), 1u);
+  const char* added = kVerilog2005AddedKeywords[0];
 
   // A reserved word cannot be the name in a variable declaration, so the report
   // is the one §6.8 governs: the declaration wanted an identifier and got a
@@ -193,8 +193,8 @@ TEST(Verilog2005KeywordElaboration, AddedWordCannotNameAnElaboratedVariable) {
 // gives. Counting newlines in the preprocessed text does not show the offset
 // reaching the user; this does.
 TEST(Verilog2005KeywordElaboration, ReservedWordDeeperInARegionKeepsItsLine) {
-  ASSERT_EQ(std::size(kTable223), 1u);
-  const char* added = kTable223[0];
+  ASSERT_EQ(std::size(kVerilog2005AddedKeywords), 1u);
+  const char* added = kVerilog2005AddedKeywords[0];
 
   ElabFixture f;
   ElaborateWithPreprocessorAllowingParseErrors(
@@ -215,8 +215,8 @@ TEST(Verilog2005KeywordElaboration, ReservedWordDeeperInARegionKeepsItsLine) {
 // elaborates into a variable of the width it asked for. The pair is what makes
 // each word an inclusion rather than an unrelated failure.
 TEST(Verilog2005KeywordElaboration, IncludedVerilog2001WordsAreReserved) {
-  EXPECT_EQ(std::size(kTable222Words), 21u);
-  for (const char* word : kTable222Words) {
+  EXPECT_EQ(std::size(kVerilog2001AddedKeywords), 21u);
+  for (const char* word : kVerilog2001AddedKeywords) {
     ElabFixture reserved;
     ElaborateWithPreprocessorAllowingParseErrors(In2005(VarDecl(word)),
                                                  reserved, "m");
@@ -241,9 +241,9 @@ TEST(Verilog2005KeywordElaboration, IncludedVerilog2001WordsAreReserved) {
 // starts from -- so the accepting side of the claim is the test below, where
 // the same words build the design in their keyword roles.
 TEST(Verilog2005KeywordElaboration, IncludedVerilog1995WordsAreReserved) {
-  EXPECT_EQ(std::size(kTable221), 102u);
+  EXPECT_EQ(std::size(kVerilog1995Keywords), 102u);
   size_t swept = 0;
-  for (const char* word : kTable221) {
+  for (const char* word : kVerilog1995Keywords) {
     if (IsGatePrimitiveWord(word)) continue;
     ElabFixture f;
     ElaborateWithPreprocessorAllowingParseErrors(In2005(VarDecl(word)), f, "m");
@@ -262,7 +262,7 @@ TEST(Verilog2005KeywordElaboration, IncludedVerilog1995WordsAreReserved) {
 // the earlier list names has to survive into the design as itself rather than
 // collapsing onto a plain wire, which would leave the inclusion unobserved.
 TEST(Verilog2005KeywordElaboration, IncludedVerilog1995WordsStillBuildDesign) {
-  ExpectTable221DeclarationsElaborate("1364-2005");
+  ExpectVerilog1995DeclarationsElaborate("1364-2005");
 }
 
 // Table 22-2 doing its work, likewise as structure rather than as tokens.
@@ -273,7 +273,7 @@ TEST(Verilog2005KeywordElaboration, IncludedVerilog1995WordsStillBuildDesign) {
 // design depends on it resolving, and the nested condition picks out a single
 // iteration, so the genvar has to hold a different constant on each pass.
 TEST(Verilog2005KeywordElaboration, IncludedVerilog2001WordsStillBuildDesign) {
-  ExpectTable222DeclarationsElaborate("1364-2005");
+  ExpectVerilog2001DeclarationsElaborate("1364-2005");
 }
 
 // The constant forms that reach a declaration's width, which is where a

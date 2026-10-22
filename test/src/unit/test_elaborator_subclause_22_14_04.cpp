@@ -196,7 +196,7 @@ TEST(NoconfigKeywordElaboration, ExcludedWordNamesModulePortsAndInstance) {
 // the nested condition picks out a single iteration, so the genvar has to hold
 // a different constant on each pass.
 TEST(NoconfigKeywordElaboration, KeptAdditionsStillBuildTheDesign) {
-  ExpectTable222DeclarationsElaborate("1364-2001-noconfig");
+  ExpectVerilog2001DeclarationsElaborate("1364-2001-noconfig");
 }
 
 // A dropped word sizing a declaration rather than naming one: each constant

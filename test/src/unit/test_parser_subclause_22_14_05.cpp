@@ -22,8 +22,8 @@ namespace {
 // table whole is what makes the inclusion, rather than a handful of its
 // entries, the thing being checked.
 TEST(CompilerDirectiveParsing, Verilog2005ReservesEveryVerilog1995Keyword) {
-  EXPECT_EQ(std::size(kTable221), 102u);
-  for (const char* word : kTable221) {
+  EXPECT_EQ(std::size(kVerilog1995Keywords), 102u);
+  for (const char* word : kVerilog1995Keywords) {
     // §6.8 owns the report: VarDecl heads its declaration with `reg`, so the
     // word stands where Parser::ParseVarDeclList reads a variable's name. The
     // expected message is built from the word, so each entry of the table is
@@ -41,8 +41,8 @@ TEST(CompilerDirectiveParsing, Verilog2005ReservesEveryVerilog1995Keyword) {
 // "1364-1995", where it is not yet a keyword -- so the rejection is this
 // version's list doing its work rather than an unrelated parse failure.
 TEST(CompilerDirectiveParsing, Verilog2005ReservesEveryVerilog2001Keyword) {
-  EXPECT_EQ(std::size(kTable222Words), 21u);
-  for (const char* word : kTable222Words) {
+  EXPECT_EQ(std::size(kVerilog2001AddedKeywords), 21u);
+  for (const char* word : kVerilog2001AddedKeywords) {
     auto r = ParseWithPreprocessor(In2005(VarDecl(word)));
     EXPECT_TRUE(ReportedError(
         r.diags, std::string("expected identifier, got '") + word + "'",
@@ -84,8 +84,8 @@ TEST(CompilerDirectiveParsing,
 // tree, so the word is observed naming something rather than merely getting
 // past the lexer.
 TEST(CompilerDirectiveParsing, Verilog2005ReservesTheWordItAddsItself) {
-  ASSERT_EQ(std::size(kTable223), 1u);
-  const char* added = kTable223[0];
+  ASSERT_EQ(std::size(kVerilog2005AddedKeywords), 1u);
+  const char* added = kVerilog2005AddedKeywords[0];
 
   auto here = ParseWithPreprocessor(In2005(VarDecl(added)));
   EXPECT_TRUE(ReportedError(
@@ -279,7 +279,7 @@ TEST(CompilerDirectiveParsing, Verilog2005IncludesTheConfigurationWords) {
 // items -- each the construct its word exists to open.
 TEST(CompilerDirectiveParsing,
      Verilog2005IncludedAdditionsOpenTheirConstructs) {
-  ExpectTable222ConstructsParse("1364-2005");
+  ExpectVerilog2001ConstructsParse("1364-2005");
 }
 
 // Table 22-1 in its keyword role too: inclusion is not only about what a word
@@ -287,7 +287,7 @@ TEST(CompilerDirectiveParsing,
 // types and drive strengths are written out, and the procedural statements
 // build control flow -- all of it under a region opened for this version.
 TEST(CompilerDirectiveParsing, Verilog2005IncludedVerilog1995WordsStillWork) {
-  ExpectTable221ConstructsParse("1364-2005");
+  ExpectVerilog1995ConstructsParse("1364-2005");
 }
 
 // The negative the three tables imply, at the stage where it shows: a word none

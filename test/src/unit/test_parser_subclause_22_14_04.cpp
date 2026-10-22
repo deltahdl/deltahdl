@@ -86,8 +86,8 @@ TEST(CompilerDirectiveParsing, NoconfigKeepsOtherVerilog2001AdditionsReserved) {
 // what makes the inheritance, rather than a handful of its entries, the thing
 // being checked.
 TEST(CompilerDirectiveParsing, NoconfigKeepsAllVerilog1995KeywordsReserved) {
-  EXPECT_EQ(std::size(kTable221), 102u);
-  for (const char* word : kTable221) {
+  EXPECT_EQ(std::size(kVerilog1995Keywords), 102u);
+  for (const char* word : kVerilog1995Keywords) {
     auto r = ParseWithPreprocessor(InNoconfig(VarDecl(word)));
     EXPECT_TRUE(ReportedError(
         r.diags, std::string("expected identifier, got '") + word + "'",

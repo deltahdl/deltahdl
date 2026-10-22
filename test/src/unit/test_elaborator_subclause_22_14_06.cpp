@@ -18,7 +18,7 @@ namespace {
 // lists this version names -- so the accepting side of the claim is the test
 // below, where the same words build the design in their keyword roles.
 TEST(SystemVerilog2005KeywordElaboration, IncludedVerilog1995WordsAreReserved) {
-  ExpectKeywordTableIsReserved("1800-2005", kSweepTable221);
+  ExpectKeywordTableIsReserved("1800-2005", kVerilog1995KeywordSweep);
 }
 
 // The second included list at this stage, swept whole. Each of Table 22-2's
@@ -27,7 +27,7 @@ TEST(SystemVerilog2005KeywordElaboration, IncludedVerilog1995WordsAreReserved) {
 // declaration elaborates into a variable of the width it asked for. The pair is
 // what makes each word an inclusion rather than an unrelated failure.
 TEST(SystemVerilog2005KeywordElaboration, IncludedVerilog2001WordsAreReserved) {
-  ExpectKeywordTableIsReserved("1800-2005", kSweepTable222);
+  ExpectKeywordTableIsReserved("1800-2005", kVerilog2001AddedKeywordSweep);
 }
 
 // The third included list. Its one word cannot name an elaborated variable
@@ -35,8 +35,8 @@ TEST(SystemVerilog2005KeywordElaboration, IncludedVerilog2001WordsAreReserved) {
 // on, and still carries its net type into the design -- inclusion means the
 // keyword role survives, not only that the identifier slot closes.
 TEST(SystemVerilog2005KeywordElaboration, IncludedVerilog2005WordIsReserved) {
-  ExpectKeywordTableIsReserved("1800-2005", kSweepTable223);
-  ExpectTable223DeclarationsElaborate("1800-2005");
+  ExpectKeywordTableIsReserved("1800-2005", kVerilog2005AddedKeywordSweep);
+  ExpectVerilog2005DeclarationsElaborate("1800-2005");
 }
 
 // Table 22-4 swept whole at this stage, with the leg that makes each entry an
@@ -46,7 +46,8 @@ TEST(SystemVerilog2005KeywordElaboration, IncludedVerilog2005WordIsReserved) {
 // Reading the variable back is what keeps the accepting leg from being any
 // elaboration that happens to succeed.
 TEST(SystemVerilog2005KeywordElaboration, AddedWordsCannotNameVariables) {
-  ExpectKeywordTableIsReserved("1800-2005", kSweepTable224);
+  ExpectKeywordTableIsReserved("1800-2005",
+                               kSystemVerilog2005AddedKeywordSweep);
 }
 
 // Table 22-4 doing the elaborated jobs its words exist for, which is the half a
@@ -59,7 +60,7 @@ TEST(SystemVerilog2005KeywordElaboration, AddedWordsCannotNameVariables) {
 // everything this version includes, which is what makes every one of them an
 // addition of this version rather than something inherited.
 TEST(SystemVerilog2005KeywordElaboration, AddedWordsDoTheirElaboratedJobs) {
-  ExpectTable224DeclarationsElaborate("1800-2005");
+  ExpectSystemVerilog2005DeclarationsElaborate("1800-2005");
 }
 
 // The declaration forms the test above does not reach, carried into the
@@ -130,7 +131,7 @@ TEST(SystemVerilog2005KeywordElaboration, AddedTypeWordsQualifyConstants) {
 // unobserved.
 TEST(SystemVerilog2005KeywordElaboration,
      IncludedVerilog1995WordsStillBuildDesign) {
-  ExpectTable221DeclarationsElaborate("1800-2005");
+  ExpectVerilog1995DeclarationsElaborate("1800-2005");
 }
 
 // Table 22-2 doing its work, likewise as structure rather than as tokens.
@@ -142,7 +143,7 @@ TEST(SystemVerilog2005KeywordElaboration,
 // iteration, so the genvar has to hold a different constant on each pass.
 TEST(SystemVerilog2005KeywordElaboration,
      IncludedVerilog2001WordsStillBuildDesign) {
-  ExpectTable222DeclarationsElaborate("1800-2005");
+  ExpectVerilog2001DeclarationsElaborate("1800-2005");
 }
 
 // The constant forms that reach a declaration's width, which is where a

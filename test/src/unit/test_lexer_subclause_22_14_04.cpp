@@ -110,12 +110,12 @@ TEST(NoconfigKeywordList, MatchesVerilog2001ExceptForTheExcludedTen) {
     }
   };
 
-  for (const char* word : kTable221) compare(word);
+  for (const char* word : kVerilog1995Keywords) compare(word);
   for (const char* word : kExcluded) compare(word);
   for (const char* word : kKept) compare(word);
 
   EXPECT_EQ(excluded_seen, 10u);
-  EXPECT_EQ(kept_seen, std::size(kTable221) + std::size(kKept));
+  EXPECT_EQ(kept_seen, std::size(kVerilog1995Keywords) + std::size(kKept));
 }
 
 // The two halves of Table 22-2 partition it: ten dropped and eleven kept makes
@@ -125,7 +125,7 @@ TEST(NoconfigKeywordList, SplitsVerilog2001AdditionsIntoTenAndEleven) {
   EXPECT_EQ(std::size(kExcluded), 10u);
   EXPECT_EQ(std::size(kKept), 11u);
   EXPECT_EQ(std::size(kExcluded) + std::size(kKept), 21u);
-  EXPECT_EQ(std::size(kTable221), 102u);
+  EXPECT_EQ(std::size(kVerilog1995Keywords), 102u);
 
   // The two groups are disjoint, so no word is counted on both sides.
   for (const char* word : kKept) {
@@ -137,7 +137,7 @@ TEST(NoconfigKeywordList, SplitsVerilog2001AdditionsIntoTenAndEleven) {
 // names reaches Table 22-2 only, so every one of Table 22-1's entries has to
 // survive into this version untouched.
 TEST(NoconfigKeywordList, KeepsAllVerilog1995Keywords) {
-  for (const char* kw : kTable221) {
+  for (const char* kw : kVerilog1995Keywords) {
     EXPECT_TRUE(
         LookupKeyword(kw, KeywordVersion::kVer13642001Noconfig).has_value())
         << kw << " is inherited from Table 22-1 and stays reserved";

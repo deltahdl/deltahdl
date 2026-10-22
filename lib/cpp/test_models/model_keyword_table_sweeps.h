@@ -37,54 +37,69 @@ struct KeywordTableSweep {
   size_t expected_swept;
 };
 
-inline constexpr KeywordTableSweep kSweepTable221 = {
-    "Table 22-1",        kTable221, std::size(kTable221), 102, {nullptr},
-    IsGatePrimitiveWord, 96};
+inline constexpr KeywordTableSweep kVerilog1995KeywordSweep = {
+    "Table 22-1",
+    kVerilog1995Keywords,
+    std::size(kVerilog1995Keywords),
+    102,
+    {nullptr},
+    IsGatePrimitiveWord,
+    96};
 
 // Table 22-1 at the parse stage, where nothing has to be skipped: the parser
 // reads a declaration whose identifier slot holds a gate primitive word as a
 // malformed gate instantiation and rejects it, which is the same verdict the
 // sweep asks for, so all 102 entries are reached here.
-inline constexpr KeywordTableSweep kSweepTable221AtParse = {
-    "Table 22-1", kTable221, std::size(kTable221), 102, {nullptr},
-    nullptr,      102};
+inline constexpr KeywordTableSweep kVerilog1995KeywordSweepAtParse = {
+    "Table 22-1",
+    kVerilog1995Keywords,
+    std::size(kVerilog1995Keywords),
+    102,
+    {nullptr},
+    nullptr,
+    102};
 
-inline constexpr KeywordTableSweep kSweepTable222 = {"Table 22-2",
-                                                     kTable222Words,
-                                                     std::size(kTable222Words),
-                                                     21,
-                                                     {"1364-1995"},
-                                                     nullptr,
-                                                     21};
+inline constexpr KeywordTableSweep kVerilog2001AddedKeywordSweep = {
+    "Table 22-2",
+    kVerilog2001AddedKeywords,
+    std::size(kVerilog2001AddedKeywords),
+    21,
+    {"1364-1995"},
+    nullptr,
+    21};
 
-inline constexpr KeywordTableSweep kSweepTable223 = {"Table 22-3",
-                                                     kTable223,
-                                                     std::size(kTable223),
-                                                     1,
-                                                     {"1364-2001", "1364-1995"},
-                                                     nullptr,
-                                                     1};
+inline constexpr KeywordTableSweep kVerilog2005AddedKeywordSweep = {
+    "Table 22-3",
+    kVerilog2005AddedKeywords,
+    std::size(kVerilog2005AddedKeywords),
+    1,
+    {"1364-2001", "1364-1995"},
+    nullptr,
+    1};
 
-inline constexpr KeywordTableSweep kSweepTable224 = {"Table 22-4",
-                                                     kTable224Words,
-                                                     std::size(kTable224Words),
-                                                     97,
-                                                     {"1364-2005"},
-                                                     IsAggregateOpenerWord,
-                                                     95};
+inline constexpr KeywordTableSweep kSystemVerilog2005AddedKeywordSweep = {
+    "Table 22-4",
+    kSystemVerilog2005AddedKeywords,
+    std::size(kSystemVerilog2005AddedKeywords),
+    97,
+    {"1364-2005"},
+    IsAggregateOpenerWord,
+    95};
 
-inline constexpr KeywordTableSweep kSweepTable225 = {"Table 22-5",
-                                                     kTable225Words,
-                                                     std::size(kTable225Words),
-                                                     23,
-                                                     {"1800-2005"},
-                                                     nullptr,
-                                                     23};
+inline constexpr KeywordTableSweep kSystemVerilog2009AddedKeywordSweep = {
+    "Table 22-5",
+    kSystemVerilog2009AddedKeywords,
+    std::size(kSystemVerilog2009AddedKeywords),
+    23,
+    {"1800-2005"},
+    nullptr,
+    23};
 
-inline constexpr KeywordTableSweep kSweepTable226 = {"Table 22-6",
-                                                     kTable226Words,
-                                                     std::size(kTable226Words),
-                                                     4,
-                                                     {"1800-2009"},
-                                                     nullptr,
-                                                     4};
+inline constexpr KeywordTableSweep kSystemVerilog2012AddedKeywordSweep = {
+    "Table 22-6",
+    kSystemVerilog2012AddedKeywords,
+    std::size(kSystemVerilog2012AddedKeywords),
+    4,
+    {"1800-2009"},
+    nullptr,
+    4};

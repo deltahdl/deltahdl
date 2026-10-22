@@ -15,7 +15,7 @@ namespace {
 // under the "1364-1995" specifier each is an ordinary identifier. They are the
 // exclusivity side of the rule: naming that version must free all of them, not
 // just the few the LRM's examples happen to mention.
-constexpr const char* kNotInTable221[] = {
+constexpr const char* kWordsAddedAfterVerilog1995[] = {
     "accept_on",
     "alias",
     "always_comb",
@@ -172,8 +172,8 @@ constexpr const char* kNotInTable221[] = {
 // expectation keeps the check exhaustive while still pinning each word to one
 // specific token rather than merely to "reserved".
 TEST(Lexer, Verilog1995KeywordsYieldTheirOwnToken) {
-  EXPECT_EQ(std::size(kTable221), 102u);
-  for (const char* kw : kTable221) {
+  EXPECT_EQ(std::size(kVerilog1995Keywords), 102u);
+  for (const char* kw : kVerilog1995Keywords) {
     auto in_1995 = LookupKeyword(kw, KeywordVersion::kVer13641995);
     auto in_default = LookupKeyword(kw);
     ASSERT_TRUE(in_default.has_value()) << kw;
@@ -190,7 +190,7 @@ TEST(Lexer, Verilog1995KeywordsYieldTheirOwnToken) {
 // under "1364-1995" is that list's doing rather than a word missing from the
 // keyword table altogether.
 TEST(Lexer, WordsOutsideVerilog1995ListAreNotReserved) {
-  for (const char* kw : kNotInTable221) {
+  for (const char* kw : kWordsAddedAfterVerilog1995) {
     EXPECT_FALSE(LookupKeyword(kw, KeywordVersion::kVer13641995).has_value())
         << kw << " is not listed in Table 22-1";
     EXPECT_TRUE(LookupKeyword(kw).has_value())

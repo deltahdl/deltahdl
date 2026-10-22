@@ -72,8 +72,8 @@ TEST(KeywordVersionPreprocessing,
 // the directive is in force.
 TEST(KeywordVersionPreprocessing,
      SystemVerilog2009ReservesEveryVerilog1995Keyword) {
-  EXPECT_EQ(std::size(kTable221), 102u);
-  for (const char* word : kTable221) {
+  EXPECT_EQ(std::size(kVerilog1995Keywords), 102u);
+  for (const char* word : kVerilog1995Keywords) {
     auto here = KindInRegion("1800-2009", word);
     EXPECT_NE(here, TokenKind::kIdentifier) << word << " is a reserved word";
     EXPECT_EQ(here, KindInRegion("1364-1995", word))
@@ -90,8 +90,8 @@ TEST(KeywordVersionPreprocessing,
 // reduced companion.
 TEST(KeywordVersionPreprocessing,
      SystemVerilog2009ReservesEveryVerilog2001Keyword) {
-  EXPECT_EQ(std::size(kTable222), 21u);
-  for (const auto& word : kTable222) {
+  EXPECT_EQ(std::size(kVerilog2001AddedKeywordTokens), 21u);
+  for (const auto& word : kVerilog2001AddedKeywordTokens) {
     EXPECT_EQ(KindInRegion("1800-2009", word.text), word.kind) << word.text;
     EXPECT_EQ(KindInRegion("1364-1995", word.text), TokenKind::kIdentifier)
         << word.text << " is an addition of the second included list";
@@ -121,8 +121,8 @@ TEST(KeywordVersionPreprocessing, SystemVerilog2009ReservesTheVerilog2005Word) {
 // than anything earlier.
 TEST(KeywordVersionPreprocessing,
      SystemVerilog2009ReservesEverySystemVerilog2005Keyword) {
-  EXPECT_EQ(std::size(kTable224), 97u);
-  for (const auto& word : kTable224) {
+  EXPECT_EQ(std::size(kSystemVerilog2005AddedKeywordTokens), 97u);
+  for (const auto& word : kSystemVerilog2005AddedKeywordTokens) {
     EXPECT_EQ(KindInRegion("1800-2009", word.text), word.kind) << word.text;
     EXPECT_EQ(KindInRegion("1364-2005", word.text), TokenKind::kIdentifier)
         << word.text << " comes from the fourth included list";
@@ -135,8 +135,8 @@ TEST(KeywordVersionPreprocessing,
 // same word arriving as an ordinary identifier. That pairing is the claim: the
 // words are additions of this version_specifier rather than anything inherited.
 TEST(KeywordVersionPreprocessing, SystemVerilog2009ReservesEveryWordItAdds) {
-  EXPECT_EQ(std::size(kTable225), 23u);
-  for (const auto& word : kTable225) {
+  EXPECT_EQ(std::size(kSystemVerilog2009AddedKeywordTokens), 23u);
+  for (const auto& word : kSystemVerilog2009AddedKeywordTokens) {
     EXPECT_EQ(KindInRegion("1800-2009", word.text), word.kind) << word.text;
     EXPECT_EQ(KindInRegion("1800-2005", word.text), TokenKind::kIdentifier)
         << word.text << " is an addition of this version, not an inheritance";

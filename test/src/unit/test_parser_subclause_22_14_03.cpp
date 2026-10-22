@@ -26,7 +26,7 @@ bool Parses2001(const std::string& body) {
 // Run through real source so the rejection is the reserved word list's doing
 // and not some unrelated parse failure.
 TEST(CompilerDirectiveParsing, Verilog2001AdditionsCannotNameAVariable) {
-  for (const char* word : kTable222Words) {
+  for (const char* word : kVerilog2001AddedKeywords) {
     std::string decl =
         std::string("module m;\n  reg [7:0] ") + word + ";\nendmodule\n";
     // §6.8 owns the report: the word stands where Parser::ParseVarDeclList
@@ -50,8 +50,8 @@ TEST(CompilerDirectiveParsing, Verilog2001AdditionsCannotNameAVariable) {
 // inherited table, rather than the handful of its entries a role test happens
 // to reach, the thing being checked.
 TEST(CompilerDirectiveParsing, InheritedKeywordsCannotNameAVariable) {
-  EXPECT_EQ(std::size(kTable221), 102u);
-  for (const char* word : kTable221) {
+  EXPECT_EQ(std::size(kVerilog1995Keywords), 102u);
+  for (const char* word : kVerilog1995Keywords) {
     std::string decl =
         std::string("module m;\n  reg [7:0] ") + word + ";\nendmodule\n";
     auto r = ParseWithPreprocessor(In2001(decl));

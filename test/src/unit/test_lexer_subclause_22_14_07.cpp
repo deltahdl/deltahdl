@@ -55,8 +55,8 @@ TEST(SystemVerilog2009KeywordList, SpecifierMisspellingsAreNotRecognized) {
 // word resolves to has to be the same one -- being reserved for a different
 // meaning would not be inclusion.
 TEST(SystemVerilog2009KeywordList, IncludesEveryVerilog1995Keyword) {
-  EXPECT_EQ(std::size(kTable221), 102u);
-  for (const char* word : kTable221) {
+  EXPECT_EQ(std::size(kVerilog1995Keywords), 102u);
+  for (const char* word : kVerilog1995Keywords) {
     auto under_1995 = LookupKeyword(word, KeywordVersion::kVer13641995);
     ASSERT_TRUE(under_1995.has_value())
         << word << " is one of the words the included list reserves";
@@ -77,8 +77,8 @@ TEST(SystemVerilog2009KeywordList, IncludesEveryVerilog1995Keyword) {
 // configuration-free list drops are called out on their own, since they are the
 // only entries on which the two disagree.
 TEST(SystemVerilog2009KeywordList, IncludesEveryVerilog2001Keyword) {
-  EXPECT_EQ(std::size(kTable222Words), 21u);
-  for (const char* word : kTable222Words) {
+  EXPECT_EQ(std::size(kVerilog2001AddedKeywords), 21u);
+  for (const char* word : kVerilog2001AddedKeywords) {
     auto under_2001 = LookupKeyword(word, KeywordVersion::kVer13642001);
     ASSERT_TRUE(under_2001.has_value())
         << word << " is one of the words the included list adds";
@@ -106,8 +106,8 @@ TEST(SystemVerilog2009KeywordList, IncludesEveryVerilog2001Keyword) {
 // of the two lists that one is itself built on -- so its being a keyword here
 // can only have come from the third inclusion.
 TEST(SystemVerilog2009KeywordList, IncludesTheVerilog2005Keyword) {
-  ASSERT_EQ(std::size(kTable223), 1u);
-  const char* word = kTable223[0];
+  ASSERT_EQ(std::size(kVerilog2005AddedKeywords), 1u);
+  const char* word = kVerilog2005AddedKeywords[0];
 
   auto under_2005 = LookupKeyword(word, KeywordVersion::kVer13642005);
   ASSERT_TRUE(under_2005.has_value());
@@ -129,8 +129,8 @@ TEST(SystemVerilog2009KeywordList, IncludesTheVerilog2005Keyword) {
 // itself built on -- so their being keywords here traces to the fourth
 // inclusion and to nothing earlier.
 TEST(SystemVerilog2009KeywordList, IncludesEverySystemVerilog2005Keyword) {
-  EXPECT_EQ(std::size(kTable224Words), 97u);
-  for (const char* word : kTable224Words) {
+  EXPECT_EQ(std::size(kSystemVerilog2005AddedKeywords), 97u);
+  for (const char* word : kSystemVerilog2005AddedKeywords) {
     auto under_sv2005 = LookupKeyword(word, KeywordVersion::kVer18002005);
     ASSERT_TRUE(under_sv2005.has_value())
         << word << " is one of the words the included list adds";
@@ -155,8 +155,8 @@ TEST(SystemVerilog2009KeywordList, IncludesEverySystemVerilog2005Keyword) {
 // them, so Table 22-5 accounts for the whole difference between the two lists.
 TEST(SystemVerilog2009KeywordList,
      AddedWordsAreTheWholeDifferenceFromIncludedLists) {
-  EXPECT_EQ(std::size(kTable225Words), 23u);
-  for (const char* word : kTable225Words) {
+  EXPECT_EQ(std::size(kSystemVerilog2009AddedKeywords), 23u);
+  for (const char* word : kSystemVerilog2009AddedKeywords) {
     EXPECT_TRUE(LookupKeyword(word, KeywordVersion::kVer18002009).has_value())
         << word << " is one of the words this version adds";
     EXPECT_FALSE(LookupKeyword(word, KeywordVersion::kVer18002005).has_value())
@@ -170,10 +170,10 @@ TEST(SystemVerilog2009KeywordList,
       ++newly_reserved;
     }
   };
-  for (const char* word : kTable221) count_new(word);
-  for (const char* word : kTable222Words) count_new(word);
-  for (const char* word : kTable223) count_new(word);
-  for (const char* word : kTable224Words) count_new(word);
+  for (const char* word : kVerilog1995Keywords) count_new(word);
+  for (const char* word : kVerilog2001AddedKeywords) count_new(word);
+  for (const char* word : kVerilog2005AddedKeywords) count_new(word);
+  for (const char* word : kSystemVerilog2005AddedKeywords) count_new(word);
   EXPECT_EQ(newly_reserved, 0u)
       << "the included lists contribute nothing this version reserves anew";
 }
@@ -182,9 +182,11 @@ TEST(SystemVerilog2009KeywordList,
 // none of them repeats a word another already holds. Without this the sweeps
 // above could each pass while between them covering only part of the list.
 TEST(SystemVerilog2009KeywordList, TheListIsTheFiveTablesTogether) {
-  ExpectTablesPartitionTheList({kSweepTable221, kSweepTable222, kSweepTable223,
-                                kSweepTable224, kSweepTable225},
-                               244);
+  ExpectTablesPartitionTheList(
+      {kVerilog1995KeywordSweep, kVerilog2001AddedKeywordSweep,
+       kVerilog2005AddedKeywordSweep, kSystemVerilog2005AddedKeywordSweep,
+       kSystemVerilog2009AddedKeywordSweep},
+      244);
 }
 
 // The list bounds what is reserved from above as well as from below: naming

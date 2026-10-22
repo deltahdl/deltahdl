@@ -61,8 +61,10 @@ SoftTally TallySoft(const ParseResult& r, const char* expected_var) {
 // every failure message. What the sweeps do not show is the keyword roles
 // surviving, which the tests further down carry, one per included list.
 TEST(CompilerDirectiveParsing, SystemVerilog2012ReservesEveryIncludedKeyword) {
-  for (const auto& table : {kSweepTable221AtParse, kSweepTable222,
-                            kSweepTable223, kSweepTable224, kSweepTable225}) {
+  for (const auto& table :
+       {kVerilog1995KeywordSweepAtParse, kVerilog2001AddedKeywordSweep,
+        kVerilog2005AddedKeywordSweep, kSystemVerilog2005AddedKeywordSweep,
+        kSystemVerilog2009AddedKeywordSweep}) {
     ExpectKeywordTableIsReservedAtParse("1800-2012", table);
   }
 
@@ -75,7 +77,8 @@ TEST(CompilerDirectiveParsing, SystemVerilog2012ReservesEveryIncludedKeyword) {
 // built and read back off the tree. Both legs together make the word this
 // version_specifier's own rather than anything it inherits.
 TEST(CompilerDirectiveParsing, SystemVerilog2012ReservesEveryWordItAdds) {
-  ExpectKeywordTableIsReservedAtParse("1800-2012", kSweepTable226);
+  ExpectKeywordTableIsReservedAtParse("1800-2012",
+                                      kSystemVerilog2012AddedKeywordSweep);
 }
 
 // Being on this version's list has to stop a word from naming anything at all,
@@ -524,13 +527,13 @@ TEST(CompilerDirectiveParsing, SystemVerilog2012AddedSoftTakesEveryPosition) {
 // control flow.
 TEST(CompilerDirectiveParsing,
      SystemVerilog2012IncludedVerilog1995WordsStillWork) {
-  ExpectTable221ConstructsParse("1800-2012");
+  ExpectVerilog1995ConstructsParse("1800-2012");
 }
 
 // Table 22-3, whose lone entry opens a net declaration and types a port.
 TEST(CompilerDirectiveParsing,
      SystemVerilog2012IncludedVerilog2005WordStillWorks) {
-  ExpectTable223ConstructsParse("1800-2012");
+  ExpectVerilog2005ConstructsParse("1800-2012");
 }
 
 // Table 22-2 in its keyword role: a constant declaration, a loop generate
@@ -541,7 +544,7 @@ TEST(CompilerDirectiveParsing,
 // companion the very same source cannot be written.
 TEST(CompilerDirectiveParsing,
      SystemVerilog2012IncludedVerilog2001WordsStillWork) {
-  ExpectTable222ConstructsParse("1800-2012");
+  ExpectVerilog2001ConstructsParse("1800-2012");
   ExpectConfigurationWordsParse("1800-2012");
 }
 
@@ -550,7 +553,7 @@ TEST(CompilerDirectiveParsing,
 // elements, and the verification vocabulary the added words sit alongside.
 TEST(CompilerDirectiveParsing,
      SystemVerilog2012IncludedSystemVerilog2005WordsStillWork) {
-  ExpectTable224ConstructsParse("1800-2012");
+  ExpectSystemVerilog2005ConstructsParse("1800-2012");
 }
 
 // The fifth included list in its keyword role: a design element of its own, a

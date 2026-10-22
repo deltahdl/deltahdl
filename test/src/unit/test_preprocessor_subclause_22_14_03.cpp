@@ -92,7 +92,7 @@ TEST(KeywordVersionPreprocessing, Verilog2001DirectiveEmitsItsVersionMarker) {
 // the *additional* part of the claim -- these words are absent from the list
 // this version builds on, so each one is genuinely brought in here.
 TEST(KeywordVersionPreprocessing, Verilog2001AdditionsAreReservedInTheRegion) {
-  for (const char* word : kTable222Words) {
+  for (const char* word : kVerilog2001AddedKeywords) {
     auto in_region = KindInRegion("1364-2001", word);
     EXPECT_NE(in_region, TokenKind::kIdentifier) << word;
     EXPECT_NE(in_region, TokenKind::kError) << word;
@@ -106,7 +106,7 @@ TEST(KeywordVersionPreprocessing, Verilog2001AdditionsAreReservedInTheRegion) {
 // names are still reserved inside a region governed by this one.
 TEST(KeywordVersionPreprocessing,
      EveryVerilog1995WordStaysReservedUnderVerilog2001) {
-  for (const char* word : kTable221) {
+  for (const char* word : kVerilog1995Keywords) {
     auto in_region = KindInRegion("1364-2001", word);
     EXPECT_NE(in_region, TokenKind::kIdentifier) << word;
     EXPECT_NE(in_region, TokenKind::kError) << word;

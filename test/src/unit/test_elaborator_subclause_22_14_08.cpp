@@ -28,8 +28,10 @@ namespace {
 // message. What they do not show is the keyword roles surviving, which the
 // tests further down carry, one per included list.
 TEST(SystemVerilog2012KeywordElaboration, IncludedWordsAreReservedAtThisStage) {
-  for (const auto& table : {kSweepTable221, kSweepTable222, kSweepTable223,
-                            kSweepTable224, kSweepTable225}) {
+  for (const auto& table :
+       {kVerilog1995KeywordSweep, kVerilog2001AddedKeywordSweep,
+        kVerilog2005AddedKeywordSweep, kSystemVerilog2005AddedKeywordSweep,
+        kSystemVerilog2009AddedKeywordSweep}) {
     ExpectKeywordTableIsReserved("1800-2012", table);
   }
 
@@ -43,7 +45,8 @@ TEST(SystemVerilog2012KeywordElaboration, IncludedWordsAreReservedAtThisStage) {
 // Reading it back keeps the accepting leg from being any elaboration that
 // happens to succeed.
 TEST(SystemVerilog2012KeywordElaboration, AddedWordsCannotNameVariables) {
-  ExpectKeywordTableIsReserved("1800-2012", kSweepTable226);
+  ExpectKeywordTableIsReserved("1800-2012",
+                               kSystemVerilog2012AddedKeywordSweep);
 }
 
 // The added word whose construct becomes elaborated structure of its own kind.
@@ -375,14 +378,14 @@ TEST(SystemVerilog2012KeywordElaboration, AddedSoftQualifierReachesTheDesign) {
 // design as itself rather than collapsing onto a plain wire.
 TEST(SystemVerilog2012KeywordElaboration,
      IncludedVerilog1995WordsStillBuildDesign) {
-  ExpectTable221DeclarationsElaborate("1800-2012");
+  ExpectVerilog1995DeclarationsElaborate("1800-2012");
 }
 
 // Table 22-3, whose lone entry is a net type of its own and so is read back the
 // same way.
 TEST(SystemVerilog2012KeywordElaboration,
      IncludedVerilog2005WordStillBuildsDesign) {
-  ExpectTable223DeclarationsElaborate("1800-2012");
+  ExpectVerilog2005DeclarationsElaborate("1800-2012");
 }
 
 // Table 22-2 doing its work, likewise as structure rather than as tokens. The
@@ -391,7 +394,7 @@ TEST(SystemVerilog2012KeywordElaboration,
 // picks one iteration, so the genvar holds a different constant each pass.
 TEST(SystemVerilog2012KeywordElaboration,
      IncludedVerilog2001WordsStillBuildDesign) {
-  ExpectTable222DeclarationsElaborate("1800-2012");
+  ExpectVerilog2001DeclarationsElaborate("1800-2012");
 }
 
 // The fourth included list doing its work, the largest thing this version
@@ -400,7 +403,7 @@ TEST(SystemVerilog2012KeywordElaboration,
 // and the design element words.
 TEST(SystemVerilog2012KeywordElaboration,
      IncludedSystemVerilog2005WordsStillBuildDesign) {
-  ExpectTable224DeclarationsElaborate("1800-2012");
+  ExpectSystemVerilog2005DeclarationsElaborate("1800-2012");
 }
 
 // The declaration forms the identifier sweeps do not reach, all written with
