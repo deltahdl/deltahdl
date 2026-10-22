@@ -85,6 +85,98 @@ TEST(BitStreamCastSim, SingleElementArrayCast) {
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
 
+// §6.24.3 packs each element whole, whatever its width. An element 32 bits
+// wide or wider is the case a 32-bit element mask gets wrong: shifted by the
+// element's own width it is no mask at all, and at 64 bits it keeps the low
+// half alone. Every value below has its top bit set, so a mask cut short shows.
+TEST(BitStreamCastSim, IntArrayElementIsPackedWhole) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  int arr [1];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    arr[0] = 32'h8BAD_F00D;\n"
+      "    result = int'(arr);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0x8BADF00Du);
+}
+
+TEST(BitStreamCastSim, TwoIntArrayElementsFillASixtyFourBitType) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  typedef bit [63:0] u64_t;\n"
+      "  int arr [2];\n"
+      "  u64_t result;\n"
+      "  initial begin\n"
+      "    arr[0] = 32'hDEAD_BEEF;\n"
+      "    arr[1] = 32'hCAFE_F00D;\n"
+      "    result = u64_t'(arr);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xDEADBEEFCAFEF00Dull);
+}
+
+TEST(BitStreamCastSim, LongintArrayElementIsPackedWhole) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  longint arr [1];\n"
+      "  longint result;\n"
+      "  initial begin\n"
+      "    arr[0] = 64'hDEAD_BEEF_CAFE_F00D;\n"
+      "    result = longint'(arr);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xDEADBEEFCAFEF00Dull);
+}
+
+// The queue and the associative array are packed by their own loops, which
+// take the same mask.
+TEST(BitStreamCastSim, TwoIntQueueElementsFillASixtyFourBitType) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  typedef bit [63:0] u64_t;\n"
+      "  int q [$];\n"
+      "  u64_t result;\n"
+      "  initial begin\n"
+      "    q.push_back(32'hDEAD_BEEF);\n"
+      "    q.push_back(32'hCAFE_F00D);\n"
+      "    result = u64_t'(q);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xDEADBEEFCAFEF00Dull);
+}
+
+TEST(BitStreamCastSim, TwoIntAssocElementsFillASixtyFourBitType) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  typedef bit [63:0] u64_t;\n"
+      "  int amap [int];\n"
+      "  u64_t result;\n"
+      "  initial begin\n"
+      "    amap[1] = 32'hCAFE_F00D;\n"
+      "    amap[0] = 32'hDEAD_BEEF;\n"
+      "    result = u64_t'(amap);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xDEADBEEFCAFEF00Dull);
+}
+
 // §6.24.3: when the source carries any 4-state bit, the packed bit-stream is
 // itself 4-state. Pre-seed the array's high element with an X-bearing logic
 // value so that the cast result preserves an unknown bit in the expected

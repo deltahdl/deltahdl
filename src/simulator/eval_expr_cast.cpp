@@ -49,13 +49,15 @@ static double ExtractDouble(const Logic4Vec& vec) {
 //
 // BitStreamPack bundles the packing layout for one unpacked array: the source
 // array's name and shape (`info`) plus the element count, total packed width,
-// and the per-element bit mask derived from the element width.
+// and the per-element bit mask derived from the element width. The mask is a
+// whole word, since an element is packed whole however wide it is, up to the
+// 64 bits a word holds.
 struct BitStreamPack {
   std::string_view name;
   const ArrayInfo& info;
   uint32_t elem_count;
   uint32_t total_bits;
-  uint32_t elem_mask;
+  uint64_t elem_mask;
 };
 
 // Accumulated packed result: the aval/bval mask pair of the packed value.
@@ -111,10 +113,8 @@ static Logic4Vec PackArrayBitStream(std::string_view name,
   uint32_t elem_count = info.size;
   if (q) elem_count = static_cast<uint32_t>(q->elements.size());
   uint32_t total_bits = elem_count * info.elem_width;
-  uint32_t elem_mask = info.elem_width >= 64
-                           ? ~uint32_t{0}
-                           : (uint32_t{1} << info.elem_width) - 1;
-  BitStreamPack pack{name, info, elem_count, total_bits, elem_mask};
+  BitStreamPack pack{name, info, elem_count, total_bits,
+                     WordMaskWithinWidth(info.elem_width, 0)};
   PackedBits packed;
   if (q) {
     PackQueueElements(pack, ctx, packed);
@@ -140,8 +140,7 @@ static Logic4Vec PackAssocBitStream(const AssocArrayObject& aa, Arena& arena) {
   uint32_t elem_width = aa.elem_width;
   uint32_t elem_count = aa.Size();
   uint32_t total_bits = elem_count * elem_width;
-  uint32_t elem_mask =
-      elem_width >= 64 ? ~uint32_t{0} : (uint32_t{1} << elem_width) - 1;
+  uint64_t elem_mask = WordMaskWithinWidth(elem_width, 0);
   PackedBits packed;
   uint32_t i = 0;
   auto pack_one = [&](const Logic4Vec& v) {
