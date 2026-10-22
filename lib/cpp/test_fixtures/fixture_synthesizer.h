@@ -8,6 +8,7 @@
 #include "common/source_mgr.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
+#include "fixture_diagnosed.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
 
@@ -16,6 +17,7 @@ using namespace delta;
 struct SynthFixture {
   SourceManager src_mgr;
   DiagEngine diag{src_mgr};
+  Diagnosed diagnosed{diag};
   Arena arena;
 };
 

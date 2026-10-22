@@ -10,6 +10,7 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "common/types.h"
+#include "fixture_diagnosed.h"
 #include "helpers_method_call.h"
 #include "parser/ast_expr.h"
 #include "simulator/evaluation.h"
@@ -25,6 +26,7 @@ struct EnumFixture {
   Arena arena;
   Scheduler scheduler{arena};
   DiagEngine diag{mgr};
+  Diagnosed diagnosed{diag};
   SimContext ctx{scheduler, arena, diag};
 
   Variable* RegisterEnum(

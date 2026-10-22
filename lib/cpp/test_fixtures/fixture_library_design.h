@@ -11,6 +11,7 @@
 #include "common/source_mgr.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
+#include "fixture_diagnosed.h"
 #include "fixture_scratch_dir.h"
 #include "lexer/lexer.h"
 #include "parser/ast_design.h"
@@ -39,6 +40,7 @@ struct LibraryDesign {
   SourceManager sources;
   Arena arena;
   DiagEngine diag{sources};
+  Diagnosed diagnosed{diag};
   LibraryMap map;
   CompilationUnit* unit = nullptr;
 

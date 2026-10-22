@@ -7,6 +7,7 @@
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "fixture_diagnosed.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_viewport.h"
 
@@ -46,6 +47,7 @@ inline std::string ViewportOf(std::string_view object,
 struct ReadingViewports {
   SourceManager mgr;
   DiagEngine diag{mgr};
+  Diagnosed diagnosed{diag};
   Preprocessor pp{mgr, diag, PreprocConfig{}};
   std::string text;
 

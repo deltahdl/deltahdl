@@ -5,6 +5,7 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "fixture_diagnosed.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/vpi_context.h"
@@ -75,6 +76,7 @@ class VpiSaveRestoreSim : public ::testing::Test {
   Arena arena_;
   Scheduler scheduler_{arena_};
   DiagEngine diag_{mgr_};
+  Diagnosed diagnosed_{diag_};
   SimContext sim_ctx_{scheduler_, arena_, diag_};
   VpiContext vpi_ctx_;
 };

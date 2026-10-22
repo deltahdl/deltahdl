@@ -9,6 +9,7 @@
 #include "common/source_mgr.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
+#include "fixture_diagnosed.h"
 #include "lexer/lexer.h"
 #include "parser/ast_design.h"
 #include "parser/ast_module.h"
@@ -36,6 +37,7 @@ struct ConfigElaboration {
   delta::SourceManager mgr;
   delta::Arena arena;
   delta::DiagEngine diag{mgr};
+  Diagnosed diagnosed{diag};
   delta::RtlirDesign* design = nullptr;
 };
 

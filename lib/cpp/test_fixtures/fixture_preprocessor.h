@@ -5,6 +5,7 @@
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "fixture_diagnosed.h"
 #include "preprocessor/preprocessor.h"
 
 using namespace delta;
@@ -12,6 +13,7 @@ using namespace delta;
 struct PreprocFixture {
   SourceManager mgr;
   DiagEngine diag{mgr};
+  Diagnosed diagnosed{diag};
 };
 
 inline std::string Preprocess(const std::string& src, PreprocFixture& f,

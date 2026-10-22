@@ -6,6 +6,7 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "fixture_diagnosed.h"
 #include "gtest/gtest.h"
 #include "lexer/lexer.h"
 #include "parser/ast_design.h"
@@ -33,6 +34,7 @@ struct SpecifyTest : ::testing::Test {
   SourceManager mgr_;
   Arena arena_;
   DiagEngine diag_{mgr_};
+  Diagnosed diagnosed_{diag_};
   std::string source_;
   std::unique_ptr<Lexer> lexer_;
   std::unique_ptr<Parser> parser_;

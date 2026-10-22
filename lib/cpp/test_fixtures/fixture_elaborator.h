@@ -11,6 +11,7 @@
 #include "common/source_mgr.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
+#include "fixture_diagnosed.h"
 #include "lexer/lexer.h"
 #include "parser/ast_design.h"
 #include "parser/parser.h"
@@ -22,7 +23,10 @@ struct ElabFixture {
   SourceManager mgr;
   Arena arena;
   DiagEngine diag{mgr};
-  bool has_errors = false;
+  // Whether the engine held an error when the last source was handed over. A
+  // case that reads neither this nor the engine after a rejected source is
+  // failed as the fixture is destroyed; see fixture_diagnosed.h.
+  Diagnosed has_errors{diag};
 
   // Applied to the Elaborator that each entry point below builds, after it is
   // constructed and before it elaborates. Every entry point owns its
@@ -59,7 +63,7 @@ inline RtlirDesign* ElaborateSrcReportingParse(const std::string& src,
   std::string_view name = top;
   if (name.empty() && !cu->modules.empty()) name = cu->modules.back()->name;
   auto* design = elab.Elaborate(name);
-  f.has_errors = f.diag.HasErrors();
+  f.has_errors.Record(src);
   return design;
 }
 
@@ -77,7 +81,9 @@ inline RtlirDesign* ElaborateSrcReportingParse(const std::string& src,
 // somewhere to return to, while callers here dereference the design, so the
 // report is raised and the run carries on exactly as before. Nothing that
 // passes today changes behaviour; a case that was passing on a syntax error
-// gains a failure naming its own input.
+// gains a failure naming its own input. Having failed the case over its source,
+// it excuses the case from reading the diagnostics, which would otherwise be
+// reported unread as well.
 //
 // A case that means to drive a parser diagnostic through this fixture calls
 // ElaborateSrcAllowingParseErrors below, which records that intent where a
@@ -87,6 +93,7 @@ inline RtlirDesign* ElaborateSrc(const std::string& src, ElabFixture& f,
   bool parse_failed = false;
   auto* design = ElaborateSrcReportingParse(src, f, top, parse_failed);
   if (parse_failed) {
+    f.has_errors.Excuse();
     ADD_FAILURE() << "the source did not parse, so nothing but a fragment was "
                      "elaborated and every answer about elaboration is "
                      "vacuous:\n"
@@ -191,7 +198,7 @@ inline RtlirDesign* ElaborateWithPreprocessorReportingParse(
   if (!auto_top && name.empty() && !cu->modules.empty())
     name = cu->modules.back()->name;
   auto* design = elab.Elaborate(name);
-  f.has_errors = f.diag.HasErrors();
+  f.has_errors.Record(src);
   return design;
 }
 
@@ -215,6 +222,7 @@ inline RtlirDesign* ElaborateWithPreprocessor(const std::string& src,
   auto* design = ElaborateWithPreprocessorReportingParse(src, f, top, auto_top,
                                                          parse_failed);
   if (parse_failed) {
+    f.has_errors.Excuse();
     ADD_FAILURE()
         << "the source did not preprocess and parse, so nothing but a "
            "fragment was elaborated and every answer about "
@@ -267,7 +275,7 @@ inline bool ElabOk(const std::string& src, ElabFixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Preprocessor preproc(f.mgr, f.diag, {});
   auto* cu = PreprocessAndParseCu(f, fid, preproc);
-  f.has_errors = f.diag.HasErrors();
+  f.has_errors.Record(src);
   if (f.has_errors) {
     ADD_FAILURE() << "the source did not parse, so nothing was elaborated "
                      "and every answer about elaboration is vacuous:\n"
@@ -279,7 +287,7 @@ inline bool ElabOk(const std::string& src, ElabFixture& f) {
   std::string_view top =
       cu->modules.empty() ? std::string_view{} : cu->modules.back()->name;
   elab.Elaborate(top);
-  f.has_errors = f.diag.HasErrors();
+  f.has_errors.Record(src);
   return !f.has_errors;
 }
 

@@ -6,6 +6,7 @@
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "fixture_diagnosed.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_keywords.h"
 #include "preprocessor/protect_processing.h"
@@ -168,6 +169,7 @@ struct ReadWithTheKeys {
 
   SourceManager sources;
   DiagEngine diags{sources};
+  Diagnosed diagnosed{diags};
   Preprocessor reader;
   std::string produced;
 

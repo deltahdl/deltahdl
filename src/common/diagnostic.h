@@ -76,19 +76,44 @@ class DiagEngine {
   // makes of the source is made again as the design runs.
   void ErrorOnce(SourceLoc loc, std::string msg, Subclause subclause);
 
-  bool HasErrors() const { return error_count_ > 0; }
+  // Each query of the record below counts as a read of it, which ReadCount and
+  // HasUnreadError report.
+  bool HasErrors() const {
+    NoteRead();
+    return error_count_ > 0;
+  }
   // How many errors have been reported so far. A caller that runs one step of
   // a longer job on a shared engine reads this before and after the step to
   // learn whether that step failed, which HasErrors() cannot tell it once an
   // earlier step has already reported something.
-  uint32_t ErrorCount() const { return error_count_; }
-  uint32_t WarningCount() const { return warning_count_; }
+  uint32_t ErrorCount() const {
+    NoteRead();
+    return error_count_;
+  }
+  uint32_t WarningCount() const {
+    NoteRead();
+    return warning_count_;
+  }
 
   // The diagnostics reported so far, in the order they were reported. A caller
   // asserting that a run failed for one reason rather than another reads the
   // message and the location here, which the counts above cannot distinguish:
   // every cause of failure adds one to the same count.
-  const std::vector<Diagnostic>& Diagnostics() const { return diags_; }
+  const std::vector<Diagnostic>& Diagnostics() const {
+    NoteRead();
+    return diags_;
+  }
+
+  // How many times the record has been queried, through any of HasErrors,
+  // ErrorCount, WarningCount, Diagnostics, SuppressedErrorCount and
+  // LastSuppressedErrorLoc. A caller that hands the engine to another notes
+  // this at the handover and compares it later, to learn whether the other
+  // looked at what the engine recorded. Asking is not itself a read.
+  uint32_t ReadCount() const { return read_count_; }
+  // Whether an error has been recorded that no query of the record has
+  // followed, so that nobody has looked at it. A query made before the error
+  // was reported does not read it. Asking is not itself a read.
+  bool HasUnreadError() const { return has_unread_error_; }
 
   // The source description a report's location is read against. A caller that
   // has to name a file rather than format a report reads it here: §37.3.3's
@@ -108,10 +133,14 @@ class DiagEngine {
   // The errors suppressed so far, which a trial parse compares before and
   // after to learn whether the text it read was well formed, the report
   // itself being discarded.
-  uint32_t SuppressedErrorCount() const { return suppressed_error_count_; }
+  uint32_t SuppressedErrorCount() const {
+    NoteRead();
+    return suppressed_error_count_;
+  }
   // Where the last of them stood, which such a parse reads to learn where its
   // text broke off once the count has said that it did.
   SourceLoc LastSuppressedErrorLoc() const {
+    NoteRead();
     return last_suppressed_error_loc_;
   }
 
@@ -124,9 +153,17 @@ class DiagEngine {
  private:
   void Emit(DiagSeverity sev, SourceLoc loc, std::string msg,
             Subclause subclause);
+  // A query reads every error recorded before it. The two members it sets are
+  // mutable because a query answers from a const engine.
+  void NoteRead() const {
+    ++read_count_;
+    has_unread_error_ = false;
+  }
 
   const SourceManager& src_mgr_;
   std::vector<Diagnostic> diags_;
+  mutable uint32_t read_count_ = 0;
+  mutable bool has_unread_error_ = false;
   uint32_t error_count_ = 0;
   uint32_t warning_count_ = 0;
   bool warnings_as_errors_ = false;

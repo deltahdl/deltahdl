@@ -19,7 +19,7 @@ inline RtlirDesign* ConfigElab(ElabFixture& f, const std::string& src) {
   auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   auto* design = elab.Elaborate(cu->configs[0]);
-  f.has_errors = f.diag.HasErrors();
+  f.has_errors.Record(src);
   return design;
 }
 

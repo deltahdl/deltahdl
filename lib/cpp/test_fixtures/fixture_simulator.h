@@ -14,6 +14,7 @@
 #include "common/source_mgr.h"
 #include "common/types.h"
 #include "elaborator/elaborator.h"
+#include "fixture_diagnosed.h"
 #include "lexer/lexer.h"
 #include "parser/ast_design.h"
 #include "parser/parser.h"
@@ -29,7 +30,11 @@ struct SimFixture {
   Scheduler scheduler{arena};
   DiagEngine diag{mgr};
   SimContext ctx{scheduler, arena, diag};
-  bool has_errors = false;
+  // Whether the engine held an error when the last source was handed over. A
+  // case that reads neither this nor the engine after a rejected source, or
+  // after a run that reported an error, is failed as the fixture is destroyed;
+  // see fixture_diagnosed.h.
+  Diagnosed has_errors{diag};
 };
 
 struct SimFixtureSeeded {
@@ -38,6 +43,8 @@ struct SimFixtureSeeded {
   Scheduler scheduler{arena};
   DiagEngine diag{mgr};
   SimContext ctx{scheduler, arena, diag, /*seed=*/42};
+  // As SimFixture's.
+  Diagnosed has_errors{diag};
 };
 
 using LowerFixture = SimFixture;
@@ -70,7 +77,7 @@ inline RtlirDesign* ElaborateSrc(const std::string& src, SimFixture& f) {
   auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   auto* design = elab.Elaborate(TopNameOf(cu));
-  f.has_errors = f.diag.HasErrors();
+  f.has_errors.Record(src);
   return design;
 }
 
@@ -84,7 +91,7 @@ inline RtlirDesign* ElaborateSrcAllTops(const std::string& src, SimFixture& f) {
   Parser parser(lexer, f.arena, f.diag);
   Elaborator elab(f.arena, f.diag, parser.Parse());
   auto* design = elab.Elaborate("");
-  f.has_errors = f.diag.HasErrors();
+  f.has_errors.Record(src);
   return design;
 }
 
@@ -94,7 +101,9 @@ inline RtlirDesign* ElaborateSrc(const std::string& src, SimFixtureSeeded& f) {
   Parser parser(lexer, f.arena, f.diag);
   auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(TopNameOf(cu));
+  auto* design = elab.Elaborate(TopNameOf(cu));
+  f.has_errors.Record(src);
+  return design;
 }
 
 inline Expr* ParseExprFrom(const std::string& src, SimFixture& f) {

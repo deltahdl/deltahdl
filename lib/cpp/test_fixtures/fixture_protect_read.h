@@ -7,6 +7,7 @@
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "fixture_diagnosed.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_envelope.h"
 #include "preprocessor/protect_keywords.h"
@@ -41,6 +42,7 @@ inline std::string EncryptedByTheAuthor(const std::string& src) {
 struct EncryptionRun {
   SourceManager mgr;
   DiagEngine diag{mgr};
+  Diagnosed diagnosed{diag};
   std::string text;
 
   explicit EncryptionRun(const std::string& src)
@@ -56,6 +58,7 @@ struct EncryptionRun {
 struct KeylessEncryptionRun {
   SourceManager mgr;
   DiagEngine diag{mgr};
+  Diagnosed diagnosed{diag};
   std::string text;
 
   explicit KeylessEncryptionRun(const std::string& src)
@@ -96,6 +99,7 @@ struct ReadSource {
 
   SourceManager mgr;
   DiagEngine diag{mgr};
+  Diagnosed diagnosed{diag};
   Preprocessor pp;
   std::string text;
 

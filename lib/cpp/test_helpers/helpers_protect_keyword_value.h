@@ -8,6 +8,7 @@
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "fixture_diagnosed.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_keywords.h"
 
@@ -64,6 +65,7 @@ inline std::string ThroughEndProtected(const std::string& envelope) {
 struct ReadKeywordScope {
   SourceManager mgr;
   DiagEngine diag{mgr};
+  Diagnosed diagnosed{diag};
   Preprocessor pp{mgr, diag, PreprocConfig{}};
   // What the reading produced. A keyword defined as standing alone speaks for
   // the line beneath it, and what a case asks of such a keyword is whether that

@@ -12,6 +12,7 @@
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "fixture_diagnosed.h"
 #include "fixture_simulator.h"
 #include "parser/ast_type.h"
 #include "simulator/dpi_arg_value.h"
@@ -83,6 +84,7 @@ inline DpiRtFunction CImport(std::string_view name, DataTypeKind result,
 struct DpiCBinding {
   SourceManager mgr;
   DiagEngine diag{mgr};
+  Diagnosed diagnosed{diag};
   DpiRuntime dpi;
 
   // Binds every import registered on `dpi` to the function `functions` maps

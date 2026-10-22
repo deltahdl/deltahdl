@@ -46,6 +46,7 @@ void DiagEngine::Emit(DiagSeverity sev, SourceLoc loc, std::string msg,
   }
   if (sev == DiagSeverity::kError) {
     ++error_count_;
+    has_unread_error_ = true;
   } else {
     ++warning_count_;
   }

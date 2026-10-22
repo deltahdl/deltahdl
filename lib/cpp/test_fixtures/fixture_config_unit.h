@@ -11,6 +11,7 @@
 #include "common/source_mgr.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
+#include "fixture_diagnosed.h"
 #include "helpers_config_reports.h"
 #include "lexer/lexer.h"
 #include "parser/library_map.h"
@@ -30,6 +31,7 @@ struct ConfigUnit {
   SourceManager mgr;
   Arena arena;
   DiagEngine diag{mgr};
+  Diagnosed diagnosed{diag};
   CompilationUnit* cu = nullptr;
 
   // Parses `src`. Returns false when it does not parse or when parsing raised

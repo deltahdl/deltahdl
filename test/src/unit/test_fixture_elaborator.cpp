@@ -19,6 +19,8 @@
 #include <gtest/gtest.h>
 
 #include "fixture_elaborator.h"
+#include "helpers_generate_elab.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -98,11 +100,18 @@ TEST(ElaboratorFixture, ElabOkAlreadyFailsTheTestWhenTheSourceDoesNotParse) {
 // across the parse rather than DiagEngine::HasErrors for this reason: after
 // the first rejection HasErrors answers for the whole engine, so the guard
 // would fire on every later source and this case would fail.
+//
+// The engine still holds the first source's rejection after the second is
+// handed over, and the case owes it a read: left unread, it would fail the case
+// as the fixture is destroyed. §6.8 is where the parser places a variable
+// declaration's terminator.
 TEST(ElaboratorFixture, ASecondWellFormedSourceOnOneFixtureRaisesNoFailure) {
   ElabFixture f;
   ElaborateSrcAllowingParseErrors(kUnparseableSrc, f);
   auto* design = ElaborateSrc(kWellFormedSrc, f);
   EXPECT_NE(design, nullptr);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "expected ';', got 'endmodule'", 3, "6.8"));
 }
 
 // The same question for the helper a case calls when it needs a compiler
@@ -186,6 +195,75 @@ TEST(ElaboratorFixture, ElabOkAcceptsAClassOnlySource) {
       ElabOk("class C;\n"
              "  int data;\n"
              "endclass\n"));
+}
+
+// The cases below cover what the fixture asks of the case after the parse:
+// that a case handed a source the elaborator rejected reads the diagnostics
+// before the fixture is gone, through has_errors or the engine. The source
+// parses, and §8.26 rejects it at line 4 because C implements none of the pure
+// virtual methods IC declares, so the parse guard above has nothing to say and
+// the rejection is the elaborator's alone.
+constexpr const char* kElaboratorRejectsSrc =
+    "interface class IC;\n"
+    "  pure virtual function void foo();\n"
+    "endclass\n"
+    "class C implements IC;\n"
+    "endclass\n"
+    "module m;\n"
+    "endmodule\n";
+
+constexpr const char* kUnreadReport =
+    "the source drew an error the case never read";
+
+void HandOverARejectionNobodyReads() {
+  ElabFixture f;
+  ElaborateSrc(kElaboratorRejectsSrc, f);
+}
+
+TEST(ElaboratorFixture, ElaborateSrcFailsTheCaseThatNeverReadsARejection) {
+  EXPECT_NONFATAL_FAILURE(HandOverARejectionNobodyReads(), kUnreadReport);
+}
+
+// The report names the input, so whoever reads the failure is sent to the
+// case's source and not to the harness.
+TEST(ElaboratorFixture, TheUnreadRejectionReportQuotesTheSource) {
+  EXPECT_NONFATAL_FAILURE(HandOverARejectionNobodyReads(),
+                          "class C implements IC;\n");
+}
+
+// Passes today and must keep passing: it is what stops a check that fails a
+// case for the rejection itself rather than for leaving it unread.
+TEST(ElaboratorFixture,
+     ElaborateSrcRaisesNothingForTheCaseThatReadsARejection) {
+  ElabFixture f;
+  ElaborateSrc(kElaboratorRejectsSrc, f);
+
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "does not implement pure virtual method", 4,
+                            "8.26"));
+}
+
+// The handover ElaborateWithPreprocessor makes, as ElaborateSrc's above.
+void HandOverAPreprocessedRejectionNobodyReads() {
+  ElabFixture f;
+  ElaborateWithPreprocessor(kElaboratorRejectsSrc, f);
+}
+
+TEST(ElaboratorFixture,
+     ElaborateWithPreprocessorFailsTheCaseThatNeverReadsARejection) {
+  EXPECT_NONFATAL_FAILURE(HandOverAPreprocessedRejectionNobodyReads(),
+                          kUnreadReport);
+}
+
+// GenerateElab, in lib/cpp/test_helpers/helpers_generate_elab.h, holds an
+// ElabFixture and is the one fixture returned by value. The result is a
+// temporary destroyed inside the statement, and the macro expects exactly one
+// report of it, so a return that left the obligation on two objects fails as
+// much as one that lost it.
+TEST(ElaboratorFixture, AFixtureReturnedByValueReportsAnUnreadRejectionOnce) {
+  EXPECT_NONFATAL_FAILURE(
+      static_cast<void>(RunGenerateElaboration(kElaboratorRejectsSrc)),
+      kUnreadReport);
 }
 
 }  // namespace

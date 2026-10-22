@@ -10,6 +10,7 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "fixture_diagnosed.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
@@ -72,6 +73,7 @@ class VpiValueArraySimBase : public ::testing::Test {
   Arena arena_;
   Scheduler scheduler_{arena_};
   DiagEngine diag_{mgr_};
+  Diagnosed diagnosed_{diag_};
   SimContext sim_ctx_{scheduler_, arena_, diag_};
   VpiContext vpi_ctx_;
   std::vector<Variable*> elems_;

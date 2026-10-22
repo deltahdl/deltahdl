@@ -10,6 +10,7 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "fixture_diagnosed.h"
 #include "lexer/lexer.h"
 #include "parser/library_map.h"
 #include "parser/parser.h"
@@ -36,6 +37,7 @@ inline std::string ReadFileText(const std::filesystem::path& path) {
 struct TaggedFile {
   SourceManager mgr;
   DiagEngine diag{mgr};
+  Diagnosed diagnosed{diag};
   Arena arena;
   CompilationUnit* unit = nullptr;
 
@@ -47,6 +49,9 @@ struct TaggedFile {
     if (unit != nullptr && !diag.HasErrors()) {
       map.TagCompilationUnit(*unit, path.string());
     }
+    // The query above is the constructor's own, so the case's reads count from
+    // here.
+    diagnosed.Record(path.string());
   }
 
   // The library the one cell this file describes was written into, or an empty

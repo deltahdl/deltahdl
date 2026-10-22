@@ -8,6 +8,7 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "common/types.h"
+#include "fixture_diagnosed.h"
 #include "parser/ast_expr.h"
 #include "simulator/evaluation.h"
 #include "simulator/scheduler.h"
@@ -28,6 +29,7 @@ struct RealFixture {
   Arena arena;
   Scheduler scheduler{arena};
   DiagEngine diag{mgr};
+  Diagnosed diagnosed{diag};
   SimContext ctx{scheduler, arena, diag};
 
   Expr* MakeIntLiteral(uint64_t val) {

@@ -8,6 +8,7 @@
 #include "common/source_mgr.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
+#include "fixture_diagnosed.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
 
@@ -17,6 +18,7 @@ struct CheckerElabFixture {
   SourceManager mgr;
   Arena arena;
   DiagEngine diag{mgr};
+  Diagnosed diagnosed{diag};
 };
 
 inline RtlirDesign* ElaborateSource(const std::string& src,

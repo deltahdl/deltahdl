@@ -333,4 +333,109 @@ TEST(Diagnostics, EveryReportedLocationIsValid) {
   }
 }
 
+// The cases below cover how the engine answers whether anyone has looked at
+// what it recorded. A caller that hands the engine to another, as a test
+// fixture hands it to a case, compares ReadCount at the handover with
+// ReadCount later to learn whether the other looked, and HasUnreadError says
+// whether an error has been reported that no query has followed.
+
+TEST(Diagnostics, EveryQueryOfTheRecordCountsAsARead) {
+  // Six accessors answer from the record, and each is called once. One left
+  // uncounted leaves the total at five, and one counted twice raises it to
+  // seven, so the count says the record was looked at whichever accessor did
+  // the looking.
+  EngineFixture f;
+  static_cast<void>(f.diag.HasErrors());
+  static_cast<void>(f.diag.ErrorCount());
+  static_cast<void>(f.diag.WarningCount());
+  static_cast<void>(f.diag.Diagnostics());
+  static_cast<void>(f.diag.SuppressedErrorCount());
+  static_cast<void>(f.diag.LastSuppressedErrorLoc());
+
+  EXPECT_EQ(f.diag.ReadCount(), 6u);
+}
+
+TEST(Diagnostics, AnErrorIsUnreadUntilTheRecordIsQueried) {
+  EngineFixture f;
+  f.diag.Error(f.Loc(2, 4), "two libraries claim this description",
+               Subclause::None());
+  EXPECT_TRUE(f.diag.HasUnreadError());
+
+  static_cast<void>(f.diag.Diagnostics());
+
+  EXPECT_FALSE(f.diag.HasUnreadError());
+}
+
+TEST(Diagnostics, AQueryBeforeAnErrorDoesNotReadIt) {
+  // A parse reads the record as it starts, before anything has gone wrong, and
+  // the error it reports afterwards is one nobody has seen. An engine that
+  // remembered only that it had been read at some point would call this error
+  // read.
+  EngineFixture f;
+  static_cast<void>(f.diag.Diagnostics());
+  f.diag.Error(f.Loc(2, 4), "unexpected token in module body",
+               Subclause::None());
+
+  EXPECT_TRUE(f.diag.HasUnreadError());
+}
+
+TEST(Diagnostics, AnErrorAfterTheLastQueryIsUnreadAgain) {
+  // The query between the two errors reads the first. The second comes after
+  // it, so the record holds an error again that nobody has seen.
+  EngineFixture f;
+  f.diag.Error(f.Loc(1, 8), "cannot read source description: absent.v",
+               Subclause::None());
+  static_cast<void>(f.diag.Diagnostics());
+  f.diag.Error(f.Loc(2, 4), "unexpected token in module body",
+               Subclause::None());
+
+  EXPECT_TRUE(f.diag.HasUnreadError());
+}
+
+TEST(Diagnostics, AWarningLeavesNoErrorUnread) {
+  // An engine that marked every report unread, whatever its severity, would
+  // answer true here.
+  EngineFixture f;
+  f.diag.Warning(f.Loc(1, 8), "cell name collides with one already written",
+                 Subclause::None());
+
+  EXPECT_FALSE(f.diag.HasUnreadError());
+}
+
+TEST(Diagnostics, AWarningPromotedToAnErrorIsUnread) {
+  // The promotion records the warning as an error, so it is unread as an error
+  // is, where the case above leaves an unpromoted warning read.
+  EngineFixture f;
+  f.diag.SetWarningsAsErrors(true);
+  f.diag.Warning(f.Loc(1, 8), "cell name collides with one already written",
+                 Subclause::None());
+
+  EXPECT_TRUE(f.diag.HasUnreadError());
+}
+
+TEST(Diagnostics, ASuppressedErrorLeavesNoErrorUnread) {
+  // A suppressed error was never recorded, so there is nothing in the record
+  // for anyone to read.
+  EngineFixture f;
+  f.diag.PushSuppress();
+  f.diag.Error(f.Loc(2, 4), "unexpected token in module body",
+               Subclause::None());
+  f.diag.PopSuppress();
+
+  EXPECT_FALSE(f.diag.HasUnreadError());
+}
+
+TEST(Diagnostics, AskingWhetherTheRecordWasReadIsNotItselfARead) {
+  // Were either of the two a read, the second call to HasUnreadError would
+  // answer false and the count would have moved.
+  EngineFixture f;
+  f.diag.Error(f.Loc(2, 4), "two libraries claim this description",
+               Subclause::None());
+  uint32_t reads_before = f.diag.ReadCount();
+
+  EXPECT_TRUE(f.diag.HasUnreadError());
+  EXPECT_TRUE(f.diag.HasUnreadError());
+  EXPECT_EQ(f.diag.ReadCount(), reads_before);
+}
+
 }  // namespace
