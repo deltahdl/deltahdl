@@ -663,36 +663,39 @@ static size_t FieldTargetSplit(const Expr* lhs, const std::string& name) {
   return name.find('.');
 }
 
+// The targets a member path names through its expression rather than the
+// name ResolveFieldTargetOf builds, `handled` set where one answers. A virtual
+// interface base is asked first, since `this.vif.a` and `d.vif.a` split at
+// the first dot would be taken for a property of `this` or of the object `d`;
+// a bare `this`, `super` or class name is no virtual interface. Last, §8.4
+// with §7.4: `objs[i].v` is v of the object the element refers to under any
+// index, scoped by the array's declared class as a handle variable's class
+// scopes `h.v`; the name carries a select only for a literal index.
+static FieldTarget ResolveExpressionFieldTarget(const Expr* lhs,
+                                                SimContext& ctx, bool report,
+                                                bool* handled) {
+  FieldTarget target = ResolveVirtualInterfaceField(lhs, ctx, report, handled);
+  if (*handled) return target;
+  target = ResolvePackageClassStaticField(lhs, ctx, handled);
+  if (*handled) return target;
+  target = ResolveStaticHandleField(lhs, ctx, handled);
+  if (*handled) return target;
+  target = ResolveSpecializationStaticField(lhs, ctx, handled);
+  if (*handled) return target;
+  const ClassTypeInfo* declared = nullptr;
+  ClassObject* obj =
+      DeclaredArrayElementObject(lhs, ctx, ctx.GetArena(), declared);
+  *handled = obj != nullptr;
+  return *handled ? ResolveClassFieldTarget(obj, declared, lhs->rhs->text, ctx)
+                  : target;
+}
+
 // ResolveFieldTarget, reporting a null virtual interface base where `report`.
 static FieldTarget ResolveFieldTargetOf(const Expr* lhs, SimContext& ctx,
                                         bool report) {
-  // A virtual interface base is asked first, on the expression rather than
-  // the flattened name: `this.vif.a` splits to `this` and `vif.a`, which
-  // ResolveThisField would take for a property named by the flat key, and
-  // `d.vif.a` to `d` and `vif.a`, which ResolveVariableField would follow
-  // into the object `d` and take the interface handle for a class handle. A
-  // bare `this`, `super` or class type name resolves to no virtual interface,
-  // so those bases still reach their own resolvers below.
   bool handled = false;
-  FieldTarget target = ResolveVirtualInterfaceField(lhs, ctx, report, &handled);
+  FieldTarget target = ResolveExpressionFieldTarget(lhs, ctx, report, &handled);
   if (handled) return target;
-  target = ResolvePackageClassStaticField(lhs, ctx, &handled);
-  if (handled) return target;
-  target = ResolveStaticHandleField(lhs, ctx, &handled);
-  if (handled) return target;
-  target = ResolveSpecializationStaticField(lhs, ctx, &handled);
-  if (handled) return target;
-
-  // §8.4 with §7.4: `objs[i].v` names v of the object the element objs[i]
-  // refers to, whatever index selects it, scoped by the class the array is
-  // declared with as a handle variable's class scopes `h.v`. The name built
-  // below carries a select only for a literal index, so the element is
-  // evaluated to its object instead.
-  const ClassTypeInfo* declared = nullptr;
-  if (ClassObject* obj =
-          DeclaredArrayElementObject(lhs, ctx, ctx.GetArena(), declared)) {
-    return ResolveClassFieldTarget(obj, declared, lhs->rhs->text, ctx);
-  }
 
   std::string name;
   BuildLhsName(lhs, name);
