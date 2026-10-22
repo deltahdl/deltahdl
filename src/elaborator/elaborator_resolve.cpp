@@ -489,10 +489,15 @@ void RegisterClassTypedefKeys(
     const ClassDecl* cls, std::string_view scope, TypedefMap& typedefs,
     std::unordered_map<std::string_view, std::vector<Expr*>>& td_array_dims,
     Arena& arena) {
+  std::unordered_set<std::string_view> declared;
   for (const auto* m : cls->members) {
     if (m->kind == ClassMemberKind::kTypedef && m->typedef_item != nullptr) {
       std::string_view key = RegisterScopedTypedef(
-          scope, m->name, m->typedef_item->typedef_type, typedefs, arena);
+          scope, m->name,
+          InClassScopeMembers(m->typedef_item->typedef_type, declared, scope,
+                              arena),
+          typedefs, arena);
+      declared.insert(m->name);
       if (!m->typedef_item->unpacked_dims.empty())
         td_array_dims[key] = m->typedef_item->unpacked_dims;
     } else if (m->kind == ClassMemberKind::kClassDecl &&

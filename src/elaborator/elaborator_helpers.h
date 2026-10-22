@@ -375,7 +375,10 @@ bool ResolveClassScopedDeclType(DataType& dtype, const TypedefMap& typedefs,
 // typedef stands for. `scope` is the key's leading part, the class's own name
 // for a class at compilation-unit scope or in a module. §7.4.4 keeps an array
 // typedef's unpacked dimensions with the type, and they are recorded in
-// `td_array_dims` under the same key. Defined in elaborator_resolve.cpp.
+// `td_array_dims` under the same key. A structure's or union's members written
+// as the name of a typedef the class declares before it are recorded behind
+// the class's scope (InClassScopeMembers, §23.9). Defined in
+// elaborator_resolve.cpp.
 void RegisterClassTypedefKeys(
     const ClassDecl* cls, std::string_view scope, TypedefMap& typedefs,
     std::unordered_map<std::string_view, std::vector<Expr*>>& td_array_dims,

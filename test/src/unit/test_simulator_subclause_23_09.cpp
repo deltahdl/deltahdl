@@ -452,4 +452,86 @@ TEST(InstanceScopeSimulation, AnAssignmentToANameDeclaredNowhereIsSkipped) {
   EXPECT_EQ(done->value.ToUint64(), 1u);
 }
 
+// §23.9 has a class open a scope, and a name written in it find the class's own
+// declaration before any outside it, so a structure typedef the class declares
+// lays out a member written `nib_t` by the class's 4-bit nib_t: S is 5 bits,
+// and 9'h1F5 keeps its low five, x reading 10 and y 1. Laid out by the
+// compilation unit's 8-bit nib_t, S was 9 bits and the line read 9 250 1.
+TEST(ClassScopeStructureTypedefSim,
+     AMemberNamedByTheClassTypedefTakesItsWidth) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("typedef logic [7:0] nib_t;\n"
+                       "class Box;\n"
+                       "  typedef logic [3:0] nib_t;\n"
+                       "  typedef struct packed { nib_t x; logic y; } S;\n"
+                       "  S s;\n"
+                       "  function void show();\n"
+                       "    s = 9'h1F5;\n"
+                       "    $display(\"%0d %0d %0d\", $bits(s), s.x, s.y);\n"
+                       "  endfunction\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  Box b;\n"
+                       "  initial begin b = new; b.show(); end\n"
+                       "endmodule\n",
+                       f),
+            "5 10 1\n");
+}
+
+// The same with no typedef of the name outside the class, which left x sized
+// by no typedef at all: one bit, S two, and the line 2 0 1.
+TEST(ClassScopeStructureTypedefSim,
+     AMemberNamedByTheClassTypedefAloneTakesItsWidth) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class Box;\n"
+                       "  typedef logic [3:0] nib_t;\n"
+                       "  typedef struct packed { nib_t x; logic y; } S;\n"
+                       "  S s;\n"
+                       "  function void show();\n"
+                       "    s = 9'h1F5;\n"
+                       "    $display(\"%0d %0d %0d\", $bits(s), s.x, s.y);\n"
+                       "  endfunction\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  Box b;\n"
+                       "  initial begin b = new; b.show(); end\n"
+                       "endmodule\n",
+                       f),
+            "5 10 1\n");
+}
+
+// The class's nib_t reaches a member of a structure written inline within the
+// typedef too, while a member written behind a package's name, p::nib_t, keeps
+// the package's 6 bits (§26.3): S is 4 + 6 + 1 = 11 bits, and the parts of
+// {4'd10, 6'd51, 1'b1} read back whole. With the inner member 8 bits wide,
+// S was 15 bits and each part read a shifted slice.
+TEST(ClassScopeStructureTypedefSim,
+     AnInlineMemberTakesTheClassTypedefAndAPackageMemberItsOwn) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package p;\n"
+                       "  typedef logic [5:0] nib_t;\n"
+                       "endpackage\n"
+                       "typedef logic [7:0] nib_t;\n"
+                       "class Box;\n"
+                       "  typedef logic [3:0] nib_t;\n"
+                       "  typedef struct packed {\n"
+                       "    struct packed { nib_t a; } inner;\n"
+                       "    p::nib_t z;\n"
+                       "    logic y;\n"
+                       "  } S;\n"
+                       "  S s;\n"
+                       "  function void show();\n"
+                       "    s = {4'd10, 6'd51, 1'b1};\n"
+                       "    $display(\"%0d %0d %0d %0d\", $bits(s), s.inner.a, "
+                       "s.z, s.y);\n"
+                       "  endfunction\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  Box b;\n"
+                       "  initial begin b = new; b.show(); end\n"
+                       "endmodule\n",
+                       f),
+            "11 10 51 1\n");
+}
+
 }  // namespace

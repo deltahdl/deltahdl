@@ -195,6 +195,19 @@ DataType InClassScope(const DataType& type, const ClassDecl& cls);
 DataType InClassScope(const DataType& type, const ClassDecl& cls,
                       std::string_view scope);
 
+// §23.9 with §6.18: a typedef's type as the class keyed under `scope` records
+// it, each member of a structure or union written as the bare name of a
+// typedef in `declared` put behind the class's scope, in an aggregate written
+// inline within a member as well. A class opens a scope, and a name inside it
+// finds the class's own typedef before one around the class; `declared` holds
+// those the class declares ahead of this typedef, since a typedef is in scope
+// only from its declaration on, which also keeps a structure from naming
+// itself. Each inline aggregate is copied into `arena` before it is scoped,
+// so the type as written is left alone.
+DataType InClassScopeMembers(
+    const DataType& type, const std::unordered_set<std::string_view>& declared,
+    std::string_view scope, Arena& arena);
+
 // The type `dtype` stands for, following each typedef or user-defined nettype
 // name (§6.18, §6.6.7) to the type it was declared with as far as the table
 // holds one: a type, or the last name on the way the table holds nothing for,
