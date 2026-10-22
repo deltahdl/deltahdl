@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <coroutine>
 #include <cstdint>
 #include <string>
@@ -13,6 +14,7 @@
 #include "simulator/class_object.h"
 #include "simulator/eval_callee_declaration.h"
 #include "simulator/eval_function_internal.h"
+#include "simulator/eval_member_path.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer_register.h"
 #include "simulator/process.h"
@@ -88,8 +90,21 @@ static bool ProcessTypedName(std::string_view name, SimContext& ctx) {
   return prop != nullptr && prop->type_name == "process";
 }
 
-// Whether `access`, a property selected through a handle, `w.q`, is declared
-// with the process class by the class of the object the handle holds.
+// §7.2 with §26.7: whether the member `name` of the structure `layout` lays
+// out is declared with the process class, bare or through the std package,
+// which the layout spells "std::process" (NestedLayoutName in
+// lowerer_var_layout.cpp).
+static bool ProcessTypedField(const StructTypeInfo& layout,
+                              std::string_view name) {
+  return std::ranges::any_of(layout.fields, [name](const StructFieldInfo& f) {
+    return f.name == name &&
+           (f.type_name == "process" || f.type_name == "std::process");
+  });
+}
+
+// Whether `access`, a member selected through a handle, `w.q`, or of a
+// structure, `s.p` (§7.2), is declared with the process class: by the layout
+// of the structure, or by the class of the object the handle holds.
 static bool ProcessTypedMember(const Expr* access, SimContext& ctx,
                                Arena& arena) {
   if (access->kind != ExprKind::kMemberAccess || access->is_scope_resolution ||
@@ -97,6 +112,8 @@ static bool ProcessTypedMember(const Expr* access, SimContext& ctx,
       access->rhs->kind != ExprKind::kIdentifier) {
     return false;
   }
+  if (const StructTypeInfo* layout = StructLayoutOfOperand(access->lhs, ctx))
+    return ProcessTypedField(*layout, access->rhs->text);
   const ClassObject* obj =
       ctx.GetClassObject(EvalExpr(access->lhs, ctx, arena).ToUint64());
   if (obj == nullptr || obj->type == nullptr) return false;

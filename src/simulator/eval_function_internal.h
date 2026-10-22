@@ -510,10 +510,11 @@ bool TryEvalProcessMethodWithoutArgs(const Expr* expr, SimContext& ctx,
 
 // §9.7: whether `recv`, the receiver of a method select, is declared with the
 // process class: a variable by its bare name, a property of the running
-// object, a property through a handle, `w.q`, or an element of an array of
-// any of them, `arr[i]` and `job[k]` as §9.7's own example keeps them; or a
-// call that answers such a handle, of the class's self(), `process::self()`,
-// or of a subroutine declared to return the class, `me()` (§13.4).
+// object, a property through a handle, `w.q`, a member of a structure, `s.p`
+// (§7.2), or an element of an array of any of them, `arr[i]` and `job[k]` as
+// §9.7's own example keeps them; or a call that answers such a handle, of the
+// class's self(), `process::self()`, or of a subroutine declared to return the
+// class, `me()` (§13.4).
 bool NamesProcessHandle(const Expr* recv, SimContext& ctx, Arena& arena);
 
 // §9.7: the process a method call through a process handle targets and the

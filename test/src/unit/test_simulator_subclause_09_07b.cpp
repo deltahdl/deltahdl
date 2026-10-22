@@ -451,4 +451,46 @@ TEST(FineGrainProcessControlRun, StatusCalledOnAMethodsResultIsRunning) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// §9.7 with §7.2: a member of an unpacked structure may hold a handle to a
+// process, and a method of the class called through the member acts on that
+// process: srandom() reseeds it. The forked process is given the first handle,
+// so the member holds one that a member one bit wide would not keep.
+TEST(FineGrainProcessControlRun,
+     SrandomCalledThroughAStructureMemberReseedsItsProcess) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  typedef struct { process p; int n; } holder_t;\n"
+                       "  holder_t s;\n"
+                       "  process q;\n"
+                       "  int a, b;\n"
+                       "  initial begin\n"
+                       "    fork q = process::self(); join\n"
+                       "    s.p = process::self();\n"
+                       "    s.p.srandom(5); a = $urandom;\n"
+                       "    process::self().srandom(5); b = $urandom;\n"
+                       "    $display(\"%0d\", a == b);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §9.7 with §7.2 and §26.7: a member declared std::process, after a member of
+// another type, holds a handle of the same class, so status() called through
+// it answers RUNNING, by name, for the process the member refers to.
+TEST(FineGrainProcessControlRun, StatusCalledThroughAStructureMemberIsRunning) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  struct { int n; std::process p; } s;\n"
+                       "  initial begin\n"
+                       "    s.p = process::self();\n"
+                       "    $display(\"%s\", s.p.status().name());\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "RUNNING\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
