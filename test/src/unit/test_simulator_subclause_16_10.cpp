@@ -85,16 +85,27 @@ constexpr char kNibbleTypes[] =
 
 // §16.10 with §6.18: a sequence's local declared with a type name is of the
 // type the name stands for: nib_t is four 4-state unsigned bits, keeping 13
-// of 29 and x of 'x, snib_t four signed ones, below 0 at -1, and `nib_t [1:0]`
-// two nib_t, eight bits keeping 255 of 9'h1FF (#5767). §16.10 bars reading a
-// local never assigned, so each is given a value. That bnib_t's four 2-state
-// bits keep 0 of 'x is #7624's to show.
+// of 29 and x of 'x, bnib_t four 2-state ones, keeping 0 of 'x (#7624),
+// snib_t four signed ones, below 0 at -1, and `nib_t [1:0]` two nib_t, eight
+// bits keeping 255 of 9'h1FF (#5767). §16.10 bars reading a local never
+// assigned, so each is given a value.
 TEST(SequenceLocals, ALocalOfATypeNameIsTheTypeTheNameStandsFor) {
   ExpectOneEndAfterTe2("(x == 13)", "    nib_t x = 29;\n", kNibbleTypes);
   ExpectOneEndAfterTe2("$isunknown(x)", "    nib_t x = 'x;\n", kNibbleTypes);
+  ExpectOneEndAfterTe2("(x == 0)", "    bnib_t x = 'x;\n", kNibbleTypes);
   ExpectOneEndAfterTe2("(x < 0)", "    snib_t x = -1;\n", kNibbleTypes);
   ExpectOneEndAfterTe2("(x == 255)", "    nib_t [1:0] x = 9'h1FF;\n",
                        kNibbleTypes);
+}
+
+// §16.10 makes a local's initialization an assignment to it, and §6.11.2 has
+// an assignment to a 2-state variable turn the x and z bits of a 4-state value
+// to 0: a `bit [3:0]` local initialized with 'x and an `int` one with 'z each
+// hold 0, where one keeping the unknown bits would leave `x == 0` unknown and
+// the sequence unmatched (#7624).
+TEST(SequenceLocals, ATwoStateLocalDropsTheUnknownBitsOfItsInitialization) {
+  ExpectOneEndAfterTe2("(x == 0)", "    bit [3:0] x = 'x;\n");
+  ExpectOneEndAfterTe2("(x == 0)", "    int x = 'z;\n");
 }
 
 // §16.10 with §6.11: a sequence's time local is 64 bits, unsigned and

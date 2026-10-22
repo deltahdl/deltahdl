@@ -92,15 +92,19 @@ std::vector<Logic4Vec> InitialLocals(const std::vector<SeqLocalDecl>& decls,
   ctx.PushScope();
   for (const SeqLocalDecl& decl : decls) {
     const uint32_t kWidth = LocalWidth(decl, ctx, arena);
+    bool is_4state = LocalIs4State(decl, ctx);
     Logic4Vec value = MakeLogic4Vec(arena, kWidth);
     if (decl.init != nullptr) {
       value = ResizeToWidth(OwnRhsWords(EvalExpr(decl.init, ctx, arena), arena),
                             kWidth, arena);
-    } else if (LocalIs4State(decl, ctx)) {
+      // §16.10 makes the initialization an assignment to the local, and
+      // §6.11.2 has one to a 2-state variable turn x and z bits to 0.
+      if (!is_4state) CoerceTo2State(value);
+    } else if (is_4state) {
       FillWithX(value);
     }
     Variable* var = ctx.CreateLocalVariable(decl.name, value.width);
-    var->is_4state = LocalIs4State(decl, ctx);
+    var->is_4state = is_4state;
     var->is_signed = LocalIsSigned(decl, ctx);
     var->value = value;
     values.push_back(value);
