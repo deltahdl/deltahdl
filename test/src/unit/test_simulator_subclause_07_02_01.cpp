@@ -611,4 +611,32 @@ TEST(PackedStructSimulation, NamedAndEnumMembersKeepTheStructFourState) {
             "xxxx xx\n");
 }
 
+// §7.2.1 with §7.4.1 and §6.20: a member `logic [W-1:0]` of a structure the
+// module declares is W bits under the W each instance binds, so the structure
+// is 2*W bits, 8 in the instance binding 4 and 16 in the one binding 8, and
+// '1 with lo cleared reads 240 and 65280. Folded with no parameters, each
+// member was one bit, the structure two, and both instances read 2.
+TEST(PackedStructSimulation, AMemberSizedByAParameterTakesEachInstancesValue) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module m #(parameter int W = 2);\n"
+                       "  typedef struct packed {\n"
+                       "    logic [W-1:0] hi;\n"
+                       "    logic [W-1:0] lo;\n"
+                       "  } p_t;\n"
+                       "  p_t p;\n"
+                       "  initial begin\n"
+                       "    #W;\n"
+                       "    p = '1;\n"
+                       "    p.lo = 0;\n"
+                       "    $display(\"%0d %0d %0d\", W, $bits(p), p);\n"
+                       "  end\n"
+                       "endmodule\n"
+                       "module t;\n"
+                       "  m #(4) a();\n"
+                       "  m #(8) b();\n"
+                       "endmodule\n",
+                       f),
+            "4 8 240\n8 16 65280\n");
+}
+
 }  // namespace

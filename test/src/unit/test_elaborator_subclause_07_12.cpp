@@ -156,6 +156,35 @@ TEST(ArrayMethodValidation, AClassTypeParameterDimensionMakesItAssociative) {
   }
 }
 
+// §7.8 with §8.13: a typedef the declaring class writes is a type in its
+// property's dimension as well, and a subclass inherits it with the base's
+// other members, so `int m[K]` and the subclass's `int d[K]` are associative
+// arrays taking num(). A fixed-size property beside them keeps its report.
+TEST(ArrayMethodValidation, AClassTypedefDimensionMakesItAssociative) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  class C; typedef int K; int m[K]; int f[4]; endclass\n"
+      "  class D extends C; int d[K]; endclass\n"
+      "  C c = new; D h = new; int n;\n"
+      "  initial begin\n"
+      "    n = c.m.num();\n"
+      "    n = h.m.num();\n"
+      "    n = h.d.num();\n"
+      "    n = c.f.num();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(
+      diags, "'num' is not a built-in method of the fixed-size array 'c.f'", 9,
+      "7.12"));
+  for (const auto& d : diags) {
+    EXPECT_FALSE(d.loc.line >= 6 && d.loc.line <= 8)
+        << d.loc.line << ": " << d.message;
+  }
+}
+
 // What that rule passes over: a receiver it cannot trace to one member of a
 // variable -- a member of a member, a package's array, an element of an
 // array, an instance's array -- and a member that is no array, each written

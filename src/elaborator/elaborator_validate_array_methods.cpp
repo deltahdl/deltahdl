@@ -296,19 +296,29 @@ bool IsIndexTypeDim(const Expr& dim, const ValueScope& values) {
          values.class_names.contains(dim.text);
 }
 
-// §8.25 with §7.8: whether `dim` names a type parameter of `cls`, which stands
-// for a type wherever the class's own declarations write it, so a dimension
-// naming one is an index type as a typedef's name is. Null `cls` declares none.
-bool NamesTypeParameter(const Expr& dim, const ClassDecl* cls) {
-  return cls != nullptr && dim.kind == ExprKind::kIdentifier &&
-         cls->type_param_names.contains(dim.text);
+// §7.8 with §8.13 and §8.25: whether `dim` names a type `cls` declares, a
+// typedef or a type parameter of its own or of a class it extends, each of
+// which stands for a type wherever the class's declarations write it, so a
+// dimension naming one is an index type as a module typedef's name is. Null
+// `cls` declares none.
+bool NamesClassType(const Expr& dim, const ClassDecl* cls,
+                    const CompilationUnit* unit) {
+  if (dim.kind != ExprKind::kIdentifier) return false;
+  for (const auto* walk = cls; walk; walk = FindBaseClass(walk, unit)) {
+    if (walk->type_param_names.contains(dim.text)) return true;
+    for (const auto* m : walk->members) {
+      if (m->kind == ClassMemberKind::kTypedef && m->name == dim.text)
+        return true;
+    }
+  }
+  return false;
 }
 
 // What the member `base` selects is declared with: its unpacked dimensions,
 // whether it is a random variable of an object, a property declared rand or
 // randc, which gives it §18.8's rand_mode whatever its type, and the class
-// declaring it where it is a property, whose type parameters its dimensions
-// may name.
+// declaring it where it is a property, whose typedefs and type parameters its
+// dimensions may name.
 struct DeclaredMember {
   const std::vector<Expr*>* dims = nullptr;
   bool random = false;
@@ -351,8 +361,9 @@ void CheckMemberArrayMethod(const Expr* e, const ArrayMethodSite& site,
   const Expr* dim = dims->front();
   info.is_dynamic = dim == nullptr;
   info.is_queue = dim != nullptr && IsQueueDim(dim);
-  info.is_assoc = dim != nullptr && (IsIndexTypeDim(*dim, scan.values) ||
-                                     NamesTypeParameter(*dim, kMember.owner));
+  info.is_assoc =
+      dim != nullptr && (IsIndexTypeDim(*dim, scan.values) ||
+                         NamesClassType(*dim, kMember.owner, scan.unit));
   if (IsKindMethod(info, site.method)) return;
   const ArrayKind kKind = KindOf(info);
   scan.diag.Error(e->range.start,

@@ -670,6 +670,50 @@ TEST(UnpackedStructDynamicMember, ABoundedQueueMemberKeepsToItsBound) {
   EXPECT_EQ(out, "2 5 6\n");
 }
 
+// §7.2 with §7.4.2 and §6.20: a member `int a[N]` of a structure the module
+// declares holds N elements, and one `int b[N-1:0]` the same, so with N = 3
+// each takes an index 2. Folded with no parameters, each held one element and
+// the writes to index 2 were dropped.
+TEST(UnpackedStructArrayMember, AMemberSizedByAParameterHoldsThatMany) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  localparam int N = 3;\n"
+      "  typedef struct { int a[N]; int b[N-1:0]; } s_t;\n"
+      "  s_t s;\n"
+      "  initial begin\n"
+      "    s.a[0] = 1;\n"
+      "    s.a[2] = 5;\n"
+      "    s.b[2] = 6;\n"
+      "    $display(\"%0d %0d %0d\", s.a[0], s.a[2], s.b[2]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 5 6\n");
+}
+
+// §7.10 with §6.20: a queue member's bound `[$:N-2]` names the module's
+// parameter, so with N = 3 it holds no element past index 1 and a third
+// push_back leaves the first two. Folded with no parameters, the bound was
+// none and the queue took all three.
+TEST(UnpackedStructDynamicMember, AQueueMembersParameterBoundIsKept) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  localparam int N = 3;\n"
+      "  typedef struct { byte q[$:N-2]; } h_t;\n"
+      "  h_t e;\n"
+      "  initial begin\n"
+      "    e.q.push_back(5);\n"
+      "    e.q.push_back(6);\n"
+      "    e.q.push_back(7);\n"
+      "    $display(\"%0d %0d %0d\", e.q.size(), e.q[0], e.q[1]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "2 5 6\n");
+}
+
 // §7.2 with §8.4: a member of a class type holds the whole handle of the
 // object stored in it, whether the structure is a typedef's or written in the
 // declaration, so a handle copied in and out again names the same object.

@@ -445,7 +445,14 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
   }
   AdoptMemberTypedefDims(item->typedef_type, td_array_dims_);
   SizeClassHandleMembers(item->typedef_type, typedefs_, class_names_);
-  RecordTypedef(typedefs_, item->name, item->typedef_type);
+  // §7.2 with §6.20: a member's dimensions may name the module's parameters,
+  // which each instance binds to its own values, so the table this instance
+  // reads the type through holds it with them folded; the declaration, which
+  // every instance shares, keeps them as written.
+  ScopeMap scope = BuildParamScope(mod);
+  DataType recorded = item->typedef_type;
+  FoldMemberDims(recorded, scope, arena_);
+  RecordTypedef(typedefs_, item->name, recorded);
   // §6.18: the dimensions belong to the type the name stands for, so a name
   // written with any of them stands for an aggregate rather than for one
   // element. Recording that is what lets the elaborated type-width table
@@ -481,7 +488,6 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
       }
     }
   }
-  ScopeMap scope = BuildParamScope(mod);
   ValidateTypedefShape(item->typedef_type, item->loc, &scope);
   CheckRealAssocIndexTypes(item->unpacked_dims, item->loc, typedefs_, diag_);
   // §6.19 declares the constants in the scope holding the enumeration, whether

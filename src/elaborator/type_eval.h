@@ -56,6 +56,18 @@ const DataType* ResolvedAggregateType(const DataType& dtype,
 const DataType* NamedPackedVectorType(const DataType& dtype,
                                       const TypedefMap& typedefs, Arena& arena);
 
+// §7.2 with §6.20 and §11.2.1: `type`'s members with every dimension folded
+// against `scope` -- each packed bound, each unpacked `[size]` or
+// `[left:right]`, a queue's `[$:bound]` bound, and those of a nested
+// aggregate's or enumeration's type -- as an arena literal, a dimension that
+// does not fold, an associative one's type among them, kept as written. The
+// readers of a member's dimensions fold them with no scope, so a member sized
+// by a parameter reaches them sized only once this has run. New expressions
+// and a new nested type are made rather than the old changed, so a type copied
+// from a source tree several instances share leaves that tree as it was.
+// Defined in src/elaborator/type_eval_aggregate.cpp.
+void FoldMemberDims(DataType& type, const ScopeMap& scope, Arena& arena);
+
 // §7.4.4: the element count of the packed dimensions a declaration writes --
 // the leading range times each further one -- which is what a use-site
 // dimension multiplies the width of the type it is written on by. Zero where
