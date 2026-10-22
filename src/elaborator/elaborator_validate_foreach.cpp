@@ -241,22 +241,25 @@ static bool IsIntegralVectorKind(DataTypeKind k) {
 
 // §12.7.3 — the number of dimensions a foreach can address on an array whose
 // declaration settles it, or nullopt where it does not. An integral element
-// type's packed dimensions count with the unpacked ones. A real, string,
-// chandle, event or class handle element has no packed dimension, so the
-// unpacked ones are all. A typedef'd or aggregate element type may contribute
-// packed dimensions the declaration does not show, so it is left alone.
+// type's packed dimensions count with the unpacked ones. A string element is a
+// dynamic array of bytes, so its characters are one dimension more after the
+// unpacked ones. A real, chandle, event or class handle element has no packed
+// dimension, so the unpacked ones are all. A typedef'd or aggregate element
+// type may contribute packed dimensions the declaration does not show, so it
+// is left alone.
 static std::optional<int> ForeachDimCount(
     const ForeachArrayDecl& decl,
     const std::unordered_set<std::string_view>& class_names) {
   static constexpr DataTypeKind kUnpackedOnly[] = {
-      DataTypeKind::kReal,   DataTypeKind::kShortreal, DataTypeKind::kRealtime,
-      DataTypeKind::kString, DataTypeKind::kChandle,   DataTypeKind::kEvent};
+      DataTypeKind::kReal, DataTypeKind::kShortreal, DataTypeKind::kRealtime,
+      DataTypeKind::kChandle, DataTypeKind::kEvent};
   const DataType& t = *decl.type;
   int unpacked = static_cast<int>(decl.unpacked);
   if (IsIntegralVectorKind(t.kind)) {
     return unpacked + (t.packed_dim_left != nullptr ? 1 : 0) +
            static_cast<int>(t.extra_packed_dims.size());
   }
+  if (t.kind == DataTypeKind::kString) return unpacked + 1;
   bool is_class = t.kind == DataTypeKind::kNamed && t.scope_name.empty() &&
                   class_names.count(t.type_name) != 0;
   if (is_class ||

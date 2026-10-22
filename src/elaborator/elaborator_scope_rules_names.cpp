@@ -362,10 +362,12 @@ void CollectBareIdents(const Expr* e, std::vector<const Expr*>& out) {
     // (§7.10.1) parse as identifier-shaped nodes and name no declaration, so
     // neither is a read this can find a declaration for. Nor is a §12.6
     // pattern's `. variable_identifier`, which declares the variable it names
-    // (Expr::is_pattern_binding); it is reached here through a matches
-    // condition, whose pattern side is the expression's right operand.
+    // (Expr::is_pattern_binding), nor its wildcard `.*`, which names nothing;
+    // either is reached here through a matches condition, whose pattern side
+    // is the expression's right operand.
     if (e->scope_prefix.empty() && !IsBuiltinTypeKeyword(e->text) &&
-        e->text != "null" && e->text != "$" && !e->is_pattern_binding) {
+        e->text != "null" && e->text != "$" && e->text != ".*" &&
+        !e->is_pattern_binding) {
       out.push_back(e);
     }
     return;

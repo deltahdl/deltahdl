@@ -488,6 +488,42 @@ TEST(PatternVariableReads, ANameNoPatternBindsIsStillReported) {
                             "23.9"));
 }
 
+// §12.6's wildcard pattern `.*` matches any value and names nothing, so as a
+// tagged member's pattern in an if or a conditional operator, with a `&&&`
+// filter or without, it is no read for §23.9 to resolve.
+TEST(PatternVariableReads, TheWildcardPatternIsNoRead) {
+  SimFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  typedef union tagged { void Invalid; int Valid; } VInt;\n"
+      "  VInt v; logic flag; int x;\n"
+      "  initial begin\n"
+      "    if (v matches tagged Valid .* &&& flag) x = 1;\n"
+      "    if (v matches tagged Valid .*) x = 2;\n"
+      "    x = (v matches tagged Valid .* &&& flag) ? 3 : 4;\n"
+      "    x = (v matches tagged Valid .*) ? 5 : 6;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// The same in a class method, whose reads §23.9 resolves against the class.
+TEST(PatternVariableReads, TheWildcardPatternInAClassMethodIsNoRead) {
+  SimFixture f;
+  ElaborateSrc(
+      "class C;\n"
+      "  typedef union tagged { void Invalid; int Valid; } VInt;\n"
+      "  function int f(VInt v, logic flag);\n"
+      "    if (v matches tagged Valid .* &&& flag) return 1;\n"
+      "    return (v matches tagged Valid .*) ? 2 : 3;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m; endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
 // §12.6 type-checks a pattern against the value it is matched with. A tagged
 // pattern needs a tagged union value, names a member that union declares, and
 // gives a void member no member pattern.

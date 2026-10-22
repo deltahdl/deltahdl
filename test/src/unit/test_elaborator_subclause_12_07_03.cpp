@@ -663,9 +663,9 @@ TEST(LoopStatementElaboration, ForeachOverBlockArrayHidingAModuleArrayOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// An array of real or string has its unpacked dimensions alone, the element
-// type having no packed dimension, so §12.7.3's count is known from the
-// declaration as it is for an integral array.
+// An array of real has its unpacked dimensions alone, the element type having
+// no packed dimension, so §12.7.3's count is known from the declaration as it
+// is for an integral array.
 TEST(LoopStatementElaboration, ForeachOverRealArrayCountsItsDimensions) {
   ElabFixture f;
   ElaborateSrc(
@@ -680,7 +680,25 @@ TEST(LoopStatementElaboration, ForeachOverRealArrayCountsItsDimensions) {
       "12.7.3"));
 }
 
+// §12.7.3 treats a string as a dynamic array of bytes, so a string has one
+// dimension a loop variable walks, its characters, counted after the unpacked
+// dimensions of an array of strings: `s [2][3]` has three, and only a fourth
+// loop variable is one too many.
 TEST(LoopStatementElaboration, ForeachOverStringArrayCountsItsDimensions) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  string s [2][3];\n"
+      "  initial foreach (s[i, j, k, l]) begin end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "foreach lists 4 loop variables but array 's' has only 3 dimension(s)", 3,
+      "12.7.3"));
+}
+
+TEST(LoopStatementElaboration, ForeachOverStringArrayWalksItsCharacters) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -688,9 +706,38 @@ TEST(LoopStatementElaboration, ForeachOverStringArrayCountsItsDimensions) {
       "  initial foreach (s[i, j, k]) begin end\n"
       "endmodule\n",
       f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// A string variable or a string formal alone has the one dimension.
+TEST(LoopStatementElaboration, ForeachOverAStringWalksItsCharacters) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  string s;\n"
+      "  int c;\n"
+      "  function automatic int f(string t);\n"
+      "    int n = 0;\n"
+      "    foreach (t[i]) n++;\n"
+      "    return n;\n"
+      "  endfunction\n"
+      "  initial foreach (s[i]) c++;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(LoopStatementElaboration, ForeachOverAStringWithTwoLoopVariablesIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  string s;\n"
+      "  initial foreach (s[i, j]) begin end\n"
+      "endmodule\n",
+      f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "foreach lists 3 loop variables but array 's' has only 2 dimension(s)", 3,
+      "foreach lists 2 loop variables but array 's' has only 1 dimension(s)", 3,
       "12.7.3"));
 }
 

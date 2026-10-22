@@ -372,9 +372,6 @@ TEST(TernaryMatchesSim, ConstantPatternComparesXAndZBits) {
 // holds where the pattern binds an identifier the consequent reads.
 TEST(TernaryMatchesSim, AmbiguousClauseSequenceCombinesBothResults) {
   SimFixture f;
-  // deltahdl reports the wildcard pattern .* as an unresolved identifier
-  // (#7614); the excuse goes with the fix.
-  f.has_errors.Excuse();
   auto* v = RunAndFindVar(
       "module t;\n"
       "  typedef union tagged { void Invalid; bit [7:0] Valid; } VInt;\n"
