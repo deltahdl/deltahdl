@@ -61,7 +61,6 @@ using AssertionSimFixture = SimFixture;
 using StmtFixture = SimFixtureSeeded;
 using ClockingSimFixture = SimFixtureSeeded;
 using MtSimFixture = SimFixture;
-using SimA604Fixture = SimFixture;
 
 // The last module is the top, as it is in every case written against these
 // fixtures; a unit with no module (a program standing alone, §24.3) names no
