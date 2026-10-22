@@ -660,4 +660,25 @@ TEST(PackedStructSimulation, ANestedMembersParameterDimensionsAreFolded) {
       "18\n");
 }
 
+// §7.2.1 with §7.4.4: packed dimensions written on a typedef name stack on the
+// typedef's own, so a member `nib_t [1:0] x` is two 4-bit elements, 8 bits,
+// and the structure with a bit beside it 9. 9'h1A5 then leaves x 8'hD2 and y
+// 1. Sized by the written dimensions alone, x was 2 bits and the structure 3.
+TEST(PackedStructSimulation, ATypedefMembersOwnPackedDimensionsStackOnIt) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  typedef logic [3:0] nib_t;\n"
+                 "  typedef struct packed { nib_t [1:0] x; logic y; } s_t;\n"
+                 "  s_t s;\n"
+                 "  initial begin\n"
+                 "    s = 9'h1A5;\n"
+                 "    $display(\"%0d %0d %0d %0d\", $bits(s), $bits(s.x), "
+                 "s.x, s.y);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "9 8 210 1\n");
+}
+
 }  // namespace

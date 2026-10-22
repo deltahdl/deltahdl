@@ -165,12 +165,12 @@ static uint32_t TagBitWidth(uint32_t num_members) {
 uint32_t EvalStructMemberWidth(const StructMember& m,
                                const TypedefMap& typedefs) {
   if (m.nested_type) return EvalTypeWidth(*m.nested_type, typedefs);
-  if (m.packed_dim_left && m.packed_dim_right) {
-    uint32_t w = PackedDimProduct(m);
-    if (w > 0) return w;
-  }
+  // §7.4.4: dimensions written on a typedef name stack on the typedef's own.
+  uint32_t w = PackedDimProduct(m);
   const DataType* named = MemberNamedType(m, typedefs);
-  if (named != nullptr) return EvalTypeWidth(*named, typedefs);
+  if (named != nullptr)
+    return EvalTypeWidth(*named, typedefs) * (w > 0 ? w : 1);
+  if (m.packed_dim_left && m.packed_dim_right && w > 0) return w;
   return EvalStructMemberWidth(m);
 }
 
