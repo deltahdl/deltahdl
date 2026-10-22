@@ -28,6 +28,7 @@ std::unique_ptr<QueueObject> EmptyOf(const StructFieldInfo& field) {
   queue->elem_width = field.dyn_elem_width;
   queue->is_4state = Is4stateType(field.type_kind);
   queue->is_signed = field.is_signed;
+  queue->max_size = field.dyn_max_size;
   return queue;
 }
 
@@ -50,11 +51,11 @@ std::vector<const QueueObject*> DynMemberQueues() {
 }
 
 QueueObject* DynMemberEmpty(const StructFieldInfo& field) {
-  static std::map<std::tuple<uint32_t, bool, bool>,
+  static std::map<std::tuple<uint32_t, bool, bool, int32_t>,
                   std::unique_ptr<QueueObject>>
       empties;
   auto& slot = empties[{field.dyn_elem_width, Is4stateType(field.type_kind),
-                        field.is_signed}];
+                        field.is_signed, field.dyn_max_size}];
   if (slot == nullptr) slot = EmptyOf(field);
   return slot.get();
 }

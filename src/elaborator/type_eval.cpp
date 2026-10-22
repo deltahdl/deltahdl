@@ -9,6 +9,7 @@
 
 #include "elaborator/const_eval.h"
 #include "elaborator/const_eval_internal.h"
+#include "elaborator/queue_dim.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_type.h"
@@ -174,7 +175,8 @@ uint32_t EvalStructMemberWidth(const StructMember& m,
 }
 
 bool IsDynamicArrayMember(const StructMember& m) {
-  return m.unpacked_dims.size() == 1 && m.unpacked_dims[0] == nullptr;
+  return m.unpacked_dims.size() == 1 &&
+         (m.unpacked_dims[0] == nullptr || IsQueueDim(m.unpacked_dims[0]));
 }
 
 uint32_t StructMemberStorageWidth(const StructMember& m) {

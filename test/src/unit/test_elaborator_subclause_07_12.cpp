@@ -127,6 +127,35 @@ TEST(ArrayMethodValidation, AMembersNamedIndexTypeMakesItAssociative) {
   }
 }
 
+// §8.25 with §7.8: a type parameter of the class declaring a property stands
+// for a type in the property's dimension too, so `int m[T]` is an associative
+// array and takes num(), reached through a specialization or through a class
+// extending one. A value parameter in that place sizes a fixed-size array,
+// which has no num().
+TEST(ArrayMethodValidation, AClassTypeParameterDimensionMakesItAssociative) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  class Box #(type T = int, int N = 3); int m[T]; int f[N]; endclass\n"
+      "  class Sub extends Box #(string); endclass\n"
+      "  Box #(string, 6) b = new; Sub s = new; int n;\n"
+      "  initial begin\n"
+      "    n = b.m.num();\n"
+      "    n = s.m.num();\n"
+      "    n = b.f.num();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(
+      diags, "'num' is not a built-in method of the fixed-size array 'b.f'", 8,
+      "7.12"));
+  for (const auto& d : diags) {
+    EXPECT_FALSE(d.loc.line >= 6 && d.loc.line <= 7)
+        << d.loc.line << ": " << d.message;
+  }
+}
+
 // What that rule passes over: a receiver it cannot trace to one member of a
 // variable -- a member of a member, a package's array, an element of an
 // array, an instance's array -- and a member that is no array, each written

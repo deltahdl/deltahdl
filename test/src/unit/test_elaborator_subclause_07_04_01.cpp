@@ -191,6 +191,27 @@ TEST(PackedArrayValidation, PackedDimOnEnumBaseType_Allowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// §7.4.1 with A.2.2.1: packed dimensions after an enumeration's body make a
+// packed array of the enumeration, written in the declaration or through a
+// typedef, and with no base type each element is an int (§6.19). An index on
+// either selects an element, which §11.5.1's rule on selecting a scalar does
+// not reach.
+TEST(PackedArrayValidation, AnEnumArrayWithNoBaseTypeTakesAnElementSelect) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  typedef enum {P, Q} [1:0] pair_t;\n"
+      "  pair_t w;\n"
+      "  enum {R, S} [2:0] v;\n"
+      "  initial begin\n"
+      "    w[1] = Q;\n"
+      "    v[2] = S;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
 TEST(PackedArrayValidation, PackedDimOnReal_Rejected) {
   ElabFixture f;
   ElaborateSrc(

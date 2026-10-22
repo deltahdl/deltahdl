@@ -587,7 +587,7 @@ TEST(UnpackedStructDynamicMember, AStructAssignmentCopiesTheDynamicMember) {
 
 // §7.2 with §7.5: a dynamic array member never written holds no element, and
 // new[] grows it, a copy taken before the growth keeping the elements it was
-// taken with. A queue member, which push_back would grow, is #7626.
+// taken with. A queue member, which push_back grows, is the case after this.
 TEST(UnpackedStructDynamicMember, AnUnwrittenMemberIsEmptyAndGrowsByMethod) {
   SimFixture f;
   std::string out = RunCapture(
@@ -606,6 +606,68 @@ TEST(UnpackedStructDynamicMember, AnUnwrittenMemberIsEmptyAndGrowsByMethod) {
       "endmodule\n",
       f);
   EXPECT_EQ(out, "0\n2 4 1\n");
+}
+
+// §7.2 with §7.10: a member may be a queue, which holds the elements written
+// to it and grows by push_back, a copy of the structure taken before the
+// growth keeping its own.
+TEST(UnpackedStructDynamicMember, AQueueMemberGrowsAndACopyKeepsItsOwn) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "typedef struct { byte data[$]; } h_t;\n"
+      "module t;\n"
+      "  h_t e, c;\n"
+      "  initial begin\n"
+      "    e.data = '{0};\n"
+      "    c = e;\n"
+      "    e.data.push_back(4);\n"
+      "    $display(\"%0d %0d %0d\", e.data.size(), e.data[1], "
+      "c.data.size());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "2 4 1\n");
+}
+
+// §7.10.2's insert and delete reach a queue member as push_back does.
+TEST(UnpackedStructDynamicMember, AQueueMemberTakesInsertAndDelete) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "typedef struct { int q[$]; } h_t;\n"
+      "module t;\n"
+      "  h_t e;\n"
+      "  initial begin\n"
+      "    e.q.push_back(1);\n"
+      "    e.q.push_back(3);\n"
+      "    e.q.insert(1, 2);\n"
+      "    $display(\"%0d %0d %0d %0d\", e.q.size(), e.q[0], e.q[1], e.q[2]);\n"
+      "    e.q.delete(0);\n"
+      "    $display(\"%0d %0d\", e.q.size(), e.q[0]);\n"
+      "    e.q.delete();\n"
+      "    $display(\"%0d\", e.q.size());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "3 1 2 3\n2 2\n0\n");
+}
+
+// §7.10: a bounded queue member [$:1] holds no element past index 1, so a
+// third push_back leaves the first two and overflows the bound (§7.10.5).
+TEST(UnpackedStructDynamicMember, ABoundedQueueMemberKeepsToItsBound) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "typedef struct { byte data[$:1]; } h_t;\n"
+      "module t;\n"
+      "  h_t e;\n"
+      "  initial begin\n"
+      "    e.data.push_back(5);\n"
+      "    e.data.push_back(6);\n"
+      "    e.data.push_back(7);\n"
+      "    $display(\"%0d %0d %0d\", e.data.size(), e.data[0], e.data[1]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "2 5 6\n");
 }
 
 // §7.2 with §8.4: a member of a class type holds the whole handle of the

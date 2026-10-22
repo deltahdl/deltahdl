@@ -296,12 +296,23 @@ bool IsIndexTypeDim(const Expr& dim, const ValueScope& values) {
          values.class_names.contains(dim.text);
 }
 
+// §8.25 with §7.8: whether `dim` names a type parameter of `cls`, which stands
+// for a type wherever the class's own declarations write it, so a dimension
+// naming one is an index type as a typedef's name is. Null `cls` declares none.
+bool NamesTypeParameter(const Expr& dim, const ClassDecl* cls) {
+  return cls != nullptr && dim.kind == ExprKind::kIdentifier &&
+         cls->type_param_names.contains(dim.text);
+}
+
 // What the member `base` selects is declared with: its unpacked dimensions,
-// and whether it is a random variable of an object, a property declared rand
-// or randc, which gives it §18.8's rand_mode whatever its type.
+// whether it is a random variable of an object, a property declared rand or
+// randc, which gives it §18.8's rand_mode whatever its type, and the class
+// declaring it where it is a property, whose type parameters its dimensions
+// may name.
 struct DeclaredMember {
   const std::vector<Expr*>* dims = nullptr;
   bool random = false;
+  const ClassDecl* owner = nullptr;
 };
 
 // That of a member of a structure variable, s.q, or of a property of the class
@@ -318,10 +329,12 @@ DeclaredMember MemberDeclared(const Expr& base, const ArrayMethodScan& scan) {
   }
   auto handle = scan.class_vars.find(base.lhs->text);
   if (handle == scan.class_vars.end()) return {};
-  const ClassMember* property = FindMemberInClass(
+  const OwnedMember kProperty = FindMemberAndOwner(
       FindClassDecl(handle->second, scan.unit), base.rhs->text, scan.unit);
-  if (property == nullptr) return {};
-  return {&property->unpacked_dims, property->is_rand || property->is_randc};
+  if (kProperty.member == nullptr) return {};
+  return {&kProperty.member->unpacked_dims,
+          kProperty.member->is_rand || kProperty.member->is_randc,
+          kProperty.owner};
 }
 
 // §7.5, §7.9, §7.10.2 and §7.12: the same rule for an array reached through a
@@ -338,7 +351,8 @@ void CheckMemberArrayMethod(const Expr* e, const ArrayMethodSite& site,
   const Expr* dim = dims->front();
   info.is_dynamic = dim == nullptr;
   info.is_queue = dim != nullptr && IsQueueDim(dim);
-  info.is_assoc = dim != nullptr && IsIndexTypeDim(*dim, scan.values);
+  info.is_assoc = dim != nullptr && (IsIndexTypeDim(*dim, scan.values) ||
+                                     NamesTypeParameter(*dim, kMember.owner));
   if (IsKindMethod(info, site.method)) return;
   const ArrayKind kKind = KindOf(info);
   scan.diag.Error(e->range.start,

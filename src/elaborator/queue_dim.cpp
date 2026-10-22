@@ -30,6 +30,11 @@ std::optional<int32_t> QueueBoundMaxSize(int64_t bound) {
   return static_cast<int32_t>(bound + 1);
 }
 
+int32_t QueueDimMaxSize(const Expr* dim) {
+  if (!IsQueueDim(dim) || dim->rhs == nullptr) return -1;
+  return ConstEvalInt(dim->rhs).and_then(QueueBoundMaxSize).value_or(-1);
+}
+
 static void CheckStmtQueueBound(const Stmt* s, const ScopeMap& scope,
                                 DiagEngine& diag) {
   if (s->kind != StmtKind::kVarDecl || s->var_unpacked_dims.empty()) return;

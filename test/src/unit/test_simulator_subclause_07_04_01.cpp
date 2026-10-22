@@ -183,9 +183,6 @@ TEST(PackedArraySimulation, ElementOfSignedNamedTypeIsSigned) {
 // replace (#7312).
 TEST(PackedArraySimulation, EnumWithDimsAfterItsBodyIsAnArrayOfIt) {
   SimFixture f;
-  // deltahdl takes w for a scalar and reports its selects (#7609); the excuse
-  // goes with the fix.
-  f.has_errors.Excuse();
   std::string out = RunCapture(
       "module t;\n"
       "  enum bit [1:0] {A, B, C} [3:0] v;\n"

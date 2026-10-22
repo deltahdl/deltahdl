@@ -569,14 +569,16 @@ static bool IsIntegerAtomKind(DataTypeKind kind) {
 
 // §6.18 with §11.5.1: whether `dtype` is a name standing for a type a select
 // may address -- one written with a packed dimension, `typedef logic [7:0] B`,
-// or an integer atom, `typedef int W` -- rather than for a scalar. A name
-// standing for nothing the table resolves answers false.
+// an enumeration with one after its body, `typedef enum {P, Q} [1:0] E`, or an
+// integer atom, `typedef int W` -- rather than for a scalar. A name standing
+// for nothing the table resolves answers false.
 static bool NamesVectorType(const DataType& dtype, const TypedefMap& typedefs) {
   if (dtype.kind != DataTypeKind::kNamed) return false;
   const DataType* d = TypeAtChainEnd(dtype, typedefs);
   if (d == nullptr) return false;
   return d->packed_dim_left != nullptr || !d->extra_packed_dims.empty() ||
-         d->has_unsized_packed_dim || IsIntegerAtomKind(d->kind);
+         d->has_unsized_packed_dim || !d->enum_array_dims.empty() ||
+         IsIntegerAtomKind(d->kind);
 }
 
 // §11.5.1 / §7.4.1: a packed structure or packed union presents as a single
@@ -605,8 +607,11 @@ static bool IsStringVar(const DataType& dtype, const TypedefMap& typedefs) {
   return d != nullptr && d->kind == DataTypeKind::kString;
 }
 
+// §7.4.1 with A.2.2.1: dimensions after an enumeration's body, `enum {P, Q}
+// [1:0] w`, make a packed array of it, whose index selects an element.
 bool DeclaresScalar(const DataType& dtype, const TypedefMap& typedefs) {
   return !IsIntegerAtomKind(dtype.kind) && !IsRealType(dtype.kind) &&
+         dtype.enum_array_dims.empty() &&
          !IsPackedAggregateVar(dtype, typedefs) &&
          !NamesVectorType(dtype, typedefs) && !IsStringVar(dtype, typedefs);
 }

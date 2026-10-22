@@ -114,8 +114,9 @@ uint32_t EvalStructMemberWidth(const StructMember& m);
 // member that is no array, or whose dimensions do not fold. A member takes
 // EvalStructMemberWidth bits per element.
 uint32_t UnpackedMemberCount(const StructMember& m);
-// §7.2 with §7.5: whether the member is declared as a dynamic array, its one
-// unpacked dimension `[]`.
+// §7.2 with §7.5 and §7.10: whether the member is declared as a dynamically
+// sized array, its one unpacked dimension a dynamic array's `[]` or a queue's
+// `[$]` or `[$:N]`.
 bool IsDynamicArrayMember(const StructMember& m);
 // The bits a member takes in its structure's packed value: a dynamic array
 // member's handle, else EvalStructMemberWidth bits per element of it.

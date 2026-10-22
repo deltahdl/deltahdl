@@ -37,6 +37,13 @@ uint32_t QueueLevelsFrom(const std::vector<Expr*>& dims, size_t first);
 // a procedural block evaluates it against the running process.
 std::optional<int32_t> QueueBoundMaxSize(int64_t bound);
 
+// The same count for the dimension `dim` where it is a bounded queue's,
+// `[$:N]`, with N folded on its own, as a structure member's dimensions are
+// folded (UnpackedMemberCount in type_eval.h); -1 for any other dimension, an
+// unbounded queue's and a dynamic array's null one among them, and for a bound
+// that does not fold or that Syntax 7-4 rules out.
+int32_t QueueDimMaxSize(const Expr* dim);
+
 // §7.10: reports every queue bound written on a declaration inside the
 // procedural block `s` that Syntax 7-4 rules out. A declaration inside a block
 // never becomes an RtlirVariable, so nothing else evaluates its bound, and

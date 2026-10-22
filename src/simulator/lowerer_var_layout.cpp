@@ -9,6 +9,7 @@
 #include "common/types.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator_enum_constants.h"
+#include "elaborator/queue_dim.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_enum_member.h"
 #include "elaborator/type_eval.h"
@@ -94,11 +95,12 @@ static StructTypeInfo* BuildStructTypeInfo(const DataType* dtype,
     // an unpacked structure of it has randomized.
     fi.is_rand = m.is_rand;
     fi.is_randc = m.is_randc;
-    // §7.2 with §7.5: a dynamic array member holds a handle to its elements,
-    // each EvalStructMemberWidth bits wide.
+    // §7.2 with §7.5 and §7.10: a dynamic array or queue member holds a handle
+    // to its elements, each EvalStructMemberWidth bits wide.
     if (IsDynamicArrayMember(m)) {
       fi.is_dynamic = true;
       fi.dyn_elem_width = EvalStructMemberWidth(m);
+      fi.dyn_max_size = QueueDimMaxSize(m.unpacked_dims.front());
     }
     if (!m.type_name.empty()) fi.type_name = NestedLayoutName(m, arena);
     if (UnpackedMemberBounds(m, &fi.elem_left, &fi.elem_right))
