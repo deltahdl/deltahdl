@@ -275,6 +275,11 @@ bool IsValueListSystemTask(const Expr* call) {
 
 }  // namespace
 
+bool ArgNamesDesignElement(const Expr* e) {
+  return e->kind == ExprKind::kSystemCall &&
+         (e->callee == "$timeunit" || e->callee == "$timeprecision");
+}
+
 // §18.17.7: the names a randsequence statement declares for its own code blocks
 // to read. A rule implicitly declares a variable for each of its productions
 // that returns a value, carrying that production's name; and a production opens
@@ -341,7 +346,7 @@ static void CollectBareIdentOperands(const Expr* e,
   CollectBareIdents(e->true_expr, out);
   CollectBareIdents(e->false_expr, out);
   CollectBareIdents(e->repeat_count, out);
-  if (!CallArgsNameNoValue(e)) {
+  if (!CallArgsNameNoValue(e) && !ArgNamesDesignElement(e)) {
     for (std::size_t i = 0; i < e->args.size(); ++i) {
       if (!ArgNamesCoverageScope(e, i)) CollectBareIdents(e->args[i], out);
     }

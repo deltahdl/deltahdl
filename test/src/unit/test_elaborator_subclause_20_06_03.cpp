@@ -48,4 +48,44 @@ TEST(IsunboundedElab, AParameterNameIsAccepted) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// Syntax 20-8 takes a hierarchical_parameter_identifier as well: `s.P` names
+// the parameter P of the instance s, `t.s.P` the same parameter from the top
+// module's own name (§23.8), and `a[0].P` that of an element of an instance
+// array (§23.6).
+TEST(IsunboundedElab, AHierarchicalParameterNameIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module sub #(parameter int P = $); endmodule\n"
+      "module t;\n"
+      "  sub s();\n"
+      "  sub a[2]();\n"
+      "  int r1, r2, r3;\n"
+      "  initial begin\n"
+      "    r1 = $isunbounded(s.P);\n"
+      "    r2 = $isunbounded(t.s.P);\n"
+      "    r3 = $isunbounded(a[0].P);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "t");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// A hierarchical name that reaches a variable of the instance names no
+// parameter, and is rejected as a bare name of one would be.
+TEST(IsunboundedElab, AHierarchicalNameOfAVariableIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module sub; int v; endmodule\n"
+      "module t;\n"
+      "  sub s();\n"
+      "  int result;\n"
+      "  initial result = $isunbounded(s.v);\n"
+      "endmodule\n",
+      f, "t");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'$isunbounded' asks about a parameter, so its argument must name one", 5,
+      "20.6.3"));
+}
+
 }  // namespace

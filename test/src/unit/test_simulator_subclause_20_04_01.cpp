@@ -39,9 +39,6 @@ TEST(TimescaleSystemFunctions, NoArgumentReportsCurrentScopeUnitAndPrecision) {
 // top module names itself; its declared 100us/10ns maps to -4 and -8.
 TEST(TimescaleSystemFunctions, NamedElementArgumentReportsThatElement) {
   SimFixture f;
-  // deltahdl reports the module's own name dut as an unresolved identifier
-  // (#7617); the excuse goes with the fix.
-  f.has_errors.Excuse();
   std::string out = RunCapture(
       "module dut;\n"
       "  timeunit 100us / 10ns;\n"
@@ -287,9 +284,6 @@ TEST(TimescaleSystemFunctions, AHierarchicalArgumentReportsTheInstanceItNames) {
 // reports the time scale it declares rather than the calling module's.
 TEST(TimescaleSystemFunctions, APackageArgumentReportsThePackage) {
   SimFixture f;
-  // deltahdl reports the package p as an unresolved identifier (#7616); the
-  // excuse goes with the fix.
-  f.has_errors.Excuse();
   std::string out = RunCapture(
       "package p;\n"
       "  timeunit 1us / 1ns;\n"

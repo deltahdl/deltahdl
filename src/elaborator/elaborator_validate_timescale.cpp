@@ -155,7 +155,7 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl,
       (this->*kPlainChecks[plain_idx++])();
     }
   }
-  CheckIsunboundedArgs(decl, diag_);
+  CheckIsunboundedArgs(decl, mod, diag_);
   CheckTimeformatArgs(decl, diag_);
   std::unordered_set<std::string_view> unbounded;
   for (const auto& param : mod->params) {

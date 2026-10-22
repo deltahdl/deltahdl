@@ -689,6 +689,17 @@ const NameSet* Widened(const NameSet* base, const NameSet& names,
   return &storage;
 }
 
+// §20.4.1: the argument of $timeunit or $timeprecision `call` is a
+// hierarchical identifier naming a design element, so a lone name there, `p`
+// for a package or a top module's own name, heads one as a dotted path does.
+void CollectDesignElementHeads(const Expr* call,
+                               std::vector<const Expr*>& out) {
+  for (const Expr* arg : call->args) {
+    const Expr* head = HierHead(arg);
+    if (head != nullptr) out.push_back(head);
+  }
+}
+
 // The heads of the hierarchical names `e` holds, but for those `bound` names:
 // a variable in scope where the name stands, which the name then reaches
 // through rather than heads a hierarchical name of (§12.6, §12.7.1). §12.6.3
@@ -703,6 +714,10 @@ void CollectHierHeads(const Expr* e, const NameSet& bound,
   if (e->kind == ExprKind::kMemberAccess) {
     const Expr* head = HierHead(e);
     if (head != nullptr && !bound.contains(head->text)) out.push_back(head);
+    return;
+  }
+  if (ArgNamesDesignElement(e)) {
+    CollectDesignElementHeads(e, out);
     return;
   }
   NameSet storage;

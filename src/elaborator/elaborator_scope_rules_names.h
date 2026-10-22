@@ -122,6 +122,12 @@ void CollectProcLocalNames(const Stmt* s,
 void CollectProcVariableNames(const Stmt* s,
                               std::unordered_set<std::string_view>& names);
 
+// §20.4.1: whether `e` calls $timeunit or $timeprecision, whose argument
+// (Syntax 20-3) is a hierarchical identifier naming a design element rather
+// than a value, so §23.8 resolves it as a hierarchical name and §23.9 reads no
+// value through it.
+bool ArgNamesDesignElement(const Expr* e);
+
 // §18.17.7: the implicit variables of the productions of the randsequence
 // statement `s` that return a value, and its productions' formal arguments,
 // the names its code blocks read beside those around it, added to `names`.

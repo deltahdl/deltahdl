@@ -642,8 +642,10 @@ void ReportPackageSubroutineStaticInits(const PackageDecl* pkg,
                                         DiagEngine& diag);
 
 // §20.6.3: reports each call of $isunbounded in `decl` whose argument is not
-// the name of a parameter. Defined in elaborator_validate_isunbounded.cpp.
-void CheckIsunboundedArgs(const ModuleDecl* decl, DiagEngine& diag);
+// the name of a parameter, a hierarchical name being read down the instances
+// below `mod`. Defined in elaborator_validate_isunbounded.cpp.
+void CheckIsunboundedArgs(const ModuleDecl* decl, const RtlirModule* mod,
+                          DiagEngine& diag);
 
 // §20.4.3: reports each call of $timeformat in `decl` that carries some but not
 // all four of its arguments. Defined in elaborator_validate_timeformat.cpp.
