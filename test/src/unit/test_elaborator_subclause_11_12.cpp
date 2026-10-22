@@ -793,4 +793,27 @@ TEST(LetDeclElaboration, StringActualsAndFormalsAreJudgedAsBitStreamTypes) {
   }
 }
 
+// §11.12 lists a sequential and a parallel block among the scopes a let may be
+// declared in, so a begin-end and a fork block's statements read the block's
+// own let though nothing outside the block declares the name; a name nothing
+// declares is still unresolved.
+TEST(LetElaboration, ABlocksOwnLetResolvesInItsStatements) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  initial begin let v = 3; $display(\"%0d\", v); end\n"
+      "  initial fork let w = 5; $display(\"%0d\", w); join\n"
+      "  initial $display(\"%0d\", u);\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {2u, 3u}) {
+    EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                               "reference to unresolved identifier", line,
+                               "23.9"));
+  }
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to unresolved identifier 'u'", 4,
+                            "23.9"));
+}
+
 }  // namespace

@@ -340,4 +340,35 @@ TEST(PartSelectBoundsElaboration, BoundNamingAProceduresVariableReported) {
   }
 }
 
+// A.8.4 counts an enum_identifier and a constant_let_expression among a
+// constant expression's primaries, so a member of an enumeration a block
+// declares, and a block's let whose body is constant, bound a part-select
+// without a report; the block's variable `k` is still reported.
+TEST(PartSelectBoundsElaboration, BoundNamingABlocksConstantIsNotReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    typedef enum {A = 3} e_t;\n"
+      "    let w = 2;\n"
+      "    int k;\n"
+      "    x[A:0] = 0;\n"
+      "    x[w:0] = 0;\n"
+      "    x[k:0] = 0;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {7u, 8u}) {
+    EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                               "non-indexed part-select bounds shall be "
+                               "constant expressions",
+                               line, "11.5.1"));
+  }
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "non-indexed part-select bounds shall be "
+                            "constant expressions",
+                            9, "11.5.1"));
+}
+
 }  // namespace

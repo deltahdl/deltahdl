@@ -110,10 +110,17 @@ void CollectModuleGenerateNames(const std::vector<ModuleItem*>& items,
 
 // The names a procedural block declares: a block variable declaration, a
 // for-loop control variable, a foreach index variable, a randsequence's names,
-// the variables a §12.6 pattern binds and the members of an enumeration a
-// block's typedef declares.
+// the variables a §12.6 pattern binds, a let the block declares (§11.12) and
+// the members of an enumeration a block's typedef declares.
 void CollectProcLocalNames(const Stmt* s,
                            std::unordered_set<std::string_view>& names);
+
+// The names CollectProcLocalNames collects but for a block's lets and the
+// members of its enumerations: the variables and other run-time names a block
+// declares, A.8.4 counting an enum_identifier and a constant_let_expression
+// among a constant expression's primaries.
+void CollectProcVariableNames(const Stmt* s,
+                              std::unordered_set<std::string_view>& names);
 
 // The names CollectProcLocalNames collects but for the variables a for loop's
 // initialization declares, which §12.7.1 scopes to the loop: the names a read

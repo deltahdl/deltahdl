@@ -516,17 +516,19 @@ static void CollectBlockEnumMemberNames(
 // Over-approximated set of names that are local to a procedural block: block
 // (begin/end) variable declarations, for-loop control variables, foreach index
 // variables, the two kinds of name §18.17.7 gives a randsequence statement,
-// the variables §12.6's patterns bind, and the members of an enumeration a
-// block's typedef declares. Collected flat across the whole
-// block tree without tracking scope boundaries — that can only ever SUPPRESS a
-// diagnostic, never raise one, so a missed boundary is always safe.
+// the variables §12.6's patterns bind, and, with `with_lets_and_enum_members`,
+// the lets a block declares (§11.12) and the members of an enumeration a
+// block's typedef declares, which name no variable. Collected flat across the
+// whole block tree without tracking scope boundaries — that can only ever
+// SUPPRESS a diagnostic, never raise one, so a missed boundary is always safe.
 // `with_for_headers` says whether the variables a for loop's initialization
 // declares are among them, and `with_bindings` whether the variables a
 // pattern binds are: CollectProcRhsIdents gives those the scopes §12.6.1 to
 // §12.6.3 define instead.
 static void CollectLocalNames(const Stmt* s,
                               std::unordered_set<std::string_view>& names,
-                              bool with_for_headers, bool with_bindings) {
+                              bool with_for_headers, bool with_bindings,
+                              bool with_lets_and_enum_members) {
   if (!s) return;
   // §12.6's patterns: those of a `case ... matches` item (§12.6.1), and those
   // under a `matches` operator in the positions CollectProcRhsIdents below
@@ -540,6 +542,15 @@ static void CollectLocalNames(const Stmt* s,
   }
   if (s->kind == StmtKind::kVarDecl && !s->var_name.empty()) {
     names.insert(s->var_name);
+  }
+  // §11.12 lists a sequential and a parallel block among the scopes a let may
+  // be declared in, and the parser keeps such a let as a kBlockItemDecl
+  // statement over the let's item (Parser::ParseBlockVarDecls).
+  if (with_lets_and_enum_members) {
+    if (s->kind == StmtKind::kBlockItemDecl &&
+        s->decl_item->kind == ModuleItemKind::kLetDecl)
+      names.insert(s->decl_item->name);
+    CollectBlockEnumMemberNames(s, names);
   }
   for (auto v : s->foreach_vars) names.insert(v);
   // A.6.8 gives `for_initialization ::= list_of_variable_assignments | ...`,
@@ -559,7 +570,6 @@ static void CollectLocalNames(const Stmt* s,
     }
   }
   CollectRandsequenceDeclaredNames(s, names);
-  CollectBlockEnumMemberNames(s, names);
   // §6.5 rules that data is declared before it is used, implicit nets aside,
   // and puts no condition on the statement the declaration stands in, so every
   // position a statement holds a statement in is a position this collection
@@ -580,18 +590,24 @@ static void CollectLocalNames(const Stmt* s,
   // same four links and never collected the read either, which is why the two
   // halves of the check are put on this list together.
   ForEachChildStmt(s, [&](Stmt* const& sub) {
-    CollectLocalNames(sub, names, with_for_headers, with_bindings);
+    CollectLocalNames(sub, names, with_for_headers, with_bindings,
+                      with_lets_and_enum_members);
   });
 }
 
 void CollectProcLocalNames(const Stmt* s,
                            std::unordered_set<std::string_view>& names) {
-  CollectLocalNames(s, names, true, true);
+  CollectLocalNames(s, names, true, true, true);
+}
+
+void CollectProcVariableNames(const Stmt* s,
+                              std::unordered_set<std::string_view>& names) {
+  CollectLocalNames(s, names, true, true, false);
 }
 
 void CollectProcReadableNames(const Stmt* s,
                               std::unordered_set<std::string_view>& names) {
-  CollectLocalNames(s, names, false, false);
+  CollectLocalNames(s, names, false, false, true);
 }
 
 std::unordered_set<std::string_view> MatchesBindingsOf(const Expr* e) {
