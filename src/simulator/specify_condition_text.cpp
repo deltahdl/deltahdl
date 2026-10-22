@@ -27,8 +27,11 @@ namespace delta {
 namespace {
 
 // The spelling of an operator a state-dependent path condition may be built
-// from (§30.4.4.1). An operator with no spelling here is one the condition text
-// below cannot render.
+// from (§30.4.4.1, Table 30-1), each XNOR in the spelling it was written in,
+// and of the case equalities a timing check condition may also compare with
+// (A.7.5.3's scalar_timing_check_condition), whose text is rendered here too.
+// An operator with no spelling here is one the condition text below cannot
+// render.
 std::string_view SpecifyConditionOperator(TokenKind op) {
   switch (op) {
     case TokenKind::kBang:
@@ -53,6 +56,14 @@ std::string_view SpecifyConditionOperator(TokenKind op) {
       return "|";
     case TokenKind::kCaret:
       return "^";
+    case TokenKind::kCaretTilde:
+      return "^~";
+    case TokenKind::kTildeCaret:
+      return "~^";
+    case TokenKind::kTildeAmp:
+      return "~&";
+    case TokenKind::kTildePipe:
+      return "~|";
     default:
       return {};
   }

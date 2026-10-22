@@ -57,6 +57,12 @@
 // range. The case asserting two conditions are not one writes `mode[9 : 6]`
 // against `mode[7:6]`, 9 being a value nothing else here uses, so what that
 // case turns on is a digit rather than a space.
+//
+// Table 30-1 also lists bitwise and reduction XNOR in both spellings, ^~ and
+// ~^, and reduction NAND and NOR, ~& and ~|, which the renderer spelled none
+// of, so a condition using one came out empty. Four direct cases read each back
+// in its own spelling, and a design declares an XNOR path at 31 beside an XOR
+// path at 43 that an SDF file annotating 71 must leave alone.
 
 #include <gtest/gtest.h>
 
@@ -119,6 +125,32 @@ TEST(StateDependentPathConditionText,
   EXPECT_EQ(TextOfCondition("hold ? gate : keep", f), "hold ? gate : keep");
 }
 
+// §30.4.4.1 Table 30-1 lists bitwise XNOR spelled ^~, so a condition built
+// from it is written with that operator between its operands.
+TEST(StateDependentPathConditionText, CaretTildeXnorConditionKeepsItsSpelling) {
+  SimFixture f;
+  EXPECT_EQ(TextOfCondition("gate ^~ hold", f), "gate ^~ hold");
+}
+
+// §30.4.4.1 Table 30-1 lists bitwise XNOR spelled ~^ too, and an SDF COND
+// written that way names it so, so the spelling the source chose is kept.
+TEST(StateDependentPathConditionText, TildeCaretXnorConditionKeepsItsSpelling) {
+  SimFixture f;
+  EXPECT_EQ(TextOfCondition("gate ~^ hold", f), "gate ~^ hold");
+}
+
+// §30.4.4.1 Table 30-1 lists reduction NAND, written before its operand.
+TEST(StateDependentPathConditionText, ReductionNandConditionNamesItsOperand) {
+  SimFixture f;
+  EXPECT_EQ(TextOfCondition("~&gate", f), "~&gate");
+}
+
+// §30.4.4.1 Table 30-1 lists reduction NOR, written before its operand.
+TEST(StateDependentPathConditionText, ReductionNorConditionNamesItsOperand) {
+  SimFixture f;
+  EXPECT_EQ(TextOfCondition("~|hold", f), "~|hold");
+}
+
 // §30.4.4.1: Table 30-1 does not list `<`, so a condition built from it is no
 // state-dependent path condition and has no spelling an SDF COND could match;
 // it renders as nothing, as an unconditional path does. The elaborator reports
@@ -165,6 +197,17 @@ const char* const kTwoBitConditions =
 // SDF file lexes into three tokens, and a concatenation, which it lexes into
 // one token or two according to the space after the comma. src_a and dst_y
 // stand in the same §30.4.1 relation to the path as they do above.
+// Two paths between one pair of terminals told apart by an XNOR and an XOR of
+// the same two inputs, so the operator alone decides which one a COND reaches.
+const char* const kXnorCondition =
+    "module path_xnor_cell(input src_a, input sel_p, input sel_q,\n"
+    "                      output dst_y);\n"
+    "  specify\n"
+    "    if (sel_p ~^ sel_q) (src_a => dst_y) = 31;\n"
+    "    if (sel_p ^ sel_q) (src_a => dst_y) = 43;\n"
+    "  endspecify\n"
+    "endmodule\n";
+
 const char* const kSpelledConditions =
     "module path_spell_cell(input src_a, input [7:0] mode, input en_hi,\n"
     "                       input en_lo, output dst_y);\n"
@@ -311,6 +354,28 @@ TEST(StateDependentPathConditionSpelling,
 
   ASSERT_NE(selected, nullptr);
   EXPECT_EQ(selected->delays[0], 67u);
+}
+
+// §32.4.1: a COND written with XNOR lands on the path declared under it, so the
+// declared 31 gives way to the file's 71, and the XOR path between the same
+// terminals keeps its 43. With the XNOR rendered as nothing, the COND matched
+// no path and the XNOR path kept 31.
+TEST(StateDependentPathConditionText,
+     SdfCondOnAnXnorAnnotatesTheDeclaredPathOnly) {
+  SimFixture f;
+  SpecifyManager mgr;
+  ASSERT_TRUE(RegisterPathsOf(kXnorCondition, f, mgr));
+
+  ApplySdfOnto(CellDelaySdf("path_xnor_cell",
+                            "(COND sel_p ~^ sel_q (IOPATH src_a dst_y (71)))"),
+               mgr);
+
+  const PathDelay* xnor = PathConditionedOn(mgr, "sel_p ~^ sel_q");
+  ASSERT_NE(xnor, nullptr);
+  EXPECT_EQ(xnor->delays[0], 71u);
+  const PathDelay* xor_path = PathConditionedOn(mgr, "sel_p ^ sel_q");
+  ASSERT_NE(xor_path, nullptr);
+  EXPECT_EQ(xor_path->delays[0], 43u);
 }
 
 }  // namespace
