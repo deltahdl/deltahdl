@@ -24,16 +24,16 @@ const DataType* ClassAggregateTypedef(const ClassDecl& decl,
                                       std::string_view name);
 
 // §8.25 with §8.23 and §7.2: registers, where none stands yet, the layout of
-// the aggregate typedef `type` a class declares under `name`, its members'
-// packed widths folded against `scope` -- the parameter values of the
-// specialization `spelled` names -- under the key "<spelled>::<name>",
-// `Box#(16)::S`, and answers the key. A method's local and a property of the
-// specialization declared by the typedef share the one registration.
-std::string_view RegisterSpecializationTypedefLayout(std::string_view spelled,
-                                                     std::string_view name,
-                                                     const DataType& type,
-                                                     const ScopeMap& scope,
-                                                     SimContext& ctx);
+// the aggregate typedef the class `declarer` declares under `name`, its
+// members' packed widths folded against `scope` -- the parameter values of
+// the specialization `spelled` names -- under the key "<spelled>::<name>",
+// `Box#(16)::S`, and answers the key. A member written as the name of a
+// typedef `declarer` reaches is sized by that typedef (§23.9). A method's
+// local and a property of the specialization declared by the typedef share
+// the one registration.
+std::string_view RegisterSpecializationTypedefLayout(
+    std::string_view spelled, const ClassTypeInfo& declarer,
+    std::string_view name, const ScopeMap& scope, SimContext& ctx);
 
 // §8.13 with §8.23: the class declaring the typedef named `name` that a
 // member of the class `info`, declared by `cls`, reaches bare -- `info` itself
@@ -44,14 +44,13 @@ const ClassTypeInfo* ClassTypedefDeclarer(std::string_view name,
                                           const ClassDecl& cls,
                                           const ClassDecl*& decl);
 
-// §8.25 with §8.23: the key of the layout the aggregate typedef `type`, which
-// the class `cls` declares under `name`, has under the specialization `cls`
-// is -- `Box#(16)::S`, or `Box#()::S` for the default one -- folded with that
+// §8.25 with §8.23: the key of the layout the aggregate typedef the class
+// `cls` declares under `name` has under the specialization `cls` is --
+// `Box#(16)::S`, or `Box#()::S` for the default one -- folded with that
 // specialization's parameter values and registered by
 // RegisterSpecializationTypedefLayout where none stands yet.
 std::string_view ClassTypedefLayoutKey(const ClassTypeInfo& cls,
-                                       std::string_view name,
-                                       const DataType& type, SimContext& ctx);
+                                       std::string_view name, SimContext& ctx);
 
 // §8.25 with §8.23 and §7.2 (printed pages 203, 200 and 146): a structure or
 // union typedef a parameterized class declares, `typedef struct { bit [p-1:0]

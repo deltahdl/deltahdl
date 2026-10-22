@@ -489,11 +489,10 @@ bool SizeClassTypedefProperty(ClassTypeInfo::PropertyInfo& prop,
                               const ScopeMap& scope, SimContext& ctx) {
   if (type.kind != DataTypeKind::kNamed || !type.scope_name.empty())
     return false;
-  const DataType* aggregate =
-      ClassAggregateTypedef(*spec->decl, type.type_name);
-  if (aggregate == nullptr) return false;
+  if (ClassAggregateTypedef(*spec->decl, type.type_name) == nullptr)
+    return false;
   std::string_view key = RegisterSpecializationTypedefLayout(
-      spec->name, type.type_name, *aggregate, scope, ctx);
+      spec->name, *spec, type.type_name, scope, ctx);
   if (const StructTypeInfo* layout = ctx.FindStructType(key)) {
     prop.type_name = key;
     prop.width = layout->total_width;
@@ -515,9 +514,8 @@ std::string_view BaseTypedefKey(const DataType& type, const ClassTypeInfo& spec,
       ClassTypedefDeclarer(type.type_name, spec, *spec.decl, decl);
   if (owner == nullptr || owner == &spec || !ClassHasValueParams(*decl))
     return {};
-  const DataType* aggregate = ClassAggregateTypedef(*decl, type.type_name);
-  if (aggregate == nullptr) return {};
-  return ClassTypedefLayoutKey(*owner, type.type_name, *aggregate, ctx);
+  if (ClassAggregateTypedef(*decl, type.type_name) == nullptr) return {};
+  return ClassTypedefLayoutKey(*owner, type.type_name, ctx);
 }
 
 // A property of `spec` declared by a parameterized base's typedef takes the

@@ -676,4 +676,127 @@ TEST(ImportedStructureTypedefSim, ANamedImportAloneKeepsThePackagesMemberType) {
             "5\n");
 }
 
+// §23.9 with §8.25: a parameterized class's structure typedef finds the
+// class's own nib_t too, sized under the specialization's values: with W of
+// 2, x is two 4-bit nib_t, S 9 bits, and 9'h1A5 keeps x at 210 and y at 1.
+// Laid out by the design's table under the bare name, x reached no typedef
+// and, its dimensions folding to nothing without W, took one bit.
+TEST(ParameterizedClassStructureTypedefSim, AMemberTakesTheClassTypedef) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class Box #(int W = 2);\n"
+                       "  typedef logic [3:0] nib_t;\n"
+                       "  typedef struct packed { nib_t [W-1:0] x; logic y; } "
+                       "S;\n"
+                       "  S s;\n"
+                       "  function void show();\n"
+                       "    s = 9'h1A5;\n"
+                       "    $display(\"%0d %0d %0d\", $bits(s), s.x, s.y);\n"
+                       "  endfunction\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  Box #() b;\n"
+                       "  initial begin b = new; b.show(); end\n"
+                       "endmodule\n",
+                       f),
+            "9 210 1\n");
+}
+
+// The same under a compilation-unit nib_t of 6 bits, which the bare lookup
+// took instead, making S 13 bits. The class declares another typedef ahead of
+// nib_t, which the search for nib_t passes over.
+TEST(ParameterizedClassStructureTypedefSim,
+     AMemberTakesTheClassTypedefOverTheUnits) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("typedef logic [5:0] nib_t;\n"
+                       "class Box #(int W = 2);\n"
+                       "  typedef logic [7:0] byte_t;\n"
+                       "  typedef logic [3:0] nib_t;\n"
+                       "  typedef struct packed { nib_t [W-1:0] x; logic y; } "
+                       "S;\n"
+                       "  S s;\n"
+                       "  function void show();\n"
+                       "    s = 9'h1A5;\n"
+                       "    $display(\"%0d %0d %0d\", $bits(s), s.x, s.y);\n"
+                       "  endfunction\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  Box #() b;\n"
+                       "  initial begin b = new; b.show(); end\n"
+                       "endmodule\n",
+                       f),
+            "9 210 1\n");
+}
+
+// A class typedef that uses the class's parameter is sized by each
+// specialization's own value (§8.25): w_t is 3 bits in Box #(3) and 5 in
+// Box #(5), so S is 4 and 6 bits.
+TEST(ParameterizedClassStructureTypedefSim,
+     AMemberTakesTheClassTypedefUnderEachSpecialization) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class Box #(int W = 2);\n"
+                       "  typedef logic [W-1:0] w_t;\n"
+                       "  typedef struct packed { w_t x; logic y; } S;\n"
+                       "  S s;\n"
+                       "  function int width(); return $bits(s); endfunction\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  Box #(3) a;\n"
+                       "  Box #(5) b;\n"
+                       "  initial begin\n"
+                       "    a = new; b = new;\n"
+                       "    $display(\"%0d %0d\", a.width(), b.width());\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "4 6\n");
+}
+
+// A typedef the class inherits (§8.13) is found through its base, sized by
+// the base's own values: Base's 4-bit nib_t makes Der's S 9 bits.
+TEST(ParameterizedClassStructureTypedefSim, AMemberTakesAnInheritedTypedef) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class Base;\n"
+                       "  int k;\n"
+                       "  typedef logic [3:0] nib_t;\n"
+                       "endclass\n"
+                       "class Der #(int W = 2) extends Base;\n"
+                       "  typedef struct packed { nib_t [W-1:0] x; logic y; } "
+                       "S;\n"
+                       "  S s;\n"
+                       "  function int width(); return $bits(s); endfunction\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  Der #() d;\n"
+                       "  initial begin d = new; $display(\"%0d\", d.width()); "
+                       "end\n"
+                       "endmodule\n",
+                       f),
+            "9\n");
+}
+
+// A member written through a package (§26.3) or by a typedef of the
+// compilation unit the class does not redeclare keeps the type the design's
+// table holds for it: 3 + 5 + 2 bits.
+TEST(ParameterizedClassStructureTypedefSim,
+     AMemberNamedOutsideTheClassKeepsItsType) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package p;\n"
+                       "  typedef logic [2:0] t3;\n"
+                       "endpackage\n"
+                       "typedef logic [4:0] t5;\n"
+                       "class Box #(int W = 2);\n"
+                       "  typedef struct packed { p::t3 a; t5 b; logic [W-1:0] "
+                       "c; } S;\n"
+                       "  S s;\n"
+                       "  function int width(); return $bits(s); endfunction\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  Box #() b;\n"
+                       "  initial begin b = new; $display(\"%0d\", b.width()); "
+                       "end\n"
+                       "endmodule\n",
+                       f),
+            "10\n");
+}
+
 }  // namespace

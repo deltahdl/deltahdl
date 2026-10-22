@@ -420,10 +420,9 @@ static std::string_view PropertyTypeKey(const DataType& type,
   if (aggregate == nullptr) return type.type_name;
   if (ClassHasValueParams(*decl)) {
     if (owner != &info)
-      return ClassTypedefLayoutKey(*owner, type.type_name, *aggregate, ctx);
-    return RegisterSpecializationTypedefLayout(std::string(info.name) + "#()",
-                                               type.type_name, *aggregate,
-                                               params, ctx);
+      return ClassTypedefLayoutKey(*owner, type.type_name, ctx);
+    return RegisterSpecializationTypedefLayout(
+        std::string(info.name) + "#()", info, type.type_name, params, ctx);
   }
   Arena& arena = ctx.GetArena();
   const auto* key = arena.Create<std::string>(
