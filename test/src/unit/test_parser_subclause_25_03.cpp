@@ -330,8 +330,8 @@ TEST(InterfaceItemsParsing, InvalidTokenInBodyIsError) {
       "  123bad\n"
       "endinterface\n");
   // The body item dispatcher is shared with module bodies, so
-  // Parser::ParseTypedItemOrInst in src/parser/parser_items.cpp files the
-  // report under §23.2.4.
+  // Parser::ParseTypedItemOrInst in src/parser/parser_items_data_decl.cpp
+  // files the report under §23.2.4.
   EXPECT_TRUE(
       ReportedError(r.diags, "unexpected token in module body", 2, "23.2.4"));
 }

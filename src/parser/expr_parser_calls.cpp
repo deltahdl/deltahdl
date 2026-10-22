@@ -1,6 +1,7 @@
 #include <utility>
 #include <vector>
 
+#include "common/arena.h"
 #include "common/diagnostic.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
@@ -10,6 +11,25 @@
 #include "parser/parser.h"
 
 namespace delta {
+
+namespace {
+
+// A.9.3 makes `$unit ::` a package_scope, so the type a cast names through it
+// is written as the scope resolution a package's type is, `$unit :: T` as
+// `P :: T`: the cast then reads its type under the "$unit::T" key the
+// elaborator records the unit's typedefs by (RegisterUnitScopedType).
+Expr* UnitScopedTypeName(Arena& arena, const Token& unit_tok,
+                         const Expr* name) {
+  auto* acc = arena.Create<Expr>();
+  acc->kind = ExprKind::kMemberAccess;
+  acc->lhs = MakeIdentifierNode(arena, unit_tok.text, unit_tok.loc);
+  acc->rhs = MakeIdentifierNode(arena, name->text, name->range.start);
+  acc->is_scope_resolution = true;
+  acc->range.start = unit_tok.loc;
+  return acc;
+}
+
+}  // namespace
 
 // Builds the scoped identifier expression produced by a "$unit::id" or
 // "$root.id" system-keyword prefix (see 23.7.1 scope resolution /
@@ -110,11 +130,18 @@ Expr* Parser::ParseSystemCall() {
   // reported as a statement missing its ';' at the `.` or `[`. The head
   // identifier keeps the prefix in Expr::scope_prefix, which the simulator
   // resolves the unit's storage by (IdentifierLookupKey in
-  // src/simulator/eval_function_args_scoped.cpp).
+  // src/simulator/eval_function_args_scoped.cpp). A.8.4 makes the name the
+  // casting type of a cast where `'(` or `'{` follows it, as
+  // TryParseIdentifierCast reads one after `P::T`; left to the tail,
+  // `$unit::T'(x)` stopped at the `'`.
   if (tok.text == "$unit" && Check(TokenKind::kColonColon)) {
     Consume();
-    return ParseIdentifierPostfixChain(
-        ParseSysRootTail(MakeSysScopePrefix(tok)));
+    Expr* name = MakeSysScopePrefix(tok);
+    bool cast_handled = false;
+    Expr* cast = TryParseIdentifierCast(UnitScopedTypeName(arena_, tok, name),
+                                        &cast_handled);
+    if (cast_handled) return cast;
+    return ParseIdentifierPostfixChain(ParseSysRootTail(name));
   }
   // §23.6 lets `$root` head a hierarchical name, and the name takes the tail
   // any name primary takes: `$root.top.arr[1][0]` and `$root.m.u.d.f()` were

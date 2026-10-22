@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <cstdint>
 
 #include "fixture_parser.h"
@@ -781,6 +782,65 @@ TEST(TypeDeclParsing, NettypeOfAPackageScopedTypeOrNettype) {
   EXPECT_EQ(items[1]->name, "alias_nt");
   EXPECT_EQ(items[1]->typedef_type.scope_name, "P");
   EXPECT_EQ(items[1]->typedef_type.type_name, "nt");
+}
+
+// A.2.1.3 lets const, var and a lifetime open a data_declaration, and A.2.2.1
+// lets its data type be named through a package scope, which no qualifier
+// rules out. Outside procedural code every qualified form was read as an
+// implicit type: P taken for the variable's name after `var`, and the
+// declaration reported as wanting `var` after `const` or `static` (#7603).
+TEST(TypeDeclParsing, AQualifiedDataDeclarationTakesAPackageScopedType) {
+  auto r = Parse(
+      "package P;\n"
+      "  typedef logic [3:0] T;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  var P::T a;\n"
+      "  const P::T b = 4'hA;\n"
+      "  static P::T c;\n"
+      "  const var static P::T d = 4'h5;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& items = r.cu->modules[0]->items;
+  ASSERT_EQ(items.size(), 4u);
+  const char* const kNames[] = {"a", "b", "c", "d"};
+  for (std::size_t i = 0; i < items.size(); ++i) {
+    EXPECT_EQ(items[i]->kind, ModuleItemKind::kVarDecl) << i;
+    EXPECT_EQ(items[i]->name, kNames[i]);
+    EXPECT_EQ(items[i]->data_type.scope_name, "P") << i;
+    EXPECT_EQ(items[i]->data_type.type_name, "T") << i;
+  }
+  EXPECT_FALSE(items[0]->data_type.is_const);
+  EXPECT_TRUE(items[1]->data_type.is_const);
+  EXPECT_FALSE(items[2]->data_type.is_const);
+  EXPECT_TRUE(items[3]->data_type.is_const);
+}
+
+// §6.8 reports `automatic` on a data declaration outside procedural code, and
+// the declaration it opens still takes its package-scoped type, so the report
+// that an implicit type wants `var` is not filed beside it.
+TEST(TypeDeclParsing, AnAutomaticPackageScopedDeclarationReportsTheLifetime) {
+  auto r = Parse(
+      "package P;\n"
+      "  typedef logic [3:0] T;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  automatic P::T e;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "'automatic' is not allowed in a data_declaration "
+                            "outside a procedural context",
+                            5, "6.8"));
+  EXPECT_FALSE(ReportedError(r.diags,
+                             "data_declaration without an explicit data type "
+                             "requires the 'var' keyword",
+                             5, "6.8"));
+  auto& items = r.cu->modules[0]->items;
+  ASSERT_EQ(items.size(), 1u);
+  EXPECT_EQ(items[0]->name, "e");
+  EXPECT_EQ(items[0]->data_type.scope_name, "P");
 }
 
 }  // namespace

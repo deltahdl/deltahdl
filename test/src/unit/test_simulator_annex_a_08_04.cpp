@@ -145,4 +145,24 @@ TEST(PrimarySim, ConcatenationWithRangeSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 0x5u);
 }
 
+// A cast through `$unit ::` takes the compilation unit's T, four bits, where
+// the module declares a T of eight bits of its own: 8'hAB becomes 8'h0B, and
+// a cast to the module's T would leave 8'hAB (#7602).
+TEST(PrimarySim, ACastThroughUnitScopeTakesTheUnitsType) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "typedef logic [3:0] T;\n"
+      "module t;\n"
+      "  typedef logic [7:0] T;\n"
+      "  logic [7:0] x, y;\n"
+      "  initial begin\n"
+      "    x = 8'hAB;\n"
+      "    y = $unit::T'(x);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "y");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xBu);
+}
+
 }  // namespace

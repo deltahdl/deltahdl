@@ -375,4 +375,49 @@ TEST(TypeDeclElaboration, NettypeResolutionClassChainReportsNameTheChain) {
                             9, "6.6.7"));
 }
 
+// A.2.1.3 with A.2.2.1: a qualified data declaration of a package's type
+// declares a variable of that type, four bits from P::T where the module's own
+// T is eight (#7603).
+TEST(TypeDeclElaboration, AQualifiedDeclarationTakesThePackagesType) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "package P;\n"
+      "  typedef logic [3:0] T;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  typedef logic [7:0] T;\n"
+      "  var P::T a;\n"
+      "  const P::T b = 4'hA;\n"
+      "  static P::T c;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const char* const kNames[] = {"a", "b", "c"};
+  for (const char* name : kNames) {
+    const RtlirVariable* v = FindVar(design, "m", name);
+    ASSERT_NE(v, nullptr) << name;
+    EXPECT_EQ(v->width, 4u) << name;
+  }
+}
+
+// §6.6.7: a nettype may declare only a net, and `var` opens a data
+// declaration, so a package's nettype named after it is reported under the
+// name the package gives it.
+TEST(TypeDeclElaboration, AVarDeclarationOfAPackagesNettypeIsReported) {
+  ElabFixture f;
+  Elaborate(
+      "package P;\n"
+      "  nettype logic [3:0] nt;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  var P::nt v;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "nettype 'P::nt' may declare only a net, and is "
+                            "named here as the type of variable 'v'",
+                            5, "6.6.7"));
+}
+
 }  // namespace

@@ -508,4 +508,32 @@ TEST(PrimaryParsing, MethodCallOnReplication) {
   EXPECT_EQ(rhs->lhs->lhs->kind, ExprKind::kReplicate);
 }
 
+// A.8.4 with A.9.3: a cast's casting type may be a type named through a
+// package_scope, and `$unit ::` is one (§3.12.1), so `$unit::T'(x)` is a cast
+// whose type is the scope resolution `$unit :: T`, the shape `P::T'(x)` takes.
+// The `'` after `$unit::T` was left unread (#7602).
+TEST(PrimaryParsing, ACastThroughUnitScopeIsACast) {
+  auto r = Parse(
+      "typedef logic [3:0] T;\n"
+      "module m;\n"
+      "  logic [7:0] x;\n"
+      "  logic [3:0] y;\n"
+      "  initial y = $unit::T'(x);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kCast);
+  ASSERT_NE(rhs->rhs, nullptr);
+  EXPECT_EQ(rhs->rhs->kind, ExprKind::kMemberAccess);
+  EXPECT_TRUE(rhs->rhs->is_scope_resolution);
+  ASSERT_NE(rhs->rhs->lhs, nullptr);
+  EXPECT_EQ(rhs->rhs->lhs->text, "$unit");
+  ASSERT_NE(rhs->rhs->rhs, nullptr);
+  EXPECT_EQ(rhs->rhs->rhs->text, "T");
+  ASSERT_NE(rhs->lhs, nullptr);
+  EXPECT_EQ(rhs->lhs->text, "x");
+}
+
 }  // namespace
