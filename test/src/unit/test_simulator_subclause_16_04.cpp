@@ -8,6 +8,7 @@
 #include "common/source_mgr.h"
 #include "common/types.h"
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "simulator/lowerer.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
@@ -379,6 +380,30 @@ TEST(DeferredAssertionSim, AClassMethodsDeferredActionFromAnAlwaysProcedure) {
       "endmodule\n",
       f);
   EXPECT_EQ(out, "f=1 p=1\n");
+}
+
+// §16.4: a deferred assertion's pass statement is a single subroutine call,
+// and a blocking assignment in its place is reported. §16.4.1 defers the call
+// a pass or failure names, and an assignment names none, so the run performs
+// nothing for it and goes on: x keeps its 0 while the procedure sets done.
+TEST(DeferredAssertionSim, APassStatementThatIsNoCallIsReportedAndNotRun) {
+  SimFixture f;
+  auto* x = RunAndFindVar(
+      "module t;\n"
+      "  int x = 0, done = 0;\n"
+      "  initial begin\n"
+      "    a: assert #0 (1) x = 5;\n"
+      "    done = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "x");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "deferred assertion pass action shall be a single subroutine call", 4,
+      "16.4"));
+  ASSERT_NE(x, nullptr);
+  EXPECT_EQ(x->value.ToUint64(), 0u);
+  EXPECT_EQ(f.ctx.FindVariable("done")->value.ToUint64(), 1u);
 }
 
 }  // namespace

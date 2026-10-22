@@ -37,6 +37,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
 #include "simulator/sim_context_types.h"
@@ -428,6 +429,27 @@ TEST(InstanceScopeSimulation, StaticMethodBareStaticIsNotItsCallersLocal) {
                       "endmodule\n",
                       "result"),
             44u);
+}
+
+// §23.9: a name a procedural assignment writes is looked up from the
+// procedure outward to the module's edge, and one declared nowhere on that
+// path is reported. The run writes nothing for it and goes on, so the
+// statement after it still sets done.
+TEST(InstanceScopeSimulation, AnAssignmentToANameDeclaredNowhereIsSkipped) {
+  SimFixture f;
+  auto* done = RunAndFindVar(
+      "module t;\n"
+      "  int done = 0;\n"
+      "  initial begin\n"
+      "    nosuch = 1;\n"
+      "    done = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "done");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "undeclared identifier 'nosuch'", 4, "23.9"));
+  ASSERT_NE(done, nullptr);
+  EXPECT_EQ(done->value.ToUint64(), 1u);
 }
 
 }  // namespace
