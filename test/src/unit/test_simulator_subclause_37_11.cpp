@@ -492,6 +492,45 @@ TEST_F(InstanceArraysOfARun, ASubarrayOrElementTerminalReachesEachElementsBit) {
   }
 }
 
+// §28.3.6 with §11.4.10: a bitwise operator works a bit at a time, so the bit
+// element k connects to of `a & b` is a[k] & b[k], and of `~a` it is ~a[k]:
+// each element's prim term reaches an operation over the operands' net bits.
+// Built as a select of the whole operation, element 0 reached the net a whole,
+// an operand of it, and element 1 reached nothing.
+TEST_F(InstanceArraysOfARun, ABitwiseTerminalReachesAnOperationOfEachBit) {
+  Run("module top; wire [1:0] a, b, y, z;\n"
+      "  buf g[1:0] (y, a & b);\n"
+      "  buf h[1:0] (z, ~a);\n"
+      "endmodule\n");
+  vpiHandle it = vpi_iterate(vpiGateArray, By("top"));
+  ASSERT_NE(it, nullptr);
+  vpiHandle g = vpi_scan(it);
+  vpiHandle h = vpi_scan(it);
+  ASSERT_NE(g, nullptr);
+  ASSERT_NE(h, nullptr);
+  if (std::string(vpi_get_str(vpiName, g)) == "h") std::swap(g, h);
+  for (int k = 0; k < 2; ++k) {
+    const std::vector<vpiHandle> kG = TermsOf(vpi_handle_by_index(g, k));
+    const std::vector<vpiHandle> kH = TermsOf(vpi_handle_by_index(h, k));
+    ASSERT_EQ(kG.size(), 2U);
+    ASSERT_EQ(kH.size(), 2U);
+    vpiHandle and_op = vpi_handle(vpiExpr, kG[1]);
+    EXPECT_EQ(OpOf(and_op), vpiBitAndOp) << k;
+    const std::vector<vpiHandle> kAnd = OperandsOf(and_op);
+    ASSERT_EQ(kAnd.size(), 2U);
+    EXPECT_EQ(VpiObjectOf(kAnd[0]),
+              VpiObjectOf(vpi_handle_by_index(By("top.a"), k)));
+    EXPECT_EQ(VpiObjectOf(kAnd[1]),
+              VpiObjectOf(vpi_handle_by_index(By("top.b"), k)));
+    vpiHandle neg_op = vpi_handle(vpiExpr, kH[1]);
+    EXPECT_EQ(OpOf(neg_op), vpiBitNegOp) << k;
+    const std::vector<vpiHandle> kNeg = OperandsOf(neg_op);
+    ASSERT_EQ(kNeg.size(), 1U);
+    EXPECT_EQ(VpiObjectOf(kNeg[0]),
+              VpiObjectOf(vpi_handle_by_index(By("top.a"), k)));
+  }
+}
+
 // §37.11: an instance array of switches is a switch array over switches.
 TEST_F(InstanceArraysOfARun, ASwitchInstanceArrayIsASwitchArray) {
   Run("module top; wire [1:0] o; logic [1:0] i; logic c;\n"

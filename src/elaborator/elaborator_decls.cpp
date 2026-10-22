@@ -480,13 +480,19 @@ std::string_view LhsSignalName(const Expr* lhs) {
 
 FoundSignalDecl FindSignalDecl(std::string_view name, const RtlirModule* mod) {
   for (const auto& v : mod->variables) {
-    if (v.name == name) return {v.dtype, v.width, v.num_unpacked_dims != 0};
+    if (v.name == name) {
+      return {v.dtype, v.width, v.num_unpacked_dims != 0, v.is_signed};
+    }
   }
   for (const auto& n : mod->nets) {
-    if (n.name == name) return {n.dtype, n.width, n.num_unpacked_dims != 0};
+    if (n.name == name) {
+      return {n.dtype, n.width, n.num_unpacked_dims != 0, n.is_signed};
+    }
   }
   for (const auto& p : mod->ports) {
-    if (p.name == name) return {p.dtype, p.width, p.num_unpacked_dims != 0};
+    if (p.name == name) {
+      return {p.dtype, p.width, p.num_unpacked_dims != 0, p.is_signed};
+    }
   }
   return {};
 }

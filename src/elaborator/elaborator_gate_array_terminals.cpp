@@ -36,22 +36,88 @@ Expr* MakeBitSelectAt(Arena& arena, Expr* base, int64_t index) {
   return e;
 }
 
+// §5.7.1: the literal of one bit whose 4-state encoding is `aval` and `bval`,
+// 1'b0, 1'b1, 1'bz or 1'bx.
+Expr* OneBitLiteral(Arena& arena, size_t aval, size_t bval) {
+  static constexpr std::string_view kBitTexts[] = {"1'b0", "1'b1", "1'bz",
+                                                   "1'bx"};
+  auto* e = arena.Create<Expr>();
+  e->kind = ExprKind::kIntegerLiteral;
+  e->text = kBitTexts[(bval * 2) + aval];
+  e->int_val = aval * (1 - bval);
+  return e;
+}
+
 // §5.7.1: the bit `bit` above the least significant end of the integer
 // literal `lit`, a 0, 1, x or z, as a literal of one bit of its own, the
 // constant one instance of the array connects to.
 Expr* LiteralBitAt(Arena& arena, const Expr* lit, uint32_t bit) {
-  static constexpr std::string_view kBitTexts[] = {"1'b0", "1'b1", "1'bz",
-                                                   "1'bx"};
   const Logic4Vec kValue = EvalIntLiteral(lit, arena);
   const Logic4Word& word = kValue.words[bit / 64];
   const uint64_t kMask = uint64_t{1} << (bit % 64);
-  const auto kAval = static_cast<size_t>((word.aval & kMask) != 0);
-  const auto kBval = static_cast<size_t>((word.bval & kMask) != 0);
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIntegerLiteral;
-  e->text = kBitTexts[(kBval * 2) + kAval];
-  e->int_val = kAval * (1 - kBval);
-  return e;
+  return OneBitLiteral(arena, static_cast<size_t>((word.aval & kMask) != 0),
+                       static_cast<size_t>((word.bval & kMask) != 0));
+}
+
+// §11.4.10: whether `t` is an operator that works a bit at a time, the ~ of
+// one operand or the &, | or ^ of two, whose bit k is made of the operands'
+// bits k alone.
+bool IsBitwise(const Expr* t) {
+  if (t->kind == ExprKind::kUnary) return t->op == TokenKind::kTilde;
+  return t->kind == ExprKind::kBinary &&
+         (t->op == TokenKind::kAmp || t->op == TokenKind::kPipe ||
+          t->op == TokenKind::kCaret);
+}
+
+// Whether every operand under the bitwise operators of `t` measures a width
+// (GateTerminalWidth), so that each of its bits can be addressed. Any other
+// operation among them measures none, and its bits are not its operands'.
+bool OperandsMeasured(const Expr* t, const RtlirModule* mod,
+                      const ScopeMap& scope) {
+  if (!IsBitwise(t)) return GateTerminalWidth(t, mod, scope) != 0;
+  return OperandsMeasured(t->lhs, mod, scope) &&
+         (t->rhs == nullptr || OperandsMeasured(t->rhs, mod, scope));
+}
+
+// §11.8.1: whether the bitwise terminal `t` is signed, which it is where every
+// operand under its operators is: a signal declared signed or a literal
+// written signed. A select, a concatenation and anything else is unsigned.
+bool TerminalSigned(const Expr* t, const RtlirModule* mod) {
+  if (IsBitwise(t)) {
+    return TerminalSigned(t->lhs, mod) &&
+           (t->rhs == nullptr || TerminalSigned(t->rhs, mod));
+  }
+  if (t->kind == ExprKind::kIntegerLiteral) return IsSignedLiteral(t->text);
+  return t->kind == ExprKind::kIdentifier &&
+         FindSignalDecl(t->text, mod).is_signed;
+}
+
+// The bit `bit` of `t`, an operand under the bitwise operators of a terminal,
+// each operand extended to the terminal's width before the operators apply
+// (§11.6.1): past an operand's own width its bit is the operand's sign bit
+// where `extend_sign`, the terminal being signed (§11.8.2), and 0 where not.
+// An operand of one bit is its own bit.
+Expr* OperandBitAt(Expr* t, uint32_t bit, bool extend_sign,
+                   const GateArraySite& site) {
+  if (IsBitwise(t)) {
+    auto* e = site.arena.Create<Expr>();
+    e->kind = t->kind;
+    e->range = t->range;
+    e->op = t->op;
+    e->lhs = OperandBitAt(t->lhs, bit, extend_sign, site);
+    if (t->rhs != nullptr) {
+      e->rhs = OperandBitAt(t->rhs, bit, extend_sign, site);
+    }
+    return e;
+  }
+  const uint32_t kWidth = GateTerminalWidth(t, site.mod, site.scope);
+  if (bit >= kWidth) {
+    if (!extend_sign) return OneBitLiteral(site.arena, 0, 0);
+    bit = kWidth - 1;
+  }
+  return kWidth == 1
+             ? t
+             : GateTerminalBit(t, bit, site.mod, site.scope, site.arena);
 }
 
 // How far above the least significant end of the range `range` the low end of
@@ -135,14 +201,11 @@ uint32_t GateTerminalWidth(const Expr* t, const RtlirModule* mod,
   }
   // §11.6.1: ~ is as wide as its operand, and &, | and ^ as the wider of
   // theirs; any other operator connects whole.
-  if (t->kind == ExprKind::kUnary && t->op == TokenKind::kTilde) {
-    return GateTerminalWidth(t->lhs, mod, scope);
-  }
-  if (t->kind == ExprKind::kBinary &&
-      (t->op == TokenKind::kAmp || t->op == TokenKind::kPipe ||
-       t->op == TokenKind::kCaret)) {
-    return std::max(GateTerminalWidth(t->lhs, mod, scope),
-                    GateTerminalWidth(t->rhs, mod, scope));
+  if (IsBitwise(t)) {
+    const uint32_t kLhs = GateTerminalWidth(t->lhs, mod, scope);
+    return t->rhs == nullptr
+               ? kLhs
+               : std::max(kLhs, GateTerminalWidth(t->rhs, mod, scope));
   }
   if (t->kind != ExprKind::kConcatenation) return LookupLhsWidth(t, mod);
   uint32_t total = 0;
@@ -172,7 +235,14 @@ Expr* GateTerminalBit(Expr* t, uint32_t bit, const RtlirModule* mod,
     return MakeBitSelectAt(arena, t->base, range.IndexAtOffset(offset));
   }
   if (t->kind == ExprKind::kIntegerLiteral) return LiteralBitAt(arena, t, bit);
-  // An operator expression, an input terminal alone, is addressed as
+  // §11.4.10: a bitwise operator's bit is the operator over its operands'
+  // bits, so each instance connects to an expression of its own one bit, the
+  // operands' bits the VPI model reports it over. Selected whole, the
+  // operation had no object for its bit.
+  if (IsBitwise(t) && OperandsMeasured(t, mod, scope)) {
+    return OperandBitAt(t, bit, TerminalSigned(t, mod), {mod, scope, arena});
+  }
+  // Any other operator expression, an input terminal alone, is addressed as
   // [width-1:0].
   if (t->kind != ExprKind::kConcatenation) {
     return MakeBitSelectAt(arena, t, bit);

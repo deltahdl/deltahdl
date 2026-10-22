@@ -345,6 +345,42 @@ TEST(GateArrayRuntime, AnOperatorExpressionTerminalIsSharedOutPerInstance) {
   EXPECT_EQ(out, "z00z 0111 0110 1010 0000\n");
 }
 
+// Each instance takes its bit of a bitwise terminal as the operator over the
+// operands' bits, every operand first extended to the terminal's width
+// (§11.6.1): with 0 where the terminal is unsigned, as for c, the scalar s1,
+// and the part-select sc[1:0], which is unsigned whatever it selects from
+// (§11.8.1), and with the operand's sign bit where every operand is signed
+// (§11.8.2), as for sc, the signed scalar ss and the literal 2'sb10, inside a
+// ~ as at the top. An operand the width is not read through, the + on either
+// side, leaves its operation selected whole, read at the four bits it is
+// evaluated at: c + c is 0110 there and 10 alone.
+TEST(GateArrayRuntime, ABitwiseTerminalExtendsEachOperandToItsWidth) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module m;\n"
+      "  wire [3:0] a = 4'b0101;\n"
+      "  wire [1:0] c = 2'b11;\n"
+      "  wire s1 = 1'b1;\n"
+      "  wire signed [3:0] sa = 4'sb0101;\n"
+      "  wire signed [1:0] sc = 2'sb10;\n"
+      "  wire signed ss = 1'b1;\n"
+      "  wire [3:0] y1, y2, y3, y4, y5, y6, y7, y8, y9;\n"
+      "  buf g1[3:0] (y1, a | c);\n"
+      "  buf g2[3:0] (y2, sa | sc);\n"
+      "  buf g3[3:0] (y3, a ^ s1);\n"
+      "  buf g4[3:0] (y4, ~(sa & sc));\n"
+      "  buf g5[3:0] (y5, sa ^ ss);\n"
+      "  buf g6[3:0] (y6, sa | 2'sb10);\n"
+      "  buf g7[3:0] (y7, sa | sc[1:0]);\n"
+      "  buf g8[3:0] (y8, a & (c + c));\n"
+      "  buf g9[3:0] (y9, (c + c) & a);\n"
+      "  initial #1 $display(\"%b %b %b %b %b %b %b %b %b\",\n"
+      "                      y1, y2, y3, y4, y5, y6, y7, y8, y9);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0111 1111 0100 1011 1010 1111 0111 0100 0100\n");
+}
+
 // A literal terminal is measured by its bit length as any other expression is,
 // a sized literal's being its size (§5.7.1), so one as wide as the array is
 // shared out a bit per instance: g[k] buffers bit k of 4'b1100, h[k] bit k of
