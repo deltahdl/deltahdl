@@ -12,11 +12,15 @@
 // assert-no-oversized-source-files in .github/workflows/deltahdl.yml fails at.
 // §6.20 is a rule of its own and its checks call nothing else in that file.
 //
-// §10.6.1 and §10.6.2 bound what a procedural continuous assignment writes, and
-// a constant is outside both bounds, so the same walk asks of an `assign` and a
-// `force` whether its target is rooted at one.
+// §10.4 and §10.6 bound what a procedural assignment and a procedural
+// continuous assignment write, and a constant is outside every one of those
+// bounds, so the same walk asks of each such statement whether its target is
+// rooted at one -- of a blocking or nonblocking assignment, whether at a name
+// an enumeration declares, since §6.20 already answers for a parameter
+// constant.
 
 #include <format>
+#include <string_view>
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
@@ -63,32 +67,46 @@ void Elaborator::ReportConstAssignTarget(const Expr* lhs, SourceLoc loc) {
               Subclause("6.20"));
 }
 
-// §10.6.1 and §10.6.2: Syntax 10-4 writes a procedural `assign` as a
-// variable_assignment and a `force` as that or a net_assignment, and the two
-// subclauses bound their targets to variables and, for a force, nets. A
-// parameter constant (§6.20) and a name an enumeration declares (§6.19) are
-// constants and neither, so a target rooted at one, or an element of a
-// concatenation rooted at one, is reported under the subclause bounding the
-// statement it stands in.
-static void ReportConstContinuousTarget(const Expr* lhs, const Stmt* s,
-                                        const NameSet& const_names,
-                                        const NameSet& enum_members,
-                                        DiagEngine& diag) {
+// §10.4.1 and §10.4.2 write the target of a blocking and a nonblocking
+// assignment as a variable_lvalue (Syntax 10-2), Syntax 10-4 in §10.6 writes a
+// procedural `assign` as a variable_assignment and a `force` as that or a
+// net_assignment, and §10.6.1 and §10.6.2 bound those two to variables and, for
+// a force, nets. A parameter constant (§6.20) and a name an enumeration
+// declares (§6.19) are constants and none of these, so a target rooted at one,
+// or an element of a concatenation rooted at one, is reported under the
+// subclause bounding the statement `s`. A blocking or nonblocking write to a
+// parameter constant is §6.20's report (Elaborator::ReportConstAssignTarget),
+// so only an enumeration's name is asked about for those two.
+static void ReportConstantRootedTarget(const Expr* lhs, const Stmt* s,
+                                       const NameSet& const_names,
+                                       const NameSet& enum_members,
+                                       DiagEngine& diag) {
   if (lhs->kind == ExprKind::kConcatenation) {
     for (const Expr* element : lhs->elements)
-      ReportConstContinuousTarget(element, s, const_names, enum_members, diag);
+      ReportConstantRootedTarget(element, s, const_names, enum_members, diag);
     return;
   }
   const Expr* base = LvalueBaseIdentifier(lhs);
-  if (base == nullptr || (const_names.count(base->text) == 0 &&
-                          enum_members.count(base->text) == 0))
+  if (base == nullptr) return;
+  bool continuous = s->kind == StmtKind::kForce || s->kind == StmtKind::kAssign;
+  if (enum_members.count(base->text) == 0 &&
+      (!continuous || const_names.count(base->text) == 0))
     return;
-  bool force = s->kind == StmtKind::kForce;
+  std::string_view what = "assignment";
+  std::string_view bound;
+  std::string_view subclause = "10.4";
+  if (s->kind == StmtKind::kForce) {
+    what = "force";
+    bound = " or a net";
+    subclause = "10.6.2";
+  } else if (s->kind == StmtKind::kAssign) {
+    what = "procedural assign";
+    subclause = "10.6.1";
+  }
   diag.Error(s->range.start,
-             std::format("{} of constant '{}', which is not a variable{}",
-                         force ? "force" : "procedural assign", base->text,
-                         force ? " or a net" : ""),
-             Subclause(force ? "10.6.2" : "10.6.1"));
+             std::format("{} of constant '{}', which is not a variable{}", what,
+                         base->text, bound),
+             Subclause(subclause));
 }
 
 void Elaborator::ReportConstMutatingMethodCall(const Expr* call,
@@ -117,9 +135,11 @@ void Elaborator::WalkStmtsForConstAssign(const Stmt* s) {
   if (s->kind == StmtKind::kExprStmt) {
     ReportConstMutatingMethodCall(s->expr, s->range.start);
   }
-  if (s->kind == StmtKind::kForce || s->kind == StmtKind::kAssign) {
-    ReportConstContinuousTarget(s->lhs, s, const_names_, enum_member_names_,
-                                diag_);
+  if (s->kind == StmtKind::kBlockingAssign ||
+      s->kind == StmtKind::kNonblockingAssign || s->kind == StmtKind::kForce ||
+      s->kind == StmtKind::kAssign) {
+    ReportConstantRootedTarget(s->lhs, s, const_names_, enum_member_names_,
+                               diag_);
   }
   // Every member of Stmt that holds a statement, taken from ForEachChildStmt in
   // elaborator_validate_internal.h rather than listed again here. §6.20 puts no

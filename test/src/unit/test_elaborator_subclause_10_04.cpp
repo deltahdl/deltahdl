@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <format>
 #include <initializer_list>
+#include <utility>
 
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
@@ -189,6 +191,37 @@ TEST(ProceduralAssignmentElaboration, TimingControlOnAssignmentOfNewIsError) {
                              "an assignment of 'new' takes no "
                              "intra-assignment delay or event control",
                              6, "10.4"));
+}
+
+// §6.19 makes the names an enumeration declares named constants, and Syntax
+// 10-2 writes the target of a blocking or nonblocking assignment as a
+// variable_lvalue, which a constant is not. An assignment to one is reported,
+// whole or as an element of a concatenation, and the variable `q` is not.
+TEST(ProceduralAssignmentElaboration,
+     AssignmentOfAnEnumerationConstantIsError) {
+  SimFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef enum {A, B} e_t;\n"
+      "  logic q;\n"
+      "  initial begin\n"
+      "    A = B;\n"
+      "    B <= A;\n"
+      "    {q, A} = 2;\n"
+      "    q = A;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const std::pair<const char*, uint32_t> kReports[] = {
+      {"A", 5}, {"B", 6}, {"A", 7}};
+  for (const auto& [name, line] : kReports) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        std::format("assignment of constant '{}', which is not a variable",
+                    name),
+        line, "10.4"));
+  }
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "of constant", 8, "10.4"));
 }
 
 }  // namespace
