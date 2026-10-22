@@ -365,4 +365,70 @@ TEST(AssignInExprSim, ValueIsTheRightHandSideCastToTheTargetsType) {
             "neg\n1.5 3\n");
 }
 
+// ---- C2 over a member-access target (§10.4) --------------------------------
+
+// A plain `=` whose target is a member of a packed struct writes the member's
+// window and yields the value cast to the member's 8 bits: 300 truncates to
+// 44, which lands in s.lo beside the untouched s.hi. The target named no
+// variable of its own, so the write was skipped and the expression yielded
+// the 300 it was handed.
+TEST(AssignmentWithinExpression, AssignToAStructMemberUpdatesItAndYieldsIt) {
+  RunAndCheck(
+      "module t;\n"
+      "  typedef struct packed { logic [7:0] hi; logic [7:0] lo; } pair_t;\n"
+      "  pair_t s;\n"
+      "  logic [15:0] q;\n"
+      "  initial begin\n"
+      "    s = 16'h0A0A;\n"
+      "    q = (s.lo = 16'd300);\n"
+      "  end\n"
+      "endmodule\n",
+      {{"s", 0x0A2Cu}, {"q", 44u}});
+}
+
+// §8.4: a property written through a handle, the -1 cast to the property's
+// unsigned 8 bits, 255, which both the object and the expression hold. The
+// write was skipped, so v kept its 7 and z took the -1 itself.
+TEST(AssignmentWithinExpression, AssignToAClassPropertyUpdatesTheObject) {
+  RunAndCheck(
+      "module t;\n"
+      "  class C;\n"
+      "    bit [7:0] v = 7;\n"
+      "  endclass\n"
+      "  C c;\n"
+      "  int y, z;\n"
+      "  initial begin\n"
+      "    c = new;\n"
+      "    z = (c.v = -1);\n"
+      "    y = c.v;\n"
+      "  end\n"
+      "endmodule\n",
+      {{"y", 255u}, {"z", 255u}});
+}
+
+// §26.3: the property of the object an element of a package's array of
+// handles refers to, read back through c, the handle stored in the element.
+TEST(AssignmentWithinExpression,
+     AssignThroughAPackageArrayElementReachesTheObject) {
+  RunAndCheck(
+      "package p;\n"
+      "  class C;\n"
+      "    int v = 7;\n"
+      "  endclass\n"
+      "  C objs[2];\n"
+      "endpackage\n"
+      "module t;\n"
+      "  import p::*;\n"
+      "  C c;\n"
+      "  int y, z;\n"
+      "  initial begin\n"
+      "    c = new;\n"
+      "    p::objs[1] = c;\n"
+      "    z = (p::objs[1].v = 5);\n"
+      "    y = c.v;\n"
+      "  end\n"
+      "endmodule\n",
+      {{"y", 5u}, {"z", 5u}});
+}
+
 }  // namespace

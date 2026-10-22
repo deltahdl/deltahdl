@@ -322,21 +322,16 @@ static Logic4Vec EvalConcat(const Expr* expr, SimContext& ctx, Arena& arena) {
   return result;
 }
 
-static uint32_t AssignExprLhsWidth(const Expr* lhs, SimContext& ctx) {
-  if (lhs->kind == ExprKind::kConcatenation) {
-    uint32_t total = 0;
-    for (auto* elem : lhs->elements) total += AssignExprLhsWidth(elem, ctx);
-    return total;
-  }
-  auto* var = ResolveLhsVariable(lhs, ctx);
-  return var ? var->value.width : 0;
-}
-
+// §11.3.6 with §10.4: the left-hand side is any target a blocking assignment
+// statement admits, so it is written as the statement writes it -- a member
+// access among them, a window of a packed structure or a property of the
+// object a handle refers to, which names no variable of its own. Asked first
+// for a variable whose width it would take, such a target found none, and the
+// expression yielded the right-hand side and wrote nothing: `z = (c.v = 5)`
+// left c.v as it was.
 static Logic4Vec EvalAssignInExpr(const Expr* expr, SimContext& ctx,
                                   Arena& arena) {
   auto rhs_val = EvalExpr(expr->rhs, ctx, arena);
-  uint32_t lhs_w = AssignExprLhsWidth(expr->lhs, ctx);
-  if (lhs_w == 0) return rhs_val;
   PerformBlockingAssign(expr->lhs, rhs_val, ctx, arena);
   // §11.3.6: the value is the right-hand side cast to the left-hand side's
   // type, which is what the assignment left there -- a real, a signed value,
