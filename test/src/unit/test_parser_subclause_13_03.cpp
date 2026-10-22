@@ -169,6 +169,33 @@ TEST(TaskAndFunctionParsing, OldStyleTaskMultipleInputs) {
   }
 }
 
+// A.2.7's tf_port_declaration takes a data_type_or_implicit, so a task port
+// declared in the body may carry a packed range alone, shared by every name
+// the declaration lists.
+TEST(TaskAndFunctionParsing, OldStyleTaskPortsWithAPackedRangeAlone) {
+  auto r = Parse(
+      "module m;\n"
+      "  task t;\n"
+      "    input [7:0] a, b;\n"
+      "    output [3:0] q;\n"
+      "    q = a + b;\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* tk = FindFunc(r, "t");
+  ASSERT_NE(tk, nullptr);
+  ASSERT_EQ(tk->func_args.size(), 3u);
+  const Direction kDirections[] = {Direction::kInput, Direction::kInput,
+                                   Direction::kOutput};
+  const uint64_t kLefts[] = {7u, 7u, 3u};
+  for (size_t i = 0; i < 3u; ++i) {
+    EXPECT_EQ(tk->func_args[i].direction, kDirections[i]);
+    ASSERT_NE(tk->func_args[i].data_type.packed_dim_left, nullptr);
+    EXPECT_EQ(tk->func_args[i].data_type.packed_dim_left->int_val, kLefts[i]);
+  }
+  EXPECT_EQ(tk->func_args[1].name, "b");
+}
+
 TEST(TaskAndFunctionParsing, TaskEndLabel) {
   auto r = Parse(
       "module m;\n"

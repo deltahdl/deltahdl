@@ -25,6 +25,24 @@ TEST(FunctionSim, FunctionWithLocalVars) {
   EXPECT_EQ(val, 30u);
 }
 
+// An input declared in the body with a packed range alone is as wide as the
+// range (§13.4, A.2.7): 16'h01FF passed to the 8-bit `a` keeps its low byte,
+// so a + 1 is 16'h0100, where a 1-bit port would give 2 and an unbounded one
+// 16'h0200.
+TEST(FunctionSim, OldStyleInputWithAPackedRangeAloneHasItsWidth) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic [15:0] x;\n"
+      "  function [15:0] inc;\n"
+      "    input [7:0] a;\n"
+      "    inc = a + 16'd1;\n"
+      "  endfunction\n"
+      "  initial x = inc(16'h01FF);\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(val, 0x100u);
+}
+
 TEST(FunctionSim, FunctionCallsFunction) {
   auto val = RunAndGet(
       "module t;\n"

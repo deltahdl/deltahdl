@@ -300,6 +300,8 @@ TEST(FunctionDeclParsing, NoDimsOnFuncArg) {
   EXPECT_TRUE(fn->func_args[0].unpacked_dims.empty());
 }
 
+// A.2.7's tf_port_declaration takes a data_type_or_implicit, so a port
+// declared in the body may carry a packed range with no type keyword before it.
 TEST(FunctionDeclParsing, OldStyleFunction) {
   auto r = Parse(
       "module m;\n"
@@ -308,14 +310,16 @@ TEST(FunctionDeclParsing, OldStyleFunction) {
       "    myfunc = a + 1;\n"
       "  endfunction\n"
       "endmodule\n");
-  // deltahdl reads no packed range after a port direction with no type keyword
-  // and rejects `input [7:0] a;` (#7629); the excuse goes with the fix.
-  r.has_errors.Excuse();
   ASSERT_NE(r.cu, nullptr);
   auto* fn = FindFunc(r, "myfunc");
   ASSERT_NE(fn, nullptr);
   ASSERT_EQ(fn->func_args.size(), 1u);
   EXPECT_EQ(fn->func_args[0].direction, Direction::kInput);
+  EXPECT_EQ(fn->func_args[0].name, "a");
+  ASSERT_NE(fn->func_args[0].data_type.packed_dim_left, nullptr);
+  ASSERT_NE(fn->func_args[0].data_type.packed_dim_right, nullptr);
+  EXPECT_EQ(fn->func_args[0].data_type.packed_dim_left->int_val, 7u);
+  EXPECT_EQ(fn->func_args[0].data_type.packed_dim_right->int_val, 0u);
 }
 
 TEST(FunctionDeclParsing, FunctionEmptyBody) {

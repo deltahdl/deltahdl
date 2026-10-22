@@ -920,6 +920,11 @@ void Parser::ParseOldStylePortDecls(ModuleItem* item, TokenKind end_kw) {
         (hdr.dir == Direction::kRef) && Match(TokenKind::kKwStatic);
     Match(TokenKind::kKwVar);
     hdr.dt = ParseDataType();
+    // A.2.7's tf_port_declaration takes a data_type_or_implicit, and A.2.2.1's
+    // implicit_data_type may be packed dimensions alone: `input [7:0] a;`
+    // names no type and no signing, and ParseDataType leaves the range unread
+    // when nothing precedes it.
+    if (hdr.dt.kind == DataTypeKind::kImplicit) ParsePackedDims(hdr.dt);
     DefaultImplicitToLogic(hdr.dt);
 
     ParseTfPortDeclarators(item, hdr);
