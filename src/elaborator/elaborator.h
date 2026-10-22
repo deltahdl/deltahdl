@@ -215,8 +215,6 @@ class Elaborator : public ElaboratorClassRules {
 
   void ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod);
 
-  static bool HasParamPortWithoutDefault(const ModuleDecl* decl);
-
   void ElaborateItem(ModuleItem* item, RtlirModule* mod);
   // Two-level dispatch for ElaborateItem: each handles a cohesive subset of
   // module-item kinds and returns true when it consumed `item->kind`.
@@ -254,7 +252,8 @@ class Elaborator : public ElaboratorClassRules {
   // signedness, `decl_signed` where `name` is no such port.
   bool ReconcilePartialPort(std::string_view name, bool decl_signed,
                             NetType net_type, RtlirModule* mod);
-  void SetVariableTypeInfo(const ModuleItem* item, RtlirVariable& var);
+  void SetVariableTypeInfo(const ModuleItem* item, RtlirVariable& var,
+                           const ScopeMap& scope);
   void NameAdoptedArrayTypedef(const ModuleItem* item,
                                std::string_view typedef_name,
                                RtlirVariable& var);

@@ -14,7 +14,7 @@ namespace delta {
 
 const DataType* ResolvedAggregateType(const DataType& dtype,
                                       const TypedefMap& typedefs,
-                                      Arena& arena) {
+                                      const ScopeMap& scope, Arena& arena) {
   const DataType* d = &dtype;
   // §6.18 lets a typedef name stand for another typedef name; the chain is
   // bounded so a name defined in terms of itself resolves to nothing rather
@@ -28,6 +28,7 @@ const DataType* ResolvedAggregateType(const DataType& dtype,
   }
   if (d->struct_members.empty()) return nullptr;
   auto* copy = arena.Create<DataType>(*d);
+  FoldMemberDims(*copy, scope, arena);
   ResolveNestedAggregateTypes(*copy, typedefs, arena);
   return copy;
 }
@@ -49,6 +50,10 @@ const DataType* NamedPackedVectorType(const DataType& dtype,
 }
 
 namespace {
+
+// The block a width's scratch fold starts its arena with: a few literals and
+// a nested type or two, where the arena's default block is 64 KiB.
+constexpr std::size_t kFoldScratchBlockSize = 4096;
 
 // `bound` folded against `scope`, as a literal of the integer it is; `bound`
 // itself where it is a literal already or does not fold.
@@ -101,6 +106,14 @@ void FoldMemberDims(DataType& type, const ScopeMap& scope, Arena& arena) {
     FoldMemberDims(*nested, scope, arena);
     m.nested_type = nested;
   }
+}
+
+uint32_t FoldedMembersWidth(const DataType& dtype, const TypedefMap& typedefs,
+                            const ScopeMap& scope) {
+  Arena scratch(kFoldScratchBlockSize);
+  DataType folded = dtype;
+  FoldMemberDims(folded, scope, scratch);
+  return EvalStructOrUnionWidth(folded, typedefs);
 }
 
 }  // namespace delta

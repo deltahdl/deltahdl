@@ -209,8 +209,8 @@ static uint32_t EvalStructOrUnionWidth(const DataType& dtype) {
   return total;
 }
 
-static uint32_t EvalStructOrUnionWidth(const DataType& dtype,
-                                       const TypedefMap& typedefs) {
+uint32_t EvalStructOrUnionWidth(const DataType& dtype,
+                                const TypedefMap& typedefs) {
   if (dtype.struct_members.empty()) return 0;
   if (dtype.kind == DataTypeKind::kUnion) {
     uint32_t max_w = 0;
@@ -470,10 +470,11 @@ uint32_t EvalTypeWidth(const DataType& dtype, const TypedefMap& typedefs,
   }
   uint32_t w = PackedDimProduct(dtype, scope);
   // Mirror the 2-arg overload: a struct/union sizes from its members (using
-  // typedefs), an element of its packed dimensions where it has any.
+  // typedefs), an element of its packed dimensions where it has any. §6.20:
+  // a member's own dimensions may name the parameters `scope` holds too.
   if (dtype.kind == DataTypeKind::kStruct ||
       dtype.kind == DataTypeKind::kUnion) {
-    return (w > 0 ? w : 1) * EvalStructOrUnionWidth(dtype, typedefs);
+    return (w > 0 ? w : 1) * FoldedMembersWidth(dtype, typedefs, scope);
   }
   if (w > 0) return w;
   return EvalTypeWidth(dtype);

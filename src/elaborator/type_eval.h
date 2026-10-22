@@ -42,10 +42,13 @@ void SizeClassHandleMembers(
 // nested member types resolved as ResolveNestedAggregateTypes leaves them. Null
 // for a type of any other kind, for a name the table does not hold and for an
 // aggregate with no members. A variable, a port and a net of an aggregate type
-// each carry the same layout, so all three resolve it here. Defined in
+// each carry the same layout, so all three resolve it here. §6.20: the copy's
+// members have their dimensions folded against `scope`, the parameters of the
+// instance declaring it, as a typedef's were where it was recorded. Defined in
 // src/elaborator/type_eval_aggregate.cpp.
 const DataType* ResolvedAggregateType(const DataType& dtype,
-                                      const TypedefMap& typedefs, Arena& arena);
+                                      const TypedefMap& typedefs,
+                                      const ScopeMap& scope, Arena& arena);
 
 // §6.18 and §6.6.7: the packed vector type `dtype`, a typedef or nettype name,
 // stands for through a chain of names, as an arena copy; null where the name
@@ -141,6 +144,17 @@ uint32_t EvalStructMemberWidth(const StructMember& m,
                                const TypedefMap& typedefs);
 uint32_t StructMemberStorageWidth(const StructMember& m,
                                   const TypedefMap& typedefs);
+// §7.2.1 and §7.3.1: the bits a structure's or union's members take together,
+// a structure's summed and a union's the widest, with a packed tagged union's
+// tag; each member's dimensions folded with no scope. Its own packed
+// dimensions, which make an array of it, are the caller's.
+uint32_t EvalStructOrUnionWidth(const DataType& dtype,
+                                const TypedefMap& typedefs);
+// The same with the members' dimensions folded against `scope` first
+// (FoldMemberDims), in a scratch arena the call releases. Defined in
+// src/elaborator/type_eval_aggregate.cpp.
+uint32_t FoldedMembersWidth(const DataType& dtype, const TypedefMap& typedefs,
+                            const ScopeMap& scope);
 
 uint32_t TaggedUnionTagWidth(const DataType& dtype);
 uint32_t TaggedUnionTagBitOffset(const DataType& dtype);

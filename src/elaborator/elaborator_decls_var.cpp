@@ -919,7 +919,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
     var_init_names_.insert(item->name);
   }
 
-  SetVariableTypeInfo(item, var);
+  SetVariableTypeInfo(item, var, BuildParamScope(mod));
   NameAdoptedArrayTypedef(item, adopted_array_typedef, var);
   BindCovergroupVariable(*item, var, mod, unit_, arena_);
 

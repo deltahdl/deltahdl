@@ -268,6 +268,11 @@ uint32_t SelectLhsWidth(const Expr* e, const ScopeMap& scope);
 const ClassDecl* FindClassDecl(std::string_view name,
                                const CompilationUnit* unit);
 
+// Whether `decl`'s parameter port list declares a value parameter with no
+// default, which only an instance overriding it gives a value. Defined in
+// elaborator_module_params.cpp.
+bool HasParamPortWithoutDefault(const ModuleDecl* decl);
+
 // §8.13: the class `cls` extends, its `extends` name resolved from the scope
 // declaring `cls` (§3.13, §23.9, §26.3): the class of the name the package its
 // name is written through declares, else that scope's own class of the name,

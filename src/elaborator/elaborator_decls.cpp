@@ -619,14 +619,14 @@ static void CarryNetArrayDims(
 // aggregate rather than one and keeps the width alone, as a port does.
 static const DataType* NetDeclaredType(const ModuleItem* item,
                                        const TypedefMap& typedefs,
-                                       Arena& arena) {
+                                       const ScopeMap& scope, Arena& arena) {
   if (item->data_type.packed_dim_left != nullptr ||
       !item->data_type.extra_packed_dims.empty()) {
     return &item->data_type;
   }
   if (!item->unpacked_dims.empty()) return nullptr;
   const DataType* aggregate =
-      ResolvedAggregateType(item->data_type, typedefs, arena);
+      ResolvedAggregateType(item->data_type, typedefs, scope, arena);
   if (aggregate != nullptr) return aggregate;
   return NamedPackedVectorType(item->data_type, typedefs, arena);
 }
@@ -694,7 +694,7 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   // naming one does not fold and the net falls back to a single bit. This is
   // the same scope the variable declaration beside it folds against.
   net.width = EvalTypeWidth(item->data_type, typedefs_, BuildParamScope(mod));
-  net.dtype = NetDeclaredType(item, typedefs_, arena_);
+  net.dtype = NetDeclaredType(item, typedefs_, BuildParamScope(mod), arena_);
   net.data_kind = ResolvedTypeKind(item->data_type, typedefs_);
   RecordWrittenNetType(*item, net);
   net.is_signed = IsSignedType(item->data_type, typedefs_);
@@ -803,9 +803,10 @@ static void SetEnumTypeInfo(const ModuleItem* item, RtlirVariable& var,
 // denoted nothing, so the variable was sized but its members were never laid
 // out and every member write was dropped.
 static void SetStructTypeInfo(const ModuleItem* item, RtlirVariable& var,
-                              const TypedefMap& typedefs, Arena& arena) {
+                              const TypedefMap& typedefs, const ScopeMap& scope,
+                              Arena& arena) {
   const DataType* aggregate =
-      ResolvedAggregateType(item->data_type, typedefs, arena);
+      ResolvedAggregateType(item->data_type, typedefs, scope, arena);
   if (aggregate != nullptr) var.dtype = aggregate;
 }
 
@@ -819,10 +820,11 @@ static void SetStructTypeInfo(const ModuleItem* item, RtlirVariable& var,
 // needed, because the declaration helps decide which bit an address reaches —
 // `logic [15:0] acc` and `logic [2:17] acc` are both sixteen bits wide and the
 // same index names a different bit of each, so the bounds as written have to
-// reach the lowerer.
-void Elaborator::SetVariableTypeInfo(const ModuleItem* item,
-                                     RtlirVariable& var) {
-  SetStructTypeInfo(item, var, typedefs_, arena_);
+// reach the lowerer. `scope` holds the parameters of the instance declaring
+// the variable, which an aggregate's member dimensions may name (§6.20).
+void Elaborator::SetVariableTypeInfo(const ModuleItem* item, RtlirVariable& var,
+                                     const ScopeMap& scope) {
+  SetStructTypeInfo(item, var, typedefs_, scope, arena_);
   // §8.23: `Outer::Inner in` declares a handle of the nested class, held under
   // its qualified key; class_names_ holds the bare names of the classes the
   // scopes declare and never a nested one, so the declaration was sized as a

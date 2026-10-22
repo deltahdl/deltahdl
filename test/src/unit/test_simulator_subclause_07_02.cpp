@@ -716,6 +716,39 @@ TEST(UnpackedStructDynamicMember, AQueueMembersParameterBoundIsKept) {
   EXPECT_EQ(out, "2 5 6\n");
 }
 
+// §7.2 with §7.4 and §6.20: a structure type written in a variable's
+// declaration rather than a typedef has its members sized by the parameters
+// each instance binds, as a typedef's are. Under W = 4 and N = 3 the packed
+// structure is 8 bits, `a[N]` takes index 2 and the `[$:N-2]` queue keeps two
+// of three elements; under W = 8 and N = 4 they are 16 bits, index 3 and
+// three. Folded with no parameters, every member was one bit or one element
+// and each queue unbounded.
+TEST(StructWrittenInDeclaration, MembersSizedByParametersTakeEachInstances) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module m #(parameter int W = 2, N = 2);\n"
+      "  struct packed { logic [W-1:0] hi; logic [W-1:0] lo; } p;\n"
+      "  struct { int a[N]; byte q[$:N-2]; } s;\n"
+      "  initial begin\n"
+      "    #W;\n"
+      "    p = '1;\n"
+      "    p.lo = 0;\n"
+      "    s.a[N-1] = 5;\n"
+      "    s.q.push_back(1);\n"
+      "    s.q.push_back(2);\n"
+      "    s.q.push_back(3);\n"
+      "    $display(\"%0d %0d %0d %0d %0d\", W, $bits(p), p, s.a[N-1],\n"
+      "             s.q.size());\n"
+      "  end\n"
+      "endmodule\n"
+      "module t;\n"
+      "  m #(4, 3) a();\n"
+      "  m #(8, 4) b();\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "4 8 240 5 2\n8 16 65280 5 3\n");
+}
+
 // §7.2 with §8.4: a member of a class type holds the whole handle of the
 // object stored in it, whether the structure is a typedef's or written in the
 // declaration, so a handle copied in and out again names the same object.

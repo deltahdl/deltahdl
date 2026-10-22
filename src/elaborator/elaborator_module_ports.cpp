@@ -276,7 +276,8 @@ static const DataType* ResolvedPortAggregate(const ModuleDecl* decl,
       !port.data_type.extra_packed_dims.empty()) {
     return nullptr;
   }
-  return ResolvedAggregateType(port.data_type, ctx.typedefs, ctx.arena);
+  return ResolvedAggregateType(port.data_type, ctx.typedefs, ctx.param_scope,
+                               ctx.arena);
 }
 
 // §7.2.1 with §23.2.2.2: a variable port whose data type is a structure or a

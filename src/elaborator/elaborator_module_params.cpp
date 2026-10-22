@@ -92,7 +92,7 @@ static void CheckTypeParamValueAssignable(const ModuleDecl* decl, size_t i,
                  Subclause("23.10.3"));
 }
 
-bool Elaborator::HasParamPortWithoutDefault(const ModuleDecl* decl) {
+bool HasParamPortWithoutDefault(const ModuleDecl* decl) {
   for (const auto& [name, expr] : decl->params) {
     if (decl->localparam_port_names.count(name)) continue;
     if (decl->type_param_names.count(name)) continue;

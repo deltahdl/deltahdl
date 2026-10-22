@@ -281,11 +281,11 @@ TEST(StructDeclarationValidation,
   to_a.kind = DataTypeKind::kNamed;
   to_a.type_name = "a_t";
   const TypedefMap kCycle{{"a_t", to_b}, {"b_t", to_a}};
-  EXPECT_EQ(ResolvedAggregateType(to_a, kCycle, arena), nullptr);
+  EXPECT_EQ(ResolvedAggregateType(to_a, kCycle, {}, arena), nullptr);
 
   DataType memberless;
   memberless.kind = DataTypeKind::kStruct;
-  EXPECT_EQ(ResolvedAggregateType(memberless, kCycle, arena), nullptr);
+  EXPECT_EQ(ResolvedAggregateType(memberless, kCycle, {}, arena), nullptr);
 }
 
 // §7.2 footnote 20 and §7.3.2: a structure or union written in place as the
