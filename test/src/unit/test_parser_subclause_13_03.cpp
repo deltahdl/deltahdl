@@ -653,4 +653,94 @@ TEST(TaskAndFunctionParsing, FormalWithAPackedDimensionAloneIsLogic) {
   }
 }
 
+// A.2.7 opens a task body without a port list with tf_item_declarations, each
+// a port declaration or a block item declaration, in either order, so a port
+// may follow a body variable: t takes the formals a and b and declares n.
+TEST(TaskAndFunctionParsing, OldStyleTaskPortAfterABodyDeclaration) {
+  auto r = Parse(
+      "module m;\n"
+      "  task t;\n"
+      "    input a;\n"
+      "    int n;\n"
+      "    output b;\n"
+      "    b = a;\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* tk = FindFunc(r, "t");
+  ASSERT_NE(tk, nullptr);
+  ASSERT_EQ(tk->func_args.size(), 2u);
+  EXPECT_EQ(tk->func_args[0].name, "a");
+  EXPECT_EQ(tk->func_args[1].name, "b");
+  EXPECT_EQ(tk->func_args[1].direction, Direction::kOutput);
+  ASSERT_EQ(tk->func_body_stmts.size(), 2u);
+  EXPECT_EQ(tk->func_body_stmts[0]->kind, StmtKind::kVarDecl);
+  EXPECT_EQ(tk->func_body_stmts[0]->var_name, "n");
+}
+
+// The declarations end at the body's first statement, so a port declared
+// after one is reported.
+TEST(TaskAndFunctionParsing, OldStyleTaskPortAfterAStatementIsReported) {
+  auto r = Parse(
+      "module m;\n"
+      "  task t;\n"
+      "    input a;\n"
+      "    $display(a);\n"
+      "    output b;\n"
+      "  endtask\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "a port declaration cannot follow a statement in a task or function body",
+      5, "13.3"));
+}
+
+// After a port list in parentheses A.2.7 gives a task body block item
+// declarations alone, so a port declared there is reported, an empty `()`
+// being a port list too.
+TEST(TaskAndFunctionParsing, PortInTheBodyOfATaskWithAPortListIsReported) {
+  auto r = Parse(
+      "module m;\n"
+      "  task t(input int a);\n"
+      "    output int b;\n"
+      "    b = a;\n"
+      "  endtask\n"
+      "  task u();\n"
+      "    input c;\n"
+      "  endtask\n"
+      "endmodule\n");
+  const char* msg =
+      "a task or function whose ports are listed in parentheses cannot declare "
+      "a port in its body";
+  EXPECT_TRUE(ReportedError(r.diags, msg, 3, "13.3"));
+  EXPECT_TRUE(ReportedError(r.diags, msg, 7, "13.3"));
+}
+
+// §13.3's mytask2 declares its formals by direction alone and gives them their
+// types with data declarations of the same names later in the body: x is an
+// int and y a logic [3:0], and neither declaration stays in the body as a
+// variable of its own.
+TEST(TaskAndFunctionParsing, BodyDeclarationTypesADirectionOnlyFormal) {
+  auto r = Parse(
+      "module m;\n"
+      "  task mytask2;\n"
+      "    output x;\n"
+      "    input y;\n"
+      "    int x;\n"
+      "    logic [3:0] y;\n"
+      "    x = y;\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* tk = FindFunc(r, "mytask2");
+  ASSERT_NE(tk, nullptr);
+  ASSERT_EQ(tk->func_args.size(), 2u);
+  EXPECT_EQ(tk->func_args[0].data_type.kind, DataTypeKind::kInt);
+  EXPECT_EQ(tk->func_args[1].data_type.kind, DataTypeKind::kLogic);
+  ASSERT_NE(tk->func_args[1].data_type.packed_dim_left, nullptr);
+  EXPECT_EQ(tk->func_args[1].data_type.packed_dim_left->int_val, 3u);
+  ASSERT_EQ(tk->func_body_stmts.size(), 1u);
+  EXPECT_NE(tk->func_body_stmts[0]->kind, StmtKind::kVarDecl);
+}
+
 }  // namespace

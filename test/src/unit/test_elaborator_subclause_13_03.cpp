@@ -391,4 +391,48 @@ TEST(TaskElaboration, TaskOperandInGenerateElseAndCaseArmsError) {
                             10, "13.3"));
 }
 
+// §13.3's mytask2: a data declaration in the body gives its type to the formal
+// the body declared by direction alone, and is no second declaration of it.
+TEST(TaskElaboration, BodyDeclarationTypingADirectionOnlyFormalElaborates) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  task mytask2;\n"
+      "    output x;\n"
+      "    input y;\n"
+      "    int x;\n"
+      "    logic y;\n"
+      "    x = y;\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// A formal whose port declaration wrote a data type has one already, and a
+// variable declared with an initial value or a parameter is a declaration of
+// its own, so each of these declares its name a second time.
+TEST(TaskElaboration, BodyDeclarationThatTypesNoFormalIsARedeclaration) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  task t;\n"
+      "    input int a;\n"
+      "    input b;\n"
+      "    input c;\n"
+      "    int a;\n"
+      "    int b = 1;\n"
+      "    localparam int c = 2;\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "redeclaration of 'a'", 6, "23.9"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "redeclaration of 'b'", 7, "23.9"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "redeclaration of 'c'", 8, "23.9"));
+}
+
 }  // namespace

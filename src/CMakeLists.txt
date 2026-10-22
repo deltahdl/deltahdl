@@ -73,6 +73,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     parser/parser_prototype_validate.cpp
     parser/parser_aggregate_types.cpp
     parser/parser_declaration.cpp
+    parser/parser_subroutine_body.cpp
     parser/parser_fsm.cpp
     parser/parser_types.cpp
     parser/parser_generate.cpp

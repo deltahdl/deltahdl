@@ -500,4 +500,44 @@ TEST(FunctionDeclParsing, VirtualFunctionAtModuleScopeRejected) {
                             "13.4"));
 }
 
+// A.2.6 opens a function body without a port list as A.2.7 does a task's, so
+// a port may follow a body variable there too: f takes a and b and declares s.
+TEST(FunctionDeclParsing, OldStylePortAfterABodyDeclaration) {
+  auto r = Parse(
+      "module m;\n"
+      "  function int f;\n"
+      "    input int a;\n"
+      "    int s;\n"
+      "    input int b;\n"
+      "    s = a;\n"
+      "    f = s + b;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* fn = FindFunc(r, "f");
+  ASSERT_NE(fn, nullptr);
+  ASSERT_EQ(fn->func_args.size(), 2u);
+  EXPECT_EQ(fn->func_args[0].name, "a");
+  EXPECT_EQ(fn->func_args[1].name, "b");
+  ASSERT_EQ(fn->func_body_stmts.size(), 3u);
+  EXPECT_EQ(fn->func_body_stmts[0]->kind, StmtKind::kVarDecl);
+  EXPECT_EQ(fn->func_body_stmts[0]->var_name, "s");
+}
+
+// After a port list in parentheses A.2.6 gives a function body block item
+// declarations alone, so a port declared there is reported.
+TEST(FunctionDeclParsing, PortInTheBodyOfAFunctionWithAPortListIsReported) {
+  auto r = Parse(
+      "module m;\n"
+      "  function int f(int a);\n"
+      "    input int b;\n"
+      "    return a + b;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "a task or function whose ports are listed in "
+                            "parentheses cannot declare a port in its body",
+                            3, "13.4"));
+}
+
 }  // namespace

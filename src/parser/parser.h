@@ -563,7 +563,10 @@ class Parser {
     bool is_ref_static = false;
     DataType dt;
   };
-  void ParseOldStylePortDecls(ModuleItem* item, TokenKind end_kw);
+  bool TryParseTfPortDeclaration(ModuleItem* item,
+                                 std::unordered_set<std::string_view>& untyped);
+  void ParseSubroutineBody(ModuleItem* item, TokenKind end_kw,
+                           Subclause subclause);
   bool IsTfPortDeclarationStart();
   Direction ParseTfPortDirection();
   void ParseTfPortDeclarators(ModuleItem* item, const TfPortHeader& hdr);

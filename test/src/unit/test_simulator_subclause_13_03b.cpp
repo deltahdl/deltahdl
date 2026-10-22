@@ -291,4 +291,23 @@ TEST(TaskSim, ClassTaskEnabledThroughAFunctionResultRunsOnItsObject) {
             10510u);
 }
 
+// §13.3's mytask2 form gives its formals their types with body declarations:
+// x and y are ints, so 7 passed to y comes back tripled through x as 21, where
+// the 1-bit logic a direction-only formal defaults to would give 1.
+TEST(TaskSim, BodyDeclarationTypesADirectionOnlyFormal) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  int r;\n"
+                      "  task mytask2;\n"
+                      "    output x;\n"
+                      "    input y;\n"
+                      "    int x;\n"
+                      "    int y;\n"
+                      "    x = y * 3;\n"
+                      "  endtask\n"
+                      "  initial mytask2(r, 7);\n"
+                      "endmodule\n",
+                      "r"),
+            21u);
+}
+
 }  // namespace

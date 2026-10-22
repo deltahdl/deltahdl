@@ -528,4 +528,41 @@ TEST(FunctionSim, GenerateBlockFunctionOfAParallelTop) {
   LowerRunAndCheck(f, design, {{"n.r", 30u}});
 }
 
+// The ports a function body declares may follow its other declarations
+// (A.2.6): f's inputs a and b, with the local s between them, sum 5 and 9.
+TEST(FunctionSim, OldStylePortAfterABodyDeclaration) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  int r;\n"
+      "  function int f;\n"
+      "    input int a;\n"
+      "    int s;\n"
+      "    input int b;\n"
+      "    s = a;\n"
+      "    f = s + b;\n"
+      "  endfunction\n"
+      "  initial r = f(5, 9);\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(val, 14u);
+}
+
+// A function's formal declared by direction alone takes its type from a body
+// declaration of its name (§13.3, §13.4): a is an int, so 5 comes back as 5
+// rather than as the 1 a 1-bit logic formal would hold.
+TEST(FunctionSim, BodyDeclarationTypesADirectionOnlyFormal) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  int r;\n"
+      "  function int g;\n"
+      "    input a;\n"
+      "    int a;\n"
+      "    g = a;\n"
+      "  endfunction\n"
+      "  initial r = g(5);\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(val, 5u);
+}
+
 }  // namespace

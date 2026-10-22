@@ -1,3 +1,4 @@
+#include <string_view>
 #include <vector>
 
 #include "common/arena.h"
@@ -76,30 +77,11 @@ bool IsAggregateKw(TokenKind tk) {
          tk == TokenKind::kKwUnion;
 }
 
-// §13.3: a leading direction keyword (or the const-as-ref qualifier) opens a
-// tf_port_declaration.
-bool IsTfPortDirectionKw(TokenKind tk) {
-  return tk == TokenKind::kKwInput || tk == TokenKind::kKwOutput ||
-         tk == TokenKind::kKwInout || tk == TokenKind::kKwRef ||
-         tk == TokenKind::kKwConst;
-}
-
 // §13.3: any directional qualifier keyword (used to detect an illegal second
 // qualifier after a ref/direction has already been parsed).
 bool IsDirectionQualifierKw(TokenKind tk) {
   return tk == TokenKind::kKwRef || tk == TokenKind::kKwInput ||
          tk == TokenKind::kKwOutput || tk == TokenKind::kKwInout;
-}
-
-// §13.3 (printed page 337): a formal whose data type is not declared is
-// `logic` where its direction is written, and a tf_port_declaration always
-// writes one, so an implicit type is `logic` with whatever signing and packed
-// dimensions it carries: `input signed [7:0] a;` is a `logic signed [7:0]`.
-// The simulator converts an actual to its formal's declared type and to none
-// where the formal's type is implicit, so an implicit `[7:0]` left as it was
-// kept all nine bits of 16'h01FF. Pure state update.
-void DefaultImplicitToLogic(DataType& dt) {
-  if (dt.kind == DataTypeKind::kImplicit) dt.kind = DataTypeKind::kLogic;
 }
 
 }  // namespace
@@ -646,14 +628,7 @@ void Parser::ParseFuncName(ModuleItem* item) {
 }
 
 void Parser::ParseFuncBody(ModuleItem* item) {
-  ParseOldStylePortDecls(item, TokenKind::kKwEndfunction);
-  while (!Check(TokenKind::kKwEndfunction) && !AtEnd()) {
-    if (IsBlockVarDeclStart()) {
-      ParseBlockVarDecls(item->func_body_stmts);
-    } else if (!RejectMisplacedStmtLabel()) {
-      item->func_body_stmts.push_back(ParseStmt());
-    }
-  }
+  ParseSubroutineBody(item, TokenKind::kKwEndfunction, Subclause("13.4"));
   Expect(TokenKind::kKwEndfunction, Subclause("13.4"));
   if (Match(TokenKind::kColon)) {
     std::string_view end_name;
@@ -747,15 +722,7 @@ ModuleItem* Parser::ParseTaskDecl(bool prototype_only) {
 
   if (prototype_only) return item;
 
-  ParseOldStylePortDecls(item, TokenKind::kKwEndtask);
-
-  while (!Check(TokenKind::kKwEndtask) && !AtEnd()) {
-    if (IsBlockVarDeclStart()) {
-      ParseBlockVarDecls(item->func_body_stmts);
-    } else if (!RejectMisplacedStmtLabel()) {
-      item->func_body_stmts.push_back(ParseStmt());
-    }
-  }
+  ParseSubroutineBody(item, TokenKind::kKwEndtask, Subclause("13.3"));
   Expect(TokenKind::kKwEndtask, Subclause("13.3"));
   MatchEndLabel(item->name);
   return item;
@@ -846,92 +813,6 @@ EventExpr Parser::ParseSingleEvent() {
     ev.iff_condition = ParseExpr();
   }
   return ev;
-}
-
-// Consume the leading direction keyword of a tf_port_declaration. The 'const'
-// qualifier (already consumed by the caller) is mapped to 'ref'.
-Direction Parser::ParseTfPortDirection() {
-  if (Check(TokenKind::kKwInput)) {
-    Consume();
-    return Direction::kInput;
-  }
-  if (Check(TokenKind::kKwOutput)) {
-    Consume();
-    return Direction::kOutput;
-  }
-  if (Check(TokenKind::kKwInout)) {
-    Consume();
-    return Direction::kInout;
-  }
-  Consume();
-  return Direction::kRef;
-}
-
-// Parse the comma-separated declarators that share one tf_port_declaration
-// header (direction/const/static and data type), appending each to item.
-void Parser::ParseTfPortDeclarators(ModuleItem* item, const TfPortHeader& hdr) {
-  do {
-    FunctionArg arg;
-    arg.is_const = hdr.is_const;
-    arg.is_ref_static = hdr.is_ref_static;
-    arg.direction = hdr.dir;
-    arg.data_type = hdr.dt;
-    arg.name = Expect(TokenKind::kIdentifier, Subclause("13.3")).text;
-    ParseUnpackedDims(arg.unpacked_dims);
-    if (Match(TokenKind::kEq)) {
-      arg.default_value = ParseExpr();
-    }
-    item->func_args.push_back(arg);
-  } while (Match(TokenKind::kComma));
-  Expect(TokenKind::kSemicolon, Subclause("13.3"));
-}
-
-// A.2.7: `tf_port_direction ::= port_direction | [ const ] ref [ static ]`, so
-// `const` opens a tf_port_declaration only where it qualifies a `ref`. Standing
-// alone it opens a data_declaration instead: `const int c = a + 1;` at the head
-// of a subroutine body is a block_item_declaration (A.2.8), and a
-// tf_port_declaration could not carry that initializer in any case -- its
-// declarators are a list_of_tf_variable_identifiers, with no `= expression`.
-bool Parser::IsTfPortDeclarationStart() {
-  auto tk = CurrentToken().kind;
-  if (tk != TokenKind::kKwConst) return IsTfPortDirectionKw(tk);
-  auto saved = lexer_.SavePos();
-  Consume();
-  bool qualifies_ref = Check(TokenKind::kKwRef);
-  lexer_.RestorePos(saved);
-  return qualifies_ref;
-}
-
-void Parser::ParseOldStylePortDecls(ModuleItem* item, TokenKind end_kw) {
-  while (true) {
-    // tf_port_declaration permits a leading attribute_instance list. Peek
-    // past any attributes and only commit to the declaration if a
-    // tf_port_direction follows.
-    auto saved = lexer_.SavePos();
-    if (Check(TokenKind::kAttrStart)) {
-      ParseAttributes();
-    }
-    if (!IsTfPortDeclarationStart()) {
-      lexer_.RestorePos(saved);
-      break;
-    }
-    TfPortHeader hdr;
-    hdr.is_const = Match(TokenKind::kKwConst);
-    hdr.dir = ParseTfPortDirection();
-    hdr.is_ref_static =
-        (hdr.dir == Direction::kRef) && Match(TokenKind::kKwStatic);
-    Match(TokenKind::kKwVar);
-    hdr.dt = ParseDataType();
-    // A.2.7's tf_port_declaration takes a data_type_or_implicit, and A.2.2.1's
-    // implicit_data_type may be packed dimensions alone: `input [7:0] a;`
-    // names no type and no signing, and ParseDataType leaves the range unread
-    // when nothing precedes it.
-    if (hdr.dt.kind == DataTypeKind::kImplicit) ParsePackedDims(hdr.dt);
-    DefaultImplicitToLogic(hdr.dt);
-
-    ParseTfPortDeclarators(item, hdr);
-  }
-  (void)end_kw;
 }
 
 }  // namespace delta
