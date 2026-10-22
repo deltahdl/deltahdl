@@ -569,7 +569,7 @@ void CheckProceduralAssignLhs(const Stmt* s, DiagEngine& diag) {
 // §10.6.2 admits; a variable of an unpacked array, structure or union type, or
 // a slice or sub-array of one, none of them singular (§6.4); or bits of a
 // vector, a bit-select or part-select (§11.5.1), which §10.6.2 bars.
-enum class ForceVariableTarget { kSingular, kAggregate, kBits };
+enum class ForceVariableTarget : uint8_t { kSingular, kAggregate, kBits };
 
 // §6.4 with §11.5.2: what `e`, a name or a chain of selects down from one,
 // names. The select next to the name addresses the first unpacked dimension
