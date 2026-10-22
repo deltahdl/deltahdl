@@ -91,13 +91,15 @@ bool IsDirectionQualifierKw(TokenKind tk) {
          tk == TokenKind::kKwOutput || tk == TokenKind::kKwInout;
 }
 
-// §6.6/§13.3: a tf_port_declaration data type that is implicit with no packed
-// dimensions and no sign defaults to logic. Pure state update.
+// §13.3 (printed page 337): a formal whose data type is not declared is
+// `logic` where its direction is written, and a tf_port_declaration always
+// writes one, so an implicit type is `logic` with whatever signing and packed
+// dimensions it carries: `input signed [7:0] a;` is a `logic signed [7:0]`.
+// The simulator converts an actual to its formal's declared type and to none
+// where the formal's type is implicit, so an implicit `[7:0]` left as it was
+// kept all nine bits of 16'h01FF. Pure state update.
 void DefaultImplicitToLogic(DataType& dt) {
-  if (dt.kind == DataTypeKind::kImplicit && dt.packed_dim_left == nullptr &&
-      !dt.is_signed) {
-    dt.kind = DataTypeKind::kLogic;
-  }
+  if (dt.kind == DataTypeKind::kImplicit) dt.kind = DataTypeKind::kLogic;
 }
 
 }  // namespace

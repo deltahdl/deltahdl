@@ -43,6 +43,24 @@ TEST(FunctionSim, OldStyleInputWithAPackedRangeAloneHasItsWidth) {
   EXPECT_EQ(val, 0x100u);
 }
 
+// The same port with a signing is a `logic signed [7:0]` (§13.3): 16'h01FF
+// keeps its low byte, which as a signed value is -1, and the assignment to the
+// 16-bit result sign-extends it to 16'hFFFF, where an unsigned port would give
+// 16'h00FF and one of no type 16'h01FF.
+TEST(FunctionSim, OldStyleSignedInputWithAPackedRangeIsSignedLogic) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic [15:0] x;\n"
+      "  function [15:0] ext;\n"
+      "    input signed [7:0] a;\n"
+      "    ext = a;\n"
+      "  endfunction\n"
+      "  initial x = ext(16'h01FF);\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(val, 0xFFFFu);
+}
+
 TEST(FunctionSim, FunctionCallsFunction) {
   auto val = RunAndGet(
       "module t;\n"
