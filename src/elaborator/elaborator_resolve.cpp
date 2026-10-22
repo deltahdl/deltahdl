@@ -488,14 +488,14 @@ void RegisterAnonymousProgramNames(
 
 // §8.13: the typedefs `cls` inherits, each under the key of the base class
 // declaring it, the nearest base's hiding a farther one's of the same name.
-// Inheritance cycles are broken only after the typedefs are keyed
-// (BreakClassInheritanceCycles), so the walk ends at a class it has seen.
+// Elaborator::RunPreElaborationValidations has BreakClassInheritanceCycles
+// drop the extends clause closing any cycle before RegisterCuScopeItems, or a
+// module's walk after it, keys a class's typedefs, so the walk reaches a class
+// with no base.
 static ClassTypedefScopes InheritedTypedefScopes(const ClassDecl* cls,
                                                  const CompilationUnit* unit) {
   ClassTypedefScopes scopes;
-  std::unordered_set<const ClassDecl*> seen{cls};
-  for (const ClassDecl* base = FindBaseClass(cls, unit);
-       base != nullptr && seen.insert(base).second;
+  for (const ClassDecl* base = FindBaseClass(cls, unit); base != nullptr;
        base = FindBaseClass(base, unit)) {
     for (const auto* m : base->members) {
       if (m->kind == ClassMemberKind::kTypedef)
