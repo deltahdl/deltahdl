@@ -1,5 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <format>
+#include <utility>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -295,6 +299,43 @@ TEST(ProceduralAssignDeassignElaboration,
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+}
+
+// §10.6.1 bounds an `assign` statement's target to a variable, and §6.20 and
+// §6.19 make a parameter, a localparam, a specparam and a name an enumeration
+// declares constants, none of them a variable. Each is reported, in a process
+// and in a task alike, and an element of a concatenation is asked about as a
+// target of its own; the variable `q` is not reported.
+TEST(ProceduralAssignDeassignElaboration, AssignOfAConstantIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  parameter P = 1; localparam L = 2; specparam SP = 3;\n"
+      "  typedef enum {A, B} e_t;\n"
+      "  logic q;\n"
+      "  initial begin\n"
+      "    assign P = 5;\n"
+      "    assign L = 5;\n"
+      "    assign SP = 5;\n"
+      "    assign A = 1;\n"
+      "    assign {q, L} = 2;\n"
+      "    assign q = 1;\n"
+      "  end\n"
+      "  task t; assign P = 6; endtask\n"
+      "endmodule\n",
+      f);
+  const std::pair<const char*, uint32_t> kReports[] = {
+      {"P", 6}, {"L", 7}, {"SP", 8}, {"A", 9}, {"L", 10}, {"P", 13}};
+  for (const auto& [name, line] : kReports) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        std::format("procedural assign of constant '{}', which is not a "
+                    "variable",
+                    name),
+        line, "10.6.1"));
+  }
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "procedural assign of constant", 11, "10.6.1"));
 }
 
 }  // namespace

@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <format>
 #include <initializer_list>
+#include <utility>
 
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
@@ -487,6 +489,40 @@ TEST(ForceReleaseElaboration, ForceTargetRulesReachSubroutineBodies) {
                               "a legal force LHS",
                               line, "10.6.2"));
   }
+}
+
+// §10.6.2 bounds a force's target to variables and nets, and §6.20 and §6.19
+// make a parameter, a localparam, a specparam and a name an enumeration
+// declares constants, none of them either. Each is reported, an element of a
+// concatenation as a target of its own, and the variable `q` is not.
+TEST(ForceReleaseElaboration, ForceOfAConstantIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  parameter P = 1; localparam L = 2; specparam SP = 3;\n"
+      "  typedef enum {A, B} e_t;\n"
+      "  logic q; wire w;\n"
+      "  initial begin\n"
+      "    force P = 5;\n"
+      "    force L = 5;\n"
+      "    force SP = 5;\n"
+      "    force A = 1;\n"
+      "    force {w, L} = 2;\n"
+      "    force q = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const std::pair<const char*, uint32_t> kReports[] = {
+      {"P", 6}, {"L", 7}, {"SP", 8}, {"A", 9}, {"L", 10}};
+  for (const auto& [name, line] : kReports) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        std::format("force of constant '{}', which is not a variable or a net",
+                    name),
+        line, "10.6.2"));
+  }
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), "force of constant", 11, "10.6.2"));
 }
 
 }  // namespace

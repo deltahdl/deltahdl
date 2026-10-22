@@ -11,6 +11,10 @@
 // where they stood, because that file reached the 1000-line maximum
 // assert-no-oversized-source-files in .github/workflows/deltahdl.yml fails at.
 // §6.20 is a rule of its own and its checks call nothing else in that file.
+//
+// §10.6.1 and §10.6.2 bound what a procedural continuous assignment writes, and
+// a constant is outside both bounds, so the same walk asks of an `assign` and a
+// `force` whether its target is rooted at one.
 
 #include <format>
 
@@ -59,6 +63,34 @@ void Elaborator::ReportConstAssignTarget(const Expr* lhs, SourceLoc loc) {
               Subclause("6.20"));
 }
 
+// §10.6.1 and §10.6.2: Syntax 10-4 writes a procedural `assign` as a
+// variable_assignment and a `force` as that or a net_assignment, and the two
+// subclauses bound their targets to variables and, for a force, nets. A
+// parameter constant (§6.20) and a name an enumeration declares (§6.19) are
+// constants and neither, so a target rooted at one, or an element of a
+// concatenation rooted at one, is reported under the subclause bounding the
+// statement it stands in.
+static void ReportConstContinuousTarget(const Expr* lhs, const Stmt* s,
+                                        const NameSet& const_names,
+                                        const NameSet& enum_members,
+                                        DiagEngine& diag) {
+  if (lhs->kind == ExprKind::kConcatenation) {
+    for (const Expr* element : lhs->elements)
+      ReportConstContinuousTarget(element, s, const_names, enum_members, diag);
+    return;
+  }
+  const Expr* base = LvalueBaseIdentifier(lhs);
+  if (base == nullptr || (const_names.count(base->text) == 0 &&
+                          enum_members.count(base->text) == 0))
+    return;
+  bool force = s->kind == StmtKind::kForce;
+  diag.Error(s->range.start,
+             std::format("{} of constant '{}', which is not a variable{}",
+                         force ? "force" : "procedural assign", base->text,
+                         force ? " or a net" : ""),
+             Subclause(force ? "10.6.2" : "10.6.1"));
+}
+
 void Elaborator::ReportConstMutatingMethodCall(const Expr* call,
                                                SourceLoc loc) {
   if (call == nullptr || call->kind != ExprKind::kCall) return;
@@ -84,6 +116,10 @@ void Elaborator::WalkStmtsForConstAssign(const Stmt* s) {
   // constant, so nothing downstream refuses the write.
   if (s->kind == StmtKind::kExprStmt) {
     ReportConstMutatingMethodCall(s->expr, s->range.start);
+  }
+  if (s->kind == StmtKind::kForce || s->kind == StmtKind::kAssign) {
+    ReportConstContinuousTarget(s->lhs, s, const_names_, enum_member_names_,
+                                diag_);
   }
   // Every member of Stmt that holds a statement, taken from ForEachChildStmt in
   // elaborator_validate_internal.h rather than listed again here. §6.20 puts no
