@@ -37,6 +37,16 @@ void DefaultImplicitToLogic(DataType& dt) {
 
 }  // namespace
 
+// The header of one tf_port_declaration, its direction, its const and static
+// qualifiers and its data type, which every declarator ParseTfPortDeclarators
+// reads after it shares.
+struct TfPortHeader {
+  Direction dir = Direction::kInput;
+  bool is_const = false;
+  bool is_ref_static = false;
+  DataType dt;
+};
+
 // Consume the leading direction keyword of a tf_port_declaration. The 'const'
 // qualifier (already consumed by the caller) is mapped to 'ref'.
 Direction Parser::ParseTfPortDirection() {

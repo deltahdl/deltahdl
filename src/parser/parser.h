@@ -36,6 +36,9 @@ struct CovergroupBodyState;
 // A.2.1.3: a data_declaration's qualifiers; defined in
 // parser/parser_data_decl_internal.h.
 struct DataDeclQualifiers;
+// A.2.7: what a tf_port_declaration's declarators share; defined in
+// parser/parser_subroutine_body.cpp.
+struct TfPortHeader;
 
 // A.1.11: the report on an item an anonymous program does not admit.
 inline constexpr char kAnonymousProgramItemsMessage[] =
@@ -555,14 +558,6 @@ class Parser {
   void ParseFunctionArgTrailer(FunctionArg& arg, bool require_identifiers);
   void ParseOneFunctionArg(std::vector<FunctionArg>& args, FuncArgScan& scan,
                            bool require_identifiers);
-  // Shared header of one tf_port_declaration (direction/const/static + type)
-  // whose declarator list is parsed by ParseTfPortDeclarators.
-  struct TfPortHeader {
-    Direction dir = Direction::kInput;
-    bool is_const = false;
-    bool is_ref_static = false;
-    DataType dt;
-  };
   bool TryParseTfPortDeclaration(ModuleItem* item,
                                  std::unordered_set<std::string_view>& untyped);
   void ParseSubroutineBody(ModuleItem* item, TokenKind end_kw,
