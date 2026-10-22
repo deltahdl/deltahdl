@@ -511,11 +511,13 @@ bool TryEvalProcessMethodWithoutArgs(const Expr* expr, SimContext& ctx,
 // §9.7: whether `recv`, the receiver of a method select, is declared with the
 // process class: a variable by its bare name, a property of the running
 // object, a property through a handle, `w.q`, or an element of an array of
-// any of them, `arr[i]` and `job[k]` as §9.7's own example keeps them.
+// any of them, `arr[i]` and `job[k]` as §9.7's own example keeps them; or a
+// call of the class's self(), `process::self()`, which answers such a handle.
 bool NamesProcessHandle(const Expr* recv, SimContext& ctx, Arena& arena);
 
 // §9.7: the process a method call through a process handle targets and the
-// method it names, for `p.kill()`, `arr[i].await()` and `job[k].status()`.
+// method it names, for `p.kill()`, `arr[i].await()`, `job[k].status()` and
+// `process::self().srandom(1)`.
 // False when the call is not one through a process handle; `proc` is null
 // where the handle names no live process.
 struct ProcessMethodCall {

@@ -35,13 +35,18 @@ static bool NamesProcessClass(const Expr* scope) {
          scope->rhs->text == "process";
 }
 
+// §9.7: whether `callee` names the class's static method self(), through
+// either form NamesProcessClass takes, `process::self` or `std::process::self`.
+static bool NamesProcessSelf(const Expr* callee) {
+  if (!callee || callee->kind != ExprKind::kMemberAccess) return false;
+  if (!NamesProcessClass(callee->lhs)) return false;
+  return callee->rhs && callee->rhs->kind == ExprKind::kIdentifier &&
+         callee->rhs->text == "self";
+}
+
 bool TryEvalProcessStaticCall(const Expr* expr, SimContext& ctx, Arena& arena,
                               Logic4Vec& out) {
-  if (!expr->lhs || expr->lhs->kind != ExprKind::kMemberAccess) return false;
-  auto* access = expr->lhs;
-  if (!NamesProcessClass(access->lhs)) return false;
-  if (!access->rhs || access->rhs->kind != ExprKind::kIdentifier) return false;
-  if (access->rhs->text != "self") return false;
+  if (!NamesProcessSelf(expr->lhs)) return false;
   // §9.7: self() answers the process making the call, and a static local's
   // initializer runs before any process exists (§10.5), so it answers null
   // there as it does outside every process.
@@ -102,6 +107,9 @@ bool NamesProcessHandle(const Expr* recv, SimContext& ctx, Arena& arena) {
   if (name == nullptr) return false;
   if (name->kind == ExprKind::kIdentifier)
     return ProcessTypedName(name->text, ctx);
+  // A call of self() answers a handle to the calling process, so a method
+  // called on it directly, `process::self().srandom(1)`, is one of the class's.
+  if (name->kind == ExprKind::kCall) return NamesProcessSelf(name->lhs);
   return ProcessTypedMember(name, ctx, arena);
 }
 

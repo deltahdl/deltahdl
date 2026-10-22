@@ -377,4 +377,36 @@ TEST(FineGrainProcessControlRun,
             "r=0\n");
 }
 
+// §9.7: self() answers a handle to the calling process, and a method of the
+// class called directly on that handle acts on the process as it does through
+// a variable holding it: srandom() reseeds the process's generator, so the draw
+// after it repeats the one after the same seed given through the variable.
+TEST(FineGrainProcessControlRun, SrandomCalledOnSelfReseedsTheCallingProcess) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t; process p; int a, b;\n"
+                       "  initial begin\n"
+                       "    process::self().srandom(5); a = $urandom;\n"
+                       "    p = process::self(); p.srandom(5); b = $urandom;\n"
+                       "    $display(\"%0d\", a == b);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §9.7: status() called on self()'s handle answers the state of the process
+// making the call, RUNNING, as a value of process::state whose name() is the
+// member's name.
+TEST(FineGrainProcessControlRun, StatusCalledOnSelfIsRunning) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  initial $display(\"%s\", "
+                       "process::self().status().name());\n"
+                       "endmodule\n",
+                       f),
+            "RUNNING\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

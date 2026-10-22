@@ -605,9 +605,6 @@ TEST_F(CallStatementsInAScope, ACallThroughAStructMemberReachesItsMethod) {
 // returns is a method func call of the built-in class, not user-defined
 // (#5797).
 TEST_F(CallStatementsInAScope, ACallOnProcessSelfIsAMethodFuncCall) {
-  // deltahdl reports srandom as called through a null handle (#7621); the
-  // excuse goes with the fix.
-  f_.has_errors.Excuse();
   Run("module top; initial begin : b process::self().srandom(1); end\n"
       "endmodule\n");
   const std::vector<vpiHandle> kCalls =
