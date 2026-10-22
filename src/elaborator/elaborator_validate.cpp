@@ -18,6 +18,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "elaborator/force_lhs.h"
 #include "elaborator/net_data_type.h"
 #include "elaborator/type_eval.h"
 #include "elaborator/type_key_match.h"

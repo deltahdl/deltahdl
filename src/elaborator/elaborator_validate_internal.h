@@ -22,7 +22,6 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
-#include "elaborator/elaborator_data.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/global_clocking_sampled_value.h"
 #include "elaborator/type_eval.h"
@@ -566,17 +565,6 @@ void CheckProceduralAssignLhs(const Stmt* s, DiagEngine& diag);
 // §28.3.2 with §10.3.4: reports (highz0, highz1) on a net declaration, a
 // continuous assignment or a gate. Defined in elaborator_cont_assign.cpp.
 void CheckHighzStrengthPair(const ModuleItem* item, DiagEngine& diag);
-// §10.6.2: what a force statement's target is judged against -- the nets, the
-// nets of a user-defined nettype among them, the variables declaring unpacked
-// dimensions, and the scope a select's bounds fold in.
-struct ForceLhsNames {
-  const std::unordered_set<std::string_view>& net_names;
-  const std::unordered_set<std::string_view>& nettype_net_names;
-  const std::unordered_map<std::string_view, ElaboratorData::VarArrayInfo>&
-      arrays;
-  const ScopeMap& scope;
-};
-void CheckForceLhs(const Stmt* s, const ForceLhsNames& names, DiagEngine& diag);
 using SelectShapeMap = std::unordered_map<std::string_view, VarSelectShape>;
 
 // What §11.5.1 needs to judge the operand of a select. Its second alternative
