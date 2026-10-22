@@ -383,6 +383,34 @@ TEST(ClassSim, PropertyOfParameterizedBaseTypedefHasBaseSpecializationLayout) {
   EXPECT_EQ(out, "3 5 32\n3 5 8\n");
 }
 
+// §8.25 with §7.4.4: a member of a parameterized class's structure typedef
+// written as a typedef name with packed dimensions, `nib_t [W-1:0] x`, is
+// the typedef's 4 bits times the W = 2 the specialization binds, so the
+// structure is 9 bits and 9'h1A5 leaves x 210 and y 1. Laid out by the
+// written dimensions alone, x was 2 bits.
+TEST(ClassSim, TypedefNamedMemberOfClassTypedefStacksItsDimensions) {
+  SimFixture f;
+  auto out = RunCapture(
+      "typedef logic [3:0] nib_t;\n"
+      "class Box #(int W = 2);\n"
+      "  typedef struct packed { nib_t [W-1:0] x; logic y; } S;\n"
+      "  S s;\n"
+      "  function void show();\n"
+      "    s = 9'h1A5;\n"
+      "    $display(\"%0d %0d %0d\", $bits(s), s.x, s.y);\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  Box #() b;\n"
+      "  initial begin\n"
+      "    b = new;\n"
+      "    b.show();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "9 210 1\n");
+}
+
 // §8.25 with §8.9: each specialization has its own copy of a static array
 // property, initialized with its own value parameter, and the scope form
 // `P#(5)::a` names that copy -- written through it, it reads back through it

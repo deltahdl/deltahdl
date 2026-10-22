@@ -13,6 +13,7 @@
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
+#include "simulator/eval_class_params.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer_register.h"
 #include "simulator/sim_context.h"
@@ -62,14 +63,35 @@ std::optional<uint32_t> FoldedPackedWidth(const StructMember& m,
   return width;
 }
 
-// `type` with each member's packed width folded against `scope`, which the
-// layout builder then reads in place of the unfolded dimensions.
+// §7.4.4: the bits a member written as a typedef name takes, the typedef's
+// width in the design's type table times the packed dimensions written on the
+// name, folded against `scope`, as SimParamTypeWidth sizes a parameter of
+// such a type; the member's own packed width where it names no integral
+// typedef the table holds.
+std::optional<uint32_t> FoldedMemberWidth(const StructMember& m,
+                                          const ScopeMap& scope,
+                                          const SimContext& ctx) {
+  if (m.type_kind == DataTypeKind::kNamed) {
+    DataType written;
+    written.kind = m.type_kind;
+    written.type_name = m.type_name;
+    written.scope_name = m.scope_name;
+    written.packed_dim_left = m.packed_dim_left;
+    written.packed_dim_right = m.packed_dim_right;
+    written.extra_packed_dims = m.extra_packed_dims;
+    if (uint32_t width = SimParamTypeWidth(written, scope, ctx)) return width;
+  }
+  return FoldedPackedWidth(m, scope);
+}
+
+// `type` with each member's width folded against `scope`, which the layout
+// builder then reads in place of the unfolded dimensions.
 DataType* FoldedAggregate(const DataType& type, const ScopeMap& scope,
-                          Arena& arena) {
-  auto* folded = arena.Create<DataType>(type);
+                          SimContext& ctx) {
+  auto* folded = ctx.GetArena().Create<DataType>(type);
   for (StructMember& m : folded->struct_members) {
     if (m.nested_type != nullptr) continue;
-    if (std::optional<uint32_t> width = FoldedPackedWidth(m, scope))
+    if (std::optional<uint32_t> width = FoldedMemberWidth(m, scope, ctx))
       m.resolved_width = *width;
   }
   return folded;
@@ -110,7 +132,7 @@ std::string_view RegisterSpecializationTypedefLayout(std::string_view spelled,
   auto* key = ctx.GetArena().Create<std::string>(std::string(spelled) +
                                                  "::" + std::string(name));
   if (ctx.FindStructType(*key) == nullptr) {
-    RegisterTypeLayout(*key, FoldedAggregate(type, scope, ctx.GetArena()), ctx,
+    RegisterTypeLayout(*key, FoldedAggregate(type, scope, ctx), ctx,
                        ctx.GetArena());
   }
   return *key;
