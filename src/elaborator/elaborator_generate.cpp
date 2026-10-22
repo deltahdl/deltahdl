@@ -143,6 +143,9 @@ void Elaborator::ProcessPendingGenerate(const PendingGenerate& pg) {
     default:
       break;
   }
+  // §6.20.4 of the construct's own value parameters, under the guards above
+  // and with every instance of its blocks registered on pg.mod.
+  ValidateGenerateValueParams(pg.item, pg.mod, scope);
   // A typedef the selected body declared was written into typedefs_ by
   // Elaborator::ElaborateTypedef, and §20.6.2 $bits reads its width back off
   // design->type_widths, which FinalizeDesignTail builds from the map restored

@@ -16,6 +16,7 @@
 #include "elaborator/elaborator_scope_rules_names.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_scopes.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
@@ -725,11 +726,36 @@ void ValidateOneValueParam(const ModuleItem* item, const ScopeMap& param_scope,
 // everything ValidateOneValueParam needs and cannot read off the item.
 struct GenerateParamCtx {
   const CompilationUnit* unit;
+  const RtlirModule* mod;
   DiagEngine& diag;
 };
 
+// §23.9: the generate block prefixes the elaborated instances of the parameter
+// `item` declares were registered under, one for each instance of the block it
+// stands in. The walk below reads a body from the source and so stands in no
+// one instance of it, and these are what put the body's own declarations in
+// reach of a fold that reads one of them: StringParamValue in
+// src/elaborator/const_eval_builtin_method.cpp answers `S.len()` from the
+// declaration Elaborator::ElaborateParamDecl registered for S, and finds a
+// generate block's declaration only from inside that block. The walk runs once
+// the construct is elaborated, so every instance is registered by then; see
+// Elaborator::ValidateGenerateValueParams.
+//
+// An instance is told by the initializer it was registered with, which is the
+// declaration's own. A declaration written with none, which
+// ValidateOneValueParam has just reported, matches every other such one, and
+// what that adds only widens what the rest of a block already in error reads.
+void AddInstancePrefixes(const ModuleItem* item, const RtlirModule* mod,
+                         GenBlockPrefixes& prefixes) {
+  for (const auto& pd : mod->params) {
+    if (pd.default_value == item->init_expr)
+      prefixes.push_back(pd.gen_block_prefix);
+  }
+}
+
 void ValidateValueParamsInGenerateBody(const std::vector<ModuleItem*>& items,
                                        ScopeMap scope,
+                                       GenBlockPrefixes prefixes,
                                        const GenerateParamCtx& ctx);
 
 // The three shapes a generate construct holds items in: the body of a loop or
@@ -741,6 +767,7 @@ void ValidateValueParamsInGenerateBody(const std::vector<ModuleItem*>& items,
 // later one unvisited.
 void ValidateValueParamsInGenerate(const ModuleItem* item,
                                    const ScopeMap& scope,
+                                   const GenBlockPrefixes& prefixes,
                                    const GenerateParamCtx& ctx) {
   ScopeMap body_scope = scope;
   // §27.4: the loop index is an implicit localparam of the generate block, so
@@ -753,10 +780,11 @@ void ValidateValueParamsInGenerate(const ModuleItem* item,
   if (item->kind == ModuleItemKind::kGenerateFor && item->gen_init &&
       item->gen_init->lhs)
     body_scope[item->gen_init->lhs->text] = 0;
-  ValidateValueParamsInGenerateBody(item->gen_body, body_scope, ctx);
-  if (item->gen_else) ValidateValueParamsInGenerate(item->gen_else, scope, ctx);
+  ValidateValueParamsInGenerateBody(item->gen_body, body_scope, prefixes, ctx);
+  if (item->gen_else)
+    ValidateValueParamsInGenerate(item->gen_else, scope, prefixes, ctx);
   for (const auto& ci : item->gen_case_items)
-    ValidateValueParamsInGenerateBody(ci.body, scope, ctx);
+    ValidateValueParamsInGenerateBody(ci.body, scope, prefixes, ctx);
 }
 
 // §6.20.4 lets a local parameter be declared in a generate block, and rules
@@ -764,21 +792,26 @@ void ValidateValueParamsInGenerate(const ModuleItem* item,
 // a body declares is held to the constant-expression rule.
 void ValidateValueParamsInGenerateBody(const std::vector<ModuleItem*>& items,
                                        ScopeMap scope,
+                                       GenBlockPrefixes prefixes,
                                        const GenerateParamCtx& ctx) {
   for (const auto* item : items) {
     if (item->kind == ModuleItemKind::kParamDecl) {
-      ValidateOneValueParam(item, scope, ctx.unit, ctx.diag, true);
+      {
+        RegisteredGenScopeGuard in_block(prefixes);
+        ValidateOneValueParam(item, scope, ctx.unit, ctx.diag, true);
+      }
       // §6.20.1 lets a later declaration in the block read an earlier one, so
       // bind the name whatever the check above decided about it. Binding only
       // the ones that passed would report every declaration downstream of a
       // breach as well, for a breach none of them committed.
       scope[item->name] = 0;
+      AddInstancePrefixes(item, ctx.mod, prefixes);
       continue;
     }
     if (item->kind == ModuleItemKind::kGenerateIf ||
         item->kind == ModuleItemKind::kGenerateCase ||
         item->kind == ModuleItemKind::kGenerateFor)
-      ValidateValueParamsInGenerate(item, scope, ctx);
+      ValidateValueParamsInGenerate(item, scope, prefixes, ctx);
   }
 }
 
@@ -787,24 +820,29 @@ void ValidateValueParamsInGenerateBody(const std::vector<ModuleItem*>& items,
 void Elaborator::ValidateValueParams(const ModuleDecl* decl,
                                      const RtlirModule* mod) {
   ScopeMap param_scope = BuildParamScope(mod);
-  GenerateParamCtx ctx{unit_, diag_};
+  // A generate construct keeps its items in ModuleItem::gen_body rather than
+  // in decl->items, and Elaborator::ValidateGenerateValueParams reaches the
+  // declarations §6.20.4 permits inside one. Parser::ParseGenerateRegion parses
+  // a bare `generate ... endgenerate` straight into decl->items, so a
+  // declaration written there is reached by this loop.
   for (const auto* item : decl->items) {
-    if (item->kind == ModuleItemKind::kParamDecl) {
+    if (item->kind == ModuleItemKind::kParamDecl)
       ValidateOneValueParam(item, param_scope, unit_, diag_);
-      continue;
-    }
-    // A generate construct keeps its items in ModuleItem::gen_body rather than
-    // in decl->items, so descending is what reaches the declarations §6.20.4
-    // permits inside one. Parser::ParseGenerateRegion parses a bare
-    // `generate ... endgenerate` straight into decl->items, so a declaration
-    // written there is already reached by the loop above.
-    if (item->kind == ModuleItemKind::kGenerateIf ||
-        item->kind == ModuleItemKind::kGenerateCase ||
-        item->kind == ModuleItemKind::kGenerateFor)
-      ValidateValueParamsInGenerate(item, param_scope, ctx);
   }
 
   CheckParamMapHierRefs(decl, unit_, diag_);
+}
+
+// Elaborator::ProcessPendingGenerate calls this as the construct's elaboration
+// ends, rather than Elaborator::ValidateValueParams with the module's own
+// declarations, because the construct is elaborated after the module: only
+// then are the block's parameters registered for a fold that reads one, as
+// `S.len()` reads a string parameter S the block declares above it.
+void Elaborator::ValidateGenerateValueParams(const ModuleItem* item,
+                                             const RtlirModule* mod,
+                                             const ScopeMap& scope) {
+  GenerateParamCtx ctx{unit_, mod, diag_};
+  ValidateValueParamsInGenerate(item, scope, {}, ctx);
 }
 
 // §6.20.4 lets a local parameter be declared in a package, and rules that

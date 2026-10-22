@@ -29,11 +29,18 @@ namespace delta {
 // §6.10 and §10.3.2 for an element of a continuous assignment's target that is
 // a whole name: an undeclared one is an implicit net, a variable takes one
 // continuous assignment and no initializer, and a uwire net one driver.
+//
+// §27.4 makes each generate block a scope of its own, and each iteration of a
+// loop generate construct a block, so the targets are told apart by the
+// declaration the name binds rather than by how it is spelled: a `w` each
+// iteration declares is a variable of that iteration's and takes one
+// assignment there.
 void Elaborator::ValidateContAssignIdentLhs(std::string_view name,
                                             ModuleItem* item,
                                             RtlirModule* mod) {
   MaybeCreateImplicitNet(name, item->loc, mod);
-  if (!cont_assign_targets_.emplace(name, item->loc).second) {
+  if (!cont_assign_targets_.emplace(DeclaredScopedName(name), item->loc)
+           .second) {
     if (net_names_.count(name) == 0) {
       // §6.5 states the rule in full: multiple continuous assignments to any
       // term in the expansion of a variable's longest static prefix are an
@@ -398,7 +405,8 @@ bool Elaborator::ValidateContAssignLeaf(ModuleItem* item, RtlirModule* mod,
 // a continuous assignment writes any part of has no initializer.
 void Elaborator::ValidateContAssignVarLeaf(ModuleItem* item,
                                            std::string_view name) {
-  if (!gen_prefix_scopes_.empty() && proc_assign_targets_.count(name) != 0) {
+  if (!gen_prefix_scopes_.empty() &&
+      proc_assign_targets_.count(DeclaredScopedName(name)) != 0) {
     diag_.Error(item->loc,
                 std::format("variable '{}' has both continuous and "
                             "procedural assignments",
@@ -447,7 +455,9 @@ void CheckHighzStrengthPair(const ModuleItem* item, DiagEngine& diag) {
 // assignment writes no net and the one-driver rule of §6.5 and §10.3.2 reach
 // them. The module's own checks run before its generate blocks are
 // elaborated, so each item of a block is checked as the block is, against the
-// targets the module's items and the earlier items recorded.
+// targets the module's items and the earlier items recorded. Both tables hold
+// a variable under the declaration the name binds, as
+// ValidateContAssignIdentLhs records it.
 void Elaborator::ValidateGeneratedItem(const ModuleItem* item) {
   CheckHighzStrengthPair(item, diag_);
   if (!IsProceduralItemKind(item->kind)) return;
@@ -462,14 +472,15 @@ void Elaborator::ValidateGeneratedItem(const ModuleItem* item) {
                   Subclause("10.4"));
       continue;
     }
-    if (cont_assign_targets_.count(name) != 0) {
+    std::string_view declared = DeclaredScopedName(name);
+    if (cont_assign_targets_.count(declared) != 0) {
       diag_.Error(loc,
                   std::format("variable '{}' has both continuous and "
                               "procedural assignments",
                               name),
                   Subclause("6.5"));
     }
-    proc_assign_targets_.emplace(name, loc);
+    proc_assign_targets_.emplace(declared, loc);
   }
 }
 
@@ -485,7 +496,8 @@ void Elaborator::RecordGateOutputDrivers(const ModuleItem* item) {
   for (size_t i = 0; i < outputs; ++i) {
     std::string_view name = ExprIdent(item->gate_terminals[i]);
     if (name.empty() || net_names_.count(name) != 0) continue;
-    if (!cont_assign_targets_.emplace(name, item->loc).second) {
+    if (!cont_assign_targets_.emplace(DeclaredScopedName(name), item->loc)
+             .second) {
       diag_.Error(item->loc,
                   std::format("variable '{}' is driven by more than one "
                               "continuous assignment or primitive output",

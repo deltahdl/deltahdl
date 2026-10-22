@@ -271,17 +271,12 @@ TEST(StringLenElaboration,
 // it at module level. 3 is unreachable from anything else the declaration
 // records for the reason that case gives.
 //
-// This fails while Elaborator::ProcessPendingGenerate in
-// src/elaborator/elaborator_generate.cpp opens no ParamRangeRegistryGuard:
-// StringParamLength in src/elaborator/const_eval_builtin_method.cpp answers
-// from the registered module, there is none for the whole of a block's body,
-// and the call does not fold, leaving N unresolved.
+// §6.20.4 holds N's initializer to the constant-expression rule, and the call
+// is constant for the reason it folds, so the source draws no report: the check
+// reads the block's S from inside the block, as the fold does.
 TEST(StringLenElaboration,
      LenOfAGenerateBlockStringLocalparamFoldsToTheCharacterCount) {
   ElabFixture f;
-  // deltahdl reports N's initializer as not constant though S.len() folds
-  // (#7606); the excuse goes with the fix.
-  f.has_errors.Excuse();
   auto* design = ElaborateSrc(
       "module m;\n"
       "  generate\n"
@@ -300,6 +295,32 @@ TEST(StringLenElaboration,
   ASSERT_NE(n, nullptr);
   EXPECT_TRUE(n->is_resolved);
   EXPECT_EQ(n->resolved_value, 3);
+}
+
+// The same in a loop generate block. §27.4 makes each iteration an instance of
+// the block declaring an S and an N of its own, and each N reads its own
+// instance's S.
+TEST(StringLenElaboration,
+     LenOfALoopGenerateBlockStringLocalparamFoldsInEveryIteration) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  for (genvar i = 0; i < 2; i++) begin : g\n"
+      "    localparam string S = \"ab\";\n"
+      "    localparam int N = S.len();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  int ns = 0;
+  for (const auto& param : design->top_modules[0]->params) {
+    if (param.name != "N") continue;
+    ++ns;
+    EXPECT_TRUE(param.is_resolved);
+    EXPECT_EQ(param.resolved_value, 2);
+  }
+  EXPECT_EQ(ns, 2);
 }
 
 }  // namespace

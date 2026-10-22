@@ -11,9 +11,6 @@ namespace {
 
 TEST(GenerateSimulation, GenerateForAssignValues) {
   LowerFixture f;
-  // deltahdl counts each iteration's w as one variable assigned more than once
-  // (#7608); the excuse goes with the fix.
-  f.has_errors.Excuse();
   auto* var = RunAndFindVar(
       "module t #(parameter N = 3) ();\n"
       "  logic [31:0] x;\n"

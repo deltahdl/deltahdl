@@ -226,16 +226,14 @@ struct EnumBaseRange {
   int64_t signed_min = 0;
 };
 
-static EnumBaseRange ComputeEnumBaseRange(const DataType& dtype,
-                                          uint32_t base_width) {
+static EnumBaseRange ComputeEnumBaseRange(bool is_signed, uint32_t base_width) {
   EnumBaseRange range;
-  range.is_signed = dtype.is_signed;
+  range.is_signed = is_signed;
   range.base_width = base_width;
   range.max_val =
-      dtype.is_signed
-          ? (base_width > 0 ? (1ULL << (base_width - 1)) - 1 : 0)
-          : (base_width < 64 ? (1ULL << base_width) - 1 : UINT64_MAX);
-  range.signed_min = (dtype.is_signed && base_width > 0 && base_width < 64)
+      is_signed ? (base_width > 0 ? (1ULL << (base_width - 1)) - 1 : 0)
+                : (base_width < 64 ? (1ULL << base_width) - 1 : UINT64_MAX);
+  range.signed_min = (is_signed && base_width > 0 && base_width < 64)
                          ? -(1LL << (base_width - 1))
                          : INT64_MIN;
   return range;
@@ -300,7 +298,11 @@ void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc,
   auto base_width = EvalTypeWidth(EnumArrayElement(dtype), typedefs_);
   bool is_2state = !Is4stateType(dtype, typedefs_);
   bool prev_had_xz = false;
-  EnumBaseRange range = ComputeEnumBaseRange(dtype, base_width);
+  // §6.19: the members' values are of the base type, whose signing is the one
+  // `int` has when no base is named and the one a typedef base resolves to,
+  // and not only a `signed` written on the declaration.
+  EnumBaseRange range =
+      ComputeEnumBaseRange(IsSignedType(dtype, typedefs_), base_width);
   std::unordered_set<std::string_view> seen_names;
   std::unordered_set<int64_t> seen_values;
   int64_t next_val = 0;

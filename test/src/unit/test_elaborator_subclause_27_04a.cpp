@@ -50,9 +50,6 @@ TEST(GenerateElaboration, GenerateForZeroIterations) {
 
 TEST(GenerateElaboration, GenerateForWithAssign) {
   ElabFixture f;
-  // deltahdl counts each iteration's w as one variable assigned more than once
-  // (#7608); the excuse goes with the fix.
-  f.has_errors.Excuse();
   auto* design = ElaborateSrc(
       "module t #(parameter N = 2) ();\n"
       "  generate\n"

@@ -236,4 +236,63 @@ TEST(NetsAndVariables, SubroutineWriteMeetsContinuousAssignment) {
                              7, "6.5"));
 }
 
+// §6.5 with §27.4: a generate block is a scope of its own, so a variable it
+// declares is another variable from the module's of the same name, and each
+// takes the one continuous assignment written to it.
+TEST(NetsAndVariables, AGenerateBlocksVariableIsNotTheModulesOfThatName) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic w;\n"
+      "  assign w = 1'b0;\n"
+      "  if (1) begin : a\n"
+      "    logic w;\n"
+      "    assign w = 1'b1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// The module's variable is one variable however many iterations of a loop
+// generate construct write it, so a continuous assignment in every iteration
+// is more than one assignment to it.
+TEST(NetsAndVariables, EveryIterationAssigningTheModulesVariableIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic w;\n"
+      "  for (genvar i = 0; i < 2; i++) begin : g\n"
+      "    assign w = 1'b1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "multiple continuous assignments to 'w'", 4,
+                            "6.5"));
+}
+
+// An iteration's own variable written by both kinds of assignment within the
+// iteration is reported as a mixture, and no iteration's continuous
+// assignment is counted against another's.
+TEST(NetsAndVariables, AnIterationsVariableTakesNoMixtureOfAssignments) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  for (genvar i = 0; i < 2; i++) begin : g\n"
+      "    logic w;\n"
+      "    assign w = 1'b0;\n"
+      "    initial w = 1'b1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "variable 'w' has both continuous and procedural "
+                            "assignments",
+                            5, "6.5"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "multiple continuous assignments to 'w'", 4,
+                             "6.5"));
+}
+
 }  // namespace

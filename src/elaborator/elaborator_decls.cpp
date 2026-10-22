@@ -349,7 +349,9 @@ static void LowerNetDeclAssignment(const ModuleItem* item, const RtlirNet& net,
         Subclause("10.3.1"));
     return;
   }
-  sink.cont_assign_targets.emplace(item->name, item->loc);
+  // Under the net's own name, which carries the prefix of the generate block
+  // declaring it, as Elaborator::ValidateContAssignIdentLhs keys a target.
+  sink.cont_assign_targets.emplace(net.name, item->loc);
   sink.mod->assigns.push_back(BuildNetDeclContAssign(item, net, sink.arena));
 }
 
