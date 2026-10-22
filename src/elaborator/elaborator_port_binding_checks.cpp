@@ -48,8 +48,8 @@ void Elaborator::CheckPortCoercion(const RtlirModuleInst& inst, SourceLoc loc) {
 
     if (binding.direction == Direction::kOutput && binding.connection &&
         binding.connection->kind == ExprKind::kIdentifier &&
-        cont_assign_targets_.count(
-            DeclaredScopedName(binding.connection->text))) {
+        cont_assign_targets_.count(DeclaredScopedName(
+            binding.connection->text, gen_prefix_scopes_, declared_names_))) {
       diag_.Warning(
           loc,
           std::format("port '{}' is declared as output but its connection "

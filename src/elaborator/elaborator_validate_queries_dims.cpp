@@ -739,7 +739,7 @@ struct GenerateParamCtx {
 // declaration Elaborator::ElaborateParamDecl registered for S, and finds a
 // generate block's declaration only from inside that block. The walk runs once
 // the construct is elaborated, so every instance is registered by then; see
-// Elaborator::ValidateGenerateValueParams.
+// ValidateGenerateValueParams.
 //
 // An instance is told by the initializer it was registered with, which is the
 // declaration's own. A declaration written with none, which
@@ -821,7 +821,7 @@ void Elaborator::ValidateValueParams(const ModuleDecl* decl,
                                      const RtlirModule* mod) {
   ScopeMap param_scope = BuildParamScope(mod);
   // A generate construct keeps its items in ModuleItem::gen_body rather than
-  // in decl->items, and Elaborator::ValidateGenerateValueParams reaches the
+  // in decl->items, and ValidateGenerateValueParams reaches the
   // declarations §6.20.4 permits inside one. Parser::ParseGenerateRegion parses
   // a bare `generate ... endgenerate` straight into decl->items, so a
   // declaration written there is reached by this loop.
@@ -838,10 +838,11 @@ void Elaborator::ValidateValueParams(const ModuleDecl* decl,
 // declarations, because the construct is elaborated after the module: only
 // then are the block's parameters registered for a fold that reads one, as
 // `S.len()` reads a string parameter S the block declares above it.
-void Elaborator::ValidateGenerateValueParams(const ModuleItem* item,
-                                             const RtlirModule* mod,
-                                             const ScopeMap& scope) {
-  GenerateParamCtx ctx{unit_, mod, diag_};
+void ValidateGenerateValueParams(const ModuleItem* item, const RtlirModule* mod,
+                                 const ScopeMap& scope,
+                                 const CompilationUnit* unit,
+                                 DiagEngine& diag) {
+  GenerateParamCtx ctx{unit, mod, diag};
   ValidateValueParamsInGenerate(item, scope, {}, ctx);
 }
 

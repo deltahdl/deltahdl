@@ -1,9 +1,11 @@
-// The generate blocks a conditional generate construct selects (§27.5) and
-// the scope each opens, moved out of src/elaborator/elaborator_generate.cpp,
-// which holds the pending-generate driver, the item walk and the loop
-// generate, at its size limit.
+// The generate blocks a conditional generate construct selects (§27.5), the
+// scope each opens, and the step an import written in a block adds to that
+// scope (§26.3), moved out of src/elaborator/elaborator_generate.cpp, which
+// holds the pending-generate driver, the item walk and the loop generate, at
+// its size limit.
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <format>
 #include <optional>
@@ -11,6 +13,7 @@
 #include <string_view>
 #include <vector>
 
+#include "common/arena.h"
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
@@ -201,6 +204,36 @@ void Elaborator::ElaborateGenerateCase(ModuleItem* item, RtlirModule* mod,
       {default_item->label, default_item->name_is_generated, default_item->body,
        default_item->has_begin_end},
       mod, scope);
+}
+
+// §26.3: a wildcard import makes the package's names potentially locally
+// visible at a point of the scope only where the import stands before that
+// point within the current scope, and an explicit import makes its name
+// locally visible from that point on; §27.5 makes the generate block a scope
+// of its own. The clause's Example 2 has `initial x = 1; import p2::*;` in a
+// block of a module importing p, and the reference binds p::x through the
+// enclosing scope because p2's import comes after it, while a reference after
+// the import binds p2::x in the block. The import is recorded as the module's
+// by ElaborateItem, with a prefix of its own that Lowerer::LowerImports keys
+// its names by, and the prefix goes into gen_prefix_scopes_ one step outside
+// the block's own so that every item elaborated after it carries it (see
+// RtlirImport::scope_prefix); an item elaborated before it was stamped
+// without it. The list ends with the block's own prefix wherever an import
+// can stand, since the one block that opens no scope, §27.5's directly nested
+// one, holds a conditional construct alone; the guard is for that shape.
+void Elaborator::ElaborateGenerateBlockImport(ModuleItem* item,
+                                              RtlirModule* mod) {
+  size_t recorded = mod->imports.size();
+  ElaborateGenerateBlockItem(item, mod);
+  if (mod->imports.size() == recorded) return;
+  std::string scope =
+      std::format("{}:import{}:", gen_prefix_, mod->imports.size());
+  std::string_view interned{arena_.AllocString(scope.c_str(), scope.size()),
+                            scope.size()};
+  mod->imports.back().scope_prefix = interned;
+  auto step = gen_prefix_scopes_.empty() ? gen_prefix_scopes_.end()
+                                         : gen_prefix_scopes_.end() - 1;
+  gen_prefix_scopes_.insert(step, interned);
 }
 
 }  // namespace delta

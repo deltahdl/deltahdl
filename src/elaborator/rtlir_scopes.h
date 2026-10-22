@@ -2,7 +2,9 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
 #include <string_view>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -67,6 +69,23 @@ inline bool ParamVisibleFromScopes(std::string_view decl_prefix,
     if (scope == decl_prefix) return true;
   }
   return false;
+}
+
+// §27.4 with §23.9: the name `declared` records the declaration under that a
+// reference to `name` binds, standing in the generate blocks `scopes`, which
+// are outermost first as above. A block's declarations are recorded under the
+// block's prefix followed by the name (Elaborator::ScopedName), so the
+// innermost block in force that declares `name` gives its prefixed form, and
+// where none does the bare name stands for the module's own declaration or for
+// none at all.
+inline std::string_view DeclaredScopedName(
+    std::string_view name, const GenBlockPrefixes& scopes,
+    const std::unordered_set<std::string_view>& declared) {
+  for (auto it = scopes.rbegin(); it != scopes.rend(); ++it) {
+    auto found = declared.find(std::string(*it) + std::string(name));
+    if (found != declared.end()) return *found;
+  }
+  return name;
 }
 
 // §23.6: one step of a hierarchical path name, which Syntax 23-7 writes as

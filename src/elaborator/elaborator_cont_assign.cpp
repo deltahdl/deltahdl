@@ -39,8 +39,9 @@ void Elaborator::ValidateContAssignIdentLhs(std::string_view name,
                                             ModuleItem* item,
                                             RtlirModule* mod) {
   MaybeCreateImplicitNet(name, item->loc, mod);
-  if (!cont_assign_targets_.emplace(DeclaredScopedName(name), item->loc)
-           .second) {
+  std::string_view declared =
+      DeclaredScopedName(name, gen_prefix_scopes_, declared_names_);
+  if (!cont_assign_targets_.emplace(declared, item->loc).second) {
     if (net_names_.count(name) == 0) {
       // §6.5 states the rule in full: multiple continuous assignments to any
       // term in the expansion of a variable's longest static prefix are an
@@ -405,8 +406,10 @@ bool Elaborator::ValidateContAssignLeaf(ModuleItem* item, RtlirModule* mod,
 // a continuous assignment writes any part of has no initializer.
 void Elaborator::ValidateContAssignVarLeaf(ModuleItem* item,
                                            std::string_view name) {
+  std::string_view declared =
+      DeclaredScopedName(name, gen_prefix_scopes_, declared_names_);
   if (!gen_prefix_scopes_.empty() &&
-      proc_assign_targets_.count(DeclaredScopedName(name)) != 0) {
+      proc_assign_targets_.count(declared) != 0) {
     diag_.Error(item->loc,
                 std::format("variable '{}' has both continuous and "
                             "procedural assignments",
@@ -472,7 +475,8 @@ void Elaborator::ValidateGeneratedItem(const ModuleItem* item) {
                   Subclause("10.4"));
       continue;
     }
-    std::string_view declared = DeclaredScopedName(name);
+    std::string_view declared =
+        DeclaredScopedName(name, gen_prefix_scopes_, declared_names_);
     if (cont_assign_targets_.count(declared) != 0) {
       diag_.Error(loc,
                   std::format("variable '{}' has both continuous and "
@@ -496,8 +500,9 @@ void Elaborator::RecordGateOutputDrivers(const ModuleItem* item) {
   for (size_t i = 0; i < outputs; ++i) {
     std::string_view name = ExprIdent(item->gate_terminals[i]);
     if (name.empty() || net_names_.count(name) != 0) continue;
-    if (!cont_assign_targets_.emplace(DeclaredScopedName(name), item->loc)
-             .second) {
+    std::string_view declared =
+        DeclaredScopedName(name, gen_prefix_scopes_, declared_names_);
+    if (!cont_assign_targets_.emplace(declared, item->loc).second) {
       diag_.Error(item->loc,
                   std::format("variable '{}' is driven by more than one "
                               "continuous assignment or primitive output",

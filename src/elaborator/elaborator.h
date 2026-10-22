@@ -541,12 +541,6 @@ class Elaborator : public ElaboratorClassRules {
   void DeclareInModuleNameSpace(std::string_view name, SourceLoc loc);
 
   std::string_view ScopedName(std::string_view base);
-  // §27.4 with §23.9: the declaration a reference to `name` written where
-  // the elaboration stands binds, as declared_names_ records it -- the
-  // innermost generate block in force that declares the name, under the
-  // prefix ScopedName gave that block's declarations, or the bare name where
-  // no block in force declares it.
-  std::string_view DeclaredScopedName(std::string_view name) const;
   // The generate prefix currently in force, arena-persisted so it outlives the
   // mutable member it is copied from. Empty outside any generate construct.
   std::string_view InternedGenPrefix();
@@ -714,11 +708,6 @@ class Elaborator : public ElaboratorClassRules {
   void ValidateSpecparamInDeclRange(const ModuleDecl* decl);
 
   void ValidateValueParams(const ModuleDecl* decl, const RtlirModule* mod);
-  // §6.20.4 of the value parameters the generate construct `item` of `mod`
-  // declares, run once the construct is elaborated.
-  void ValidateGenerateValueParams(const ModuleItem* item,
-                                   const RtlirModule* mod,
-                                   const ScopeMap& scope);
 
   void ValidateLhsPatternWidths(const ModuleDecl* decl, const RtlirModule* mod);
 

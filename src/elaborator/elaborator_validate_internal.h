@@ -35,6 +35,7 @@
 namespace delta {
 
 struct CompilationUnit;
+struct RtlirModule;
 struct TypeShapeTables;
 
 using TypeMap = std::unordered_map<std::string_view, DataTypeKind>;
@@ -704,5 +705,13 @@ std::string EnabledSubroutineName(const Stmt* s);
 // elaborator_validate_event_operands.cpp.
 void ReportNonEventOperands(const ModuleDecl* decl, const TypeMap& kinds,
                             DiagEngine& diag);
+
+// §6.20.4 of the value parameters the generate construct `item` of `mod`
+// declares, `scope` binding the module's own parameters. Run once the
+// construct is elaborated, when the parameters its blocks declare are
+// registered on `mod`. Defined in elaborator_validate_queries_dims.cpp.
+void ValidateGenerateValueParams(const ModuleItem* item, const RtlirModule* mod,
+                                 const ScopeMap& scope,
+                                 const CompilationUnit* unit, DiagEngine& diag);
 
 }  // namespace delta

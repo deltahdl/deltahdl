@@ -123,16 +123,6 @@ std::string_view Elaborator::ScopedName(std::string_view base) {
   return {arena_.AllocString(full.c_str(), full.size()), full.size()};
 }
 
-std::string_view Elaborator::DeclaredScopedName(std::string_view name) const {
-  for (auto it = gen_prefix_scopes_.rbegin(); it != gen_prefix_scopes_.rend();
-       ++it) {
-    std::string scoped = std::string(*it) + std::string(name);
-    auto found = declared_names_.find(scoped);
-    if (found != declared_names_.end()) return *found;
-  }
-  return name;
-}
-
 std::string_view Elaborator::InternedGenPrefix() {
   if (gen_prefix_.empty()) return {};
   return {arena_.AllocString(gen_prefix_.c_str(), gen_prefix_.size()),
