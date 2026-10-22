@@ -157,14 +157,15 @@ TEST(ArrayMethodValidation, AClassTypeParameterDimensionMakesItAssociative) {
 }
 
 // §7.8 with §8.13: a typedef the declaring class writes is a type in its
-// property's dimension as well, and a subclass inherits it with the base's
-// other members, so `int m[K]` and the subclass's `int d[K]` are associative
-// arrays taking num(). A fixed-size property beside them keeps its report.
+// property's dimension as well, whichever of the class's typedefs it is, and a
+// subclass inherits it with the base's other members, so `int m[K]` and the
+// subclass's `int d[K]` are associative arrays taking num(). A fixed-size
+// property beside them keeps its report.
 TEST(ArrayMethodValidation, AClassTypedefDimensionMakesItAssociative) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
-      "  class C; typedef int K; int m[K]; int f[4]; endclass\n"
+      "  class C; typedef int J; typedef int K; int m[K]; int f[4]; endclass\n"
       "  class D extends C; int d[K]; endclass\n"
       "  C c = new; D h = new; int n;\n"
       "  initial begin\n"

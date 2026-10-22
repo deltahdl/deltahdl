@@ -671,25 +671,27 @@ TEST(UnpackedStructDynamicMember, ABoundedQueueMemberKeepsToItsBound) {
 }
 
 // §7.2 with §7.4.2 and §6.20: a member `int a[N]` of a structure the module
-// declares holds N elements, and one `int b[N-1:0]` the same, so with N = 3
-// each takes an index 2. Folded with no parameters, each held one element and
-// the writes to index 2 were dropped.
+// declares holds N elements, one `int b[N-1:0]` the same and one `int c[N-1]`
+// one fewer, so with N = 3 the first two take an index 2 and the third an
+// index 1. Folded with no parameters, each held one element and the writes
+// past index 0 were dropped.
 TEST(UnpackedStructArrayMember, AMemberSizedByAParameterHoldsThatMany) {
   SimFixture f;
   std::string out = RunCapture(
       "module t;\n"
       "  localparam int N = 3;\n"
-      "  typedef struct { int a[N]; int b[N-1:0]; } s_t;\n"
+      "  typedef struct { int a[N]; int b[N-1:0]; int c[N-1]; } s_t;\n"
       "  s_t s;\n"
       "  initial begin\n"
       "    s.a[0] = 1;\n"
       "    s.a[2] = 5;\n"
       "    s.b[2] = 6;\n"
-      "    $display(\"%0d %0d %0d\", s.a[0], s.a[2], s.b[2]);\n"
+      "    s.c[1] = 7;\n"
+      "    $display(\"%0d %0d %0d %0d\", s.a[0], s.a[2], s.b[2], s.c[1]);\n"
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_EQ(out, "1 5 6\n");
+  EXPECT_EQ(out, "1 5 6 7\n");
 }
 
 // §7.10 with §6.20: a queue member's bound `[$:N-2]` names the module's

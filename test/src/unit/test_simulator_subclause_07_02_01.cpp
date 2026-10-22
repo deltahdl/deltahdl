@@ -639,4 +639,25 @@ TEST(PackedStructSimulation, AMemberSizedByAParameterTakesEachInstancesValue) {
             "4 8 240\n8 16 65280\n");
 }
 
+// §7.2.1 with §7.4.1 and §6.20: a member written as a packed structure type
+// with packed dimensions after its body, `struct packed {...} [1:0][W-1:0]`,
+// has those dimensions and its own members sized by the module's W, so under
+// W = 3 it is 2*3 elements of 3 bits and the structure holding it 18 bits.
+// Folded with no parameters, the inner member was one bit and the dimension
+// [W-1:0] no dimension.
+TEST(PackedStructSimulation, ANestedMembersParameterDimensionsAreFolded) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  localparam int W = 3;\n"
+                 "  typedef struct packed {\n"
+                 "    struct packed { logic [W-1:0] v; } [1:0][W-1:0] g;\n"
+                 "  } g_t;\n"
+                 "  g_t s;\n"
+                 "  initial $display(\"%0d\", $bits(s));\n"
+                 "endmodule\n",
+                 f),
+      "18\n");
+}
+
 }  // namespace
