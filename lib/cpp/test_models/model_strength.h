@@ -30,11 +30,11 @@ enum class StrengthLevel : uint8_t {
 // one occupying neither has the value z, and `value` says which.
 //
 // Both _lo and _hi are read. CombineAmbiguous and CombineWithWiredLogic below
-// take the extremes over these spans, which §28.12.2 states as "a range that
-// includes the extremes of the signals and all the strengths between them";
-// before issue #3423 the two functions read _hi alone and answered a signal
-// anchored above high impedance, such as Figure 28-12's Pu1 to St1, as though
-// it reached high impedance.
+// take the extremes over these spans, §28.12.2's result being a range running
+// from the outermost strength of either signal to the outermost of the other,
+// every strength in between included; before issue #3423 the two functions read
+// _hi alone and answered a signal anchored above high impedance, such as Figure
+// 28-12's Pu1 to St1, as though it reached high impedance.
 struct StrengthSignal {
   Val4 value = Val4::kZ;
   StrengthLevel strength0_hi = StrengthLevel::kHighz;
@@ -98,11 +98,11 @@ inline StrengthLevel MapStrengthKeyword(uint8_t keyword_index) {
   }
 }
 
-// §28.11: "The combinations (highz0, highz1) and (highz1, highz0) shall be
-// considered illegal." Both spellings name one pair once the two keywords are
-// read as levels, so the rule is that the two sides are not both kHighz. Every
-// other pair of the two lists is legal, the clause ruling out these and no
-// others.
+// §28.11 rules out the pairs (highz0, highz1) and (highz1, highz0) as illegal
+// strength specifications. Both spellings name one pair once the two keywords
+// are read as levels, so the rule is that the two sides are not both kHighz.
+// Every other pair of the two lists is legal, the clause ruling out these and
+// no others.
 inline bool ValidateStrengthPair(StrengthLevel s0, StrengthLevel s1) {
   return s0 != StrengthLevel::kHighz || s1 != StrengthLevel::kHighz;
 }
@@ -154,10 +154,10 @@ inline StrengthSignal CombineUnambiguous(StrengthSignal a, StrengthSignal b) {
 }
 
 // A cell of Figure 28-2's scale, as a position running from Su0 at 0 to Su1 at
-// 15. Ordering the sixteen cells on one line is what lets "all the strengths
-// between them" be a span rather than two separate ranges: §28.12.2's own
-// Figure 28-10 draws a range crossing from We0 through HiZ0 and HiZ1 to Pu1,
-// which no per-side pair of levels expresses on its own.
+// 15. Ordering the sixteen cells on one line is what lets the strengths lying
+// between two extremes be a span rather than two separate ranges: §28.12.2's
+// own Figure 28-10 draws a range crossing from We0 through HiZ0 and HiZ1 to
+// Pu1, which no per-side pair of levels expresses on its own.
 inline int ScalePositionOf(StrengthLevel level, bool side_is_1) {
   int index = static_cast<int>(level);
   return side_is_1 ? 8 + index : 7 - index;
@@ -195,8 +195,8 @@ inline ScaleSpan SpanOf(const StrengthSignal& s) {
 }
 
 // The signal a span of the scale stands for. A span reaching both sides holds
-// cells of both values, which is the x §28.12.2 gives "because its range
-// includes the values 1 and 0"; one reaching neither is z.
+// cells of both values, which is the x §28.12.2 gives a range holding both a 1
+// and a 0; one reaching neither is z.
 //
 // A signal occupying HiZ0 alone, or HiZ1 alone, is the one thing StrengthSignal
 // cannot say, a side being occupied only when its _hi is above kHighz. Nothing
@@ -228,11 +228,10 @@ inline StrengthSignal SignalOfSpan(const ScaleSpan& span) {
   return result;
 }
 
-// §28.12.4: the net types triand, wand, trior and wor "shall resolve conflicts
-// when multiple drivers have the same strength", by "treating signals as inputs
-// of logic functions". The result has "the same value as the result produced by
-// an and gate" or "an or gate" with the two values as inputs, and "the strength
-// of the result is the same as the strength of the combined signals".
+// §28.12.4: the net types triand, wand, trior and wor settle a conflict between
+// drivers of equal strength by feeding the signals to a logic function. The
+// result takes the value an and gate, or an or gate, gives with the two values
+// as its inputs, and keeps the strength the combined signals share.
 //
 // Two cells of unequal strength are not a conflict, and Figure 28-25's charts
 // resolve such a pair to the stronger cell under both kinds of logic. The gate
@@ -250,12 +249,11 @@ inline int WiredPairPosition(int a, int b, ModelWiredLogicKind logic) {
   return want_zero ? std::min(a, b) : std::max(a, b);
 }
 
-// §28.12.4: "When ambiguous strength signals combine in wired logic, it is
-// necessary to consider the results of all combinations of each of the strength
-// levels in the first signal with each of the strength levels in the second
-// signal, as shown in Figure 28-25." Every cell of one signal is resolved
-// against every cell of the other, and the results are taken together as one
-// range.
+// §28.12.4: two signals of ambiguous strength combined in wired logic are
+// resolved by pairing every strength level of the first with every strength
+// level of the second, which Figure 28-25 draws. Every cell of one signal is
+// resolved against every cell of the other, and the results are taken together
+// as one range.
 //
 // Figure 28-25 is what fixes both halves. Its signal 1 occupies St0 and Pu0 and
 // its signal 2 occupies Pu1. Under and logic the chart gives (5,0) and (6,0)
@@ -279,11 +277,11 @@ inline StrengthSignal CombineWithWiredLogic(StrengthSignal a, StrengthSignal b,
   return SignalOfSpan(result);
 }
 
-// §28.12.2: "The combination of two signals of ambiguous strength shall result
-// in a signal of ambiguous strength. The resulting signal shall have a range of
-// strength levels that includes the strength levels in its component signals",
-// which Figure 28-9 and Figure 28-10 draw as "a range that includes the
-// extremes of the signals and all the strengths between them".
+// §28.12.2: combining two signals of ambiguous strength yields a signal of
+// ambiguous strength whose range covers every strength level of both
+// components, which Figure 28-9 and Figure 28-10 draw as a range from the
+// outermost strength of either signal to the outermost of the other, every
+// strength in between included.
 //
 // The extremes are taken over Figure 28-2's scale rather than per side, so a
 // range whose two components sit on opposite sides crosses high impedance and

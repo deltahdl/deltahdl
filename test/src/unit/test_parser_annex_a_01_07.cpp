@@ -480,9 +480,8 @@ TEST(NonPortProgramItem, InstantiationOfCellDeclaredLaterIsLeftToElaboration) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// Footnote 5 to program_generate_item: "it shall be illegal for a
-// program_generate_item to include any item that would be illegal in a
-// program_declaration outside a program_generate_item".
+// Footnote 5 to program_generate_item: a program_generate_item may hold no item
+// that a program_declaration would refuse outside one.
 TEST(ProgramGenerateItem, AdmitsProgramItemsOnly) {
   auto r = Parse(
       "program p;\n"

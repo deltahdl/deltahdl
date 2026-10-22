@@ -220,8 +220,9 @@ TEST(OverriddenMemberSimulation, WriteThroughBaseTypeTargetsBaseSlot) {
 // through a base handle exercises BOTH facets of the rule at once: the
 // non-virtual call selects the base method, and inside that base method the
 // unqualified "i" binds to the base's property (1), never the derived override
-// (-2). The literal-returning method test above only observes method
-// selection; this one observes the "original members in the base class" claim.
+// (-2). The literal-returning method test above only observes method selection;
+// this one observes the claim that a base-class handle reaches the base class's
+// own original members.
 TEST(OverriddenMemberSimulation,
      E2eBaseMethodReadsBasePropertyThroughBaseHandle) {
   EXPECT_EQ(RunAndGet("class Packet;\n"

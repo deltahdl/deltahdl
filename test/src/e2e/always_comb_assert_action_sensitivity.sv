@@ -1,9 +1,8 @@
-// IEEE 1800-2023 9.2.2.2.1 (printed page 223): "An expression used in an
-// immediate assertion (see 16.3) within the procedure, or in any function
-// called within the procedure, contributes to the implicit sensitivity list of
-// an always_comb as if that expression were used as a condition of an if
-// statement. Expressions used in assertion action blocks do not contribute to
-// the implicit sensitivity list of an always_comb."
+// IEEE 1800-2023 9.2.2.2.1 (printed page 223): the expression of an immediate
+// assertion (§16.3) in an always_comb procedure, or in a function the procedure
+// calls, joins the procedure's implicit sensitivity list just as the condition
+// of an if statement would. What an assertion's action blocks read stays out of
+// that list.
 //
 // So `en`, the assertion expression, is in the list, and `a`, read only in the
 // pass statement, is not. Driving `a` from 10 to 20 leaves the procedure

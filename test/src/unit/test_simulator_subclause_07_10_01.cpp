@@ -238,7 +238,7 @@ TEST(QueueOps, SliceXZBoundYieldsEmpty) {
   EXPECT_EQ(dst->elements.size(), 0u);
 }
 
-// §7.10.1: "Q[a:b] where a < 0 is the same as Q[0:b]" -- the low bound clamps
+// §7.10.1: Q[a:b] with a < 0 selects what Q[0:b] does -- the low bound clamps
 // up to 0.
 //
 // The low bound is built as the negation of 1 rather than as the bit pattern

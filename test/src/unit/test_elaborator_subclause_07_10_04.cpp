@@ -63,7 +63,7 @@ TEST(QueueAssignElaboration, ConcatWithVariableBoundSlicesOk) {
              "endmodule\n"));
 }
 
-// §7.10.4: `q = q[2:$]`, "a new queue lacking the first two items",
+// §7.10.4: `q = q[2:$]`, which makes a new queue without the first two items,
 // elaborates.
 TEST(QueueAssignElaboration, BareSliceDroppingFirstTwoOk) {
   EXPECT_TRUE(
@@ -73,8 +73,8 @@ TEST(QueueAssignElaboration, BareSliceDroppingFirstTwoOk) {
              "endmodule\n"));
 }
 
-// §7.10.4: `q = q[1:$-1]`, "a new queue lacking the first and last items",
-// elaborates.
+// §7.10.4: `q = q[1:$-1]`, which makes a new queue without the first and last
+// items, elaborates.
 TEST(QueueAssignElaboration, BareSliceDroppingFirstAndLastOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"

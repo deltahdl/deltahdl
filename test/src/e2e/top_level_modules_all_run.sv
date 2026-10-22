@@ -1,13 +1,12 @@
-// §23.3.1: "Top-level modules are modules that are included in the
-// SystemVerilog source text, but do not appear in any module instantiation
-// statement ... A top-level module is implicitly instantiated once". Neither
-// a nor b instantiates the other, so both are top-level modules and every
-// initial procedure of each runs. With no --top the command line took the
+// §23.3.1: a top-level module is one the source text holds but no module
+// instantiation statement names, and it is instantiated once, implicitly.
+// Neither a nor b instantiates the other, so both are top-level modules and
+// every initial procedure of each runs. With no --top the command line took the
 // last module in the source for the one top, and a's initials never ran.
 //
-// §23.11: "The bind_instantiation is effectively a complete module, interface,
-// program, or checker instantiation statement", so chk, which the bind alone
-// names, is no top-level module and runs once, bound into b.
+// §23.11 treats a bind_instantiation as a module, interface, program or checker
+// instantiation statement in full, so chk, which the bind alone names, is no
+// top-level module and runs once, bound into b.
 `timescale 1ns / 1ns
 module a;
   initial $display("a0");

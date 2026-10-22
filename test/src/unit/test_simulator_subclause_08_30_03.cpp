@@ -62,10 +62,10 @@ TEST(ClassSim, WeakRefE2eGetQueriesReferentBuiltInDeclInit) {
             1u);
 }
 
-// §8.30.3 SHALL#1, "referent value used to initialize": the handle get()
-// returns is the actual referent, so a field written on the object before the
-// query is visible when read back through get()'s result. Built from real
-// new(referent) source and driven end to end.
+// §8.30.3 SHALL#1, get() answering with the referent the reference was
+// initialized with: the handle get() returns is the actual referent, so a field
+// written on the object before the query is visible when read back through
+// get()'s result. Built from real new(referent) source and driven end to end.
 TEST(ClassSim, WeakRefE2eGetResultIsUsableReferent) {
   EXPECT_EQ(RunAndGet("class obj;\n"
                       "  int x;\n"

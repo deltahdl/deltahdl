@@ -1,9 +1,8 @@
-// §34.3 (printed page 949): "Envelope decryption is the process of
-// recognizing decryption envelopes in the input text and transforming them
-// into the corresponding cleartext." This envelope was written by
-// `deltahdl --encrypt --protect-key K1` from a region naming
-// data_keyowner="Vendor" and data_keyname="k1", and is read back here with
-// that key, supplied on the command line.
+// §34.3 (printed page 949): envelope decryption finds the decryption envelopes
+// in the input text and turns each back into the cleartext it stands for. This
+// envelope was written by `deltahdl --encrypt --protect-key K1` from a region
+// naming data_keyowner="Vendor" and data_keyname="k1", and is read back here
+// with that key, supplied on the command line.
 `pragma protect data_keyowner="Vendor", data_keyname="k1"
 `pragma protect begin_protected
 `pragma protect encrypt_agent="deltahdl"

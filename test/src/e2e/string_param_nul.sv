@@ -1,5 +1,5 @@
-// §6.16: "A string variable shall not contain the special character "\0".
-// Assigning the value 0 to a string character shall be ignored." So S holds the
+// §6.16 keeps the special character "\0" out of a string variable and has an
+// assignment of the value 0 to one of its characters ignored. So S holds the
 // two characters "ab", and §6.16.1's count of them is 2 wherever it is asked.
 //
 // The two displays are the point of the case. N is folded by the elaborator and

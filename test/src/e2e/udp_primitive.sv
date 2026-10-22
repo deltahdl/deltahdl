@@ -1,8 +1,7 @@
-// IEEE 1800-2023 §29.4: in a combinational UDP "the output state is determined
-// solely as a function of the current input states". Every combination this
-// design drives has a row below, because §29.3.4 rules that "All combinations
-// of input values that are not explicitly specified result in a default output
-// state of x".
+// IEEE 1800-2023 §29.4: a combinational UDP's output state depends on nothing
+// but the input states of the moment. Every combination this design drives has
+// a row below, because §29.3.4 gives every input combination the table leaves
+// out the default output state x.
 primitive mux2 (mux, control, dataA, dataB);
   output mux;
   input control, dataA, dataB;
@@ -26,8 +25,8 @@ module udp_primitive;
   wire mux_out;
 
   // §29.8: `udp_instance ::= [ name_of_instance ] ( output_terminal ,
-  // input_terminal { , input_terminal } )`, and "The terminal connection order
-  // is as specified in the UDP definition", which is mux, control, dataA,
+  // input_terminal { , input_terminal } )`, and the terminals connect in the
+  // order the UDP definition declares them, which is mux, control, dataA,
   // dataB.
   mux2 m1 (mux_out, control, dataA, dataB);
 

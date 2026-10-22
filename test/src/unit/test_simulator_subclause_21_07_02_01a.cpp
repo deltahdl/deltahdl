@@ -241,7 +241,7 @@ TEST_F(VcdFileSyntaxSim, RegVariableDeclaresRegVarType) {
   EXPECT_EQ(r[2], "8");
 }
 
-// Table 6-8: "integer -- 4-state data type, 32-bit signed integer", so the
+// Table 6-8 makes integer a 4-state, 32-bit signed integer type, so the
 // §21.7.2.3 size is 32 whatever the model stores the variable in. §21.7.2.3's
 // own example declares one this way: "$var integer 32 (2 index $end".
 TEST_F(VcdFileSyntaxSim, IntegerVariableDeclaresIntegerVarType) {
@@ -260,7 +260,7 @@ TEST_F(VcdFileSyntaxSim, IntegerVariableDeclaresIntegerVarType) {
   EXPECT_EQ(i[2], "32");
 }
 
-// Table 6-8: "time -- 4-state data type, 64-bit unsigned integer". time is the
+// Table 6-8 makes time a 4-state, 64-bit unsigned integer type. time is the
 // one of the three whose keyword nothing else in the writer produces, so a
 // dumped time variable declared as anything at all is declared wrongly.
 TEST_F(VcdFileSyntaxSim, TimeVariableDeclaresTimeVarType) {

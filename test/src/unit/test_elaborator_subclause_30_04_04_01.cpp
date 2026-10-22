@@ -484,10 +484,10 @@ TEST(OperatorElaboration, OutputOperandOnEdgeSensitivePathIsRejected) {
 }
 
 // §30.4.4.1 (printed page 876): a condition's operands are input or inout
-// ports, "Locally defined variables or nets" and "Compile-time constants", and
-// their selects, so a hierarchical name reaching into the instantiating
-// module, `if (top.b)`, is none of them. The operator check ran and the operand
-// passed unexamined, so the design elaborated and ran.
+// ports, variables or nets the module defines locally, and compile-time
+// constants, and their selects, so a hierarchical name reaching into the
+// instantiating module, `if (top.b)`, is none of them. The operator check ran
+// and the operand passed unexamined, so the design elaborated and ran.
 TEST(OperatorElaboration, HierarchicalNameOperandIsRejected) {
   ElabFixture f;
   auto* design = ElaborateSrc(

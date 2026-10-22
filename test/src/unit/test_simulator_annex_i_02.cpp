@@ -42,7 +42,7 @@ TEST(SvdpiIncludeFileContract, WidthTypesAreDefined) {
 }
 
 // The types are unsigned exact-width integers, as their names require. This
-// pins down the "define the types uint8_t and uint32_t" obligation rather than
+// pins down the header's obligation to define uint8_t and uint32_t rather than
 // merely accepting any 1- and 4-byte spelling.
 TEST(SvdpiIncludeFileContract, WidthTypesAreUnsignedExactWidth) {
   EXPECT_TRUE((std::is_same<uint8_t, std::uint8_t>::value));

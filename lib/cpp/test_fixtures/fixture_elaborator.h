@@ -249,16 +249,15 @@ inline RtlirDesign* ElaborateWithPreprocessorAllowingParseErrors(
 // failure then names the input.
 //
 // A source that parses and declares no module is elaborated like any other.
-// §3.12.1 rules that the compilation-unit scope "can contain any item that can
-// be defined within a package (see 26.2) and bind constructs as well", so a
-// source holding only classes or only packages is legal and has something to
-// elaborate. Refusing it here answered `false` -- the same answer a rejected
-// source gets -- before the elaborator ran, so a case asserting such a source
-// elaborates could not pass and was told nothing about why, and a case
-// asserting one is rejected passed whether the rule it was about fired or not.
-// The top name is chosen the way ElaborateSrcReportingParse above chooses it:
-// empty where there is no module, which the elaborator takes as the whole
-// compilation unit.
+// §3.12.1 lets the compilation-unit scope hold bind constructs and every item a
+// package may hold (§26.2), so a source holding only classes or only packages
+// is legal and has something to elaborate. Refusing it here answered `false` --
+// the same answer a rejected source gets -- before the elaborator ran, so a
+// case asserting such a source elaborates could not pass and was told nothing
+// about why, and a case asserting one is rejected passed whether the rule it
+// was about fired or not. The top name is chosen the way
+// ElaborateSrcReportingParse above chooses it: empty where there is no module,
+// which the elaborator takes as the whole compilation unit.
 //
 // The caller supplies the fixture, so the engine that recorded the diagnostics
 // outlives the answer and a case that asserts a rejection can go on to name

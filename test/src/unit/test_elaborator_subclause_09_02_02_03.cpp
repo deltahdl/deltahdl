@@ -525,8 +525,8 @@ TEST(AlwaysLatchElaboration, CycleDelayInAlwaysLatchErrors) {
 // always_latch whose body leaves nothing held describes no latch and is warned
 // about. AssignedOnEveryPath in src/elaborator/elaborator_process.cpp is what
 // decides whether a variable is left held, and §9.3.2's Table 9-1 decides it
-// for a fork: under `join` "the parent process blocks until all the processes
-// spawned by this fork terminate", so control leaves the block only once every
+// for a fork: under `join` the parent process waits until every process the
+// fork spawned has terminated, so control leaves the block only once every
 // arm has run and an arm's assignment is made on every path through it.
 //
 // `q` is assigned conditionally in the if and unconditionally in the fork arm,

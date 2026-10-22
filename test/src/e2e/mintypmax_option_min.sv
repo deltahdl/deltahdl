@@ -1,6 +1,6 @@
-// §11.11: a min:typ:max expression carries "minimum, typical, and maximum
-// values -- in that order", and "the three values allow a design to be tested
-// with minimum, typical, or maximum delay values". This case claims that
+// §11.11: a min:typ:max expression carries a minimum, a typical and a maximum
+// value, written in that order, so that a design can be run against its
+// minimum, typical or maximum delays. This case claims that
 // `--mintypmax min`, which its .args file passes, takes the minimum member in
 // both places the choice has to reach: DELAY prints 11 and $finish runs at
 // time 95.

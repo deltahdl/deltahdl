@@ -1,18 +1,17 @@
-// IEEE 1800-2023 §27.4: a named loop generate block "is a declaration of an
-// array of generate block instances", and "the index values in this array are
-// the values assumed by the genvar during elaboration". Two sibling blocks
-// written over one genvar are therefore two distinct arrays. §27.4 also rules
-// that a generate block, "like all generate blocks, comprises a separate scope
-// and a new level of hierarchy when it is instantiated", so the v declared in
-// blk_a is a different object from the v declared in blk_b. A name built from
-// the genvar rather than the block gives both of them one name, and whichever
-// block is elaborated second wins every read.
+// IEEE 1800-2023 §27.4: a named loop generate block declares an array of
+// generate block instances, indexed by the values the genvar takes while the
+// design elaborates. Two sibling blocks written over one genvar are therefore
+// two distinct arrays. §27.4 also has every generate block, once instantiated,
+// open a scope of its own and a further level of hierarchy, so the v declared
+// in blk_a is a different object from the v declared in blk_b. A name built
+// from the genvar rather than the block gives both of them one name, and
+// whichever block is elaborated second wins every read.
 //
 // Reusing one genvar across the two loops is what makes that collision
-// reachable, and it is legal: §27.4 rules only that "it is not possible to have
-// two nested loop generate constructs that use the same genvar", and these are
-// siblings. The standard's own mod_c example writes two sibling loops over i,
-// and the error it marks there is the repeated block name a, not the genvar.
+// reachable, and it is legal: §27.4 forbids one genvar only to two loop
+// generate constructs nested one in the other, and these are siblings. The
+// standard's own mod_c example writes two sibling loops over i, and the error
+// it marks there is the repeated block name a, not the genvar.
 //
 // The genvar runs 4 to 5 rather than 0 to 1 so that its value is never the
 // ordinal of the instance the iteration creates, which are 0 and 1. A name

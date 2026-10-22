@@ -116,8 +116,8 @@ inline void LowerAndRun(const RtlirDesign* design, SimFixture& f) {
 // Asserts that a value and the copy taken from it are two storage elements
 // holding one value, rather than one storage element read twice.
 //
-// §6.8 makes a variable "an abstraction of a data storage element" that "shall
-// store a value from one assignment to the next", so a store that copies
+// §6.8 makes a variable an abstract data storage element that keeps the value
+// one assignment gave it until the next, so a store that copies
 // between two of them has to leave each holding its own words. Logic4Vec copies
 // its `words` pointer rather than the words, so a store that skips the copy
 // leaves the pair sharing one buffer, and a later writer that deposits in place
@@ -202,8 +202,8 @@ inline const Diagnostic* FindDiag(const SimFixture& f,
 // this position plus one to FindDiagFrom, so what it asks for is a report
 // beyond the one it already named rather than a report beyond a position it
 // guessed. A clause that states how many violations a construct reports is what
-// makes such a claim worth writing: §31.8 has a $setup over a vector "still
-// only report a single timing violation" however many bits transitioned, and
+// makes such a claim worth writing: §31.8 has a $setup over a vector report one
+// timing violation however many of its bits transitioned, and
 // §31.4.3's event-based $fullskew continues its window after a violation where
 // the timer-based mode turns dormant.
 inline std::size_t PositionOfFirstDiag(const SimFixture& f,

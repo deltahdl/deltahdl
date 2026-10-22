@@ -16,8 +16,9 @@ namespace {
 // §9.3 head: statements in a sequential block execute in the given order. The
 // second statement reads what the first wrote, so the observed value is proof
 // of in-order execution -- a reordered run would read the still-default source.
-// The block also sits in a single-statement position (an if then-branch),
-// tying the ordering guarantee to the head's "acts as a single statement" role.
+// The block also sits in a single-statement position (an if then-branch), tying
+// the ordering guarantee to the head's rule that a block stands as one
+// statement.
 TEST(BlockStatementSimulation, SequentialBlockExecutesInGivenOrder) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  logic [7:0] a, b;\n"

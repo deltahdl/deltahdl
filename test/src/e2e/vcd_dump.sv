@@ -1,8 +1,8 @@
-// §21.7: a VCD file holds value changes "stored by VCD system tasks", so what
-// this design is right or wrong by is the file it writes rather than the line
-// it prints. The e2e tier compared a run's two streams and nothing else until
-// the .artifact file beside this one existed, which left §21.7's whole subject
-// outside it.
+// §21.7: a VCD file holds the value changes the VCD system tasks record, so
+// what this design is right or wrong by is the file it writes rather than the
+// line it prints. The e2e tier compared a run's two streams and nothing else
+// until the .artifact file beside this one existed, which left §21.7's whole
+// subject outside it.
 module vcd_dump;
   logic clk;
 

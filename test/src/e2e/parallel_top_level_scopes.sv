@@ -1,5 +1,5 @@
-// §23.3.1: "A top-level module is implicitly instantiated once, and its
-// instance name is the same as the module name", and each such instance is a
+// §23.3.1 instantiates each top-level module once, implicitly, under an
+// instance name equal to the module's own, and each such instance is a
 // scope of its own (§23.9), so t1 and t2 each hold their own x and their own
 // instance u. §23.6 reaches one from the other by the complete path, t2.x and
 // t1.u.v, a call through it runs in the named top, t2.f() reading t2's x,

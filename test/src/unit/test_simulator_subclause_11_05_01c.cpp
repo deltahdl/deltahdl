@@ -240,8 +240,8 @@ TEST(ExpressionSim, BitSelectWriteCarriesAnUnknownValueBit) {
 // test/src/unit/test_simulator_subclause_11_05_01a.cpp is, with neither the
 // elaborator nor the lowerer in between, because the shift is a property of
 // the writer every assignment form shares. §11.5.1 gives `w[71:68]` the four
-// adjacent bits §11.5 calls "a group of adjacent bits" starting at offset 68,
-// and 68 is past the first word.
+// adjacent bits starting at offset 68, a part-select being a run of adjacent
+// bits under §11.5, and 68 is past the first word.
 //
 // The target is zeroed and the value all ones -- the reverse of the sentinels
 // in PartSelectWriteKeepsTheTargetBitsAboveTheFirstWord, and for the same
@@ -467,7 +467,7 @@ TEST(SelectBoundaryBehavior, PartSelectWithAnUnknownWidthBoundWritesNothing) {
   EXPECT_EQ(var->value.ToUint64(), uint64_t{0xC3});
 }
 
-// §11.5.1 gives a bit-select "the value of the bit" it addresses, and §6.3.1
+// §11.5.1 gives a bit-select the value of the bit it addresses, and §6.3.1
 // says each bit of a 4-state vector may independently take any of the four
 // basic values, x among them. So a bit-select of a bit holding x is 1'bx. The
 // sharpest way to say that is not to assert on the bit-select alone but against

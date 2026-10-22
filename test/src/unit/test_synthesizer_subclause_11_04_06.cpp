@@ -12,11 +12,11 @@ namespace {
 // is constant zero, which is what `assign y = a ==? 4'b10?z;` lowers to today:
 // `SynthLower::LowerBinaryBit` in src/synthesizer/synth_lower.cpp answers
 // `AigGraph::kConstFalse` for the operator, so the netlist says no value of `a`
-// ever matches. Table 11-10 of §11.4.6 defines `a ==? b` as "a equals b, x and
-// z values in b act as wildcards", and §11.4.6 lets a wildcard bit match
-// whatever value (0, 1, z or x) the left operand holds at that position, while
-// any other bit is compared as for the logical equality operator, yielding 1'b1
-// when the relation is true.
+// ever matches. Table 11-10 of §11.4.6 defines `a ==? b` as a compared equal to
+// b with the x and z bits of b matching anything, and §11.4.6 lets a wildcard
+// bit match whatever value (0, 1, z or x) the left operand holds at that
+// position, while any other bit is compared as for the logical equality
+// operator, yielding 1'b1 when the relation is true.
 //
 // The literal wildcards its two low bits and compares its two high bits, so the
 // answer is one exactly when bit 3 of `a` is one and bit 2 of `a` is zero,
@@ -36,9 +36,9 @@ TEST(WildcardEqualitySynthesis,
 
 // The test fails on a fix that reaches `==?` and leaves `!=?` answering
 // `AigGraph::kConstFalse`, which the case above passes. Table 11-10 of §11.4.6
-// defines `a !=? b` as "a does not equal b, x and z values in b act as
-// wildcards" in the one table that defines `a ==? b`, so the two are owed
-// together, and the wildcard positions are read from the same literal. The
+// defines `a !=? b` as a compared unequal to b with the x and z bits of b
+// matching anything, in the one table that defines `a ==? b`, so the two are
+// owed together, and the wildcard positions are read from the same literal. The
 // answer is therefore the negation of the case above over every value of `a`,
 // which is what a netlist left constant zero disagrees with wherever the
 // wildcard equality holds.

@@ -7,12 +7,12 @@ using namespace delta;
 
 // §16.4.3 Deferred assertions outside procedural code.
 //
-// A deferred assertion statement that appears outside procedural code is a
-// "static deferred assertion" and shall be treated as if it were contained in
-// an always_comb procedure. The elaborator carries this rule by building an
-// implicit always_comb process whose body is the deferred assertion statement,
-// so the assertion runs once at time zero and re-evaluates whenever one of its
-// operands changes — exactly the behaviour of always_comb.
+// A deferred assertion statement standing outside procedural code is a static
+// deferred assertion, which behaves as though an always_comb procedure held it.
+// The elaborator carries this rule by building an implicit always_comb process
+// whose body is the deferred assertion statement, so the assertion runs once at
+// time zero and re-evaluates whenever one of its operands changes — exactly the
+// behaviour of always_comb.
 
 namespace {
 

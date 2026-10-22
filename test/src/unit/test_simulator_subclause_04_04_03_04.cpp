@@ -141,7 +141,7 @@ TEST(PliPostNbaSim, PostNBAReentrantEventStillRunsAfterNBA) {
   EXPECT_EQ(order[2], "post_nba_reentrant");
 }
 
-// End-to-end coverage of the "after the NBA region is evaluated" guarantee,
+// End-to-end coverage of the guarantee that Post-NBA follows the NBA region,
 // building the consumed NBA update from the dependency §4.4.2.4's real source
 // syntax: a nonblocking assignment. Parsing/elaborating/lowering `q <= 42`
 // schedules q's update into the real NBA region at time 0. A Post-NBA callback

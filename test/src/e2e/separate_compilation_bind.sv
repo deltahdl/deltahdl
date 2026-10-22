@@ -1,12 +1,12 @@
 // §33.5.3's separate compilation flow, which takes two invocations of
 // deltahdl. The first compiles this source description into the library
-// `cells` and writes the compiled form to cells.lib, because "it is essential
-// that library cells persist, and the compiled forms shall, therefore, exist
-// somewhere in the filesystem". The second is given cells.lib and the name of
-// the configuration below and nothing else, which is §33.5.4's strategy: "the
-// tool that actually does the binding only needs to be given the lib.cell
-// specification for the top-level cell(s) and/or the config to be used. In
-// this strategy, the config itself shall also be precompiled."
+// `cells` and writes the compiled form to cells.lib, because the flow depends
+// on library cells outliving the invocation, so their compiled forms have to
+// be kept in the filesystem. The second is given cells.lib and the name of the
+// configuration below and nothing else, which is §33.5.4's strategy: the tool
+// doing the binding needs only the lib.cell specification of the top-level
+// cells, the configuration to use, or both, and under that strategy the
+// configuration is precompiled as well.
 //
 // separate_compilation_bind.before names the first invocation and
 // separate_compilation_bind.args names the second. Both run in a temporary

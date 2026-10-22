@@ -1,15 +1,13 @@
-// §23.5 Extern modules: "If an extern declaration exists for a module, it is
-// possible to use .* as the ports of the module. This usage shall be
-// equivalent to placing the ports (and possibly parameters) of the extern
-// declaration on the module." m takes the plain port list (a,b,c,d) and a the
-// parameter port list and typed ANSI ports, so aa.size is 8 and b is a TP,
-// logic [7:0].
+// §23.5 Extern modules: a module that has an extern declaration may give .* as
+// its port list, which then stands for the extern declaration's ports, and its
+// parameters where it has any, written on the module itself. m takes the plain
+// port list (a,b,c,d) and a the parameter port list and typed ANSI ports, so
+// aa.size is 8 and b is a TP, logic [7:0].
 //
-// §23.3.1: "Top-level modules are modules that are included in the
-// SystemVerilog source text, but do not appear in any module instantiation
-// statement". top comes before the modules it instantiates: with no --top the
-// command line took the last module in the source, a, for the top instead,
-// elaborated it alone and printed nothing.
+// §23.3.1: a top-level module is one the source text holds but no module
+// instantiation statement names. top comes before the modules it instantiates:
+// with no --top the command line took the last module in the source, a, for the
+// top instead, elaborated it alone and printed nothing.
 //
 // §23.3.2.3 has the declarations on each side of an implicit connection be of
 // equivalent data types, so m's one-bit implicit ports meet one-bit wires in

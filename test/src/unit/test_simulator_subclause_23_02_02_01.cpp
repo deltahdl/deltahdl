@@ -7,10 +7,10 @@ using namespace delta;
 namespace {
 
 // §23.2.2.1 (printed page 732), Example 3: `module split_ports (a[7:4],
-// a[3:0])` has "First port is upper 4 bits of 'a'. Second port is lower 4 bits
-// of 'a'." The positional connection (4'd10, 4'd5) fills the two halves, so a
-// reads 165. Each port was taken as the whole of a with no name to find
-// storage by, and nothing reached a: its halves read x and a 0.
+// a[3:0])` has its first port take the upper 4 bits of a and its second the
+// lower 4. The positional connection (4'd10, 4'd5) fills the two halves, so a
+// reads 165. Each port was taken as the whole of a with no name to find storage
+// by, and nothing reached a: its halves read x and a 0.
 TEST(NonAnsiPortExpressionSimulation, SplitPortsFillHalvesOfTheVector) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module split_ports(a[7:4], a[3:0]);\n"

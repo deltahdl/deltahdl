@@ -17,9 +17,9 @@ namespace {
 // `SynthLower::LowerBinaryBit` in src/synthesizer/synth_lower.cpp answers
 // `AigGraph::kConstFalse` for every equality operator, on a module the
 // synthesizer accepts without a word. Table 11-9 of §11.4.5 defines `a == b` as
-// "a equal to b, result can be unknown", and §11.4.5 rules that the operands
-// are compared bit for bit, so the netlist owes 1 at the 16 pairs where `a` and
-// `b` hold the same value and 0 at the other 240.
+// a compared equal to b with a result that may be unknown, and §11.4.5 rules
+// that the operands are compared bit for bit, so the netlist owes 1 at the 16
+// pairs where `a` and `b` hold the same value and 0 at the other 240.
 TEST(EqualitySynthesis, EqualityLowersToTheComparisonOfItsOperands) {
   ExpectAssignSweep(
       ModuleAssigning("input [3:0] a, input [3:0] b", "a == b"), 16,
@@ -28,8 +28,8 @@ TEST(EqualitySynthesis, EqualityLowersToTheComparisonOfItsOperands) {
 
 // The test fails on a fix that reaches `==` and leaves `!=` answering constant
 // zero, which the case above passes. Table 11-9 of §11.4.5 defines `a != b` as
-// "a not equal to b, result can be unknown" in the one table that defines
-// `a == b`, so the two are owed together, and `!=` arrives at
+// a compared unequal to b with a result that may be unknown in the one table
+// that defines `a == b`, so the two are owed together, and `!=` arrives at
 // `SynthLower::LowerBinaryBit` as `TokenKind::kBangEq` rather than as the
 // `TokenKind::kEqEq` the case above drives.
 TEST(EqualitySynthesis, InequalityLowersToTheComparisonOfItsOperands) {
@@ -80,8 +80,8 @@ TEST(EqualitySynthesis, EqualityCarriesItsResultInBitZeroAlone) {
 
 // The test fails on a fix that reaches the logical equality operators and
 // leaves `===` answering constant zero, which the cases above pass. Table 11-9
-// of §11.4.5 defines `a === b` as "a equal to b, including x and z", and
-// §11.4.5 rules that for the case equality operators the result is always
+// of §11.4.5 defines `a === b` as a compared equal to b with x and z counted,
+// and §11.4.5 rules that for the case equality operators the result is always
 // known, 1'b1 or 1'b0.
 //
 // `===` is expected to answer what `==` answers here because an `AigGraph` node
@@ -100,8 +100,8 @@ TEST(EqualitySynthesis,
 
 // The test fails on a fix that reaches `===` and leaves `!==` answering
 // constant zero, which the case above passes. Table 11-9 of §11.4.5 defines
-// `a !== b` as "a not equal to b, including x and z", and §11.4.5 rules that
-// the case equality operators always yield a known value, 1'b1 or 1'b0.
+// `a !== b` as a compared unequal to b with x and z counted, and §11.4.5 rules
+// that the case equality operators always yield a known value, 1'b1 or 1'b0.
 //
 // As with `===` above, the netlist an `AigGraph` holds carries two values per
 // node, so no operand value it can represent is x or z and `!==` is the same

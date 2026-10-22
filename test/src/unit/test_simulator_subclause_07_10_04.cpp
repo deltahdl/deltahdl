@@ -381,7 +381,7 @@ TEST(QueueAssign, SourceConcatInsertAfterPosEquivInsertPlusOne) {
       "q", {2, 4, 6, 8});
 }
 
-// §7.10.4: `q = q[2:$]` is "a new queue lacking the first two items".
+// §7.10.4: `q = q[2:$]` makes a new queue without the first two items.
 TEST(QueueAssign, SourceSliceDropsFirstTwo) {
   RunAndExpectQueue(
       "module t;\n"
@@ -391,7 +391,7 @@ TEST(QueueAssign, SourceSliceDropsFirstTwo) {
       "q", {8, 16, 32});
 }
 
-// §7.10.4: `q = q[1:$-1]` is "a new queue lacking the first and last items".
+// §7.10.4: `q = q[1:$-1]` makes a new queue without the first and last items.
 TEST(QueueAssign, SourceSliceDropsFirstAndLast) {
   RunAndExpectQueue(
       "module t;\n"

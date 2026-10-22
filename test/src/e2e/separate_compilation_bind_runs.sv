@@ -1,7 +1,7 @@
-// §33.5.4 (printed page 944): "the tool that actually does the binding only
-// needs to be given the lib.cell specification for the top-level cell(s)
-// and/or the config to be used". The design so bound is the design of the
-// invocation, and running it is what shows which cell was bound.
+// §33.5.4 (printed page 944): the tool doing the binding needs only the
+// lib.cell specification of the top-level cells, the configuration to use, or
+// both. The design so bound is the design of the invocation, and running it is
+// what shows which cell was bound.
 //
 // separate_compilation_bind_runs.before compiles this file into the library
 // `runs` and writes it to runs.lib; separate_compilation_bind_runs.args loads

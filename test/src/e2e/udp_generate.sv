@@ -1,8 +1,7 @@
-// IEEE 1800-2023 §29.4: in a combinational UDP "the output state is determined
-// solely as a function of the current input states". Every combination this
-// design drives has a row below, because §29.3.4 rules that "All combinations
-// of input values that are not explicitly specified result in a default output
-// state of x".
+// IEEE 1800-2023 §29.4: a combinational UDP's output state depends on nothing
+// but the input states of the moment. Every combination this design drives has
+// a row below, because §29.3.4 gives every input combination the table leaves
+// out the default output state x.
 primitive udp_inv (y, a);
   output y;
   input a;
@@ -19,11 +18,10 @@ module udp_generate;
 
   genvar bit_pos;
 
-  // §27.4: "Within the generate block of a loop generate construct, there is
-  // an implicit localparam declaration", whose "value within each instance of
-  // the generate block is the value of the loop index at the time the instance
-  // was elaborated", and which "can be used anywhere within the generate block
-  // that a normal parameter with an integer value can be used". A terminal
+  // §27.4 declares a localparam, implicitly, inside the generate block of a
+  // loop generate construct. In each instance of the block it holds the value
+  // the loop index had when that instance was elaborated, and it may stand
+  // wherever in the block an ordinary integer-valued parameter may. A terminal
   // written y[bit_pos] is such a use, so each of the two instances drives its
   // own bit and y is the bitwise inverse of d. Two instances that resolved
   // bit_pos to one value would drive one bit twice and leave the other at x.

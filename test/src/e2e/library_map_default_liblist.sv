@@ -1,5 +1,5 @@
-// IEEE 1800-2023 §33.6.2 (printed page 945): "The default liblist statement
-// overrides the library search order in the lib.map file". The map
+// IEEE 1800-2023 §33.6.2 (printed page 945): a default liblist statement
+// replaces the search order the lib.map file sets for the libraries. The map
 // library_map_default_liblist.args names declares rtlLib first, mapping
 // library_map/adder.v into it and library_map/adder.vg into gateLib, and this
 // file matches neither specification, so its cells are compiled into work.

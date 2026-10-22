@@ -166,10 +166,10 @@ inline void ExpectDeclsFailInRegionButElaborateOutside(
     // one, the dimension is where the declaration was meant to end, so
     // Parser::ParsePlainVarDecl in src/parser/parser_items.cpp demands the
     // semicolon under §6.8. Without one, the head word and the name read as a
-    // data declaration whose type_identifier is that head word, and §6.18 --
-    // "The declaration of a user-defined data type shall precede any reference
-    // to its type_identifier" -- refuses it at elaboration, because inside the
-    // region the word declares no type.
+    // data declaration whose type_identifier is that head word, and §6.18,
+    // which requires a user-defined data type to be declared before any
+    // reference to its type_identifier, refuses it at elaboration, because
+    // inside the region the word declares no type.
     const bool kHasPackedDim =
         std::string_view(decl).find('[') != std::string_view::npos;
     std::string message = "expected ';', got '['";
@@ -426,13 +426,13 @@ inline void ExpectNonAnsiPortDeclarationsElaborate(const char* spec) {
 // the declaration.
 //
 // The byte input is written `input var byte`. §23.2.2.3 makes an input whose
-// port kind is omitted "a net of default net type" whatever data type it names,
-// and §6.7.1 admits only a 4-state integral type as a net's data type, so an
-// input net of a 2-state type is not legal source. `var` is what makes an input
-// a variable -- the clause's own `module mh7 (input var integer x);` -- and a
-// variable is outside that rule. The word being exercised still types a port
-// declaration, which is what this covers. The `output int` beside it needs no
-// such help: §23.2.2.3 says an output whose data type is written with the
+// port kind is omitted a net of the default net type whatever data type it
+// names, and §6.7.1 admits only a 4-state integral type as a net's data type,
+// so an input net of a 2-state type is not legal source. `var` is what makes an
+// input a variable -- the clause's own `module mh7 (input var integer x);` --
+// and a variable is outside that rule. The word being exercised still types a
+// port declaration, which is what this covers. The `output int` beside it needs
+// no such help: §23.2.2.3 says an output whose data type is written with the
 // explicit data_type syntax is already a variable.
 inline void ExpectEveryDeclarationFormElaborates(const char* spec) {
   ElabFixture ansi;

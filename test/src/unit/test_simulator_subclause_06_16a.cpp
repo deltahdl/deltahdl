@@ -569,8 +569,8 @@ TEST(StringDataType,
 }
 
 // Table 6-9 defines replication in the row below concatenation, and gives the
-// result as "M concatenated copies of the inner concatenation". Three copies of
-// two characters is six, which is more than the four a packed 32-bit value
+// result as M copies of the inner concatenation joined end to end. Three copies
+// of two characters is six, which is more than the four a packed 32-bit value
 // holds, so a truncating fold cannot reach this answer.
 TEST(StringDataType,
      AParameterInitializedFromAStringReplicationKeepsEveryCharacter) {

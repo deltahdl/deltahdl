@@ -10,7 +10,7 @@ namespace {
 
 // §11.3.3 governs how an integer literal is interpreted (signed vs unsigned)
 // when it is used as an operand of an expression. The distinguishing vehicle
-// the LRM itself uses is "minus twelve divided by three": negation followed by
+// the LRM itself uses is minus twelve divided by three: negation followed by
 // division, where the sign attribute of the literal decides whether the
 // division is signed (result -4) or unsigned (a large positive value). Every
 // test below builds the literal from real source syntax (the literal is the

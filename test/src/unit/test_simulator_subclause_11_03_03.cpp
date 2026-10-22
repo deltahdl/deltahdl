@@ -113,8 +113,8 @@ TEST(IntegerLiteralSim, UnsignedBasedLiteralInDeclInitIsUnsigned) {
 
 // SHALL #2 in the same declaration-initializer position: an unbased literal is
 // signed, so -12 / 3 in a decl initializer resolves to -4 (0xFFFFFFFC), the
-// signed counterpart of the unsigned-based case above. The pair makes the
-// SHALL #1 "differs from a based literal" contrast observable within the
+// signed counterpart of the unsigned-based case above. The pair makes SHALL
+// #1's contrast with a based literal observable within the
 // declaration-initializer code path, not only in a procedural assignment.
 TEST(IntegerLiteralSim, UnbasedLiteralInDeclInitIsSigned) {
   auto result = RunAndGet(

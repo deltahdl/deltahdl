@@ -1,8 +1,7 @@
-// IEEE 1800-2023 §29.4: in a combinational UDP "the output state is determined
-// solely as a function of the current input states". Every combination this
-// design drives has a row below, because §29.3.4 rules that "All combinations
-// of input values that are not explicitly specified result in a default output
-// state of x".
+// IEEE 1800-2023 §29.4: a combinational UDP's output state depends on nothing
+// but the input states of the moment. Every combination this design drives has
+// a row below, because §29.3.4 gives every input combination the table leaves
+// out the default output state x.
 primitive udp_and2 (y, a, b);
   output y;
   input a, b;
@@ -22,12 +21,11 @@ module udp_array;
   wire [3:0] y;
   wire [3:0] z;
 
-  // §29.8: "An optional range may be specified for an array of UDP instances",
-  // so each of these is four instances of udp_and2 rather than one. §29.8 also
-  // rules that "The terminal connection rules remain the same as outlined in
-  // 28.3.6", which connects element p to bit p of a terminal as wide as the
-  // array and broadcasts a single-bit terminal to every element. So y is the
-  // bitwise AND of a and b, and z is a gated by the one bit enable.
+  // §29.8 lets an array of UDP instances carry a range, so each of these is
+  // four instances of udp_and2 rather than one. §29.8 also keeps §28.3.6's
+  // terminal connection rules, which connect element p to bit p of a terminal
+  // as wide as the array and broadcast a single-bit terminal to every element.
+  // So y is the bitwise AND of a and b, and z is a gated by the one bit enable.
   udp_and2 ga [3:0] (y, a, b);
   udp_and2 gb [3:0] (z, a, enable);
 

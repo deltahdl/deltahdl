@@ -374,13 +374,12 @@ TEST(AlwaysCombLatchWarning, RandsequenceCodeBlockAssignmentInfersLatch) {
                               "9.2.2.2"));
 }
 
-// §9.3.2's Table 9-1 has join_none leave "the parent process ... to execute
-// concurrently with all the processes spawned by the fork", so an arm's
-// assignment need not have been made when control passes out of the block and
-// the fork puts nothing on every path. The fork-join is also barred from an
-// always_comb by §9.2.2.2.2 and reported separately; this case is about the
-// warning, and the counterpart that does complete every arm is in
-// test_elaborator_subclause_09_02_02_03.cpp.
+// §9.3.2's Table 9-1 has join_none let the parent process run on alongside
+// every process the fork spawns, so an arm's assignment need not have been made
+// when control passes out of the block and the fork puts nothing on every path.
+// The fork-join is also barred from an always_comb by §9.2.2.2.2 and reported
+// separately; this case is about the warning, and the counterpart that does
+// complete every arm is in test_elaborator_subclause_09_02_02_03.cpp.
 TEST(AlwaysCombLatchWarning, ForkJoinNoneArmAssignmentInfersLatch) {
   ElabFixture f;
   ElaborateSrc(

@@ -773,9 +773,8 @@ TEST(CheckerItemsParsing, CheckerPackageDeclarationRejected) {
       HasItemOfKind(r.cu->checkers[0]->items, ModuleItemKind::kInitialBlock));
 }
 
-// Footnote 6 to checker_generate_item: "it shall be illegal for a
-// checker_generate_item to include any item that would be illegal in a
-// checker_declaration outside a checker_generate_item".
+// Footnote 6 to checker_generate_item: a checker_generate_item may hold no item
+// that a checker_declaration would refuse outside one.
 TEST(CheckerItemsParsing, CheckerGenerateBlockAdmitsCheckerItemsOnly) {
   auto r = Parse(
       "checker c;\n"

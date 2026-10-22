@@ -6,7 +6,7 @@
 
 // Presenting a §34.5 protected block on more lines than the tool wrote it on.
 //
-// §34.5.15.2 has a data block "begin on the next line in the file" and says
+// §34.5.15.2 starts a data block on the following line of the file and says
 // nothing about where it ends, and §34.5.22.2 and §34.5.27.2 word the digest
 // block and the key block the same way. So one block written on one line and
 // the same block written on three are the same block: §34.5.9's count is of the

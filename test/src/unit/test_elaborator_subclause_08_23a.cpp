@@ -406,7 +406,7 @@ TEST(ClassScopeResolutionElaboration,
 
 // §6.20.3 gives `class P#(type C); C::T x;` as its worked illegal example
 // (IEEE 1800-2023 PDF page 129, printed 128), marking the property
-// declaration "Illegal, C is an incomplete type". The prefix is a type
+// declaration illegal because C is an incomplete type. The prefix is a type
 // parameter and a class property declaration is none of the three contexts
 // §8.23 permits, so the report names §6.20.3, the subclause that states the
 // type parameter case in its own words. The prefix stands on a class member

@@ -101,9 +101,9 @@ static char UdpInputChar(const Expr* terminal, SimContext& ctx, Arena& arena) {
 // initial value as `output reg port_identifier = constant_expression`, and the
 // parser keeps that expression on UdpDecl::initial_expr because `~1'b0` is not
 // a bit it can read off the spelling; it is evaluated here, in the one-bit
-// context the reg gives it, the same way an input terminal is. §29.3.4 rules
-// that "The z state is explicitly excluded from consideration in UDPs", so a z
-// the expression evaluates to seeds x, as §29.3.5 gives a z input. Where the
+// context the reg gives it, the same way an input terminal is. §29.3.4 leaves
+// the z state out of what a UDP considers, so a z the expression evaluates to
+// seeds x, as §29.3.5 gives a z input. Where the
 // header wrote no expression the bit is the one the parser read, off a literal
 // or off §29.3.3's initial statement, whose right-hand side A.5.3 closes over
 // literals.

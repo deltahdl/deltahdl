@@ -7,8 +7,8 @@
 // [ initial_or_extends_specifier ] [ final_specifier ]` is printed twice, in
 // Syntax 8-1 (printed page 181) and again in A.2.7 (printed page 1187), and
 // Annex A is titled "(normative) Formal syntax". §8.20 Example 3 prints the
-// opposite order, `virtual function :final :extends void f2();` under the
-// comment "OK: f2 shall not be overridden in subclasses of A" (printed page
+// opposite order, `virtual function :final :extends void f2();` under a comment
+// marking it legal and f2 closed to overriding in A's subclasses (printed page
 // 198), and no sentence in §8.20 or Syntax 8-1 constrains the order either way:
 // the clause's rule for the pair, on printed page 197, lets final go with
 // either initial or extends, which names no order. The example is illustrative

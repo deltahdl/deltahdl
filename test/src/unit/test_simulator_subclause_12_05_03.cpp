@@ -185,8 +185,9 @@ TEST(CaseQualifierSim, UniqueSingleItemMultiplePatternsIsNotViolation) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// §12.5.3 (N9 for unique0): the "multiple matching expressions in one item is
-// not a uniqueness violation" rule covers unique0-case as well as unique-case.
+// §12.5.3 (N9 for unique0): the rule that several matching expressions within
+// one item are no uniqueness violation covers unique0-case as well as
+// unique-case.
 // Both casez patterns in the single item match the selector, yet unique0 runs
 // the item once with no violation report.
 TEST(CaseQualifierSim, Unique0SingleItemMultiplePatternsIsNotViolation) {

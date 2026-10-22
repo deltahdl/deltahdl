@@ -214,9 +214,9 @@ TEST(VirtualMethodParsing, ExtendsFinalCombined) {
   EXPECT_TRUE(m->is_method_final);
 }
 
-// The line §8.20 Example 3 prints (printed page 198), under the comment the
-// standard gives it: "OK: f2 shall not be overridden in subclasses of A". The
-// order is the one the normative grammar does not admit --
+// The line §8.20 Example 3 prints (printed page 198), under a comment of the
+// standard's marking it legal and f2 closed to overriding in A's subclasses.
+// The order is the one the normative grammar does not admit --
 // `dynamic_override_specifiers ::= [ initial_or_extends_specifier ]
 // [ final_specifier ]` is printed in Syntax 8-1 and again in A.2.7, under an
 // annex titled "(normative) Formal syntax" -- so the source is reported, and

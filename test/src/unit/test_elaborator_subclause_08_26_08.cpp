@@ -308,9 +308,10 @@ TEST(InterfaceClassMethodDefaults, ParameterConstantDefaultOk) {
              "endmodule\n"));
 }
 
-// The "same value for every implementor" rule folds a named-constant default to
-// its value before comparing: an implementor whose literal default differs from
-// the interface's localparam-valued default is a mismatch.
+// The rule that a default be the same in every implementor folds a
+// named-constant default to its value before comparing: an implementor whose
+// literal default differs from the interface's localparam-valued default is a
+// mismatch.
 TEST(InterfaceClassMethodDefaults, LocalparamDefaultValueMismatchError) {
   ElabFixture f;
   ElabOk(
