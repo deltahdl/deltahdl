@@ -454,6 +454,44 @@ TEST_F(InstanceArraysOfARun, AGateArrayBelowTheTopTakesItsInstancesBits) {
             VpiObjectOf(vpi_handle_by_index(By("top.s.y"), 1)));
 }
 
+// §28.3.6: a select as wide as the array, of a packed subarray or of an
+// unpacked element, gives each element its bit, and the element's prim term
+// reaches it: g[k] p's net bit p[1][k], and h[k] bit k of the element mem[1].
+// The model gave every element the whole select, holding no bit objects of
+// its own, while the run connected each element to its bit.
+TEST_F(InstanceArraysOfARun, ASubarrayOrElementTerminalReachesEachElementsBit) {
+  Run("module top; wire [1:0][1:0] p; logic [1:0] mem [0:1];\n"
+      "  wire [1:0] y, z;\n"
+      "  buf g[1:0] (y, p[1]);\n"
+      "  buf h[1:0] (z, mem[1]);\n"
+      "endmodule\n");
+  vpiHandle it = vpi_iterate(vpiGateArray, By("top"));
+  ASSERT_NE(it, nullptr);
+  vpiHandle g = vpi_scan(it);
+  vpiHandle h = vpi_scan(it);
+  ASSERT_NE(g, nullptr);
+  ASSERT_NE(h, nullptr);
+  if (std::string(vpi_get_str(vpiName, g)) == "h") std::swap(g, h);
+  vpiHandle element = vpi_handle_by_index(By("top.mem"), 1);
+  ASSERT_NE(element, nullptr);
+  for (int k = 0; k < 2; ++k) {
+    const std::vector<vpiHandle> kG = TermsOf(vpi_handle_by_index(g, k));
+    const std::vector<vpiHandle> kH = TermsOf(vpi_handle_by_index(h, k));
+    ASSERT_EQ(kG.size(), 2U);
+    ASSERT_EQ(kH.size(), 2U);
+    vpiHandle p_bit = vpi_handle(vpiExpr, kG[1]);
+    ASSERT_NE(p_bit, nullptr);
+    EXPECT_EQ(vpi_get(vpiType, p_bit), vpiNetBit) << k;
+    EXPECT_EQ(std::string(vpi_get_str(vpiName, p_bit)),
+              "p[1][" + std::to_string(k) + "]");
+    vpiHandle mem_bit = vpi_handle(vpiExpr, kH[1]);
+    ASSERT_NE(mem_bit, nullptr);
+    EXPECT_EQ(VpiObjectOf(vpi_handle(vpiParent, mem_bit)), VpiObjectOf(element))
+        << k;
+    EXPECT_EQ(IntOf(vpi_handle(vpiIndex, mem_bit)), k);
+  }
+}
+
 // §37.11: an instance array of switches is a switch array over switches.
 TEST_F(InstanceArraysOfARun, ASwitchInstanceArrayIsASwitchArray) {
   Run("module top; wire [1:0] o; logic [1:0] i; logic c;\n"

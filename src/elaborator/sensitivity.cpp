@@ -45,11 +45,12 @@ static void CollectSelectReads(const Expr* expr,
   // the chain stands on is the coarsest expansion, and it is always an object.
   //
   // It is the only name a distributed instance-array terminal ever gets:
-  // InstanceArrayElementTerminals in elaborator_gates.cpp connects element p
-  // through MakeBitSelect with a literal index, so every element of
-  // `udp_and2 ga [3:0] (y, a, b)` watched nothing and evaluated once. Where the
-  // index does not fold the prefix is already the bare name, which is why the
-  // genvar-indexed form in test/src/e2e/udp_generate.sv kept working.
+  // InstanceArrayElementTerminals in elaborator_gate_array_terminals.cpp
+  // connects element p through MakeBitSelect with a literal index, so every
+  // element of `udp_and2 ga [3:0] (y, a, b)` watched nothing and evaluated
+  // once. Where the index does not fold the prefix is already the bare name,
+  // which is why the genvar-indexed form in test/src/e2e/udp_generate.sv kept
+  // working.
   //
   // The added name over-triggers: a change anywhere in `b` wakes a process that
   // reads `b[3]` alone. Every consumer re-reads what it watches -- a UDP

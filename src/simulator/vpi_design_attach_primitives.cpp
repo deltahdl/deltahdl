@@ -5,18 +5,18 @@
 #include <unordered_set>
 #include <vector>
 
-#include "common/arena.h"
 #include "common/packed_range.h"
-#include "common/types.h"
+#include "elaborator/const_eval.h"
+#include "elaborator/elaborator_gate_array_terminals.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_attribute.h"
 #include "elaborator/rtlir_primitives.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_specify.h"
+#include "simulator/dpi_formal_type.h"
 #include "simulator/instance_prefix_override.h"
 #include "simulator/sim_context.h"
-#include "simulator/variable.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_walk.h"
@@ -216,36 +216,6 @@ std::vector<VpiObject*> TerminalObjects(const ModuleItem& item,
   return terminals;
 }
 
-// §37.58: the bit at `offset` of the constant `whole` as a constant of one bit
-// of its own, of the same constant type.
-VpiObject* ConstantBit(const VpiObject& whole, int64_t offset,
-                       const VpiAttachBuild& build) {
-  VpiObject* bit = build.alloc();
-  bit->type = vpiConstant;
-  bit->const_type = whole.const_type;
-  auto* storage = build.arena.Create<Variable>();
-  storage->value = ExtractBitField(build.arena, whole.var->value,
-                                   static_cast<uint32_t>(offset), 1);
-  bit->var = storage;
-  bit->size = 1;
-  return bit;
-}
-
-// §28.3.6: what one element of an instance array connects to: the bit at
-// `offset` of a terminal as wide as the array (`length` elements), the
-// rightmost element taking the least significant bit, and a terminal of any
-// other width whole. A constant's bit is one no object of the constant holds,
-// so it is made, as the elaborator gives the element a one-bit literal. The
-// whole constant stood for every element, so element 1 of `and g[1:0] (y,
-// 2'b01, c)` reported 1, the whole value, where it connects to 0.
-VpiObject* ElementTerminal(VpiObject* whole, int64_t offset, int64_t length,
-                           const VpiAttachBuild& build) {
-  if (whole == nullptr || whole->size != length || length <= 1) return whole;
-  if (whole->type == vpiConstant) return ConstantBit(*whole, offset, build);
-  VpiObject* bit = VpiBitAtOffset(*whole, offset);
-  return bit != nullptr ? bit : whole;
-}
-
 // What one instance array of primitives is made of: the instantiation `item`
 // writing its range and terminals, the shape its elements share, the kind of
 // array, the delay each element is instantiated with, the udp defn a udp
@@ -276,15 +246,23 @@ void MakePrimitiveArray(const PrimArraySpec& spec, const PrimSite& site,
   VpiObject* array = VpiMakeInstanceArray(site.instance, spec.kind,
                                           item.gate_inst_name, kRange, build);
   array->delay_expr = spec.delay;
-  const std::vector<VpiObject*> kWhole =
-      TerminalObjects(item, site, ctx, build);
+  // §28.3.6 with §37.35: each element's prim terms reach what the elaborator
+  // connected that element to, the terminals InstanceArrayElementTerminals
+  // gives it under the module's parameter values: a terminal as wide as the
+  // array its bit -- a vector's net bit or var bit, a bit of a packed
+  // subarray or of an unpacked element, a literal's bit as a constant -- and
+  // any other whole. Shared out by the model's objects instead, a terminal
+  // whose object held no bit objects, `p[1]` or `mem[1]`, stood whole for
+  // every element.
+  const ScopeMap kScope = DpiParameterScope(*site.mod);
+  const GateArraySite kTerms{site.mod, kScope, build.arena};
   for (int64_t index = kRange.LowIndex(); index <= kRange.HighIndex();
        ++index) {
     std::vector<VpiObject*> terminals;
-    terminals.reserve(kWhole.size());
-    for (VpiObject* whole : kWhole) {
-      terminals.push_back(
-          ElementTerminal(whole, kRange.OffsetOf(index), kLength, build));
+    for (const Expr* terminal : InstanceArrayElementTerminals(
+             item.gate_terminals, kTerms, static_cast<uint32_t>(kLength),
+             static_cast<uint32_t>(kRange.OffsetOf(index)))) {
+      terminals.push_back(TerminalExpression(terminal, site, ctx, build));
     }
     const std::string kName =
         std::string(item.gate_inst_name) + "[" + std::to_string(index) + "]";

@@ -1,6 +1,8 @@
 // §28.3.6: the terminals of an array of gate or switch instances, measured and
 // shared out a bit per instance.
 
+#include "elaborator/elaborator_gate_array_terminals.h"
+
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -183,6 +185,24 @@ Expr* GateTerminalBit(Expr* t, uint32_t bit, const RtlirModule* mod,
     ++it;
   }
   return GateTerminalBit(*it, bit, mod, scope, arena);
+}
+
+std::vector<Expr*> InstanceArrayElementTerminals(
+    const std::vector<Expr*>& terms, const GateArraySite& site,
+    uint32_t array_len, uint32_t p) {
+  std::vector<Expr*> bit_terms;
+  bit_terms.reserve(terms.size());
+  for (auto* t : terms) {
+    // §28.3.6: a terminal as wide as one instance's, one bit, connects to it
+    // whole, so an array of one element, whose length is that width too,
+    // takes its terminals as written.
+    const bool kShared =
+        array_len > 1 &&
+        GateTerminalWidth(t, site.mod, site.scope) == array_len;
+    bit_terms.push_back(
+        kShared ? GateTerminalBit(t, p, site.mod, site.scope, site.arena) : t);
+  }
+  return bit_terms;
 }
 
 }  // namespace delta
