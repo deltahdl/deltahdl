@@ -224,4 +224,23 @@ TEST(GateArrayConnection, ALiteralOfTheWrongWidthIsReported) {
   }
 }
 
+// A select with one index of a packed array with a further dimension is the
+// subarray it names (§7.4.5), here two bits for four instances. Measured as
+// one bit, it was connected to every instance without a report.
+TEST(GateArrayConnection, ASubarrayOfTheWrongWidthIsReported) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  wire [1:0][1:0] p;\n"
+      "  wire [3:0] o;\n"
+      "  wire a;\n"
+      "  and g[3:0] (o, p[1], a);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "gate or primitive array terminal width does not "
+                            "match",
+                            5, "28.3.6"));
+}
+
 }  // namespace

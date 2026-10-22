@@ -365,4 +365,31 @@ TEST(GateArrayRuntime, ALiteralTerminalIsSharedOutPerInstance) {
   EXPECT_EQ(out, "1100 1001 10xx\n");
 }
 
+// A select with one index is as wide as what it selects: p[1] is a two-bit
+// subarray of the packed array p (§7.4.5) and mem[1] a two-bit element of the
+// unpacked array mem (§7.4.6), so each is shared out a bit per instance, g[k]
+// taking p[1][k] and h[k] mem[1][k]. A bit of the integer n, and one of the
+// parameter P, is one bit and connects to both instances of k and of q.
+// Measured as one bit, p[1] and mem[1] were connected whole, every instance
+// reading their least significant bit: 00 00.
+TEST(GateArrayRuntime, ASubarrayOrAnUnpackedElementIsSharedOutPerInstance) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module m;\n"
+      "  localparam logic [1:0] P = 2'b01;\n"
+      "  wire [1:0][1:0] p = 4'b1000;\n"
+      "  logic [1:0] mem [0:1];\n"
+      "  integer n = 1;\n"
+      "  wire [1:0] y, z, x, w;\n"
+      "  buf g[1:0] (y, p[1]);\n"
+      "  buf h[1:0] (z, mem[1]);\n"
+      "  buf k[1:0] (x, n[0]);\n"
+      "  buf q[1:0] (w, P[0]);\n"
+      "  initial mem[1] = 2'b10;\n"
+      "  initial #1 $display(\"%b %b %b %b\", y, z, x, w);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "10 10 11 11\n");
+}
+
 }  // namespace

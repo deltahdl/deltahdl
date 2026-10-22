@@ -478,28 +478,20 @@ std::string_view LhsSignalName(const Expr* lhs) {
   return lhs->text;
 }
 
-namespace {
-
-// The declared type and width of the signal named `name`. A port contributes
-// both, like a variable or a net: RtlirPort::dtype carries the type the port
-// header declared, so a port's own packed dimension is reachable from here.
-struct FoundSignalDecl {
-  const DataType* dtype = nullptr;
-  uint32_t width = 0;
-};
-
 FoundSignalDecl FindSignalDecl(std::string_view name, const RtlirModule* mod) {
   for (const auto& v : mod->variables) {
-    if (v.name == name) return {v.dtype, v.width};
+    if (v.name == name) return {v.dtype, v.width, v.num_unpacked_dims != 0};
   }
   for (const auto& n : mod->nets) {
-    if (n.name == name) return {n.dtype, n.width};
+    if (n.name == name) return {n.dtype, n.width, n.num_unpacked_dims != 0};
   }
   for (const auto& p : mod->ports) {
-    if (p.name == name) return {p.dtype, p.width};
+    if (p.name == name) return {p.dtype, p.width, p.num_unpacked_dims != 0};
   }
   return {};
 }
+
+namespace {
 
 // How many indices a range covers, whichever way it runs.
 int64_t RangeSpan(int64_t left, int64_t right) {

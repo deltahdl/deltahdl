@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string_view>
+#include <vector>
 
 #include "common/arena.h"
 #include "common/packed_range.h"
@@ -63,11 +64,67 @@ int64_t SelectLowOffset(const Expr* sel, const PackedRange& range,
   return std::min(range.OffsetOf(first), range.OffsetOf(second));
 }
 
+// How many indices `range` covers.
+int64_t RangeWidth(const PackedRange& range) {
+  return range.HighIndex() - range.LowIndex() + 1;
+}
+
+// §7.4.5 and §7.4.6: the packed dimensions, outermost first, of what the
+// select `sel` names where it is written with one index of a signal and names
+// more than a bit: every packed dimension of an unpacked array's element, or
+// those inside the outermost one of a packed array, the subarray the index
+// selects. None for a part-select, a select of a vector's bit, or a select of
+// a name that is no variable, net or port of `mod`.
+std::vector<PackedRange> SelectedDims(const Expr* sel, const RtlirModule* mod,
+                                      const ScopeMap& scope) {
+  if (sel->index_end != nullptr) return {};
+  const FoundSignalDecl kDecl = FindSignalDecl(sel->base->text, mod);
+  if (kDecl.dtype == nullptr) return {};
+  auto fold = [&](const Expr* left, const Expr* right) {
+    return PackedRange{ConstEvalInt(left, scope).value_or(0),
+                       ConstEvalInt(right, scope).value_or(0)};
+  };
+  std::vector<PackedRange> dims;
+  if (kDecl.unpacked) {
+    dims.push_back(
+        fold(kDecl.dtype->packed_dim_left, kDecl.dtype->packed_dim_right));
+  }
+  for (const auto& [left, right] : kDecl.dtype->extra_packed_dims) {
+    dims.push_back(fold(left, right));
+  }
+  return dims;
+}
+
+// The bit `bit` above the least significant end of the select `sel`, whose
+// packed dimensions are `dims`, outermost first: a select of it per
+// dimension, the innermost dimension's index running fastest (§7.4.5).
+Expr* SelectedBitAt(Arena& arena, Expr* sel, int64_t bit,
+                    const std::vector<PackedRange>& dims) {
+  std::vector<int64_t> indices(dims.size());
+  for (size_t i = dims.size(); i > 0; --i) {
+    const PackedRange& dim = dims[i - 1];
+    indices[i - 1] = dim.IndexAtOffset(bit % RangeWidth(dim));
+    bit /= RangeWidth(dim);
+  }
+  Expr* e = sel;
+  for (int64_t index : indices) e = MakeBitSelectAt(arena, e, index);
+  return e;
+}
+
 }  // namespace
 
 uint32_t GateTerminalWidth(const Expr* t, const RtlirModule* mod,
                            const ScopeMap& scope) {
-  if (t->kind == ExprKind::kSelect) return SelectLhsWidth(t, scope);
+  // A select of a subarray or an unpacked element is as wide as its
+  // dimensions. SelectLhsWidth gives any select written with one index one
+  // bit, so `p[1]` of `wire [1:0][1:0] p` was connected whole.
+  if (t->kind == ExprKind::kSelect) {
+    const std::vector<PackedRange> kDims = SelectedDims(t, mod, scope);
+    if (kDims.empty()) return SelectLhsWidth(t, scope);
+    int64_t width = 1;
+    for (const PackedRange& dim : kDims) width *= RangeWidth(dim);
+    return static_cast<uint32_t>(width);
+  }
   // §5.7.1: a sized literal is as wide as its size says, and an unsized one
   // at least 32 bits. Asked of the declared signals, a literal measured 0 and
   // was connected whole, every instance reading its least significant bit.
@@ -106,6 +163,8 @@ Expr* GateTerminalBit(Expr* t, uint32_t bit, const RtlirModule* mod,
     return MakeBitSelectAt(arena, t, range.IndexAtOffset(bit));
   }
   if (t->kind == ExprKind::kSelect) {
+    const std::vector<PackedRange> kDims = SelectedDims(t, mod, scope);
+    if (!kDims.empty()) return SelectedBitAt(arena, t, bit, kDims);
     PackedRange range = SignalDeclaredRange(t->base->text, mod, scope);
     int64_t offset = SelectLowOffset(t, range, scope) + bit;
     return MakeBitSelectAt(arena, t->base, range.IndexAtOffset(offset));

@@ -74,6 +74,19 @@ std::string_view LhsSignalName(const Expr* lhs);
 
 uint32_t LookupLhsWidth(const Expr* lhs, const RtlirModule* mod);
 
+// The declared type and width of the signal named `name`, and whether its
+// declaration wrote an unpacked dimension, which makes a select of it name an
+// element (§7.4.6). A port contributes all three, like a variable or a net:
+// RtlirPort::dtype carries the type the port header declared, so a port's
+// own packed dimension is reachable from here. Empty where `name` names no
+// variable, net or port of `mod`.
+struct FoundSignalDecl {
+  const DataType* dtype = nullptr;
+  uint32_t width = 0;
+  bool unpacked = false;
+};
+FoundSignalDecl FindSignalDecl(std::string_view name, const RtlirModule* mod);
+
 // The range a select on the signal named `name` in `mod` resolves its indices
 // against: the outermost packed dimension of that signal's declaration, folded
 // in `scope`. Falls back to [width-1:0] -- where an index and a bit offset
