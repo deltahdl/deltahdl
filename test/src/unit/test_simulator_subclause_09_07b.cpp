@@ -409,4 +409,46 @@ TEST(FineGrainProcessControlRun, StatusCalledOnSelfIsRunning) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// §9.7 with §13.4: a function may return a handle to a process, and a method
+// of the class called on what it returns acts on that process as one called on
+// self() does: srandom() reseeds the calling process.
+TEST(FineGrainProcessControlRun,
+     SrandomCalledOnAFunctionsResultReseedsItsProcess) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t; int a, b;\n"
+                       "  function automatic process me();\n"
+                       "    return process::self();\n"
+                       "  endfunction\n"
+                       "  initial begin\n"
+                       "    me().srandom(5); a = $urandom;\n"
+                       "    process::self().srandom(5); b = $urandom;\n"
+                       "    $display(\"%0d\", a == b);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §9.7 with §8.6 and §26.7: a class method declared to return std::process
+// returns a handle of the same class, so status() called on its result through
+// the object answers RUNNING, by name, for the process calling it.
+TEST(FineGrainProcessControlRun, StatusCalledOnAMethodsResultIsRunning) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class W;\n"
+                       "  function std::process mine();\n"
+                       "    return process::self();\n"
+                       "  endfunction\n"
+                       "endclass\n"
+                       "module t; W w;\n"
+                       "  initial begin\n"
+                       "    w = new;\n"
+                       "    $display(\"%s\", w.mine().status().name());\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "RUNNING\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

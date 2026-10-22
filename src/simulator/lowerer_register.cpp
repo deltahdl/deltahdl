@@ -803,11 +803,7 @@ void RegisterClassTypeAliases(const RtlirDesign* design, SimContext& ctx,
     RegisterClassScopeTypedefAliases(info, ctx, arena);
 }
 
-// §9.7 (printed page 245) and §8.30.1 (printed 217): the built-in class
-// the declared type names, `process` or `weak_reference`, bare or through
-// the std package (§26.7), by the bare name the run keys the class under.
-// Empty for any other type.
-static std::string UnitBuiltinClassKey(const DataType& type) {
+std::string UnitBuiltinClassKey(const DataType& type) {
   bool std_or_bare = type.scope_name.empty() || type.scope_name == "std";
   bool builtin =
       type.type_name == "process" || type.type_name == "weak_reference";

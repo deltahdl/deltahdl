@@ -8,9 +8,10 @@
 #include "common/types.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
-#include "parser/ast_module.h"
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
+#include "simulator/eval_call_result.h"
+#include "simulator/eval_callee_declaration.h"
 #include "simulator/eval_function_args_scoped.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
@@ -317,40 +318,6 @@ static const EnumTypeInfo* EnumTypeOfLiteral(std::string_view name,
   return ctx.FindEnumTypeDeclaringMember(name, {});
 }
 
-// Whether `e` is a name or a chain of member selects down from one, `h` or
-// `d.c`: reading it runs no subroutine, so it can be evaluated to find the
-// object it denotes and evaluated again for the value the method starts from.
-static bool IsNamePath(const Expr* e) {
-  if (e == nullptr) return false;
-  if (e->kind == ExprKind::kIdentifier) return true;
-  return e->kind == ExprKind::kMemberAccess && !e->is_scope_resolution &&
-         e->rhs != nullptr && e->rhs->kind == ExprKind::kIdentifier &&
-         IsNamePath(e->lhs);
-}
-
-// §8.3, §8.11 and §8.15: the class whose declarations a member select through
-// `base` reads -- the object's own for a handle or a chain of them and for
-// `this`, and the parent of the running method's class for `super` -- or
-// null where `base` denotes no object.
-static const ClassTypeInfo* ClassBehindHandle(const Expr* base, SimContext& ctx,
-                                              Arena& arena) {
-  if (base->kind == ExprKind::kIdentifier && base->text == "super") {
-    const ClassTypeInfo* running = ctx.CurrentMethodClass();
-    if (running != nullptr) return running->parent;
-    const ClassObject* self = ctx.CurrentThis();
-    return self != nullptr && self->type != nullptr ? self->type->parent
-                                                    : nullptr;
-  }
-  if (base->kind == ExprKind::kIdentifier && base->text == "this") {
-    const ClassObject* self = ctx.CurrentThis();
-    return self != nullptr ? self->type : nullptr;
-  }
-  if (!IsNamePath(base)) return nullptr;
-  const ClassObject* obj =
-      ctx.GetClassObject(EvalExpr(base, ctx, arena).ToUint64());
-  return obj != nullptr ? obj->type : nullptr;
-}
-
 // §23.9 (printed page 761): the enumeration a variable read by its bare name
 // was declared with. A variable an instance below the top declares is
 // recorded under the instance's prefix (Lowerer::RegisterEnumForCast), so the
@@ -401,71 +368,18 @@ static const EnumTypeInfo* EnumTypeOfScopedName(std::string_view scope,
   return ctx.FindEnumTypeDeclaringMember(member, scope);
 }
 
-// §13.4 with §8.7: the declared result type of the method `name` of `cls` or
-// of a class it extends, resolved in the declaring class.
-static const EnumTypeInfo* EnumTypeOfMethodResult(const ClassTypeInfo* cls,
-                                                  std::string_view name,
-                                                  SimContext& ctx) {
-  for (const ClassTypeInfo* c = cls; c != nullptr; c = c->parent) {
-    auto it = c->methods.find(std::string(name));
-    if (it == c->methods.end()) continue;
-    return EnumTypeOfDeclaredType(it->second->return_type, {c, {}}, ctx);
-  }
-  return nullptr;
-}
-
-// §13.4: the declared result type of a bare callee -- a function of the
-// module, of a package the module imports or the running frame's package
-// (§26.3), or a method of the running method's class named bare (§8.6).
-static const EnumTypeInfo* EnumTypeOfBareCallResult(std::string_view name,
-                                                    SimContext& ctx) {
-  ModuleItem* func = ctx.FindFunction(name);
-  if (func == nullptr) func = ctx.FindFunctionInPackageScope(name);
-  if (func != nullptr)
-    return EnumTypeOfDeclaredType(func->return_type, {}, ctx);
-  const ClassObject* self = ctx.CurrentThis();
-  if (self == nullptr) return nullptr;
-  const ClassTypeInfo* running = ctx.CurrentMethodClass();
-  return EnumTypeOfMethodResult(running != nullptr ? running : self->type, name,
-                                ctx);
-}
-
-// §8.9 and §26.3: the declared result type of `C::m()`, a static method of
-// the class, or of `P::f()`, a package's function under the "P::f" key
-// RegisterPackageScopedSubroutines enters it by.
-static const EnumTypeInfo* EnumTypeOfScopedCallResult(std::string_view scope,
-                                                      std::string_view name,
-                                                      SimContext& ctx) {
-  if (const ClassTypeInfo* cls = ctx.FindClassType(scope))
-    return EnumTypeOfMethodResult(cls, name, ctx);
-  ModuleItem* func =
-      ctx.FindFunction(std::string(scope) + "::" + std::string(name));
-  if (func == nullptr) return nullptr;
-  return EnumTypeOfDeclaredType(func->return_type, {nullptr, scope}, ctx);
-}
-
 // §13.4 with §8.9 and §26.3: the declared result type of the subroutine a
-// call names -- a bare function or method, a static method or package
-// function through a scope, or a method through a handle, `this` or `super`.
+// call names (DeclarationOfCallee), resolved where the subroutine is declared.
+// status() through a process handle answers `process::state` (§9.7), a method
+// of the built-in class, which declares no subroutine of the design.
 static const EnumTypeInfo* EnumTypeOfSubroutineResult(const Expr* callee,
                                                       SimContext& ctx,
                                                       Arena& arena) {
-  if (callee->kind == ExprKind::kIdentifier)
-    return EnumTypeOfBareCallResult(callee->text, ctx);
-  if (callee->kind != ExprKind::kMemberAccess || callee->lhs == nullptr ||
-      callee->rhs == nullptr || callee->rhs->kind != ExprKind::kIdentifier) {
-    return nullptr;
-  }
-  if (!callee->is_scope_resolution) {
-    // §9.7: status() through a process handle answers `process::state`.
-    if (callee->rhs->text == "status" &&
-        NamesProcessHandle(callee->lhs, ctx, arena))
-      return ctx.FindEnumType("process::state");
-    return EnumTypeOfMethodResult(ClassBehindHandle(callee->lhs, ctx, arena),
-                                  callee->rhs->text, ctx);
-  }
-  if (callee->lhs->kind != ExprKind::kIdentifier) return nullptr;
-  return EnumTypeOfScopedCallResult(callee->lhs->text, callee->rhs->text, ctx);
+  if (SelectsNamedMember(callee) && callee->rhs->text == "status" &&
+      NamesProcessHandle(callee->lhs, ctx, arena))
+    return ctx.FindEnumType("process::state");
+  CalleeDeclaration decl = DeclarationOfCallee(callee, ctx, arena);
+  return EnumTypeOfDeclaredType(*decl.result, {decl.cls, decl.package}, ctx);
 }
 
 // A member select: `C::x` or `P::x` through a scope, else a member of the

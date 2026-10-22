@@ -9,7 +9,9 @@
 #include "common/source_loc.h"
 #include "common/types.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_type.h"
 #include "simulator/class_object.h"
+#include "simulator/eval_callee_declaration.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer_register.h"
@@ -102,14 +104,26 @@ static bool ProcessTypedMember(const Expr* access, SimContext& ctx,
   return prop != nullptr && prop->type_name == "process";
 }
 
+// §9.7 with §13.4: whether `call` answers a handle to a process, so that a
+// method called on it directly is one of the class's: a call of self(),
+// `process::self().srandom(1)`, or of a subroutine declared to return the
+// class, `me().srandom(1)`. A call a method is selected on names its callee,
+// as every call the parser reads after a primary does; only `new`, which no
+// method is selected on, has none.
+static bool CallAnswersProcess(const Expr* call, SimContext& ctx,
+                               Arena& arena) {
+  if (NamesProcessSelf(call->lhs)) return true;
+  const DataType& result = *DeclarationOfCallee(call->lhs, ctx, arena).result;
+  return UnitBuiltinClassKey(result) == "process";
+}
+
 bool NamesProcessHandle(const Expr* recv, SimContext& ctx, Arena& arena) {
   const Expr* name = SelectedName(recv);
   if (name == nullptr) return false;
   if (name->kind == ExprKind::kIdentifier)
     return ProcessTypedName(name->text, ctx);
-  // A call of self() answers a handle to the calling process, so a method
-  // called on it directly, `process::self().srandom(1)`, is one of the class's.
-  if (name->kind == ExprKind::kCall) return NamesProcessSelf(name->lhs);
+  if (name->kind == ExprKind::kCall)
+    return CallAnswersProcess(name, ctx, arena);
   return ProcessTypedMember(name, ctx, arena);
 }
 

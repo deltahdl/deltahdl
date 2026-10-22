@@ -31,15 +31,13 @@
 
 namespace delta {
 
-namespace {
-
-// Whether `expr` selects a named member, `.m`, the dot no package's scope
-// resolution.
 bool SelectsNamedMember(const Expr* expr) {
   return expr != nullptr && expr->kind == ExprKind::kMemberAccess &&
          !expr->is_scope_resolution && expr->rhs != nullptr &&
          expr->rhs->kind == ExprKind::kIdentifier;
 }
+
+namespace {
 
 // A.8.4: a system function call is a primary a method is called on as a
 // subroutine call is, `$sformatf("%s", s).len()`.

@@ -109,6 +109,10 @@ class CallResultReceiverScope {
 // nothing.
 bool StartsAtHeldCall(const Expr* side);
 
+// Whether `expr` selects a named member, `.m`, the dot no package's scope
+// resolution.
+bool SelectsNamedMember(const Expr* expr);
+
 // Records, for the innermost running body, the elements of the queue, dynamic
 // array or fixed-size unpacked array `returned` names -- the expression of the
 // `return` statement ExecFuncReturn is carrying out -- and records nothing for

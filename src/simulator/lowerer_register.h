@@ -197,6 +197,11 @@ void RegisterPackageClassVariables(const RtlirDesign* design, SimContext& ctx,
 // classes an import may name. Defined in src/simulator/lowerer_register.cpp.
 void RegisterUnitClassVariables(const RtlirDesign* design, SimContext& ctx,
                                 Arena& arena);
+// §9.7 (printed page 245) and §8.30.1 (printed 217): the built-in class
+// the declared type names, `process` or `weak_reference`, bare or through
+// the std package (§26.7), by the bare name the run keys the class under.
+// Empty for any other type. Defined in src/simulator/lowerer_register.cpp.
+std::string UnitBuiltinClassKey(const DataType& type);
 
 // §6.20.2: a parameter declared with a range or a type has the range of its
 // declaration, unchanged by any override, and RtlirParamDecl::resolved_value

@@ -356,6 +356,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/eval_expr_inside.cpp
     simulator/eval_member_path.cpp
     simulator/eval_enum.cpp
+    simulator/eval_callee_declaration.cpp
     simulator/block_enums.cpp
     simulator/eval_array.cpp
     simulator/eval_array_value_ops.cpp
