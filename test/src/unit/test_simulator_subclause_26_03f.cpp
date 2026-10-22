@@ -197,4 +197,31 @@ TEST(PackageImportSim, ModuleInitializerReadsAUnitHandle) {
             7u);
 }
 
+// §26.3 with §8.4 and §11.3.6: `p::objs[1]` is an element of the package's
+// array of handles, so the assignment `p::objs[1].v = 5` used as an
+// expression writes v of the object the element refers to and yields the
+// 5 it wrote at v's 32 bits, read back through c, the handle stored in it.
+TEST(PackageScopeReferenceSim, AWriteThroughAPackageArrayElementReachesIt) {
+  const std::string kSrc =
+      "package p;\n"
+      "  class C;\n"
+      "    int v = 7;\n"
+      "  endclass\n"
+      "  C objs[2];\n"
+      "endpackage\n"
+      "module t;\n"
+      "  import p::*;\n"
+      "  C c;\n"
+      "  int y, z;\n"
+      "  initial begin\n"
+      "    c = new;\n"
+      "    p::objs[1] = c;\n"
+      "    z = (p::objs[1].v = 5);\n"
+      "    y = c.v;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(kSrc, "y"), 5u);
+  EXPECT_EQ(RunAndGet(kSrc, "z"), 5u);
+}
+
 }  // namespace
