@@ -266,6 +266,9 @@ TEST(UdpDeclGrammar,
       "            output o);\n"
       "  table 0 : 0; endtable\n"
       "endprimitive\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a UDP's output has to lead its port list, ahead of every input",
+      1, "29.3.1"));
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->udps.size(), 1u);
   auto* udp = r.cu->udps[0];

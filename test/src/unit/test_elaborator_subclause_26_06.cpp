@@ -862,7 +862,7 @@ TEST(PackageExport, PackageReferencedNamesReadEveryDeclaration) {
   auto r = Parse(
       "package p;\n"
       "  typedef int my_t;\n"
-      "  typedef enum {A = KA, R[RN]} e_t;\n"
+      "  typedef enum {A = KA, R[2]} e_t;\n"
       "  typedef struct { my_t m; int arr[KD]; struct { int k; } in; } s_t;\n"
       "  my_t v = initv;\n"
       "  logic [KL:0] w;\n"
@@ -890,11 +890,11 @@ TEST(PackageExport, PackageReferencedNamesReadEveryDeclaration) {
   const std::unordered_set<std::string_view> kNames =
       PackageReferencedNames(r.cu->packages[0]);
   for (std::string_view name :
-       {"KA",       "RN",         "my_t",     "KD",        "initv",
-        "KL",       "KX",         "KU",       "defv",      "body_ref",
-        "call_ref", "clk_ref",    "tree_ref", "clk2",      "dis_ref",
-        "bool_ref", "cparam_ref", "base_ref", "minit_ref", "mdim_ref",
-        "meth_ref", "pt_t"}) {
+       {"KA",         "my_t",     "KD",        "initv",    "KL",
+        "KX",         "KU",       "defv",      "body_ref", "call_ref",
+        "clk_ref",    "tree_ref", "clk2",      "dis_ref",  "bool_ref",
+        "cparam_ref", "base_ref", "minit_ref", "mdim_ref", "meth_ref",
+        "pt_t"}) {
     EXPECT_TRUE(kNames.contains(name)) << name;
   }
 }

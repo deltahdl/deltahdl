@@ -66,10 +66,21 @@ TEST(ParseResultRead, EveryEntryPointFailsAnErrorNeverRead) {
   EXPECT_NONFATAL_FAILURE(ParseARejectedLibraryNobodyReads(), kUnreadReport);
 }
 
-TEST(ParseResultRead, ReadingHasErrorsDischargesIt) {
+// Parses the rejected source and then reads the record with `read`. The reads
+// below take the answer without asserting it, so that none of them claims the
+// source was rejected without naming the report.
+void ParseThenRead(void (*read)(const ParseResult&)) {
   auto r = Parse(kRejectedSrc);
+  read(r);
+}
 
-  EXPECT_TRUE(r.has_errors);
+// has_errors is read through its conversion to bool, which an assertion macro,
+// an `if` and a `!` all go through.
+TEST(ParseResultRead, ReadingHasErrorsDischargesIt) {
+  ParseThenRead([](const ParseResult& r) {
+    static_cast<void>(static_cast<bool>(r.has_errors));
+  });
+  ParseThenRead([](const ParseResult& r) { static_cast<void>(!r.has_errors); });
 }
 
 TEST(ParseResultRead, NamingTheReportDischargesIt) {
@@ -77,13 +88,6 @@ TEST(ParseResultRead, NamingTheReportDischargesIt) {
 
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ';', got 'endmodule'", 3, "6.8"));
-}
-
-// Parses the rejected source and then reads the record with `read`, as a case
-// does that looks at diags rather than at has_errors.
-void ParseThenRead(void (*read)(const ParseResult&)) {
-  auto r = Parse(kRejectedSrc);
-  read(r);
 }
 
 // Each way a case reaches diags discharges the obligation, as reading
@@ -108,8 +112,16 @@ TEST(ParseResultRead, AnyReadOfTheDiagnosticsDischargesIt) {
 // ParseOk and ParseWithPreprocessorOk read has_errors on their caller's
 // behalf, so the answer they give is the case's read.
 TEST(ParseResultRead, TheAcceptanceHelpersReadOnTheCallersBehalf) {
-  EXPECT_FALSE(ParseOk(kRejectedSrc));
-  EXPECT_FALSE(ParseWithPreprocessorOk(kRejectedSrc));
+  static_cast<void>(ParseOk(kRejectedSrc));
+  static_cast<void>(ParseWithPreprocessorOk(kRejectedSrc));
+}
+
+// A case that a defect of deltahdl's fails is excused beside the issue filed
+// for it, as an elaborator case is through Diagnosed::Excuse.
+TEST(ParseResultRead, AnExcusedResultRaisesNothing) {
+  auto r = Parse(kRejectedSrc);
+
+  r.has_errors.Excuse();
 }
 
 TEST(ParseResultRead, AnAcceptedSourceNeverReadRaisesNothing) {
@@ -150,7 +162,7 @@ TEST(ParseResultRead, AMoveCarriesTheObligationAndRaisesItOnce) {
 
 TEST(ParseResultRead, AReadBeforeAMoveTravelsWithIt) {
   auto first = Parse(kRejectedSrc);
-  EXPECT_TRUE(first.has_errors);
+  static_cast<void>(static_cast<bool>(first.has_errors));
 
   ParseResult second(std::move(first));
 }

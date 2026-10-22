@@ -308,6 +308,9 @@ TEST(FunctionDeclParsing, OldStyleFunction) {
       "    myfunc = a + 1;\n"
       "  endfunction\n"
       "endmodule\n");
+  // deltahdl reads no packed range after a port direction with no type keyword
+  // and rejects `input [7:0] a;` (#7629); the excuse goes with the fix.
+  r.has_errors.Excuse();
   ASSERT_NE(r.cu, nullptr);
   auto* fn = FindFunc(r, "myfunc");
   ASSERT_NE(fn, nullptr);

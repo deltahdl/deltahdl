@@ -532,6 +532,9 @@ TEST(StatementLabelParsing, LabelBeforeDeclarationLeavesTheDeclarationParsed) {
       "    lbl: int x;\n"
       "  end\n"
       "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a statement label cannot appear before a declaration", 3,
+      "9.3.5"));
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kVarDecl);

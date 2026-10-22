@@ -194,7 +194,9 @@ TEST(GenerateInstantiationGrammar, GenerateBlockLabelAfterBegin) {
               "endmodule\n"));
 }
 
-TEST(GenerateInstantiationGrammar, NestedGenerateRegion) {
+// A generate_region holds generate_items, and no generate_item is a
+// generate_region, so a region opened inside another is reported.
+TEST(GenerateInstantiationGrammar, NestedGenerateRegionIsReported) {
   auto r = Parse(
       "module m;\n"
       "  generate\n"
@@ -203,8 +205,10 @@ TEST(GenerateInstantiationGrammar, NestedGenerateRegion) {
       "    endgenerate\n"
       "  endgenerate\n"
       "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_GE(r.cu->modules[0]->items.size(), 1u);
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "this generate region opens inside another one, which is not allowed", 3,
+      "27.3"));
 }
 
 TEST(GenerateInstantiationGrammar, GenerateIfInChecker) {

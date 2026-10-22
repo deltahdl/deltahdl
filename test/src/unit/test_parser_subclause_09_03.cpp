@@ -511,6 +511,10 @@ TEST(BlockStatementParsing, ParallelMalformedTerminatorDoesNotBecomeAJoinKind) {
       "    a = 1;\n"
       "  end\n"
       "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "expected join, join_any or join_none to close the parallel block", 4,
+      "9.3.2"));
   auto* body = InitialBody(r);
   ASSERT_NE(body, nullptr);
   ASSERT_EQ(body->kind, StmtKind::kFork);

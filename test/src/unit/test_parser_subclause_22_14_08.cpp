@@ -19,6 +19,12 @@ using namespace delta;
 
 namespace {
 
+// A.1.10's report over a constraint block whose items stop parsing, which is
+// where a relation the fourth added word opened breaks off when the word is an
+// ordinary identifier.
+constexpr const char* kItemsDoNotParse =
+    "the constraint block's items do not parse from here";
+
 // What a constraint block recorded for the fourth added word. Shared by the two
 // tests below so each reads as a tally rather than as a walk.
 struct SoftTally {
@@ -376,10 +382,11 @@ TEST(CompilerDirectiveParsing, SystemVerilog2012AddedNettypeTakesEveryForm) {
 // negative is the qualifier's own exclusivity rule: a union takes at most one
 // of the two qualifiers it admits.
 //
-// The constraint half has no paired rejection under "1800-2009": a constraint
-// body is scanned token by token rather than parsed as a grammar, so a stray
-// identifier where the word stood is absorbed. What the pairing shows there is
-// that nothing is *captured*. The union half does reject outright.
+// Both halves are rejected under "1800-2009". The union half is reported where
+// the word stands; in the constraint half the relation the word opened derives
+// no constraint_block_item, and A.1.10's report stands where the block's parse
+// breaks off. What the pairing shows there beyond the report is that nothing is
+// *captured*.
 TEST(CompilerDirectiveParsing,
      SystemVerilog2012AddedSoftQualifiesUnionsAndConstraints) {
   const std::string kUnion =
@@ -446,6 +453,10 @@ TEST(CompilerDirectiveParsing,
   EXPECT_EQ(here.discarded, 1u);
 
   auto included = ParseWithPreprocessor(In("1800-2009", kConstraint));
+  EXPECT_TRUE(ReportedError(included.diags, kItemsDoNotParse, LineInRegion(4),
+                            "A.1.10"));
+  EXPECT_TRUE(ReportedError(included.diags, kItemsDoNotParse, LineInRegion(5),
+                            "A.1.10"));
   ASSERT_NE(included.cu, nullptr);
   ASSERT_EQ(included.cu->classes.size(), 1u);
   auto there = TallySoft(included, "v");
@@ -498,8 +509,10 @@ TEST(CompilerDirectiveParsing, SystemVerilog2012AddedSoftTakesEveryPosition) {
   EXPECT_EQ(here.refs, 1u);
   EXPECT_EQ(here.relations, 0u);
 
-  auto there =
-      TallySoft(ParseWithPreprocessor(In("1800-2009", kSoftDist)), "v");
+  auto in_2009 = ParseWithPreprocessor(In("1800-2009", kSoftDist));
+  EXPECT_TRUE(ReportedError(in_2009.diags, kItemsDoNotParse, LineInRegion(3),
+                            "A.1.10"));
+  auto there = TallySoft(in_2009, "v");
   EXPECT_EQ(there.dists, 0u)
       << "an ordinary identifier qualifies no distribution";
   EXPECT_EQ(there.refs, 0u);

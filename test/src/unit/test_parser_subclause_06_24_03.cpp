@@ -29,17 +29,20 @@ TEST(BitStreamCastParsing, BitstreamCastIntToStruct) {
       "endmodule\n"));
 }
 
+// A.2.2.1 names a cast's target with a casting_type, which a packed range
+// written after logic is not, so the eight-bit target is named through a
+// typedef.
 TEST(BitStreamCastParsing, BitStreamCastFromStruct) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef struct { logic [3:0] a; logic [3:0] b; } pair_t;\n"
-      "  initial begin\n"
-      "    pair_t p;\n"
-      "    logic [7:0] flat;\n"
-      "    flat = logic [7:0]'(p);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  typedef struct { logic [3:0] a; logic [3:0] b; } pair_t;\n"
+              "  typedef logic [7:0] flat_t;\n"
+              "  initial begin\n"
+              "    pair_t p;\n"
+              "    flat_t flat;\n"
+              "    flat = flat_t'(p);\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 TEST(BitStreamCastParsing, BitstreamCastStructToStruct) {

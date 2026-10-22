@@ -382,14 +382,10 @@ TEST(CompilerDirectiveParsing, ConstantKeywordsOutsideTheListAreIdentifiers) {
   EXPECT_EQ(localparam_item->data_type.type_name, "localparam");
   EXPECT_TRUE(localparam_item->type_name_undeclared_at_parse);
 
-  auto as_genvar = ParseWithPreprocessor(
-      In1995("module m;\n"
-             "  genvar i;\n"
-             "  generate\n"
-             "    for (i = 0; i < 2; i = i + 1) begin : g\n"
-             "    end\n"
-             "  endgenerate\n"
-             "endmodule\n"));
+  auto as_genvar =
+      ParseWithPreprocessor(In1995("module m;\n"
+                                   "  genvar i;\n"
+                                   "endmodule\n"));
   // With the word an ordinary identifier, `genvar i` is a declaration of i
   // whose type_identifier is called genvar, which is what a declaration of the
   // word's own name would look like and not the genvar declaration §27.4 gives
@@ -397,6 +393,7 @@ TEST(CompilerDirectiveParsing, ConstantKeywordsOutsideTheListAreIdentifiers) {
   // type; the parser's answer is the item, and the item is what says the word
   // carried no keyword meaning here.
   ASSERT_NE(as_genvar.cu, nullptr);
+  EXPECT_FALSE(as_genvar.has_errors);
   auto* genvar_item = as_genvar.cu->modules[0]->items[0];
   EXPECT_EQ(genvar_item->kind, ModuleItemKind::kVarDecl);
   EXPECT_FALSE(genvar_item->is_genvar);

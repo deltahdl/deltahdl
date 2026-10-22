@@ -55,6 +55,10 @@ class Watched {
   auto begin() const { return Get().begin(); }
   auto end() const { return Get().end(); }
 
+  // For a case that a defect of deltahdl's fails, which names the issue filed
+  // for it beside the call and drops the call with the fix.
+  void Excuse() { read_ = true; }
+
   // What ParseResult looks at as it is destroyed, neither of them a read.
   bool WasRead() const { return read_; }
   const T& Peek() const { return value_; }

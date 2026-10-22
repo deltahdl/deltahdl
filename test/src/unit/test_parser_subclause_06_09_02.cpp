@@ -196,6 +196,10 @@ TEST(VectorNetAccessibility, VectoredAfterVariableTypeLeavesTheDeclarator) {
       "module top();\n"
       "  logic vectored [15:0] a = 0;\n"
       "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "'vectored' shall be used in a vector net "
+                            "declaration and 'logic' declares no net",
+                            2, "6.9.2"));
   ASSERT_NE(r.cu, nullptr);
   auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);

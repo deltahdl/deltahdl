@@ -84,6 +84,8 @@ TEST(VirtualMethodParsing, InitialAndExtendsTogetherStoresOnlyTheFirst) {
       "class C;\n"
       "  function :initial :extends void foo(); endfunction\n"
       "endclass\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "':initial' and ':extends' are mutually exclusive", 2, "8.20"));
   ASSERT_NE(r.cu, nullptr);
   auto* m = r.cu->classes[0]->members[0]->method;
   ASSERT_NE(m, nullptr);

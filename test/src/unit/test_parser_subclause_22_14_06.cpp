@@ -381,6 +381,14 @@ TEST(CompilerDirectiveParsing, SystemVerilog2005AddedProcessWordsOpenBlocks) {
   // since no such type is declared. Finding the declaration under that reading
   // is what says the word carried no keyword meaning under this list.
   auto before = ParseWithPreprocessor(In2005(kSrc));
+  // always_comb leaves a declarator after it, but each of the other three words
+  // is followed by text no declarator begins with, and is reported there.
+  EXPECT_TRUE(ReportedError(before.diags, "expected ';', got '@'",
+                            LineInRegion(5), "6.8"));
+  EXPECT_TRUE(ReportedError(before.diags, "expected ';', got 'if'",
+                            LineInRegion(6), "6.8"));
+  EXPECT_TRUE(ReportedError(before.diags, "expected ';', got 'begin'",
+                            LineInRegion(7), "6.8"));
   ASSERT_NE(before.cu, nullptr);
   bool read_as_a_named_type = false;
   for (auto* item : before.cu->modules[0]->items) {

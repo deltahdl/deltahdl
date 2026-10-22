@@ -118,6 +118,8 @@ TEST(StaticMethodParsing, StaticLifetimeSetsTheLifetimeFlagAlone) {
       "  task static t2();\n"
       "  endtask\n"
       "endclass\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "class method shall not have static lifetime", 2, "8.6"));
   ASSERT_NE(r.cu, nullptr);
   auto* m = r.cu->classes[0]->members[0];
   EXPECT_FALSE(m->is_static);

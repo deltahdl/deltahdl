@@ -231,6 +231,7 @@ TEST(GenerateIfConstruct, MissingEndBeforeElseStillReadsTheElseBranch) {
       "    wire x;\n"
       "  end\n"
       "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "expected 'end', got 'else'", 4, "27.3"));
   ASSERT_NE(r.cu, nullptr);
   auto* mod = r.cu->modules[0];
   ASSERT_EQ(mod->items.size(), 1u);
