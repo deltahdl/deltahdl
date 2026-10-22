@@ -15,6 +15,7 @@
 #include "simulator/class_object.h"
 #include "simulator/class_specialization.h"
 #include "simulator/eval_array.h"
+#include "simulator/eval_class_array_handles.h"
 #include "simulator/eval_expr_internal.h"
 #include "simulator/eval_member_path.h"
 #include "simulator/eval_string.h"
@@ -681,6 +682,17 @@ static FieldTarget ResolveFieldTargetOf(const Expr* lhs, SimContext& ctx,
   if (handled) return target;
   target = ResolveSpecializationStaticField(lhs, ctx, &handled);
   if (handled) return target;
+
+  // §8.4 with §7.4: `objs[i].v` names v of the object the element objs[i]
+  // refers to, whatever index selects it, scoped by the class the array is
+  // declared with as a handle variable's class scopes `h.v`. The name built
+  // below carries a select only for a literal index, so the element is
+  // evaluated to its object instead.
+  const ClassTypeInfo* declared = nullptr;
+  if (ClassObject* obj =
+          DeclaredArrayElementObject(lhs, ctx, ctx.GetArena(), declared)) {
+    return ResolveClassFieldTarget(obj, declared, lhs->rhs->text, ctx);
+  }
 
   std::string name;
   BuildLhsName(lhs, name);

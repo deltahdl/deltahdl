@@ -130,6 +130,16 @@ bool TryEvalDeclaredArrayElementMember(const Expr* expr, SimContext& ctx,
 
 }  // namespace
 
+ClassObject* DeclaredArrayElementObject(const Expr* expr, SimContext& ctx,
+                                        Arena& arena,
+                                        const ClassTypeInfo*& declared) {
+  const Expr* sel = SelectOfMemberAccess(expr);
+  if (sel == nullptr) return nullptr;
+  declared = ctx.FindClassType(DeclaredArrayElementClass(sel->base, ctx));
+  if (declared == nullptr) return nullptr;
+  return ctx.GetClassObject(EvalExpr(sel, ctx, arena).ToUint64());
+}
+
 Logic4Vec ConstructElementObject(const Expr* rhs, std::string_view class_type,
                                  SimContext& ctx, Arena& arena) {
   // §15.3.1 and §15.4.1: an element of a container of semaphores or mailboxes

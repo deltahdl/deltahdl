@@ -878,4 +878,49 @@ TEST(ClassSim, NewIntoAHandlePropertyOfADeclaredArrayElementConstructsIt) {
             9u);
 }
 
+// §8.4 with §7.4: an element selected by a variable, `arr[i]`, is the handle
+// arr[1] is while i holds 1, so `arr[i].v = 5` writes v of the object arr[1]
+// refers to, read back as 5 over its initial 7. The member path's name
+// carried the select only for a literal index, and the write went nowhere.
+TEST(ClassSim, AWriteThroughAVariableIndexedElementReachesItsObject) {
+  EXPECT_EQ(RunAndGet(HandleArrayDesign("module t;\n"
+                                        "  C arr[2];\n"
+                                        "  int i = 1;\n"
+                                        "  int y;\n"
+                                        "  initial begin\n"
+                                        "    arr[1] = new;\n"
+                                        "    arr[i].v = 5;\n"
+                                        "    y = arr[1].v;\n"
+                                        "  end\n"
+                                        "endmodule\n"),
+                      "y"),
+            5u);
+}
+
+// §8.4: `arr[i].h = new` stores the object it constructs in h of the object
+// arr[i] refers to, as `arr[1].h = new` does, so it is read back through
+// arr[1].h. The object was constructed and its handle went nowhere.
+TEST(ClassSim, NewThroughAVariableIndexedElementIsStoredInItsObject) {
+  EXPECT_EQ(RunAndGet("class N;\n"
+                      "  int v = 9;\n"
+                      "endclass\n"
+                      "class C;\n"
+                      "  N h;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  C arr[2];\n"
+                      "  N n;\n"
+                      "  int i = 1;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    arr[1] = new;\n"
+                      "    arr[i].h = new;\n"
+                      "    n = arr[1].h;\n"
+                      "    y = n.v;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            9u);
+}
+
 }  // namespace

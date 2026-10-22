@@ -7,6 +7,8 @@
 
 namespace delta {
 
+struct ClassObject;
+struct ClassTypeInfo;
 struct Expr;
 struct Stmt;
 class SimContext;
@@ -78,5 +80,13 @@ bool ResolveElementObjectMethod(const Expr* access, SimContext& ctx,
 // Before this the call had no dispatch: `arr[0].get()` read 0.
 bool TryEvalElementObjectMethodCall(const Expr* expr, SimContext& ctx,
                                     Arena& arena, Logic4Vec& out);
+
+// §8.4 with §7.4: for `expr` as `a[i].name`, `a` a declared array of class
+// handles and `i` any index, the object the element refers to, the array's
+// declared class put in `declared`. Null for a member access of any other
+// shape and for an element that refers to no object.
+ClassObject* DeclaredArrayElementObject(const Expr* expr, SimContext& ctx,
+                                        Arena& arena,
+                                        const ClassTypeInfo*& declared);
 
 }  // namespace delta
