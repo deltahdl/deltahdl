@@ -2,16 +2,20 @@
 // shared out a bit per instance.
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
+#include <string_view>
 
 #include "common/arena.h"
 #include "common/packed_range.h"
+#include "common/types.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/rtlir.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
+#include "simulator/evaluation.h"
 
 namespace delta {
 
@@ -26,6 +30,24 @@ Expr* MakeBitSelectAt(Arena& arena, Expr* base, int64_t index) {
   e->kind = ExprKind::kSelect;
   e->base = base;
   e->index = lit;
+  return e;
+}
+
+// §5.7.1: the bit `bit` above the least significant end of the integer
+// literal `lit`, a 0, 1, x or z, as a literal of one bit of its own, the
+// constant one instance of the array connects to.
+Expr* LiteralBitAt(Arena& arena, const Expr* lit, uint32_t bit) {
+  static constexpr std::string_view kBitTexts[] = {"1'b0", "1'b1", "1'bz",
+                                                   "1'bx"};
+  const Logic4Vec kValue = EvalIntLiteral(lit, arena);
+  const Logic4Word& word = kValue.words[bit / 64];
+  const uint64_t kMask = uint64_t{1} << (bit % 64);
+  const auto kAval = static_cast<size_t>((word.aval & kMask) != 0);
+  const auto kBval = static_cast<size_t>((word.bval & kMask) != 0);
+  auto* e = arena.Create<Expr>();
+  e->kind = ExprKind::kIntegerLiteral;
+  e->text = kBitTexts[(kBval * 2) + kAval];
+  e->int_val = kAval * (1 - kBval);
   return e;
 }
 
@@ -46,6 +68,12 @@ int64_t SelectLowOffset(const Expr* sel, const PackedRange& range,
 uint32_t GateTerminalWidth(const Expr* t, const RtlirModule* mod,
                            const ScopeMap& scope) {
   if (t->kind == ExprKind::kSelect) return SelectLhsWidth(t, scope);
+  // §5.7.1: a sized literal is as wide as its size says, and an unsized one
+  // at least 32 bits. Asked of the declared signals, a literal measured 0 and
+  // was connected whole, every instance reading its least significant bit.
+  if (t->kind == ExprKind::kIntegerLiteral) {
+    return LiteralWidth(t->text, t->int_val);
+  }
   // §11.6.1: ~ is as wide as its operand, and &, | and ^ as the wider of
   // theirs; any other operator connects whole.
   if (t->kind == ExprKind::kUnary && t->op == TokenKind::kTilde) {
@@ -82,6 +110,7 @@ Expr* GateTerminalBit(Expr* t, uint32_t bit, const RtlirModule* mod,
     int64_t offset = SelectLowOffset(t, range, scope) + bit;
     return MakeBitSelectAt(arena, t->base, range.IndexAtOffset(offset));
   }
+  if (t->kind == ExprKind::kIntegerLiteral) return LiteralBitAt(arena, t, bit);
   // An operator expression, an input terminal alone, is addressed as
   // [width-1:0].
   if (t->kind != ExprKind::kConcatenation) {

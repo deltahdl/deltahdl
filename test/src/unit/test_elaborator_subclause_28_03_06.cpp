@@ -2,6 +2,8 @@
 
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -198,6 +200,28 @@ TEST(GateArrayConnection, AnOperatorExpressionOfTheWrongWidthIsReported) {
                             "gate or primitive array terminal width does not "
                             "match",
                             4, "28.3.6"));
+}
+
+// A literal of the wrong width is reported as a named vector is: 2'b01 is two
+// bits for four instances, and an unsized 1 the 32 bits §5.7.1 gives it.
+// Measured as nothing, each was connected whole without a report.
+TEST(GateArrayConnection, ALiteralOfTheWrongWidthIsReported) {
+  for (const char* literal : {"2'b01", "1"}) {
+    ElabFixture f;
+    Elaborate(std::string("module m;\n"
+                          "  wire [3:0] o;\n"
+                          "  wire a;\n"
+                          "  and g[3:0] (o, ") +
+                  literal +
+                  ", a);\n"
+                  "endmodule\n",
+              f);
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "gate or primitive array terminal width does not "
+                              "match",
+                              4, "28.3.6"))
+        << literal;
+  }
 }
 
 }  // namespace

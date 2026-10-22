@@ -345,4 +345,24 @@ TEST(GateArrayRuntime, AnOperatorExpressionTerminalIsSharedOutPerInstance) {
   EXPECT_EQ(out, "z00z 0111 0110 1010 0000\n");
 }
 
+// A literal terminal is measured by its bit length as any other expression is,
+// a sized literal's being its size (§5.7.1), so one as wide as the array is
+// shared out a bit per instance: g[k] buffers bit k of 4'b1100, h[k] bit k of
+// the concatenation, and k[k] bit k of 4'b10xz, a buf turning its z into x.
+// Measured as nothing, each literal was connected whole, and every instance
+// read its least significant bit: 0000 1111 xxxx.
+TEST(GateArrayRuntime, ALiteralTerminalIsSharedOutPerInstance) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module m;\n"
+      "  wire [3:0] w, v, u;\n"
+      "  buf g[3:0] (w, 4'b1100);\n"
+      "  buf h[3:0] (v, {2'b10, 1'b0, 1'b1});\n"
+      "  buf k[3:0] (u, 4'b10xz);\n"
+      "  initial #1 $display(\"%b %b %b\", w, v, u);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1100 1001 10xx\n");
+}
+
 }  // namespace

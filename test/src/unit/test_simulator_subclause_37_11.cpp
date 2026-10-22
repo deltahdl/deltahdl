@@ -399,11 +399,11 @@ vpiHandle OnlyPrimitiveArray(vpiHandle scope) {
   return it == nullptr ? nullptr : vpi_scan(it);
 }
 
-// §28.3.6: only a terminal as wide as the array is split among its elements.
-// A scalar terminal connects to every element whole, and so does an
-// expression of the array's width that holds no bits of its own -- a
-// constant, for which no object stands for one bit.
-TEST_F(InstanceArraysOfARun, AGateArraysScalarAndConstantTerminalsAreWhole) {
+// §28.3.6: a scalar terminal connects to every element whole, and a terminal
+// as wide as the array gives each element its bit, a constant as a named
+// vector does: 2'b01 gives element 0 the constant 1 and element 1 the
+// constant 0. The constant was connected whole, both elements reading 2'b01.
+TEST_F(InstanceArraysOfARun, AGateArraysConstantTerminalIsSharedOutPerElement) {
   Run("module top; wire [1:0] y; logic c;\n"
       "  and g[1:0] (y, 2'b01, c);\n"
       "endmodule\n");
@@ -413,10 +413,12 @@ TEST_F(InstanceArraysOfARun, AGateArraysScalarAndConstantTerminalsAreWhole) {
   const std::vector<vpiHandle> kTerms1 = TermsOf(vpi_handle_by_index(array, 1));
   ASSERT_EQ(kTerms0.size(), 3U);
   ASSERT_EQ(kTerms1.size(), 3U);
-  vpiHandle constant = vpi_handle(vpiExpr, kTerms0[1]);
-  EXPECT_EQ(vpi_get(vpiType, constant), vpiConstant);
-  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, kTerms1[1])),
-            VpiObjectOf(constant));
+  vpiHandle bit0 = vpi_handle(vpiExpr, kTerms0[1]);
+  vpiHandle bit1 = vpi_handle(vpiExpr, kTerms1[1]);
+  EXPECT_EQ(vpi_get(vpiType, bit0), vpiConstant);
+  EXPECT_EQ(vpi_get(vpiType, bit1), vpiConstant);
+  EXPECT_EQ(IntOf(bit0), 1);
+  EXPECT_EQ(IntOf(bit1), 0);
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, kTerms0[2])),
             VpiObjectOf(By("top.c")));
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, kTerms1[2])),

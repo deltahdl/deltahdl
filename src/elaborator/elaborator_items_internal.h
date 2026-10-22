@@ -167,9 +167,9 @@ bool PortSelectsFrom(const RtlirPort& port, std::string_view name);
 bool IsConditionalGenerateConstruct(ModuleItemKind k);
 
 // §28.3.6: the bit length of a terminal of an array of gate or switch
-// instances: a named signal's, a select's, a concatenation's of those, and a
-// ~, &, | or ^ expression's over them; zero for anything else, which is
-// connected whole. Defined in
+// instances: a named signal's, a select's, an integer literal's, a
+// concatenation's of those, and a ~, &, | or ^ expression's over them; zero
+// for anything else, which is connected whole. Defined in
 // elaborator_gate_array_terminals.cpp.
 uint32_t GateTerminalWidth(const Expr* t, const RtlirModule* mod,
                            const ScopeMap& scope);
