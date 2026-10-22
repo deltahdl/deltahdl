@@ -14,6 +14,7 @@ enum class DataTypeKind : uint8_t;
 class Arena;
 struct PackageDecl;
 struct ClassDecl;
+struct ModuleItem;
 
 using TypedefMap = std::unordered_map<std::string_view, DataType>;
 
@@ -195,23 +196,39 @@ DataType InClassScope(const DataType& type, const ClassDecl& cls);
 DataType InClassScope(const DataType& type, const ClassDecl& cls,
                       std::string_view scope);
 
-// The typedef names in scope at a point of a class, each with the key of the
-// class declaring it: the class's own typedefs declared so far, and those its
-// base classes declare (§8.13), a nearer class's hiding a farther one's.
-using ClassTypedefScopes =
-    std::unordered_map<std::string_view, std::string_view>;
+// The typedef names in scope at a point of a class or a package, each with the
+// key of the class or package declaring it: the scope's own typedefs declared
+// so far, and for a class those its base classes declare (§8.13), a nearer
+// class's hiding a farther one's.
+using TypedefScopes = std::unordered_map<std::string_view, std::string_view>;
 
-// §23.9 with §6.18: a typedef's type as a class records it, each member of a
-// structure or union written as the bare name of a typedef in `scopes` put
-// behind the key of the class declaring it, in an aggregate written inline
-// within a member as well. A class opens a scope, and a name inside it finds
-// the class's own typedef, or one it inherits, before one around the class.
-// The class's own typedefs enter `scopes` as they are declared, since a
-// typedef is in scope only from its declaration on, which also keeps a
-// structure from naming itself. Each inline aggregate is copied into `arena`
-// before it is scoped, so the type as written is left alone.
-DataType InClassScopeMembers(const DataType& type,
-                             const ClassTypedefScopes& scopes, Arena& arena);
+// §23.9 with §6.18: a typedef's type as the class or package declaring it
+// records it, written as the bare name of a typedef in `scopes` put behind the
+// key of the scope declaring that typedef, and so each member of a structure
+// or union, in an aggregate written inline within a member as well. A class
+// or a package opens a scope, and a name inside it finds the scope's own
+// typedef, or one a class inherits, before one around the scope. The scope's
+// own typedefs enter `scopes` as they are declared, since a typedef is in
+// scope only from its declaration on, which also keeps a typedef from naming
+// itself. Each inline aggregate is copied into `arena` before it is scoped,
+// so the type as written is left alone.
+DataType InTypedefScopes(const DataType& type, const TypedefScopes& scopes,
+                         Arena& arena);
+
+// §6.18: enters `td`, a typedef the class or package keyed `scope` declares,
+// into `scopes` under its name, unless it is a forward typedef, which names a
+// type defined elsewhere rather than defining one under the scope's key.
+void EnterTypedefScope(TypedefScopes& scopes, const ModuleItem& td,
+                       std::string_view scope);
+
+// §23.9 with §26.3: the type of `item`, a typedef `pkg` declares, as the
+// package records it under its "package::name" key and an import of it enters
+// it under its bare name: its own name written through the package where the
+// package declares a typedef of it (InPackageScope), and each member of a
+// structure or union written as the name of a typedef the package declares
+// ahead of `item` put behind the package's name (InTypedefScopes).
+DataType PackageTypedefType(const ModuleItem& item, const PackageDecl& pkg,
+                            Arena& arena);
 
 // The type `dtype` stands for, following each typedef or user-defined nettype
 // name (§6.18, §6.6.7) to the type it was declared with as far as the table

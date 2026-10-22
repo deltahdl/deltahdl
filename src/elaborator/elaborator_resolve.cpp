@@ -272,7 +272,9 @@ std::string_view RegisterScopedTypedef(std::string_view scope_name,
 // bare name, which is the separate spelling an import makes legal. §7.4.4
 // keeps an array typedef's unpacked dimensions with the type, and they are
 // recorded in `td_array_dims` under the same key, so `p::A'{...}` is counted
-// against them (§10.9.1).
+// against them (§10.9.1). A member of a structure or union written as the
+// name of a typedef the package declares before it is recorded behind the
+// package's name, as the typedef's own name is (PackageTypedefType, §23.9).
 void RegisterPackageTypedefs(
     CompilationUnit* unit, TypedefMap& typedefs,
     std::unordered_map<std::string_view, std::vector<Expr*>>& td_array_dims,
@@ -281,7 +283,7 @@ void RegisterPackageTypedefs(
     for (auto* item : pkg->items) {
       if (item->kind != ModuleItemKind::kTypedef) continue;
       std::string_view key = RegisterScopedTypedef(
-          pkg->name, item->name, InPackageScope(item->typedef_type, *pkg),
+          pkg->name, item->name, PackageTypedefType(*item, *pkg, arena),
           typedefs, arena);
       if (!item->unpacked_dims.empty())
         td_array_dims[key] = item->unpacked_dims;
@@ -487,19 +489,24 @@ void RegisterAnonymousProgramNames(
 }  // namespace
 
 // §8.13: the typedefs `cls` inherits, each under the key of the base class
-// declaring it, the nearest base's hiding a farther one's of the same name.
+// declaring it, entered from the farthest base in so that the nearest base's
+// hides a farther one's of the same name.
 // Elaborator::RunPreElaborationValidations has BreakClassInheritanceCycles
 // drop the extends clause closing any cycle before RegisterCuScopeItems, or a
 // module's walk after it, keys a class's typedefs, so the walk reaches a class
 // with no base.
-static ClassTypedefScopes InheritedTypedefScopes(const ClassDecl* cls,
-                                                 const CompilationUnit* unit) {
-  ClassTypedefScopes scopes;
+static TypedefScopes InheritedTypedefScopes(const ClassDecl* cls,
+                                            const CompilationUnit* unit) {
+  std::vector<const ClassDecl*> bases;
   for (const ClassDecl* base = FindBaseClass(cls, unit); base != nullptr;
        base = FindBaseClass(base, unit)) {
-    for (const auto* m : base->members) {
+    bases.push_back(base);
+  }
+  TypedefScopes scopes;
+  for (auto base = bases.rbegin(); base != bases.rend(); ++base) {
+    for (const auto* m : (*base)->members) {
       if (m->kind == ClassMemberKind::kTypedef)
-        scopes.try_emplace(m->name, base->name);
+        EnterTypedefScope(scopes, *m->typedef_item, (*base)->name);
     }
   }
   return scopes;
@@ -507,15 +514,14 @@ static ClassTypedefScopes InheritedTypedefScopes(const ClassDecl* cls,
 
 void RegisterClassTypedefKeys(const ClassDecl* cls, std::string_view scope,
                               const ClassTypedefTables& tables) {
-  ClassTypedefScopes scopes = InheritedTypedefScopes(cls, tables.unit);
+  TypedefScopes scopes = InheritedTypedefScopes(cls, tables.unit);
   for (const auto* m : cls->members) {
     if (m->kind == ClassMemberKind::kTypedef && m->typedef_item != nullptr) {
       std::string_view key = RegisterScopedTypedef(
           scope, m->name,
-          InClassScopeMembers(m->typedef_item->typedef_type, scopes,
-                              tables.arena),
+          InTypedefScopes(m->typedef_item->typedef_type, scopes, tables.arena),
           tables.typedefs, tables.arena);
-      scopes[m->name] = scope;
+      EnterTypedefScope(scopes, *m->typedef_item, scope);
       if (!m->typedef_item->unpacked_dims.empty())
         tables.td_array_dims[key] = m->typedef_item->unpacked_dims;
     } else if (m->kind == ClassMemberKind::kClassDecl &&

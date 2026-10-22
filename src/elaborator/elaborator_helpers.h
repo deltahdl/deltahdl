@@ -384,10 +384,11 @@ struct ClassTypedefTables {
 // typedef stands for. `scope` is the key's leading part, the class's own name
 // for a class at compilation-unit scope or in a module. §7.4.4 keeps an array
 // typedef's unpacked dimensions with the type, and they are recorded in
-// `td_array_dims` under the same key. A structure's or union's members written
-// as the name of a typedef the class declares before it, or of one a base
-// class declares (§8.13), are recorded behind the declaring class's key
-// (InClassScopeMembers, §23.9). Defined in elaborator_resolve.cpp.
+// `td_array_dims` under the same key. A typedef written as the name of a
+// typedef the class declares before it, or of one a base class declares
+// (§8.13), is recorded behind the declaring class's key, and so is such a name
+// written as a member of a structure or union (InTypedefScopes, §23.9).
+// Defined in elaborator_resolve.cpp.
 void RegisterClassTypedefKeys(const ClassDecl* cls, std::string_view scope,
                               const ClassTypedefTables& tables);
 

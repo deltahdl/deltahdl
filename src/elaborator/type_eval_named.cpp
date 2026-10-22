@@ -6,6 +6,7 @@
 // of names to its type; and RecordTypedef, which enters a typedef into the
 // table.
 
+#include <algorithm>
 #include <cstddef>
 #include <string>
 #include <string_view>
@@ -80,30 +81,55 @@ DataType InClassScope(const DataType& type, const ClassDecl& cls) {
   return InClassScope(type, cls, cls.name);
 }
 
-// Puts behind its declaring class's key each member of `type` that
-// InClassScopeMembers scopes, copying an inline aggregate into `arena` before
+// Writes `scope_name`, empty for a name written bare, as the key `scopes`
+// gives `type_name`, where it gives one.
+static void ScopeTypedefName(std::string_view type_name,
+                             std::string_view& scope_name,
+                             const TypedefScopes& scopes) {
+  auto declarer = scopes.find(type_name);
+  if (scope_name.empty() && declarer != scopes.end())
+    scope_name = declarer->second;
+}
+
+// Puts behind its declaring scope's key each member of `type` that
+// InTypedefScopes scopes, copying an inline aggregate into `arena` before
 // scoping its own members.
-static void ScopeClassTypedefMembers(DataType& type,
-                                     const ClassTypedefScopes& scopes,
-                                     Arena& arena) {
+static void ScopeTypedefMembers(DataType& type, const TypedefScopes& scopes,
+                                Arena& arena) {
   for (StructMember& m : type.struct_members) {
     if (m.nested_type != nullptr) {
       auto* nested = arena.Create<DataType>(*m.nested_type);
-      ScopeClassTypedefMembers(*nested, scopes, arena);
+      ScopeTypedefMembers(*nested, scopes, arena);
       m.nested_type = nested;
       continue;
     }
-    auto declarer = scopes.find(m.type_name);
-    if (m.scope_name.empty() && declarer != scopes.end())
-      m.scope_name = declarer->second;
+    ScopeTypedefName(m.type_name, m.scope_name, scopes);
   }
 }
 
-DataType InClassScopeMembers(const DataType& type,
-                             const ClassTypedefScopes& scopes, Arena& arena) {
+DataType InTypedefScopes(const DataType& type, const TypedefScopes& scopes,
+                         Arena& arena) {
   DataType scoped = type;
-  ScopeClassTypedefMembers(scoped, scopes, arena);
+  ScopeTypedefName(scoped.type_name, scoped.scope_name, scopes);
+  ScopeTypedefMembers(scoped, scopes, arena);
   return scoped;
+}
+
+void EnterTypedefScope(TypedefScopes& scopes, const ModuleItem& td,
+                       std::string_view scope) {
+  if (td.typedef_type.kind != DataTypeKind::kImplicit) scopes[td.name] = scope;
+}
+
+DataType PackageTypedefType(const ModuleItem& item, const PackageDecl& pkg,
+                            Arena& arena) {
+  TypedefScopes declared;
+  const auto kAt = std::find(pkg.items.begin(), pkg.items.end(), &item);
+  for (auto earlier = pkg.items.begin(); earlier != kAt; ++earlier) {
+    if ((*earlier)->kind == ModuleItemKind::kTypedef)
+      EnterTypedefScope(declared, **earlier, pkg.name);
+  }
+  return InTypedefScopes(InPackageScope(item.typedef_type, pkg), declared,
+                         arena);
 }
 
 const DataType& LastTypeInChain(const DataType& dtype,

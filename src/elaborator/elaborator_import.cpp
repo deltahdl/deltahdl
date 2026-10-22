@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#include "common/arena.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/nettype_registration.h"
@@ -38,6 +39,8 @@ struct ImportScope {
   // §6.6.7: the nettypes of the importing scope, which an imported package
   // nettype joins under its bare name.
   NettypeTables nettypes;
+  // Where an imported typedef's type is made (PackageTypedefType).
+  Arena& arena;
 };
 
 // §26.3 with §6.6.7: an imported package nettype is that nettype under its bare
@@ -90,7 +93,8 @@ void RegisterImportItem(const ModuleItem* pi, const PackageDecl& pkg,
   } else if (pi->kind == ModuleItemKind::kNettypeDecl) {
     RegisterImportedNettype(pkg.name, pi->name, name, scope);
   } else if (pi->kind == ModuleItemKind::kTypedef) {
-    scope.typedefs[name] = InPackageScope(pi->typedef_type, pkg);
+    // §23.9: the type the package declared, as the package records it.
+    scope.typedefs[name] = PackageTypedefType(*pi, pkg, scope.arena);
     // §6.18: an import is what gives a package's typedef its bare name in this
     // scope, and the name stands for whatever the package declared -- an
     // aggregate when the declaration carried unpacked dimensions.
@@ -165,7 +169,8 @@ void Elaborator::ApplyCompilationUnitImports(const ModuleDecl* decl,
                  class_names_,
                  parameterized_class_names_,
                  func_decls_,
-                 {nettype_names_, nettype_resolve_funcs_, nettype_canonical_}});
+                 {nettype_names_, nettype_resolve_funcs_, nettype_canonical_},
+                 arena_});
     mod->imports.push_back(RtlirImport{imp.package_name, imp.item_name,
                                        imp.is_wildcard, std::string_view()});
   }
@@ -186,7 +191,8 @@ void Elaborator::ApplyHeaderImports(const ModuleDecl* decl) {
                  class_names_,
                  parameterized_class_names_,
                  func_decls_,
-                 {nettype_names_, nettype_resolve_funcs_, nettype_canonical_}});
+                 {nettype_names_, nettype_resolve_funcs_, nettype_canonical_},
+                 arena_});
   }
 }
 
@@ -209,7 +215,8 @@ void Elaborator::ApplyBodyImport(const ImportItem& import_item) {
                class_names_,
                parameterized_class_names_,
                func_decls_,
-               {nettype_names_, nettype_resolve_funcs_, nettype_canonical_}});
+               {nettype_names_, nettype_resolve_funcs_, nettype_canonical_},
+               arena_});
   // §9.2.2.2.1: a function the import brings in is one an always_comb below it
   // may call, and the table the inference reads was filled ahead of the walk
   // (ElaborateItems).

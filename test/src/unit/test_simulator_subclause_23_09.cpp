@@ -534,4 +534,146 @@ TEST(ClassScopeStructureTypedefSim,
             "11 10 51 1\n");
 }
 
+// A typedef the class declares as the name of another typedef in its scope
+// stands for that one: Box's pair_t is its own 4-bit nib_t, its three_t the
+// 3-bit tri_t it inherits from Base (§8.13), and its pkg_t, written through
+// package p (§26.3), p's 6-bit nib_t. Recorded as written, pair_t was sized
+// by the compilation unit's 8-bit nib_t and three_t by no typedef at all.
+TEST(ClassScopeTypedefNameSim, ATypedefNamedByAnotherTypedefInScopeTakesIt) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("package p;\n"
+                 "  typedef logic [5:0] nib_t;\n"
+                 "endpackage\n"
+                 "typedef logic [7:0] nib_t;\n"
+                 "class Base;\n"
+                 "  typedef logic [2:0] tri_t;\n"
+                 "endclass\n"
+                 "class Box extends Base;\n"
+                 "  typedef logic [3:0] nib_t;\n"
+                 "  typedef nib_t pair_t;\n"
+                 "  typedef p::nib_t pkg_t;\n"
+                 "  typedef tri_t three_t;\n"
+                 "endclass\n"
+                 "module t;\n"
+                 "  initial $display(\"%0d %0d %0d\", $bits(Box::pair_t), "
+                 "$bits(Box::pkg_t), $bits(Box::three_t));\n"
+                 "endmodule\n",
+                 f),
+      "4 6 3\n");
+}
+
+// The same with no typedef of the name outside the class, where pair_t
+// reached no typedef at all.
+TEST(ClassScopeTypedefNameSim, ATypedefNamedByAnotherClassTypedefAloneTakesIt) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class Box;\n"
+                       "  typedef logic [3:0] nib_t;\n"
+                       "  typedef nib_t pair_t;\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  initial $display(\"%0d\", $bits(Box::pair_t));\n"
+                       "endmodule\n",
+                       f),
+            "4\n");
+}
+
+// §23.9 has a package open a scope as a class does, so a structure typedef the
+// package declares lays out a member written `nib_t` by the package's 4-bit
+// nib_t, in a structure written inline within a member too: S and T are 5
+// bits each, whatever the module reading them calls nib_t. Looked up bare,
+// the member took a nib_t of the scope reading the type, or none. The
+// package's forward typedef of its class C (§6.18) defines no type under p,
+// and the class's full declaration still follows it.
+TEST(PackageScopeStructureTypedefSim, AMemberNamedByThePackageTypedefTakesIt) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package p;\n"
+                       "  typedef class C;\n"
+                       "  class C; endclass\n"
+                       "  typedef logic [3:0] nib_t;\n"
+                       "  typedef struct packed { nib_t x; logic y; } S;\n"
+                       "  typedef struct packed {\n"
+                       "    struct packed { nib_t a; } inner;\n"
+                       "    logic y;\n"
+                       "  } T;\n"
+                       "endpackage\n"
+                       "module t;\n"
+                       "  typedef logic [7:0] nib_t;\n"
+                       "  initial $display(\"%0d %0d\", $bits(p::S), "
+                       "$bits(p::T));\n"
+                       "endmodule\n",
+                       f),
+            "5 5\n");
+}
+
+// The same with no nib_t visible outside the package.
+TEST(PackageScopeStructureTypedefSim,
+     AMemberNamedByThePackageTypedefAloneTakesIt) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package p;\n"
+                       "  typedef logic [3:0] nib_t;\n"
+                       "  typedef struct packed { nib_t x; logic y; } S;\n"
+                       "endpackage\n"
+                       "module t;\n"
+                       "  initial $display(\"%0d\", $bits(p::S));\n"
+                       "endmodule\n",
+                       f),
+            "5\n");
+}
+
+// §26.3 has an import make the package's S visible by its bare name, and the
+// type it names is the one the package declared, its member x of p's 4-bit
+// nib_t: s is 5 bits under the module's own 8-bit nib_t. Entered with the
+// member's name bare, s took the module's nib_t and was 9 bits.
+TEST(ImportedStructureTypedefSim, ANamedImportKeepsThePackagesMemberType) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package p;\n"
+                       "  typedef logic [3:0] nib_t;\n"
+                       "  typedef struct packed { nib_t x; logic y; } S;\n"
+                       "endpackage\n"
+                       "module t;\n"
+                       "  import p::S;\n"
+                       "  typedef logic [7:0] nib_t;\n"
+                       "  S s;\n"
+                       "  initial $display(\"%0d\", $bits(s));\n"
+                       "endmodule\n",
+                       f),
+            "5\n");
+}
+
+// The same through a wildcard import, whose bare nib_t the module's own
+// declaration below it hides.
+TEST(ImportedStructureTypedefSim, AWildcardImportKeepsThePackagesMemberType) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package p;\n"
+                       "  typedef logic [3:0] nib_t;\n"
+                       "  typedef struct packed { nib_t x; logic y; } S;\n"
+                       "endpackage\n"
+                       "module t;\n"
+                       "  import p::*;\n"
+                       "  typedef logic [7:0] nib_t;\n"
+                       "  S s;\n"
+                       "  initial $display(\"%0d\", $bits(s));\n"
+                       "endmodule\n",
+                       f),
+            "5\n");
+}
+
+// A named import with no nib_t visible in the module, where x took one bit
+// and s two.
+TEST(ImportedStructureTypedefSim, ANamedImportAloneKeepsThePackagesMemberType) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package p;\n"
+                       "  typedef logic [3:0] nib_t;\n"
+                       "  typedef struct packed { nib_t x; logic y; } S;\n"
+                       "endpackage\n"
+                       "module t;\n"
+                       "  import p::S;\n"
+                       "  S s;\n"
+                       "  initial $display(\"%0d\", $bits(s));\n"
+                       "endmodule\n",
+                       f),
+            "5\n");
+}
+
 }  // namespace
