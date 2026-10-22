@@ -332,9 +332,15 @@ void Elaborator::ValidateScopeRules(const ModuleDecl* decl) {
   // search reaches only the part of the unit written before the module.
   const std::vector<ModuleItem*> kUnitBefore =
       UnitItemsBefore(unit_, decl->range.start);
+  // §26.3 with §24.3: the search for a name the module does not declare goes
+  // on through the scopes lexically enclosing it, among their imports.
+  const std::vector<ModuleItem*> kEnclosingImports =
+      EnclosingImportsAbove(*unit_, *decl);
   auto target_visible = [&](std::string_view name) {
     return walk.local_names.count(name) != 0 || IsNameInModuleScope(name) ||
            ImportsProvideName(unit_, pkg_provided_names_, decl->items, name) ||
+           ImportsProvideName(unit_, pkg_provided_names_, kEnclosingImports,
+                              name) ||
            ImportsProvideName(unit_, pkg_provided_names_, kUnitBefore, name) ||
            UnitDeclaresData(unit_, name, decl->range.start);
   };

@@ -2,10 +2,12 @@
 
 #include <string_view>
 #include <unordered_set>
+#include <vector>
 
 namespace delta {
 
 struct CompilationUnit;
+struct ModuleDecl;
 struct ModuleItem;
 
 // Whether `item` declares a task or a function a call may call: one the
@@ -22,5 +24,13 @@ bool InterfaceDeclaresSubroutine(const CompilationUnit& unit,
 // module writes by a name it does not declare may name.
 std::unordered_set<std::string_view> EnclosingSubroutineNames(
     const CompilationUnit& unit, std::string_view module);
+
+// §26.3 with §24.3: the package imports a reference written in `decl` reaches
+// once its search leaves `decl` for the scopes lexically enclosing it, where
+// `decl` is declared within another module, interface or program: those
+// each enclosing scope writes before the declaration nesting `decl`, the
+// innermost scope's first. Empty for a declaration nested in none.
+std::vector<ModuleItem*> EnclosingImportsAbove(const CompilationUnit& unit,
+                                               const ModuleDecl& decl);
 
 }  // namespace delta

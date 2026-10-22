@@ -396,4 +396,67 @@ TEST(PackageImport, ImportedNettypeDeclaresANetOfThePackagesNettype) {
   }
 }
 
+// §26.3 continues a search that fails in a scope into the next outer lexical
+// scope, among the identifiers a wildcard import written there before the
+// point of the reference offers, and §24.3 makes a program declared in a
+// module a scope nested in it. So the program's call of set_v finds the task
+// the module imports from pkg above the program. Its own items holding no
+// import, it was reported as an undeclared identifier.
+TEST(PackageImport, ANestedProgramCallsATaskItsModuleWildcardImports) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package pkg;\n"
+      "  task automatic set_v(output logic [7:0] o); o = 8'd99; endtask\n"
+      "endpackage\n"
+      "module top;\n"
+      "  import pkg::*;\n"
+      "  logic [7:0] v;\n"
+      "  program p;\n"
+      "    initial set_v(v);\n"
+      "  endprogram\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// The same through an explicit import of the task.
+TEST(PackageImport, ANestedProgramCallsATaskItsModuleExplicitlyImports) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package pkg;\n"
+      "  task automatic set_v(output logic [7:0] o); o = 8'd99; endtask\n"
+      "endpackage\n"
+      "module top;\n"
+      "  import pkg::set_v;\n"
+      "  logic [7:0] v;\n"
+      "  program p;\n"
+      "    initial set_v(v);\n"
+      "  endprogram\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// The search goes on through each outer lexical scope in turn (§26.3): a
+// program in a module nested in top reaches the import top writes above the
+// nested module.
+TEST(PackageImport, ANestedProgramCallsATaskAnOuterModuleImports) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package pkg;\n"
+      "  task automatic set_v(output logic [7:0] o); o = 8'd99; endtask\n"
+      "endpackage\n"
+      "module top;\n"
+      "  import pkg::*;\n"
+      "  module mid;\n"
+      "    logic [7:0] v;\n"
+      "    program p;\n"
+      "      initial set_v(v);\n"
+      "    endprogram\n"
+      "  endmodule\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

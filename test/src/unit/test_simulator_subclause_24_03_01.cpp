@@ -219,9 +219,6 @@ TEST(ProgramSchedulingSim, ModuleTaskCalledFromProgramSchedulesNbaInReactive) {
 // module-declared cases exercise.
 TEST(ProgramSchedulingSim, PackageTaskCalledFromProgramRunsBlockingInReactive) {
   SimFixture f;
-  // deltahdl reports set_v undeclared in the nested program (#7619); the
-  // excuse goes with the fix.
-  f.has_errors.Excuse();
   auto* v = RunAndFindVar(
       "package pkg;\n"
       "  task automatic set_v(output logic [7:0] o);\n"
