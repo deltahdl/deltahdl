@@ -53,7 +53,7 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl,
   // scope.
   pla_ascending_scope_ = scope;
   for (const auto* item : decl->items) {
-    ValidateItemConstraints(item, scope);
+    ValidateItemConstraints(item, *mod, scope);
   }
   // The bulk of module-level validation is an ordered series of independent
   // single-element checks. Two of them inspect elaborator-wide state rather

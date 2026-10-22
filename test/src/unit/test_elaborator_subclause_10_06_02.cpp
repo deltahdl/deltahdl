@@ -199,9 +199,9 @@ TEST(ForceReleaseElaboration, ForceConcatWithBitSelectVariableIsError) {
 // §10.6.2 bars a bit-select or part-select of a variable, which §11.5.1 makes
 // a select of a vector's bits. An address for each unpacked dimension of an
 // array, a queue or an associative array selects an element (§11.5.2), a
-// variable of the element type, so lines 5 to 8 name none. A bit of such an
-// element, a slice of the array and a bit of a structure's vector member are
-// reported still.
+// singular variable of the element type, so lines 5 to 8 name a legal target.
+// A bit of such an element and a bit of a structure's vector member are
+// bit-selects of a variable.
 TEST(ForceReleaseElaboration, ForceOfAnArrayElementIsNoBitSelect) {
   ElabFixture f;
   ElaborateSrc(
@@ -214,22 +214,58 @@ TEST(ForceReleaseElaboration, ForceOfAnArrayElementIsNoBitSelect) {
       "    force aa[\"k\"] = 9;\n"
       "    force sq[1][0] = 8'h1;\n"
       "    force out[1][3] = 1'b1;\n"
-      "    force out[1:2] = '{8'h1, 8'h2};\n"
       "    force s.f[0] = 1'b1;\n"
       "  end\n"
       "endmodule\n",
       f);
   for (uint32_t line : {5u, 6u, 7u, 8u}) {
-    EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
-                               "bit-select or part-select of a variable", line,
-                               "10.6.2"));
+    EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "not a legal force LHS",
+                               line, "10.6.2"));
   }
-  for (uint32_t line : {9u, 10u, 11u}) {
+  for (uint32_t line : {9u, 10u}) {
     EXPECT_TRUE(ReportedError(
         f.diag.Diagnostics(),
         "bit-select or part-select of a variable is not a legal force LHS",
         line, "10.6.2"));
   }
+}
+
+// §10.6.2 lets a force name a singular variable, and §6.4 makes an unpacked
+// array, structure or union an aggregate instead, so a force is reported on
+// the whole of one, on a slice of an array, on a sub-array of a
+// multidimensional one and on an element whose type is a structure. None of
+// them selects a vector's bits (§11.5.1), so the report names the aggregate
+// rather than a bit-select. A member of a structure is a variable of the
+// member's type, and `s.a` is an int.
+TEST(ForceReleaseElaboration, ForceOfAnUnpackedAggregateIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] out [0:3]; logic [7:0] sq [2][2];\n"
+      "  typedef struct { int a; int b; } pair_t;\n"
+      "  typedef union { int i; int j; } word_t;\n"
+      "  pair_t s; pair_t ps [2]; word_t u, v;\n"
+      "  initial begin\n"
+      "    force out = '{8'h1, 8'h2, 8'h3, 8'h4};\n"
+      "    force s = '{1, 2};\n"
+      "    force out[1:2] = '{8'h1, 8'h2};\n"
+      "    force sq[1] = '{8'h1, 8'h2};\n"
+      "    force ps[0] = '{1, 2};\n"
+      "    force u = v;\n"
+      "    force s.a = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {7u, 8u, 9u, 10u, 11u, 12u}) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "unpacked array, structure or union is not a legal force LHS", line,
+        "10.6.2"));
+    EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                               "bit-select or part-select", line, "10.6.2"));
+  }
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "not a legal force LHS", 13,
+                             "10.6.2"));
 }
 
 // §10.6.2 admits a constant bit-select of a vector net as a force target, and a

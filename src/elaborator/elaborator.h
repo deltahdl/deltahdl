@@ -260,6 +260,7 @@ class Elaborator : public ElaboratorClassRules {
   void ElaborateContAssign(ModuleItem* item, RtlirModule* mod);
   void ValidateGeneratedItem(const ModuleItem* item);
   void ValidateSubroutineBodyTargets(const ModuleItem* item,
+                                     const RtlirModule& mod,
                                      const ScopeMap& scope);
   void ResolvePackedStructParam(RtlirParamDecl& pd, const DataType* type,
                                 const Expr* default_value,
@@ -630,8 +631,8 @@ class Elaborator : public ElaboratorClassRules {
                            bool is_2state);
 
   void ValidateEdgeOnReal(const ModuleItem* item);
-
-  void ValidateItemConstraints(const ModuleItem* item, const ScopeMap& scope);
+  void ValidateItemConstraints(const ModuleItem* item, const RtlirModule& mod,
+                               const ScopeMap& scope);
 
   void ValidateDeferredAssertionActions(const ModuleDecl* decl);
   void WalkStmtsForDeferredActions(

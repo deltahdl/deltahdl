@@ -60,6 +60,7 @@ static void WalkStmtsForLhsPatternKeys(const Stmt* s, DiagEngine& diag) {
 // method defined out of its class writes the class's properties, which no
 // module name stands for.
 void Elaborator::ValidateSubroutineBodyTargets(const ModuleItem* item,
+                                               const RtlirModule& mod,
                                                const ScopeMap& scope) {
   if (item->kind != ModuleItemKind::kTaskDecl &&
       item->kind != ModuleItemKind::kFunctionDecl)
@@ -70,8 +71,8 @@ void Elaborator::ValidateSubroutineBodyTargets(const ModuleItem* item,
   ReportProceduralNetTargets(targets);
   for (const auto& [name, loc] : targets)
     if (net_names_.count(name) == 0) proc_assign_targets_.emplace(name, loc);
-  const ForceLhsNames kForceNames{net_names_, nettype_net_names_,
-                                  var_array_info_, scope};
+  const ForceLhsNames kForceNames{net_names_, nettype_net_names_, mod,
+                                  typedefs_, scope};
   for (const Stmt* s : item->func_body_stmts) {
     CheckForceLhs(s, kForceNames, diag_);
     WalkStmtsForLhsPatternKeys(s, diag_);
@@ -79,6 +80,7 @@ void Elaborator::ValidateSubroutineBodyTargets(const ModuleItem* item,
 }
 
 void Elaborator::ValidateItemConstraints(const ModuleItem* item,
+                                         const RtlirModule& mod,
                                          const ScopeMap& scope) {
   bool is_proc = IsProceduralItemKind(item->kind);
   if (is_proc && item->body) {
@@ -90,14 +92,14 @@ void Elaborator::ValidateItemConstraints(const ModuleItem* item,
     CheckProceduralAssignLhs(item->body, diag_);
 
     CheckForceLhs(item->body,
-                  {net_names_, nettype_net_names_, var_array_info_, scope},
+                  {net_names_, nettype_net_names_, mod, typedefs_, scope},
                   diag_);
 
     CheckBlockQueueBounds(item->body, scope, diag_);
 
     WalkStmtsForLhsPatternKeys(item->body, diag_);
   }
-  ValidateSubroutineBodyTargets(item, scope);
+  ValidateSubroutineBodyTargets(item, mod, scope);
   // §10.8 makes a continuous assignment an assignment-like context, so a
   // pattern on its left-hand side is positional too (§10.9).
   if (item->kind == ModuleItemKind::kContAssign)

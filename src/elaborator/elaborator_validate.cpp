@@ -14,12 +14,14 @@
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
+#include "elaborator/aggregate_shape.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/force_lhs.h"
 #include "elaborator/net_data_type.h"
+#include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "elaborator/type_key_match.h"
 #include "lexer/token.h"
@@ -563,20 +565,65 @@ void CheckProceduralAssignLhs(const Stmt* s, DiagEngine& diag) {
       s, [&diag](const Stmt* sub) { CheckProceduralAssignLhs(sub, diag); });
 }
 
-// §7.4 with §11.5.2: whether `e` selects one element of a variable's unpacked
-// array, queue or associative array, an address for each unpacked dimension
-// the declaration writes and no range among them. That element is a variable
-// of the element type, and the select is no bit-select or part-select of a
-// vector (§11.5.1).
-static bool SelectsAnArrayElement(const Expr* e, const ForceLhsNames& names) {
-  uint32_t depth = 0;
-  for (; e->kind == ExprKind::kSelect; e = e->base) {
-    if (e->index_end != nullptr) return false;
-    ++depth;
+// What the variable target of a force names: a singular variable, which
+// §10.6.2 admits; a variable of an unpacked array, structure or union type, or
+// a slice or sub-array of one, none of them singular (§6.4); or bits of a
+// vector, a bit-select or part-select (§11.5.1), which §10.6.2 bars.
+enum class ForceVariableTarget { kSingular, kAggregate, kBits };
+
+// §6.4 with §11.5.2: what `e`, a name or a chain of selects down from one,
+// names. The select next to the name addresses the first unpacked dimension
+// the variable declares: one address for each, with no range among them,
+// selects an element, a variable of the element type; a range among them
+// selects a slice, and fewer addresses a sub-array. Addresses past the unpacked
+// dimensions select bits of the element. A name the module declares no
+// variable of, such as one reached through a member select, has no unpacked
+// dimension known here and an element type that is no aggregate.
+static ForceVariableTarget ClassifyForceVariableTarget(
+    const Expr* e, const ForceLhsNames& names) {
+  std::vector<const Expr*> selects;
+  for (; e->kind == ExprKind::kSelect; e = e->base)
+    selects.insert(selects.begin(), e);
+  std::string_view name =
+      e->kind == ExprKind::kIdentifier ? e->text : std::string_view{};
+  auto var = std::ranges::find(names.mod.variables, name, &RtlirVariable::name);
+  const DataType* written =
+      var != names.mod.variables.end() ? var->written_type : nullptr;
+  size_t dims = 0;
+  bool aggregate_element = false;
+  if (written != nullptr) {
+    dims = var->num_unpacked_dims;
+    std::vector<std::string_view> followed;
+    aggregate_element =
+        IsUnpackedAggregate(FollowTypedefs(*written, names.typedefs, followed));
   }
-  if (e->kind != ExprKind::kIdentifier) return false;
-  auto it = names.arrays.find(e->text);
-  return it != names.arrays.end() && it->second.num_unpacked_dims == depth;
+  for (size_t i = 0; i < std::min(dims, selects.size()); ++i)
+    if (selects[i]->index_end != nullptr)
+      return ForceVariableTarget::kAggregate;
+  if (selects.size() != dims)
+    return selects.size() > dims ? ForceVariableTarget::kBits
+                                 : ForceVariableTarget::kAggregate;
+  return aggregate_element ? ForceVariableTarget::kAggregate
+                           : ForceVariableTarget::kSingular;
+}
+
+static void CheckForceVariableTarget(const Expr* e, const ForceLhsNames& names,
+                                     SourceLoc loc, DiagEngine& diag) {
+  switch (ClassifyForceVariableTarget(e, names)) {
+    case ForceVariableTarget::kAggregate:
+      diag.Error(loc,
+                 "unpacked array, structure or union is not a legal force LHS",
+                 Subclause("10.6.2"));
+      break;
+    case ForceVariableTarget::kBits:
+      diag.Error(loc,
+                 "bit-select or part-select of a variable is not a "
+                 "legal force LHS",
+                 Subclause("10.6.2"));
+      break;
+    default:
+      break;
+  }
 }
 
 static void CheckForceLhsOperand(const Expr* e, const ForceLhsNames& names,
@@ -585,18 +632,17 @@ static void CheckForceLhsOperand(const Expr* e, const ForceLhsNames& names,
     for (auto* el : e->elements) CheckForceLhsOperand(el, names, loc, diag);
     return;
   }
-  if (e->kind != ExprKind::kSelect) return;
+  if (e->kind != ExprKind::kSelect && e->kind != ExprKind::kIdentifier) return;
   auto base_name = LhsBaseName(e);
-  if (base_name.empty() || SelectsAnArrayElement(e, names)) return;
-  if (names.nettype_net_names.count(base_name) != 0) {
+  if (base_name.empty()) return;
+  if (names.net_names.count(base_name) == 0) {
+    CheckForceVariableTarget(e, names, loc, diag);
+  } else if (e->kind != ExprKind::kSelect) {
+    return;
+  } else if (names.nettype_net_names.count(base_name) != 0) {
     diag.Error(loc,
                "bit-select or part-select of a net with a user-defined "
                "nettype is not a legal force LHS",
-               Subclause("10.6.2"));
-  } else if (names.net_names.count(base_name) == 0) {
-    diag.Error(loc,
-               "bit-select or part-select of a variable is not a "
-               "legal force LHS",
                Subclause("10.6.2"));
   } else if (!SelectPathIsConstant(e, names.scope)) {
     // §10.6.2 (printed page 257) admits a constant bit-select or constant
