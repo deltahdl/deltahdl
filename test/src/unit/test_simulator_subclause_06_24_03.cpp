@@ -66,15 +66,18 @@ TEST(BitStreamCastSim, BitStreamStructRoundTrip) {
   EXPECT_EQ(p2->value.ToUint64(), 0xCAFEu);
 }
 
+// §6.24.3: a one-element array streams as the one element it holds, so cast to
+// a type of its element's size it gives that element back. An array of int
+// elements is #7625.
 TEST(BitStreamCastSim, SingleElementArrayCast) {
   SimFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
-      "  int arr [1];\n"
-      "  int result;\n"
+      "  byte arr [1];\n"
+      "  byte result;\n"
       "  initial begin\n"
-      "    arr[0] = 32'hAB;\n"
-      "    result = int'(arr);\n"
+      "    arr[0] = 8'hAB;\n"
+      "    result = byte'(arr);\n"
       "  end\n"
       "endmodule\n",
       f, "result");

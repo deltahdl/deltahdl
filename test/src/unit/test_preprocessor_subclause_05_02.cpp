@@ -194,8 +194,10 @@ TEST(LexicalConventionPreprocessor,
       "endmodule\n",
       f, std::move(cfg));
   EXPECT_EQ(KindOfWordIn(out, "logic"), TokenKind::kKwLogic);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "unexpected character '\x10'",
-                            2, "5.2"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "unexpected character 0x01 in the value of command-line define 'WIDTH'",
+      0, "5.2"));
 }
 
 // §5.2 counts a comment among the lexical tokens, so a block comment in macro

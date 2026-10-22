@@ -338,14 +338,16 @@ TEST(StrengthResolutionPipeline, EqualStrengthConflictFromNetDeclInitializer) {
 // its own -- conflicting bits become x while agreeing bits keep their value.
 // The competing vector drivers come from real drive-strength source rather than
 // a hand-built Net: arrays of gates, one per bit, since §10.3.4 gives a
-// continuous assignment a strength only on a scalar net.
+// continuous assignment a strength only on a scalar net, each array reading a
+// net that holds its value (a literal terminal is #7623).
 TEST(StrengthResolutionPipeline, EqualStrengthConflictVectorResolvesPerBit) {
   SimFixture f;
   Net* net = RunAndFindNetW(f,
                             "module t;\n"
                             "  wire [3:0] w;\n"
-                            "  buf (strong0, strong1) g[3:0] (w, 4'b1100);\n"
-                            "  buf (strong0, strong1) h[3:0] (w, 4'b1010);\n"
+                            "  wire [3:0] p = 4'b1100, q = 4'b1010;\n"
+                            "  buf (strong0, strong1) g[3:0] (w, p);\n"
+                            "  buf (strong0, strong1) h[3:0] (w, q);\n"
                             "endmodule\n");
   ASSERT_NE(net, nullptr);
   auto* var = f.ctx.FindVariable("w");

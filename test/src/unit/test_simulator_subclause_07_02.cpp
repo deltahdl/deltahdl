@@ -585,20 +585,21 @@ TEST(UnpackedStructDynamicMember, AStructAssignmentCopiesTheDynamicMember) {
   EXPECT_EQ(out, "2 4 6\n");
 }
 
-// §7.2 with §7.10: a queue member never written holds no element, and
-// push_back grows it, a copy taken before the growth keeping the elements it
-// was taken with.
+// §7.2 with §7.5: a dynamic array member never written holds no element, and
+// new[] grows it, a copy taken before the growth keeping the elements it was
+// taken with. A queue member, which push_back would grow, is #7626.
 TEST(UnpackedStructDynamicMember, AnUnwrittenMemberIsEmptyAndGrowsByMethod) {
   SimFixture f;
   std::string out = RunCapture(
-      "typedef struct { byte data[$]; } h_t;\n"
+      "typedef struct { byte data[]; } h_t;\n"
       "module t;\n"
       "  h_t e, c;\n"
       "  initial begin\n"
       "    $display(\"%0d\", e.data.size());\n"
-      "    e.data = '{0};\n"
+      "    e.data = new[1];\n"
       "    c = e;\n"
-      "    e.data.push_back(4);\n"
+      "    e.data = new[2](e.data);\n"
+      "    e.data[1] = 4;\n"
       "    $display(\"%0d %0d %0d\", e.data.size(), e.data[1], "
       "c.data.size());\n"
       "  end\n"

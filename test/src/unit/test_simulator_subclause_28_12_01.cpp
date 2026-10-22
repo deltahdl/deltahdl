@@ -177,15 +177,17 @@ TEST(StrengthResolutionPipeline, IdenticalDriversYieldSameSignal) {
 // multi-bit net each bit is decided by its own stronger driver. Full-pipeline
 // analog of the scalar case, exercising the vector operand type end to end.
 // §10.3.4 gives a continuous assignment a strength only on a scalar net, so the
-// drivers are arrays of gates, one per bit.
+// drivers are arrays of gates, one per bit, each array reading a net that
+// holds its value (a literal terminal is #7623).
 TEST(StrengthResolutionPipeline, UnequalStrengthVectorResolvesPerBit) {
   SimFixture f;
   Net* net = RunAndFindNetW(
       f,
       "module t;\n"
       "  wire [7:0] w;\n"
-      "  buf (weak0, weak1) gw[7:0] (w, 8'hFF);\n"      // weak, all ones
-      "  buf (strong0, strong1) gs[7:0] (w, 8'h0F);\n"  // strong, low nibble
+      "  wire [7:0] ones = 8'hFF, low = 8'h0F;\n"
+      "  buf (weak0, weak1) gw[7:0] (w, ones);\n"     // weak, all ones
+      "  buf (strong0, strong1) gs[7:0] (w, low);\n"  // strong, low nibble
       "endmodule\n");
   ASSERT_NE(net, nullptr);
   auto* var = f.ctx.FindVariable("w");
