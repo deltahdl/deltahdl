@@ -308,36 +308,37 @@ class ElaboratorData {
   // printed page 821, §27.5 printed page 824), so a name declared in another
   // module decides nothing about it.
   //
-  // The key is one elaborated module scope rather than one module declaration.
-  // Elaborator::ElaborateModule creates a fresh RtlirModule per call
-  // (src/elaborator/elaborator_module.cpp:847) and
-  // Elaborator::ElaborateModuleInst calls it once per instance
-  // (src/elaborator/elaborator_module_inst.cpp:799), so instantiating one
-  // module twice yields two keys and neither instance's names are offered to
-  // the other.
+  // The key is one elaborated module scope rather than one module declaration:
+  // Elaborator::ElaborateModule creates a fresh RtlirModule per call and
+  // Elaborator::ElaborateModuleInst calls it once per instance, so
+  // instantiating one module twice yields two keys and neither instance's
+  // names are offered to the other.
   //
-  // §10.11 with §27.5: the nets among those names are kept beside them, so an
-  // alias in a block can tell the enclosing module's nets from its variables.
   // What a module's generate blocks are elaborated against, the module's own
   // items having been elaborated and checked before them: the names it
-  // declares and the nets among them, and the variables its continuous and its
-  // procedural assignments write, which §6.5's and §10.3.2's one-driver rules
-  // weigh a block's assignments against.
+  // declares; the nets among them, by which an alias in a block tells the
+  // module's nets from its variables (§10.11 with §27.5); the variables its
+  // continuous and its procedural assignments write, which §6.5's and
+  // §10.3.2's one-driver rules weigh a block's assignments against; and the
+  // variables declared with an initializer, which §10.3.2 bars a block's
+  // continuous assignment from.
   struct ModuleScopeNames {
     std::unordered_set<std::string_view> declared;
     std::unordered_set<std::string_view> nets;
     std::unordered_map<std::string_view, SourceLoc> cont_targets;
     std::unordered_map<std::string_view, SourceLoc> proc_targets;
+    std::unordered_set<std::string_view> initialized;
   };
   std::unordered_map<const RtlirModule*, ModuleScopeNames> module_scope_names_;
-  // Exchanges the four sets ModuleScopeNames keeps with the ones in force,
-  // which installs a module's for its generate blocks and, done again, puts
-  // the enclosing ones back with the module's as the blocks left them.
+  // Exchanges the sets ModuleScopeNames keeps with the ones in force, which
+  // installs a module's for its generate blocks and, done again, puts the
+  // enclosing ones back with the module's as the blocks left them.
   void SwapModuleScopeNames(ModuleScopeNames& names) {
     std::swap(declared_names_, names.declared);
     std::swap(net_names_, names.nets);
     std::swap(cont_assign_targets_, names.cont_targets);
     std::swap(proc_assign_targets_, names.proc_targets);
+    std::swap(var_init_names_, names.initialized);
   }
   // §27.4: genvar names of the loop generate constructs currently being
   // elaborated. Used to reject a nested loop generate construct that reuses an

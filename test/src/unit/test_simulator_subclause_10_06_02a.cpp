@@ -610,9 +610,9 @@ TEST(ForceReleaseSim, ReleaseOfAConcatenationReestablishesTheAssignPerElement) {
 //
 // The select is on a net because §10.6.2 admits a constant bit-select or
 // part-select of a vector net, or a concatenation of such things, and nothing
-// wider: CheckForceLhsOperand rejects a select of a variable in a force lvalue
-// outright, which is why `bus` is a wire here as it is in
-// ForceOfAConcatenationWritesOnlyTheNetBitItsSelectNames above.
+// wider: CheckForceLhsOperand rejects a bit-select or part-select of a
+// variable in a force lvalue outright, which is why `bus` is a wire here as it
+// is in ForceOfAConcatenationWritesOnlyTheNetBitItsSelectNames above.
 //
 // The width is a variable because a folded constant zero never reaches the
 // simulator at all -- CheckIndexedPartSelectWidthNode rejects it during
@@ -873,9 +873,6 @@ TEST(ForceReleaseSim, CountDriversReportsANetBitSelectForceOnlyOnThatBit) {
 // `b` correct.
 TEST(ForceReleaseSim, ForceOverAConcatenationWritesAnUnpackedArrayElement) {
   SimFixture f;
-  // deltahdl reports the element select as a bit-select of a variable (#7611);
-  // the excuse goes with the fix.
-  f.has_errors.Excuse();
   auto* b = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] out [0:3];\n"
@@ -901,9 +898,6 @@ TEST(ForceReleaseSim, ForceOverAConcatenationWritesAnUnpackedArrayElement) {
 // driver and no assign standing to give it anything else.
 TEST(ForceReleaseSim, ReleaseOverAConcatenationEndsAnArrayElementsForce) {
   SimFixture f;
-  // deltahdl reports the element select as a bit-select of a variable (#7611);
-  // the excuse goes with the fix.
-  f.has_errors.Excuse();
   auto* b = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] out [0:3];\n"

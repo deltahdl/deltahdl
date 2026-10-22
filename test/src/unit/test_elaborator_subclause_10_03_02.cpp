@@ -547,4 +547,53 @@ TEST(ContAssignStatementElaboration, NettypeArrayElementSelectErrors) {
       4, "10.3.2"));
 }
 
+// §10.3.2 with §23.9: a continuous assignment or a primitive output in a
+// generate block naming a variable the block does not declare drives the
+// module's variable of that name, which then takes no initializer.
+TEST(ContAssignStatementElaboration, BlockDriverOfAnInitializedModuleVariable) {
+  ElabFixture f;
+  Elaborate(
+      "module t;\n"
+      "  logic w = 1'b0;\n"
+      "  logic g = 1'b0;\n"
+      "  if (1) begin : a\n"
+      "    assign w = 1'b1;\n"
+      "    buf b1(g, 1'b1);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "variable 'w' has both an initializer and a "
+                            "continuous assignment",
+                            5, "10.3.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "variable 'g' has both an initializer and a "
+                            "primitive output driving it",
+                            6, "10.3.2"));
+}
+
+// §10.3.2 rules on one variable, and §27.4 makes each generate block a scope
+// of its own, so block a's initialized `w` and `g` and the `w` and `g` block
+// b drives are four variables, and so are the module's initialized `m` and
+// the `m` block b declares and drives. None has both.
+TEST(ContAssignStatementElaboration, InitializerAndDriverInTwoScopesAreApart) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module t;\n"
+      "  logic m = 1'b0;\n"
+      "  if (1) begin : a\n"
+      "    logic w = 1'b0, g = 1'b0;\n"
+      "  end\n"
+      "  if (1) begin : b\n"
+      "    logic w, g, m;\n"
+      "    assign w = 1'b1;\n"
+      "    buf b1(g, 1'b1);\n"
+      "    assign m = 1'b1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

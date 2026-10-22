@@ -623,7 +623,7 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   // Elaborator::ProcessPendingGenerate, and §23.9 judges what they declare
   // against the scope they were written in, so keep the set here for them.
   module_scope_names_[mod] = {declared_names_, net_names_, cont_assign_targets_,
-                              proc_assign_targets_};
+                              proc_assign_targets_, var_init_names_};
   saved_item_state.Restore(*this);
   return mod;
 }

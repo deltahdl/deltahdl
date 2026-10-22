@@ -69,8 +69,10 @@ void Elaborator::ValidateSubroutineBodyTargets(const ModuleItem* item,
   ReportProceduralNetTargets(targets);
   for (const auto& [name, loc] : targets)
     if (net_names_.count(name) == 0) proc_assign_targets_.emplace(name, loc);
+  const ForceLhsNames kForceNames{net_names_, nettype_net_names_,
+                                  var_array_info_, scope};
   for (const Stmt* s : item->func_body_stmts) {
-    CheckForceLhs(s, net_names_, nettype_net_names_, scope, diag_);
+    CheckForceLhs(s, kForceNames, diag_);
     WalkStmtsForLhsPatternKeys(s, diag_);
   }
 }
@@ -86,7 +88,9 @@ void Elaborator::ValidateItemConstraints(const ModuleItem* item,
     CheckInterconnectProceduralRead(item->body, interconnect_names_, diag_);
     CheckProceduralAssignLhs(item->body, diag_);
 
-    CheckForceLhs(item->body, net_names_, nettype_net_names_, scope, diag_);
+    CheckForceLhs(item->body,
+                  {net_names_, nettype_net_names_, var_array_info_, scope},
+                  diag_);
 
     CheckBlockQueueBounds(item->body, scope, diag_);
 

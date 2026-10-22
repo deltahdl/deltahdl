@@ -562,13 +562,21 @@ void CheckProceduralAssignLhs(const Stmt* s, DiagEngine& diag) {
       s, [&diag](const Stmt* sub) { CheckProceduralAssignLhs(sub, diag); });
 }
 
-// The names a force statement may target and the scope its select bounds
-// fold in.
-struct ForceLhsNames {
-  const std::unordered_set<std::string_view>& net_names;
-  const std::unordered_set<std::string_view>& nettype_net_names;
-  const ScopeMap& scope;
-};
+// §7.4 with §11.5.2: whether `e` selects one element of a variable's unpacked
+// array, queue or associative array, an address for each unpacked dimension
+// the declaration writes and no range among them. That element is a variable
+// of the element type, and the select is no bit-select or part-select of a
+// vector (§11.5.1).
+static bool SelectsAnArrayElement(const Expr* e, const ForceLhsNames& names) {
+  uint32_t depth = 0;
+  for (; e->kind == ExprKind::kSelect; e = e->base) {
+    if (e->index_end != nullptr) return false;
+    ++depth;
+  }
+  if (e->kind != ExprKind::kIdentifier) return false;
+  auto it = names.arrays.find(e->text);
+  return it != names.arrays.end() && it->second.num_unpacked_dims == depth;
+}
 
 static void CheckForceLhsOperand(const Expr* e, const ForceLhsNames& names,
                                  SourceLoc loc, DiagEngine& diag) {
@@ -578,7 +586,7 @@ static void CheckForceLhsOperand(const Expr* e, const ForceLhsNames& names,
   }
   if (e->kind != ExprKind::kSelect) return;
   auto base_name = LhsBaseName(e);
-  if (base_name.empty()) return;
+  if (base_name.empty() || SelectsAnArrayElement(e, names)) return;
   if (names.nettype_net_names.count(base_name) != 0) {
     diag.Error(loc,
                "bit-select or part-select of a net with a user-defined "
@@ -601,18 +609,13 @@ static void CheckForceLhsOperand(const Expr* e, const ForceLhsNames& names,
 
 // Reports §10.6.2's rule on what a force statement may name, at every statement
 // position a force can stand in, which is what ForEachChildStmt enumerates.
-void CheckForceLhs(
-    const Stmt* s, const std::unordered_set<std::string_view>& net_names,
-    const std::unordered_set<std::string_view>& nettype_net_names,
-    const ScopeMap& scope, DiagEngine& diag) {
+void CheckForceLhs(const Stmt* s, const ForceLhsNames& names,
+                   DiagEngine& diag) {
   if (!s) return;
-  if (s->kind == StmtKind::kForce && s->lhs) {
-    CheckForceLhsOperand(s->lhs, {net_names, nettype_net_names, scope},
-                         s->range.start, diag);
-  }
-  ForEachChildStmt(s, [&](const Stmt* sub) {
-    CheckForceLhs(sub, net_names, nettype_net_names, scope, diag);
-  });
+  if (s->kind == StmtKind::kForce && s->lhs)
+    CheckForceLhsOperand(s->lhs, names, s->range.start, diag);
+  ForEachChildStmt(s,
+                   [&](const Stmt* sub) { CheckForceLhs(sub, names, diag); });
 }
 
 // True when any expression of `list` reads one of the named nets.

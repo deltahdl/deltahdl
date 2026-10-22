@@ -916,7 +916,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   var.gen_block_consts = gen_loop_consts_;
 
   if (item->init_expr) {
-    var_init_names_.insert(item->name);
+    var_init_names_.insert(var.name);
   }
 
   SetVariableTypeInfo(item, var, BuildParamScope(mod));

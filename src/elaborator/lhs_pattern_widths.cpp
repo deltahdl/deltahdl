@@ -1,8 +1,11 @@
 #include <cstddef>
 #include <cstdint>
 #include <format>
+#include <functional>
+#include <numeric>
 #include <string_view>
 #include <unordered_map>
+#include <vector>
 
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
@@ -21,12 +24,13 @@ namespace delta {
 namespace {
 
 // What a left-hand-side pattern's widths are read against: the module whose
-// names its items and the right-hand side name, the module's typedefs and
-// functions, and the scope a select's bounds fold in.
+// names its items and the right-hand side name, the module's typedefs,
+// functions and unpacked arrays, and the scope a select's bounds fold in.
 struct LhsPatternCtx {
   const RtlirModule* mod;
   const TypedefMap& typedefs;
   const std::unordered_map<std::string_view, const ModuleItem*>& funcs;
+  const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>& arrays;
   const ScopeMap& scope;
   DiagEngine& diag;
 };
@@ -41,11 +45,27 @@ bool IsUnpackedFree(std::string_view name, const RtlirModule* mod) {
   return false;
 }
 
-// The bit count of a pattern's right-hand side: a name's declared width, the
-// span of a constant select of a vector, a call's declared return width, and
-// otherwise what the operators give it. 0 where none of these is known.
+// §7.4: how many elements the variable `name` holds: 1 for one declaring no
+// unpacked array, each dimension's size multiplied out for a fixed-size
+// array, and 0 for a dynamic array, a queue or an associative array, whose
+// count is the run's to know, as for any array a dimension of which does not
+// fold.
+uint32_t ElementCount(std::string_view name, const LhsPatternCtx& ctx) {
+  auto it = ctx.arrays.find(name);
+  if (it == ctx.arrays.end()) return 1;
+  const std::vector<uint32_t>& sizes = it->second.dim_sizes;
+  if (sizes.size() != it->second.num_unpacked_dims) return 0;
+  return std::accumulate(sizes.begin(), sizes.end(), 1U, std::multiplies<>());
+}
+
+// The bit count of a pattern's right-hand side: a name's declared width, every
+// element's for an unpacked array (§10.9 has `U'{a, b, c} = A` take the three
+// elements of `A`), the span of a constant select of a vector, a call's
+// declared return width, and otherwise what the operators give it. 0 where
+// none of these is known.
 uint32_t PatternRhsWidth(const Expr* rhs, const LhsPatternCtx& ctx) {
-  if (rhs->kind == ExprKind::kIdentifier) return LookupLhsWidth(rhs, ctx.mod);
+  if (rhs->kind == ExprKind::kIdentifier)
+    return LookupLhsWidth(rhs, ctx.mod) * ElementCount(rhs->text, ctx);
   if (rhs->kind == ExprKind::kSelect &&
       rhs->base->kind == ExprKind::kIdentifier &&
       IsUnpackedFree(rhs->base->text, ctx.mod))
@@ -128,7 +148,8 @@ void WalkStmtsForLhsPattern(const Stmt* s, const LhsPatternCtx& ctx) {
 void Elaborator::ValidateLhsPatternWidths(const ModuleDecl* decl,
                                           const RtlirModule* mod) {
   ScopeMap scope = BuildParamScope(mod);
-  const LhsPatternCtx kCtx{mod, typedefs_, func_decls_, scope, diag_};
+  const LhsPatternCtx kCtx{mod,   typedefs_, func_decls_, var_array_info_,
+                           scope, diag_};
   for (const auto* item : decl->items) {
     if (IsProceduralItemKind(item->kind))
       WalkStmtsForLhsPattern(item->body, kCtx);

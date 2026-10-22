@@ -596,6 +596,39 @@ TEST(AssignmentPatternElaboration, LhsPatternBitCountAgainstNamedRhs) {
   EXPECT_EQ(FindDiag(f, "but RHS supplies 4 bits"), nullptr);
 }
 
+// §10.9 (printed page 261): an unpacked array on the right of a positional
+// pattern supplies the bits of every element, so under `typedef byte U[3]`,
+// `U'{a, b, c} = A` takes A's three bytes and two items fall 8 bits short of
+// them, and a byte array of two by two supplies 32 bits. A queue's element
+// count is the run's to know, so the pattern it supplies is not sized here.
+TEST(AssignmentPatternElaboration, LhsPatternBitCountAgainstAnUnpackedArray) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef byte U[3];\n"
+      "  U A; byte a, b, c; byte sq [2][2]; byte q[$];\n"
+      "  initial begin\n"
+      "    U'{a, b, c} = A;\n"
+      "    '{a, b} = A;\n"
+      "    '{a, b, c} = sq;\n"
+      "    '{a, b, c} = q;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "LHS assignment pattern needs 16 bits but RHS supplies 24 bits", 6,
+      "10.9"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "LHS assignment pattern needs 24 bits but RHS supplies 32 bits", 7,
+      "10.9"));
+  for (uint32_t line : {5u, 8u}) {
+    EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                               "LHS assignment pattern needs", line, "10.9"));
+  }
+}
+
 // §10.9 (printed page 261): each item of a typed left-hand-side pattern has
 // the bit count of the member of its type it stands for, so items whose widths
 // are swapped against the members are reported though their total agrees.

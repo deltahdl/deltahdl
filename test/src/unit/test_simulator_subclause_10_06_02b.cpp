@@ -758,9 +758,6 @@ TEST(ForceReleaseSim, ReleaseThenAStreamingConcatTargetWriteResumes) {
 // nothing reads, leaving q[0] at the 5 it was pushed with.
 TEST(ForceReleaseSim, ForceOfAQueueElementOverridesAWriteToIt) {
   SimFixture f;
-  // deltahdl reports the element select as a bit-select of a variable (#7611);
-  // the excuse goes with the fix.
-  f.has_errors.Excuse();
   auto* r1 = RunAndFindVar(
       "module t;\n"
       "  int q[$];\n"
@@ -792,9 +789,6 @@ TEST(ForceReleaseSim, ForceOfAQueueElementOverridesAWriteToIt) {
 // nothing the queue case exercises answers for it.
 TEST(ForceReleaseSim, ForceOfAnAssociativeElementOverridesAWriteToIt) {
   SimFixture f;
-  // deltahdl reports the element select as a bit-select of a variable (#7611);
-  // the excuse goes with the fix.
-  f.has_errors.Excuse();
   auto* r1 = RunAndFindVar(
       "module t;\n"
       "  int aa[string];\n"
@@ -828,9 +822,6 @@ TEST(ForceReleaseSim, ForceOfAnAssociativeElementOverridesAWriteToIt) {
 // only wrote once passes the case above and fails this.
 TEST(ForceReleaseSim, ForceOfAQueueElementFollowsItsExpression) {
   SimFixture f;
-  // deltahdl reports the element select as a bit-select of a variable (#7611);
-  // the excuse goes with the fix.
-  f.has_errors.Excuse();
   auto* r1 = RunAndFindVar(
       "module t;\n"
       "  int q[$];\n"

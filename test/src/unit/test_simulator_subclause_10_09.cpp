@@ -415,9 +415,6 @@ TEST(AssignmentPatternSim, PackedArrayPatternFillsEachElement) {
 // only the last member received anything: `0 0 3` and `0 4 0`.
 TEST(AssignmentPatternSim, PatternTargetDeconstructsAnUnpackedArray) {
   SimFixture f;
-  // deltahdl sizes the unpacked array on the right of the pattern as one
-  // element (#7612); the excuse goes with the fix.
-  f.has_errors.Excuse();
   std::string out = RunCapture(
       "module t;\n"
       "  typedef byte U[3];\n"

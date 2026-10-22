@@ -196,6 +196,42 @@ TEST(ForceReleaseElaboration, ForceConcatWithBitSelectVariableIsError) {
       "10.6.2"));
 }
 
+// §10.6.2 bars a bit-select or part-select of a variable, which §11.5.1 makes
+// a select of a vector's bits. An address for each unpacked dimension of an
+// array, a queue or an associative array selects an element (§11.5.2), a
+// variable of the element type, so lines 5 to 8 name none. A bit of such an
+// element, a slice of the array and a bit of a structure's vector member are
+// reported still.
+TEST(ForceReleaseElaboration, ForceOfAnArrayElementIsNoBitSelect) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] out [0:3]; logic [7:0] b; int q[$]; int aa[string];\n"
+      "  logic [7:0] sq [2][2]; struct { logic [7:0] f; } s;\n"
+      "  initial begin\n"
+      "    force {out[1], b} = 16'hABCD;\n"
+      "    force q[0] = 9;\n"
+      "    force aa[\"k\"] = 9;\n"
+      "    force sq[1][0] = 8'h1;\n"
+      "    force out[1][3] = 1'b1;\n"
+      "    force out[1:2] = '{8'h1, 8'h2};\n"
+      "    force s.f[0] = 1'b1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {5u, 6u, 7u, 8u}) {
+    EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                               "bit-select or part-select of a variable", line,
+                               "10.6.2"));
+  }
+  for (uint32_t line : {9u, 10u, 11u}) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "bit-select or part-select of a variable is not a legal force LHS",
+        line, "10.6.2"));
+  }
+}
+
 // §10.6.2 admits a constant bit-select of a vector net as a force target, and a
 // constant expression per §11.2.1 is not only a literal but also a parameter. A
 // parameter-indexed net bit-select is therefore a legal force LHS.

@@ -416,7 +416,7 @@ void Elaborator::ValidateContAssignVarLeaf(ModuleItem* item,
                             name),
                 Subclause("6.5"));
   }
-  if (var_init_names_.count(name) != 0) {
+  if (var_init_names_.count(declared) != 0) {
     diag_.Error(item->loc,
                 std::format("variable '{}' has both an initializer and a "
                             "continuous assignment",
@@ -509,7 +509,7 @@ void Elaborator::RecordGateOutputDrivers(const ModuleItem* item) {
                               name),
                   Subclause("10.3.2"));
     }
-    if (var_init_names_.count(name) != 0) {
+    if (var_init_names_.count(declared) != 0) {
       diag_.Error(item->loc,
                   std::format("variable '{}' has both an initializer and a "
                               "primitive output driving it",
