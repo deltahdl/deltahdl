@@ -269,7 +269,8 @@ TEST(NetAndVariableTypeSimulation, PropertyAndFormalsOfATypeReference) {
 // among them, or a built-in type (§6.23). w is z's byte and k an int, so each
 // holds -5 for rw and rk to read back, where a one-bit property would hold 1.
 // u names a value of the compilation unit, which no property and no built-in
-// type is, and the class stands with it all the same.
+// type is, and e's argument is an expression rather than a name; the pass
+// leaves both as they are, and the class stands with them all the same.
 TEST(NetAndVariableTypeSimulation,
      PropertyTypeReferencesFindAPropertyOrABuiltInType) {
   SimFixture f;
@@ -283,6 +284,7 @@ TEST(NetAndVariableTypeSimulation,
       "  var type(z) w;\n"
       "  var type(int) k;\n"
       "  var type(g) u;\n"
+      "  var type(x + 1) e;\n"
       "endclass\n"
       "module t;\n"
       "  int rw, rk;\n"
