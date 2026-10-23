@@ -133,7 +133,7 @@ TEST(SystemNameLexing, EscapedNameThatIsNoSystemTfIdentifierReportsNothing) {
 // does not reach a name that is neither of the two things §5.6 calls an
 // identifier. A name past that cap is one system identifier here; §36.3's own
 // file holds the rule and both sides of it.
-TEST(SystemNameLexing, LengthIsClause36sToBoundAndItBoundsNone) {
+TEST(SystemNameLexing, ANameOfAnyLengthLexesAsOneSystemIdentifier) {
   std::string id = "$" + std::string(2000, 'a');
   id += " ";
   auto [tokens, errors] = LexWithDiag(id);

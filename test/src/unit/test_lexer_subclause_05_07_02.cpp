@@ -45,7 +45,7 @@ TEST(RealLiteralLexing, FixedPointWithExponentIsRealLiteral) {
 // so that a failure names the form.
 
 // No digit before the point.
-TEST(RealLiteralLexing, NoLeadingDigitIsReportedUnderClause572) {
+TEST(RealLiteralLexing, NoLeadingDigitIsReported) {
   EXPECT_TRUE(ReportedError(
       LexDiagnostics(".12 "),
       "real literal '.12' has no digit before its decimal point", 1, "5.7.2"));
@@ -56,7 +56,7 @@ TEST(RealLiteralLexing, NoLeadingDigitIsReportedUnderClause572) {
 }
 
 // No digit after the point.
-TEST(RealLiteralLexing, NoTrailingDigitIsReportedUnderClause572) {
+TEST(RealLiteralLexing, NoTrailingDigitIsReported) {
   EXPECT_TRUE(ReportedError(
       LexDiagnostics("9. "),
       "real literal '9.' has no digit after its decimal point", 1, "5.7.2"));
@@ -68,7 +68,7 @@ TEST(RealLiteralLexing, NoTrailingDigitIsReportedUnderClause572) {
 
 // A point with an exponent but no fractional digit is still missing the digit
 // after the point; the exponent is read with the literal.
-TEST(RealLiteralLexing, PointBeforeExponentIsReportedUnderClause572) {
+TEST(RealLiteralLexing, PointBeforeExponentIsReported) {
   EXPECT_TRUE(ReportedError(
       LexDiagnostics("4.E3 "),
       "real literal '4.E3' has no digit after its decimal point", 1, "5.7.2"));
@@ -79,7 +79,7 @@ TEST(RealLiteralLexing, PointBeforeExponentIsReportedUnderClause572) {
 }
 
 // Missing the digit before the point, even with an exponent.
-TEST(RealLiteralLexing, NoLeadingDigitWithExponentIsReportedUnderClause572) {
+TEST(RealLiteralLexing, NoLeadingDigitWithExponentIsReported) {
   EXPECT_TRUE(ReportedError(
       LexDiagnostics(".2e-7 "),
       "real literal '.2e-7' has no digit before its decimal point", 1,
@@ -93,7 +93,7 @@ TEST(RealLiteralLexing, NoLeadingDigitWithExponentIsReportedUnderClause572) {
 // The legal spellings of §5.7.2's own list, with a digit on each side of the
 // point or no point at all, draw nothing: the report is for the point that
 // lacks a digit, not for the point or the exponent as such.
-TEST(RealLiteralLexing, DigitsOnBothSidesOfThePointDrawNoClause572Report) {
+TEST(RealLiteralLexing, DigitsOnBothSidesOfThePointDrawNoReport) {
   EXPECT_TRUE(LexDiagnostics("0.1 ").empty());
   EXPECT_TRUE(LexDiagnostics("1.2E12 ").empty());
   EXPECT_TRUE(LexDiagnostics("29E-2 ").empty());

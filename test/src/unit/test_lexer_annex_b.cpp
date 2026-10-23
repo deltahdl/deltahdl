@@ -18,7 +18,7 @@ struct KwEntry {
   TokenKind expected;
 };
 
-static const KwEntry kTableB1[] = {
+static const KwEntry kReservedKeywords[] = {
     {"accept_on", TokenKind::kKwAcceptOn},
     {"alias", TokenKind::kKwAlias},
     {"always", TokenKind::kKwAlways},
@@ -269,56 +269,60 @@ static const KwEntry kTableB1[] = {
     {"xor", TokenKind::kKwXor},
 };
 
-static constexpr size_t kTableB1Count = sizeof(kTableB1) / sizeof(kTableB1[0]);
+static constexpr size_t kReservedKeywordCount =
+    sizeof(kReservedKeywords) / sizeof(kReservedKeywords[0]);
 
 TEST(KeywordListLexing, ReservedKeywordCountIs248) {
-  EXPECT_EQ(kTableB1Count, 248u);
+  EXPECT_EQ(kReservedKeywordCount, 248u);
 }
 
 TEST(KeywordListLexing, EachKeywordMapsToCorrectTokenKind) {
-  for (size_t i = 0; i < kTableB1Count; ++i) {
-    auto tokens = Lex(kTableB1[i].text);
-    ASSERT_GE(tokens.size(), 2u) << "keyword: " << kTableB1[i].text;
-    EXPECT_EQ(tokens[0].kind, kTableB1[i].expected)
-        << kTableB1[i].text << " mapped to wrong TokenKind";
+  for (size_t i = 0; i < kReservedKeywordCount; ++i) {
+    auto tokens = Lex(kReservedKeywords[i].text);
+    ASSERT_GE(tokens.size(), 2u) << "keyword: " << kReservedKeywords[i].text;
+    EXPECT_EQ(tokens[0].kind, kReservedKeywords[i].expected)
+        << kReservedKeywords[i].text << " mapped to wrong TokenKind";
   }
 }
 
 TEST(KeywordListLexing, LookupKeywordReturnsCorrectTokenKind) {
-  for (size_t i = 0; i < kTableB1Count; ++i) {
-    auto result = LookupKeyword(kTableB1[i].text);
+  for (size_t i = 0; i < kReservedKeywordCount; ++i) {
+    auto result = LookupKeyword(kReservedKeywords[i].text);
     ASSERT_TRUE(result.has_value())
-        << kTableB1[i].text << " not in keyword table";
-    EXPECT_EQ(result.value_or(TokenKind::kError), kTableB1[i].expected)
-        << kTableB1[i].text << " LookupKeyword returned wrong TokenKind";
+        << kReservedKeywords[i].text << " not in keyword table";
+    EXPECT_EQ(result.value_or(TokenKind::kError), kReservedKeywords[i].expected)
+        << kReservedKeywords[i].text
+        << " LookupKeyword returned wrong TokenKind";
   }
 }
 
 TEST(KeywordListLexing, ReservedKeywordListIsAlphabetical) {
-  for (size_t i = 1; i < kTableB1Count; ++i) {
-    EXPECT_LT(std::string_view(kTableB1[i - 1].text),
-              std::string_view(kTableB1[i].text))
-        << "Table B.1 entry " << i - 1 << " (" << kTableB1[i - 1].text
-        << ") should precede entry " << i << " (" << kTableB1[i].text << ")";
+  for (size_t i = 1; i < kReservedKeywordCount; ++i) {
+    EXPECT_LT(std::string_view(kReservedKeywords[i - 1].text),
+              std::string_view(kReservedKeywords[i].text))
+        << "Table B.1 entry " << i - 1 << " (" << kReservedKeywords[i - 1].text
+        << ") should precede entry " << i << " (" << kReservedKeywords[i].text
+        << ")";
   }
 }
 
 TEST(KeywordListLexing, EachKeywordProducesOneToken) {
-  for (size_t i = 0; i < kTableB1Count; ++i) {
-    auto tokens = Lex(kTableB1[i].text);
+  for (size_t i = 0; i < kReservedKeywordCount; ++i) {
+    auto tokens = Lex(kReservedKeywords[i].text);
     EXPECT_EQ(tokens.size(), 2u)
-        << kTableB1[i].text << " should produce exactly one token plus EOF";
+        << kReservedKeywords[i].text
+        << " should produce exactly one token plus EOF";
     EXPECT_EQ(tokens.back().kind, TokenKind::kEof)
-        << kTableB1[i].text << " should end with EOF";
+        << kReservedKeywords[i].text << " should end with EOF";
   }
 }
 
 TEST(KeywordListLexing, KeywordTextIsPreserved) {
-  for (size_t i = 0; i < kTableB1Count; ++i) {
-    auto tokens = Lex(kTableB1[i].text);
-    ASSERT_GE(tokens.size(), 2u) << "keyword: " << kTableB1[i].text;
-    EXPECT_EQ(tokens[0].text, kTableB1[i].text)
-        << kTableB1[i].text << " text not preserved";
+  for (size_t i = 0; i < kReservedKeywordCount; ++i) {
+    auto tokens = Lex(kReservedKeywords[i].text);
+    ASSERT_GE(tokens.size(), 2u) << "keyword: " << kReservedKeywords[i].text;
+    EXPECT_EQ(tokens[0].text, kReservedKeywords[i].text)
+        << kReservedKeywords[i].text << " text not preserved";
   }
 }
 
@@ -328,38 +332,39 @@ TEST(KeywordListLexing, KeywordTextIsPreserved) {
 // values as the annex prints words, entered by that many distinct kinds (the
 // test above), leaves no kind over for a word the annex does not list -- which
 // is the direction a fixed count of table entries cannot establish on its own.
-TEST(KeywordListLexing, TableB1FillsTheWholeKeywordTokenKindRange) {
+TEST(KeywordListLexing, ReservedKeywordsFillTheWholeKeywordTokenKindRange) {
   constexpr auto kFirstKeywordKind = static_cast<int>(TokenKind::kKwModule);
   constexpr auto kLastKeywordKind = static_cast<int>(TokenKind::kKwXor);
   EXPECT_EQ(kLastKeywordKind - kFirstKeywordKind + 1,
-            static_cast<int>(kTableB1Count))
+            static_cast<int>(kReservedKeywordCount))
       << "the keyword token kinds should number what Table B.1 lists";
-  for (size_t i = 0; i < kTableB1Count; ++i) {
-    auto kind = static_cast<int>(kTableB1[i].expected);
-    EXPECT_GE(kind, kFirstKeywordKind) << kTableB1[i].text;
-    EXPECT_LE(kind, kLastKeywordKind) << kTableB1[i].text;
+  for (size_t i = 0; i < kReservedKeywordCount; ++i) {
+    auto kind = static_cast<int>(kReservedKeywords[i].expected);
+    EXPECT_GE(kind, kFirstKeywordKind) << kReservedKeywords[i].text;
+    EXPECT_LE(kind, kLastKeywordKind) << kReservedKeywords[i].text;
   }
 }
 
 TEST(KeywordListLexing, NoDuplicateTokenKinds) {
   std::set<TokenKind> seen;
-  for (size_t i = 0; i < kTableB1Count; ++i) {
-    auto [it, inserted] = seen.insert(kTableB1[i].expected);
-    EXPECT_TRUE(inserted) << kTableB1[i].text << " has a duplicate TokenKind";
+  for (size_t i = 0; i < kReservedKeywordCount; ++i) {
+    auto [it, inserted] = seen.insert(kReservedKeywords[i].expected);
+    EXPECT_TRUE(inserted) << kReservedKeywords[i].text
+                          << " has a duplicate TokenKind";
   }
-  EXPECT_EQ(seen.size(), kTableB1Count);
+  EXPECT_EQ(seen.size(), kReservedKeywordCount);
 }
 
 // Boundary of the reservation rule: only the exact lowercase spellings in
 // Table B.1 are reserved. A differently-cased spelling must fall through to an
 // ordinary identifier, both at the keyword-lookup layer and through the lexer.
 TEST(KeywordListLexing, KeywordsAreCaseSensitive) {
-  for (size_t i = 0; i < kTableB1Count; ++i) {
-    std::string upper(kTableB1[i].text);
+  for (size_t i = 0; i < kReservedKeywordCount; ++i) {
+    std::string upper(kReservedKeywords[i].text);
     for (char& c : upper) {
       c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
     }
-    ASSERT_NE(upper, std::string(kTableB1[i].text))
+    ASSERT_NE(upper, std::string(kReservedKeywords[i].text))
         << "every keyword has a letter to upcase";
     EXPECT_FALSE(LookupKeyword(upper).has_value())
         << upper << " must not be reserved; keywords are case-sensitive";
@@ -373,8 +378,8 @@ TEST(KeywordListLexing, KeywordsAreCaseSensitive) {
 // Reservation matches a complete token, not a leading substring. A keyword
 // immediately followed by identifier characters is one ordinary identifier.
 TEST(KeywordListLexing, KeywordWithIdentifierSuffixIsIdentifier) {
-  for (size_t i = 0; i < kTableB1Count; ++i) {
-    std::string extended = std::string(kTableB1[i].text) + "_x";
+  for (size_t i = 0; i < kReservedKeywordCount; ++i) {
+    std::string extended = std::string(kReservedKeywords[i].text) + "_x";
     EXPECT_FALSE(LookupKeyword(extended).has_value())
         << extended << " must not be reserved";
     auto tokens = Lex(extended);
@@ -389,8 +394,8 @@ TEST(KeywordListLexing, KeywordWithIdentifierSuffixIsIdentifier) {
 // An underscore prefix yields a valid identifier whose spelling is not the
 // reserved keyword, so it must not be treated as one.
 TEST(KeywordListLexing, KeywordWithLeadingUnderscoreIsIdentifier) {
-  for (size_t i = 0; i < kTableB1Count; ++i) {
-    std::string prefixed = "_" + std::string(kTableB1[i].text);
+  for (size_t i = 0; i < kReservedKeywordCount; ++i) {
+    std::string prefixed = "_" + std::string(kReservedKeywords[i].text);
     EXPECT_FALSE(LookupKeyword(prefixed).has_value())
         << prefixed << " must not be reserved";
     auto tokens = Lex(prefixed);
@@ -404,8 +409,8 @@ TEST(KeywordListLexing, KeywordWithLeadingUnderscoreIsIdentifier) {
 // most likely to be mistaken for one of them. No entry is another entry with a
 // '9' appended, which makes that suffix a spelling the table cannot contain.
 TEST(KeywordListLexing, KeywordWithTrailingDigitIsIdentifier) {
-  for (size_t i = 0; i < kTableB1Count; ++i) {
-    std::string suffixed = std::string(kTableB1[i].text) + "9";
+  for (size_t i = 0; i < kReservedKeywordCount; ++i) {
+    std::string suffixed = std::string(kReservedKeywords[i].text) + "9";
     EXPECT_FALSE(LookupKeyword(suffixed).has_value())
         << suffixed << " must not be reserved";
     auto tokens = Lex(suffixed);
@@ -421,8 +426,8 @@ TEST(KeywordListLexing, KeywordWithTrailingDigitIsIdentifier) {
 // appended is a legal identifier whose spelling is not the reserved word. That
 // is the near miss a scan keyed on letters and underscores alone would fumble.
 TEST(KeywordListLexing, KeywordWithTrailingDollarIsIdentifier) {
-  for (size_t i = 0; i < kTableB1Count; ++i) {
-    std::string suffixed = std::string(kTableB1[i].text) + "$";
+  for (size_t i = 0; i < kReservedKeywordCount; ++i) {
+    std::string suffixed = std::string(kReservedKeywords[i].text) + "$";
     EXPECT_FALSE(LookupKeyword(suffixed).has_value())
         << suffixed << " must not be reserved";
     auto tokens = Lex(suffixed);
@@ -438,13 +443,14 @@ TEST(KeywordListLexing, KeywordWithTrailingDollarIsIdentifier) {
 // Whitespace never separates the word from its neighbours here, so a scan that
 // only recognized whitespace-delimited words would miss every one of these.
 TEST(KeywordListLexing, KeywordIsReservedWhenAdjacentToPunctuation) {
-  for (size_t i = 0; i < kTableB1Count; ++i) {
-    std::string src = "(" + std::string(kTableB1[i].text) + ")";
+  for (size_t i = 0; i < kReservedKeywordCount; ++i) {
+    std::string src = "(" + std::string(kReservedKeywords[i].text) + ")";
     auto tokens = Lex(src);
     ASSERT_EQ(tokens.size(), 4u) << "input: " << src;
     EXPECT_EQ(tokens[0].kind, TokenKind::kLParen) << src;
-    EXPECT_EQ(tokens[1].kind, kTableB1[i].expected)
-        << kTableB1[i].text << " should stay reserved between parentheses";
+    EXPECT_EQ(tokens[1].kind, kReservedKeywords[i].expected)
+        << kReservedKeywords[i].text
+        << " should stay reserved between parentheses";
     EXPECT_EQ(tokens[2].kind, TokenKind::kRParen) << src;
   }
 }
@@ -452,18 +458,18 @@ TEST(KeywordListLexing, KeywordIsReservedWhenAdjacentToPunctuation) {
 // A comment carries no token of its own, so the word that follows one begins a
 // fresh scan and is reserved exactly as it would be at the start of a line.
 TEST(KeywordListLexing, KeywordIsReservedImmediatelyAfterAComment) {
-  for (size_t i = 0; i < kTableB1Count; ++i) {
-    std::string block = "/*c*/" + std::string(kTableB1[i].text);
+  for (size_t i = 0; i < kReservedKeywordCount; ++i) {
+    std::string block = "/*c*/" + std::string(kReservedKeywords[i].text);
     auto block_tokens = Lex(block);
     ASSERT_GE(block_tokens.size(), 2u) << "input: " << block;
-    EXPECT_EQ(block_tokens[0].kind, kTableB1[i].expected)
-        << kTableB1[i].text << " after a block comment";
+    EXPECT_EQ(block_tokens[0].kind, kReservedKeywords[i].expected)
+        << kReservedKeywords[i].text << " after a block comment";
 
-    std::string line = "//c\n" + std::string(kTableB1[i].text);
+    std::string line = "//c\n" + std::string(kReservedKeywords[i].text);
     auto line_tokens = Lex(line);
     ASSERT_GE(line_tokens.size(), 2u) << "input: " << line;
-    EXPECT_EQ(line_tokens[0].kind, kTableB1[i].expected)
-        << kTableB1[i].text << " after a one-line comment";
+    EXPECT_EQ(line_tokens[0].kind, kReservedKeywords[i].expected)
+        << kReservedKeywords[i].text << " after a one-line comment";
   }
 }
 
@@ -472,13 +478,13 @@ TEST(KeywordListLexing, KeywordIsReservedImmediatelyAfterAComment) {
 // reserved word. The name the escape carries is the spelling without the
 // backslash, which is what makes this the closest rejecting input there is.
 TEST(KeywordListLexing, EscapedFormOfAKeywordIsAnIdentifier) {
-  for (size_t i = 0; i < kTableB1Count; ++i) {
-    std::string escaped = "\\" + std::string(kTableB1[i].text) + " ";
+  for (size_t i = 0; i < kReservedKeywordCount; ++i) {
+    std::string escaped = "\\" + std::string(kReservedKeywords[i].text) + " ";
     auto tokens = Lex(escaped);
     ASSERT_GE(tokens.size(), 2u) << "input: " << escaped;
     EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier)
         << escaped << " should lex as an escaped identifier";
-    EXPECT_EQ(tokens[0].text, kTableB1[i].text)
+    EXPECT_EQ(tokens[0].text, kReservedKeywords[i].text)
         << escaped << " should carry the keyword spelling as its name";
   }
 }
@@ -486,8 +492,8 @@ TEST(KeywordListLexing, EscapedFormOfAKeywordIsAnIdentifier) {
 // Inside a string literal there is no identifier scan at all, so a listed word
 // there is character data and yields one literal token.
 TEST(KeywordListLexing, KeywordInsideAStringLiteralIsNotReserved) {
-  for (size_t i = 0; i < kTableB1Count; ++i) {
-    std::string quoted = "\"" + std::string(kTableB1[i].text) + "\"";
+  for (size_t i = 0; i < kReservedKeywordCount; ++i) {
+    std::string quoted = "\"" + std::string(kReservedKeywords[i].text) + "\"";
     auto tokens = Lex(quoted);
     ASSERT_EQ(tokens.size(), 2u) << "input: " << quoted;
     EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral)
@@ -500,7 +506,7 @@ TEST(KeywordListLexing, KeywordInsideAStringLiteralIsNotReserved) {
 // language defines elsewhere, vocabulary from other hardware description
 // languages, and plural or near-miss spellings of listed words -- and every one
 // of them has to come back an ordinary identifier.
-TEST(KeywordListLexing, VocabularyOutsideTableB1IsNotReserved) {
+TEST(KeywordListLexing, WordsOffTheReservedKeywordListAreNotReserved) {
   const char* const kNotReserved[] = {
       // Names the language defines without reserving them.
       "randomize",
@@ -557,14 +563,16 @@ TEST(KeywordListLexing, VocabularyOutsideTableB1IsNotReserved) {
 
 // Every word above is genuinely absent from the list this file checks, so the
 // negative sweep cannot be quietly asserting something about a listed word.
-TEST(KeywordListLexing, TheNonReservedVocabularyIsDisjointFromTableB1) {
+TEST(KeywordListLexing,
+     TheNonReservedVocabularyIsDisjointFromTheReservedKeywords) {
   const char* const kNotReserved[] = {
       "randomize", "std",      "variable", "signal", "wired",
       "logics",    "join_all", "boolean",  "state",  "tri2",
   };
   for (const char* word : kNotReserved) {
-    for (size_t i = 0; i < kTableB1Count; ++i) {
-      EXPECT_NE(std::string_view(word), std::string_view(kTableB1[i].text))
+    for (size_t i = 0; i < kReservedKeywordCount; ++i) {
+      EXPECT_NE(std::string_view(word),
+                std::string_view(kReservedKeywords[i].text))
           << word << " is on Table B.1 after all";
     }
   }
@@ -575,17 +583,17 @@ TEST(KeywordListLexing, TheNonReservedVocabularyIsDisjointFromTableB1) {
 // many keyword tokens, in order, with nothing merged and nothing dropped.
 TEST(KeywordListLexing, WholeListLexesAsThatManyKeywordsInOrder) {
   std::string all;
-  for (size_t i = 0; i < kTableB1Count; ++i) {
-    all += kTableB1[i].text;
+  for (size_t i = 0; i < kReservedKeywordCount; ++i) {
+    all += kReservedKeywords[i].text;
     all += '\n';
   }
   auto tokens = Lex(all);
-  ASSERT_EQ(tokens.size(), kTableB1Count + 1)
+  ASSERT_EQ(tokens.size(), kReservedKeywordCount + 1)
       << "one token per keyword plus EOF";
-  for (size_t i = 0; i < kTableB1Count; ++i) {
-    EXPECT_EQ(tokens[i].kind, kTableB1[i].expected)
-        << kTableB1[i].text << " at stream position " << i;
-    EXPECT_EQ(tokens[i].text, kTableB1[i].text) << "position " << i;
+  for (size_t i = 0; i < kReservedKeywordCount; ++i) {
+    EXPECT_EQ(tokens[i].kind, kReservedKeywords[i].expected)
+        << kReservedKeywords[i].text << " at stream position " << i;
+    EXPECT_EQ(tokens[i].text, kReservedKeywords[i].text) << "position " << i;
   }
   EXPECT_EQ(tokens.back().kind, TokenKind::kEof);
 }
