@@ -83,7 +83,6 @@ inline std::string PreprocessAndCapture(const std::string& src, SimFixture& f) {
   Parser parser(lexer, f.arena, f.diag);
   auto* cu = parser.Parse();
   ApplyModuleDirectives(cu, pp.ModuleDirectivesList());
-  cu->preproc_timescale = pp.CurrentTimescale();
   cu->has_preproc_global_precision = pp.HasGlobalPrecision();
   cu->preproc_global_precision = pp.GlobalPrecision();
   cu->preproc_global_precision_magnitude = pp.GlobalPrecisionMagnitude();

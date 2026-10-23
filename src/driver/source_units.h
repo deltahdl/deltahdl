@@ -46,7 +46,6 @@ struct PreprocResult {
 
   DelayModeDirective delay_mode_directive = DelayModeDirective::kNone;
 
-  TimeScale timescale;
   bool has_global_precision = false;
   TimeUnit global_precision = TimeUnit::kNs;
   int global_precision_magnitude = 1;

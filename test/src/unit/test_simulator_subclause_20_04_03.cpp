@@ -32,12 +32,11 @@ RtlirDesign* PreprocElaborate(const std::string& src, SimFixture& f) {
               TextOrigin::kPreprocessorOutput);
   Parser parser(lexer, f.arena, f.diag);
   auto* cu = parser.Parse();
-  // What a `timescale directive said is read by the preprocessor and consumed
-  // by the elaborator, but the two never meet: the parser is handed a token
-  // stream, so the caller that ran both has to carry the value across, as the
-  // driver does. Without this the compilation unit reports no timescale and
-  // the elaborator falls back to its ns default.
-  cu->preproc_timescale = preproc.CurrentTimescale();
+  // The finest precision of the `timescale directives is read by the
+  // preprocessor and consumed by the elaborator, but the two never meet: the
+  // parser is handed a token stream, so the caller that ran both has to carry
+  // it across, as the driver does. Without this the elaborator finds no
+  // directive precision and the global precision falls back to its ns default.
   cu->has_preproc_global_precision = preproc.HasGlobalPrecision();
   cu->preproc_global_precision = preproc.GlobalPrecision();
   Elaborator elab(f.arena, f.diag, cu);

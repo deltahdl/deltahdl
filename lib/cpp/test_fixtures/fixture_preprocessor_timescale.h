@@ -59,7 +59,6 @@ struct PreprocessedParseResult {
   CompilationUnit* cu = nullptr;
   bool has_errors = false;
   std::vector<Diagnostic> diags;
-  TimeScale preproc_timescale;
   bool has_preproc_global_precision = false;
   TimeUnit preproc_global_precision = TimeUnit::kS;
 };
@@ -78,7 +77,6 @@ inline PreprocessedParseResult PreprocessAndParse(const std::string& src) {
   auto fid = result.mgr.AddFile("<test>", src);
   Preprocessor preproc(result.mgr, diag, {});
   auto pp = preproc.Preprocess(fid);
-  result.preproc_timescale = preproc.CurrentTimescale();
   result.has_preproc_global_precision = preproc.HasGlobalPrecision();
   result.preproc_global_precision = preproc.GlobalPrecision();
   auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);

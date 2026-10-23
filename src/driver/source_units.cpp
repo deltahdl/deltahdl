@@ -54,7 +54,6 @@ void ReadPreprocessorState(const Preprocessor& preproc, PreprocResult& result) {
   result.default_trireg_strength = preproc.DefaultTriregStrength();
   result.has_default_trireg_strength = preproc.HasDefaultTriregStrength();
   result.delay_mode_directive = preproc.DelayModeDirective();
-  result.timescale = preproc.CurrentTimescale();
   result.has_global_precision = preproc.HasGlobalPrecision();
   result.global_precision = preproc.GlobalPrecision();
   result.global_precision_magnitude = preproc.GlobalPrecisionMagnitude();
@@ -135,7 +134,6 @@ void ApplyPreprocMetadata(CompilationUnit* cu, const PreprocResult& pp) {
   cu->default_trireg_strength = pp.default_trireg_strength;
   cu->has_default_trireg_strength = pp.has_default_trireg_strength;
   cu->delay_mode_directive = pp.delay_mode_directive;
-  cu->preproc_timescale = pp.timescale;
   cu->has_preproc_global_precision = pp.has_global_precision;
   cu->preproc_global_precision = pp.global_precision;
   cu->preproc_global_precision_magnitude = pp.global_precision_magnitude;

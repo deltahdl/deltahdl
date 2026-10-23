@@ -146,9 +146,8 @@ inline void PropagateDirectivesToCu(CompilationUnit* cu,
   cu->has_default_trireg_strength = preproc.HasDefaultTriregStrength();
   ApplyModuleDirectives(cu, preproc.ModuleDirectivesList());
   cu->delay_mode_directive = preproc.DelayModeDirective();
-  // As the driver's ApplyPreprocMetadata does, so §3.14's resolutions and
-  // §3.14.3's global precision see every `timescale the source holds.
-  cu->preproc_timescale = preproc.CurrentTimescale();
+  // As the driver's ApplyPreprocMetadata does, so §3.14.3's global precision
+  // counts every `timescale the source holds.
   cu->has_preproc_global_precision = preproc.HasGlobalPrecision();
   cu->preproc_global_precision = preproc.GlobalPrecision();
   cu->preproc_global_precision_magnitude = preproc.GlobalPrecisionMagnitude();

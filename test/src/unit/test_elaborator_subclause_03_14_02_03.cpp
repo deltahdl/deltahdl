@@ -22,7 +22,6 @@ static RtlirDesign* ElaborateWithPreprocAndCu(const std::string& src,
   auto* cu = PreprocessAndParseCu(f, fid, preproc);
   // As the driver does, so each element takes the `timescale before it.
   ApplyModuleDirectives(cu, preproc.ModuleDirectivesList());
-  cu->preproc_timescale = preproc.CurrentTimescale();
   cu->has_preproc_global_precision = preproc.HasGlobalPrecision();
   cu->preproc_global_precision = preproc.GlobalPrecision();
   Elaborator elab(f.arena, f.diag, cu);
