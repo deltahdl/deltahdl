@@ -380,4 +380,28 @@ TEST(UserDefinedTypeAssocArrayElaboration, NetOfScopedIndexDimIsReported) {
   }
 }
 
+// §7.8.5 admits an index type with equality defined, which §6.14 defines for a
+// chandle, so `a` is associative with a 64-bit unsigned index. §6.7 holds a
+// net to fixed-size dimensions, so `w`'s chandle index is reported. `a` was
+// built with no dimension, and `w`'s index taken for a size.
+TEST(UserDefinedTypeAssocArrayElaboration, ChandleIndexIsAssociative) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  int a [chandle];\n"
+      "  wire w [chandle];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  const auto& vars = design->top_modules[0]->variables;
+  auto a = std::ranges::find(vars, std::string_view("a"), &RtlirVariable::name);
+  ASSERT_NE(a, vars.end());
+  EXPECT_TRUE(a->is_assoc);
+  EXPECT_EQ(a->assoc_index_width, 64u);
+  EXPECT_FALSE(a->is_index_signed);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a net's unpacked dimension must be fixed-size", 3,
+                            "6.7"));
+}
+
 }  // namespace

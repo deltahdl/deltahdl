@@ -31,4 +31,23 @@ TEST(UserDefinedIndexAssocArraySimulation,
   EXPECT_EQ(out, "2 1 2\n");
 }
 
+// §7.8.5 with §6.14: a chandle is a legal index type, and a chandle variable
+// starts as null, so the entry written under `h` is read back under it and is
+// the array's one entry. The array was built with no dimension, so `m[h]`
+// selected nothing.
+TEST(UserDefinedIndexAssocArraySimulation, ChandleIndexKeysAnEntry) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  int m [chandle];\n"
+      "  chandle h;\n"
+      "  initial begin\n"
+      "    m[h] = 7;\n"
+      "    $display(\"%0d %0d %0d\", m.num(), m[h], m.exists(h));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 7 1\n");
+}
+
 }  // namespace

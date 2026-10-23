@@ -24,10 +24,11 @@ namespace {
 constexpr int kMaxTypedefHops = 16;
 
 // §7.8 (printed page 160): the index types an associative array may be written
-// with as a keyword, which the parser keeps as the dimension's text.
-constexpr std::array<std::string_view, 10> kAssocIndexKeywords = {
-    "string",  "int", "integer", "byte", "shortint",
-    "longint", "bit", "logic",   "reg",  "time"};
+// with as a keyword, which the parser keeps as the dimension's text; §7.8.5
+// adds a chandle, whose equality §6.14 defines.
+constexpr std::array<std::string_view, 11> kAssocIndexKeywords = {
+    "string", "int",   "integer", "byte", "shortint", "longint",
+    "bit",    "logic", "reg",     "time", "chandle"};
 
 }  // namespace
 
