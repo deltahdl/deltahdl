@@ -1,33 +1,28 @@
 #include "elaborator/elaborator_call_targets.h"
 
-#include <algorithm>
 #include <cstddef>
 #include <deque>
 #include <format>
 #include <functional>
 #include <initializer_list>
 #include <memory>
-#include <optional>
-#include <span>
 #include <string>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
-#include <utility>
 #include <vector>
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "elaborator/class_member_names.h"
+#include "elaborator/elaborator_call_targets_internal.h"
 #include "elaborator/elaborator_enclosing_subroutines.h"
 #include "elaborator/elaborator_enum_constants.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/local_type_sites.h"
 #include "elaborator/operator_result_members.h"
 #include "elaborator/package_references.h"
-#include "elaborator/std_package.h"
 #include "elaborator/struct_member_selects.h"
-#include "elaborator/type_eval.h"
 #include "elaborator/type_site_lookup.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
@@ -39,95 +34,6 @@
 namespace delta {
 
 namespace {
-
-// A variable's declaration: the type it was declared with, the number of
-// unpacked dimensions it writes after its name (§7.4), and, for one a scope
-// within the module declares, the site of that scope, whose typedefs its type
-// names first (LocalTypeSites); null for one the module declares.
-struct DeclaredVar {
-  const DataType* type = nullptr;
-  std::size_t dims = 0;
-  const TypeSite* site = nullptr;
-};
-
-// The names a walk of one module's procedures sees as variables or nets: the
-// module's own, and those each block around the statement walked declares,
-// the innermost last (§23.9); the other names the module itself declares, or
-// imports as data, which a call statement cannot call; the tasks and
-// functions the module declares; and, first, whether the scope or a module
-// enclosing it sees a name at all.
-struct DataScope {
-  const std::function<bool(std::string_view)>& visible;
-  const CompilationUnit& unit;
-  const std::vector<ModuleItem*>& items;
-  // The declaration of each variable of the module and of a block around the
-  // statement walked.
-  std::unordered_map<std::string_view, DeclaredVar> module_vars = {};
-  // In a method of a class, the declaration of each property the class
-  // declares or inherits (§8.13), which hides a variable of the scope around
-  // the class of its name and is what `this` reaches (§8.11).
-  std::unordered_map<std::string_view, DeclaredVar> properties = {};
-  std::unordered_set<std::string_view> module = {};
-  std::vector<std::pair<std::string_view, DeclaredVar>> blocks = {};
-  std::unordered_set<std::string_view> uncallable = {};
-  std::unordered_set<std::string_view> subroutines = {};
-  // The numbered constants of the scope's ranged enumeration members (§6.19.2),
-  // which no source text spells for `module_vars` to key them by.
-  std::deque<std::string> numbered_names = {};
-  // The kind of scope `items` belong to, which the types of the scope's
-  // variables are looked up from.
-  SiteKind site = SiteKind::kModule;
-  // The names a type of the scope may be written as without naming a class of
-  // the scope around it: a type parameter of the module, and in a method a
-  // type parameter, typedef or nested class of its class or a class it
-  // extends.
-  std::unordered_set<std::string_view> local_types = {};
-  // The classes of the unit known by their name alone, shared by every scope
-  // copied from the one that made them.
-  std::shared_ptr<const SoleClassIndex> classes = nullptr;
-  // In a method of a class, the class, whose methods a call by a name alone
-  // calls first (§8.13).
-  const ClassDecl* cls = nullptr;
-  // The sites of the scopes within the module around the item walked.
-  LocalTypeSites local_sites = {};
-
-  // The site of the scope `items` belong to, seeing each of them.
-  TypeSite Site() const { return {&items, items.size(), site}; }
-
-  // The site of the scope declaring the variable `var`, whose typedefs its
-  // type names first (§23.9).
-  TypeSite SiteOf(const DeclaredVar& var) const {
-    return var.site != nullptr ? *var.site : Site();
-  }
-
-  bool Names(std::string_view name) const {
-    return module.contains(name) ||
-           std::ranges::any_of(blocks, [name](const auto& declared) {
-             return declared.first == name;
-           });
-  }
-
-  // The declaration of the variable `name` names in the scope, the innermost
-  // block's first, then a property of the class a method's scope is in, then
-  // the module's (§23.9); null for a name no variable bears.
-  const DeclaredVar* Declared(std::string_view name) const {
-    for (auto it = blocks.rbegin(); it != blocks.rend(); ++it) {
-      if (it->first == name) return &it->second;
-    }
-    for (const auto* vars : {&properties, &module_vars}) {
-      const auto kFound = vars->find(name);
-      if (kFound != vars->end()) return &kFound->second;
-    }
-    return nullptr;
-  }
-
-  // §8.11: the declaration of the property `name` names through `this`; null
-  // for a name no property of the class bears, and outside a method.
-  const DeclaredVar* Property(std::string_view name) const {
-    const auto kFound = properties.find(name);
-    return kFound == properties.end() ? nullptr : &kFound->second;
-  }
-};
 
 // Reports a call of `name` written at `loc` where the scope sees the name as
 // a variable or a net.
@@ -191,18 +97,6 @@ std::string_view VifInterface(const DataType& type) {
                                                       : std::string_view();
 }
 
-// §6.18 with §26.3: the type the type `type`, written among the items of the
-// scope, stands for, through each typedef it is written as (ThroughTypedefsAt).
-SitedType ThroughTypedefs(const DataScope& scope, const DataType& type) {
-  return ThroughTypedefsAt(scope.unit, {&type, scope.Site()});
-}
-
-// §6.18 with §23.9: the type the type the variable `var` is declared with
-// stands for, its typedefs looked up from the scope declaring it.
-SitedType VarType(const DataScope& scope, const DeclaredVar& var) {
-  return ThroughTypedefsAt(scope.unit, {var.type, scope.SiteOf(var)});
-}
-
 // The type the variable `root` names is declared with, as written in the
 // scope or the scope within it declaring it, with the unpacked dimensions
 // written after its name; no type where `root` names no variable, or one whose
@@ -214,31 +108,6 @@ SitedType DeclaredType(const Expr& root, const DataScope& scope) {
     return {};
   }
   return {var->type, scope.SiteOf(*var), var->dims};
-}
-
-// §8.3 with §7.4: the class declaration whose handle the element of the
-// variable `var` that `selects` selects reach holds, through the typedefs its
-// type is written as, their unpacked dimensions counted with the variable's
-// own (§6.18); null where none is, and where the selects reach no element.
-const ClassDecl* ClassNamed(const DataScope& scope, const DeclaredVar& var,
-                            std::size_t selects) {
-  const auto [named, site, dims] = VarType(scope, var);
-  if (var.dims + dims != selects) return nullptr;
-  if (!named->scope_name.empty()) {
-    return ScopedClass(scope.unit, site, named->scope_name, named->type_name);
-  }
-  return ClassIn(scope.unit, site, named->type_name);
-}
-
-// The expression the selects in front of `e` select from, the number of them
-// counted into `selects`: `va` of va[0][1], two.
-const Expr& SelectRoot(const Expr& e, std::size_t& selects) {
-  const Expr* root = &e;
-  while (root->kind == ExprKind::kSelect && root->base != nullptr) {
-    ++selects;
-    root = root->base;
-  }
-  return *root;
 }
 
 // §8.4: the property of the class a variable of the scope holds a handle of
@@ -313,27 +182,6 @@ DeclaredVar SelectedProperty(const Expr& root, const DataScope& scope) {
              : DeclaredVar{&held->data_type, held->unpacked_dims.size()};
 }
 
-// §8.4: the class whose handle `e` holds, where the scope tells it for
-// certain: a variable of the scope, or an element of one, one select per
-// unpacked dimension (§7.4), whose type names a class, or a property of such a
-// class (§8.5), h.p or h.p[0]; null for anything else.
-const ClassDecl* HandleClass(const Expr& e, const DataScope& scope) {
-  std::size_t selects = 0;
-  const Expr& root = SelectRoot(e, selects);
-  if (root.kind == ExprKind::kIdentifier) {
-    const DeclaredVar* var = scope.Declared(root.text);
-    const bool kClassType = var != nullptr &&
-                            var->type->kind == DataTypeKind::kNamed &&
-                            !scope.local_types.contains(var->type->type_name);
-    return kClassType ? ClassNamed(scope, *var, selects) : nullptr;
-  }
-  if (root.kind != ExprKind::kMemberAccess) return nullptr;
-  const ClassDecl* holder = HandleClass(*root.lhs, scope);
-  return holder == nullptr
-             ? nullptr
-             : scope.classes->PropertyClass(*holder, root.rhs->text, selects);
-}
-
 // §8.5 and §8.6: a member access `access`, h.m, applied to a handle of a class
 // that, with the classes it extends or implements, declares nothing `m`
 // names; reported under `rule`, §8.6 where the access is what a call calls and
@@ -350,203 +198,6 @@ void ReportUndeclaredMember(const Expr& access, std::string_view rule,
              std::format("class '{}' has no member named '{}'", cls->name,
                          access.rhs->text),
              Subclause(rule));
-}
-
-// §6.16 and §6.19.5: the built-in methods of a string and of an enumeration.
-constexpr std::string_view kStringMethods[] = {
-    "len",      "putc",   "getc",   "toupper", "tolower", "compare",
-    "icompare", "substr", "atoi",   "atohex",  "atooct",  "atobin",
-    "atoreal",  "itoa",   "hextoa", "octtoa",  "bintoa",  "realtoa"};
-constexpr std::string_view kEnumMethods[] = {"first", "last", "next",
-                                             "prev",  "num",  "name"};
-
-// §8.13: the member of kind `kind` named `name` the class `cls` or the nearest
-// class it extends declares; null where none does. Each base is looked up from
-// the scope's site; no class is its own ancestor (§8.13), so the walk ends.
-const ClassMember* ChainMember(const ClassDecl& cls, ClassMemberKind kind,
-                               std::string_view name, const DataScope& scope) {
-  const TypeSite kSite = scope.Site();
-  for (const ClassDecl* walked = &cls; walked != nullptr;
-       walked = BaseClassIn(scope.unit, kSite, *walked)) {
-    for (const ClassMember* member : walked->members) {
-      if (member->kind == kind && member->name == name) return member;
-    }
-  }
-  return nullptr;
-}
-
-// §6.18: the kind of the type `type` stands for, through the typedefs the
-// scope sees it written as, where it is a single value; kImplicit where those
-// typedefs make it an array (§7.4).
-DataTypeKind ScalarKind(const DataScope& scope, const DataType& type) {
-  const SitedType kNamed = ThroughTypedefs(scope, type);
-  return kNamed.dims == 0 ? kNamed.type->kind : DataTypeKind::kImplicit;
-}
-
-// §13.4.1 with §8.13: the kind of type the method `method` of the class `cls`
-// returns as a single value: a name, written without a scope, that the class
-// or a class it extends declares as a type is its typedef there, and any other
-// type as the scope sees it; kImplicit where the class's name is a type
-// parameter or a nested class, or its typedef writes unpacked dimensions.
-DataTypeKind MethodResultKind(const ModuleItem& method, const ClassDecl& cls,
-                              const DataScope& scope) {
-  const DataType* type = &method.return_type;
-  std::unordered_set<std::string_view> local;
-  scope.classes->AddLocalTypes(cls, local);
-  if (type->kind == DataTypeKind::kNamed && type->scope_name.empty() &&
-      local.contains(type->type_name)) {
-    const ClassMember* def =
-        ChainMember(cls, ClassMemberKind::kTypedef, type->type_name, scope);
-    if (def == nullptr || !def->typedef_item->unpacked_dims.empty()) {
-      return DataTypeKind::kImplicit;
-    }
-    type = &def->typedef_item->typedef_type;
-  }
-  return ScalarKind(scope, *type);
-}
-
-// §G.1: the class of the std package whose handle `e` holds, where the scope
-// tells it for certain: a variable of the scope declared as one, process p,
-// where no class of the design takes the name, or a call of a method of one
-// returning one, process::self() or p.self(); none for anything else.
-std::optional<StdPackageMember> StdClassOf(const Expr& e,
-                                           const DataScope& scope) {
-  const Expr* callee = e.kind == ExprKind::kCall ? e.lhs : nullptr;
-  if (callee != nullptr && callee->kind == ExprKind::kMemberAccess) {
-    const std::optional<StdPackageMember> kOwner =
-        callee->is_scope_resolution ? StdPackageMemberNamed(callee->lhs->text)
-                                    : StdClassOf(*callee->lhs, scope);
-    const StdMethodPrototype* prototype =
-        kOwner ? StdMethodNamed(*kOwner, callee->rhs->text) : nullptr;
-    return prototype == nullptr ? std::nullopt
-                                : StdPackageMemberNamed(prototype->return_type);
-  }
-  const DeclaredVar* var =
-      e.kind == ExprKind::kIdentifier ? scope.Declared(e.text) : nullptr;
-  if (var == nullptr || var->type->kind != DataTypeKind::kNamed ||
-      ClassNamed(scope, *var, 0) != nullptr) {
-    return std::nullopt;
-  }
-  return StdPackageMemberNamed(var->type->type_name);
-}
-
-// §G.3 to §G.7: the kind of type the method `method` of the std class `owner`
-// returns: a string, get_randstate()'s, or process's enumeration state,
-// status()'s (§9.7); kImplicit for any other.
-DataTypeKind StdResultKind(StdPackageMember owner, std::string_view method) {
-  const StdMethodPrototype* prototype = StdMethodNamed(owner, method);
-  const std::string_view kReturns =
-      prototype == nullptr ? std::string_view() : prototype->return_type;
-  if (kReturns == "string") return DataTypeKind::kString;
-  return kReturns == "state" ? DataTypeKind::kEnum : DataTypeKind::kImplicit;
-}
-
-// §13.4.1 with §23.9: the kind of type the call of `name`, written alone,
-// returns: in a method of a class, a method the class or a class it extends
-// declares (§8.13), else a function the items of the scope declare; kImplicit
-// where neither does.
-DataTypeKind PlainCallKind(std::string_view name, const DataScope& scope) {
-  const ClassMember* method =
-      scope.cls == nullptr
-          ? nullptr
-          : ChainMember(*scope.cls, ClassMemberKind::kMethod, name, scope);
-  if (method != nullptr) {
-    return MethodResultKind(*method->method, *scope.cls, scope);
-  }
-  for (const ModuleItem* item : scope.items) {
-    if (item->kind == ModuleItemKind::kFunctionDecl && item->name == name) {
-      return ScalarKind(scope, item->return_type);
-    }
-  }
-  return DataTypeKind::kImplicit;
-}
-
-// §13.4.1: the kind of type the call whose callee is `callee` returns as a
-// single value, where the scope tells it for certain: a function or method
-// called by its name alone, f(); a method of a std class (§G.3 to §G.7),
-// p.status(); and a method of the class a handle holds, h.get(); kImplicit
-// for any other call.
-DataTypeKind CallResultKind(const Expr& callee, const DataScope& scope) {
-  if (callee.kind != ExprKind::kMemberAccess) {
-    return PlainCallKind(callee.text, scope);
-  }
-  if (callee.is_scope_resolution) return DataTypeKind::kImplicit;
-  const std::string_view kMethod = callee.rhs->text;
-  if (const auto kStd = StdClassOf(*callee.lhs, scope)) {
-    return StdResultKind(*kStd, kMethod);
-  }
-  const ClassDecl* cls = HandleClass(*callee.lhs, scope);
-  const ClassMember* method =
-      cls == nullptr
-          ? nullptr
-          : ChainMember(*cls, ClassMemberKind::kMethod, kMethod, scope);
-  return method == nullptr ? DataTypeKind::kImplicit
-                           : MethodResultKind(*method->method, *cls, scope);
-}
-
-// The value a member access is applied to, as far as the scope tells it: the
-// kind of its type, how a report names it, and whether it is a property of
-// the class whose method writes it, which may be random (§18.8).
-struct AppliedValue {
-  DataTypeKind kind = DataTypeKind::kImplicit;
-  std::string named;
-  bool property = false;
-};
-
-// The value `root`, written `selects` selects in front of a member access,
-// stands for: a variable of the scope or an element of one, one select per
-// unpacked dimension its declaration and its typedefs write (§6.18, §7.4), or
-// the result of a call (§13.4.1).
-AppliedValue ValueOf(const Expr& root, std::size_t selects,
-                     const DataScope& scope) {
-  AppliedValue value;
-  const DeclaredVar* var =
-      root.kind == ExprKind::kIdentifier ? scope.Declared(root.text) : nullptr;
-  const Expr* callee =
-      root.kind == ExprKind::kCall && selects == 0 ? root.lhs : nullptr;
-  if (var != nullptr) {
-    const SitedType kNamed = VarType(scope, *var);
-    if (var->dims + kNamed.dims == selects) value.kind = kNamed.type->kind;
-    value.named = std::format("'{}'", root.text);
-    value.property = scope.Property(root.text) == var;
-  } else if (callee != nullptr) {
-    value.kind = CallResultKind(*callee, scope);
-    const std::string_view kCalled = callee->kind == ExprKind::kMemberAccess
-                                         ? callee->rhs->text
-                                         : callee->text;
-    value.named = std::format("that '{}()' returns", kCalled);
-  }
-  return value;
-}
-
-// §6.16 and §6.19.5: a member access `access`, s.m or e.m, applied to a string
-// or an enumeration (ValueOf), naming none of its type's built-in methods, and
-// §23.7 a): one applied to an integral or real value, which has none. A random
-// property of a class, but a string, also has rand_mode (§18.8).
-void ReportNoBuiltInMethod(const Expr& access, const DataScope& scope,
-                           DiagEngine& diag) {
-  std::size_t selects = 0;
-  const Expr& root = SelectRoot(*access.lhs, selects);
-  const AppliedValue kValue = ValueOf(root, selects, scope);
-  const bool kString = kValue.kind == DataTypeKind::kString;
-  const bool kBare = IsMemberlessKind(kValue.kind);
-  if (!kString && !kBare && kValue.kind != DataTypeKind::kEnum) return;
-  const std::string_view kName = access.rhs->text;
-  using Methods = std::span<const std::string_view>;
-  const Methods kMethods = kString ? Methods(kStringMethods)
-                           : kBare ? Methods()
-                                   : Methods(kEnumMethods);
-  if (std::ranges::find(kMethods, kName) != kMethods.end() ||
-      (!kString && kName == "rand_mode" && kValue.property))
-    return;
-  constexpr const char* kNouns[] = {"string", "integral or real value",
-                                    "enumeration"};
-  constexpr const char* kRules[] = {"6.16", "23.7", "6.19.5"};
-  const int kWhich = kString ? 0 : (kBare ? 1 : 2);
-  diag.Error(access.rhs->range.start,
-             std::format("'{}' is not a built-in method of the {} {}", kName,
-                         kNouns[kWhich], kValue.named),
-             Subclause(kRules[kWhich]));
 }
 
 // §25.9 with §7.4: a select `select` into a class property that is a virtual
@@ -601,7 +252,7 @@ void CheckExprCalls(const Expr* expr, const DataScope& scope, DiagEngine& diag,
         *expr, scope.unit,
         [&scope](const Expr& root) { return DeclaredType(root, scope); }, diag);
     ReportOperatorResultMember(
-        *expr, [&scope](const Expr& e) { return ValueOf(e, 0, scope).kind; },
+        *expr, [&scope](const Expr& e) { return AppliedValueKind(e, scope); },
         kStringMethods, diag);
   }
   if (const Expr* callee = NamedCallee(*expr)) {

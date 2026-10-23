@@ -465,4 +465,161 @@ TEST(DottedNameElaboration, ClassMemberAndRandModeOfAStructAreAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §23.7 a) with §8.5: a property selected through a handle, h.x, is a value of
+// the property's type, so an integral one has no members, and a string and an
+// enumeration only their built-in methods (§6.16, §6.19.5), the enumeration
+// here a typedef of the class itself (#7722).
+TEST(DottedNameElaboration, AMemberOfAPropertyAHandleHoldsIsJudged) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C; int x; string s; typedef enum {A, B} e_t; e_t e; endclass\n"
+      "module top;\n"
+      "  C h = new;\n"
+      "  initial begin\n"
+      "    h.x.foo();\n"
+      "    h.s.foo();\n"
+      "    h.e.foo();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "built-in method of the integral or real value", 5,
+                            "23.7"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "built-in method of the string", 6, "6.16"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "built-in method of the enumeration", 7, "6.19.5"));
+}
+
+// §8.5 with §6.16, §6.19.5, §7.10 and §18.8: a property selected through a
+// handle takes the built-in methods of its type, an array property its
+// array's, and a random property rand_mode.
+TEST(DottedNameElaboration, ABuiltInMethodOfAPropertyAHandleHoldsIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package p; string s = \"ab\"; endpackage\n"
+      "module top;\n"
+      "  typedef enum {A, B} e_t;\n"
+      "  class C; rand int x; string s; e_t e; int q [$]; endclass\n"
+      "  C h = new;\n"
+      "  initial begin\n"
+      "    void'(h.s.len());\n"
+      "    void'(h.e.name());\n"
+      "    void'(h.q.size());\n"
+      "    h.x.rand_mode(0);\n"
+      "    void'(p::s.len());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §8.5: a member through a property the handle's class lacks is reported once,
+// at the property, and not again as a member of a value of no known type.
+TEST(DottedNameElaboration, AMemberOfAnUndeclaredPropertyIsReportedOnce) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C; int x; endclass\n"
+      "module top;\n"
+      "  C h = new;\n"
+      "  initial h.nope.foo();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "class 'C' has no member named 'nope'", 4, "8.5"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1U);
+}
+
+// §23.7 a) with Annex G: mailbox::num() and semaphore::try_get() return an
+// int, which has no members (#7727).
+TEST(DottedNameElaboration, AMemberOfAStdMethodsIntResultIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  mailbox mb = new; semaphore sm = new(1);\n"
+      "  initial begin\n"
+      "    void'(mb.num().foo());\n"
+      "    void'(sm.try_get().foo());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  for (int line : {4, 5}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "built-in method of the integral or real value",
+                              line, "23.7"))
+        << line;
+  }
+}
+
+// §23.7 a) with §18.6.1 and §18.13.4: a class's built-in randomize() returns
+// an int, which has no members, and get_randstate() a string, which has only
+// the string's methods; a method the class lacks is reported as such (#7737).
+TEST(DottedNameElaboration, AMemberOfAClasssBuiltInMethodResultIsJudged) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class K; endclass\n"
+      "module top;\n"
+      "  K k = new;\n"
+      "  initial begin\n"
+      "    void'(k.randomize().foo());\n"
+      "    void'(k.get_randstate().foo());\n"
+      "    void'(k.nope().foo());\n"
+      "    void'(k.get_randstate().len());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "built-in method of the integral or real value", 5,
+                            "23.7"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "built-in method of the string", 6, "6.16"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "class 'K' has no member named 'nope'", 7, "8.6"));
+  EXPECT_EQ(f.diag.ErrorCount(), 3U);
+}
+
+// §23.7 a) with §20.8.1 and §21.3.3: $clog2 returns an integer and an element
+// of the string $sformatf returns is a byte, neither of which has members,
+// and the string itself has only the string's methods (#7738).
+TEST(DottedNameElaboration, AMemberOfASystemFunctionsResultIsJudged) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  int n = 5; int x;\n"
+      "  initial begin\n"
+      "    x = $clog2(8).foo;\n"
+      "    void'($sformatf(\"%0d\", n).foo());\n"
+      "    x = $sformatf(\"ab\")[0].foo;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "built-in method of the integral or real value", 4,
+                            "23.7"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "built-in method of the string", 5, "6.16"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "built-in method of the integral or real value", 6,
+                            "23.7"));
+}
+
+// §21.3.3, §20.6.1 and §16.9.3: $sformatf and $typename return a string,
+// which has the string's methods, and $sampled returns its argument's type,
+// here a structure, whose members it has (#7738).
+TEST(DottedNameElaboration, AMemberOfASystemFunctionsResultIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  typedef struct { int a; } s_t;\n"
+      "  int n = 5; int x; s_t st;\n"
+      "  initial begin\n"
+      "    x = $sformatf(\"%0d\", n).len();\n"
+      "    x = $typename(n).len();\n"
+      "    x = $sampled(st).a;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
