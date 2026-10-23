@@ -720,6 +720,10 @@ bool TryEvalCallResultMember(const Expr* expr, SimContext& ctx, Arena& arena,
   ClassObject* obj = ctx.GetClassObject(value.ToUint64());
   if (obj == nullptr) return false;
   out = obj->GetProperty(expr->rhs->text, arena);
+  // §6.16: a string property's value is marked a string, as a call answering
+  // one marks its own, so a string method applied to it, f().s.len(), reads
+  // its text (TryEvalCallResultMethodCall) rather than taking it for a handle.
+  if (PropertyIsString(obj->type, expr->rhs->text, ctx)) out.is_string = true;
   return true;
 }
 

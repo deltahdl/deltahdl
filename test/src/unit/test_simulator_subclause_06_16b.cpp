@@ -239,6 +239,26 @@ TEST(StringMethodReceivers, MethodOnACallResultAndOnAMethodResult) {
       "a=3 b=ELL c=hel d=72 e=WOR\nf=5 g=3 l=5\n");
 }
 
+// §6.16 with §8.5: a string property selected from a call's result is a
+// string whose methods read its text, its declaration writing the string type
+// or a typedef of it, while a property of another type is read as itself
+// (#7736).
+TEST(StringMethodReceivers, AStringPropertyOfACallsResultTakesStringMethods) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  typedef string str_t;\n"
+                       "  class K;\n"
+                       "    string s = \"ab\"; str_t u = \"xyz\"; int n = 7;\n"
+                       "  endclass\n"
+                       "  K k = new;\n"
+                       "  function K f(); return k; endfunction\n"
+                       "  initial $display(\"%0d %s %0d\", f().s.len(),\n"
+                       "                   f().u.toupper(), f().n);\n"
+                       "endmodule\n",
+                       f),
+            "2 XYZ 7\n");
+}
+
 // §8.6: a class's own methods are its own whatever they are named, so `len`
 // and `substr` declared by the class run as the class's methods on a handle,
 // on a property holding a handle and through the class scope; a dispatcher

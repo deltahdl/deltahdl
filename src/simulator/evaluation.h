@@ -18,6 +18,7 @@
 namespace delta {
 
 struct AssocArrayObject;
+struct ClassTypeInfo;
 struct DataType;
 enum class DataTypeKind : uint8_t;
 struct EnumTypeInfo;
@@ -294,6 +295,14 @@ bool TryEvalStringMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
 // their object among them, since a value is no object to write.
 bool TryEvalStringMethodOnValue(const Logic4Vec& value, const Expr* call_expr,
                                 SimContext& ctx, Arena& arena, Logic4Vec& out);
+
+// §6.16 with §8.7: whether `type`, or a class it extends, declares the
+// property `name` with the string type, written directly or through a typedef
+// -- a string itself, or, where `elements` says so, an array whose elements
+// are strings. The value the property stores does not say: a literal stored
+// into it is a packed value (§5.9) that carries no kind.
+bool PropertyIsString(const ClassTypeInfo* type, std::string_view name,
+                      SimContext& ctx, bool elements = false);
 
 // §6.19.5: every enumeration method works from the variable's current value and
 // answers with a value of that variable's enumeration, so a call

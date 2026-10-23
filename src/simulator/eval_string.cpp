@@ -508,16 +508,13 @@ static PropertyShape PropertyShapeOf(const ClassTypeInfo* type,
   return {};
 }
 
-// §6.16 with §8.7: whether `type`, or a class it extends, declares the
-// property `name` with the string type -- a string itself, or, where
-// `elements` says so, an array whose elements are strings. §7.4, §7.5 and
-// §7.10 with §8.5: a property declared as an array of strings, `string
-// inst[2]`, is no string itself, and a select of it, `h.inst[1] = "ab"`,
-// writes an element rather than a character. Taken for a string, that write
-// set character 1 of the property's empty text, which changed nothing, and the
-// element read back empty.
-static bool PropertyIsString(const ClassTypeInfo* type, std::string_view name,
-                             SimContext& ctx, bool elements = false) {
+// §7.4, §7.5 and §7.10 with §8.5: a property declared as an array of
+// strings, `string inst[2]`, is no string itself, and a select of it,
+// `h.inst[1] = "ab"`, writes an element rather than a character. Taken for a
+// string, that write set character 1 of the property's empty text, which
+// changed nothing, and the element read back empty.
+bool PropertyIsString(const ClassTypeInfo* type, std::string_view name,
+                      SimContext& ctx, bool elements) {
   const ClassTypeInfo::PropertyInfo* prop =
       type != nullptr ? type->FindProperty(name) : nullptr;
   if (prop == nullptr) return false;
