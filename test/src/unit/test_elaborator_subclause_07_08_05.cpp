@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <format>
 #include <string>
 #include <string_view>
 
@@ -380,18 +381,17 @@ TEST(UserDefinedTypeAssocArrayElaboration, NetOfScopedIndexDimIsReported) {
   }
 }
 
-// §7.8.5 admits an index type with equality defined, which §6.14 defines for a
-// chandle, so `a` is associative with a 64-bit unsigned index. §6.7 holds a
-// net to fixed-size dimensions, so `w`'s chandle index is reported. `a` was
-// built with no dimension, and `w`'s index taken for a size.
-TEST(UserDefinedTypeAssocArrayElaboration, ChandleIndexIsAssociative) {
+// §7.8.5 with §6.7: `int a [<keyword>]` is associative with a 64-bit unsigned
+// index, and a net written with the same index, on line 3, is reported, a
+// net's dimensions being fixed-size.
+void ExpectKeywordIndexAssociative(const std::string& keyword) {
   ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module top;\n"
-      "  int a [chandle];\n"
-      "  wire w [chandle];\n"
-      "endmodule\n",
-      f);
+  auto* design = ElaborateSrc(std::format("module top;\n"
+                                          "  int a [{0}];\n"
+                                          "  wire w [{0}];\n"
+                                          "endmodule\n",
+                                          keyword),
+                              f);
   ASSERT_NE(design, nullptr);
   const auto& vars = design->top_modules[0]->variables;
   auto a = std::ranges::find(vars, std::string_view("a"), &RtlirVariable::name);
@@ -402,6 +402,20 @@ TEST(UserDefinedTypeAssocArrayElaboration, ChandleIndexIsAssociative) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "a net's unpacked dimension must be fixed-size", 3,
                             "6.7"));
+}
+
+// §7.8.5 admits an index type with equality defined, which §6.14 defines for a
+// chandle. The array was built with no dimension, and the net's index taken
+// for a size.
+TEST(UserDefinedTypeAssocArrayElaboration, ChandleIndexIsAssociative) {
+  ExpectKeywordIndexAssociative("chandle");
+}
+
+// §15.5.5.3 defines equality for an event, by the object it refers to, whose
+// identity is the 64-bit index. The array was built with no dimension, and
+// the net's index taken for a size.
+TEST(UserDefinedTypeAssocArrayElaboration, EventIndexIsAssociative) {
+  ExpectKeywordIndexAssociative("event");
 }
 
 }  // namespace

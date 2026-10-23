@@ -84,12 +84,15 @@ static bool TryParseRangeDim(const Expr* dim, RtlirVariable& var,
 
 // §6.11: the width each index type keyword denotes on its own. `bit`, `logic`
 // and `reg` are the one-bit types, and `time` is a 64-bit unsigned integer
-// type. A chandle holds a pointer, which a 64-bit key keeps (§6.14).
+// type. A chandle holds a pointer, which a 64-bit key keeps (§6.14), and an
+// event is keyed by the identity of the object it refers to, an address too.
 static uint32_t AssocIndexWidth(std::string_view t) {
   if (t == "bit" || t == "logic" || t == "reg") return 1;
   if (t == "byte") return 8;
   if (t == "shortint") return 16;
-  if (t == "longint" || t == "time" || t == "chandle") return 64;
+  if (t == "longint" || t == "time" || t == "chandle" || t == "event") {
+    return 64;
+  }
   return 32;
 }
 
@@ -125,11 +128,12 @@ static bool TryParseAssocDim(const Expr* dim, RtlirVariable& var,
   if (dim->kind != ExprKind::kIdentifier) return false;
   auto t = dim->text;
   // §7.8.5 admits an index type with equality defined, which §6.14 defines
-  // for a chandle; its keys are unordered and kept in the order of their
-  // values, which §7.8.5 leaves arbitrary but stable.
+  // for a chandle and §15.5.5.3 for an event; their keys are unordered and
+  // kept in the order of their values, which §7.8.5 leaves arbitrary but
+  // stable.
   if (t == "string" || t == "int" || t == "integer" || t == "byte" ||
       t == "shortint" || t == "longint" || t == "bit" || t == "logic" ||
-      t == "reg" || t == "time" || t == "chandle" || t == "*") {
+      t == "reg" || t == "time" || t == "chandle" || t == "event" || t == "*") {
     var.is_assoc = true;
     var.assoc_index_keyword = t;
     var.is_string_index = (t == "string");

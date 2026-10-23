@@ -50,4 +50,27 @@ TEST(UserDefinedIndexAssocArraySimulation, ChandleIndexKeysAnEntry) {
   EXPECT_EQ(out, "1 7 1\n");
 }
 
+// §7.8.5 with §15.5.5.3: an event index keys an entry by the object the event
+// refers to, so two events are two entries and `null` a third. Once `e2 = e1`
+// merges them (§15.5.5.1), e2 refers to e1's object and reads e1's entry.
+// Every event read as one bit, so e1 and e2 shared an entry.
+TEST(UserDefinedIndexAssocArraySimulation, EventIndexKeysByTheObject) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  int b [event];\n"
+      "  event e1, e2;\n"
+      "  initial begin\n"
+      "    b[e1] = 1;\n"
+      "    b[e2] = 2;\n"
+      "    b[null] = 3;\n"
+      "    $display(\"%0d %0d %0d %0d\", b[e1], b[e2], b[null], b.num());\n"
+      "    e2 = e1;\n"
+      "    $display(\"%0d\", b[e2]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 2 3 3\n1\n");
+}
+
 }  // namespace

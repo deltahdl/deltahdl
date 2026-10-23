@@ -207,8 +207,15 @@ static Logic4Vec EvalIdentifier(const Expr* expr, SimContext& ctx,
       return instance;
     return EvalIdentifierClassScope(expr, ctx, arena);
   }
-  if (var->is_event)
-    return MakeLogic4VecVal(arena, 1, var->is_null_event ? 0u : 1u);
+  // §15.5.5.3: an event's value is the synchronization object it refers to,
+  // which two events merged by an assignment share (§15.5.5.1) and a null
+  // event has none of, reading 0. An event-indexed associative array keys its
+  // entries by it (§7.8.5), a queue of events holds it (EventIdentityOf), and
+  // a test of the event's truth reads it.
+  if (var->is_event) {
+    return MakeLogic4VecVal(
+        arena, 64, var->is_null_event ? 0 : ctx.RegisterEventIdentity(var));
+  }
   auto val = var->value;
   // §16.5.2: inside an assertion, a variable's sampled value is the one value
   // it has at a clock tick. While a clocked concurrent assertion's
