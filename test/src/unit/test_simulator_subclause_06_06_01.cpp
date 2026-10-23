@@ -421,8 +421,7 @@ TEST(WireTriResolutionE2e, TriHighZDriverDefersToDrivenValue) {
 // a 4-bit wire produce, per bit, an agreement (bit0: 1&1 -> 1), two conflicts
 // (bit1: 1&0 -> x, bit2: 0&1 -> x), and an agreement (bit3: 0&0 -> 0). The
 // whole resolved vector is matched with case equality against 0xx1, so all four
-// cells
-// -- including the two x results -- are checked at once.
+// cells -- including the two x results -- are checked at once.
 TEST(WireTriResolutionE2e, WireVectorResolvesBitByBit) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  wire [3:0] w;\n"

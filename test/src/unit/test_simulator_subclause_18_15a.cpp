@@ -72,9 +72,8 @@ TEST(ManuallySeedingRandomize, NewMethodSrandomGovernsMemberRandomization) {
 
 // §18.15: the seed the constructor installs actually controls the member draw,
 // not merely a fixed value. Two objects constructed with different seeds
-// diverge
-// -- the new()-time this.srandom(seed) selects the stream member randomization
-// draws from.
+// diverge -- the new()-time this.srandom(seed) selects the stream member
+// randomization draws from.
 TEST(ManuallySeedingRandomize, ConstructorSeedValueControlsResult) {
   const char* src =
       "class Packet;\n"

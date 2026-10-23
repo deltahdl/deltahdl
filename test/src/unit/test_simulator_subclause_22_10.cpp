@@ -5,10 +5,9 @@
 // §22.10 (C5) states that `celldefine and `endcelldefine may appear anywhere
 // in the source description. "Anywhere" includes positions the other Clause 22
 // state directives reject -- inside a design element, and inside a procedural
-// block
-// -- so the runtime consequence of the rule is that the surrounding design is
-// untouched: it still elaborates, still lowers, and still computes the same
-// values it would compute with the directives removed.
+// block -- so the runtime consequence of the rule is that the surrounding
+// design is untouched: it still elaborates, still lowers, and still computes
+// the same values it would compute with the directives removed.
 //
 // The tag the directives apply is a compile-time property of a module; it does
 // not reach the simulator, so what is checked here is that placing the

@@ -162,11 +162,11 @@ static bool IsRepeatableIndex(const Expr* e) {
 
 // §11.5.1: the bit of `net` that a bit-select's index names, resolved against
 // the declaration, since which bit an address reaches depends in part on the
-// declaration. An index carrying x or z names no bit
-// -- §11.5.1 has `vect[expression that returns x]` return x -- and neither does
-// one outside the declared bounds, which reads as x for the same reason. Both
-// are still the scalar reference §21.2.1.4 asks for, so neither is reported;
-// there is simply no bit of a net whose strength could be named.
+// declaration. An index carrying x or z names no bit -- §11.5.1 has
+// `vect[expression that returns x]` return x -- and neither does one outside
+// the declared bounds, which reads as x for the same reason. Both are still the
+// scalar reference §21.2.1.4 asks for, so neither is reported; there is simply
+// no bit of a net whose strength could be named.
 static PercentVArg ClassifyNetBitSelect(const Expr* arg, const Net* net,
                                         SimContext& ctx, Arena& arena) {
   // §7.4.1: one index of a packed multidimensional array addresses an element

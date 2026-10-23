@@ -363,13 +363,12 @@ TEST(CheckerProcedures, CheckerInitialProcedureRejectsDelayTimingControl) {
 }
 
 // §17.5's two checker-procedure walks in
-// src/elaborator/elaborator_items_udp.cpp
-// -- StmtContainsBlockingAssignment for the always_ff restriction and
-// StmtContainsNonEventTimingControl for the initial procedure's timing control
-// -- each wrote out six of the thirteen child-statement links Stmt holds, and
-// now take the list from ForEachChildStmt in
-// src/elaborator/elaborator_validate_internal.h. The cases below stand at the
-// positions each rule newly reaches.
+// src/elaborator/elaborator_items_udp.cpp -- StmtContainsBlockingAssignment for
+// the always_ff restriction and StmtContainsNonEventTimingControl for the
+// initial procedure's timing control -- each wrote out six of the thirteen
+// child-statement links Stmt holds, and now take the list from ForEachChildStmt
+// in src/elaborator/elaborator_validate_internal.h. The cases below stand at
+// the positions each rule newly reaches.
 //
 // Four links get no case. §17.5 puts neither a randcase (§18.16) nor a
 // randsequence (A.6.12) on the list of what either procedure may contain, so no

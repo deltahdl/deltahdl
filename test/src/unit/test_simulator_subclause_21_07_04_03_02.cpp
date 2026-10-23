@@ -114,9 +114,8 @@ class ExtendedVcdDriversSim : public VcdDumpRunTestBase {
 
   // Extended-VCD value change for a named port: the p-record whose trailing
   // identifier token matches the port's $var code. Returns
-  // "<port_value>|<s0s1>"
-  // -- the state character run and the two strength component digits -- or a
-  // diagnostic marker.
+  // "<port_value>|<s0s1>" -- the state character run and the two strength
+  // component digits -- or a diagnostic marker.
   std::string PortRecord(const std::string& content, const std::string& name) {
     std::string ident = IdentFor(content, name);
     if (ident == "<none>") return "<no-ident>";

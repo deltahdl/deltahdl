@@ -580,8 +580,8 @@ void ExecFunctionBody(const ModuleItem* func, const Expr* call,
   // §37.44 detail 1: a thread going down a chain of task and function calls
   // activates a new frame on entering each one. This is that entry for a
   // function or a method, and the scope is what leaves the frame that was
-  // active standing again however the body ends
-  // -- a return out of the middle of it included.
+  // active standing again however the body ends -- a return out of the middle
+  // of it included.
   VpiActiveFrameScope frame(call);
   // §13.4.1: the record a `return` of a queue or an array fills, handed to
   // the evaluation of the call when the body completes (eval_call_result.cpp).

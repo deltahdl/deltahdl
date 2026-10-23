@@ -389,8 +389,7 @@ TEST(InterfaceClassSpecialization,
 // property of the parameterization, so IntfBase#(2) and IntfBase#(A) with
 // `localparam int A = 2` are one specialization, SIZE is inherited once, and
 // the source is legal. An implementation that split every argument it could not
-// fold
-// -- or that keyed a name by its spelling -- reports a conflict here while
+// fold -- or that keyed a name by its spelling -- reports a conflict here while
 // still passing the test above.
 TEST(InterfaceClassSpecialization,
      AModuleLocalparamAndAnEqualLiteralAreOneSpecialization) {

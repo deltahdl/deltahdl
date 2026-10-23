@@ -142,8 +142,7 @@ static bool TryClassCopyNewAssign(const Stmt* stmt, std::string_view target,
 // §8.30.1 (printed page 217 of IEEE 1800-2023): the `new(referent)` of
 // the built-in weak_reference class, which names no class the run holds a
 // record of, allocates the weak reference to the object the one argument refers
-// to
-// -- a null reference with no argument -- and answers its handle as the
+// to -- a null reference with no argument -- and answers its handle as the
 // 64-bit value the variable of the weak_reference type holds. One mechanism
 // for the procedural `w = new(h)` below and for a package's or the unit's
 // `weak_reference #(C) w = new(h);` declaration assignment
