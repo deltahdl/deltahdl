@@ -171,11 +171,11 @@ TEST_F(ProgramParseTest, ProgramWithAutomaticLifetime) {
 
 TEST(ScopeAndLifetimeParsing, StaticVarKeywordInBlock) {
   EXPECT_TRUE(
-      ParseOk6("module t;\n"
-               "  initial begin\n"
-               "    var static logic x;\n"
-               "  end\n"
-               "endmodule\n"));
+      ParseOk("module t;\n"
+              "  initial begin\n"
+              "    var static logic x;\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 TEST(ScopeAndLifetimeParsing, StaticVarInInitialBlock) {

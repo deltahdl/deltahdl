@@ -415,20 +415,20 @@ TEST(TypeOperatorParsing, TypeOpInParamDefault) {
 
 TEST(TypeOperatorParsing, TypeRefDataTypeCaseAndComparison) {
   EXPECT_TRUE(
-      ParseOk6("module top #(parameter type T = type(logic[11:0]))\n"
-               "  ();\n"
-               "  initial begin\n"
-               "    case (type(T))\n"
-               "      type(logic[11:0]) : ;\n"
-               "      default : $stop;\n"
-               "    endcase\n"
-               "    if (type(T) == type(logic[12:0])) $stop;\n"
-               "    if (type(T) != type(logic[11:0])) $stop;\n"
-               "    if (type(T) === type(logic[12:0])) $stop;\n"
-               "    if (type(T) !== type(logic[11:0])) $stop;\n"
-               "    $finish;\n"
-               "  end\n"
-               "endmodule\n"));
+      ParseOk("module top #(parameter type T = type(logic[11:0]))\n"
+              "  ();\n"
+              "  initial begin\n"
+              "    case (type(T))\n"
+              "      type(logic[11:0]) : ;\n"
+              "      default : $stop;\n"
+              "    endcase\n"
+              "    if (type(T) == type(logic[12:0])) $stop;\n"
+              "    if (type(T) != type(logic[11:0])) $stop;\n"
+              "    if (type(T) === type(logic[12:0])) $stop;\n"
+              "    if (type(T) !== type(logic[11:0])) $stop;\n"
+              "    $finish;\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 TEST(TypeOperatorParsing, TypeRefThis) {

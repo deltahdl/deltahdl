@@ -1,7 +1,6 @@
 #include <gtest/gtest.h>
 
 #include "fixture_parser.h"
-#include "helpers_parser_verify.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -67,17 +66,17 @@ TEST(TaskAndFunctionParsing, ExplicitlyTypedParam) {
 
 TEST(DataTypeParsing, ParamDecl_ImplicitType) {
   EXPECT_TRUE(
-      ParseOk6("module t;\n"
-               "  localparam [10:0] p = 1 << 5;\n"
-               "  localparam logic [10:0] q = 1 << 5;\n"
-               "endmodule\n"));
+      ParseOk("module t;\n"
+              "  localparam [10:0] p = 1 << 5;\n"
+              "  localparam logic [10:0] q = 1 << 5;\n"
+              "endmodule\n"));
 }
 
 TEST(DataTypeParsing, ParamDecl_UnpackedDims) {
   EXPECT_TRUE(
-      ParseOk6("module t;\n"
-               "  parameter logic [31:0] p [3:0] = '{1, 2, 3, 4};\n"
-               "endmodule\n"));
+      ParseOk("module t;\n"
+              "  parameter logic [31:0] p [3:0] = '{1, 2, 3, 4};\n"
+              "endmodule\n"));
 }
 
 TEST(DataTypeParsing, UntypedUnrangedParameterParses) {

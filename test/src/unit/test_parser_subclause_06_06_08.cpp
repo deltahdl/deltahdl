@@ -34,9 +34,9 @@ TEST(InterconnectParsing, MultipleDecls) {
 
 TEST(InterconnectParsing, BasicWithVersionGate) {
   EXPECT_TRUE(
-      ParseOk6("module t;\n"
-               "  interconnect bus;\n"
-               "endmodule\n"));
+      ParseOk("module t;\n"
+              "  interconnect bus;\n"
+              "endmodule\n"));
 }
 
 TEST(InterconnectParsing, DeclFlagWithPreprocessor) {

@@ -1,7 +1,6 @@
 #include <gtest/gtest.h>
 
 #include "fixture_parser.h"
-#include "helpers_parser_verify.h"
 
 using namespace delta;
 
@@ -18,9 +17,9 @@ TEST(DollarConstantParsing, DollarInQueueDimension) {
 
 TEST(DollarConstantParsing, DollarAssignedToParameter) {
   EXPECT_TRUE(
-      ParseOk6("module t;\n"
-               "  parameter p = $;\n"
-               "endmodule\n"));
+      ParseOk("module t;\n"
+              "  parameter p = $;\n"
+              "endmodule\n"));
 }
 
 TEST(DollarConstantParsing, DollarParameterInPortList) {

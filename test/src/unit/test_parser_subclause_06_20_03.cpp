@@ -46,39 +46,39 @@ TEST(TypeParameterParsing, TypeParameterLogicVector) {
 
 TEST(TypeParameterParsing, LocalparamTypeDecl) {
   EXPECT_TRUE(
-      ParseOk6("module t;\n"
-               "  localparam type testtype = logic;\n"
-               "  testtype x;\n"
-               "endmodule\n"));
+      ParseOk("module t;\n"
+              "  localparam type testtype = logic;\n"
+              "  testtype x;\n"
+              "endmodule\n"));
 }
 
 TEST(TypeParameterParsing, TypeParameterWithMultipleParams) {
   EXPECT_TRUE(
-      ParseOk6("module m #(parameter type T = int, parameter type U = real)\n"
-               "  ();\n"
-               "  T x;\n"
-               "  U y;\n"
-               "endmodule\n"));
+      ParseOk("module m #(parameter type T = int, parameter type U = real)\n"
+              "  ();\n"
+              "  T x;\n"
+              "  U y;\n"
+              "endmodule\n"));
 }
 
 TEST(TypeParameterParsing, MixedValueAndTypeParamsParses) {
   EXPECT_TRUE(
-      ParseOk6("module ma #(parameter p1 = 1, parameter type p2 = shortint)\n"
-               "  (input logic [p1:0] i, output logic [p1:0] o);\n"
-               "  p2 j = 0;\n"
-               "endmodule\n"));
+      ParseOk("module ma #(parameter p1 = 1, parameter type p2 = shortint)\n"
+              "  (input logic [p1:0] i, output logic [p1:0] o);\n"
+              "  p2 j = 0;\n"
+              "endmodule\n"));
 }
 
 TEST(TypeParameterParsing, PortListForwardEnumParses) {
   EXPECT_TRUE(
-      ParseOk6("module m #(type enum T = logic);\n"
-               "endmodule\n"));
+      ParseOk("module m #(type enum T = logic);\n"
+              "endmodule\n"));
 }
 
 TEST(TypeParameterParsing, TypeParamWithStructRestriction) {
   EXPECT_TRUE(
-      ParseOk6("module m #(type struct T);\n"
-               "endmodule\n"));
+      ParseOk("module m #(type struct T);\n"
+              "endmodule\n"));
 }
 
 TEST(TypeParameterParsing, TypeParamForwardEnum) {

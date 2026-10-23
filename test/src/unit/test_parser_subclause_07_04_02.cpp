@@ -1,17 +1,12 @@
 #include <gtest/gtest.h>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
-#include "lexer/lexer.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
-#include "parser/parser.h"
 
 using namespace delta;
 
@@ -113,19 +108,8 @@ TEST(UnpackedArrayParsing, Int2DUnpackedArray) {
   ASSERT_GE(item->unpacked_dims.size(), 2u);
 }
 
-static bool ParseOk5(const std::string& src) {
-  SourceManager mgr;
-  Arena arena;
-  auto fid = mgr.AddFile("<test>", src);
-  DiagEngine diag(mgr);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, arena, diag);
-  parser.Parse();
-  return !diag.HasErrors();
-}
-
 TEST(UnpackedArrayParsing, UnpackedDimMultiRange) {
-  EXPECT_TRUE(ParseOk5("module m; int a[1:2][1:3]; endmodule"));
+  EXPECT_TRUE(ParseOk("module m; int a[1:2][1:3]; endmodule"));
 }
 
 TEST(UnpackedArrayParsing, RealUnpackedDim) {

@@ -1,13 +1,8 @@
 #include <gtest/gtest.h>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "fixture_parser.h"
 #include "helpers_reported_error.h"
-#include "lexer/lexer.h"
 #include "parser/ast_module.h"
-#include "parser/parser.h"
 
 using namespace delta;
 
@@ -74,19 +69,8 @@ TEST(PackageParsing, EmptyPackage) {
   EXPECT_EQ(r.cu->packages[0]->name, "pkg");
 }
 
-static bool ParseOk5(const std::string& src) {
-  SourceManager mgr;
-  Arena arena;
-  auto fid = mgr.AddFile("<test>", src);
-  DiagEngine diag(mgr);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, arena, diag);
-  parser.Parse();
-  return !diag.HasErrors();
-}
-
 TEST(DataObjectParsing, ModuleBody_NullItem) {
-  EXPECT_TRUE(ParseOk5("module m; ; endmodule"));
+  EXPECT_TRUE(ParseOk("module m; ; endmodule"));
 }
 
 TEST(PackageDeclaration, PackageEndLabel) {

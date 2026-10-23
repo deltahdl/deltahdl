@@ -123,14 +123,14 @@ TEST(CastOperatorParsing, StringCastFromInteger) {
 
 TEST(CastOperatorParsing, UserDefinedEnumCast) {
   EXPECT_TRUE(
-      ParseOk6("module t;\n"
-               "  typedef enum {a, b, c, d} e;\n"
-               "  initial begin\n"
-               "    e val;\n"
-               "    val = a;\n"
-               "    val = e'(val + 1);\n"
-               "  end\n"
-               "endmodule\n"));
+      ParseOk("module t;\n"
+              "  typedef enum {a, b, c, d} e;\n"
+              "  initial begin\n"
+              "    e val;\n"
+              "    val = a;\n"
+              "    val = e'(val + 1);\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 TEST(CastOperatorParsing, IntCastAstFields) {

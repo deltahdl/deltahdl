@@ -523,8 +523,6 @@ inline Stmt* FirstAlwaysCombStmt(T& r) {
   return item ? item->body : nullptr;
 }
 
-inline bool ParseOk6(const std::string& src) { return ParseOk(src); }
-
 template <typename T>
 inline ModuleItem* FirstContAssign(T& r) {
   return FirstItem(r, ModuleItemKind::kContAssign);
