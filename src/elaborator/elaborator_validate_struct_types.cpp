@@ -231,33 +231,41 @@ static const ModuleItem* OuterValueNamed(std::string_view name,
   return ItemNamed(UnitItemsBefore(scope.unit, scope.reference), name);
 }
 
-// §6.19: the key RtlirModule::enum_types holds the enumeration declaring the
-// named constant `name` under, or empty where no enumeration the module sees
-// declares it.
-static std::string_view EnumerationDeclaring(const RtlirModule* mod,
-                                             std::string_view name) {
-  for (const auto& [key, members] : mod->enum_types) {
-    if (std::ranges::find(members, name, &RtlirEnumMember::name) !=
-        members.end()) {
-      return key;
-    }
+// §6.19: the named constant `name` of an enumeration the module sees, or null
+// where no enumeration declares it, with the key RtlirModule::enum_types
+// holds that enumeration under.
+static const RtlirEnumMember* EnumConstantNamed(const RtlirModule* mod,
+                                                std::string_view name,
+                                                std::string_view& key) {
+  for (const auto& [enum_key, members] : mod->enum_types) {
+    auto it = std::ranges::find(members, name, &RtlirEnumMember::name);
+    if (it == members.end()) continue;
+    key = enum_key;
+    return &*it;
   }
-  return {};
+  return nullptr;
 }
 
-// §6.19.3 with §6.23: the enumerated type the enumeration keyed `key`
-// declares, which a type reference to one of its named constants stands for.
-// A typedef's enumeration is named by the typedef. One written as a
-// variable's type has no name another declaration could write, and the
-// reference takes the width and signing that variable has.
-static void AdoptEnumerationType(DataType& dt, std::string_view key,
-                                 const TypeRefScope& scope) {
+// §6.19.3 with §6.23: the enumerated type declaring `constant`, keyed `key`,
+// which a type reference to the constant stands for. A typedef's enumeration
+// is named by the typedef, and the declaration resolves the name as it would
+// a typedef it wrote. One written as a variable's or a structure member's type
+// has no name another declaration could write, so the declaration takes a
+// copy of it, keeping its own `const`, and the key is answered: the
+// declaration declares none of the enumeration's constants again, and names
+// its enumeration by the key. Empty for a typedef's.
+static std::string_view AdoptEnumerationType(DataType& dt,
+                                             const RtlirEnumMember& constant,
+                                             std::string_view key,
+                                             const TypeRefScope& scope) {
   if (scope.typedefs.count(key) != 0) {
     AdoptReferencedType(dt, TypeNameToDataType(key));
-    return;
+    return {};
   }
-  AdoptLogicVector(dt, NamedValueShape(key, scope.mod).value_or(ValueShape{}),
-                   scope.arena);
+  bool is_const = dt.is_const;
+  dt = *constant.enumeration;
+  dt.is_const = is_const;
+  return key;
 }
 
 // §8.23 names the type operator as a context in which a class scope resolution
@@ -325,28 +333,33 @@ static void ResolveNamedTypeRef(DataType& dt, std::string_view name,
   AdoptReferencedType(dt, DeclaredValueType(*outer, scope));
 }
 
-void Elaborator::ResolveTypeRef(DataType& dt, SourceLoc loc,
-                                const RtlirModule* mod) {
-  if (!dt.type_ref_expr) return;
+// §6.23: resolves the type reference `dt` holds, if any, written at `loc` in
+// `mod`, to the type it stands for, in place. Answers the key
+// RtlirModule::enum_types holds an enumeration under where the reference
+// named a constant of one no typedef names, whose type `dt` then copies
+// (AdoptEnumerationType), and empty otherwise.
+std::string_view Elaborator::ResolveTypeRef(DataType& dt, SourceLoc loc,
+                                            const RtlirModule* mod) {
+  if (!dt.type_ref_expr) return {};
   auto* ref = dt.type_ref_expr;
   CheckTypeRefArgInner(ref, loc);
   const TypeRefScope kScope{mod, typedefs_, unit_, loc, arena_};
-  if (ResolveScopedTypeRef(dt, ref, kScope)) return;
+  if (ResolveScopedTypeRef(dt, ref, kScope)) return {};
   if (ref->kind != ExprKind::kIdentifier) {
     AdoptLogicVector(
         dt, {InferTypeRefExprWidth(ref, mod), InferTypeRefExprSigned(ref, mod)},
         arena_);
-    return;
+    return {};
   }
   // A named constant of an enumeration stands for the enumeration's type. It
   // is looked up before the module's variables, which BuildEnumMembers gives
   // each constant one of to hold its value: matched there, the constant read
   // var_types_, which records no such name, and took the implicit type's one
   // bit.
-  std::string_view enumeration = EnumerationDeclaring(mod, ref->text);
-  if (!enumeration.empty()) {
-    AdoptEnumerationType(dt, enumeration, kScope);
-    return;
+  std::string_view enumeration;
+  if (const RtlirEnumMember* constant =
+          EnumConstantNamed(mod, ref->text, enumeration)) {
+    return AdoptEnumerationType(dt, *constant, enumeration, kScope);
   }
   for (const auto& v : mod->variables) {
     if (v.name != ref->text) continue;
@@ -357,7 +370,7 @@ void Elaborator::ResolveTypeRef(DataType& dt, SourceLoc loc,
       SetTypeRefPackedDims(dt, v.width, arena_);
     }
     dt.type_ref_expr = nullptr;
-    return;
+    return {};
   }
   // §6.23: type(net) yields the net's underlying data type (a logic vector of
   // the net's width); the net-ness of the declared object comes separately from
@@ -365,15 +378,16 @@ void Elaborator::ResolveTypeRef(DataType& dt, SourceLoc loc,
   for (const auto& n : mod->nets) {
     if (n.name != ref->text) continue;
     AdoptLogicVector(dt, {n.width, n.is_signed}, arena_);
-    return;
+    return {};
   }
   auto it = var_types_.find(ref->text);
   if (it != var_types_.end()) {
     dt.kind = it->second;
     dt.type_ref_expr = nullptr;
-    return;
+    return {};
   }
   ResolveNamedTypeRef(dt, ref->text, kScope);
+  return {};
 }
 
 // The class a name reaches, or nothing when the answer is not clear.

@@ -544,8 +544,8 @@ class Elaborator : public ElaboratorClassRules {
   // The generate prefix currently in force, arena-persisted so it outlives the
   // mutable member it is copied from. Empty outside any generate construct.
   std::string_view InternedGenPrefix();
-
-  void ResolveTypeRef(DataType& dt, SourceLoc loc, const RtlirModule* mod);
+  std::string_view ResolveTypeRef(DataType& dt, SourceLoc loc,
+                                  const RtlirModule* mod);
 
   void ValidateArrayInitPattern(const ModuleItem* item);
   void ValidateStructInitPattern(const ModuleItem* item);

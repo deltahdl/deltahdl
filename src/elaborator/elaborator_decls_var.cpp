@@ -766,39 +766,6 @@ static std::string_view AdoptTypedefArrayDims(
   return typedef_name;
 }
 
-void Elaborator::ReportUndeclaredTypeName(const ModuleItem* item) {
-  if (!item->type_name_undeclared_at_parse) return;
-  // One report per declaration rather than per declarator. A.2.1.3 gives
-  // `data_declaration ::= [ const ] [ var ] [ lifetime ] data_type_or_implicit
-  // list_of_variable_decl_assignments ;`, so `my_type a, b, c;` writes the
-  // type_identifier once however many names follow it, and §6.18 is breached by
-  // that one reference. Parser::ParseVarDeclList builds one ModuleItem per
-  // declarator and marks each of them, so without this the source would be
-  // reported as many times as it declares names.
-  if (!item->first_in_decl_list) return;
-  std::string_view name = item->data_type.type_name;
-  // §23.3.2 gives module_instantiation its parenthesized list_of_port_
-  // connections, so a name that does turn out to be a module was written as an
-  // instantiation with that list left off.
-  if (FindModuleInScope(name) != nullptr) {
-    diag_.Error(
-        item->loc,
-        std::format("instantiation of module '{}' has no port connection list",
-                    name),
-        Subclause("23.3.2"));
-    return;
-  }
-  // §6.18: a user-defined data type is declared before any reference to its
-  // type_identifier. A type declared below this reference and a type declared
-  // nowhere at all both breach it, and the sentence draws no distinction
-  // between them: neither declaration precedes the reference.
-  diag_.Error(item->loc,
-              std::format("declaration of type '{}' does not precede this "
-                          "reference to it",
-                          name),
-              Subclause("6.18"));
-}
-
 // §6.6.7: a declaration naming a nettype declares a net, and only a net may
 // be declared with one. A.2.1.3 opens a data declaration, and never a net
 // declaration, with `const`, `var` or a lifetime, so the same declaration
@@ -843,7 +810,10 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
 
   ReportUndeclaredTypeName(item);
 
-  ResolveTypeRef(item->data_type, item->loc, mod);
+  // §6.23: a type reference to a constant of an enumeration no typedef names
+  // gives the declaration that enumeration (Elaborator::ResolveTypeRef).
+  std::string_view adopted_enumeration =
+      ResolveTypeRef(item->data_type, item->loc, mod);
 
   SpecializeClassScopedTypedef(item, unit_, BuildParamScope(mod), typedefs_,
                                arena_);
@@ -921,6 +891,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
 
   SetVariableTypeInfo(item, var, BuildParamScope(mod));
   NameAdoptedArrayTypedef(item, adopted_array_typedef, var);
+  if (!adopted_enumeration.empty()) var.enum_type_name = adopted_enumeration;
   BindCovergroupVariable(*item, var, mod, unit_, arena_);
 
   ElaborateUnpackedDims(
@@ -936,10 +907,13 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   // mod->variables in order, so the constants go first; pushed after s, the
   // initializer read a c not yet declared, and s started at a.
   // §6.19: the typedef declared the constants of an enumeration it writes,
-  // so a variable adopting its type above declares none of them again.
-  ValidateVarDeclTypes(item, BuildParamScope(mod),
-                       adopted_array_typedef.empty());
-  if (adopted_array_typedef.empty()) EmitBareEnumMembers(item, mod);
+  // and the declaration a type reference took its enumeration from declared
+  // that enumeration's, so a variable adopting either type above declares
+  // none of them again.
+  bool writes_its_type =
+      adopted_array_typedef.empty() && adopted_enumeration.empty();
+  ValidateVarDeclTypes(item, BuildParamScope(mod), writes_its_type);
+  if (writes_its_type) EmitBareEnumMembers(item, mod);
   mod->variables.push_back(var);
   ValidateArrayInitPattern(item);
   ValidateStructInitPattern(item);

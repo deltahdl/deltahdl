@@ -197,15 +197,18 @@ struct EnumMemberDeclCtx {
 // contributes its numeric value when read (§6.19.4). The values themselves --
 // explicit values, ranges and implicit increments -- are folded by
 // FoldEnumMembers in elaborator_enum_constants.cpp, which the package and
-// compilation-unit scopes read as well. Takes the member list rather than the
+// compilation-unit scopes read as well. Takes the enumeration rather than the
 // declaration holding it, because Syntax 6-5 makes the enum form a data_type:
 // the same members can be written in a typedef or directly in a data
-// declaration, and both declare the named constants.
-std::vector<RtlirEnumMember> BuildEnumMembers(
-    const std::vector<EnumMember>& decl_members, uint32_t width,
-    const EnumMemberDeclCtx& ctx) {
-  auto members = FoldEnumMembers(decl_members, ctx.scope, ctx.arena);
-  for (const auto& member : members) {
+// declaration, and both declare the named constants. Each constant records
+// the enumeration, which a type reference to it stands for (§6.23).
+std::vector<RtlirEnumMember> BuildEnumMembers(const DataType& enumeration,
+                                              uint32_t width,
+                                              const EnumMemberDeclCtx& ctx) {
+  auto members =
+      FoldEnumMembers(enumeration.enum_members, ctx.scope, ctx.arena);
+  for (auto& member : members) {
+    member.enumeration = &enumeration;
     if (ctx.explicitly_imported != nullptr &&
         ctx.explicitly_imported->count(member.name) != 0)
       continue;
@@ -256,7 +259,7 @@ std::string_view EnumTypeKey(std::string_view decl_name,
 // enumeration's constant.
 void DeclareEnumType(const DataType& type, std::string_view key, uint32_t width,
                      ScopeMap& scope, const EnumMemberDeclCtx& ctx) {
-  auto members = BuildEnumMembers(type.enum_members, width, ctx);
+  auto members = BuildEnumMembers(type, width, ctx);
   for (const auto& m : members) scope[m.name] = m.value;
   ctx.mod->enum_types[key] = std::move(members);
 }
@@ -765,7 +768,7 @@ void EmitEnumLiteralsOfItems(
       if (mod->enum_types.count(key) != 0) return;
       uint32_t width = EvalTypeWidth(EnumArrayElement(type), ctx.typedefs);
       mod->enum_types[key] = BuildEnumMembers(
-          type.enum_members, width,
+          type, width,
           {no_scope, ctx.arena, mod, ctx.enum_member_names,
            &explicitly_imported, IsSignedType(type, ctx.typedefs)});
     });
@@ -831,6 +834,39 @@ void RegisterCuEnumLiterals(const ModuleDecl* decl, RtlirModule* mod,
                             const ImportedEnumCtx& ctx) {
   EmitEnumLiteralsOfItems(ctx.unit->cu_items, mod, ctx,
                           ExplicitImportNames(decl->items));
+}
+
+void Elaborator::ReportUndeclaredTypeName(const ModuleItem* item) {
+  if (!item->type_name_undeclared_at_parse) return;
+  // One report per declaration rather than per declarator. A.2.1.3 gives
+  // `data_declaration ::= [ const ] [ var ] [ lifetime ] data_type_or_implicit
+  // list_of_variable_decl_assignments ;`, so `my_type a, b, c;` writes the
+  // type_identifier once however many names follow it, and §6.18 is breached by
+  // that one reference. Parser::ParseVarDeclList builds one ModuleItem per
+  // declarator and marks each of them, so without this the source would be
+  // reported as many times as it declares names.
+  if (!item->first_in_decl_list) return;
+  std::string_view name = item->data_type.type_name;
+  // §23.3.2 gives module_instantiation its parenthesized list_of_port_
+  // connections, so a name that does turn out to be a module was written as an
+  // instantiation with that list left off.
+  if (FindModuleInScope(name) != nullptr) {
+    diag_.Error(
+        item->loc,
+        std::format("instantiation of module '{}' has no port connection list",
+                    name),
+        Subclause("23.3.2"));
+    return;
+  }
+  // §6.18: a user-defined data type is declared before any reference to its
+  // type_identifier. A type declared below this reference and a type declared
+  // nowhere at all both breach it, and the sentence draws no distinction
+  // between them: neither declaration precedes the reference.
+  diag_.Error(item->loc,
+              std::format("declaration of type '{}' does not precede this "
+                          "reference to it",
+                          name),
+              Subclause("6.18"));
 }
 
 }  // namespace delta

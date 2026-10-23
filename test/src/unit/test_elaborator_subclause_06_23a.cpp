@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
@@ -620,21 +621,60 @@ TEST(TypeOperatorSim, TypeOfANamedEnumerationsConstantIsTheEnumeration) {
 }
 
 // A constant of an enumeration written as a variable's type, with no typedef
-// to name it, takes the width and signing of that enumeration: `int`'s, the
-// default base type (§6.19), so z holds -2 in 32 bits.
-TEST(TypeOperatorSim, TypeOfAnAnonymousEnumerationsConstantTakesItsWidth) {
+// to name it, stands for that enumeration all the same (§6.19.3): z is of w's
+// type, 32 bits signed as `int`, the default base type (§6.19), makes it, and
+// holds Y.
+TEST(TypeOperatorSim, TypeOfAnAnonymousEnumerationsConstantIsTheEnumeration) {
   SimFixture f;
   auto* z = RunAndFindVar(
       "module t;\n"
       "  enum {X, Y} w;\n"
       "  var type(X) z;\n"
-      "  initial z = -2;\n"
+      "  initial z = Y;\n"
       "endmodule\n",
       f, "z");
   ASSERT_NE(z, nullptr);
   EXPECT_EQ(z->value.width, 32u);
   EXPECT_TRUE(z->is_signed);
-  EXPECT_EQ(z->value.ToUint64(), 0xFFFFFFFEu);
+  EXPECT_EQ(z->value.ToUint64(), 1u);
+}
+
+// §6.19.3 checks an assignment to a variable of an enumerated type strictly,
+// and a variable a type reference to one of the enumeration's constants
+// declares is of that type: Y stands, and the integer 5 needs a cast.
+TEST(TypeOperatorSim, AVariableOfAnAnonymousEnumerationsConstantsTypeIsStrict) {
+  SimFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  enum {X, Y} w;\n"
+      "  var type(X) z;\n"
+      "  initial begin\n"
+      "    z = Y;\n"
+      "    z = 5;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "integer assigned to enum variable without cast", 6,
+                            "6.19.3"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
+}
+
+// §6.19 with §7.2 declares the constants of an enumeration written as a
+// structure member's type in the scope holding the structure, so P is the
+// module's, and type(P) stands for the member's two-bit enumeration.
+TEST(TypeOperatorSim, TypeOfAMemberEnumerationsConstantIsTheEnumeration) {
+  SimFixture f;
+  auto* z = RunAndFindVar(
+      "module t;\n"
+      "  struct packed { enum bit [1:0] {P, Q} f; bit k; } s;\n"
+      "  var type(P) z;\n"
+      "  initial z = Q;\n"
+      "endmodule\n",
+      f, "z");
+  ASSERT_NE(z, nullptr);
+  EXPECT_EQ(z->value.width, 2u);
+  EXPECT_EQ(z->value.ToUint64(), 1u);
 }
 
 // §26.3 makes a package's declarations visible in a module that imports them,
