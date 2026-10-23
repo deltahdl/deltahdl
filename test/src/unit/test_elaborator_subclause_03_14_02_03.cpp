@@ -2,10 +2,12 @@
 
 #include <string>
 
+#include "common/types.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
+#include "helpers_rtlir_lookup.h"
 #include "parser/ast_design.h"
 #include "preprocessor/preprocessor.h"
 
@@ -418,6 +420,346 @@ TEST(TimescalePrecedenceElaboration, PrecisionOnlyIsUnspecified) {
                             "some design elements specify time unit and "
                             "precision while others do not",
                             5, "3.14.2.3"));
+}
+
+// The cases below read the time scale the elaborator gave each element, which
+// is what its delays are scaled by, rather than asking whether the design was
+// accepted. Each source keeps every element's precision no coarser than its
+// unit, so §3.14 rejects none of them.
+
+// §3.14.2.3: an element's own timeunit stands ahead of the `timescale before
+// it, which still supplies the precision the element omits.
+TEST(TimescalePrecedenceElaboration, ExplicitTimeunitTakesPriority) {
+  ElabFixture f;
+  auto* design = ElaborateWithPreprocessor(
+      "`timescale 1us / 1fs\n"
+      "module m;\n"
+      "  timeunit 1ps;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* mod = FindModule(design, "m");
+  ASSERT_NE(mod, nullptr);
+  EXPECT_EQ(mod->timescale.unit, TimeUnit::kPs);
+  EXPECT_EQ(mod->timescale.magnitude, 1);
+  EXPECT_EQ(mod->timescale.precision, TimeUnit::kFs);
+  EXPECT_EQ(mod->timescale.prec_magnitude, 1);
+}
+
+TEST(TimescalePrecedenceElaboration, ExplicitTimeprecisionTakesPriority) {
+  ElabFixture f;
+  auto* design = ElaborateWithPreprocessor(
+      "`timescale 1us / 1ns\n"
+      "module m;\n"
+      "  timeprecision 1fs;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* mod = FindModule(design, "m");
+  ASSERT_NE(mod, nullptr);
+  EXPECT_EQ(mod->timescale.unit, TimeUnit::kUs);
+  EXPECT_EQ(mod->timescale.magnitude, 1);
+  EXPECT_EQ(mod->timescale.precision, TimeUnit::kFs);
+  EXPECT_EQ(mod->timescale.prec_magnitude, 1);
+}
+
+// §3.14.2.3 a): a nested module that declares neither takes both from the
+// module enclosing it.
+TEST(TimescalePrecedenceElaboration, NestedModuleInheritsEnclosingUnit) {
+  ElabFixture f;
+  auto* design = ElaborateWithPreprocessor(
+      "module outer;\n"
+      "  timeunit 1ps;\n"
+      "  timeprecision 1fs;\n"
+      "  module inner;\n"
+      "  endmodule\n"
+      "  inner i();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* inner = FindModule(design, "inner");
+  ASSERT_NE(inner, nullptr);
+  EXPECT_EQ(inner->timescale.unit, TimeUnit::kPs);
+  EXPECT_EQ(inner->timescale.magnitude, 1);
+  EXPECT_EQ(inner->timescale.precision, TimeUnit::kFs);
+  EXPECT_EQ(inner->timescale.prec_magnitude, 1);
+}
+
+// The same of an interface nested in an interface. The module instantiating
+// the outer one declares a time scale of its own, which the inner interface
+// does not take, since it is nested in the interface and not in the module.
+TEST(TimescalePrecedenceElaboration,
+     NestedInterfaceInheritsEnclosingTimescale) {
+  ElabFixture f;
+  auto* design = ElaborateWithPreprocessor(
+      "interface outer_if;\n"
+      "  timeunit 1us;\n"
+      "  timeprecision 1ns;\n"
+      "  interface inner_if;\n"
+      "  endinterface\n"
+      "  inner_if v();\n"
+      "endinterface\n"
+      "module m;\n"
+      "  timeunit 1ms;\n"
+      "  timeprecision 1ps;\n"
+      "  outer_if u();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* inner = FindModule(design, "inner_if");
+  ASSERT_NE(inner, nullptr);
+  EXPECT_EQ(inner->timescale.unit, TimeUnit::kUs);
+  EXPECT_EQ(inner->timescale.magnitude, 1);
+  EXPECT_EQ(inner->timescale.precision, TimeUnit::kNs);
+  EXPECT_EQ(inner->timescale.prec_magnitude, 1);
+}
+
+// §3.14.2.3 b): an element that declares neither and is nested in nothing
+// takes both from the last `timescale before it.
+TEST(TimescalePrecedenceElaboration, FallbackToPreviousTimescaleDirective) {
+  ElabFixture f;
+  auto* design = ElaborateWithPreprocessor(
+      "`timescale 1us / 1ps\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* mod = FindModule(design, "m");
+  ASSERT_NE(mod, nullptr);
+  EXPECT_EQ(mod->timescale.unit, TimeUnit::kUs);
+  EXPECT_EQ(mod->timescale.magnitude, 1);
+  EXPECT_EQ(mod->timescale.precision, TimeUnit::kPs);
+  EXPECT_EQ(mod->timescale.prec_magnitude, 1);
+}
+
+// §3.14.2.3 c): with no `timescale before it, the compilation unit's own
+// declarations give both.
+TEST(TimescalePrecedenceElaboration, FallbackToCompilationUnitTimeunit) {
+  ElabFixture f;
+  auto* design = ElaborateWithPreprocessor(
+      "timeunit 10ps;\n"
+      "timeprecision 1fs;\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* mod = FindModule(design, "m");
+  ASSERT_NE(mod, nullptr);
+  EXPECT_EQ(mod->timescale.unit, TimeUnit::kPs);
+  EXPECT_EQ(mod->timescale.magnitude, 10);
+  EXPECT_EQ(mod->timescale.precision, TimeUnit::kFs);
+  EXPECT_EQ(mod->timescale.prec_magnitude, 1);
+}
+
+// §3.14.2.3 d): with nothing declared anywhere, the default, which deltahdl
+// takes as 1 ns for both.
+TEST(TimescalePrecedenceElaboration, FallbackToDefaultWhenNothingSpecified) {
+  ElabFixture f;
+  auto* design = ElaborateWithPreprocessor(
+      "module m;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* mod = FindModule(design, "m");
+  ASSERT_NE(mod, nullptr);
+  EXPECT_EQ(mod->timescale.unit, TimeUnit::kNs);
+  EXPECT_EQ(mod->timescale.magnitude, 1);
+  EXPECT_EQ(mod->timescale.precision, TimeUnit::kNs);
+  EXPECT_EQ(mod->timescale.prec_magnitude, 1);
+}
+
+// Every source at once: the inner module's own 10 ns unit stands ahead of all
+// of them, and the 100 ps precision it omits comes from the module enclosing
+// it, ahead of the `timescale's 1 us and the compilation unit's 1 ps.
+TEST(TimescalePrecedenceElaboration, FullPrecedenceChain) {
+  ElabFixture f;
+  auto* design = ElaborateWithPreprocessor(
+      "`timescale 1ms / 1us\n"
+      "timeunit 1ns;\n"
+      "timeprecision 1ps;\n"
+      "module outer;\n"
+      "  timeunit 1us;\n"
+      "  timeprecision 100ps;\n"
+      "  module inner;\n"
+      "    timeunit 10ns;\n"
+      "  endmodule\n"
+      "  inner i();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* outer = FindModule(design, "outer");
+  ASSERT_NE(outer, nullptr);
+  EXPECT_EQ(outer->timescale.unit, TimeUnit::kUs);
+  EXPECT_EQ(outer->timescale.precision, TimeUnit::kPs);
+  EXPECT_EQ(outer->timescale.prec_magnitude, 100);
+  const auto* inner = FindModule(design, "inner");
+  ASSERT_NE(inner, nullptr);
+  EXPECT_EQ(inner->timescale.unit, TimeUnit::kNs);
+  EXPECT_EQ(inner->timescale.magnitude, 10);
+  EXPECT_EQ(inner->timescale.precision, TimeUnit::kPs);
+  EXPECT_EQ(inner->timescale.prec_magnitude, 100);
+}
+
+// §3.14.2.3 b) ranks the `timescale ahead of the compilation unit's timeunit,
+// whichever of the two is written first.
+TEST(TimescalePrecedenceElaboration, TimescaleBeforeCUTimeunit) {
+  ElabFixture f;
+  auto* design = ElaborateWithPreprocessor(
+      "timeunit 1fs;\n"
+      "`timescale 100us / 10ps\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* mod = FindModule(design, "m");
+  ASSERT_NE(mod, nullptr);
+  EXPECT_EQ(mod->timescale.unit, TimeUnit::kUs);
+  EXPECT_EQ(mod->timescale.magnitude, 100);
+  EXPECT_EQ(mod->timescale.precision, TimeUnit::kPs);
+  EXPECT_EQ(mod->timescale.prec_magnitude, 10);
+}
+
+// A precision the element omits follows the same order as a unit: the inner
+// module declares only its unit and takes the outer module's 1 ps precision.
+TEST(TimescalePrecedenceElaboration, SameRulesForPrecision) {
+  ElabFixture f;
+  auto* design = ElaborateWithPreprocessor(
+      "module outer;\n"
+      "  timeunit 1ns;\n"
+      "  timeprecision 1ps;\n"
+      "  module inner;\n"
+      "    timeunit 1ns;\n"
+      "  endmodule\n"
+      "  inner i();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* inner = FindModule(design, "inner");
+  ASSERT_NE(inner, nullptr);
+  EXPECT_EQ(inner->timescale.unit, TimeUnit::kNs);
+  EXPECT_EQ(inner->timescale.magnitude, 1);
+  EXPECT_EQ(inner->timescale.precision, TimeUnit::kPs);
+  EXPECT_EQ(inner->timescale.prec_magnitude, 1);
+}
+
+// The compilation unit's declarations reach an interface as they reach a
+// module.
+TEST(TimescalePrecedenceElaboration, CUTimeunitAppliesToInterface) {
+  ElabFixture f;
+  auto* design = ElaborateWithPreprocessor(
+      "timeunit 1ps;\n"
+      "timeprecision 1fs;\n"
+      "interface i;\n"
+      "endinterface\n"
+      "module m;\n"
+      "  i u();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* iface = FindModule(design, "i");
+  ASSERT_NE(iface, nullptr);
+  EXPECT_EQ(iface->timescale.unit, TimeUnit::kPs);
+  EXPECT_EQ(iface->timescale.magnitude, 1);
+  EXPECT_EQ(iface->timescale.precision, TimeUnit::kFs);
+  EXPECT_EQ(iface->timescale.prec_magnitude, 1);
+}
+
+// And a program, here standing alone as its own top (§24.3).
+TEST(TimescalePrecedenceElaboration, CUTimeunitAppliesToProgram) {
+  ElabFixture f;
+  auto* design = ElaborateWithPreprocessor(
+      "timeunit 1us;\n"
+      "timeprecision 10ns;\n"
+      "program p;\n"
+      "endprogram\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* prog = FindModule(design, "p");
+  ASSERT_NE(prog, nullptr);
+  EXPECT_EQ(prog->timescale.unit, TimeUnit::kUs);
+  EXPECT_EQ(prog->timescale.magnitude, 1);
+  EXPECT_EQ(prog->timescale.precision, TimeUnit::kNs);
+  EXPECT_EQ(prog->timescale.prec_magnitude, 10);
+}
+
+// A program is never nested (§3.14.2.3 a), so one that declares neither, with
+// no `timescale and no compilation-unit declaration, takes the default.
+TEST(TimescalePrecedenceElaboration, ProgramDeclaringNothingTakesTheDefault) {
+  ElabFixture f;
+  auto* design = ElaborateWithPreprocessor(
+      "program p;\n"
+      "endprogram\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* prog = FindModule(design, "p");
+  ASSERT_NE(prog, nullptr);
+  EXPECT_EQ(prog->timescale.unit, TimeUnit::kNs);
+  EXPECT_EQ(prog->timescale.magnitude, 1);
+  EXPECT_EQ(prog->timescale.precision, TimeUnit::kNs);
+  EXPECT_EQ(prog->timescale.prec_magnitude, 1);
+}
+
+// Each element resolves on its own: under one `timescale, module a's own
+// timeunit is a's alone, and module b takes the directive's unit. Both are
+// elaborated as tops, so each is reached.
+TEST(TimescalePrecedenceElaboration, IndependentResolution) {
+  ElabFixture f;
+  auto* design = ElaborateWithPreprocessor(
+      "`timescale 1us / 1ps\n"
+      "module a;\n"
+      "  timeunit 1ns;\n"
+      "endmodule\n"
+      "module b;\n"
+      "endmodule\n",
+      f, "", /*auto_top=*/true);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* a = FindModule(design, "a");
+  ASSERT_NE(a, nullptr);
+  EXPECT_EQ(a->timescale.unit, TimeUnit::kNs);
+  EXPECT_EQ(a->timescale.precision, TimeUnit::kPs);
+  const auto* b = FindModule(design, "b");
+  ASSERT_NE(b, nullptr);
+  EXPECT_EQ(b->timescale.unit, TimeUnit::kUs);
+  EXPECT_EQ(b->timescale.precision, TimeUnit::kPs);
+}
+
+// A nested module that declares both of its own takes nothing from the module
+// enclosing it.
+TEST(TimescalePrecedenceElaboration, NestedOverridesInheritance) {
+  ElabFixture f;
+  auto* design = ElaborateWithPreprocessor(
+      "module outer;\n"
+      "  timeunit 1us;\n"
+      "  timeprecision 1ns;\n"
+      "  module inner;\n"
+      "    timeunit 1fs;\n"
+      "    timeprecision 1fs;\n"
+      "  endmodule\n"
+      "  inner i();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* inner = FindModule(design, "inner");
+  ASSERT_NE(inner, nullptr);
+  EXPECT_EQ(inner->timescale.unit, TimeUnit::kFs);
+  EXPECT_EQ(inner->timescale.magnitude, 1);
+  EXPECT_EQ(inner->timescale.precision, TimeUnit::kFs);
+  EXPECT_EQ(inner->timescale.prec_magnitude, 1);
 }
 
 }  // namespace

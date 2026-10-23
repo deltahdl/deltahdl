@@ -35,44 +35,6 @@ bool TryParseTimeMagnitudeAndUnit(std::string_view text, int& magnitude,
   return true;
 }
 
-ResolvedTimescale ResolveModuleTimescale(const ModuleDecl* mod,
-                                         const CompilationUnit* cu,
-                                         bool has_preproc_timescale,
-                                         const TimeScale& preproc_timescale,
-                                         const ResolvedTimescale* enclosing) {
-  ResolvedTimescale result;
-
-  if (mod->has_timeunit) {
-    result.unit = mod->time_unit;
-    result.has_unit = true;
-  } else if (enclosing != nullptr && enclosing->has_unit) {
-    result.unit = enclosing->unit;
-    result.has_unit = true;
-  } else if (has_preproc_timescale) {
-    result.unit = preproc_timescale.unit;
-    result.has_unit = true;
-  } else if (cu->has_cu_timeunit) {
-    result.unit = cu->cu_time_unit;
-    result.has_unit = true;
-  }
-
-  if (mod->has_timeprecision) {
-    result.precision = mod->time_prec;
-    result.has_precision = true;
-  } else if (enclosing != nullptr && enclosing->has_precision) {
-    result.precision = enclosing->precision;
-    result.has_precision = true;
-  } else if (has_preproc_timescale) {
-    result.precision = preproc_timescale.precision;
-    result.has_precision = true;
-  } else if (cu->has_cu_timeprecision) {
-    result.precision = cu->cu_time_prec;
-    result.has_precision = true;
-  }
-
-  return result;
-}
-
 namespace {
 
 // The finest precision found so far, as its order: 10ps is -11.

@@ -247,13 +247,6 @@ struct CompilationUnit {
   }
 };
 
-struct ResolvedTimescale {
-  TimeUnit unit = TimeUnit::kNs;
-  TimeUnit precision = TimeUnit::kNs;
-  bool has_unit = false;
-  bool has_precision = false;
-};
-
 // §22.10: applies the cell-module tag. The preprocessor decides which modules
 // the `celldefine/`endcelldefine regions covered and hands the names over; this
 // is the step that puts the tag on the declarations the parser built. It lives
