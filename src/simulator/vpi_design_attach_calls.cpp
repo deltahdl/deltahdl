@@ -407,21 +407,20 @@ CallShape MethodCallShape(const Expr& access, const BlockParent& parent,
   return MethodShape(call, access.rhs->text, kVar.object, parent.scope, walk);
 }
 
-// §8.4 with §8.13: the property `name` the class `cls`, of the package
-// `package` where one is named, held under the specialization `args`, or a
-// class it extends (VpiBaseOf), declares; null where neither does.
-const ClassMember* PropertyNamed(const BodyWalk& walk, std::string_view cls,
-                                 std::string_view name,
-                                 std::string_view package = {},
-                                 std::span<const DataType> args = {}) {
+// §8.4 with §8.13: the member of kind `kind` named `name` the class `cls`, of
+// the package `package` where one is named, held under the specialization
+// `args`, or a class it extends (VpiBaseOf), declares; null where neither
+// does.
+const ClassMember* MemberNamed(const BodyWalk& walk, ClassMemberKind kind,
+                               std::string_view cls, std::string_view name,
+                               std::string_view package = {},
+                               std::span<const DataType> args = {}) {
   VpiHeldClass held{cls, args};
   for (const ClassDecl* decl = VpiFindClassDecl(walk, held.name, package).decl;
        decl != nullptr;
        decl = VpiFindClassDecl(walk, held.name, package).decl) {
     for (const ClassMember* member : decl->members) {
-      if (member->kind == ClassMemberKind::kProperty && member->name == name) {
-        return member;
-      }
+      if (member->kind == kind && member->name == name) return member;
     }
     held = VpiBaseOf(*decl, held.args);
   }
@@ -442,13 +441,20 @@ struct HandleType {
 };
 
 // The same for the property `name` of the class `cls`, or of a class it
-// extends; empty where neither declares it with a named type or as a virtual
-// interface.
+// extends, or for the instance a covergroup embedded under that name holds
+// (§19.4), whose methods are built in (§19.8); empty where neither declares
+// it with a named type or as a virtual interface.
 HandleType PropertyType(const BodyWalk& walk, std::string_view cls,
                         std::string_view name, std::string_view package = {},
                         std::span<const DataType> args = {}) {
-  const ClassMember* member = PropertyNamed(walk, cls, name, package, args);
-  if (member == nullptr) return {};
+  const ClassMember* member =
+      MemberNamed(walk, ClassMemberKind::kProperty, cls, name, package, args);
+  if (member == nullptr) {
+    const bool kEmbedded = MemberNamed(walk, ClassMemberKind::kCovergroup, cls,
+                                       name, package, args) != nullptr;
+    return kEmbedded ? HandleType{{}, {}, {}, VpiBuiltInHolder::kCovergroup}
+                     : HandleType{};
+  }
   const DataType& type = member->data_type;
   return {
       type.kind == DataTypeKind::kNamed ? type.type_name : std::string_view(),
@@ -529,8 +535,8 @@ int MemberIndexKind(const Expr& array, const BlockParent& parent,
   for (std::size_t i = first; i + 1 < names.size(); ++i) {
     held = PropertyType(kAt, held.cls, names[i], {}, held.args);
   }
-  const ClassMember* member =
-      PropertyNamed(kAt, held.cls, names.back(), {}, held.args);
+  const ClassMember* member = MemberNamed(
+      kAt, ClassMemberKind::kProperty, held.cls, names.back(), {}, held.args);
   return member == nullptr ? vpiIntVar
                            : FirstDimIndexKind(member->unpacked_dims, kAt);
 }

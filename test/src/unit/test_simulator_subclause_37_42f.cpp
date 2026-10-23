@@ -160,6 +160,19 @@ TEST_F(MethodCallsOnValues, ACovergroupInstanceTakesItsPredefinedMethods) {
   EXPECT_EQ(BuiltInCallsOfTheBlock(), 3U);
 }
 
+// §19.4 with §19.8: a covergroup a class embeds names the instance the class
+// holds, whose predefined methods a handle reaches, o.cg.sample() (#7741).
+TEST_F(MethodCallsOnValues, AnEmbeddedCovergroupTakesItsPredefinedMethods) {
+  Run("module top;\n"
+      "  class C; covergroup cg; endgroup\n"
+      "    function new(); cg = new; endfunction\n"
+      "  endclass\n"
+      "  C o = new;\n"
+      "  initial begin : b o.cg.sample(); end\n"
+      "endmodule\n");
+  EXPECT_EQ(BuiltInCallsOfTheBlock(), 1U);
+}
+
 // §11.3.6 with A.8.4: an assignment in parentheses, ((h = g)), is a handle of
 // its left-hand side's class (#7720).
 TEST_F(MethodCallsOnValues, AParenthesizedAssignmentTakesItsTargetsMethods) {
