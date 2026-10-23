@@ -124,10 +124,27 @@ static void CheckSubroutine(const ModuleItem* item, const NettypeScan& scan) {
   for (const Stmt* s : item->func_body_stmts) CheckStmt(s, scan);
 }
 
+// A.2.1.3 writes a net of a user-defined nettype as the nettype's name, an
+// optional delay and the net names, and A.2.2.1's net_port_type writes a port
+// of one as the name alone: the nettype fixes the net's data type, so no packed
+// dimension follows its name. `production` is the subclause the report cites,
+// and the report stands at the dimension.
+static void ReportPackedDimAfterNettype(const DataType& dtype,
+                                        const char* production,
+                                        const NettypeScan& scan) {
+  if (dtype.packed_dim_left == nullptr || !IsNettype(dtype, scan)) return;
+  scan.diag.Error(dtype.packed_dim_left->range.start,
+                  std::format("a net of nettype '{}' takes the nettype's data "
+                              "type, and no packed dimension follows its name",
+                              NamedTypeKey(dtype)),
+                  Subclause(production));
+}
+
 static void CheckClass(const ClassDecl* cls, const NettypeScan& scan);
 
 static void CheckItem(const ModuleItem* item, const NettypeScan& scan) {
   if (item->class_decl != nullptr) CheckClass(item->class_decl, scan);
+  ReportPackedDimAfterNettype(item->data_type, "A.2.1.3", scan);
   CheckMembers(item->data_type, item->loc, scan);
   CheckMembers(item->typedef_type, item->loc, scan);
   if (item->kind == ModuleItemKind::kParamDecl &&
@@ -164,6 +181,9 @@ void CheckNettypeUses(const ModuleDecl* decl,
                       DiagEngine& diag) {
   if (nettypes.empty()) return;
   const NettypeScan kScan{nettypes, nettypes, diag};
+  for (const PortDecl& port : decl->ports) {
+    ReportPackedDimAfterNettype(port.data_type, "A.2.2.1", kScan);
+  }
   for (const ModuleItem* item : decl->items) CheckItem(item, kScan);
   for (size_t i = 0; i < decl->param_types.size(); ++i) {
     if (IsNettype(decl->param_types[i], kScan)) {

@@ -263,4 +263,45 @@ TEST(NetAndVariableTypeElaboration, NettypeOfAUnitClassOrDynamicArrayRejected) {
   }
 }
 
+// A.2.2.1's net_port_type writes a port of a user-defined nettype as the
+// nettype's name alone, so a packed dimension after it is reported on a body
+// port declaration.
+TEST(NetAndVariableTypeElaboration, APackedDimensionAfterABodyPortsNettype) {
+  ElabFixture f;
+  Elaborate(
+      "module m(p, q);\n"
+      "  nettype logic [3:0] nt;\n"
+      "  input nt [1:0] p;\n"
+      "  input nt q;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a net of nettype 'nt' takes the nettype's data "
+                            "type, and no packed dimension follows its name",
+                            3, "A.2.2.1"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "a net of nettype 'nt' takes", 4, "A.2.2.1"));
+}
+
+// The same holds for an ANSI port naming a package's nettype, which the report
+// names as the package does.
+TEST(NetAndVariableTypeElaboration, APackedDimensionAfterAnAnsiPortsNettype) {
+  ElabFixture f;
+  Elaborate(
+      "package P;\n"
+      "  nettype logic [3:0] pnt;\n"
+      "endpackage\n"
+      "module n(input P::pnt [1:0] a,\n"
+      "         input P::pnt b);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a net of nettype 'P::pnt' takes the nettype's "
+                            "data type, and no packed dimension follows its "
+                            "name",
+                            4, "A.2.2.1"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "a net of nettype 'P::pnt' takes", 5, "A.2.2.1"));
+}
+
 }  // namespace

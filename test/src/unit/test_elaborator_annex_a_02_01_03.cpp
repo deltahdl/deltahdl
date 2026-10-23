@@ -420,4 +420,33 @@ TEST(TypeDeclElaboration, AVarDeclarationOfAPackagesNettypeIsReported) {
                             5, "6.6.7"));
 }
 
+// A.2.1.3 writes a net of a user-defined nettype as the nettype's name, an
+// optional delay and the net names, so no packed dimension follows the name,
+// bare or written through a package.
+TEST(TypeDeclElaboration, APackedDimensionAfterANettypeNameIsReported) {
+  ElabFixture f;
+  Elaborate(
+      "package P;\n"
+      "  nettype logic [3:0] pnt;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  nettype logic [3:0] nt;\n"
+      "  nt [1:0] n;\n"
+      "  P::pnt [1:0] q;\n"
+      "  nt d;\n"
+      "  nt #5 e;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a net of nettype 'nt' takes the nettype's data "
+                            "type, and no packed dimension follows its name",
+                            6, "A.2.1.3"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a net of nettype 'P::pnt' takes the nettype's "
+                            "data type, and no packed dimension follows its "
+                            "name",
+                            7, "A.2.1.3"));
+  EXPECT_EQ(f.diag.ErrorCount(), 2u);
+}
+
 }  // namespace
