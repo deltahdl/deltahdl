@@ -136,7 +136,7 @@ void ApplyPreprocMetadata(CompilationUnit* cu, const PreprocResult& pp) {
   cu->has_default_trireg_strength = pp.has_default_trireg_strength;
   cu->delay_mode_directive = pp.delay_mode_directive;
   cu->preproc_timescale = pp.timescale;
-  cu->has_preproc_timescale = pp.has_global_precision;
+  cu->has_preproc_global_precision = pp.has_global_precision;
   cu->preproc_global_precision = pp.global_precision;
   cu->preproc_global_precision_magnitude = pp.global_precision_magnitude;
 }

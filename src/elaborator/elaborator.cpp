@@ -359,7 +359,7 @@ void CopyDesignMetadata(RtlirDesign* design, const CompilationUnit* unit,
   // design whose only timescale comes from a directive resolves to the ns
   // default.
   design->global_time_precision = ComputeGlobalTimePrecision(
-      unit, unit->has_preproc_timescale, unit->preproc_global_precision);
+      unit, unit->has_preproc_global_precision, unit->preproc_global_precision);
   design->global_precision_order = GlobalTimePrecisionOrder(unit);
 }
 

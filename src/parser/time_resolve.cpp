@@ -96,10 +96,10 @@ static FinestOrder CollectGlobalPrecision(const CompilationUnit* cu,
 }
 
 TimeUnit ComputeGlobalTimePrecision(const CompilationUnit* cu,
-                                    bool has_preproc_timescale,
+                                    bool has_preproc_global_precision,
                                     TimeUnit preproc_global_precision) {
   FinestOrder preproc;
-  if (has_preproc_timescale) preproc.Update(preproc_global_precision, 1);
+  if (has_preproc_global_precision) preproc.Update(preproc_global_precision, 1);
   FinestOrder finest = CollectGlobalPrecision(cu, preproc);
   if (!finest.found) return TimeUnit::kNs;
   // The unit of an order is the power of 1000 at or below it: -11 is ps.
@@ -108,7 +108,7 @@ TimeUnit ComputeGlobalTimePrecision(const CompilationUnit* cu,
 
 int GlobalTimePrecisionOrder(const CompilationUnit* cu) {
   FinestOrder preproc;
-  if (cu->has_preproc_timescale) {
+  if (cu->has_preproc_global_precision) {
     preproc.Update(cu->preproc_global_precision,
                    cu->preproc_global_precision_magnitude);
   }

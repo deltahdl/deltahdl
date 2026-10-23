@@ -15,7 +15,7 @@ TEST(DesignBuildingBlockParsing, ConsidersTimescalePrec) {
       "  timeprecision 1ns;\n"
       "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_timescale,
+  auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_global_precision,
                                        r.preproc_global_precision);
   EXPECT_EQ(gp, TimeUnit::kPs);
 }
@@ -30,7 +30,7 @@ TEST(DesignBuildingBlockParsing, MinAcrossAllThreeSources) {
       "  timeprecision 1ps;\n"
       "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_timescale,
+  auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_global_precision,
                                        r.preproc_global_precision);
   EXPECT_EQ(gp, TimeUnit::kPs);
 }
@@ -40,7 +40,7 @@ TEST(DesignBuildingBlockParsing, DefaultWhenNoneSpecified) {
       "module a;\n"
       "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_timescale,
+  auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_global_precision,
                                        r.preproc_global_precision);
   EXPECT_EQ(gp, TimeUnit::kNs);
 }
@@ -52,7 +52,7 @@ TEST(DesignBuildingBlockParsing, CUScopeTimeprecisionIncluded) {
       "  timeprecision 1ns;\n"
       "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_timescale,
+  auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_global_precision,
                                        r.preproc_global_precision);
   EXPECT_EQ(gp, TimeUnit::kFs);
 }
@@ -69,7 +69,7 @@ TEST(DesignBuildingBlockParsing, InterfacesAndProgramsContribute) {
       "  timeprecision 1us;\n"
       "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_timescale,
+  auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_global_precision,
                                        r.preproc_global_precision);
   EXPECT_EQ(gp, TimeUnit::kPs);
 }
@@ -86,7 +86,7 @@ TEST(DesignBuildingBlockParsing, MinOfTimeprecisionStatements) {
       "  timeprecision 1us;\n"
       "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_timescale,
+  auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_global_precision,
                                        r.preproc_global_precision);
   EXPECT_EQ(gp, TimeUnit::kPs);
 }
@@ -100,7 +100,7 @@ TEST(DesignBuildingBlockParsing, ConsidersTimeunitPrecArg) {
       "  timeprecision 1ns;\n"
       "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_timescale,
+  auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_global_precision,
                                        r.preproc_global_precision);
   EXPECT_EQ(gp, TimeUnit::kFs);
 }
@@ -114,7 +114,7 @@ TEST(DesignBuildingBlockParsing, PackageTimeprecisionContributes) {
       "  timeprecision 1ns;\n"
       "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_timescale,
+  auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_global_precision,
                                        r.preproc_global_precision);
   EXPECT_EQ(gp, TimeUnit::kFs);
 }
@@ -128,7 +128,7 @@ TEST(DesignBuildingBlockParsing, PackageTimeunitPrecArgContributes) {
       "  timeprecision 1ns;\n"
       "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_timescale,
+  auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_global_precision,
                                        r.preproc_global_precision);
   EXPECT_EQ(gp, TimeUnit::kFs);
 }
@@ -173,7 +173,7 @@ TEST(DesignBuildingBlockParsing, TimeunitWithoutPrecArgDoesNotContribute) {
       "  timeunit 1fs;\n"
       "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_timescale,
+  auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_global_precision,
                                        r.preproc_global_precision);
   EXPECT_EQ(gp, TimeUnit::kNs);
 }
@@ -212,7 +212,7 @@ TEST(DesignBuildingBlockParsing, InterfaceTimeunitPrecArgContributes) {
       "  timeprecision 1ns;\n"
       "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_timescale,
+  auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_global_precision,
                                        r.preproc_global_precision);
   EXPECT_EQ(gp, TimeUnit::kFs);
 }
@@ -228,7 +228,7 @@ TEST(DesignBuildingBlockParsing, CuScopeTimeunitPrecArgContributes) {
       "  timeprecision 1ns;\n"
       "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_timescale,
+  auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_global_precision,
                                        r.preproc_global_precision);
   EXPECT_EQ(gp, TimeUnit::kFs);
 }
@@ -245,7 +245,7 @@ TEST(DesignBuildingBlockParsing, NestedModuleTimeprecisionContributes) {
       "  endmodule\n"
       "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_timescale,
+  auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_global_precision,
                                        r.preproc_global_precision);
   EXPECT_EQ(gp, TimeUnit::kPs);
 }
@@ -266,7 +266,7 @@ TEST(DesignBuildingBlockParsing, ProgramTimeunitPrecArgIsMinimum) {
       "  timeprecision 1us;\n"
       "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_timescale,
+  auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_global_precision,
                                        r.preproc_global_precision);
   EXPECT_EQ(gp, TimeUnit::kPs);
 }

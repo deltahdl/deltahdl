@@ -13,7 +13,7 @@ bool TryParseTimeMagnitudeAndUnit(std::string_view text, int& magnitude,
                                   TimeUnit& out);
 
 TimeUnit ComputeGlobalTimePrecision(const CompilationUnit* cu,
-                                    bool has_preproc_timescale,
+                                    bool has_preproc_global_precision,
                                     TimeUnit preproc_global_precision);
 
 // §3.14.3: the order of the global time precision, the finest precision of

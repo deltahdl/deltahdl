@@ -226,11 +226,12 @@ struct CompilationUnit {
   std::vector<TimeLiteralSite> time_literals;
 
   TimeScale preproc_timescale;
-  bool has_preproc_timescale = false;
+  bool has_preproc_global_precision = false;
   // The finest precision of every `timescale the preprocessor read, which
   // §3.14.3 counts toward the global precision. preproc_timescale holds only
   // the last directive, and an earlier finer one need not stand before any
-  // design element's header. Meaningful only under has_preproc_timescale.
+  // design element's header. Meaningful only under
+  // has_preproc_global_precision.
   TimeUnit preproc_global_precision = TimeUnit::kNs;
   int preproc_global_precision_magnitude = 1;
 

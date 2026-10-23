@@ -15,7 +15,7 @@ TEST(DesignBuildingBlockParsing, SingleModuleTimeunitSlash) {
       "  timeunit 1us / 1ps;\n"
       "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_timescale,
+  auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_global_precision,
                                        r.preproc_global_precision);
   EXPECT_EQ(gp, TimeUnit::kPs);
 }
