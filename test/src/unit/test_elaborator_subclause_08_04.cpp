@@ -787,4 +787,102 @@ TEST(ClassObjectElaboration, AHandleYieldedByAnExpressionIsAHandle) {
   }
 }
 
+// §11.3.6 with §8.4: an assignment written in parentheses stands within an
+// expression, and one of a compatible handle, another of the target's class,
+// of a class extending it, or null, writes a handle of the target's class,
+// which a method is called through or compared like any other.
+TEST(ClassObjectElaboration, AParenthesizedHandleAssignmentIsAHandle) {
+  EXPECT_TRUE(
+      ElabOk("class C; task run(); endtask endclass\n"
+             "class D extends C; endclass\n"
+             "module m;\n"
+             "  C h; C g = new; D d = new; logic b;\n"
+             "  initial begin\n"
+             "    ((h = g)).run();\n"
+             "    b = ((h = d)) == null;\n"
+             "    b = ((h = null)) == null;\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+// §11.3.6 with §8.4 and §7.4: a parenthesized assignment of a handle to an
+// element of an array of handles, or to a structure member holding one, is
+// written as the assignment statement is.
+TEST(ClassObjectElaboration, AParenthesizedAssignmentToAHandleElement) {
+  EXPECT_TRUE(
+      ElabOk("class C; endclass\n"
+             "module m;\n"
+             "  typedef struct { C h; } s_t;\n"
+             "  C arr [2]; C g = new; s_t s; logic b;\n"
+             "  initial begin\n"
+             "    b = ((arr[0] = g)) == null;\n"
+             "    b = ((s.h = g)) == null;\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+// §8.4: a parenthesized assignment of a handle of an unrelated class is no
+// assignment of a compatible handle.
+TEST(ClassObjectElaboration, AParenthesizedIncompatibleHandleAssignment) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C; endclass\n"
+      "class E; endclass\n"
+      "module m;\n"
+      "  C h; E e = new; logic b;\n"
+      "  initial b = ((h = e)) == null;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "class handle assignment requires assignment compatible types", 5,
+      "8.4"));
+}
+
+// §8.4: a parenthesized assignment writes no integral value into a handle.
+TEST(ClassObjectElaboration, AParenthesizedIntegralAssignmentToAHandle) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C; endclass\n"
+      "module m;\n"
+      "  C h; logic b;\n"
+      "  initial b = ((h = 1)) == null;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "cannot assign non-class value to class object handle", 4, "8.4"));
+}
+
+// §8.4: a parenthesized assignment writes no handle into an integral variable.
+TEST(ClassObjectElaboration, AParenthesizedHandleAssignmentToAnInt) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C; endclass\n"
+      "module m;\n"
+      "  C g = new; int n; logic b;\n"
+      "  initial b = ((n = g)) == 0;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "cannot assign class object handle to a non-class variable", 4, "8.4"));
+}
+
+// §8.4: a compound assignment written in parentheses is an arithmetic
+// operator on the handle, which no handle admits.
+TEST(ClassObjectElaboration, AParenthesizedCompoundAssignmentToAHandle) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C; endclass\n"
+      "module m;\n"
+      "  C h; logic b;\n"
+      "  initial b = ((h += 1)) == null;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on class object handles",
+                            4, "8.4"));
+}
+
 }  // namespace

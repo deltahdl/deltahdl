@@ -151,6 +151,40 @@ static bool IsPlainValue(
   }
 }
 
+// §11.3.6 (printed page 274): an assignment written in parentheses stands
+// within an expression, and §8.4 (printed page 182) lets one write a handle of
+// the target's class or of a class extending it, or null, into a handle. Such
+// an assignment `e`, a handle among its operands and the target one where
+// `lhs_class`, is judged as an assignment statement is, rather than as an
+// operator on handles: no handle is written into a variable of an integral or
+// real type, and no value of such a type into a handle.
+static void CheckClassHandleAssignExpr(const Expr* e,
+                                       const ClassHandleTables& t,
+                                       bool lhs_class, DiagEngine& diag) {
+  if (!lhs_class) {
+    if (IsPlainValue(e->lhs, t.var_types)) {
+      diag.Error(e->range.start,
+                 "cannot assign class object handle to a non-class variable",
+                 Subclause("8.4"));
+    }
+    return;
+  }
+  if (IsPlainValue(e->rhs, t.var_types)) {
+    diag.Error(e->range.start,
+               "cannot assign non-class value to class object handle",
+               Subclause("8.4"));
+    return;
+  }
+  auto lt = t.class_var_types.find(ExprIdent(e->lhs));
+  auto rt = t.class_var_types.find(ExprIdent(e->rhs));
+  if (lt != t.class_var_types.end() && rt != t.class_var_types.end() &&
+      !IsClassDerivedFrom(rt->second, lt->second, t.unit)) {
+    diag.Error(e->range.start,
+               "class handle assignment requires assignment compatible types",
+               Subclause("8.4"));
+  }
+}
+
 // Validates the operands of a binary expression that involves at least one
 // class-handle variable: rejects disallowed operators and, for comparisons of
 // two handles, requires assignment-compatible types.
@@ -163,7 +197,12 @@ static void CheckClassHandleBinary(const Expr* e, const ClassHandleTables& t,
       e->lhs && IsHandleOperand(e->lhs, class_vars, class_var_types, unit);
   bool rhs_class =
       e->rhs && IsHandleOperand(e->rhs, class_vars, class_var_types, unit);
-  if ((lhs_class || rhs_class) && !IsAllowedClassBinaryOp(e->op)) {
+  if (!lhs_class && !rhs_class) return;
+  if (e->op == TokenKind::kEq) {
+    CheckClassHandleAssignExpr(e, t, lhs_class, diag);
+    return;
+  }
+  if (!IsAllowedClassBinaryOp(e->op)) {
     diag.Error(e->range.start,
                "operator is not allowed on class object handles",
                Subclause("8.4"));
