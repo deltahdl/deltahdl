@@ -10,6 +10,7 @@
 
 #include <cstdint>
 
+#include "common/diagnostic.h"
 #include "fixture_parser.h"
 #include "helpers_reported_error.h"
 #include "parser/ast_class.h"
@@ -215,15 +216,18 @@ TEST(ClassItems, ClassPropertyOfImplicitTypeWithVarStands) {
 }
 
 // A name followed by the property's name is a type the parse does not know
-// rather than an implicit type, so it draws its own error and no word of
-// `var`.
+// rather than an implicit type. It draws the property parse's own report at
+// the name after it, and no word of `var` where the type stands, at column 3;
+// the `h;` the parse resumes at is a property of implicit type of its own.
 TEST(ClassItems, ClassPropertyOfAnUnknownTypeNameDrawsNoVarReport) {
   auto r = Parse(
       "class C;\n"
       "  nosuch_t h;\n"
       "endclass\n");
-  EXPECT_TRUE(r.has_errors);
-  EXPECT_FALSE(ReportedError(r.diags, "requires the 'var' keyword", 2, "6.8"));
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got identifier", 2, "8.5"));
+  for (const Diagnostic& d : r.diags) {
+    EXPECT_FALSE(d.subclause == "6.8" && d.loc.column == 3) << d.message;
+  }
 }
 
 // --- property_qualifier ------------------------------------------------------
