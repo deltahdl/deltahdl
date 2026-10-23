@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "fixture_parser.h"
 #include "helpers_reported_error.h"
 #include "parser/ast_module.h"
@@ -338,13 +340,12 @@ TEST(DeclarationAssignmentParsing, DefparamMissingEqualsIsError) {
 
 // A.2.4 writes both alternatives of pulse_control_specparam with the limit list
 // in parentheses, and §30.7.1's Syntax 30-7 prints the same production. The
-// worked example under that same subclause ends `PATHPULSE$ = 3;` and its prose
-// reads the value back off it, so the standard's grammar and its own example
-// disagree. A source written from the example has to parse; issue #3384 settled
-// that, and this case is where the annex records it. §30.7.1 says what a lone
-// limit means -- a reject limit given alone serves as the error limit too --
-// which is why no error limit is expected here.
-TEST(DeclarationAssignmentParsing, PulseControlSpecparamNeedsNoParens) {
+// worked example under that subclause ends `PATHPULSE$ = 3;`, but §1.10 makes
+// an example informative, so a limit written without the parentheses is
+// reported. It is still read, as the lone reject limit §30.7.1 lets serve as
+// the error limit too, which is why no error limit is expected. It was
+// accepted with no report.
+TEST(DeclarationAssignmentParsing, PulseControlSpecparamBareLimitIsReported) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -352,7 +353,9 @@ TEST(DeclarationAssignmentParsing, PulseControlSpecparamNeedsNoParens) {
       "  endspecify\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a PATHPULSE$ specparam's limits are written in parentheses", 3,
+      "A.2.4"));
   auto* block = r.cu->modules[0]->items[0];
   ASSERT_EQ(block->kind, ModuleItemKind::kSpecifyBlock);
   ASSERT_EQ(block->specify_items.size(), 1u);
@@ -360,6 +363,71 @@ TEST(DeclarationAssignmentParsing, PulseControlSpecparamNeedsNoParens) {
   EXPECT_TRUE(sp->is_pathpulse);
   EXPECT_NE(sp->pathpulse_reject, nullptr);
   EXPECT_EQ(sp->pathpulse_error, nullptr);
+}
+
+// A.2.4 writes dynamic_array_new's parenthesized part as `( expression )`, one
+// expression, so two expressions there, or none, are each reported. Both were
+// read as a call's argument list and accepted.
+TEST(DeclarationAssignmentParsing,
+     DynamicArrayNewOfOtherThanOneInitIsReported) {
+  auto r = Parse(
+      "module m;\n"
+      "  int a [], b [], c [];\n"
+      "  initial begin\n"
+      "    b = new [4] (a, a);\n"
+      "    c = new [4] ();\n"
+      "  end\n"
+      "endmodule\n");
+  for (uint32_t line : {4u, 5u}) {
+    EXPECT_TRUE(ReportedError(r.diags,
+                              "a dynamic array's new takes one expression in "
+                              "its parentheses, the array whose elements it "
+                              "starts with",
+                              line, "A.2.4"))
+        << "line " << line;
+  }
+}
+
+// A.2.4 makes a defparam's target a hierarchical_parameter_identifier, which
+// A.9.3 writes as names joined by `.`, the last with no select. An operation,
+// a call, a concatenation, a package scope, `$unit::` and a select after the
+// last name are none, and each is reported. Each was read as an expression,
+// and the elaborator gave it only the warning that its target was not found.
+TEST(DeclarationAssignmentParsing,
+     DefparamTargetOfNoHierarchicalNameIsReported) {
+  auto r = Parse(
+      "module m;\n"
+      "  child c ();\n"
+      "  defparam c.P + 1 = 5;\n"
+      "  defparam f(c.P) = 6;\n"
+      "  defparam {c.P} = 7;\n"
+      "  defparam p::P = 8;\n"
+      "  defparam $unit::P = 9;\n"
+      "  defparam c.P[0] = 3;\n"
+      "endmodule\n");
+  for (uint32_t line : {3u, 4u, 5u, 6u, 7u, 8u}) {
+    EXPECT_TRUE(ReportedError(r.diags,
+                              "a defparam's target is a hierarchical parameter "
+                              "name, not an expression",
+                              line, "A.2.4"))
+        << "line " << line;
+  }
+}
+
+// A hierarchical name is a defparam's target in each of its forms: a name
+// alone, names joined by `.`, a bit-select on a name before the last, and a
+// name under `$root .`.
+TEST(DeclarationAssignmentParsing, DefparamHierarchicalTargetsAreAccepted) {
+  auto r = Parse(
+      "module m;\n"
+      "  child c ();\n"
+      "  defparam P = 1;\n"
+      "  defparam c.P = 2;\n"
+      "  defparam c[0].P = 3;\n"
+      "  defparam $root.m.c.P = 4;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
 }
 
 }  // namespace

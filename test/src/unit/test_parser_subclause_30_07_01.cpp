@@ -182,18 +182,18 @@ TEST(PulseControlSpecparamParsing, TerminalCannotBePartSelect) {
 }
 
 // §30.7.1's own worked example, printed on page 888 and reproduced here
-// verbatim -- the blank line, the `(2,9)` written without a space, and above
-// all the final `PATHPULSE$ = 3;` written with no parentheses at all. Syntax
-// 30-7 and A.2.4 both parenthesize the limit list, so the standard's grammar
-// and its example disagree and the example is what a user copies. Issue #3384
-// is that this source was rejected. Every other case in this file writes the
-// non-path-specific limit as `= (3)`, so this is the one that decides it.
+// verbatim -- the blank line, the `(2,9)` written without a space, and the
+// final `PATHPULSE$ = 3;` written with no parentheses. Syntax 30-7 and A.2.4
+// both parenthesize the limit list, and §1.10 makes the example informative,
+// so that last limit is reported, on line 10 alone, and still read as the
+// reject limit that serves as both. It was accepted.
 //
 // The delays 12, 10 and 4 and the limits 2, 9 and 3 are the example's own
 // numbers, and no two of them coincide, so a value read off the wrong
 // declaration is caught. The 0 in `(0,4)` is the exception: nothing here
 // asserts on it, because an unset limit and a limit of 0 read the same.
-TEST(PulseControlSpecparamParsing, StandardExampleUnparenthesizedLimitParses) {
+TEST(PulseControlSpecparamParsing,
+     StandardExampleUnparenthesizedLimitIsReported) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -208,7 +208,10 @@ TEST(PulseControlSpecparamParsing, StandardExampleUnparenthesizedLimitParses) {
       "  endspecify\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a PATHPULSE$ specparam's limits are written in parentheses", 10,
+      "A.2.4"));
+  EXPECT_EQ(ErrorCount(r.diags), 1U);
   auto specparams = CollectSpecparamsInSpecify(r.cu->modules[0]);
   ASSERT_EQ(specparams.size(), 3U);
   EXPECT_TRUE(specparams[0]->is_pathpulse);
@@ -221,13 +224,11 @@ TEST(PulseControlSpecparamParsing, StandardExampleUnparenthesizedLimitParses) {
   EXPECT_EQ(specparams[2]->pathpulse_error, nullptr);
 }
 
-// Syntax 30-7 gives both alternatives the same parenthesized limit list, so
-// dropping the parentheses from the path-specific alternative is the same
-// disagreement with §30.7.1's example as dropping them from the
-// non-path-specific one, and a fix reaching only the second alternative would
-// leave this source rejected. 3 is the one limit written in this source, so no
-// other value can stand in for it.
-TEST(PulseControlSpecparamParsing, PathSpecificLimitNeedsNoParentheses) {
+// Syntax 30-7 gives both alternatives the same parenthesized limit list, so a
+// path-specific limit written without the parentheses is reported as the
+// nonpath-specific one is, and still read: 3 is the one limit written in this
+// source, so no other value can stand in for it.
+TEST(PulseControlSpecparamParsing, PathSpecificBareLimitIsReported) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -235,7 +236,9 @@ TEST(PulseControlSpecparamParsing, PathSpecificLimitNeedsNoParentheses) {
       "  endspecify\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a PATHPULSE$ specparam's limits are written in parentheses", 3,
+      "A.2.4"));
   auto* item = FindPathpulseInSpecify(r.cu->modules[0]);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->pathpulse_input, "clk");

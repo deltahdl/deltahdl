@@ -270,7 +270,20 @@ Expr* Parser::ParseNewExpr() {
     Consume();
     expr->args.push_back(ParseExpr());
     Expect(TokenKind::kRBracket, Subclause("7.5.1"));
-    if (Check(TokenKind::kLParen)) ParseParenList(expr->args);
+    // A.2.4's dynamic_array_new writes `( expression )` after the size: one
+    // expression, the array whose elements the new one starts with (§7.5.1).
+    // Any other count is reported, and the list read whole so the parse goes
+    // on.
+    if (Check(TokenKind::kLParen)) {
+      auto open = CurrentLoc();
+      ParseParenList(expr->args);
+      if (expr->args.size() != 2) {
+        diag_.Error(open,
+                    "a dynamic array's new takes one expression in its "
+                    "parentheses, the array whose elements it starts with",
+                    Subclause("A.2.4"));
+      }
+    }
   } else if (Check(TokenKind::kLParen)) {
     // A.2.4 gives class_new a list_of_arguments, the same production a
     // subroutine call takes, so the named forms A.8.2 spells are read here as

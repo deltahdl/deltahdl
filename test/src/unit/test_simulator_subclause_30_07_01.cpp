@@ -271,21 +271,17 @@ TEST(PulseControlResolution, UnmatchedPathSpecificIsIgnored) {
   EXPECT_EQ(p->error_limit[0], 12u);
 }
 
-// §30.7.1's worked example, run rather than inspected. Issue #3384 is that the
-// example's own last line, `PATHPULSE$ = 3;`, was rejected, and the prose above
-// the example reads the 3 back off exactly the path asserted here: no
-// PATHPULSE$ declaration names the path (data=>q), so it takes the reject and
-// error limit of 3 the last PATHPULSE$ declaration sets. A parse test alone
-// would pass against a parser that accepted the unparenthesized form and
-// dropped the value, so this is the case that says the 3 arrived; both limits
-// are asserted because §30.7.1 mirrors a lone reject limit onto the error
-// limit.
+// §30.7.1's worked example, run rather than inspected. The prose above the
+// example reads the 3 back off exactly the path asserted here: no PATHPULSE$
+// declaration names the path (data=>q), so it takes the reject and error limit
+// of 3 the last PATHPULSE$ declaration sets. Both limits are asserted because
+// §30.7.1 mirrors a lone reject limit onto the error limit.
 //
-// Nothing of the specify block is trimmed -- all three module path
-// declarations and all three specparams are the example's, verbatim. What is
-// added is the module header the example does not print: §30.4.1 requires a
-// module path source to be a net connected to an input or inout port and a
-// destination to be connected to an output or inout port, and
+// The specify block is the example's, its last limit written `(3)` as Syntax
+// 30-7 and A.2.4 parenthesize it; the example's bare `3` is reported (A.2.4).
+// What is added is the module header the example does not print: §30.4.1
+// requires a module path source to be a net connected to an input or inout
+// port and a destination to be connected to an output or inout port, and
 // CheckSpecifyPathTerminal in src/elaborator/elaborator_validate_specify.cpp
 // rejects a path terminal that is a declared local signal, so clk, data, clr
 // and pre are input ports and q is an output port.
@@ -295,7 +291,7 @@ TEST(PulseControlResolution, UnmatchedPathSpecificIsIgnored) {
 // 2, 9), so a limit taken from the wrong specparam or from a path's default
 // (its own delay of 10) is caught. Nothing asserts on the 0 in `(0,4)`, since a
 // reject limit of 0 and an unset one read the same.
-TEST(PulseControlResolution, StandardExampleUnparenthesizedLimitReachesPath) {
+TEST(PulseControlResolution, StandardExampleNonspecificLimitReachesPath) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t(input clk, input data, input clr, input pre, output q);\n"
@@ -307,7 +303,7 @@ TEST(PulseControlResolution, StandardExampleUnparenthesizedLimitReachesPath) {
       "  specparam\n"
       "      PATHPULSE$clk$q = (2,9),\n"
       "      PATHPULSE$clr$q = (0,4),\n"
-      "      PATHPULSE$ = 3;\n"
+      "      PATHPULSE$ = (3);\n"
       "  endspecify\n"
       "endmodule\n",
       f);
@@ -343,23 +339,23 @@ std::string BufferPulseDesign(const std::string& specify_body) {
          "endmodule\n";
 }
 
-// §30.7.1 (printed pages 887-888): the standard's own `PATHPULSE$ = 3;`, with
-// no terminals, sets both limits of every path of the module, so a 4-wide
+// §30.7.1 (printed pages 887-888): `PATHPULSE$ = (3)`, the example's limit,
+// with no terminals, sets both limits of every path of the module, so a 4-wide
 // pulse through a path of 7 passes: y falls at 17 and rises at 21. With the
 // default limits, the delay itself, it was rejected.
 TEST(PulseControlRun, NonspecificLimitReachesEveryPath) {
   SimFixture f;
   EXPECT_EQ(RunCapture(BufferPulseDesign("    (a => y) = 7;\n"
-                                         "    specparam PATHPULSE$ = 3;\n"),
+                                         "    specparam PATHPULSE$ = (3);\n"),
                        f),
             "t=7 y=1\nt=17 y=0\nt=21 y=1\n");
 }
 
-// §30.7.1: `PATHPULSE$ = 0` makes both limits 0, so no pulse is filtered and
+// §30.7.1: `PATHPULSE$ = (0)` makes both limits 0, so no pulse is filtered and
 // the 2-wide pulse a (7, 9) path makes of a 4-wide input propagates.
 TEST(PulseControlRun, ZeroLimitsLetEveryPulsePropagate) {
   SimFixture f;
-  EXPECT_EQ(RunCapture(BufferPulseDesign("    specparam PATHPULSE$ = 0;\n"
+  EXPECT_EQ(RunCapture(BufferPulseDesign("    specparam PATHPULSE$ = (0);\n"
                                          "    (a => y) = (7, 9);\n"),
                        f),
             "t=7 y=1\nt=19 y=0\nt=21 y=1\n");
@@ -386,7 +382,7 @@ TEST(PulseControlRun, PathSpecificLimitsTakePrecedence) {
                        "  assign y = a & b;\n"
                        "  specify\n"
                        "    specparam PATHPULSE$a$y = (0, 0);\n"
-                       "    specparam PATHPULSE$ = 3;\n"
+                       "    specparam PATHPULSE$ = (3);\n"
                        "    (a => y) = (7, 9);\n"
                        "    (b => y) = (7, 9);\n"
                        "  endspecify\n"

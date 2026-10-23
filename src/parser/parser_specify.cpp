@@ -39,6 +39,24 @@ ModuleItem* Parser::ParseSpecifyBlock() {
   return item;
 }
 
+// A.2.4 and Syntax 30-7 (printed page 887) parenthesize a PATHPULSE$
+// specparam's limits; §30.7.1's example `PATHPULSE$ = 3;` is informative
+// (§1.10), so a bare limit is reported and read as the one limit that serves
+// as both. Answers the reject limit.
+Expr* Parser::ParsePathpulseLimits() {
+  if (!Check(TokenKind::kLParen)) {
+    diag_.Error(CurrentLoc(),
+                "a PATHPULSE$ specparam's limits are written in parentheses",
+                Subclause("A.2.4"));
+    return ParseMinTypMaxExpr();
+  }
+  Consume();
+  Expr* reject = ParseMinTypMaxExpr();
+  if (Match(TokenKind::kComma)) ParseMinTypMaxExpr();
+  Expect(TokenKind::kRParen, Subclause("30.7.1"));
+  return reject;
+}
+
 void Parser::ParseSpecparamDecl(std::vector<ModuleItem*>& items) {
   auto kw_loc = CurrentLoc();
   Expect(TokenKind::kKwSpecparam, Subclause("6.20.5"));
@@ -61,25 +79,9 @@ void Parser::ParseSpecparamDecl(std::vector<ModuleItem*>& items) {
     item->data_type.packed_dim_right = packed_right;
     item->name = Expect(TokenKind::kIdentifier, Subclause("6.20.5")).text;
     Expect(TokenKind::kEq, Subclause("6.20.5"));
-    if (item->name.starts_with("PATHPULSE$")) {
-      // The parentheses are optional, which Syntax 30-7 does not admit. §30.7.1
-      // prints `PATHPULSE$ = 3;` in its own worked example and its prose reads
-      // the 3 back off it, as the reject and error limit the last PATHPULSE$
-      // declaration sets -- while Syntax 30-7 and A.2.4 both parenthesize the
-      // limit list. The two disagree, and a source written from the example
-      // has to parse. Without the parentheses there is one limit and §30.7.1
-      // makes it serve as both: a reject limit given alone is the error limit
-      // too. A comma after an unparenthesized limit opens the next
-      // specparam of the declaration, so only the parenthesized form reads one.
-      bool parenthesized = Match(TokenKind::kLParen);
-      item->init_expr = ParseMinTypMaxExpr();
-      if (parenthesized) {
-        if (Match(TokenKind::kComma)) ParseMinTypMaxExpr();
-        Expect(TokenKind::kRParen, Subclause("30.7.1"));
-      }
-    } else {
-      item->init_expr = ParseMinTypMaxExpr();
-    }
+    item->init_expr = item->name.starts_with("PATHPULSE$")
+                          ? ParsePathpulseLimits()
+                          : ParseMinTypMaxExpr();
     items.push_back(item);
   };
 

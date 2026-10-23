@@ -92,6 +92,22 @@ bool IsDirectionQualifierKw(TokenKind tk) {
 
 }  // namespace
 
+// A.9.3: whether `target`, a defparam's, is a hierarchical_identifier: names
+// joined by `.`, each but the last with any constant bit-selects, the first
+// alone or behind `$root .`. A package or class scope, `p::P`, joins none.
+static bool IsHierarchicalParameterName(const Expr* target) {
+  while (target->kind == ExprKind::kMemberAccess &&
+         !target->is_scope_resolution) {
+    target = target->lhs;
+    while (target->kind == ExprKind::kSelect) target = target->base;
+  }
+  return target->kind == ExprKind::kIdentifier &&
+         (target->scope_prefix.empty() || target->scope_prefix == "$root");
+}
+
+// A.2.4's defparam_assignment is a hierarchical_parameter_identifier, `=` and
+// a constant_mintypmax_expression. A target written as any other expression
+// is reported, and read whole so the value after it still parses.
 ModuleItem* Parser::ParseDefparam() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kDefparam;
@@ -99,7 +115,14 @@ ModuleItem* Parser::ParseDefparam() {
   Expect(TokenKind::kKwDefparam, Subclause("23.10.1"));
 
   do {
+    SourceLoc target_loc = CurrentLoc();
     Expr* path = ParseExpr();
+    if (!IsHierarchicalParameterName(path)) {
+      diag_.Error(target_loc,
+                  "a defparam's target is a hierarchical parameter name, not "
+                  "an expression",
+                  Subclause("A.2.4"));
+    }
     Expect(TokenKind::kEq, Subclause("23.10.1"));
     Expr* value = ParseMinTypMaxExpr();
     item->defparam_assigns.emplace_back(path, value);
