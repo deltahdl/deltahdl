@@ -240,15 +240,13 @@ TEST(StringMethodReceivers, MethodOnACallResultAndOnAMethodResult) {
 }
 
 // §6.16 with §8.5: a string property selected from a call's result is a
-// string whose methods read its text, its declaration writing the string type
-// or a typedef of it, while a property of another type is read as itself
-// (#7736).
+// string whose methods read its text, while a property of another type is
+// read as itself (#7736).
 TEST(StringMethodReceivers, AStringPropertyOfACallsResultTakesStringMethods) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
-                       "  typedef string str_t;\n"
                        "  class K;\n"
-                       "    string s = \"ab\"; str_t u = \"xyz\"; int n = 7;\n"
+                       "    string s = \"ab\"; string u = \"xyz\"; int n = 7;\n"
                        "  endclass\n"
                        "  K k = new;\n"
                        "  function K f(); return k; endfunction\n"

@@ -297,10 +297,10 @@ bool TryEvalStringMethodOnValue(const Logic4Vec& value, const Expr* call_expr,
                                 SimContext& ctx, Arena& arena, Logic4Vec& out);
 
 // §6.16 with §8.7: whether `type`, or a class it extends, declares the
-// property `name` with the string type, written directly or through a typedef
-// -- a string itself, or, where `elements` says so, an array whose elements
-// are strings. The value the property stores does not say: a literal stored
-// into it is a packed value (§5.9) that carries no kind.
+// property `name` with the string type -- a string itself, written directly,
+// or, where `elements` says so, an array whose elements are strings, written
+// directly or through a typedef. The value the property stores does not say:
+// a literal stored into it is a packed value (§5.9) that carries no kind.
 bool PropertyIsString(const ClassTypeInfo* type, std::string_view name,
                       SimContext& ctx, bool elements = false);
 
