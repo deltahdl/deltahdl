@@ -151,11 +151,7 @@ static void SetTypeRefPackedDims(DataType& dt, uint32_t width, Arena& arena) {
   dt.packed_dim_right = right;
 }
 
-// Takes onto `dt` the type its type reference stands for, in place of the
-// reference: the type's kind, signing, name and packed dimensions. What the
-// declaration itself says, a net type keyword or `const`, stays as `dt` holds
-// it.
-static void AdoptReferencedType(DataType& dt, const DataType& type) {
+void AdoptReferencedType(DataType& dt, const DataType& type) {
   dt.kind = type.kind;
   dt.is_signed = type.is_signed;
   dt.type_name = type.type_name;
@@ -440,6 +436,27 @@ std::string_view Elaborator::ResolveTypeRef(DataType& dt, SourceLoc loc,
   return {};
 }
 
+void ResolveScopeTypeRef(DataType& dt, const std::vector<ModuleItem*>& items,
+                         Arena& arena) {
+  const Expr* ref = dt.type_ref_expr;
+  if (ref == nullptr || ref->kind != ExprKind::kIdentifier) return;
+  DataType spelled = TypeNameToDataType(ref->text);
+  const ModuleItem* item = ItemNamed(items, ref->text);
+  if (spelled.kind != DataTypeKind::kNamed ||
+      (item != nullptr && item->kind == ModuleItemKind::kTypedef)) {
+    AdoptReferencedType(dt, spelled);
+    return;
+  }
+  if (item == nullptr) return;
+  // No module's values stand around the scope, so a parameter of no type takes
+  // the width of its value's literals alone (DeclaredValueType).
+  static const RtlirModule kNoModule{};
+  static const TypedefMap kNoTypedefs{};
+  const TypeRefScope kScope{&kNoModule, kNoTypedefs, nullptr,
+                            item->loc,  arena,       nullptr};
+  AdoptReferencedType(dt, DeclaredValueType(*item, kScope));
+}
+
 // The class a name reaches, or nothing when the answer is not clear.
 //
 // §8.1 lets a class be declared wherever a data declaration may appear, so the
@@ -561,35 +578,6 @@ static void AppendClassDecls(const std::vector<ModuleItem*>& items,
       AppendClassAndNested(item->class_decl, out);
     }
     AppendGenerateClassDecls(item, out);
-  }
-}
-
-// The type a class property's type reference to `name` stands for: that of
-// the property of `cls` written `name`, or the built-in type `name` spells.
-// Nothing where `name` is neither.
-static std::optional<DataType> PropertyReferencedType(const ClassDecl& cls,
-                                                      std::string_view name) {
-  auto named = std::ranges::find_if(cls.members, [&](const ClassMember* m) {
-    return m->kind == ClassMemberKind::kProperty && m->name == name;
-  });
-  if (named != cls.members.end()) return (*named)->data_type;
-  DataType spelled = TypeNameToDataType(name);
-  if (spelled.kind == DataTypeKind::kNamed) return std::nullopt;
-  return spelled;
-}
-
-void ResolvePropertyTypeRefs(const CompilationUnit* unit) {
-  for (const ClassDecl* cls : AllClassDecls(unit)) {
-    for (ClassMember* m : cls->members) {
-      const Expr* ref = m->data_type.type_ref_expr;
-      if (m->kind != ClassMemberKind::kProperty || ref == nullptr ||
-          ref->kind != ExprKind::kIdentifier) {
-        continue;
-      }
-      if (std::optional<DataType> type =
-              PropertyReferencedType(*cls, ref->text))
-        AdoptReferencedType(m->data_type, *type);
-    }
   }
 }
 

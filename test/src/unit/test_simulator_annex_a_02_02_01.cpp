@@ -266,11 +266,12 @@ TEST(NetAndVariableTypeSimulation, PropertyAndFormalsOfATypeReference) {
 
 // A class property's type reference names another property of its class,
 // found past the class's other members, a method and a property of another name
-// among them, or a built-in type (§6.23). w is z's byte and k an int, so each
-// holds -5 for rw and rk to read back, where a one-bit property would hold 1.
-// u names a value of the compilation unit, which no property and no built-in
-// type is, and e's argument is an expression rather than a name; the pass
-// leaves both as they are, and the class stands with them all the same.
+// among them, a built-in type, or a value of the scope around the class
+// (§6.23). w is z's byte, and k and u, of the compilation unit's g, are each an
+// int, so each holds -5 for rw, rk and ru to read back, where a one-bit
+// property would hold 1. e's argument is an expression rather than a name,
+// which the compilation unit has no values to type, and the class stands with
+// it all the same.
 TEST(NetAndVariableTypeSimulation,
      PropertyTypeReferencesFindAPropertyOrABuiltInType) {
   SimFixture f;
@@ -287,18 +288,22 @@ TEST(NetAndVariableTypeSimulation,
       "  var type(x + 1) e;\n"
       "endclass\n"
       "module t;\n"
-      "  int rw, rk;\n"
+      "  int rw, rk, ru;\n"
       "  C c;\n"
       "  initial begin\n"
       "    c = new;\n"
       "    c.w = -5;\n"
       "    c.k = -5;\n"
+      "    c.u = -5;\n"
       "    rw = c.w;\n"
       "    rk = c.k;\n"
+      "    ru = c.u;\n"
       "  end\n"
       "endmodule\n",
       f);
-  LowerRunAndCheck(f, design, {{"rw", 0xFFFFFFFBu}, {"rk", 0xFFFFFFFBu}});
+  LowerRunAndCheck(
+      f, design,
+      {{"rw", 0xFFFFFFFBu}, {"rk", 0xFFFFFFFBu}, {"ru", 0xFFFFFFFBu}});
 }
 
 }  // namespace

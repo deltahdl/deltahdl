@@ -309,11 +309,22 @@ const ClassDecl* FindBaseClass(const ClassDecl* cls,
 // elaborator_validate_struct_types.cpp.
 std::vector<const ClassDecl*> AllClassDecls(const CompilationUnit* unit);
 
-// §6.23 with §8.5: gives each property of a class of `unit` whose type is a
-// type reference, `var type(x) w;`, the type of what its argument names where
-// that is another property of the class or a built-in type, in place. Defined
-// in elaborator_validate_struct_types.cpp.
-void ResolvePropertyTypeRefs(const CompilationUnit* unit);
+// §6.23: takes onto `dt` the type its type reference stands for, `type`, in
+// place of the reference: the type's kind, signing, name and packed
+// dimensions. What the declaration itself says, a net type keyword or
+// `const`, stays as `dt` holds it. Defined in
+// elaborator_validate_struct_types.cpp.
+void AdoptReferencedType(DataType& dt, const DataType& type);
+
+// §6.23 with §26.2 and §3.12.1: resolves in place the type reference `dt`
+// holds, whose argument is a name, against `items`, the declarations of the
+// package or the compilation unit it is written in: the built-in type the
+// name spells, a typedef of the scope, by its name, which the typedef tables
+// resolve, or a value of the scope, by the type its declaration writes. A
+// reference to none of these, or whose argument is an expression, is left as
+// it stands. Defined in elaborator_validate_struct_types.cpp.
+void ResolveScopeTypeRef(DataType& dt, const std::vector<ModuleItem*>& items,
+                         Arena& arena);
 
 // Whether any identifier or callee anywhere in `e` is one of `names`. A caller
 // that has failed to fold an expression asks this to tell a value it cannot

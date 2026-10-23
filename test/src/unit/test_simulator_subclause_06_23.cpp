@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
 using namespace delta;
@@ -258,6 +259,159 @@ TEST(TypeOfExprCastSim, TypeReferenceEqualityMatchesTypesInAProcedure) {
       "  end\n"
       "endmodule\n";
   EXPECT_EQ(RunAndGet(kSrc, "r"), 0b111110u);
+}
+
+// §6.23 with §26.2 and §3.12.1: a typedef or nettype of a package or of the
+// compilation unit may name its type by a type reference to a value, or a
+// typedef, its scope declares. a and b are the package's int, so -5 stands
+// whole in each; c is the unit's four bits, so 5'h1F keeps 15; and n, of the
+// unit's nettype, carries 4'hA. Left unresolved, each type was implicit, the
+// mark of a forward typedef, and one bit wide.
+TEST(TypeReferenceScopeSim, PackageAndUnitTypedefsOfATypeReference) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "package p;\n"
+      "  int x;\n"
+      "  typedef int base_t;\n"
+      "  typedef type(x) xt;\n"
+      "  typedef type(base_t) bt;\n"
+      "endpackage\n"
+      "logic [3:0] uy;\n"
+      "typedef type(uy) ut;\n"
+      "nettype type(uy) unt;\n"
+      "module t;\n"
+      "  p::xt a;\n"
+      "  p::bt b;\n"
+      "  ut c;\n"
+      "  unt n;\n"
+      "  assign n = 4'hA;\n"
+      "  initial begin\n"
+      "    a = -5;\n"
+      "    b = -5;\n"
+      "    c = 5'h1F;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(
+      f, design,
+      {{"a", 0xFFFFFFFBu}, {"b", 0xFFFFFFFBu}, {"c", 0xFu}, {"n", 0xAu}});
+}
+
+// §6.23 with §8.5 and §23.9: a class property's type reference to a name its
+// class does not declare reaches the scope around the class. w is the
+// module's int x and u its four-bit parameter P, so -5 stands whole in w and
+// 5'h1F keeps 15 in u, where a one-bit property held 1.
+TEST(TypeReferenceScopeSim, ModuleClassPropertiesOfTheModulesNames) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int x;\n"
+      "  parameter logic [3:0] P = 1;\n"
+      "  class C;\n"
+      "    var type(x) w;\n"
+      "    var type(P) u;\n"
+      "  endclass\n"
+      "  int rw, ru;\n"
+      "  C c;\n"
+      "  initial begin\n"
+      "    c = new;\n"
+      "    c.w = -5;\n"
+      "    c.u = 5'h1F;\n"
+      "    rw = c.w;\n"
+      "    ru = c.u;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"rw", 0xFFFFFFFBu}, {"ru", 0xFu}});
+}
+
+// §6.23 with A.2.7, A.2.8 and A.6.8: a class method's formal, a variable its
+// body declares and a for loop's variable may each take their type by a type
+// reference, which finds the class's property x before anything around the
+// class. y, v and i are each an int, so f(-5) adds -2 and -1 to -5 and returns
+// -8, where one-bit ones returned 1. A class nested in C reaches C's
+// properties the same way, so the inner object's z holds -5 for g to return.
+// `type(this)` names no property and nothing of the unit, and stands as
+// written for the method's evaluation (§8.11).
+TEST(TypeReferenceScopeSim, ClassMethodsAndNestedClassesOfTheClassesNames) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class C;\n"
+      "  int x;\n"
+      "  class I;\n"
+      "    var type(x) z;\n"
+      "  endclass\n"
+      "  function int f(input var type(x) y);\n"
+      "    var type(x) v = y;\n"
+      "    for (var type(x) i = -2; i < 0; i++) v += i;\n"
+      "    return v;\n"
+      "  endfunction\n"
+      "  function int g();\n"
+      "    I inner = new;\n"
+      "    inner.z = -5;\n"
+      "    return inner.z;\n"
+      "  endfunction\n"
+      "  function C me();\n"
+      "    var type(this) h = this;\n"
+      "    return h;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int r1, r2;\n"
+      "  C c;\n"
+      "  initial begin\n"
+      "    c = new;\n"
+      "    r1 = c.f(-5);\n"
+      "    r2 = c.g();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"r1", 0xFFFFFFF8u}, {"r2", 0xFFFFFFFBu}});
+}
+
+// §6.23 with §26.2 and §3.12.1: a subroutine of a package or of the
+// compilation unit may type a formal, or a variable its body declares, by a
+// type reference to a value its scope declares, and a class of a package may
+// type a property so. y, v and w are the package's int and z and q the
+// unit's, so -5 stands whole in each, where a one-bit one held 1.
+TEST(TypeReferenceScopeSim, PackageAndUnitSubroutinesOfTheirScopesNames) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "package p;\n"
+      "  int x;\n"
+      "  function automatic int f(input var type(x) y);\n"
+      "    var type(x) v = y;\n"
+      "    return v;\n"
+      "  endfunction\n"
+      "  class K;\n"
+      "    var type(x) w;\n"
+      "  endclass\n"
+      "endpackage\n"
+      "int ux;\n"
+      "function automatic int h(input var type(ux) z);\n"
+      "  return z;\n"
+      "endfunction\n"
+      "task automatic tk(input var type(ux) q, output int o);\n"
+      "  o = q;\n"
+      "endtask\n"
+      "module t;\n"
+      "  int r1, r2, r3, r4;\n"
+      "  p::K k;\n"
+      "  initial begin\n"
+      "    r1 = p::f(-5);\n"
+      "    r2 = h(-5);\n"
+      "    k = new;\n"
+      "    k.w = -5;\n"
+      "    r3 = k.w;\n"
+      "    tk(-5, r4);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design,
+                   {{"r1", 0xFFFFFFFBu},
+                    {"r2", 0xFFFFFFFBu},
+                    {"r3", 0xFFFFFFFBu},
+                    {"r4", 0xFFFFFFFBu}});
 }
 
 }  // namespace

@@ -23,6 +23,7 @@
 #include "elaborator/rtlir_scopes.h"
 #include "elaborator/std_package.h"
 #include "elaborator/type_eval.h"
+#include "elaborator/type_ref_walks.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
@@ -572,7 +573,10 @@ void Elaborator::RegisterCuScopeItems() {
   // compilation unit's items, while §26.3 lets the unit's own parameters
   // reference a package's, so the packages' typedefs and parameters are
   // registered ahead of the walk that folds the unit's: `parameter int X =
-  // p::P` reads the "p.P" key RegisterPackageParams records.
+  // p::P` reads the "p.P" key RegisterPackageParams records. The types the
+  // packages' and the unit's declarations write as type references are
+  // resolved first, so the typedefs record the types they name (§6.23).
+  ResolveUnitScopeTypeRefs(unit_, arena_);
   RegisterPackageTypedefs(unit_, typedefs_, td_array_dims_, arena_);
   // §6.6.7 with A.2.1.3 and A.2.2.1: a nettype's data type or renamed source
   // may be written through a package, `nettype P::T n;` or `nettype P::nt
@@ -614,7 +618,6 @@ void Elaborator::RegisterCuScopeItems() {
   // values are converted to the types those name.
   RegisterClassTypedefs(unit_, typedefs_, td_array_dims_, arena_);
   RegisterClassParams(unit_, cu_param_scope_, arena_, diag_);
-  ResolvePropertyTypeRefs(unit_);
   // §13.3 with §7.2.1: after the two typedef registrations above, which are
   // what give the table the "pkg::T" and "Class::T" names a formal's member
   // may be written with; a package's and a compilation-unit class's
