@@ -1,5 +1,6 @@
 #include "elaborator/assoc_index_type.h"
 
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -57,14 +58,26 @@ static bool ContainsRealType(const DataType& dtype, const TypedefMap& tds,
   return false;
 }
 
+std::string ScopedTypeKey(const Expr* dim) {
+  if (dim->kind != ExprKind::kMemberAccess || !dim->is_scope_resolution) {
+    return {};
+  }
+  return std::string(dim->lhs->text) + "::" + std::string(dim->rhs->text);
+}
+
 // Whether the unpacked dimension `dim` is an associative one whose index type
 // is, or holds, a real: the parser keeps an index type as the identifier of the
-// keyword or the name written.
+// keyword or the name written, and a name written through a package or class
+// scope as the scope resolution it is.
 static bool IsRealIndexType(const Expr* dim, const TypedefMap& typedefs) {
-  if (dim == nullptr || dim->kind != ExprKind::kIdentifier) return false;
-  std::string_view t = dim->text;
-  if (t == "real" || t == "shortreal" || t == "realtime") return true;
-  auto it = typedefs.find(t);
+  if (dim == nullptr) return false;
+  const std::string kName = dim->kind == ExprKind::kIdentifier
+                                ? std::string(dim->text)
+                                : ScopedTypeKey(dim);
+  if (kName == "real" || kName == "shortreal" || kName == "realtime") {
+    return true;
+  }
+  auto it = typedefs.find(kName);
   return it != typedefs.end() && ContainsRealType(it->second, typedefs);
 }
 

@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <format>
 #include <utility>
 
 #include "elaborator/elaborator.h"
@@ -361,6 +362,91 @@ TEST(UnpackedArrayValidation, SingleDimensionFillsThePerDimensionRecord) {
   EXPECT_EQ(std::make_pair(mod->variables[0].unpacked_dims[0].left,
                            mod->variables[0].unpacked_dims[0].right),
             std::make_pair(int64_t{1}, int64_t{4}));
+}
+
+// A.2.5 and §7.4.2: an unpacked dimension's bounds, and a queue's, are
+// constant expressions, and a variable, a net and a const variable, set at run
+// time (§6.20.6), are none. Each dimension below reads one, at module scope or
+// in a block, and is reported. Each was accepted, and its declaration built
+// with no dimension.
+TEST(UnpackedArrayValidation, VariableReadInUnpackedDimIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int n;\n"
+      "  const int k = 2;\n"
+      "  wire [3:0] v;\n"
+      "  int a [n];\n"
+      "  logic [7:0] b [0:n];\n"
+      "  wire w [n];\n"
+      "  int q [$:v];\n"
+      "  int g [k];\n"
+      "  initial begin\n"
+      "    int c [n];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const struct {
+    const char* declared;
+    const char* read;
+    uint32_t line;
+  } kReads[] = {{"a", "n", 5}, {"b", "n", 6}, {"w", "n", 7},
+                {"q", "v", 8}, {"g", "k", 9}, {"c", "n", 11}};
+  for (const auto& read : kReads) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        std::format("unpacked dimension of '{}' reads '{}', which is no "
+                    "constant, so the dimension is not a constant expression",
+                    read.declared, read.read),
+        read.line, "7.4.2"))
+        << read.declared;
+  }
+}
+
+// Parameters, a package's parameter, `$size` of a fixed-size array, a type
+// reference, a constant function's call, and a block's own local parameter
+// hiding the module's variable of its name each leave a dimension constant,
+// in a block and a fork alike, and draw no report.
+TEST(UnpackedArrayValidation, ConstantsInUnpackedDimsAreNotReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package p; parameter int N = 3; endpackage\n"
+      "module m;\n"
+      "  parameter int P = 4;\n"
+      "  localparam int L = 2;\n"
+      "  int n;\n"
+      "  int fixed [4];\n"
+      "  int s [$size(fixed)];\n"
+      "  int t [p::N];\n"
+      "  int u [type(n)];\n"
+      "  int d [P];\n"
+      "  int e [0:L];\n"
+      "  function int f(int x);\n"
+      "    return x;\n"
+      "  endfunction\n"
+      "  int h [f(2)];\n"
+      "  initial begin\n"
+      "    typedef int word_t;\n"
+      "    localparam int n = 2;\n"
+      "    int c [n];\n"
+      "    fork\n"
+      "      int z [L];\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const struct {
+    const char* declared;
+    uint32_t line;
+  } kDims[] = {{"s", 7},  {"t", 8},  {"u", 9},  {"d", 10},
+               {"e", 11}, {"h", 15}, {"c", 19}, {"z", 21}};
+  for (const auto& dim : kDims) {
+    EXPECT_FALSE(ReportedError(
+        f.diag.Diagnostics(),
+        std::format("unpacked dimension of '{}' reads", dim.declared), dim.line,
+        "7.4.2"))
+        << dim.declared;
+  }
 }
 
 }  // namespace

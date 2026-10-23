@@ -15,6 +15,7 @@
 #include "common/packed_range.h"
 #include "common/source_loc.h"
 #include "common/types.h"
+#include "elaborator/assoc_index_type.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_decls_internal.h"
@@ -153,18 +154,18 @@ static bool IsUserDefinedType(
 }
 
 static void ApplyUserDefinedAssocDim(
-    const Expr* dim, RtlirVariable& var, const TypedefMap& typedefs,
+    std::string_view name, RtlirVariable& var, const TypedefMap& typedefs,
     const std::unordered_set<std::string_view>& class_names) {
   var.is_assoc = true;
-  if (class_names.count(dim->text) > 0) {
+  if (class_names.count(name) > 0) {
     var.is_class_index = true;
-    var.assoc_index_class_name = dim->text;
+    var.assoc_index_class_name = name;
     var.assoc_index_width = 64;
     return;
   }
-  auto it = typedefs.find(dim->text);
+  auto it = typedefs.find(name);
   if (it != typedefs.end()) {
-    var.assoc_index_type_name = dim->text;
+    var.assoc_index_type_name = name;
     var.assoc_index_width = EvalTypeWidth(it->second, typedefs);
     // A typedef'd integral index follows the signedness of its underlying
     // type, so e.g. `bit signed [4:1]` orders signed and `bit [4:1]`
@@ -189,17 +190,34 @@ static void ApplyConstSizedUnpackedDim(const Expr* dim, RtlirVariable& var,
   }
 }
 
-// §7.8: an identifier first dimension naming a typedef or class type makes the
-// array associative with that user-defined index type. Returns true when the
+// §7.8 with §26.3 and §8.23: the name `typedefs` or `class_names` holds the
+// user-defined type the dimension `dim` names under, written bare or through a
+// package or class scope, `[p::idx_t]`; empty where it names none, as a
+// constant so named, `[p::N]`, does not.
+static std::string_view UserDefinedIndexName(
+    const Expr* dim, const TypedefMap& typedefs,
+    const std::unordered_set<std::string_view>& class_names) {
+  if (dim->kind == ExprKind::kIdentifier) {
+    return IsUserDefinedType(dim->text, typedefs, class_names)
+               ? dim->text
+               : std::string_view();
+  }
+  const std::string kKey = ScopedTypeKey(dim);
+  if (auto td = typedefs.find(kKey); td != typedefs.end()) return td->first;
+  auto cls = class_names.find(kKey);
+  return cls == class_names.end() ? std::string_view() : *cls;
+}
+
+// §7.8: a first dimension naming a typedef or class type makes the array
+// associative with that user-defined index type. Returns true when the
 // dimension was a user-defined associative index.
 static bool TryParseUserDefinedAssocDim(
     const Expr* dim, RtlirVariable& var, const TypedefMap& typedefs,
     const std::unordered_set<std::string_view>& class_names) {
-  if (dim->kind != ExprKind::kIdentifier ||
-      !IsUserDefinedType(dim->text, typedefs, class_names)) {
-    return false;
-  }
-  ApplyUserDefinedAssocDim(dim, var, typedefs, class_names);
+  const std::string_view kName =
+      UserDefinedIndexName(dim, typedefs, class_names);
+  if (kName.empty()) return false;
+  ApplyUserDefinedAssocDim(kName, var, typedefs, class_names);
   return true;
 }
 

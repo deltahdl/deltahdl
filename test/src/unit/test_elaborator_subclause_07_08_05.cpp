@@ -1,9 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <string>
 #include <string_view>
 
+#include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -288,6 +290,93 @@ TEST(AssocIndexTypeValidation, RealIndexTypeRejectedInEveryScope) {
                               "real or shortreal type shall not be used as an "
                               "associative array index type",
                               line, "7.8.5"));
+  }
+}
+
+// §7.8 with §26.3 and §8.23: an index type named through a package or a class
+// scope is the type the scope declares, so `a` takes a 4-bit unsigned index,
+// `b` an 8-bit signed one and `k` a class index, while `p::N`, a constant,
+// still sizes `z` at four. Each scoped index was dropped, and its variable
+// built with no dimension.
+TEST(UserDefinedTypeAssocArrayElaboration, ScopedTypeNameIndexIsAssociative) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "package p;\n"
+      "  typedef bit [3:0] idx_t;\n"
+      "  parameter int N = 4;\n"
+      "  class K; endclass\n"
+      "endpackage\n"
+      "class C; typedef byte key_t; endclass\n"
+      "module top;\n"
+      "  int a [p::idx_t];\n"
+      "  int b [C::key_t];\n"
+      "  int k [p::K];\n"
+      "  int z [p::N];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  const auto& vars = design->top_modules[0]->variables;
+  auto var = [&vars](std::string_view name) -> const RtlirVariable* {
+    auto it = std::ranges::find(vars, name, &RtlirVariable::name);
+    return it == vars.end() ? nullptr : &*it;
+  };
+  const RtlirVariable* a = var("a");
+  const RtlirVariable* b = var("b");
+  const RtlirVariable* k = var("k");
+  const RtlirVariable* z = var("z");
+  ASSERT_NE(a, nullptr);
+  ASSERT_NE(b, nullptr);
+  ASSERT_NE(k, nullptr);
+  ASSERT_NE(z, nullptr);
+  EXPECT_TRUE(a->is_assoc);
+  EXPECT_EQ(a->assoc_index_width, 4u);
+  EXPECT_FALSE(a->is_index_signed);
+  EXPECT_TRUE(b->is_assoc);
+  EXPECT_EQ(b->assoc_index_width, 8u);
+  EXPECT_TRUE(b->is_index_signed);
+  EXPECT_TRUE(k->is_assoc);
+  EXPECT_TRUE(k->is_class_index);
+  EXPECT_FALSE(z->is_assoc);
+  EXPECT_EQ(z->unpacked_size, 4u);
+}
+
+// §7.8.5: a real index type is illegal however it is named, and a package's
+// typedef of real is reached through its scope as a bare typedef is.
+TEST(UserDefinedTypeAssocArrayElaboration, ScopedRealIndexIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package q; typedef real real_t; endpackage\n"
+      "module top;\n"
+      "  int r [q::real_t];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "real or shortreal type shall not be used as an "
+                            "associative array index type",
+                            3, "7.8.5"));
+}
+
+// §6.7: a net's dimension is fixed-size, and an index type named through a
+// package scope, a typedef's or a class's, makes an associative one, so each
+// of w1 and w2 is reported. A range, which w3 writes, is fixed-size.
+TEST(UserDefinedTypeAssocArrayElaboration, NetOfScopedIndexDimIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package p; typedef bit [3:0] idx_t; class K; endclass endpackage\n"
+      "module top;\n"
+      "  wire w1 [p::idx_t];\n"
+      "  wire w2 [p::K];\n"
+      "  wire w3 [0:1];\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {3u, 4u, 5u}) {
+    EXPECT_EQ(
+        static_cast<bool>(ReportedError(
+            f.diag.Diagnostics(),
+            "a net's unpacked dimension must be fixed-size", line, "6.7")),
+        line != 5u)
+        << "line " << line;
   }
 }
 

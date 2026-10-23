@@ -8,6 +8,7 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "common/types.h"
+#include "elaborator/assoc_index_type.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/queue_dim.h"
 #include "elaborator/type_eval.h"
@@ -46,7 +47,14 @@ const DataType* FollowTypedefs(const DataType& dtype,
 
 bool IsFixedSizeUnpackedDim(const Expr* dim, const TypeShapeTables& tables) {
   if (dim == nullptr) return false;
-  if (dim->kind != ExprKind::kIdentifier) return true;
+  if (dim->kind != ExprKind::kIdentifier) {
+    // §7.8 with §26.3 and §8.23: an index type may be named through a package
+    // or class scope, `[p::idx_t]`, which a constant so named, `[p::N]`, is
+    // not.
+    const std::string kKey = ScopedTypeKey(dim);
+    return tables.typedefs.count(kKey) == 0 &&
+           tables.class_names.count(kKey) == 0;
+  }
   if (IsQueueDim(dim) || dim->text == "*") return false;
   for (std::string_view keyword : kAssocIndexKeywords) {
     if (dim->text == keyword) return false;

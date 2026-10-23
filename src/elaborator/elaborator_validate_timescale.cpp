@@ -21,6 +21,7 @@
 #include "elaborator/rtlir.h"
 #include "elaborator/time_literal_scale.h"
 #include "elaborator/unit_scope_switch.h"
+#include "elaborator/unpacked_dim_reads.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -168,6 +169,7 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl,
   }
   CheckUnboundedParamsInQueueContexts(decl, unbounded, queues, diag_);
   CheckDollarOperands(decl, diag_);
+  CheckVariableReadsInUnpackedDims(decl, var_types_, diag_);
   CheckUntypedDefaultPatternValues(decl, diag_);
   CheckContinuousPropertyWrites(decl, class_var_types_, unit_, diag_);
   CheckInstanceLocalTypeAssignments(decl, unit_, diag_);
