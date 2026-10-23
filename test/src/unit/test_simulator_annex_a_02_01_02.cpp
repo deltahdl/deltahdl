@@ -124,11 +124,14 @@ TEST(PortDeclSim, BodyPortsOfAPackageScopedTypeCarryItsWidth) {
 // A.2.1.2's port declarations take a data_type after `var`, which A.2.2.1 lets
 // be a type_reference (§6.23). Each port here is x's int, an earlier port of
 // the header and a variable of the body alike being x, so -5 crosses whole; a
-// one-bit port would carry its low bit, 1.
+// one-bit port would carry its low bit, 1. The header's x is written with
+// `var`, since an input of no port kind is a net (§23.2.2.3), which §6.7.1
+// bars from a 2-state type.
 TEST(PortDeclSim, VarPortsOfATypeReferenceCarryTheReferencedType) {
   SimFixture f;
   auto* design = ElaborateSrc(
-      "module m(input int x, input var type(x) a, output var type(x) b);\n"
+      "module m(input var int x, input var type(x) a,\n"
+      "         output var type(x) b);\n"
       "  assign b = a;\n"
       "endmodule\n"
       "module n(c, d);\n"
