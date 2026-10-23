@@ -19,6 +19,7 @@
 #include "elaborator/nettype_uses.h"
 #include "elaborator/new_placement.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/time_literal_scale.h"
 #include "elaborator/unit_scope_switch.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
@@ -247,78 +248,37 @@ void ClassifyTimescaleElement(const DeclaredTimescale& own,
   }
 }
 
-// A design element's time unit or time precision as §3.14.2.3 (printed page
-// 60) resolves it, and whether it came from the module or interface enclosing
-// the element. The default is the 1 ns deltahdl takes for both, which §3.14.2.3
-// leaves to the implementation and the TimeScale struct starts from.
-struct ResolvedTime {
-  TimeUnit unit = TimeUnit::kNs;
-  int magnitude = 1;
-  bool inherited = false;
-};
-
-struct ElementTimescale {
-  ResolvedTime unit;
-  ResolvedTime precision;
-};
-
-// §3.14.2.3: an element takes each of the two from its own declaration, else
-// from the module or interface enclosing it (a), else from the `timescale in
-// force at its header (b), else from the compilation unit's declaration (c),
-// and otherwise from the default (d). A precision the element does not declare
-// is found by the same order of sources as a unit.
-ResolvedTime ResolveTime(const DeclaredTime& own, const ResolvedTime* enclosing,
-                         const DeclaredTime& directive,
-                         const DeclaredTime& cu) {
-  if (own.declared) return {own.unit, own.magnitude, false};
-  if (enclosing != nullptr)
-    return {enclosing->unit, enclosing->magnitude, true};
-  if (directive.declared) return {directive.unit, directive.magnitude, false};
-  if (cu.declared) return {cu.unit, cu.magnitude, false};
-  return {};
-}
-
-ElementTimescale ResolveElementTimescale(const DeclaredTimescale& own,
-                                         const ElementTimescale* enclosing,
-                                         const DeclaredTimescale& directive,
-                                         const DeclaredTimescale& cu) {
-  return {
-      ResolveTime(own.unit, enclosing ? &enclosing->unit : nullptr,
-                  directive.unit, cu.unit),
-      ResolveTime(own.precision, enclosing ? &enclosing->precision : nullptr,
-                  directive.precision, cu.precision)};
-}
-
 // §3.14 (printed page 59): a design element's time precision may be no coarser
-// than its time unit. The comparison is of the two values the element resolves
-// to, wherever each came from, so a lone `timeunit 1ps;` is held to the 1 ns
-// default precision. A pair a nested element inherits whole from the one
-// enclosing it is that element's pair, reported there. An extern declaration
-// (§23.5) is not an element of its own and is left to its definition.
-void CheckTimescaleOrder(const ElementTimescale& ts, SourceLoc loc,
-                         DiagEngine& diag) {
-  if (ts.unit.inherited && ts.precision.inherited) return;
-  if (EffectiveTimeOrder(ts.precision.unit, ts.precision.magnitude) >
-      EffectiveTimeOrder(ts.unit.unit, ts.unit.magnitude)) {
+// than its time unit. The comparison is of the time scale the element runs at,
+// the one ModuleTimescale or PackageTimescale gives it by §3.14.2.3 (printed
+// page 60) and its delays are scaled by, wherever each half came from, so a
+// lone `timeunit 1ps;` is held to the 1 ns default precision.
+void CheckTimescaleOrder(const TimeScale& ts, SourceLoc loc, DiagEngine& diag) {
+  if (EffectiveTimeOrder(ts.precision, ts.prec_magnitude) >
+      EffectiveTimeOrder(ts.unit, ts.magnitude)) {
     diag.Error(loc, "time precision is less precise than the time unit",
                Subclause("3.14"));
   }
 }
 
-// Checks a module, interface or program and every module or interface nested
-// in it, each nested one resolving against the element enclosing it.
-void CheckDesignElementTimescales(const ModuleDecl* decl,
-                                  const ElementTimescale* enclosing,
-                                  const DeclaredTimescale& cu,
+// Checks a module, interface or program of `unit` and every module or interface
+// nested in it, `nested` saying whether `decl` stands inside another. A nested
+// element that declares neither half takes its pair whole from the one
+// enclosing it, so the pair is that element's and is reported there. An extern
+// declaration (§23.5) is not an element of its own and is left to its
+// definition.
+void CheckDesignElementTimescales(const ModuleDecl* decl, bool nested,
+                                  const CompilationUnit& unit,
                                   DiagEngine& diag) {
   if (decl->is_extern) return;
-  ElementTimescale ts = ResolveElementTimescale(
-      DeclaredBy(decl), enclosing,
-      DeclaredBy(decl->has_directive_timescale, decl->directive_timescale), cu);
-  CheckTimescaleOrder(ts, decl->range.start, diag);
+  bool inherits_whole =
+      nested && !decl->has_timeunit && !decl->has_timeprecision;
+  if (!inherits_whole) {
+    CheckTimescaleOrder(ModuleTimescale(decl, unit), decl->range.start, diag);
+  }
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kNestedModuleDecl) {
-      CheckDesignElementTimescales(item->nested_module_decl, &ts, cu, diag);
+      CheckDesignElementTimescales(item->nested_module_decl, true, unit, diag);
     }
   }
 }
@@ -378,20 +338,16 @@ void Elaborator::ValidateTimescaleConsistency() {
 // package is never nested, so it resolves from its own declarations, the
 // `timescale before its header and the compilation unit alone.
 void Elaborator::ValidateTimescaleOrder() {
-  DeclaredTimescale cu = DeclaredBy(unit_);
   for (const auto* list :
        {&unit_->modules, &unit_->interfaces, &unit_->programs}) {
     for (const auto* decl : *list) {
-      CheckDesignElementTimescales(decl, nullptr, cu, diag_);
+      CheckDesignElementTimescales(decl, /*nested=*/false, *unit_, diag_);
     }
   }
+  const TimeScale kUnitScale = CompilationUnitTimescale(*unit_);
   for (const auto* pkg : unit_->packages) {
-    CheckTimescaleOrder(
-        ResolveElementTimescale(
-            DeclaredBy(pkg), nullptr,
-            DeclaredBy(pkg->has_directive_timescale, pkg->directive_timescale),
-            cu),
-        pkg->range.start, diag_);
+    CheckTimescaleOrder(PackageTimescale(*pkg, kUnitScale), pkg->range.start,
+                        diag_);
   }
 }
 
