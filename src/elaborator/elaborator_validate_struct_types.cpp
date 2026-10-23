@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <format>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -10,6 +11,7 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
+#include "elaborator/const_eval.h"
 #include "elaborator/const_eval_internal.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_class_lookup.h"
@@ -23,6 +25,17 @@
 
 namespace delta {
 
+// The value parameter of `mod` written `name`, or null where none is. A type
+// parameter is a type rather than a value, and is left to the name's reading
+// as a type.
+static const RtlirParamDecl* ValueParamNamed(const RtlirModule* mod,
+                                             std::string_view name) {
+  for (const auto& p : mod->params) {
+    if (p.name == name && !p.is_type_param) return &p;
+  }
+  return nullptr;
+}
+
 static uint32_t InferTypeRefExprWidth(const Expr* expr,
                                       const RtlirModule* mod) {
   if (!expr) return 0;
@@ -33,6 +46,11 @@ static uint32_t InferTypeRefExprWidth(const Expr* expr,
       }
       for (const auto& n : mod->nets) {
         if (n.name == expr->text) return n.width;
+      }
+      // §6.20.2: a parameter is as wide as its declaration, or as its final
+      // value where it was declared with neither range nor type.
+      if (const RtlirParamDecl* pd = ValueParamNamed(mod, expr->text)) {
+        return ParamStorageShapeOf(*pd).width;
       }
       return 0;
     case ExprKind::kIntegerLiteral:
@@ -71,6 +89,9 @@ static bool InferTypeRefExprSigned(const Expr* expr, const RtlirModule* mod) {
       for (const auto& n : mod->nets) {
         if (n.name == expr->text) return n.is_signed;
       }
+      if (const RtlirParamDecl* pd = ValueParamNamed(mod, expr->text)) {
+        return ParamStorageShapeOf(*pd).is_signed;
+      }
       return false;
     case ExprKind::kBinary:
       return InferTypeRefExprSigned(expr->lhs, mod) &&
@@ -101,6 +122,20 @@ static void SetTypeRefPackedDims(DataType& dt, uint32_t width, Arena& arena) {
   dt.packed_dim_right = right;
 }
 
+// Takes onto `dt` the type its type reference stands for, in place of the
+// reference: the type's kind, signing, name and packed dimensions. What the
+// declaration itself says, a net type keyword or `const`, stays as `dt` holds
+// it.
+static void AdoptReferencedType(DataType& dt, const DataType& type) {
+  dt.kind = type.kind;
+  dt.is_signed = type.is_signed;
+  dt.type_name = type.type_name;
+  dt.packed_dim_left = type.packed_dim_left;
+  dt.packed_dim_right = type.packed_dim_right;
+  dt.extra_packed_dims = type.extra_packed_dims;
+  dt.type_ref_expr = nullptr;
+}
+
 // §8.23 names the type operator as a context in which a class scope resolution
 // may prefix a type name, so `type(Frame::payload_t)` denotes the typedef
 // `payload_t` declared in class `Frame`. `Frame::payload_t` parses to a
@@ -123,14 +158,35 @@ static bool ResolveClassScopedTypeRef(DataType& dt, const Expr* ref,
   const DataType* resolved =
       FindClassScopedTypedefType(ref->lhs->text, ref->rhs->text, unit);
   if (resolved == nullptr) return false;
-  dt.kind = resolved->kind;
-  dt.is_signed = resolved->is_signed;
-  dt.type_name = resolved->type_name;
-  dt.packed_dim_left = resolved->packed_dim_left;
-  dt.packed_dim_right = resolved->packed_dim_right;
-  dt.extra_packed_dims = resolved->extra_packed_dims;
-  dt.type_ref_expr = nullptr;
+  AdoptReferencedType(dt, *resolved);
   return true;
+}
+
+// §6.23 with §6.20.2: a type reference whose argument is a name no variable or
+// net of the module carries. A parameter stands for its type: the one it was
+// declared with, or, declared with no type, the logic vector of its declared
+// range or of its final value. A built-in type keyword and a typedef name,
+// which the parser reads as identifiers, stand for the type they spell, a
+// typedef's left named for the declaration's own resolution of it. A name
+// that is none of these leaves the reference as it stands.
+static void ResolveNamedTypeRef(DataType& dt, std::string_view name,
+                                const RtlirModule* mod,
+                                const TypedefMap& typedefs, Arena& arena) {
+  if (const RtlirParamDecl* pd = ValueParamNamed(mod, name)) {
+    if (pd->decl_type != nullptr && !pd->decl_type_implicit) {
+      AdoptReferencedType(dt, *pd->decl_type);
+      return;
+    }
+    ParamStorageShape shape = ParamStorageShapeOf(*pd);
+    dt.kind = DataTypeKind::kLogic;
+    dt.is_signed = shape.is_signed;
+    SetTypeRefPackedDims(dt, shape.width, arena);
+    dt.type_ref_expr = nullptr;
+    return;
+  }
+  DataType spelled = TypeNameToDataType(name);
+  if (spelled.kind == DataTypeKind::kNamed && typedefs.count(name) == 0) return;
+  AdoptReferencedType(dt, spelled);
 }
 
 void Elaborator::ResolveTypeRef(DataType& dt, SourceLoc loc,
@@ -172,7 +228,9 @@ void Elaborator::ResolveTypeRef(DataType& dt, SourceLoc loc,
   if (it != var_types_.end()) {
     dt.kind = it->second;
     dt.type_ref_expr = nullptr;
+    return;
   }
+  ResolveNamedTypeRef(dt, ref->text, mod, typedefs_, arena_);
 }
 
 // The class a name reaches, or nothing when the answer is not clear.

@@ -518,4 +518,88 @@ TEST(TypeOperatorSim, TypeOpTypedefVectorType) {
   EXPECT_EQ(var->value.ToUint64(), 0xABCDEFu);
 }
 
+// §6.23 has a type reference to a data type stand for that type. The parse
+// reads `int`, a typedef name and a type parameter's name as identifiers, and
+// none names a variable or a net here, so each is resolved as the type it
+// spells.
+TEST(TypeOperatorSim, TypeOfADataTypeOrATypedefIsThatType) {
+  SimFixture f;
+  auto* a = RunAndFindVar(
+      "module t;\n"
+      "  typedef logic [7:0] byte_t;\n"
+      "  parameter type T = logic [5:0];\n"
+      "  var type(int) a;\n"
+      "  var type(byte_t) c;\n"
+      "  var type(T) g;\n"
+      "  initial begin\n"
+      "    a = -3;\n"
+      "    c = 8'hA5;\n"
+      "    g = 6'h2A;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "a");
+  ASSERT_NE(a, nullptr);
+  EXPECT_EQ(a->value.width, 32u);
+  EXPECT_TRUE(a->is_signed);
+  EXPECT_EQ(a->value.ToUint64(), 0xFFFFFFFDu);
+  auto* c = f.ctx.FindVariable("c");
+  ASSERT_NE(c, nullptr);
+  EXPECT_EQ(c->value.width, 8u);
+  EXPECT_EQ(c->value.ToUint64(), 0xA5u);
+  auto* g = f.ctx.FindVariable("g");
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(g->value.width, 6u);
+  EXPECT_EQ(g->value.ToUint64(), 0x2Au);
+}
+
+// A type reference to a parameter stands for the parameter's type: the type
+// it was declared with, `int` for P, or, declared with no type, the logic
+// vector of its declared range or of its final value (§6.20.2): 12 bits for
+// Q, 8 for U and 4 for the parameter port V. An expression over a parameter
+// takes the parameter's width and signing, as one over a variable takes the
+// variable's.
+TEST(TypeOperatorSim, TypeOfAParameterIsTheParametersType) {
+  SimFixture f;
+  auto* b = RunAndFindVar(
+      "module t #(parameter V = 4'h9);\n"
+      "  parameter int P = 5;\n"
+      "  parameter [11:0] Q = 1;\n"
+      "  parameter U = 8'hA5;\n"
+      "  var type(P) b;\n"
+      "  var type(Q) d;\n"
+      "  var type(-P) e;\n"
+      "  var type(U) u;\n"
+      "  var type(V) w;\n"
+      "  initial begin\n"
+      "    b = -3;\n"
+      "    d = 12'hFFF;\n"
+      "    e = -3;\n"
+      "    u = 9'h1FF;\n"
+      "    w = 5'h1F;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "b");
+  ASSERT_NE(b, nullptr);
+  EXPECT_EQ(b->value.width, 32u);
+  EXPECT_TRUE(b->is_signed);
+  EXPECT_EQ(b->value.ToUint64(), 0xFFFFFFFDu);
+  auto* d = f.ctx.FindVariable("d");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->value.width, 12u);
+  EXPECT_FALSE(d->is_signed);
+  EXPECT_EQ(d->value.ToUint64(), 0xFFFu);
+  auto* e = f.ctx.FindVariable("e");
+  ASSERT_NE(e, nullptr);
+  EXPECT_EQ(e->value.width, 32u);
+  EXPECT_TRUE(e->is_signed);
+  auto* u = f.ctx.FindVariable("u");
+  ASSERT_NE(u, nullptr);
+  EXPECT_EQ(u->value.width, 8u);
+  EXPECT_EQ(u->value.ToUint64(), 0xFFu);
+  auto* w = f.ctx.FindVariable("w");
+  ASSERT_NE(w, nullptr);
+  EXPECT_EQ(w->value.width, 4u);
+  EXPECT_EQ(w->value.ToUint64(), 0xFu);
+}
+
 }  // namespace
