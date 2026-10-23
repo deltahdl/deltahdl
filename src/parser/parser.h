@@ -320,7 +320,7 @@ class Parser {
   uint8_t ParseStrength1();
   void ParseGateDelay(Expr*& d1, Expr*& d2, Expr*& d3);
   Expr* ParseDelayValue();
-  Expr* ParsePathpulseLimits();
+  Expr* ParsePathpulseLimits(Expr*& error_limit);
 
   UdpDecl* ParseUdpDecl();
   // Chooses between A.5.2's two port lists for the header in hand, and is what

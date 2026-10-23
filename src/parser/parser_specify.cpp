@@ -42,8 +42,9 @@ ModuleItem* Parser::ParseSpecifyBlock() {
 // A.2.4 and Syntax 30-7 (printed page 887) parenthesize a PATHPULSE$
 // specparam's limits; §30.7.1's example `PATHPULSE$ = 3;` is informative
 // (§1.10), so a bare limit is reported and read as the one limit that serves
-// as both. Answers the reject limit.
-Expr* Parser::ParsePathpulseLimits() {
+// as both. Answers the reject limit, and sets `error_limit` where one is
+// written.
+Expr* Parser::ParsePathpulseLimits(Expr*& error_limit) {
   if (!Check(TokenKind::kLParen)) {
     diag_.Error(CurrentLoc(),
                 "a PATHPULSE$ specparam's limits are written in parentheses",
@@ -52,7 +53,7 @@ Expr* Parser::ParsePathpulseLimits() {
   }
   Consume();
   Expr* reject = ParseMinTypMaxExpr();
-  if (Match(TokenKind::kComma)) ParseMinTypMaxExpr();
+  if (Match(TokenKind::kComma)) error_limit = ParseMinTypMaxExpr();
   Expect(TokenKind::kRParen, Subclause("30.7.1"));
   return reject;
 }
@@ -79,8 +80,9 @@ void Parser::ParseSpecparamDecl(std::vector<ModuleItem*>& items) {
     item->data_type.packed_dim_right = packed_right;
     item->name = Expect(TokenKind::kIdentifier, Subclause("6.20.5")).text;
     Expect(TokenKind::kEq, Subclause("6.20.5"));
+    Expr* error_limit = nullptr;
     item->init_expr = item->name.starts_with("PATHPULSE$")
-                          ? ParsePathpulseLimits()
+                          ? ParsePathpulseLimits(error_limit)
                           : ParseMinTypMaxExpr();
     items.push_back(item);
   };
@@ -897,24 +899,14 @@ void Parser::ParseSpecparamInSpecify(std::vector<SpecifyItem*>& items) {
     Expect(TokenKind::kRBracket, Subclause("6.20.5"));
   }
 
+  // A lone reject limit leaves pathpulse_error null, which is how §30.7.1's
+  // rule that it is the error limit too reaches ApplyPulseControlOverride in
+  // src/simulator/specify_pulse.cpp: a cleared has_error there is the
+  // instruction to use the reject limit for both.
   auto parse_pathpulse_value = [&](SpecifyItem* sp) {
     DecodePathpulseName(*sp);
-    // The parentheses are optional here for the reason ParseSpecparamDecl above
-    // states at length: §30.7.1's example writes `PATHPULSE$ = 3;` and Syntax
-    // 30-7 parenthesizes. An unparenthesized limit leaves pathpulse_error null,
-    // which is how §30.7.1's rule that a lone reject limit is the error limit
-    // too reaches ApplyPulseControlOverride in
-    // src/simulator/specify_pulse.cpp -- that function takes a cleared
-    // has_error as the instruction to use the reject limit for both.
-    bool parenthesized = Match(TokenKind::kLParen);
-    sp->pathpulse_reject = ParseMinTypMaxExpr();
+    sp->pathpulse_reject = ParsePathpulseLimits(sp->pathpulse_error);
     sp->param_value = sp->pathpulse_reject;
-    if (parenthesized) {
-      if (Match(TokenKind::kComma)) {
-        sp->pathpulse_error = ParseMinTypMaxExpr();
-      }
-      Expect(TokenKind::kRParen, Subclause("30.7.1"));
-    }
   };
 
   auto parse_one = [&]() {
