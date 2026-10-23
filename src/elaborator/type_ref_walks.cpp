@@ -130,23 +130,34 @@ std::optional<DataType> PropertyTypeNamed(const ClassDecl& cls,
   return (*named)->data_type;
 }
 
+// A.2.5 with §6.23: the associative indexes the declaration `item`, a
+// variable or a typedef, writes as type references, `[type(k)]`, given the
+// types `resolve` gives their arguments, made in `arena`.
+void ResolveItemIndexTypeRefs(ModuleItem& item, const TypeRefResolver& resolve,
+                              Arena& arena) {
+  ResolveTypeRefIndexDims(
+      item.unpacked_dims, [&](DataType& type) { resolve(type, item.loc); },
+      arena);
+}
+
 // The type references the declarations of `items`, a package's or the
 // compilation unit's, write in their typedefs' and nettypes' types, their
-// variables' associative indexes (A.2.5), their subroutines and their
-// classes, with `resolve` resolving a name none of them declares more
+// typedefs' and variables' associative indexes (A.2.5), their subroutines and
+// their classes, with `resolve` resolving a name none of them declares more
 // closely.
 void ResolveScopeItemTypeRefs(const std::vector<ModuleItem*>& items,
                               const TypeRefResolver& resolve, Arena& arena) {
   for (ModuleItem* item : items) {
     switch (item->kind) {
       case ModuleItemKind::kTypedef:
+        resolve(item->typedef_type, item->loc);
+        ResolveItemIndexTypeRefs(*item, resolve, arena);
+        break;
       case ModuleItemKind::kNettypeDecl:
         resolve(item->typedef_type, item->loc);
         break;
       case ModuleItemKind::kVarDecl:
-        ResolveTypeRefIndexDims(
-            item->unpacked_dims,
-            [&](DataType& type) { resolve(type, item->loc); }, arena);
+        ResolveItemIndexTypeRefs(*item, resolve, arena);
         break;
       case ModuleItemKind::kFunctionDecl:
       case ModuleItemKind::kTaskDecl:
@@ -209,6 +220,9 @@ void ResolveClassTypeRefs(ClassDecl& cls, const TypeRefResolver& resolve_outer,
         break;
       case ClassMemberKind::kMethod:
         ResolveProceduralTypeRefs(m->method, kInClass, arena);
+        break;
+      case ClassMemberKind::kTypedef:
+        ResolveItemIndexTypeRefs(*m->typedef_item, kInClass, arena);
         break;
       case ClassMemberKind::kClassDecl:
         ResolveClassTypeRefs(*m->nested_class, kInClass, arena);

@@ -527,4 +527,54 @@ TEST(AssocIndexTypeValidation, TypeRefIndexWithoutRealInTypedefIsNotReported) {
                              3, "7.8.5"));
 }
 
+// A.2.5 with §6.18, §6.23 and §7.8.5: a typedef's associative index written
+// as a type reference has its argument's type in every scope, so `[type(r)]`
+// of a real is reported in the compilation unit, a package, a module and a
+// class, and `tk x;` under `[type(k)]` of a `bit [3:0]` is an associative
+// array keyed by four unsigned bits. The index was resolved in none of them:
+// no typedef drew the report, and x was built with no associative dimension.
+TEST(AssocIndexTypeValidation, TypedefTypeRefIndexIsResolvedInEveryScope) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "real ur; typedef int ut [type(ur)];\n"
+      "package q; real r; typedef int qt [type(r)]; endpackage\n"
+      "module top;\n"
+      "  real r; bit [3:0] k;\n"
+      "  typedef int mt [type(r)];\n"
+      "  class C; real cr; typedef int ct [type(cr)]; endclass\n"
+      "  typedef int tk [type(k)];\n"
+      "  tk x;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  const auto& diags = f.diag.Diagnostics();
+  const std::string_view kMessage =
+      "real or shortreal type shall not be used as an associative array index "
+      "type";
+  for (uint32_t line : {1u, 2u, 5u, 6u}) {
+    EXPECT_TRUE(ReportedError(diags, kMessage, line, "7.8.5")) << line;
+  }
+  const auto& vars = design->top_modules[0]->variables;
+  auto x = std::ranges::find(vars, "x", &RtlirVariable::name);
+  ASSERT_NE(x, vars.end());
+  EXPECT_TRUE(x->is_assoc);
+  EXPECT_EQ(x->assoc_index_width, 4u);
+  EXPECT_FALSE(x->is_index_signed);
+}
+
+// §7.8.5 bars a real index alone, so a variable port whose associative index
+// is a type reference to a port that holds no real, `[type(k)]` of a
+// `bit [3:0]`, draws no report.
+TEST(AssocIndexTypeValidation, TypeRefIndexWithoutRealOnPortIsNotReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top (input bit [3:0] k, input var int p [type(k)]);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "real or shortreal type shall not be used as an "
+                             "associative array index type",
+                             1, "7.8.5"));
+}
+
 }  // namespace

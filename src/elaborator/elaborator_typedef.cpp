@@ -422,6 +422,12 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
   // below judges and records that type. Unresolved, the type is implicit, the
   // mark of a forward typedef.
   ResolveTypeRef(item->typedef_type, item->loc, mod);
+  // A.2.5 with §6.23: `typedef int t [type(k)];` is an associative array type
+  // indexed by the type of k. The dimension is resolved here, ahead of the
+  // record below that every variable `t x;` takes its dimensions from.
+  ResolveTypeRefIndexDims(
+      item->unpacked_dims,
+      [&](DataType& type) { ResolveTypeRef(type, item->loc, mod); }, arena_);
   if (HandleForwardTypedef(item, typedefs_, forward_typedef_kinds_, diag_)) {
     return;
   }
