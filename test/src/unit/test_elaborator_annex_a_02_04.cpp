@@ -1,7 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <format>
+
 #include "fixture_elaborator.h"
 #include "helpers_child_instance.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -216,6 +220,86 @@ TEST(DeclarationAssignmentElaboration, DefparamAssignmentDeepHierarchy) {
     }
   }
   EXPECT_TRUE(found);
+}
+
+// A.2.4's class_new writes a shallow copy as `new expression`, and footnote 23
+// has the expression evaluate to an object handle. An int, a 4-bit logic and a
+// net, an int parameter port and a byte parameter are none, and each is
+// reported, in a module item's initializer, a block's declaration and an
+// assignment alike. A variable and a parameter of a named type, which may be a
+// class, and an untyped parameter, whose type is its final value's (§6.20.2),
+// are let through. Each was accepted, and the copy built nothing at run time.
+TEST(DeclarationAssignmentElaboration, ShallowCopyOfNoHandleIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C; int v; endclass\n"
+      "module m #(parameter int W = 2, parameter U = 1, parameter type T = "
+      "int);\n"
+      "  typedef int myint_t;\n"
+      "  int x;\n"
+      "  logic [3:0] y;\n"
+      "  wire w;\n"
+      "  myint_t z;\n"
+      "  parameter byte P = 1;\n"
+      "  localparam type L = int;\n"
+      "  parameter myint_t N = 3;\n"
+      "  C e = new x;\n"
+      "  initial begin\n"
+      "    C b;\n"
+      "    C d = new y;\n"
+      "    b = new w;\n"
+      "    b = new W;\n"
+      "    b = new P;\n"
+      "    b = new z;\n"
+      "    b = new U;\n"
+      "    b = new N;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const struct {
+    const char* name;
+    uint32_t line;
+    bool reported;
+  } kSources[] = {{"x", 11, true},  {"y", 14, true}, {"w", 15, true},
+                  {"W", 16, true},  {"P", 17, true}, {"z", 18, false},
+                  {"U", 19, false}, {"N", 20, false}};
+  for (const auto& source : kSources) {
+    EXPECT_EQ(static_cast<bool>(ReportedError(
+                  f.diag.Diagnostics(),
+                  std::format("'{}' is no object handle, so 'new' makes no "
+                              "shallow copy of it",
+                              source.name),
+                  source.line, "A.2.4")),
+              source.reported)
+        << source.name;
+  }
+}
+
+// A handle is a shallow copy's source in each of its forms: a handle variable
+// in a module item's initializer and in an assignment, an element of an array
+// of handles, and `this` in a method.
+TEST(DeclarationAssignmentElaboration, ShallowCopyOfHandleIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C;\n"
+      "  int v;\n"
+      "  function C copy();\n"
+      "    C c = new this;\n"
+      "    return c;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  C a = new;\n"
+      "  C arr [2];\n"
+      "  C e = new a;\n"
+      "  initial begin\n"
+      "    C b;\n"
+      "    b = new a;\n"
+      "    b = new arr[0];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 }  // namespace

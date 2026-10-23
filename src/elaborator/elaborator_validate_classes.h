@@ -198,6 +198,9 @@ class ElaboratorClassRules : public ElaboratorOperationRules {
   // or a package holds is in view from every one of them, so this is what
   // reports such a class once rather than once per module.
   std::unordered_set<const ClassDecl*> static_method_bodies_checked_;
+  // A.2.4: the value parameters of the module ValidateClassHandleOps reads
+  // that are declared with a keyword type, none of which is an object handle.
+  std::unordered_set<std::string_view> keyword_typed_params_;
 };
 
 }  // namespace delta

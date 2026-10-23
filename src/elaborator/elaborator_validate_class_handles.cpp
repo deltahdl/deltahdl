@@ -121,6 +121,7 @@ struct ClassHandleTables {
   const std::unordered_set<std::string_view>& class_vars;
   const std::unordered_map<std::string_view, std::string_view>& class_var_types;
   const std::unordered_map<std::string_view, DataTypeKind>& var_types;
+  const std::unordered_set<std::string_view>& keyword_typed_params;
   const CompilationUnit* unit;
 };
 
@@ -295,9 +296,44 @@ static void CheckConditionalClassOperands(
              Subclause("11.4.11"));
 }
 
+// Returns true when *e* is a bare `new` object-construction call (the
+// scope-less form written simply as `new` or `new(args)`), as opposed to a
+// typed constructor call such as `Derived::new`.
+static bool IsBareNewCall(const Expr* e) {
+  return e && e->kind == ExprKind::kCall && e->text == "new";
+}
+
+// A.2.4's class_new writes a shallow copy as `new expression`, and its
+// footnote 23 (printed page 1217) has that expression evaluate to an object
+// handle. A source naming a variable or a net declared with a type other than
+// a named one, or a value parameter declared with a keyword type, is no handle
+// and is reported. A handle, a name of a named type, which may be a class, and
+// a source these tables cannot judge -- `this`, a select, a call, a name under
+// a package or class scope, an untyped parameter -- draw no report.
+static void CheckShallowCopySource(const Expr* e, const ClassHandleTables& t,
+                                   DiagEngine& diag) {
+  if (!IsBareNewCall(e) || e->lhs == nullptr) return;
+  const Expr* src = e->lhs;
+  if (src->kind != ExprKind::kIdentifier ||
+      t.class_var_types.contains(src->text)) {
+    return;
+  }
+  auto var = t.var_types.find(src->text);
+  bool no_handle = var != t.var_types.end()
+                       ? var->second != DataTypeKind::kNamed
+                       : t.keyword_typed_params.contains(src->text);
+  if (!no_handle) return;
+  diag.Error(src->range.start,
+             std::format("'{}' is no object handle, so 'new' makes no shallow "
+                         "copy of it",
+                         src->text),
+             Subclause("A.2.4"));
+}
+
 static void CheckClassHandleExpr(const Expr* e, const ClassHandleTables& t,
                                  DiagEngine& diag) {
   if (!e) return;
+  CheckShallowCopySource(e, t, diag);
   const auto& class_vars = t.class_vars;
   const auto& class_var_types = t.class_var_types;
   const CompilationUnit* unit = t.unit;
@@ -524,13 +560,6 @@ static void CheckUnnamedConstraintModeHasArgument(
              Subclause("18.9"));
 }
 
-// Returns true when *e* is a bare `new` object-construction call (the
-// scope-less form written simply as `new` or `new(args)`), as opposed to a
-// typed constructor call such as `Derived::new`.
-static bool IsBareNewCall(const Expr* e) {
-  return e && e->kind == ExprKind::kCall && e->text == "new";
-}
-
 // §8.21 and §8.26.5: no object of an abstract class or an interface class is
 // constructed directly; the class `name` names is reported at `loc` where it
 // is one of the two. The rule is on the source, so it is reported here whether
@@ -739,6 +768,8 @@ static void CheckClassHandleAssignTarget(const Stmt* s,
 
 void ElaboratorClassRules::WalkStmtsForClassHandleOps(const Stmt* s) {
   if (!s) return;
+  const ClassHandleTables kTables{class_var_names_, class_var_types_,
+                                  var_types_, keyword_typed_params_, unit_};
 
   if (s->kind == StmtKind::kVarDecl &&
       s->var_decl_type.kind == DataTypeKind::kNamed &&
@@ -756,6 +787,7 @@ void ElaboratorClassRules::WalkStmtsForClassHandleOps(const Stmt* s) {
     CheckConstruction(
         DeclaredHandleType(s->var_decl_type, s->var_unpacked_dims), s->var_init,
         s->range.start, unit_, diag_);
+    CheckShallowCopySource(s->var_init, kTables, diag_);
   }
 
   if ((s->kind == StmtKind::kBlockingAssign ||
@@ -787,8 +819,6 @@ void ElaboratorClassRules::WalkStmtsForClassHandleOps(const Stmt* s) {
 
   CheckUnnamedRandModeHasArgument(s, class_var_types_, unit_, diag_);
 
-  const ClassHandleTables kTables{class_var_names_, class_var_types_,
-                                  var_types_, unit_};
   CheckClassHandleExpr(s->rhs, kTables, diag_);
   CheckClassHandleExpr(s->expr, kTables, diag_);
   CheckClassHandleExpr(s->condition, kTables, diag_);
@@ -829,6 +859,34 @@ void ElaboratorClassRules::WalkStmtsForClassHandleOps(const Stmt* s) {
   }
 }
 
+// A.2.4 with §6.20.2 (printed page 126): the value parameters `decl` declares
+// with a keyword type, in its parameter port list or its body. A type
+// parameter names a type, one of a named type may be a class, and one declared
+// with no type takes its final value's, which A.8.4's constant_primary lets be
+// `null`, so none of those is held.
+static std::unordered_set<std::string_view> KeywordTypedParams(
+    const ModuleDecl& decl) {
+  auto keyword = [](DataTypeKind k) {
+    return k != DataTypeKind::kImplicit && k != DataTypeKind::kNamed &&
+           k != DataTypeKind::kVoid;
+  };
+  std::unordered_set<std::string_view> names;
+  for (size_t i = 0; i < decl.params.size(); ++i) {
+    std::string_view name = decl.params[i].first;
+    if (!decl.type_param_names.contains(name) &&
+        keyword(decl.param_types[i].kind)) {
+      names.insert(name);
+    }
+  }
+  for (const ModuleItem* item : decl.items) {
+    if (item->kind == ModuleItemKind::kParamDecl &&
+        keyword(item->data_type.kind)) {
+      names.insert(item->name);
+    }
+  }
+  return names;
+}
+
 void ElaboratorClassRules::ValidateClassHandleOps(const ModuleDecl* decl) {
   // Block-local class handles are not seeded into class_var_names_ (only
   // module-scope handles are); they are collected during the walk itself
@@ -837,6 +895,9 @@ void ElaboratorClassRules::ValidateClassHandleOps(const ModuleDecl* decl) {
   // walk entirely when every handle is declared inside a procedural block, so
   // guard on class_names_ instead, mirroring ValidateLocalProtectedAccess.
   if (class_names_.empty()) return;
+  keyword_typed_params_ = KeywordTypedParams(*decl);
+  const ClassHandleTables kTables{class_var_names_, class_var_types_,
+                                  var_types_, keyword_typed_params_, unit_};
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kVarDecl && item->init_expr &&
         item->data_type.kind == DataTypeKind::kNamed &&
@@ -846,6 +907,7 @@ void ElaboratorClassRules::ValidateClassHandleOps(const ModuleDecl* decl) {
       CheckConstruction(
           DeclaredHandleType(item->data_type, item->unpacked_dims),
           item->init_expr, item->loc, unit_, diag_);
+      CheckShallowCopySource(item->init_expr, kTables, diag_);
     }
     bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {

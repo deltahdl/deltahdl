@@ -196,6 +196,7 @@ void ElaboratorClassRules::ValidateLocalConstructorBases() {
 // §8.4 over the compilation unit's and each package's subroutines and
 // classes, read once, where a module's are read with each module.
 void ElaboratorClassRules::ValidateClassHandleOpsOutsideModules() {
+  keyword_typed_params_.clear();
   WalkSubroutinesForClassHandleOps(
       unit_->cu_items, {unit_->classes.begin(), unit_->classes.end()});
   for (const auto* pkg : unit_->packages) {
