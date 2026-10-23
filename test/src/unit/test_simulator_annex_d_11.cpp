@@ -1,7 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <vector>
+
 #include "fixture_simulator.h"
+#include "helpers_event_callbacks.h"
 #include "helpers_reported_error.h"
+#include "simulator/vpi_user.h"
 
 using namespace delta;
 
@@ -135,6 +139,27 @@ TEST(OptionalScopeSim, AnArgumentNamingNoScopeIsRejected) {
                             "'t.v' is none",
                             5, "D.11"));
   EXPECT_EQ(f.ctx.InteractiveScope(), "t");
+}
+
+// Annex D.11 with §9.3.5: a label on an assertion written in a procedure opens
+// a named begin around it, whose full name the assertion shares. $scope given
+// that name makes the begin, a named block, the interactive scope, so the
+// cbInteractiveScopeChange callback (§38.36.3) is given the begin rather than
+// the assertion it holds.
+TEST_F(EventCallbacksOfARun, ScopeOnALabelledAssertionNotesItsBegin) {
+  Armer() = [] { PlaceEventCallback(cbInteractiveScopeChange, nullptr); };
+  Run("module top; timeunit 1ns; timeprecision 1ns;\n"
+      "  logic clk = 0, x = 1;\n"
+      "  always @(posedge clk) begin\n"
+      "    i1: assert (x) else begin end\n"
+      "  end\n"
+      "  initial begin $arm; #1 $scope(top.i1); end\n"
+      "endmodule\n");
+  const std::vector<EventDelivery> kChanges =
+      DeliveriesOf(cbInteractiveScopeChange);
+  ASSERT_EQ(kChanges.size(), 1u);
+  EXPECT_EQ(kChanges[0].obj_type, vpiNamedBegin);
+  EXPECT_EQ(kChanges[0].obj, "i1");
 }
 
 }  // namespace

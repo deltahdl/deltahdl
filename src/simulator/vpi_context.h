@@ -210,6 +210,12 @@ class VpiContext {
   // that scope's contents. A protected scope object, or a hierarchical name
   // that passes through a protected scope, makes the call an error (no handle).
   VpiHandle HandleByName(const char* name, VpiHandle scope);
+  // D.11 and §38.4: the scope object (§37.12) the hierarchical name `name`
+  // reaches from the top level, null where it reaches none. A label on an
+  // assertion written in a procedure opens a named begin around it (§9.3.5)
+  // whose full name the assertion shares; here that name reaches the begin,
+  // where HandleByName answers the assertion (§39.3.1).
+  VpiHandle ScopeByName(const char* name);
   VpiHandle HandleByIndex(int index, VpiHandle parent);
 
   // §38.20: return a handle to the index-selected subobject of `parent` named
@@ -755,6 +761,11 @@ class VpiContext {
 
  private:
   VpiHandle AllocObject();
+
+  // §38.21: the object `name` reaches from `scope`, or from the top level with
+  // a null scope, one path component at a time; a named begin answers itself.
+  // Null, with the error recorded, where the search is refused.
+  VpiHandle ObjectByName(const char* name, VpiHandle scope);
 
   // §37.42: the object standing for one system task or system function call.
   // Written in vpi_systf.cpp, where what `evaluate_args` separates is set out.

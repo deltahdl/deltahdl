@@ -110,7 +110,7 @@ bool PassesThroughSealedScope(const std::vector<VpiHandle>& path) {
 
 }  // namespace
 
-VpiHandle VpiContext::HandleByName(const char* name, VpiHandle scope) {
+VpiHandle VpiContext::ObjectByName(const char* name, VpiHandle scope) {
   if (!name) return nullptr;
 
   // §38.21: a protected object cannot serve as the search scope. Unless
@@ -150,7 +150,17 @@ VpiHandle VpiContext::HandleByName(const char* name, VpiHandle scope) {
   // §37.10 detail 6: imported items and compilation-unit objects must not be
   // reachable by name even when an object happens to be registered under it.
   if (!VpiHandleByNameAccessible(*current)) return nullptr;
-  return VpiLabelledAssertionOr(current);
+  return current;
+}
+
+VpiHandle VpiContext::HandleByName(const char* name, VpiHandle scope) {
+  VpiHandle found = ObjectByName(name, scope);
+  return found != nullptr ? VpiLabelledAssertionOr(found) : nullptr;
+}
+
+VpiHandle VpiContext::ScopeByName(const char* name) {
+  VpiHandle found = ObjectByName(name, nullptr);
+  return found != nullptr && VpiIsScopeObject(found) ? found : nullptr;
 }
 
 VpiHandle VpiContext::HandleByIndex(int index, VpiHandle parent) {

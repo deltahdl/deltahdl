@@ -587,7 +587,7 @@ static Logic4Vec EvalAnnexDScope(const Expr* expr, SimContext& ctx,
       // cbInteractiveScopeChange callbacks, given the new scope where the
       // VPI model holds one.
       VpiContext& vpi = GetGlobalVpiContext();
-      if (VpiHandle scope = vpi.HandleByName(name.c_str(), nullptr)) {
+      if (VpiHandle scope = vpi.ScopeByName(name.c_str())) {
         vpi.NoteInteractiveScope(scope);
       }
     } else {
