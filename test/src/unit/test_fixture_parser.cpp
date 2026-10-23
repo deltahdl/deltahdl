@@ -90,6 +90,38 @@ TEST(ParseResultRead, AMovedPreprocessedParseRaisesItOnce) {
   EXPECT_NONFATAL_FAILURE(MoveAnUnreadPreprocessedParse(), kUnreadReport);
 }
 
+// PreprocessTimescale, in the same header, hands over the timescale state the
+// preprocessor ended in on a record of the same kind. A `timescale whose unit
+// is no unit name is rejected once, on line 1, under §22.7, and still leaves a
+// state behind.
+constexpr const char* kRejectedTimescaleSrc = "`timescale 1xx / 1ns\n";
+
+void PreprocessARejectedTimescaleNobodyReads() {
+  auto r = PreprocessTimescale(kRejectedTimescaleSrc);
+}
+
+TEST(RecordedRunRead, APreprocessedTimescaleFailsAnErrorNeverRead) {
+  EXPECT_NONFATAL_FAILURE(PreprocessARejectedTimescaleNobodyReads(),
+                          kUnreadReport);
+  EXPECT_NONFATAL_FAILURE(PreprocessARejectedTimescaleNobodyReads(),
+                          "`timescale 1xx / 1ns\n");
+}
+
+TEST(RecordedRunRead, NamingAPreprocessedTimescalesReportDischargesIt) {
+  auto r = PreprocessTimescale(kRejectedTimescaleSrc);
+
+  EXPECT_TRUE(ReportedError(r.diags, "invalid `timescale unit", 1, "22.7"));
+}
+
+void MoveAnUnreadPreprocessedTimescale() {
+  auto first = PreprocessTimescale(kRejectedTimescaleSrc);
+  PreprocTimescaleResult second(std::move(first));
+}
+
+TEST(RecordedRunRead, AMovedPreprocessedTimescaleRaisesItOnce) {
+  EXPECT_NONFATAL_FAILURE(MoveAnUnreadPreprocessedTimescale(), kUnreadReport);
+}
+
 // Parses the rejected source and then reads the record with `read`. The reads
 // below take the answer without asserting it, so that none of them claims the
 // source was rejected without naming the report.

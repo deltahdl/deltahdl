@@ -16,7 +16,7 @@
 
 using namespace delta;
 
-// A member of ParseResult that notes whether the case it was handed to ever
+// A member of RecordedRun that notes whether the case it was handed to ever
 // read it. Every way a case reads one arrives at Get: has_errors is read
 // through its conversion to bool, in EXPECT_TRUE, EXPECT_FALSE, an `if` or a
 // `!`, and diags through its conversion to the vector ReportedError takes, its
@@ -59,7 +59,7 @@ class Watched {
   // for it beside the call and drops the call with the fix.
   void Excuse() { read_ = true; }
 
-  // What ParseResult looks at as it is destroyed, neither of them a read.
+  // What RecordedRun looks at as it is destroyed, neither of them a read.
   bool WasRead() const { return read_; }
   const T& Peek() const { return value_; }
 
@@ -73,50 +73,57 @@ class Watched {
   mutable bool read_ = false;
 };
 
-// What a run of the parser left behind for a case to make its claim about. The
-// diagnostics are a copy rather than a view: the engine that recorded them is
-// a local of the call that ran the parser, so a case reading the engine's own
-// record would be reading storage released before the call returned.
+// What a fixture run hands a case once the engine that recorded the run is
+// gone: the source manager holding the case's source, and the diagnostics. The
+// diagnostics are a copy rather than a view: the engine is a local of the call
+// that ran the tool, so a case reading the engine's own record would be reading
+// storage released before the call returned.
 //
 // has_errors stays beside them, because a case asking only whether a source
 // was accepted is asking a question the whole record does not answer more
 // clearly than the boolean does.
 //
-// A parser that rejects a source still builds a CompilationUnit out of what it
-// recovered, so a case asserting that the unit lacks something holds whether
+// A tool that rejects a source still leaves behind what it built or the state
+// it ended in, so a case asserting an absence or a default there holds whether
 // the rule it covers works or not. A case that read has_errors or diags has
 // taken the rejection into account, whatever it concluded from them. One that
-// read neither passed on a source that never parsed, and the destructor
-// reports that, the end of the result's life being the last moment anybody
+// read neither passed on a source that was never accepted, and the destructor
+// reports that, the end of the record's life being the last moment anybody
 // could still have looked. Since the engine is gone by then, the record and
 // whether it was read are kept here rather than on the engine, as Diagnosed in
 // fixture_diagnosed.h keeps them for the fixtures that own their engine.
-struct ParseResult {
+struct RecordedRun {
   SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
   Watched<bool> has_errors;
   Watched<std::vector<Diagnostic>> diags;
 
-  ParseResult() = default;
-  ParseResult(ParseResult&&) noexcept = default;
-  ParseResult& operator=(ParseResult&&) noexcept = default;
-  ParseResult(const ParseResult&) = delete;
-  ParseResult& operator=(const ParseResult&) = delete;
+  RecordedRun() = default;
+  RecordedRun(RecordedRun&&) noexcept = default;
+  RecordedRun& operator=(RecordedRun&&) noexcept = default;
+  RecordedRun(const RecordedRun&) = delete;
+  RecordedRun& operator=(const RecordedRun&) = delete;
 
   // The report quotes the first file the run registered, which every entry
   // point registers the case's own source as.
-  ~ParseResult() {
+  ~RecordedRun() {
     if (!has_errors.Peek() || has_errors.WasRead() || diags.WasRead()) return;
     ReportUnreadErrors(diags.Peek(), "read has_errors or diags",
                        mgr.FileContent(1));
   }
 };
 
+// What a run of the parser left behind for a case to make its claim about: the
+// record of the run and the CompilationUnit the parser built, which for a
+// rejected source holds whatever the parser recovered.
+struct ParseResult : RecordedRun {
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
 // Takes both readings of the engine at once, so no run can copy the record and
 // leave the boolean behind, or the reverse. Neither assignment is a read of
 // the result, so the case it is handed to still owes one.
-inline void RecordDiagnostics(const DiagEngine& diag, ParseResult& result) {
+inline void RecordDiagnostics(const DiagEngine& diag, RecordedRun& result) {
   result.has_errors = diag.HasErrors();
   result.diags = diag.Diagnostics();
 }

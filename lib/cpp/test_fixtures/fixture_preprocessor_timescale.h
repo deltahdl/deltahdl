@@ -1,7 +1,6 @@
 #pragma once
 
 #include <string>
-#include <vector>
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -13,15 +12,15 @@
 
 using namespace delta;
 
-struct PreprocTimescaleResult {
-  SourceManager mgr;
+// What a run of the preprocessor left behind for a case to make its claim
+// about: the record of the run and the timescale state the preprocessor ended
+// in. A `timescale it rejected still leaves that state behind, the default or
+// whatever an earlier directive set, so the record holds the case to reading
+// has_errors or diags as a ParseResult does.
+struct PreprocTimescaleResult : RecordedRun {
   TimeScale timescale;
   TimeUnit global_precision;
   bool has_timescale;
-  bool has_errors;
-  // A copy rather than a view, because the engine that recorded them is a
-  // local of the call below and its storage is gone once that call returns.
-  std::vector<Diagnostic> diags;
 };
 
 inline PreprocTimescaleResult PreprocessTimescale(const std::string& src) {
@@ -33,8 +32,7 @@ inline PreprocTimescaleResult PreprocessTimescale(const std::string& src) {
   result.timescale = preproc.CurrentTimescale();
   result.global_precision = preproc.GlobalPrecision();
   result.has_timescale = preproc.HasTimescale();
-  result.has_errors = diag.HasErrors();
-  result.diags = diag.Diagnostics();
+  RecordDiagnostics(diag, result);
   return result;
 }
 
