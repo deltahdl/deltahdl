@@ -622,4 +622,70 @@ TEST(DottedNameElaboration, AMemberOfASystemFunctionsResultIsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §23.7 a) with §7.2 and §8.5: a structure property selected through a handle,
+// h.st, is a structure of the property's type, written through a typedef of the
+// module or of the class itself, and a select names one of its members
+// (#7739).
+TEST(DottedNameElaboration, AMemberAStructurePropertyLacksIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  typedef struct { int a; } s_t;\n"
+      "  class C; s_t st; typedef struct { int b; } l_t; l_t ls; endclass\n"
+      "  C h = new; int x;\n"
+      "  initial begin\n"
+      "    h.st.foo();\n"
+      "    x = h.st.nope;\n"
+      "    x = h.ls.nope;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "structure 's_t' has no member named 'foo'", 6,
+                            "23.7"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "structure 's_t' has no member named 'nope'", 7,
+                            "23.7"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the structure of 'ls' has no member named 'nope'",
+                            8, "23.7"));
+}
+
+// §7.2 and §8.5: a member a structure property selected through a handle
+// declares is selected, and a property of a class nested in the handle's
+// class (§8.23) is no structure.
+TEST(DottedNameElaboration, AMemberOfAStructurePropertyIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  typedef struct { int a; } s_t;\n"
+      "  class C;\n"
+      "    s_t st; typedef struct { int b; } l_t; l_t ls;\n"
+      "    class N; int c; endclass\n"
+      "    N n;\n"
+      "  endclass\n"
+      "  C h = new; int x;\n"
+      "  initial x = h.st.a + h.ls.b + h.n.c;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §7.2: a member through a member the structure lacks is reported once, at the
+// member it lacks.
+TEST(DottedNameElaboration, AMemberOfAnUndeclaredStructMemberIsReportedOnce) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  typedef struct { int a; } s_t;\n"
+      "  s_t s; int x;\n"
+      "  initial x = s.nope.y;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "structure 's_t' has no member named 'nope'", 4,
+                            "23.7"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1U);
+}
+
 }  // namespace

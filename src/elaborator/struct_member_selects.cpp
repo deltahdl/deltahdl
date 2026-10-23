@@ -71,18 +71,25 @@ SitedType MemberType(const CompilationUnit& unit, const TypeSite& site,
                                   kDims + kDef.item->unpacked_dims.size()});
 }
 
+// The type `written`, which the variable or property named `declared` is
+// declared with, reaches through its typedefs; none where it is no type.
+ReachedType NamedReached(const SitedType& written, const CompilationUnit& unit,
+                         std::string_view declared) {
+  if (written.type == nullptr) return {};
+  const std::string_view kTypeName = written.type->kind == DataTypeKind::kNamed
+                                         ? written.type->type_name
+                                         : std::string_view();
+  return {ThroughTypedefsAt(unit, written), kTypeName, declared};
+}
+
 // The type the part `e` of a dotted name reaches: the variable its first name
-// names, one element per select of an unpacked dimension, and the member each
-// member select names of the structure or union reached before it.
+// names, one element per select of an unpacked dimension, the member each
+// member select names of the structure or union reached before it, and the
+// property one names of the class a handle reached before it holds (§8.5).
 ReachedType Reached(const Expr& e, const CompilationUnit& unit,
                     const RootTypeOf& root_type) {
   if (e.kind == ExprKind::kIdentifier) {
-    const SitedType kWritten = root_type(e);
-    if (kWritten.type == nullptr) return {};
-    const std::string_view kTypeName =
-        kWritten.type->kind == DataTypeKind::kNamed ? kWritten.type->type_name
-                                                    : std::string_view();
-    return {ThroughTypedefsAt(unit, kWritten), kTypeName, e.text};
+    return NamedReached(root_type(e), unit, e.text);
   }
   if (e.kind == ExprKind::kSelect) {
     ReachedType element = Reached(*e.base, unit, root_type);
@@ -93,7 +100,7 @@ ReachedType Reached(const Expr& e, const CompilationUnit& unit,
   if (e.kind != ExprKind::kMemberAccess || e.is_scope_resolution) return {};
   const ReachedType kHolder = Reached(*e.lhs, unit, root_type);
   const StructMember* member = MemberOf(kHolder, e.rhs->text);
-  if (member == nullptr) return {};
+  if (member == nullptr) return NamedReached(root_type(e), unit, e.rhs->text);
   return {MemberType(unit, kHolder.sited.site, *member), member->type_name,
           member->name};
 }

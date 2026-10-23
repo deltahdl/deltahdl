@@ -15,6 +15,7 @@
 
 #include "elaborator/class_member_names.h"
 #include "elaborator/local_type_sites.h"
+#include "elaborator/struct_member_selects.h"
 #include "elaborator/type_site_lookup.h"
 #include "parser/ast_type.h"
 
@@ -143,6 +144,14 @@ const Expr& SelectRoot(const Expr& e, std::size_t& selects);
 // unpacked dimension (§7.4), whose type names a class, or a property of such a
 // class (§8.5), h.p or h.p[0]; null for anything else.
 const ClassDecl* HandleClass(const Expr& e, const DataScope& scope);
+
+// §8.5: the type the property the member access `access`, h.st, names of the
+// class a handle holds is declared with, through a typedef of that class or a
+// class it extends, as the scope sees it, with the unpacked dimensions written
+// after the property's name; no type where the scope tells no class the handle
+// holds, that class declares no such property, or its type is a type
+// parameter or a nested class of it.
+SitedType HeldPropertyType(const Expr& access, const DataScope& scope);
 
 // The kind of the type of the value `value` stands for, written with no select
 // in front of a member access, as far as the scope tells it for certain: a

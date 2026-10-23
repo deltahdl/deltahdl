@@ -68,27 +68,35 @@ DataTypeKind ScalarKind(const DataScope& scope, const DataType& type) {
   return kNamed.dims == 0 ? kNamed.type->kind : DataTypeKind::kImplicit;
 }
 
-// §8.13: the kind of the type `written`, a method's return type (§13.4.1) or a
-// property's type (§8.5) the class `cls` declares, as a single value: a name,
-// written without a scope, that the class or a class it extends declares as a
-// type is its typedef there, and any other type as the scope sees it;
-// kImplicit where the class's name is a type parameter or a nested class, or
-// its typedef writes unpacked dimensions.
-DataTypeKind ClassTypeKind(const DataType& written, const ClassDecl& cls,
-                           const DataScope& scope) {
-  const DataType* type = &written;
+// §8.13: the type `written`, a method's return type (§13.4.1) or a property's
+// type (§8.5) the class `cls` declares, stands for: a name, written without a
+// scope, that the class or a class it extends declares as a type is its
+// typedef there, whose unpacked dimensions are added to `dims`, and any other
+// type is itself, as the scope sees it; null where the class's name is a type
+// parameter or a nested class.
+const DataType* ClassLocalType(const DataType& written, const ClassDecl& cls,
+                               const DataScope& scope, std::size_t& dims) {
   std::unordered_set<std::string_view> local;
   scope.classes->AddLocalTypes(cls, local);
-  if (type->kind == DataTypeKind::kNamed && type->scope_name.empty() &&
-      local.contains(type->type_name)) {
-    const ClassMember* def =
-        ChainMember(cls, ClassMemberKind::kTypedef, type->type_name, scope);
-    if (def == nullptr || !def->typedef_item->unpacked_dims.empty()) {
-      return DataTypeKind::kImplicit;
-    }
-    type = &def->typedef_item->typedef_type;
+  if (written.kind != DataTypeKind::kNamed || !written.scope_name.empty() ||
+      !local.contains(written.type_name)) {
+    return &written;
   }
-  return ScalarKind(scope, *type);
+  const ClassMember* def =
+      ChainMember(cls, ClassMemberKind::kTypedef, written.type_name, scope);
+  if (def == nullptr) return nullptr;
+  dims += def->typedef_item->unpacked_dims.size();
+  return &def->typedef_item->typedef_type;
+}
+
+// The kind of that type as a single value; kImplicit where it is none, or its
+// class's typedef writes unpacked dimensions.
+DataTypeKind ClassTypeKind(const DataType& written, const ClassDecl& cls,
+                           const DataScope& scope) {
+  std::size_t dims = 0;
+  const DataType* type = ClassLocalType(written, cls, scope, dims);
+  return type == nullptr || dims != 0 ? DataTypeKind::kImplicit
+                                      : ScalarKind(scope, *type);
 }
 
 // §G.1: the class of the std package whose handle `e` holds, where the scope
@@ -295,6 +303,18 @@ const ClassDecl* HandleClass(const Expr& e, const DataScope& scope) {
   return holder == nullptr
              ? nullptr
              : scope.classes->PropertyClass(*holder, root.rhs->text, selects);
+}
+
+SitedType HeldPropertyType(const Expr& access, const DataScope& scope) {
+  const ClassDecl* cls = HandleClass(*access.lhs, scope);
+  const ClassMember* property =
+      cls == nullptr ? nullptr
+                     : ChainMember(*cls, ClassMemberKind::kProperty,
+                                   access.rhs->text, scope);
+  if (property == nullptr) return {};
+  std::size_t dims = property->unpacked_dims.size();
+  const DataType* type = ClassLocalType(property->data_type, *cls, scope, dims);
+  return type == nullptr ? SitedType{} : SitedType{type, scope.Site(), dims};
 }
 
 DataTypeKind AppliedValueKind(const Expr& value, const DataScope& scope) {

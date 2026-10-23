@@ -99,10 +99,14 @@ std::string_view VifInterface(const DataType& type) {
 
 // The type the variable `root` names is declared with, as written in the
 // scope or the scope within it declaring it, with the unpacked dimensions
-// written after its name; no type where `root` names no variable, or one whose
-// type is a type parameter, typedef or class the scope declares for itself
-// alone.
+// written after its name, or the type of the property a member access `root`
+// names of the class a handle holds (HeldPropertyType); no type where `root`
+// names no variable, or one whose type is a type parameter, typedef or class
+// the scope declares for itself alone.
 SitedType DeclaredType(const Expr& root, const DataScope& scope) {
+  if (root.kind == ExprKind::kMemberAccess) {
+    return HeldPropertyType(root, scope);
+  }
   const DeclaredVar* var = scope.Declared(root.text);
   if (var == nullptr || scope.local_types.contains(var->type->type_name)) {
     return {};
