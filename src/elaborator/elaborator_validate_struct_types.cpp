@@ -2,6 +2,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <format>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -36,23 +37,41 @@ static const RtlirParamDecl* ValueParamNamed(const RtlirModule* mod,
   return nullptr;
 }
 
+namespace {
+
+// The width and signing of a value a type reference's expression names.
+struct ValueShape {
+  uint32_t width = 0;
+  bool is_signed = false;
+};
+
+}  // namespace
+
+// The shape of the value `name` stands for in `mod`: a variable's, a net's,
+// or a value parameter's, which §6.20.2 makes as wide as its declaration, or
+// as its final value where it was declared with neither range nor type.
+// Empty where `name` is none of them.
+static std::optional<ValueShape> NamedValueShape(std::string_view name,
+                                                 const RtlirModule* mod) {
+  for (const auto& v : mod->variables) {
+    if (v.name == name) return ValueShape{v.width, v.is_signed};
+  }
+  for (const auto& n : mod->nets) {
+    if (n.name == name) return ValueShape{n.width, n.is_signed};
+  }
+  if (const RtlirParamDecl* pd = ValueParamNamed(mod, name)) {
+    ParamStorageShape shape = ParamStorageShapeOf(*pd);
+    return ValueShape{shape.width, shape.is_signed};
+  }
+  return std::nullopt;
+}
+
 static uint32_t InferTypeRefExprWidth(const Expr* expr,
                                       const RtlirModule* mod) {
   if (!expr) return 0;
   switch (expr->kind) {
     case ExprKind::kIdentifier:
-      for (const auto& v : mod->variables) {
-        if (v.name == expr->text) return v.width;
-      }
-      for (const auto& n : mod->nets) {
-        if (n.name == expr->text) return n.width;
-      }
-      // §6.20.2: a parameter is as wide as its declaration, or as its final
-      // value where it was declared with neither range nor type.
-      if (const RtlirParamDecl* pd = ValueParamNamed(mod, expr->text)) {
-        return ParamStorageShapeOf(*pd).width;
-      }
-      return 0;
+      return NamedValueShape(expr->text, mod).value_or(ValueShape{}).width;
     case ExprKind::kIntegerLiteral:
       return ConstLiteralWidth(expr);
     case ExprKind::kBinary: {
@@ -83,16 +102,7 @@ static bool InferTypeRefExprSigned(const Expr* expr, const RtlirModule* mod) {
   if (!expr) return false;
   switch (expr->kind) {
     case ExprKind::kIdentifier:
-      for (const auto& v : mod->variables) {
-        if (v.name == expr->text) return v.is_signed;
-      }
-      for (const auto& n : mod->nets) {
-        if (n.name == expr->text) return n.is_signed;
-      }
-      if (const RtlirParamDecl* pd = ValueParamNamed(mod, expr->text)) {
-        return ParamStorageShapeOf(*pd).is_signed;
-      }
-      return false;
+      return NamedValueShape(expr->text, mod).value_or(ValueShape{}).is_signed;
     case ExprKind::kBinary:
       return InferTypeRefExprSigned(expr->lhs, mod) &&
              InferTypeRefExprSigned(expr->rhs, mod);
