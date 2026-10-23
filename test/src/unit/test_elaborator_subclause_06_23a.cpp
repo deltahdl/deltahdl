@@ -602,4 +602,108 @@ TEST(TypeOperatorSim, TypeOfAParameterIsTheParametersType) {
   EXPECT_EQ(w->value.ToUint64(), 0xFu);
 }
 
+// §6.19.3 makes a typedef's enumeration a data type its named constants are
+// of, and §6.23 has a type reference to one of them stand for that type, so
+// `type(A)` declares v of e_t: four bits, holding B's 4'h4 whole.
+TEST(TypeOperatorSim, TypeOfANamedEnumerationsConstantIsTheEnumeration) {
+  SimFixture f;
+  auto* v = RunAndFindVar(
+      "module t;\n"
+      "  typedef enum bit [3:0] {A = 4'h3, B} e_t;\n"
+      "  var type(A) v;\n"
+      "  initial v = B;\n"
+      "endmodule\n",
+      f, "v");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.width, 4u);
+  EXPECT_EQ(v->value.ToUint64(), 4u);
+}
+
+// A constant of an enumeration written as a variable's type, with no typedef
+// to name it, takes the width and signing of that enumeration: `int`'s, the
+// default base type (§6.19), so z holds -2 in 32 bits.
+TEST(TypeOperatorSim, TypeOfAnAnonymousEnumerationsConstantTakesItsWidth) {
+  SimFixture f;
+  auto* z = RunAndFindVar(
+      "module t;\n"
+      "  enum {X, Y} w;\n"
+      "  var type(X) z;\n"
+      "  initial z = -2;\n"
+      "endmodule\n",
+      f, "z");
+  ASSERT_NE(z, nullptr);
+  EXPECT_EQ(z->value.width, 32u);
+  EXPECT_TRUE(z->is_signed);
+  EXPECT_EQ(z->value.ToUint64(), 0xFFFFFFFEu);
+}
+
+// §26.3 makes a package's declarations visible in a module that imports them,
+// by name or by a wildcard, and reachable through the package's scope; §3.12.1
+// makes the compilation unit's declarations before the module visible in it.
+// A type reference to any of these values stands for the value's type: pv's
+// six bits, W's `int` both imported and written p::W, g's three bits, QV's
+// ten through q's explicit import, and for the untyped U and R the eight bits
+// of U's value and R's declared [3:0] (§6.20.2).
+TEST(TypeOperatorSim, TypeOfAValueOfAPackageOrTheUnitIsItsType) {
+  SimFixture f;
+  auto* a = RunAndFindVar(
+      "package p;\n"
+      "  parameter int W = 8;\n"
+      "  parameter U = 8'hA5;\n"
+      "  parameter [3:0] R = 1;\n"
+      "  logic [5:0] pv;\n"
+      "endpackage\n"
+      "package q;\n"
+      "  logic [9:0] QV;\n"
+      "endpackage\n"
+      "logic [2:0] g;\n"
+      "module t;\n"
+      "  import q::QV;\n"
+      "  import p::*;\n"
+      "  var type(pv) a;\n"
+      "  var type(W) b;\n"
+      "  var type(p::W) c;\n"
+      "  var type(g) d;\n"
+      "  var type(QV) e;\n"
+      "  var type(U) u;\n"
+      "  var type(R) h;\n"
+      "  initial begin\n"
+      "    a = 6'h3F;\n"
+      "    b = -3;\n"
+      "    c = -3;\n"
+      "    d = 3'h5;\n"
+      "    e = 10'h3FF;\n"
+      "    u = 9'h1FF;\n"
+      "    h = 5'h1F;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "a");
+  ASSERT_NE(a, nullptr);
+  EXPECT_EQ(a->value.width, 6u);
+  EXPECT_EQ(a->value.ToUint64(), 0x3Fu);
+  for (const char* name : {"b", "c"}) {
+    auto* v = f.ctx.FindVariable(name);
+    ASSERT_NE(v, nullptr) << name;
+    EXPECT_EQ(v->value.width, 32u) << name;
+    EXPECT_TRUE(v->is_signed) << name;
+    EXPECT_EQ(v->value.ToUint64(), 0xFFFFFFFDu) << name;
+  }
+  auto* d = f.ctx.FindVariable("d");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->value.width, 3u);
+  EXPECT_EQ(d->value.ToUint64(), 5u);
+  auto* e = f.ctx.FindVariable("e");
+  ASSERT_NE(e, nullptr);
+  EXPECT_EQ(e->value.width, 10u);
+  EXPECT_EQ(e->value.ToUint64(), 0x3FFu);
+  auto* u = f.ctx.FindVariable("u");
+  ASSERT_NE(u, nullptr);
+  EXPECT_EQ(u->value.width, 8u);
+  EXPECT_EQ(u->value.ToUint64(), 0xFFu);
+  auto* h = f.ctx.FindVariable("h");
+  ASSERT_NE(h, nullptr);
+  EXPECT_EQ(h->value.width, 4u);
+  EXPECT_EQ(h->value.ToUint64(), 0xFu);
+}
+
 }  // namespace

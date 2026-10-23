@@ -883,4 +883,49 @@ TEST(TypeOperatorElab, TypeParamSetToAnExpressionTypeReference) {
   EXPECT_TRUE(iv->is_signed);
 }
 
+// §6.10 assumes an implicit net for an undeclared name only in a port
+// expression, an instance's connections and a continuous assignment's left
+// side, so a type reference's argument naming nothing declared, in a module
+// item or among a block's items, is §23.9's unresolved reference.
+TEST(TypeOperatorElab, AnUndeclaredTypeReferenceArgumentIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  var type(nosuch) v;\n"
+      "  initial begin\n"
+      "    var type(missing) w;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to unresolved identifier 'nosuch'", 2,
+                            "23.9"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to unresolved identifier 'missing'", 4,
+                            "23.9"));
+}
+
+// A type reference's argument naming a variable, a block's own local, a
+// typedef, a built-in type or an enumeration's constant names something
+// declared, and draws no report.
+TEST(TypeOperatorElab, ADeclaredTypeReferenceArgumentIsNotReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef logic [3:0] n_t;\n"
+      "  typedef enum {K0, K1} k_t;\n"
+      "  int x;\n"
+      "  var type(x) a;\n"
+      "  var type(n_t) b;\n"
+      "  var type(int) c;\n"
+      "  var type(K1) e;\n"
+      "  initial begin\n"
+      "    int y;\n"
+      "    var type(y) d;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

@@ -429,19 +429,22 @@ void ReportProcUnresolved(const ModuleDecl* decl, Pred declared,
   ReportUnresolvedRefs(refs, declared, diag, DeclaredGenvars(decl->items));
 }
 
-// §23.9: rejects an unresolved bare identifier read in the initializer of a
-// variable or net declaration. §6.8 writes the initializer as part of the
-// declaration rather than as a statement, so no procedural walk reaches it, and
-// `int q = v;` read a name the module does not declare with nothing said.
+// §23.9: rejects an unresolved bare identifier read in the initializer or the
+// type reference of a variable or net declaration. §6.8 writes the
+// initializer as part of the declaration rather than as a statement, so no
+// procedural walk reaches it, and `int q = v;` read a name the module does not
+// declare with nothing said. §6.23's `var type(v) q;` reads v as an
+// expression's operand, which §6.10 declares nothing for.
 template <typename Pred>
-void ReportDeclInitUnresolved(const ModuleDecl* decl, Pred declared,
-                              DiagEngine& diag) {
+void ReportDeclReadsUnresolved(const ModuleDecl* decl, Pred declared,
+                               DiagEngine& diag) {
   std::vector<const Expr*> refs;
   for (const auto* item : decl->items) {
     bool is_data_decl = item->kind == ModuleItemKind::kVarDecl ||
                         item->kind == ModuleItemKind::kNetDecl;
-    if (!is_data_decl || item->init_expr == nullptr) continue;
+    if (!is_data_decl) continue;
     CollectBareIdents(item->init_expr, refs);
+    CollectBareIdents(item->data_type.type_ref_expr, refs);
   }
   ReportUnresolvedRefs(refs, declared, diag, DeclaredGenvars(decl->items));
 }
@@ -754,7 +757,7 @@ void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
       diag_);
   ReportContAssignUnresolved(decl, declared, diag_);
   ReportProcUnresolved(decl, declared, diag_);
-  ReportDeclInitUnresolved(decl, declared, diag_);
+  ReportDeclReadsUnresolved(decl, declared, diag_);
   ReportGenvarConstantMisuse(decl, diag_);
   ReportAssertionUnresolved(decl, declared, diag_);
   ReportNonConstantBoundActuals(

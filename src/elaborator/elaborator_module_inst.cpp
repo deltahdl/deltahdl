@@ -84,7 +84,7 @@ static void FillDefaultSpecializationArgs(std::vector<DataType>& args,
 // kMemberAccess with is_scope_resolution set, from Parser::MakeMemberAccess in
 // src/parser/expr_parser.cpp. When the class and its typedef are visible
 // the override binds to the type the typedef aliases; type_ref_expr is dropped
-// for the reason ResolveClassScopedTypeRef drops it in
+// for the reason ResolveScopedTypeRef drops it in
 // src/elaborator/elaborator_validate_struct_types.cpp, namely that the
 // alias has already been resolved and a leftover `type(...)` argument would be
 // resolved a second time against the child's scope. When they are not visible

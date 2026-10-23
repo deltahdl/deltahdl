@@ -2,6 +2,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <format>
+#include <functional>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -17,8 +18,11 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_class_lookup.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_enum_member.h"
+#include "elaborator/rtlir_scopes.h"
 #include "elaborator/type_eval.h"
 #include "elaborator/type_site_lookup.h"
+#include "elaborator/unit_scope_order.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
@@ -43,6 +47,18 @@ namespace {
 struct ValueShape {
   uint32_t width = 0;
   bool is_signed = false;
+};
+
+// What a type reference's argument is looked up in beyond the module's own
+// variables and nets: the module, the typedefs in force, the compilation unit
+// and the position of the declaration writing the reference, with the arena a
+// resolved type's packed dimensions are made in.
+struct TypeRefScope {
+  const RtlirModule* mod;
+  const TypedefMap& typedefs;
+  const CompilationUnit* unit;
+  SourceLoc reference;
+  Arena& arena;
 };
 
 }  // namespace
@@ -146,16 +162,116 @@ static void AdoptReferencedType(DataType& dt, const DataType& type) {
   dt.type_ref_expr = nullptr;
 }
 
+// Takes onto `dt`, in place of its type reference, the logic vector of
+// `shape`'s width and signing.
+static void AdoptLogicVector(DataType& dt, ValueShape shape, Arena& arena) {
+  dt.kind = DataTypeKind::kLogic;
+  dt.is_signed = shape.is_signed;
+  SetTypeRefPackedDims(dt, shape.width, arena);
+  dt.type_ref_expr = nullptr;
+}
+
+// The item of `items` written `name`, or null where none is.
+static const ModuleItem* ItemNamed(const std::vector<ModuleItem*>& items,
+                                   std::string_view name) {
+  auto it = std::ranges::find(items, name, &ModuleItem::name);
+  return it == items.end() ? nullptr : *it;
+}
+
+// The item written `name` of the first package of `unit` that `reaches`
+// answers true for and that declares one, or null where none does.
+static const ModuleItem* PackageItemReached(
+    const CompilationUnit* unit, std::string_view name,
+    const std::function<bool(std::string_view)>& reaches) {
+  for (const PackageDecl* pkg : unit->packages) {
+    if (!reaches(pkg->name)) continue;
+    if (const ModuleItem* item = ItemNamed(pkg->items, name)) return item;
+  }
+  return nullptr;
+}
+
+// §26.3: whether `mod` imports `name` from `package`, by name or by a
+// wildcard.
+static bool ImportsFrom(const RtlirModule& mod, std::string_view package,
+                        std::string_view name) {
+  return std::ranges::any_of(mod.imports, [&](const RtlirImport& imp) {
+    return imp.package_name == package &&
+           (imp.is_wildcard || imp.item_name == name);
+  });
+}
+
+// The type of the value `item` declares, which a type reference to it stands
+// for: the type the declaration writes, or, for a parameter written with
+// neither a type nor a range, the self-determined type of its value
+// (§6.20.2).
+static DataType DeclaredValueType(const ModuleItem& item,
+                                  const TypeRefScope& scope) {
+  DataType type = item.data_type;
+  if (item.kind != ModuleItemKind::kParamDecl ||
+      type.kind != DataTypeKind::kImplicit || type.packed_dim_left != nullptr) {
+    return type;
+  }
+  AdoptLogicVector(type,
+                   {InferTypeRefExprWidth(item.init_expr, scope.mod),
+                    InferTypeRefExprSigned(item.init_expr, scope.mod)},
+                   scope.arena);
+  return type;
+}
+
+// §26.3 with §3.12.1: the declaration of the value `name` names outside the
+// module: one a package the module imports it from declares, or else one of
+// the compilation unit written before the reference. Null where neither is.
+static const ModuleItem* OuterValueNamed(std::string_view name,
+                                         const TypeRefScope& scope) {
+  const ModuleItem* imported =
+      PackageItemReached(scope.unit, name, [&](std::string_view package) {
+        return ImportsFrom(*scope.mod, package, name);
+      });
+  if (imported != nullptr) return imported;
+  return ItemNamed(UnitItemsBefore(scope.unit, scope.reference), name);
+}
+
+// §6.19: the key RtlirModule::enum_types holds the enumeration declaring the
+// named constant `name` under, or empty where no enumeration the module sees
+// declares it.
+static std::string_view EnumerationDeclaring(const RtlirModule* mod,
+                                             std::string_view name) {
+  for (const auto& [key, members] : mod->enum_types) {
+    if (std::ranges::find(members, name, &RtlirEnumMember::name) !=
+        members.end()) {
+      return key;
+    }
+  }
+  return {};
+}
+
+// §6.19.3 with §6.23: the enumerated type the enumeration keyed `key`
+// declares, which a type reference to one of its named constants stands for.
+// A typedef's enumeration is named by the typedef. One written as a
+// variable's type has no name another declaration could write, and the
+// reference takes the width and signing that variable has.
+static void AdoptEnumerationType(DataType& dt, std::string_view key,
+                                 const TypeRefScope& scope) {
+  if (scope.typedefs.count(key) != 0) {
+    AdoptReferencedType(dt, TypeNameToDataType(key));
+    return;
+  }
+  AdoptLogicVector(dt, NamedValueShape(key, scope.mod).value_or(ValueShape{}),
+                   scope.arena);
+}
+
 // §8.23 names the type operator as a context in which a class scope resolution
 // may prefix a type name, so `type(Frame::payload_t)` denotes the typedef
-// `payload_t` declared in class `Frame`. `Frame::payload_t` parses to a
-// kMemberAccess node, which ResolveTypeRef would otherwise treat as an
-// expression whose width and signedness are unknown, making the declared object
-// a 1-bit unsigned logic instead of the type the typedef names. Returns false,
-// leaving `dt` untouched, when `ref` is not a class scope resolution over two
-// identifiers or when the class or its typedef is not visible.
-static bool ResolveClassScopedTypeRef(DataType& dt, const Expr* ref,
-                                      const CompilationUnit* unit) {
+// `payload_t` declared in class `Frame`, and §26.3 lets a package's scope
+// prefix the name of a value it declares, so `type(p::W)` stands for the type
+// of package `p`'s W. Either parses to a kMemberAccess node, which
+// ResolveTypeRef would otherwise treat as an expression whose width and
+// signedness are unknown, making the declared object a 1-bit unsigned logic.
+// Returns false, leaving `dt` untouched, when `ref` is not a scope resolution
+// over two identifiers or when neither a class's typedef nor a package's
+// declaration is found by it.
+static bool ResolveScopedTypeRef(DataType& dt, const Expr* ref,
+                                 const TypeRefScope& scope) {
   if (ref->kind != ExprKind::kMemberAccess || !ref->is_scope_resolution) {
     return false;
   }
@@ -165,38 +281,54 @@ static bool ResolveClassScopedTypeRef(DataType& dt, const Expr* ref,
   if (ref->rhs == nullptr || ref->rhs->kind != ExprKind::kIdentifier) {
     return false;
   }
-  const DataType* resolved =
-      FindClassScopedTypedefType(ref->lhs->text, ref->rhs->text, unit);
-  if (resolved == nullptr) return false;
-  AdoptReferencedType(dt, *resolved);
+  std::string_view prefix = ref->lhs->text;
+  if (const DataType* resolved =
+          FindClassScopedTypedefType(prefix, ref->rhs->text, scope.unit)) {
+    AdoptReferencedType(dt, *resolved);
+    return true;
+  }
+  const ModuleItem* item = PackageItemReached(
+      scope.unit, ref->rhs->text,
+      [&](std::string_view package) { return package == prefix; });
+  if (item == nullptr) return false;
+  AdoptReferencedType(dt, DeclaredValueType(*item, scope));
   return true;
 }
 
 // §6.23 with §6.20.2: a type reference whose argument is a name no variable or
 // net of the module carries. A parameter stands for its type: the one it was
 // declared with, or, declared with no type, the logic vector of its declared
-// range or of its final value. A built-in type keyword and a typedef name,
-// which the parser reads as identifiers, stand for the type they spell, a
-// typedef's left named for the declaration's own resolution of it. A name
-// that is none of these leaves the reference as it stands.
+// range or of its final value. A named constant of an enumeration stands for
+// the enumeration's type (AdoptEnumerationType). A built-in type keyword and a
+// typedef name, which the parser reads as identifiers, stand for the type
+// they spell, a typedef's left named for the declaration's own resolution of
+// it. A value of a package or of the compilation unit stands for its type
+// (OuterValueNamed). A name that is none of these leaves the reference as it
+// stands, for the scope rules to report.
 static void ResolveNamedTypeRef(DataType& dt, std::string_view name,
-                                const RtlirModule* mod,
-                                const TypedefMap& typedefs, Arena& arena) {
-  if (const RtlirParamDecl* pd = ValueParamNamed(mod, name)) {
+                                const TypeRefScope& scope) {
+  if (const RtlirParamDecl* pd = ValueParamNamed(scope.mod, name)) {
     if (pd->decl_type != nullptr && !pd->decl_type_implicit) {
       AdoptReferencedType(dt, *pd->decl_type);
       return;
     }
     ParamStorageShape shape = ParamStorageShapeOf(*pd);
-    dt.kind = DataTypeKind::kLogic;
-    dt.is_signed = shape.is_signed;
-    SetTypeRefPackedDims(dt, shape.width, arena);
-    dt.type_ref_expr = nullptr;
+    AdoptLogicVector(dt, {shape.width, shape.is_signed}, scope.arena);
+    return;
+  }
+  std::string_view enumeration = EnumerationDeclaring(scope.mod, name);
+  if (!enumeration.empty()) {
+    AdoptEnumerationType(dt, enumeration, scope);
     return;
   }
   DataType spelled = TypeNameToDataType(name);
-  if (spelled.kind == DataTypeKind::kNamed && typedefs.count(name) == 0) return;
-  AdoptReferencedType(dt, spelled);
+  if (spelled.kind != DataTypeKind::kNamed || scope.typedefs.count(name) != 0) {
+    AdoptReferencedType(dt, spelled);
+    return;
+  }
+  const ModuleItem* outer = OuterValueNamed(name, scope);
+  if (outer == nullptr) return;
+  AdoptReferencedType(dt, DeclaredValueType(*outer, scope));
 }
 
 void Elaborator::ResolveTypeRef(DataType& dt, SourceLoc loc,
@@ -204,12 +336,12 @@ void Elaborator::ResolveTypeRef(DataType& dt, SourceLoc loc,
   if (!dt.type_ref_expr) return;
   auto* ref = dt.type_ref_expr;
   CheckTypeRefArgInner(ref, loc);
-  if (ResolveClassScopedTypeRef(dt, ref, unit_)) return;
+  const TypeRefScope kScope{mod, typedefs_, unit_, loc, arena_};
+  if (ResolveScopedTypeRef(dt, ref, kScope)) return;
   if (ref->kind != ExprKind::kIdentifier) {
-    dt.kind = DataTypeKind::kLogic;
-    SetTypeRefPackedDims(dt, InferTypeRefExprWidth(ref, mod), arena_);
-    dt.is_signed = InferTypeRefExprSigned(ref, mod);
-    dt.type_ref_expr = nullptr;
+    AdoptLogicVector(
+        dt, {InferTypeRefExprWidth(ref, mod), InferTypeRefExprSigned(ref, mod)},
+        arena_);
     return;
   }
   for (const auto& v : mod->variables) {
@@ -228,10 +360,7 @@ void Elaborator::ResolveTypeRef(DataType& dt, SourceLoc loc,
   // its own net keyword, not from the type_reference.
   for (const auto& n : mod->nets) {
     if (n.name != ref->text) continue;
-    dt.kind = DataTypeKind::kLogic;
-    dt.is_signed = n.is_signed;
-    SetTypeRefPackedDims(dt, n.width, arena_);
-    dt.type_ref_expr = nullptr;
+    AdoptLogicVector(dt, {n.width, n.is_signed}, arena_);
     return;
   }
   auto it = var_types_.find(ref->text);
@@ -240,7 +369,7 @@ void Elaborator::ResolveTypeRef(DataType& dt, SourceLoc loc,
     dt.type_ref_expr = nullptr;
     return;
   }
-  ResolveNamedTypeRef(dt, ref->text, mod, typedefs_, arena_);
+  ResolveNamedTypeRef(dt, ref->text, kScope);
 }
 
 // The class a name reaches, or nothing when the answer is not clear.

@@ -732,9 +732,13 @@ static void CollectProcRhsIdentsIn(
   // right side alone, `if (undeclared) x = 1;` elaborated clean. §9.4.2 has an
   // event control's expressions name the nets and variables it waits on, and
   // its iff guard is read as a condition, so both are reads too:
-  // `@(posedge nosuch)` elaborated clean. A statement's delay, disable target,
-  // initializer and assertion are not read here.
+  // `@(posedge nosuch)` elaborated clean. A block's declaration of a variable
+  // whose type is §6.23's type reference reads the reference's operand as an
+  // expression does, so `var type(nosuch) w;` among a block's items is a read
+  // too. A statement's delay, disable target, initializer and assertion are
+  // not read here.
   CollectBareIdents(s->condition, refs);
+  CollectBareIdents(s->var_decl_type.type_ref_expr, refs);
   CollectBareIdents(s->for_cond, refs);
   for (const EventExpr& ev : s->events) {
     CollectBareIdents(ev.signal, refs);
