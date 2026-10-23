@@ -8,6 +8,7 @@
 
 #include "common/arena.h"
 #include "common/source_loc.h"
+#include "elaborator/assoc_index_type.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "parser/ast_class.h"
@@ -75,23 +76,45 @@ void DeclareForLoopLocals(Stmt* s, std::vector<ProceduralLocal>& locals,
   }
 }
 
+// A.2.5 with §6.23: the associative indexes among `dims`, the unpacked
+// dimensions of a declaration a procedure writes at `loc`, written as a type
+// reference to an expression, `[type(k)]`, given the type of `k` as a type
+// reference the declaration's own type writes is: a name the procedure
+// declared earlier takes that declaration's type, and any other is left to
+// `resolve_outer`. A name's unpacked dimensions are no part of an index type
+// and are not taken.
+void ResolveLocalIndexTypeRefs(std::vector<Expr*>& dims, SourceLoc loc,
+                               const std::vector<ProceduralLocal>& locals,
+                               const TypeRefResolver& resolve_outer,
+                               Arena& arena) {
+  ResolveTypeRefIndexDims(
+      dims,
+      [&](DataType& type) {
+        std::vector<Expr*> taken_dims;
+        ResolveLocalTypeRef(type, taken_dims, loc, locals, resolve_outer);
+      },
+      arena);
+}
+
 // Resolves the block type references of `s` and the statements it holds, with
 // `locals` the names in scope ahead of it; a block's own names, and a for
 // loop's, are dropped when the walk leaves it.
 void ResolveTypeRefsInStmt(Stmt* s, std::vector<ProceduralLocal>& locals,
-                           const TypeRefResolver& resolve_outer) {
+                           const TypeRefResolver& resolve_outer, Arena& arena) {
   if (s == nullptr) return;
   if (s->kind != StmtKind::kVarDecl) {
     const size_t kOuter = locals.size();
     DeclareForLoopLocals(s, locals, resolve_outer);
     ForEachChildStmt(s, [&](Stmt* const& sub) {
-      ResolveTypeRefsInStmt(sub, locals, resolve_outer);
+      ResolveTypeRefsInStmt(sub, locals, resolve_outer, arena);
     });
     locals.resize(kOuter);
     return;
   }
   ResolveLocalTypeRef(s->var_decl_type, s->var_unpacked_dims, s->range.start,
                       locals, resolve_outer);
+  ResolveLocalIndexTypeRefs(s->var_unpacked_dims, s->range.start, locals,
+                            resolve_outer, arena);
   locals.push_back({s->var_name, &s->var_decl_type, &s->var_unpacked_dims});
 }
 
@@ -109,22 +132,28 @@ std::optional<DataType> PropertyTypeNamed(const ClassDecl& cls,
 
 // The type references the declarations of `items`, a package's or the
 // compilation unit's, write in their typedefs' and nettypes' types, their
-// subroutines and their classes, with `resolve` resolving a name none of
-// them declares more closely.
+// variables' associative indexes (A.2.5), their subroutines and their
+// classes, with `resolve` resolving a name none of them declares more
+// closely.
 void ResolveScopeItemTypeRefs(const std::vector<ModuleItem*>& items,
-                              const TypeRefResolver& resolve) {
+                              const TypeRefResolver& resolve, Arena& arena) {
   for (ModuleItem* item : items) {
     switch (item->kind) {
       case ModuleItemKind::kTypedef:
       case ModuleItemKind::kNettypeDecl:
         resolve(item->typedef_type, item->loc);
         break;
+      case ModuleItemKind::kVarDecl:
+        ResolveTypeRefIndexDims(
+            item->unpacked_dims,
+            [&](DataType& type) { resolve(type, item->loc); }, arena);
+        break;
       case ModuleItemKind::kFunctionDecl:
       case ModuleItemKind::kTaskDecl:
-        ResolveProceduralTypeRefs(item, resolve);
+        ResolveProceduralTypeRefs(item, resolve, arena);
         break;
       case ModuleItemKind::kClassDecl:
-        ResolveClassTypeRefs(*item->class_decl, resolve);
+        ResolveClassTypeRefs(*item->class_decl, resolve, arena);
         break;
       default:
         break;
@@ -139,25 +168,28 @@ void ResolveScopeItemTypeRefs(const std::vector<ModuleItem*>& items,
 // names in scope. A formal's own type may be a type reference, to an earlier
 // formal or to a name of the scope around the subroutine.
 void ResolveProceduralTypeRefs(ModuleItem* item,
-                               const TypeRefResolver& resolve_outer) {
+                               const TypeRefResolver& resolve_outer,
+                               Arena& arena) {
   std::vector<ProceduralLocal> locals;
   locals.reserve(item->func_args.size());
   for (auto& arg : item->func_args) {
     ResolveLocalTypeRef(arg.data_type, arg.unpacked_dims, item->loc, locals,
                         resolve_outer);
+    ResolveLocalIndexTypeRefs(arg.unpacked_dims, item->loc, locals,
+                              resolve_outer, arena);
     locals.push_back({arg.name, &arg.data_type, &arg.unpacked_dims});
   }
-  ResolveTypeRefsInStmt(item->body, locals, resolve_outer);
+  ResolveTypeRefsInStmt(item->body, locals, resolve_outer, arena);
   for (auto* s : item->func_body_stmts) {
-    ResolveTypeRefsInStmt(s, locals, resolve_outer);
+    ResolveTypeRefsInStmt(s, locals, resolve_outer, arena);
   }
 }
 
 // A name `type(this)` writes, which §8.11 has stand for the class itself, is
 // none of the class's properties and is left to `resolve_outer`, which leaves
 // it as written for the method's evaluation to read.
-void ResolveClassTypeRefs(ClassDecl& cls,
-                          const TypeRefResolver& resolve_outer) {
+void ResolveClassTypeRefs(ClassDecl& cls, const TypeRefResolver& resolve_outer,
+                          Arena& arena) {
   const TypeRefResolver kInClass = [&](DataType& dt, SourceLoc loc) {
     const Expr* ref = dt.type_ref_expr;
     if (ref == nullptr) return;
@@ -171,12 +203,15 @@ void ResolveClassTypeRefs(ClassDecl& cls,
     switch (m->kind) {
       case ClassMemberKind::kProperty:
         kInClass(m->data_type, m->loc);
+        ResolveTypeRefIndexDims(
+            m->unpacked_dims, [&](DataType& type) { kInClass(type, m->loc); },
+            arena);
         break;
       case ClassMemberKind::kMethod:
-        ResolveProceduralTypeRefs(m->method, kInClass);
+        ResolveProceduralTypeRefs(m->method, kInClass, arena);
         break;
       case ClassMemberKind::kClassDecl:
-        ResolveClassTypeRefs(*m->nested_class, kInClass);
+        ResolveClassTypeRefs(*m->nested_class, kInClass, arena);
         break;
       default:
         break;
@@ -186,15 +221,20 @@ void ResolveClassTypeRefs(ClassDecl& cls,
 
 void ResolveUnitScopeTypeRefs(CompilationUnit* unit, Arena& arena) {
   for (const PackageDecl* pkg : unit->packages) {
-    ResolveScopeItemTypeRefs(pkg->items, [&](DataType& dt, SourceLoc) {
-      ResolveScopeTypeRef(dt, pkg->items, arena);
-    });
+    ResolveScopeItemTypeRefs(
+        pkg->items,
+        [&](DataType& dt, SourceLoc) {
+          ResolveScopeTypeRef(dt, pkg->items, arena);
+        },
+        arena);
   }
   const TypeRefResolver kInUnit = [&](DataType& dt, SourceLoc) {
     ResolveScopeTypeRef(dt, unit->cu_items, arena);
   };
-  ResolveScopeItemTypeRefs(unit->cu_items, kInUnit);
-  for (ClassDecl* cls : unit->classes) ResolveClassTypeRefs(*cls, kInUnit);
+  ResolveScopeItemTypeRefs(unit->cu_items, kInUnit, arena);
+  for (ClassDecl* cls : unit->classes) {
+    ResolveClassTypeRefs(*cls, kInUnit, arena);
+  }
 }
 
 }  // namespace delta

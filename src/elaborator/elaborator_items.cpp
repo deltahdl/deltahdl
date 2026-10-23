@@ -528,7 +528,8 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
                        [&] { return BuildParamScope(mod); });
   if (ElaborateDeclItem(item, mod)) return;
   ResolveProceduralTypeRefs(
-      item, [&](DataType& dt, SourceLoc loc) { ResolveTypeRef(dt, loc, mod); });
+      item, [&](DataType& dt, SourceLoc loc) { ResolveTypeRef(dt, loc, mod); },
+      arena_);
   TypeRefCompareFolder fold = [this](const Expr* e) {
     return EvalConstTypeRefCompare(e);
   };
@@ -574,9 +575,10 @@ void Elaborator::ElaborateModuleClassDecl(ModuleItem* item, RtlirModule* mod) {
   ResolveClassMethodFormalTypes(item->class_decl, typedefs_, arena_);
   // §6.23: the type references the class writes, resolved against its own
   // properties and then the module's names.
-  ResolveClassTypeRefs(*item->class_decl, [&](DataType& dt, SourceLoc loc) {
-    ResolveTypeRef(dt, loc, mod);
-  });
+  ResolveClassTypeRefs(
+      *item->class_decl,
+      [&](DataType& dt, SourceLoc loc) { ResolveTypeRef(dt, loc, mod); },
+      arena_);
 }
 
 // Declarations, types, instances, and structural items (§6, §23, §25, §28).

@@ -473,4 +473,41 @@ TEST(UserDefinedTypeAssocArrayElaboration, DataTypeIndexFormsAreAssociative) {
                             "6.7"));
 }
 
+// A.2.5 with §6.23 and §7.8.5: an index written as a type reference has the
+// type its argument has wherever the array is declared, so `[type(r)]` of a
+// real is reported in a procedural block, a function's body and formal, a
+// class property and a package variable, each `r` the nearest declaration of
+// that name, while `[type(k)]` of a `bit [3:0]` beside each is not. Each was
+// left unresolved, naming no type, and so no real.
+TEST(AssocIndexTypeValidation, TypeRefRealIndexReportedInEveryScope) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package q; real r; bit [3:0] k;\n"
+      "  int a [type(r)]; int b [type(k)];\n"
+      "endpackage\n"
+      "module top;\n"
+      "  real r; bit [3:0] k;\n"
+      "  class C; real cr; int p [type(cr)]; int n [type(k)]; endclass\n"
+      "  function void g(int fa [type(r)]);\n"
+      "    int fb [type(r)];\n"
+      "    int fc [type(k)];\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    int ya [type(r)];\n"
+      "    int yb [type(k)];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  const std::string_view kMessage =
+      "real or shortreal type shall not be used as an associative array index "
+      "type";
+  for (uint32_t line : {2u, 6u, 7u, 8u, 12u}) {
+    EXPECT_TRUE(ReportedError(diags, kMessage, line, "7.8.5")) << line;
+  }
+  for (uint32_t line : {9u, 13u}) {
+    EXPECT_FALSE(ReportedError(diags, kMessage, line, "7.8.5")) << line;
+  }
+}
+
 }  // namespace
