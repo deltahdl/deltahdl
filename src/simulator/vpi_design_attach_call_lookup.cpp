@@ -62,6 +62,32 @@ const DataType* TypeArgument(std::span<const DataType> args, std::size_t index,
   return kPositional && index < args.size() ? &args[index] : nullptr;
 }
 
+// §8.25: the type the specialization `args` of the class `decl` binds its
+// type parameter `name` to, the parameter's default where it binds none
+// (§8.25.1); null where `name` is none of the class's type parameters.
+const DataType* TypeParamBound(const ClassDecl& decl,
+                               std::span<const DataType> args,
+                               std::string_view name) {
+  if (!decl.type_param_names.contains(name)) return nullptr;
+  const auto kIndex = static_cast<std::size_t>(
+      std::ranges::find(decl.params, name,
+                        &std::pair<std::string_view, Expr*>::first) -
+      decl.params.begin());
+  const DataType* arg = TypeArgument(args, kIndex, name);
+  return arg != nullptr ? arg : &decl.param_types.at(kIndex);
+}
+
+// §8.23: the classes the class `outer` declares within it.
+std::vector<ClassDecl*> NestedClasses(const ClassDecl& outer) {
+  std::vector<ClassDecl*> nested;
+  for (const ClassMember* member : outer.members) {
+    if (member->kind == ClassMemberKind::kClassDecl) {
+      nested.push_back(member->nested_class);
+    }
+  }
+  return nested;
+}
+
 // §9.3.4: the declaration of the variable `name` that a block named `block`,
 // written anywhere in the statement `s`, declares; null where none does.
 const Stmt* NamedBlockVarDecl(const Stmt* s, std::string_view block,
@@ -107,6 +133,12 @@ VpiScopedClass VpiFindClassDecl(const BodyWalk& walk, std::string_view name,
                                 std::string_view package) {
   name = VpiClassNameOf(walk, name);
   if (!package.empty()) {
+    // §8.23: a scope naming a class is the class a nested class is declared
+    // in, whose defn the nested one's hangs under.
+    const VpiScopedClass kOuter = VpiFindClassDecl(walk, package);
+    if (kOuter.decl != nullptr) {
+      return {ClassNamed(NestedClasses(*kOuter.decl), name), kOuter.scope};
+    }
     return {ClassNamed(PackageClasses(walk.design, package), name),
             std::string(package)};
   }
@@ -133,16 +165,37 @@ const ModuleItem* VpiMethodNamed(const ClassDecl& cls, std::string_view name) {
 }
 
 VpiHeldClass VpiBaseOf(const ClassDecl& decl, std::span<const DataType> args) {
-  if (!decl.type_param_names.contains(decl.base_class)) {
-    return {decl.base_class, decl.base_class_type_params};
+  const DataType* bound = TypeParamBound(decl, args, decl.base_class);
+  if (bound == nullptr) return {decl.base_class, decl.base_class_type_params};
+  return {bound->type_name, bound->type_params};
+}
+
+VpiDeclaredMember VpiMemberNamed(const BodyWalk& walk, ClassMemberKind kind,
+                                 VpiHeldClass held, std::string_view name,
+                                 std::string_view package) {
+  for (const ClassDecl* decl = VpiFindClassDecl(walk, held.name, package).decl;
+       decl != nullptr;
+       decl = VpiFindClassDecl(walk, held.name, package).decl) {
+    for (const ClassMember* member : decl->members) {
+      if (member->kind == kind && member->name == name) {
+        return {member, decl, held.args};
+      }
+    }
+    held = VpiBaseOf(*decl, held.args);
   }
-  const auto kIndex = static_cast<std::size_t>(
-      std::ranges::find(decl.params, decl.base_class,
-                        &std::pair<std::string_view, Expr*>::first) -
-      decl.params.begin());
-  const DataType* arg = TypeArgument(args, kIndex, decl.base_class);
-  const DataType& base = arg != nullptr ? *arg : decl.param_types.at(kIndex);
-  return {base.type_name, base.type_params};
+  return {};
+}
+
+VpiPropertyType VpiPropertyTypeOf(const VpiDeclaredMember& found) {
+  const DataType& written = found.member->data_type;
+  if (const DataType* bound =
+          TypeParamBound(*found.decl, found.args, written.type_name)) {
+    return {bound, bound->scope_name};
+  }
+  const bool kNested =
+      written.scope_name.empty() &&
+      ClassNamed(NestedClasses(*found.decl), written.type_name) != nullptr;
+  return {&written, kNested ? found.decl->name : written.scope_name};
 }
 
 const Stmt* VpiNamedBlockVarDecl(const RtlirModule& mod, std::string_view block,

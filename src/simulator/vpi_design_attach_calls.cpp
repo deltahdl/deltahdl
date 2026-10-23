@@ -407,24 +407,6 @@ CallShape MethodCallShape(const Expr& access, const BlockParent& parent,
   return MethodShape(call, access.rhs->text, kVar.object, parent.scope, walk);
 }
 
-// §8.4 with §8.13: the member of kind `kind` named `name` the class `held`
-// names, of the package `package` where one is named, held under its
-// specialization, or a class it extends (VpiBaseOf), declares; null where
-// neither does.
-const ClassMember* MemberNamed(const BodyWalk& walk, ClassMemberKind kind,
-                               VpiHeldClass held, std::string_view name,
-                               std::string_view package = {}) {
-  for (const ClassDecl* decl = VpiFindClassDecl(walk, held.name, package).decl;
-       decl != nullptr;
-       decl = VpiFindClassDecl(walk, held.name, package).decl) {
-    for (const ClassMember* member : decl->members) {
-      if (member->kind == kind && member->name == name) return member;
-    }
-    held = VpiBaseOf(*decl, held.args);
-  }
-  return nullptr;
-}
-
 // What a value a call is applied through holds: the class it holds a handle
 // of, or the interface it refers to an instance of as a virtual interface
 // (§25.9); both empty for any other value.
@@ -436,28 +418,34 @@ struct HandleType {
   // The kind of built-in value the member is, whose methods a call through it
   // may be (§37.42 details 2 and 11).
   VpiBuiltInHolder holder = VpiBuiltInHolder::kNone;
+  // The package or class the class is found in, empty for one found where
+  // the walk stands (VpiFindClassDecl).
+  std::string_view scope = {};
 };
 
 // The same for the property `name` of the class `cls`, or of a class it
-// extends, or for the instance a covergroup embedded under that name holds
-// (§19.4), whose methods are built in (§19.8); empty where neither declares
-// it with a named type or as a virtual interface.
+// extends, of the type VpiPropertyTypeOf reads, or for the instance a
+// covergroup embedded under that name holds (§19.4), whose methods are built
+// in (§19.8); empty where neither declares it with a named type or as a
+// virtual interface.
 HandleType PropertyType(const BodyWalk& walk, std::string_view cls,
                         std::string_view name, std::string_view package = {},
                         std::span<const DataType> args = {}) {
-  const ClassMember* member =
-      MemberNamed(walk, ClassMemberKind::kProperty, {cls, args}, name, package);
-  if (member == nullptr) {
-    const bool kEmbedded = MemberNamed(walk, ClassMemberKind::kCovergroup,
-                                       {cls, args}, name, package) != nullptr;
+  const VpiDeclaredMember kFound = VpiMemberNamed(
+      walk, ClassMemberKind::kProperty, {cls, args}, name, package);
+  if (kFound.member == nullptr) {
+    const bool kEmbedded = VpiMemberNamed(walk, ClassMemberKind::kCovergroup,
+                                          {cls, args}, name, package)
+                               .member != nullptr;
     return kEmbedded ? HandleType{{}, {}, {}, VpiBuiltInHolder::kCovergroup}
                      : HandleType{};
   }
-  const DataType& type = member->data_type;
+  const VpiPropertyType kOf = VpiPropertyTypeOf(kFound);
+  const DataType& type = *kOf.type;
   return {
       type.kind == DataTypeKind::kNamed ? type.type_name : std::string_view(),
       VifInterface(&type), type.type_params,
-      TypedHolder(member->unpacked_dims, type, walk)};
+      TypedHolder(kFound.member->unpacked_dims, type, walk), kOf.scope};
 }
 
 // §7.2 with §8.4: the class the member `name` of the structure `aggregate`
@@ -531,10 +519,12 @@ int MemberIndexKind(const Expr& array, const BlockParent& parent,
     aggregate = inner;
   }
   for (std::size_t i = first; i + 1 < names.size(); ++i) {
-    held = PropertyType(kAt, held.cls, names[i], {}, held.args);
+    held = PropertyType(kAt, held.cls, names[i], held.scope, held.args);
   }
-  const ClassMember* member = MemberNamed(kAt, ClassMemberKind::kProperty,
-                                          {held.cls, held.args}, names.back());
+  const ClassMember* member =
+      VpiMemberNamed(kAt, ClassMemberKind::kProperty, {held.cls, held.args},
+                     names.back(), held.scope)
+          .member;
   return member == nullptr ? vpiIntVar
                            : FirstDimIndexKind(member->unpacked_dims, kAt);
 }
@@ -771,7 +761,7 @@ CallShape MemberChainCallShape(const Expr& access, const BlockParent& parent,
                     : nullptr;
   }
   for (std::size_t i = first; i < names.size(); ++i) {
-    type = PropertyType(kAt, type.cls, names[i], {}, type.args);
+    type = PropertyType(kAt, type.cls, names[i], type.scope, type.args);
   }
   if (!type.vif.empty()) {
     return InterfaceCallShape(kAt, type.vif, access.rhs->text);
@@ -783,7 +773,8 @@ CallShape MemberChainCallShape(const Expr& access, const BlockParent& parent,
   if (type.holder != VpiBuiltInHolder::kNone) {
     call.type = vpiMethodFuncCall;
   } else {
-    call = ClassMethodCall(kAt, type.cls, access.rhs->text, {}, type.args);
+    call =
+        ClassMethodCall(kAt, type.cls, access.rhs->text, type.scope, type.args);
     if (call.type == 0) call.type = VpiMemberBuiltInCallKind(access.rhs->text);
   }
   CallShape shape =

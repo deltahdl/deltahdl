@@ -8,6 +8,7 @@
 
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
+#include "parser/ast_class.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 #include "simulator/vpi_design_attach_build.h"
@@ -138,8 +139,9 @@ struct VpiScopedClass {
 // a typedef's chain of names where it is a typedef name, `typedef B B_t;`.
 std::string_view VpiClassNameOf(const BodyWalk& walk, std::string_view name);
 
-// The class the design declares under `name`: in the package `package` where
-// one is named (§26.3), and otherwise in the instance's module, the
+// The class the design declares under `name`: where a scope `package` is
+// named, among the classes nested in the class it names (§8.23), else in the
+// package it names (§26.3), and otherwise in the instance's module, the
 // compilation unit or a package the module imports the name from, by name or
 // with a wildcard (§26.3), a typedef name standing for the class it names. No
 // declaration for a name the design declares no class under, a built-in class
@@ -164,6 +166,36 @@ struct VpiHeldClass {
 // class C #(type T = B) extends T, the class the specialization's argument for
 // it names, else the parameter's default (§8.25.1).
 VpiHeldClass VpiBaseOf(const ClassDecl& decl, std::span<const DataType> args);
+
+// A member a class declares, with the class that declares it and the
+// arguments of the specialization that class is held under (§8.25).
+struct VpiDeclaredMember {
+  const ClassMember* member = nullptr;
+  const ClassDecl* decl = nullptr;
+  std::span<const DataType> args;
+};
+
+// §8.4 with §8.13: the member of kind `kind` named `name` the class `held`
+// names, found in the scope `package` where one is named, held under its
+// specialization, or a class it extends (VpiBaseOf), declares; none where
+// neither does.
+VpiDeclaredMember VpiMemberNamed(const BodyWalk& walk, ClassMemberKind kind,
+                                 VpiHeldClass held, std::string_view name,
+                                 std::string_view package = {});
+
+// The type a property is of, and the package or class its name is found in,
+// empty for one found where the walk stands (VpiFindClassDecl).
+struct VpiPropertyType {
+  const DataType* type = nullptr;
+  std::string_view scope;
+};
+
+// The type of the property `found`: the type the specialization binds it to
+// where it is written as one of its class's type parameters (§8.25), and else
+// the type written, found behind the package or class it is scoped with
+// (§26.3), or behind its own class where it names a class nested in it
+// (§8.23).
+VpiPropertyType VpiPropertyTypeOf(const VpiDeclaredMember& found);
 
 // §9.3.4 with §23.6: the declaration of the variable `name` that a block named
 // `block`, written in one of the procedures of `mod`, declares, which a

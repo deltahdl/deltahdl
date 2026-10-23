@@ -4,6 +4,7 @@
 
 #include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -34,6 +35,16 @@ class MethodCallsOnValues : public VpiDesignRun {
     vpiHandle call = CallOf(vpiMethodTaskCall, By("top.b"), "run");
     ASSERT_NE(call, nullptr);
     EXPECT_EQ(vpi_get(vpiUserDefn, call), 1);
+  }
+
+  // That the method task call of `run` the block top.b holds reaches the task
+  // `run` of the class defn `defn` (§37.42).
+  static void ExpectTheBlockCallsRunOf(vpiHandle defn) {
+    ASSERT_NE(defn, nullptr);
+    vpiHandle call = CallOf(vpiMethodTaskCall, By("top.b"), "run");
+    ASSERT_NE(call, nullptr);
+    EXPECT_EQ(VpiObjectOf(vpi_handle(vpiTask, call)),
+              VpiObjectOf(Named(vpiMethods, defn, "run")));
   }
 };
 
@@ -171,6 +182,66 @@ TEST_F(MethodCallsOnValues, AnEmbeddedCovergroupTakesItsPredefinedMethods) {
       "  initial begin : b o.cg.sample(); end\n"
       "endmodule\n");
   EXPECT_EQ(BuiltInCallsOfTheBlock(), 1U);
+}
+
+// §8.25 with §6.16: a property written with its class's type parameter is of
+// the type the specialization binds the parameter to, else of the parameter's
+// default, and a string's methods apply to it (#7742).
+TEST_F(MethodCallsOnValues,
+       APropertyOfATypeParameterTakesTheBoundTypesMethods) {
+  Run("module top;\n"
+      "  class C #(type T = int); T t; endclass\n"
+      "  class E #(type U = string); U u; endclass\n"
+      "  C #(string) g = new;\n"
+      "  E e = new;\n"
+      "  initial begin : b void'(g.t.len()); void'(e.u.len()); end\n"
+      "endmodule\n");
+  EXPECT_EQ(BuiltInCallsOfTheBlock(), 2U);
+}
+
+// §8.25: a property written with its class's type parameter holds a handle of
+// the class the specialization binds the parameter to, whose method a call
+// through it reaches (#7742).
+TEST_F(MethodCallsOnValues, APropertyOfATypeParameterReachesTheBoundClass) {
+  Run("module top;\n"
+      "  class D; task run(); endtask endclass\n"
+      "  class C #(type T = int); T t; endclass\n"
+      "  C #(D) g = new;\n"
+      "  D d = new;\n"
+      "  initial begin : b g.t = d; g.t.run(); end\n"
+      "endmodule\n");
+  ExpectTheBlockCallsRunOf(Named(vpiClassDefn, By("top"), "D"));
+}
+
+// §8.23: a property written with a class its class declares within it holds a
+// handle of that nested class rather than of a class of the module named alike,
+// whose method a call through it reaches (#7743).
+TEST_F(MethodCallsOnValues, APropertyOfANestedClassReachesTheNestedClass) {
+  Run("module top;\n"
+      "  class N; task run(); endtask endclass\n"
+      "  class C;\n"
+      "    class N; task run(); endtask endclass\n"
+      "    N n = new;\n"
+      "  endclass\n"
+      "  C h = new;\n"
+      "  initial begin : b h.n.run(); end\n"
+      "endmodule\n");
+  ExpectTheBlockCallsRunOf(
+      Named(vpiInternalScope, Named(vpiClassDefn, By("top"), "C"), "N"));
+}
+
+// §26.3: a property written with a class behind its package's name holds a
+// handle of the package's class rather than of a class of the module named
+// alike, though the module imports nothing from the package.
+TEST_F(MethodCallsOnValues, APropertyOfAPackagesClassReachesThePackagesClass) {
+  Run("package pk; class D; task run(); endtask endclass endpackage\n"
+      "module top;\n"
+      "  class D; task run(); endtask endclass\n"
+      "  class C; pk::D d = new; endclass\n"
+      "  C h = new;\n"
+      "  initial begin : b h.d.run(); end\n"
+      "endmodule\n");
+  ExpectTheBlockCallsRunOf(Named(vpiClassDefn, By("pk"), "D"));
 }
 
 // §11.3.6 with A.8.4: an assignment in parentheses, ((h = g)), is a handle of
