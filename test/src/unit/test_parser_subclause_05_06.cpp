@@ -135,7 +135,7 @@ TEST(LexicalConventionParsing, IdentifierExceedingMaxLengthReportsError) {
 // underscore, never a `$`. The lexer makes `$dollar` a system identifier, the
 // only thing those characters can be; where a name is expected, the report is
 // the lexical rule the spelling breaks, not the declaration grammar around it.
-TEST(LexicalConventionParsing, NameBeginningWithDollarIsReportedUnderClause56) {
+TEST(LexicalConventionParsing, NameBeginningWithDollarIsReported) {
   auto r = Parse(
       "module identifiers();\n"
       "  reg $dollar;\n"
@@ -147,7 +147,7 @@ TEST(LexicalConventionParsing, NameBeginningWithDollarIsReportedUnderClause56) {
 // The same rule for a digit: `0number` is the integer 0 with the identifier
 // number directly against it, and that adjacency is what makes it one
 // misspelt name rather than two tokens the grammar has other uses for.
-TEST(LexicalConventionParsing, NameBeginningWithDigitIsReportedUnderClause56) {
+TEST(LexicalConventionParsing, NameBeginningWithDigitIsReported) {
   auto r = Parse(
       "module identifiers();\n"
       "  reg $dollar;\n"
@@ -160,7 +160,8 @@ TEST(LexicalConventionParsing, NameBeginningWithDigitIsReportedUnderClause56) {
 // With white space between them, `0` and `number` are the two tokens they
 // look like and no name beginning with a digit was written: the declaration
 // is still wrong, but under its own grammar, not under §5.6.
-TEST(LexicalConventionParsing, DigitThenSpaceThenNameIsNotAClause56Report) {
+TEST(LexicalConventionParsing,
+     DigitThenSpaceThenNameIsReportedByTheDeclarationGrammar) {
   auto r = Parse(
       "module m;\n"
       "  reg 0 number;\n"

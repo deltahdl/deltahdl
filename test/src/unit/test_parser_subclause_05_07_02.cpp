@@ -133,7 +133,7 @@ TEST(RealLiteralParsing, RealLiteralAddition) {
 // real literal it was written to be and reports it there, so each assignment of
 // the sv-tests module is reported under the subclause whose rule it breaks, on
 // its own line.
-TEST(RealLiteralParsing, PointWithoutADigitOnEachSideIsReportedUnderClause572) {
+TEST(RealLiteralParsing, PointWithoutADigitOnEachSideIsReported) {
   auto r = Parse(
       "module top();\n"
       "  logic [31:0] a;\n"

@@ -158,7 +158,8 @@ TEST(VectorNetAccessibility, PlainWireNeitherFlag) {
 // variable's type is reported under §6.9.2 rather than as the identifier the
 // declarator list did not find. sv-tests' 6.9.2--vector_vectored_inv.sv writes
 // `logic vectored` for a vectored net, and a report under §6.8 scored it FAIL.
-TEST(VectorNetAccessibility, VectoredAfterVariableTypeIsAClause692Report) {
+TEST(VectorNetAccessibility,
+     VectoredAfterVariableTypeIsReportedAsANetOnlyKeyword) {
   auto r = Parse(
       "module top();\n"
       "  logic vectored [15:0] a = 0;\n"
@@ -174,7 +175,8 @@ TEST(VectorNetAccessibility, VectoredAfterVariableTypeIsAClause692Report) {
   }
 }
 
-TEST(VectorNetAccessibility, ScalaredAfterVariableTypeIsAClause692Report) {
+TEST(VectorNetAccessibility,
+     ScalaredAfterVariableTypeIsReportedAsANetOnlyKeyword) {
   auto r = Parse(
       "module top();\n"
       "  bit scalared [7:0] b;\n"

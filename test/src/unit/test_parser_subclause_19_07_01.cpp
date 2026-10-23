@@ -16,7 +16,7 @@ namespace {
 // options of the covergroup level alone, and real_interval of the covergroup
 // and coverpoint levels, so each written in a coverpoint or cross body the
 // table excludes it from is an error.
-TEST_F(VerifyParseTest, TypeOptionAtALevelTable194ExcludesIsError) {
+TEST_F(VerifyParseTest, TypeOptionAtALevelThatDoesNotTakeItIsError) {
   Parse(R"(
     module m;
       covergroup cg @(posedge clk);
@@ -46,7 +46,7 @@ TEST_F(VerifyParseTest, TypeOptionAtALevelTable194ExcludesIsError) {
 
 // §19.7.1, Table 19-4: weight, goal and comment are type options of every
 // level, and real_interval of a coverpoint, so none of them is reported.
-TEST_F(VerifyParseTest, TypeOptionAtALevelTable194AllowsIsAccepted) {
+TEST_F(VerifyParseTest, TypeOptionAtALevelThatTakesItIsAccepted) {
   Parse(R"(
     module m;
       covergroup cg @(posedge clk);

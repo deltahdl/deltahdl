@@ -15,7 +15,7 @@ namespace {
 
 // Table B.1 -- the words SystemVerilog reserves -- in the alphabetical order
 // the annex prints them.
-constexpr const char* kTableB1[] = {
+constexpr const char* kReservedKeywords[] = {
     "accept_on",
     "alias",
     "always",
@@ -266,7 +266,7 @@ constexpr const char* kTableB1[] = {
     "xor",
 };
 
-constexpr size_t kTableB1Count = std::size(kTableB1);
+constexpr size_t kReservedKeywordCount = std::size(kReservedKeywords);
 
 // Two entries open an aggregate type declaration. In a slot that has no way to
 // close the type they start, the parser does not come back from reading one --
@@ -445,10 +445,10 @@ constexpr const char* kControlName = "ctrl_name";
 // declaration and is read back off the tree -- so the rejection is the
 // reservation doing its work rather than a template that never parsed.
 TEST(KeywordListParsing, NoReservedWordCanNameAVariable) {
-  EXPECT_EQ(kTableB1Count, 248u);
+  EXPECT_EQ(kReservedKeywordCount, 248u);
   size_t swept = 0;
-  for (size_t i = 0; i < kTableB1Count; ++i) {
-    std::string_view word = kTableB1[i];
+  for (size_t i = 0; i < kReservedKeywordCount; ++i) {
+    std::string_view word = kReservedKeywords[i];
     if (IsAggregateOpenerWord(word)) continue;
     ++swept;
     EXPECT_FALSE(ParseOk(VarDecl(word)))
@@ -479,8 +479,8 @@ TEST(KeywordListParsing, NoReservedWordCanNameAnythingInAnyPosition) {
         << "the " << position.what << " template parses with a free name";
 
     size_t swept = 0;
-    for (size_t i = 0; i < kTableB1Count; ++i) {
-      std::string_view word = kTableB1[i];
+    for (size_t i = 0; i < kReservedKeywordCount; ++i) {
+      std::string_view word = kReservedKeywords[i];
       if (position.excluded != nullptr && position.excluded(word)) continue;
       ++swept;
       EXPECT_FALSE(ParseOk(AtPosition(position, word)))
@@ -494,15 +494,15 @@ TEST(KeywordListParsing, NoReservedWordCanNameAnythingInAnyPosition) {
 // -- built-in class and method names, other languages' reserved words, plural
 // and near-miss spellings of listed words -- all still name a variable, which
 // is how this stage shows the list is not quietly wider than it is printed.
-TEST(KeywordListParsing, VocabularyOutsideTableB1StillNamesADeclaration) {
+TEST(KeywordListParsing, WordsOffTheReservedKeywordListStillNameADeclaration) {
   const char* const kNotReserved[] = {
       "randomize", "mailbox",  "semaphore", "process", "std",       "option",
       "sample",    "variable", "signal",    "entity",  "component", "wired",
       "logics",    "nettypes", "join_all",  "boolean", "unique1",   "tri2",
   };
   for (const char* word : kNotReserved) {
-    for (size_t i = 0; i < kTableB1Count; ++i) {
-      ASSERT_NE(std::string_view(word), std::string_view(kTableB1[i]))
+    for (size_t i = 0; i < kReservedKeywordCount; ++i) {
+      ASSERT_NE(std::string_view(word), std::string_view(kReservedKeywords[i]))
           << word << " is on Table B.1 after all";
     }
     auto parsed = Parse(VarDecl(word));
@@ -521,8 +521,8 @@ TEST(KeywordListParsing, VocabularyOutsideTableB1StillNamesADeclaration) {
 // spelling, which is what separates escaping from evading the rule.
 TEST(KeywordListParsing, EscapedFormOfAReservedWordNamesAVariable) {
   size_t built = 0;
-  for (size_t i = 0; i < kTableB1Count; ++i) {
-    std::string_view word = kTableB1[i];
+  for (size_t i = 0; i < kReservedKeywordCount; ++i) {
+    std::string_view word = kReservedKeywords[i];
     std::string escaped = "\\" + std::string(word) + " ";
     auto parsed = Parse(VarDecl(escaped));
     ASSERT_NE(parsed.cu, nullptr) << word;
@@ -534,7 +534,8 @@ TEST(KeywordListParsing, EscapedFormOfAReservedWordNamesAVariable) {
         << "the escaped declaration should carry the spelling " << word;
     ++built;
   }
-  EXPECT_EQ(built, kTableB1Count) << "the escape works for every listed word";
+  EXPECT_EQ(built, kReservedKeywordCount)
+      << "the escape works for every listed word";
 }
 
 // The accepting side of the reservation. Words that cannot name anything are

@@ -521,7 +521,8 @@ TEST(IntegerLiteralParsing, LineCommentBetweenSizeAndBaseJoinsOneLiteral) {
 // identifier against it, the only thing the grammar makes of those characters,
 // so where an expression is expected the run is reported as the literal it was
 // written to be, under the subclause whose rule it breaks.
-TEST(IntegerLiteralParsing, DigitsAgainstLettersAreReportedUnderClause571) {
+TEST(IntegerLiteralParsing,
+     DigitsAgainstLettersAreReportedAsOneMalformedLiteral) {
   auto r = Parse(
       "module top();\n"
       "  logic [31:0] a;\n"
@@ -552,7 +553,8 @@ TEST(IntegerLiteralParsing, DigitsAgainstLettersLeaveNoLeftoverTokenReport) {
 // With white space between them, `4` and `af` are the two tokens they look
 // like and no malformed literal was written: the statement is still wrong,
 // but as a token left over, not under §5.7.1.
-TEST(IntegerLiteralParsing, DigitsThenSpaceThenLettersIsNotAClause571Report) {
+TEST(IntegerLiteralParsing,
+     DigitsThenSpaceThenLettersAreReportedAsALeftoverToken) {
   auto r = Parse(
       "module top();\n"
       "  logic [31:0] a;\n"
@@ -566,7 +568,7 @@ TEST(IntegerLiteralParsing, DigitsThenSpaceThenLettersIsNotAClause571Report) {
 
 // The based forms the example points to, unsized and sized, are the legal
 // spellings of the same digits and draw nothing.
-TEST(IntegerLiteralParsing, HexDigitsBehindABaseAreNotAClause571Report) {
+TEST(IntegerLiteralParsing, HexDigitsBehindABaseDrawNoReport) {
   EXPECT_TRUE(
       ParseOk("module top(); logic [31:0] a; initial a = 'haf; endmodule\n"));
   EXPECT_TRUE(

@@ -286,7 +286,7 @@ TEST(UdpStateTable, LevelRowBesideEdgeRowWithAnotherOutputAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(UdpStateTable, JkEdgeFlipFlopOfSubclause29_9Accepted) {
+TEST(UdpStateTable, JkEdgeFlipFlopMixingLevelAndEdgeRowsAccepted) {
   // §29.9's jk_edge_ff mixes level rows over the preset and clear with edge
   // rows over the clock, j and k, none of them in conflict.
   auto r = Parse(
