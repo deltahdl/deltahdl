@@ -364,7 +364,7 @@ DataType PropertyIndexType(const ClassMember* member,
                            const ClassObject* obj, SimContext& ctx) {
   const ClassDecl* decl = declaring->decl;
   const Expr* dim = PropertyUnpackedDims(member, declaring, ctx)[0];
-  if (!DimNamesTypeParam(dim, decl)) return TypeNameToDataType(dim->text);
+  if (!DimNamesTypeParam(dim, decl)) return AssocIndexType(dim);
   const DataType* bound = TypeParamActual(obj, decl, dim->text);
   DataType index_type =
       bound != nullptr ? ResolveNamedType(*bound) : TypeNameToDataType("int");

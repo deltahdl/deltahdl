@@ -205,21 +205,33 @@ void RecordClassParamActuals(std::string_view var_name,
                              const std::vector<DataType>& type_params,
                              SimContext& ctx);
 
-// Defined in statement_assign_decl.cpp; also used by the class-property
-// resolution in eval_array_class_assoc.cpp. §7.8: whether the unpacked
-// dimension `dim` is an index type -- a keyword type, the `*` wildcard, a
-// class, or a name the elaborated typedef table sizes -- and so declares an
-// associative array rather than a fixed-size one.
+// Defined in statement_assign_assoc_index.cpp; used by every builder of an
+// array from its declaration. §7.8: whether the unpacked dimension `dim` is an
+// index type -- a keyword type, the `*` wildcard, a class, a name the
+// elaborated typedef table sizes, or a type reference (A.2.5), which also
+// holds an index written as a data_type no expression can spell -- and so
+// declares an associative array rather than a fixed-size one.
 bool IsAssocIndexDim(const Expr* dim, SimContext& ctx);
 
-// Defined in statement_assign_decl.cpp; also used by
+// Defined in statement_assign_assoc_index.cpp. §7.8: the index type the
+// dimension `dim`, which IsAssocIndexDim has answered for, writes: a type
+// reference's own, which the elaborator resolved where it was written
+// `type(expression)`, or else the type the name spells.
+DataType AssocIndexType(const Expr* dim);
+
+// Defined in statement_assign_assoc_index.cpp. §7.8.2: whether the dimension
+// `dim`, which IsAssocIndexDim has answered for, keys its array by string.
+bool IsStringIndexDim(const Expr* dim);
+
+// Defined in statement_assign_assoc_index.cpp; also used by
 // eval_array_class_assoc.cpp. §7.8: the index-type attributes of an associative
 // array declared with the dimension `dim`, which IsAssocIndexDim has answered
 // for, and whose element type is 4-state when `elem_4state` says so.
 AssocArraySpec AssocIndexSpec(const Expr* dim, bool elem_4state,
                               SimContext& ctx);
 
-// Defined in statement_assign_decl.cpp; also used by eval_array_class_assoc.cpp
+// Defined in statement_assign_assoc_index.cpp; also used by
+// eval_array_class_assoc.cpp
 // for an index dimension naming a type parameter, whose type is what the
 // specialization bound it to (§8.25) rather than what the dimension spells.
 // §7.8: the index-type attributes of an associative array whose index type is

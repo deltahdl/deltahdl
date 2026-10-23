@@ -214,4 +214,98 @@ TEST(DeclarationRangeSim, QueueBoundedParameterYieldsQueue) {
   EXPECT_EQ(v, 3u);
 }
 
+// associative_dimension ::= [ data_type ] in a procedural block, with each
+// data_type an expression cannot spell: an enumeration, a packed structure, a
+// type reference to a 4-bit vector or to string, and a parameterized class.
+// Each array keeps its entries: the 4-bit index reads key 17 back as key 1,
+// "abcde" and "bcde" are two string keys, and the handle keys its entry. The
+// result packs, from the left, e.num(), e[1], s[3], y[1], z.num() and c[h]:
+// built as no associative array, a block's array kept no entry at all.
+TEST(DeclarationRangeSim, DataTypeIndexFormsInBlockAreAssociative) {
+  auto v = RunAndGet(
+      "class P #(int N = 1); endclass\n"
+      "module t;\n"
+      "  bit [3:0] k;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    int e [enum {A, B}];\n"
+      "    int s [struct packed {bit [3:0] v;}];\n"
+      "    int y [type(k)];\n"
+      "    int z [type(string)];\n"
+      "    int c [P#(8)];\n"
+      "    P#(8) h;\n"
+      "    h = new;\n"
+      "    e[1] = 5;\n"
+      "    s[3] = 6;\n"
+      "    y[17] = 7;\n"
+      "    z[\"abcde\"] = 1;\n"
+      "    z[\"bcde\"] = 1;\n"
+      "    c[h] = 9;\n"
+      "    result = e.num() * 100000 + e[1] * 10000 + s[3] * 1000 +\n"
+      "             y[1] * 100 + z.num() * 10 + c[h];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 156729u);
+}
+
+// associative_dimension ::= [ data_type ] in a function body: a packed
+// structure four bits wide keys key 19 as key 3, so the one entry written
+// reads back there. The result packs num() and that entry.
+TEST(DeclarationRangeSim, StructureIndexInFunctionBodyIsAssociative) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int result;\n"
+      "  function automatic int count();\n"
+      "    int a [struct packed {bit [3:0] v;}];\n"
+      "    a[19] = 4;\n"
+      "    return a.num() * 10 + a[3];\n"
+      "  endfunction\n"
+      "  initial result = count();\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 14u);
+}
+
+// associative_dimension ::= [ data_type ] on a class property, written as a
+// type reference to the module's 4-bit k: key 18 is key 2. The result packs
+// num() and that entry.
+TEST(DeclarationRangeSim, TypeRefIndexOfClassPropertyIsAssociative) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  bit [3:0] k;\n"
+      "  int result;\n"
+      "  class C;\n"
+      "    int m [type(k)];\n"
+      "  endclass\n"
+      "  initial begin\n"
+      "    C o;\n"
+      "    o = new;\n"
+      "    o.m[18] = 3;\n"
+      "    result = o.m.num() * 10 + o.m[2];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 13u);
+}
+
+// associative_dimension ::= [ data_type ] on a package's variable: a packed
+// structure four bits wide keys key 20 as key 4. The result packs num() and
+// that entry.
+TEST(DeclarationRangeSim, StructureIndexOfPackageVariableIsAssociative) {
+  auto v = RunAndGet(
+      "package q;\n"
+      "  int a [struct packed {bit [3:0] v;}];\n"
+      "endpackage\n"
+      "module t;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    q::a[20] = 6;\n"
+      "    result = q::a.num() * 10 + q::a[4];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 16u);
+}
+
 }  // namespace
