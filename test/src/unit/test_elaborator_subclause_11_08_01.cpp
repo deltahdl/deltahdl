@@ -22,7 +22,7 @@ TEST(ExpressionTypeElaboration, MemberOfOperatorResultIsReported) {
       "  initial (-r).run();\n"
       "  initial (x++).run();\n"
       "  initial b = (x inside {1, 2}).m;\n"
-      "  initial (x += 2).run();\n"
+      "  initial ((x += 2)).run();\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
@@ -49,13 +49,15 @@ TEST(ExpressionTypeElaboration, MemberOfOperatorResultIsReported) {
 }
 
 // §11.3.6: a parenthesized assignment yields the value it assigns, of its
-// left-hand side's type, so the methods of a string apply to `(s = t)`.
+// left-hand side's type, so the methods of a string apply to `((s = t))`, the
+// assignment in a second pair of parentheses being the primary A.8.2 roots a
+// method call in.
 TEST(ExpressionTypeElaboration, ParenthesizedAssignmentKeepsItsTargetsMethods) {
   EXPECT_TRUE(
       ElabOk("module top;\n"
              "  string s, t;\n"
              "  int n;\n"
-             "  initial n = (s = t).len();\n"
+             "  initial n = ((s = t)).len();\n"
              "endmodule\n"));
 }
 
