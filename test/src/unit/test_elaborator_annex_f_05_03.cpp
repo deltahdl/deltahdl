@@ -228,7 +228,8 @@ std::vector<std::shared_ptr<const PropertyExpr>> Properties() {
 // variables understood to be allowed, so on a property that involves none
 // the two agree, §F.5.6.1 entered from the empty context, on every word --
 // and the verdicts are not all one way.
-TEST(SatisfactionWithoutLocalVariables, NeutralSatisfactionAgreesWithF563) {
+TEST(SatisfactionWithoutLocalVariables,
+     NeutralSatisfactionAgreesWithTheLocalVariableSemantics) {
   std::set<bool> verdicts;
   for (const auto& property : Properties()) {
     ASSERT_FALSE(PropertyInvolvesLocalVariables(*property));
@@ -248,7 +249,8 @@ TEST(SatisfactionWithoutLocalVariables, NeutralSatisfactionAgreesWithF563) {
 // pass/disabled/fail trichotomy of §F.5.3.1 are those of §F.5.6.1 on a
 // top-level property without local variables, through a disable iff guard
 // and a parenthesis.
-TEST(SatisfactionWithoutLocalVariables, TopLevelVerdictsAgreeWithF563) {
+TEST(SatisfactionWithoutLocalVariables,
+     TopLevelVerdictsAgreeWithTheLocalVariableSemantics) {
   std::vector<std::shared_ptr<const TopLevelProperty>> tops;
   for (const auto& property : Properties()) {
     tops.push_back(TopProperty(property));
@@ -280,7 +282,8 @@ TEST(SatisfactionWithoutLocalVariables, TopLevelVerdictsAgreeWithF563) {
 // §F.5.6.3 gives vacuity as the definition of §F.5.3.3 with local variables
 // understood to be allowed, so non-vacuity and nonvacuous satisfaction agree
 // on every property and top-level property without local variables.
-TEST(SatisfactionWithoutLocalVariables, VacuityAgreesWithF563) {
+TEST(SatisfactionWithoutLocalVariables,
+     VacuityAgreesWithTheLocalVariableSemantics) {
   std::set<bool> verdicts;
   for (const auto& property : Properties()) {
     auto lv = AsPropertyWithLocalVariables(*property);

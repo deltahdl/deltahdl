@@ -22,7 +22,7 @@ bool IsPropertyFormalTypeAllowed(PropertyFormalTypeKind kind) {
     case PropertyFormalTypeKind::kProperty:
     case PropertyFormalTypeKind::kSequence:
     case PropertyFormalTypeKind::kEvent:
-    case PropertyFormalTypeKind::kTypeAllowedIn166:
+    case PropertyFormalTypeKind::kAssertionExpressionType:
       return true;
     case PropertyFormalTypeKind::kForbidden:
       return false;

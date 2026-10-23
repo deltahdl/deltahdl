@@ -24,7 +24,7 @@ enum class PropertyFormalTypeKind : uint8_t {
   kProperty,
   kSequence,
   kEvent,
-  kTypeAllowedIn166,
+  kAssertionExpressionType,
   kForbidden,
 };
 

@@ -79,7 +79,7 @@ enum class LvalueProhibitionScope : std::uint8_t {
 // replaced reference shall not be a variable_lvalue anywhere in the checker. A
 // cast expression is never an lvalue, so the rule forbids using such a formal
 // as a variable_lvalue.
-struct Step4LvalueRule {
+struct CastReplacedFormalLvalueRule {
   // Whether a step-4 replaced reference is permitted to be a variable_lvalue.
   // Always false: the cast it is replaced by cannot be an lvalue.
   bool replacement_may_be_lvalue = false;
@@ -88,7 +88,7 @@ struct Step4LvalueRule {
 };
 
 // Returns the §F.4.2.1 step-4 variable_lvalue prohibition.
-Step4LvalueRule CheckerStep4LvalueRule();
+CastReplacedFormalLvalueRule CheckerCastReplacedFormalLvalueRule();
 
 // §F.4.2.1 step 5b: the parentheses around the substituted actual a_f may be
 // omitted where the reference is itself already enclosed in parentheses, as

@@ -125,7 +125,8 @@ TEST(StructLiteralElaboration, CLikeFlatLiteralForArrayOfStructsRejected) {
 // The module of 5.10-structure-arrays-illegal.sv, whose rejection is scored
 // against §5.10: the same flat form, and no §10.9.2 report for it, since the
 // pattern initializes an array, not a structure.
-TEST(StructLiteralElaboration, FlatLiteralForStructArrayIsReportedUnder510) {
+TEST(StructLiteralElaboration,
+     FlatLiteralForStructArrayIsReportedAsAStructureLiteral) {
   ElabFixture f;
   ElaborateSrc(
       "module top();\n"

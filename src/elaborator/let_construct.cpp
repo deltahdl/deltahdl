@@ -6,7 +6,7 @@ bool IsLetFormalTypeAllowed(LetFormalTypeKind kind) {
   switch (kind) {
     case LetFormalTypeKind::kUntyped:
     case LetFormalTypeKind::kEvent:
-    case LetFormalTypeKind::kTypeAllowedIn166:
+    case LetFormalTypeKind::kAssertionExpressionType:
       return true;
     case LetFormalTypeKind::kForbidden:
       return false;

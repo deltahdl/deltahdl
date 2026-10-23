@@ -96,10 +96,11 @@ enum class CheckerAlwaysExpressionPosition : uint8_t {
 bool CheckerAlwaysExpressionIsSampled(CheckerAlwaysForm form,
                                       CheckerAlwaysExpressionPosition position);
 
-// §17.5: clock inference for checker procedures follows the rules in §16.14.6.
-// The inference rules themselves are owned by §16.14.6; this records only that
-// checker procedures fall within their scope.
-bool CheckerProcedureClockInferenceFollowsSection16146();
+// §17.5: clock inference for checker procedures follows the rules in §16.14.6,
+// the ones that infer the clock of a concurrent assertion embedded in
+// procedural code. The inference rules themselves are owned by §16.14.6; this
+// records only that checker procedures fall within their scope.
+bool CheckerProcedureClockInferenceFollowsProceduralAssertionRules();
 
 // §17.5: a final procedure may be specified within a checker in the same manner
 // as in a module (see §9.2.3).

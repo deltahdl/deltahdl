@@ -210,7 +210,8 @@ TEST(LetDeclElaboration, LetDeclInTaskElaborates) {
 TEST(LetConstructRules, TypedFormalMustBeEventOrAllowedDataType) {
   EXPECT_TRUE(IsLetFormalTypeAllowed(LetFormalTypeKind::kUntyped));
   EXPECT_TRUE(IsLetFormalTypeAllowed(LetFormalTypeKind::kEvent));
-  EXPECT_TRUE(IsLetFormalTypeAllowed(LetFormalTypeKind::kTypeAllowedIn166));
+  EXPECT_TRUE(
+      IsLetFormalTypeAllowed(LetFormalTypeKind::kAssertionExpressionType));
   EXPECT_FALSE(IsLetFormalTypeAllowed(LetFormalTypeKind::kForbidden));
 }
 

@@ -139,7 +139,8 @@ std::vector<Paired> PairsWithoutLocals() {
 // §F.5.6.2: on a body without local variables the two relations and the
 // verdict are §F.5.3.2's, for both shapes of body, both activations and the
 // assert and cover roles, with every verdict occurring.
-TEST(FiniteWordSatisfactionLocals, TheVerdictsAgreeWithF532WithoutLocals) {
+TEST(FiniteWordSatisfactionLocals,
+     TheVerdictsWithoutLocalsAgreeWithTheLocalFreeSemantics) {
   std::set<FiniteWordVerdict> seen;
   for (const Paired& pair : PairsWithoutLocals()) {
     for (const Word& w : Words()) {

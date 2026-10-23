@@ -44,10 +44,10 @@ ReferenceReplacement ReplaceCheckerFormalReference(FormalKind kind,
   return ReplaceFormalReference(kind, actual);
 }
 
-Step4LvalueRule CheckerStep4LvalueRule() {
+CastReplacedFormalLvalueRule CheckerCastReplacedFormalLvalueRule() {
   // The step-4 replacement is a cast, which is never a variable_lvalue, and the
   // prohibition spans the whole checker.
-  Step4LvalueRule rule;
+  CastReplacedFormalLvalueRule rule;
   rule.replacement_may_be_lvalue = false;
   rule.scope = LvalueProhibitionScope::kWholeChecker;
   return rule;

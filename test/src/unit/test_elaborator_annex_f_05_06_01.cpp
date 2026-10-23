@@ -478,7 +478,8 @@ TEST(NeutralSatisfactionLocals, AssertionsThreadLocalsThroughTheirBodies) {
 // §F.5.6.1 (assertion): on a body without local variables the relation is
 // §F.5.3.1's, for both shapes of body, both activations and the assert and
 // cover roles, over words with a match, a late match, no match and no letter.
-TEST(NeutralSatisfactionLocals, AssertionsAgreeWithF531WithoutLocals) {
+TEST(NeutralSatisfactionLocals,
+     AssertionsWithoutLocalsAgreeWithTheLocalFreeSemantics) {
   const auto kAThenB = SeqConcat(Bool("a"), Bool("b"));
   auto q = ClkClock(BoolAtom("clk"), ClkStrong(kAThenB));
   const std::vector<Word> kWords{

@@ -339,7 +339,8 @@ std::vector<OperandPair> OperandPairs() {
 // §F.5.6.3: on operands without local variables each derived rule agrees
 // with §F.5.3.3's on the retraction, under the empty context and one binding
 // a name alike, with both verdicts occurring across the rules.
-TEST(NonVacuityLocals, DerivedRulesAgreeWithF533OnTheFragment) {
+TEST(NonVacuityLocals,
+     DerivedRulesAgreeWithTheLocalFreeSemanticsOnTheFragment) {
   const std::vector<Word> kWords{Word{L({"x"}), L({"a", "t"})},
                                  Word{L({"a", "t"})},
                                  Word{L({"x"}), L({"x"})},

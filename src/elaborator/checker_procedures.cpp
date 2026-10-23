@@ -82,7 +82,7 @@ bool CheckerAlwaysExpressionIsSampled(
   return false;
 }
 
-bool CheckerProcedureClockInferenceFollowsSection16146() {
+bool CheckerProcedureClockInferenceFollowsProceduralAssertionRules() {
   // §17.5 defers clock inference for checker procedures to §16.14.6.
   return true;
 }

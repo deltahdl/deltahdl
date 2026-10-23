@@ -740,7 +740,7 @@ static LetFormalTypeKind ClassifyLetFormalType(const DataType& dt) {
     default:
       // Integral, real, string, named, enum, struct, and union types are all
       // usable in the §16.6 contexts a let body forms.
-      return LetFormalTypeKind::kTypeAllowedIn166;
+      return LetFormalTypeKind::kAssertionExpressionType;
   }
 }
 

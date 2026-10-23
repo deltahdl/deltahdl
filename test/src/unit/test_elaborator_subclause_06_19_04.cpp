@@ -105,7 +105,8 @@ TEST(EnumNumericalExpr, EnumExprAssignNoCast_Error) {
 // The expression need not name the variable it is assigned to: a member of the
 // enumeration is an enum identifier used as part of an expression, which
 // §6.19.4 auto-casts to the base type, so `Red + 1` is that clause's case too.
-TEST(EnumNumericalExpr, EnumMemberExprAssignNoCastIsAClause6194Report) {
+TEST(EnumNumericalExpr,
+     EnumMemberExprAssignNoCastIsANumericalExpressionReport) {
   ElabFixture f;
   ElaborateSrc(
       "module top();\n"
@@ -125,7 +126,8 @@ TEST(EnumNumericalExpr, EnumMemberExprAssignNoCastIsAClause6194Report) {
 // enumeration type (§6.19.5), so `C.next + 1` is arithmetic on an enum value
 // and the assignment back is §6.19.4's case. A walk that stopped at every
 // member access as it does at `c.num()` would call this §6.19.3.
-TEST(EnumNumericalExpr, EnumMethodResultExprAssignNoCastIsAClause6194Report) {
+TEST(EnumNumericalExpr,
+     EnumMethodResultExprAssignNoCastIsANumericalExpressionReport) {
   ElabFixture f;
   ElaborateSrc(
       "module top();\n"
@@ -146,7 +148,7 @@ TEST(EnumNumericalExpr, EnumMethodResultExprAssignNoCastIsAClause6194Report) {
 // so an initializer that is arithmetic on an enum member is §6.19.4's case
 // wherever the declaration stands: as a module item and as a procedural
 // declaration, which two different walks judge.
-TEST(EnumNumericalExpr, EnumExprInitializersAreClause6194Reports) {
+TEST(EnumNumericalExpr, EnumExprInitializersAreNumericalExpressionReports) {
   ElabFixture f;
   ElaborateSrc(
       "module top();\n"
@@ -168,7 +170,7 @@ TEST(EnumNumericalExpr, EnumExprInitializersAreClause6194Reports) {
 // An expression with no enum operand is an arbitrary expression of another
 // type, whose cast §6.19.3 states; §6.19.4 speaks only of expressions an enum
 // takes part in. A fix that cited §6.19.4 for every non-bare value fails here.
-TEST(EnumNumericalExpr, IntegerExprAssignNoCastStaysAClause6193Report) {
+TEST(EnumNumericalExpr, IntegerExprAssignNoCastStaysATypeCheckingReport) {
   ElabFixture f;
   ElaborateSrc(
       "module top();\n"

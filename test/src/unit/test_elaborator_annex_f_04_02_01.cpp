@@ -119,8 +119,8 @@ TEST(CheckerRewriteAlgorithm, TypedMatchingFormalSubstitution) {
 // than §F.4.1.1's, which is confined to a sequence_match_item assignment
 // target.
 TEST(CheckerRewriteAlgorithm,
-     Step4ReplacementForbidsVariableLvalueWholeChecker) {
-  Step4LvalueRule rule = CheckerStep4LvalueRule();
+     CastReplacedFormalIsNoVariableLvalueAnywhereInTheChecker) {
+  CastReplacedFormalLvalueRule rule = CheckerCastReplacedFormalLvalueRule();
   EXPECT_FALSE(rule.replacement_may_be_lvalue);
   EXPECT_EQ(rule.scope, LvalueProhibitionScope::kWholeChecker);
 }

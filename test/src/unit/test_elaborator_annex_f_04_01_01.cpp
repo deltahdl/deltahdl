@@ -160,7 +160,7 @@ TEST(RewriteAlgorithm, LocalVariableReferenceSubstitutesDirectly) {
 // the formal's type, in either of step 4's two shapes, may not stand as the
 // variable_lvalue of an operator_assignment or inc_or_dec_expression in a
 // sequence_match_item, where the replacements of steps 3 and 5 may.
-TEST(RewriteAlgorithm, Step4CastsMayNotStandAsMatchItemLvalues) {
+TEST(RewriteAlgorithm, CastsThroughTheFormalTypeMayNotStandAsMatchItemLvalues) {
   EXPECT_FALSE(ReplacementMayStandAsMatchItemLvalue(
       ReferenceReplacement::kItemCastToFormalType));
   EXPECT_FALSE(ReplacementMayStandAsMatchItemLvalue(

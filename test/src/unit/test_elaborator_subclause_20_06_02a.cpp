@@ -438,7 +438,7 @@ TEST(BitsOfDeclaration, ImplicitParameterSetFromAWideParameterIsAsWide) {
 // equality, a logical operator, an implication, a reduction and `!` one bit,
 // unary `+ - ~` their operand, a conditional the wider arm. B is 8 bits and
 // an unsized literal at least 32, so `B + B` is 8 bits and `B + 1` is 32.
-TEST(BitsOfDeclaration, OperatorExpressionIsSizedByTable11_21) {
+TEST(BitsOfDeclaration, OperatorExpressionIsSizedBySelfDeterminedBitLength) {
   const std::vector<std::pair<std::string, int64_t>> kCases{
       {"B + B", 8},   {"B - B", 8},   {"B * B", 8},
       {"B / B", 8},   {"B % B", 8},   {"B & B", 8},
@@ -475,7 +475,7 @@ TEST(BitsOfDeclaration, OperatorExpressionIsSizedByTable11_21) {
 // A binary operator Table 11-21 does not size -- the sequence implication,
 // which makes no expression at all -- leaves $bits unfolded rather than sized
 // as something it is not.
-TEST(BitsOfDeclaration, OperatorOutsideTable11_21IsLeftUnsized) {
+TEST(BitsOfDeclaration, OperatorWithNoSelfDeterminedBitLengthIsLeftUnsized) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
