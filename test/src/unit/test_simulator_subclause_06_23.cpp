@@ -414,4 +414,125 @@ TEST(TypeReferenceScopeSim, PackageAndUnitSubroutinesOfTheirScopesNames) {
                     {"r4", 0xFFFFFFFBu}});
 }
 
+// §6.23 with §6.20.2, §26.2 and §3.12.1: a parameter of a package or of the
+// compilation unit declared with neither type nor range takes its value's
+// type, whose names are the parameters its own scope declares ahead of it.
+// P's Q is the package's 32-bit 3 and UP's UQ the unit's int, so each sum is
+// 32 bits and every variable typed after P or UP holds -5 whole: through the
+// package's typedef, the unit's typedef, an import, a `p::` prefix and a
+// module's reference to the unit. Read among the module's names, where no Q or
+// UQ is declared, each sum took the 4 bits of its literal and held 4'hB.
+TEST(TypeReferenceScopeSim, UntypedParametersOfTheirScopesParameters) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "package p;\n"
+      "  parameter R = 1;\n"
+      "  parameter Q = 3;\n"
+      "  parameter P = Q + 4'd1;\n"
+      "  typedef type(P) t;\n"
+      "endpackage\n"
+      "parameter int UQ = 3;\n"
+      "parameter UP = UQ + 4'd1;\n"
+      "typedef type(UP) ut;\n"
+      "module t;\n"
+      "  import p::*;\n"
+      "  p::t a;\n"
+      "  ut b;\n"
+      "  var type(P) c;\n"
+      "  var type(p::P) d;\n"
+      "  var type(UP) e;\n"
+      "  initial begin\n"
+      "    a = -5;\n"
+      "    b = -5;\n"
+      "    c = -5;\n"
+      "    d = -5;\n"
+      "    e = -5;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design,
+                   {{"a", 0xFFFFFFFBu},
+                    {"b", 0xFFFFFFFBu},
+                    {"c", 0xFFFFFFFBu},
+                    {"d", 0xFFFFFFFBu},
+                    {"e", 0xFFFFFFFBu}});
+}
+
+// §6.23 with §6.20.2, §6.19 and §6.19.3: a parameter of a package or of the
+// compilation unit declared with neither type nor range whose value is an
+// enumeration constant takes the enumeration's type, an int by default. PE is
+// E1's, PF the F1 that `F[2]` generates, and UPE the unit's U1, so each typed
+// after them is 32 bits and holds -5 whole, through a typedef or a `p::`
+// prefix. Looked up among parameters alone, each constant added no width,
+// and each variable was one bit holding 1.
+TEST(TypeReferenceScopeSim, UntypedParametersOfEnumerationConstants) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "package p;\n"
+      "  typedef enum {E0, E1} e_t;\n"
+      "  typedef enum {F[2]} f_t;\n"
+      "  parameter PE = E1;\n"
+      "  parameter PF = F1;\n"
+      "  typedef type(PE) et;\n"
+      "  typedef type(PF) ft;\n"
+      "endpackage\n"
+      "typedef enum {U0, U1} u_t;\n"
+      "parameter UPE = U1;\n"
+      "typedef type(UPE) uet;\n"
+      "module t;\n"
+      "  p::et a;\n"
+      "  p::ft b;\n"
+      "  uet c;\n"
+      "  var type(p::PE) d;\n"
+      "  initial begin\n"
+      "    a = -5;\n"
+      "    b = -5;\n"
+      "    c = -5;\n"
+      "    d = -5;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design,
+                   {{"a", 0xFFFFFFFBu},
+                    {"b", 0xFFFFFFFBu},
+                    {"c", 0xFFFFFFFBu},
+                    {"d", 0xFFFFFFFBu}});
+}
+
+// §6.23 with §5.7.1: a type reference to a simple decimal number stands for a
+// signed type, and one to a based literal for a signed type only where its
+// base carries s. So a, of type(3), compares below 0 after -5, and b, of
+// type(4'sd1), widens its -1 to an int's -1, where c, of type(4'd1), widens
+// it to 15. A package's parameter of no type valued 3 is signed the same way,
+// and d, typed after it, compares below 0. Each literal was read unsigned,
+// and a and d compared above 0 while b widened to 15.
+TEST(TypeReferenceScopeSim, LiteralTypeReferencesTakeTheLiteralsSigning) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "package p;\n"
+      "  parameter P = 3;\n"
+      "  typedef type(P) t;\n"
+      "endpackage\n"
+      "module t;\n"
+      "  var type(3) a;\n"
+      "  var type(4'sd1) b;\n"
+      "  var type(4'd1) c;\n"
+      "  p::t d;\n"
+      "  int ra, rb, rc, rd;\n"
+      "  initial begin\n"
+      "    a = -5;\n"
+      "    b = -1;\n"
+      "    c = -1;\n"
+      "    d = -5;\n"
+      "    ra = a < 0;\n"
+      "    rb = b;\n"
+      "    rc = c;\n"
+      "    rd = d < 0;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design,
+                   {{"ra", 1u}, {"rb", 0xFFFFFFFFu}, {"rc", 0xFu}, {"rd", 1u}});
+}
+
 }  // namespace

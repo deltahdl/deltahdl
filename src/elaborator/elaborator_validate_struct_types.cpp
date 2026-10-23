@@ -4,6 +4,7 @@
 #include <format>
 #include <functional>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -17,6 +18,7 @@
 #include "elaborator/const_eval_internal.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_class_lookup.h"
+#include "elaborator/elaborator_enum_constants.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_enum_member.h"
 #include "elaborator/rtlir_scopes.h"
@@ -48,6 +50,10 @@ struct ValueShape {
   uint32_t width = 0;
   bool is_signed = false;
 };
+
+// The shape of the value a name stands for in the scope an expression is
+// written in, empty where the scope declares no value of the name.
+using ValueShapeOf = std::function<std::optional<ValueShape>(std::string_view)>;
 
 // What a type reference's argument is looked up in beyond the module's own
 // variables and nets: the module, the typedefs in force, the compilation unit
@@ -85,53 +91,64 @@ static std::optional<ValueShape> NamedValueShape(std::string_view name,
   return std::nullopt;
 }
 
+// The values in scope of a module: its variables, nets and value parameters
+// (NamedValueShape).
+static ValueShapeOf ShapesIn(const RtlirModule* mod) {
+  return [mod](std::string_view name) { return NamedValueShape(name, mod); };
+}
+
 static uint32_t InferTypeRefExprWidth(const Expr* expr,
-                                      const RtlirModule* mod) {
+                                      const ValueShapeOf& shape_of) {
   if (!expr) return 0;
   switch (expr->kind) {
     case ExprKind::kIdentifier:
-      return NamedValueShape(expr->text, mod).value_or(ValueShape{}).width;
+      return shape_of(expr->text).value_or(ValueShape{}).width;
     case ExprKind::kIntegerLiteral:
       return ConstLiteralWidth(expr);
     case ExprKind::kBinary: {
-      uint32_t lw = InferTypeRefExprWidth(expr->lhs, mod);
-      uint32_t rw = InferTypeRefExprWidth(expr->rhs, mod);
+      uint32_t lw = InferTypeRefExprWidth(expr->lhs, shape_of);
+      uint32_t rw = InferTypeRefExprWidth(expr->rhs, shape_of);
       return std::max(lw, rw);
     }
     case ExprKind::kTernary: {
-      uint32_t tw = InferTypeRefExprWidth(expr->true_expr, mod);
-      uint32_t fw = InferTypeRefExprWidth(expr->false_expr, mod);
+      uint32_t tw = InferTypeRefExprWidth(expr->true_expr, shape_of);
+      uint32_t fw = InferTypeRefExprWidth(expr->false_expr, shape_of);
       return std::max(tw, fw);
     }
     case ExprKind::kConcatenation: {
       uint32_t total = 0;
       for (const auto* el : expr->elements) {
-        total += InferTypeRefExprWidth(el, mod);
+        total += InferTypeRefExprWidth(el, shape_of);
       }
       return total;
     }
     case ExprKind::kUnary:
-      return InferTypeRefExprWidth(expr->lhs, mod);
+      return InferTypeRefExprWidth(expr->lhs, shape_of);
     default:
       return 0;
   }
 }
 
-static bool InferTypeRefExprSigned(const Expr* expr, const RtlirModule* mod) {
+static bool InferTypeRefExprSigned(const Expr* expr,
+                                   const ValueShapeOf& shape_of) {
   if (!expr) return false;
   switch (expr->kind) {
     case ExprKind::kIdentifier:
-      return NamedValueShape(expr->text, mod).value_or(ValueShape{}).is_signed;
+      return shape_of(expr->text).value_or(ValueShape{}).is_signed;
+    // §5.7.1: a simple decimal number is signed, and a based one only where
+    // its base carries the s designator.
+    case ExprKind::kIntegerLiteral:
+      return IsSignedLiteral(expr->text);
     case ExprKind::kBinary:
-      return InferTypeRefExprSigned(expr->lhs, mod) &&
-             InferTypeRefExprSigned(expr->rhs, mod);
+      return InferTypeRefExprSigned(expr->lhs, shape_of) &&
+             InferTypeRefExprSigned(expr->rhs, shape_of);
     case ExprKind::kTernary:
-      return InferTypeRefExprSigned(expr->true_expr, mod) &&
-             InferTypeRefExprSigned(expr->false_expr, mod);
+      return InferTypeRefExprSigned(expr->true_expr, shape_of) &&
+             InferTypeRefExprSigned(expr->false_expr, shape_of);
     case ExprKind::kConcatenation:
       return false;
     case ExprKind::kUnary:
-      return InferTypeRefExprSigned(expr->lhs, mod);
+      return InferTypeRefExprSigned(expr->lhs, shape_of);
     default:
       return false;
   }
@@ -171,20 +188,21 @@ static void AdoptLogicVector(DataType& dt, ValueShape shape, Arena& arena) {
 }
 
 // The item of `items` written `name`, or null where none is.
-static const ModuleItem* ItemNamed(const std::vector<ModuleItem*>& items,
+static const ModuleItem* ItemNamed(std::span<ModuleItem* const> items,
                                    std::string_view name) {
   auto it = std::ranges::find(items, name, &ModuleItem::name);
   return it == items.end() ? nullptr : *it;
 }
 
-// The item written `name` of the first package of `unit` that `reaches`
-// answers true for and that declares one, or null where none does.
-static const ModuleItem* PackageItemReached(
+// The first package of `unit` that `reaches` answers true for and that
+// declares an item written `name`, or null where none does.
+static const PackageDecl* PackageDeclaring(
     const CompilationUnit* unit, std::string_view name,
     const std::function<bool(std::string_view)>& reaches) {
   for (const PackageDecl* pkg : unit->packages) {
-    if (!reaches(pkg->name)) continue;
-    if (const ModuleItem* item = ItemNamed(pkg->items, name)) return item;
+    if (reaches(pkg->name) && ItemNamed(pkg->items, name) != nullptr) {
+      return pkg;
+    }
   }
   return nullptr;
 }
@@ -202,19 +220,77 @@ static bool ImportsFrom(const RtlirModule& mod, std::string_view package,
 // The type of the value `item` declares, which a type reference to it stands
 // for: the type the declaration writes, or, for a parameter written with
 // neither a type nor a range, the self-determined type of its value
-// (§6.20.2).
+// (§6.20.2), whose names `shape_of` reads in the scope the declaration is
+// written in.
 static DataType DeclaredValueType(const ModuleItem& item,
-                                  const TypeRefScope& scope) {
+                                  const ValueShapeOf& shape_of, Arena& arena) {
   DataType type = item.data_type;
   if (item.kind != ModuleItemKind::kParamDecl ||
       type.kind != DataTypeKind::kImplicit || type.packed_dim_left != nullptr) {
     return type;
   }
   AdoptLogicVector(type,
-                   {InferTypeRefExprWidth(item.init_expr, scope.mod),
-                    InferTypeRefExprSigned(item.init_expr, scope.mod)},
-                   scope.arena);
+                   {InferTypeRefExprWidth(item.init_expr, shape_of),
+                    InferTypeRefExprSigned(item.init_expr, shape_of)},
+                   arena);
   return type;
+}
+
+static std::optional<ValueShape> ScopeValueShape(
+    std::string_view name, std::span<ModuleItem* const> items, Arena& arena);
+
+// §6.20.2 with §26.2 and §3.12.1: the type of the value `item` declares among
+// `items`, the declarations of a package or of the compilation unit. A
+// parameter of no type takes its value's, whose names are those `items`
+// declares ahead of the parameter (ScopeValueShape).
+static DataType ScopeValueType(const ModuleItem& item,
+                               std::span<ModuleItem* const> items,
+                               Arena& arena) {
+  auto at = std::ranges::find(items, &item);
+  std::span<ModuleItem* const> ahead =
+      items.first(static_cast<size_t>(at - items.begin()));
+  return DeclaredValueType(
+      item,
+      [&](std::string_view name) {
+        return ScopeValueShape(name, ahead, arena);
+      },
+      arena);
+}
+
+// §6.19 with §6.19.3: the shape of the enumeration constant `name` that one
+// of `items` declares, which is of the enumeration's type. A `name[N]`
+// member declares the constants it generates (EnumMemberDeclaredNames).
+// Empty where `items` declares no constant of the name.
+static std::optional<ValueShape> EnumConstantShape(
+    std::string_view name, std::span<ModuleItem* const> items) {
+  std::optional<ValueShape> shape;
+  const auto kVisit = [&](std::string_view, const DataType& type) {
+    for (const EnumMember& member : type.enum_members) {
+      const std::vector<std::string> kNames =
+          EnumMemberDeclaredNames(member, {});
+      if (std::ranges::find(kNames, name) == kNames.end()) continue;
+      shape = ValueShape{EvalTypeWidth(type), IsSignedType(type, {})};
+    }
+  };
+  for (const ModuleItem* item : items) ForEachEnumTypeOfItem(item, kVisit);
+  return shape;
+}
+
+// The shape of the parameter or enumeration constant `name` among `items`,
+// the declarations of a package or of the compilation unit ahead of the
+// parameter whose value reads it: a parameter's from the type its own
+// declaration writes or its own value's (ScopeValueType), a constant's from
+// its enumeration (EnumConstantShape). A parameter's value being a constant
+// expression, the values it names are these rather than variables or nets.
+// Empty where `items` declares neither of the name.
+static std::optional<ValueShape> ScopeValueShape(
+    std::string_view name, std::span<ModuleItem* const> items, Arena& arena) {
+  auto param = std::ranges::find_if(items, [&](const ModuleItem* i) {
+    return i->kind == ModuleItemKind::kParamDecl && i->name == name;
+  });
+  if (param == items.end()) return EnumConstantShape(name, items);
+  DataType type = ScopeValueType(**param, items, arena);
+  return ValueShape{EvalTypeWidth(type), type.is_signed};
 }
 
 // The type of the value `name` that the module's declaration writes: a port's,
@@ -229,20 +305,25 @@ static std::optional<DataType> ModuleValueType(std::string_view name,
   if (port != ports.end()) return port->data_type;
   const ModuleItem* item = ItemNamed(scope.decl->items, name);
   if (item == nullptr) return std::nullopt;
-  return DeclaredValueType(*item, scope);
+  return DeclaredValueType(*item, ShapesIn(scope.mod), scope.arena);
 }
 
-// §26.3 with §3.12.1: the declaration of the value `name` names outside the
-// module: one a package the module imports it from declares, or else one of
-// the compilation unit written before the reference. Null where neither is.
-static const ModuleItem* OuterValueNamed(std::string_view name,
-                                         const TypeRefScope& scope) {
-  const ModuleItem* imported =
-      PackageItemReached(scope.unit, name, [&](std::string_view package) {
+// §26.3 with §3.12.1: the type of the value `name` names outside the module,
+// read in the scope declaring it (ScopeValueType): one a package the module
+// imports it from declares, or else one of the compilation unit written before
+// the reference. Nothing where neither is.
+static std::optional<DataType> OuterValueType(std::string_view name,
+                                              const TypeRefScope& scope) {
+  const PackageDecl* pkg =
+      PackageDeclaring(scope.unit, name, [&](std::string_view package) {
         return ImportsFrom(*scope.mod, package, name);
       });
-  if (imported != nullptr) return imported;
-  return ItemNamed(UnitItemsBefore(scope.unit, scope.reference), name);
+  const std::vector<ModuleItem*> kItems =
+      pkg != nullptr ? pkg->items
+                     : UnitItemsBefore(scope.unit, scope.reference);
+  const ModuleItem* item = ItemNamed(kItems, name);
+  if (item == nullptr) return std::nullopt;
+  return ScopeValueType(*item, kItems, scope.arena);
 }
 
 // §6.19: the named constant `name` of an enumeration the module sees, or null
@@ -334,11 +415,12 @@ static bool ResolveScopedTypeRef(DataType& dt, const Expr* ref,
     AdoptReferencedType(dt, *resolved);
     return true;
   }
-  const ModuleItem* item = PackageItemReached(
+  const PackageDecl* pkg = PackageDeclaring(
       scope.unit, ref->rhs->text,
       [&](std::string_view package) { return package == prefix; });
-  if (item == nullptr) return false;
-  AdoptReferencedType(dt, DeclaredValueType(*item, scope));
+  if (pkg == nullptr) return false;
+  AdoptReferencedType(dt, ScopeValueType(*ItemNamed(pkg->items, ref->rhs->text),
+                                         pkg->items, scope.arena));
   return true;
 }
 
@@ -348,7 +430,7 @@ static bool ResolveScopedTypeRef(DataType& dt, const Expr* ref,
 // range or of its final value. A built-in type keyword and a typedef name,
 // which the parser reads as identifiers, stand for the type they spell, a
 // typedef's left named for the declaration's own resolution of it. A value of a
-// package or of the compilation unit stands for its type (OuterValueNamed). A
+// package or of the compilation unit stands for its type (OuterValueType). A
 // name that is none of these leaves the reference as it stands, for the scope
 // rules to report.
 static void ResolveNamedTypeRef(DataType& dt, std::string_view name,
@@ -371,9 +453,9 @@ static void ResolveNamedTypeRef(DataType& dt, std::string_view name,
     AdoptReferencedType(dt, *own);
     return;
   }
-  const ModuleItem* outer = OuterValueNamed(name, scope);
-  if (outer == nullptr) return;
-  AdoptReferencedType(dt, DeclaredValueType(*outer, scope));
+  if (std::optional<DataType> outer = OuterValueType(name, scope)) {
+    AdoptReferencedType(dt, *outer);
+  }
 }
 
 // §6.23: resolves the type reference `dt` holds, if any, written at `loc` in
@@ -392,9 +474,10 @@ std::string_view Elaborator::ResolveTypeRef(DataType& dt, SourceLoc loc,
   const TypeRefScope kScope{mod, typedefs_, unit_, loc, arena_, decl};
   if (ResolveScopedTypeRef(dt, ref, kScope)) return {};
   if (ref->kind != ExprKind::kIdentifier) {
-    AdoptLogicVector(
-        dt, {InferTypeRefExprWidth(ref, mod), InferTypeRefExprSigned(ref, mod)},
-        arena_);
+    AdoptLogicVector(dt,
+                     {InferTypeRefExprWidth(ref, ShapesIn(mod)),
+                      InferTypeRefExprSigned(ref, ShapesIn(mod))},
+                     arena_);
     return {};
   }
   // A named constant of an enumeration stands for the enumeration's type. It
@@ -448,13 +531,7 @@ void ResolveScopeTypeRef(DataType& dt, const std::vector<ModuleItem*>& items,
     return;
   }
   if (item == nullptr) return;
-  // No module's values stand around the scope, so a parameter of no type takes
-  // the width of its value's literals alone (DeclaredValueType).
-  static const RtlirModule kNoModule{};
-  static const TypedefMap kNoTypedefs{};
-  const TypeRefScope kScope{&kNoModule, kNoTypedefs, nullptr,
-                            item->loc,  arena,       nullptr};
-  AdoptReferencedType(dt, DeclaredValueType(*item, kScope));
+  AdoptReferencedType(dt, ScopeValueType(*item, items, arena));
 }
 
 // The class a name reaches, or nothing when the answer is not clear.
