@@ -260,9 +260,12 @@ VpiBuiltInHolder ModuleHolder(const RtlirVariable& var) {
   if (var.num_unpacked_dims > 0) return VpiBuiltInHolder::kFixedArray;
   if (var.is_string) return VpiBuiltInHolder::kString;
   // An enum declared without a typedef is keyed by its declaration's name
-  // (SetEnumTypeInfo), so every enum variable names an enumeration.
-  return var.enum_type_name.empty() ? VpiBuiltInHolder::kNone
-                                    : VpiBuiltInHolder::kEnum;
+  // (SetEnumTypeInfo), so every enum variable names an enumeration. One of an
+  // enumeration's named constants is a value of it too (§6.19), though the
+  // elaborator records no enumeration on its storage.
+  return var.enum_type_name.empty() && !var.is_enum_constant
+             ? VpiBuiltInHolder::kNone
+             : VpiBuiltInHolder::kEnum;
 }
 
 // §25.9: the interface a value declared with `type` refers to an instance of,
@@ -470,7 +473,9 @@ CallShape InterfaceCallShape(const BodyWalk& walk, std::string_view iface,
 // §37.42: a method task or method function call, applied through `access`,
 // which joins two names, to a variable of the scope the call stands in: a
 // class var, whose class says what the method is, or a string, an enum or an
-// unpacked array, whose built-in methods are functions no design declares.
+// unpacked array, whose built-in methods are functions no design declares. The
+// elaborator reports a name that is no built-in method of the variable's kind
+// (§6.16, §6.19.5, §7.12).
 CallShape MethodCallShape(const Expr& access, const BlockParent& parent,
                           const BodyWalk& walk) {
   const PrefixVar kVar = FindPrefixVar(parent, access.lhs->text, walk);
@@ -480,7 +485,7 @@ CallShape MethodCallShape(const Expr& access, const BlockParent& parent,
   MethodCall call;
   if (kVar.holder == VpiBuiltInHolder::kNone) {
     call = ClassMethodCall(walk, kVar.cls, access.rhs->text, {}, kVar.args);
-  } else if (VpiIsBuiltInMethod(kVar.holder, access.rhs->text)) {
+  } else {
     call.type = vpiMethodFuncCall;
   }
   return MethodShape(call, access.rhs->text, kVar.object, parent.scope, walk);
@@ -765,7 +770,9 @@ CallShape ExprCallShape(const Expr& access, const BlockParent& parent,
 // built-in methods of the member itself, h.x.rand_mode(0) or
 // h.c.constraint_mode(0) (§18.8, §18.9). A member that is a string, an enum or
 // an unpacked array takes the built-in methods of its kind instead,
-// s.q.delete() or h.q.size() (§37.42 details 2 and 11).
+// s.q.delete() or h.q.size() (§37.42 details 2 and 11). No chain starts from a
+// string, an enum or an array variable, none of which has members: the
+// elaborator reports the member it selects (§6.16, §6.19.5, §7.12).
 CallShape MemberChainCallShape(const Expr& access, const BlockParent& parent,
                                const BodyWalk& walk) {
   std::vector<std::string_view> names;
@@ -773,7 +780,6 @@ CallShape MemberChainCallShape(const Expr& access, const BlockParent& parent,
     return ExprCallShape(access, parent, walk);
   }
   const ChainHead kHead = ChainHeadVar(names, parent, walk);
-  if (kHead.var.holder != VpiBuiltInHolder::kNone) return {};
   const BodyWalk kAt = kHead.WalkAt(walk);
   HandleType type{kHead.var.cls, kHead.var.vif, kHead.var.args};
   VpiObject* prefix = kHead.var.object;

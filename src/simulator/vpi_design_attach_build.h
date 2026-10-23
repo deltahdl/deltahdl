@@ -537,12 +537,6 @@ enum class VpiBuiltInHolder : uint8_t {
   kQueue,
 };
 
-// Whether `method` is one of the built-in methods of a value of `holder`'s
-// kind: §6.16's of a string, §6.19.5's of an enum, §7.5's of a dynamic array,
-// §7.9's of an associative array, §7.10.2's of a queue, and §7.12's of any
-// unpacked array but §7.12.2's ordering methods for an associative one.
-bool VpiIsBuiltInMethod(VpiBuiltInHolder holder, std::string_view method);
-
 // Whether `name` is a system function the standard defines, which a statement
 // calling it calls as a function.
 bool VpiIsBuiltInSystemFunction(std::string_view name);

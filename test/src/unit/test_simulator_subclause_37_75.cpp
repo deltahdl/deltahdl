@@ -560,6 +560,19 @@ TEST_F(DoWhileAndForeachLoopsOfARun,
   EXPECT_EQ(FirstLoopVarKinds(By("top.b")), (std::vector<int>{vpiByteVar}));
 }
 
+// §12.7.3 with §7.2: over a fixed-size array a structure member's own
+// structure member holds, s.inner.f, the index variable is an int var, as over
+// any fixed-size array.
+TEST_F(DoWhileAndForeachLoopsOfARun, ANestedStructMembersFixedArrayGivesInt) {
+  Run("module top;\n"
+      "  typedef struct { int f [2]; } in_t;\n"
+      "  typedef struct { in_t inner; } out_t;\n"
+      "  out_t s;\n"
+      "  initial begin : b foreach (s.inner.f[k]) begin end end\n"
+      "endmodule\n");
+  EXPECT_EQ(FirstLoopVarKinds(By("top.b")), (std::vector<int>{vpiIntVar}));
+}
+
 // §37.75: a null handle has no do-while condition.
 TEST_F(DoWhileForeach, DoWhileConditionOfANullHandleIsNull) {
   EXPECT_EQ(VpiDoWhileConditionExpr(nullptr), nullptr);

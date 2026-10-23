@@ -65,5 +65,20 @@ TEST_F(BuiltInCallsThroughMembers, AClassStringPropertyTakesStringMethods) {
   EXPECT_STREQ(vpi_get_str(vpiName, call), "len");
 }
 
+// An enumeration's named constant takes the enumeration's methods (§6.19.5)
+// as a variable of it does. The call, written in a void cast and with no label,
+// is the built-in method call it wraps, unnamed and no user's (§37.42 detail
+// 11), though the constant records no type of its own for the call's prefix.
+TEST_F(BuiltInCallsThroughMembers, AnEnumConstantTakesTheEnumsMethods) {
+  Run("module top; typedef enum {A, B} e_t;\n"
+      "  initial begin : b void'(A.name()); end\n"
+      "endmodule\n");
+  vpiHandle call = FirstStatement();
+  ASSERT_NE(call, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, call), vpiMethodFuncCall);
+  EXPECT_EQ(vpi_get_str(vpiName, call), nullptr);
+  EXPECT_EQ(vpi_get(vpiUserDefn, call), 0);
+}
+
 }  // namespace
 }  // namespace delta
