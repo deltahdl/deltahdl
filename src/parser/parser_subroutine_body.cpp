@@ -123,7 +123,10 @@ bool Parser::TryParseTfPortDeclaration(
   hdr.is_ref_static =
       (hdr.dir == Direction::kRef) && Match(TokenKind::kKwStatic);
   Match(TokenKind::kKwVar);
-  hdr.dt = ParseDataType();
+  // A.2.2.1 lets the data type be a type_identifier behind a package or class
+  // scope, `input pk::t x;`, which ParseDeclaredDataType reads past
+  // known_types_.
+  hdr.dt = ParseDeclaredDataType();
   // A.2.7's tf_port_declaration takes a data_type_or_implicit, and A.2.2.1's
   // implicit_data_type may be packed dimensions alone: `input [7:0] a;`
   // names no type and no signing, and ParseDataType leaves the range unread

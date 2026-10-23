@@ -918,9 +918,11 @@ void Parser::ParseNonAnsiPortDecls(ModuleDecl& mod,
 
   // Syntax 23-3 (§23.2.2.1, printed page 731): an input, output or ref
   // declaration may hold a variable_port_type, which A.2.2.1 lets open with
-  // `var` and an optional data type after it.
+  // `var` and an optional data type after it. A.2.2.1 lets that data type be
+  // a type_identifier behind a package or class scope, `input pk::t a;`,
+  // which ParseDeclaredDataType reads past known_types_.
   bool has_var = Match(TokenKind::kKwVar);
-  auto dtype = ParseDataType();
+  auto dtype = ParseDeclaredDataType();
   if (NonAnsiPortDeclIsNet(dir, dtype, has_var)) dtype.is_net = true;
 
   // A.2.2.1's implicit_data_type takes any number of packed dimensions, and

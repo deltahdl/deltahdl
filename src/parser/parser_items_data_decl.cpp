@@ -72,22 +72,6 @@ void Parser::ParseVarPrefixed(std::vector<ModuleItem*>& items, bool is_const) {
   }
 }
 
-// The type is read as ParseVarPrefixed reads a module item's. §8.5 puts no
-// restriction on a property's data type, so an inline enumeration, structure
-// or union and the package-scoped `pk::t` of §26.3 are read as a declaration's
-// type is; packed dimensions with no type before them are read only after
-// `var`, where footnote 14 of A.10 lets the type be implicit.
-DataType ParserDataDeclHelpers::ReadClassPropertyType(Parser& p) {
-  bool has_var = p.Match(TokenKind::kKwVar);
-  DataType dtype;
-  if (!p.TryParseInlineAggregateType(dtype)) dtype = p.ParseDeclaredDataType();
-  if (has_var && dtype.kind == DataTypeKind::kImplicit &&
-      p.Check(TokenKind::kLBracket)) {
-    p.ParsePackedDims(dtype);
-  }
-  return dtype;
-}
-
 // §6.8, footnote 14 of Syntax 6-3: a data declaration whose type is implicit,
 // written as a sign, a packed range or nothing at all behind `const`, declares
 // a variable only after `var`. A declaration that wrote `var` is read by
@@ -99,6 +83,32 @@ static void ReportImplicitTypeWithoutVar(const DataType& dtype, SourceLoc loc,
              "data_declaration without an explicit data type requires the "
              "'var' keyword",
              Subclause("6.8"));
+}
+
+// The type is read as ParseVarPrefixed reads a module item's. §8.5 puts no
+// restriction on a property's data type, so an inline enumeration, structure
+// or union and the package-scoped `pk::t` of §26.3 are read as a declaration's
+// type is, and packed dimensions with no type before them are read as an
+// implicit type. Footnote 14 of A.10 lets that implicit type stand only after
+// `var`, and without it the property is reported as a module item is. A name
+// followed by another is no implicit type but a type name the parse does not
+// know, and the property's own parse reports what it makes of it.
+DataType ParserDataDeclHelpers::ReadClassPropertyType(Parser& p) {
+  bool has_var = p.Match(TokenKind::kKwVar);
+  SourceLoc type_loc = p.CurrentLoc();
+  DataType dtype;
+  if (!p.TryParseInlineAggregateType(dtype)) dtype = p.ParseDeclaredDataType();
+  if (dtype.kind != DataTypeKind::kImplicit) return dtype;
+  if (p.Check(TokenKind::kLBracket)) p.ParsePackedDims(dtype);
+  if (has_var) return dtype;
+  auto saved = p.lexer_.SavePos();
+  p.Consume();
+  bool unknown_type_name = p.CheckIdentifier();
+  p.lexer_.RestorePos(saved);
+  if (!unknown_type_name) {
+    ReportImplicitTypeWithoutVar(dtype, type_loc, p.diag_);
+  }
+  return dtype;
 }
 
 void Parser::ParseTypedItemOrInst(std::vector<ModuleItem*>& items,

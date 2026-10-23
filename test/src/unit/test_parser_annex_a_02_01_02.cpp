@@ -226,6 +226,29 @@ TEST(PortDeclParsing, NonAnsiOutputVariablePortInitializer) {
   EXPECT_EQ(ports[2].default_value, nullptr);
 }
 
+// A body port declaration's net_port_type or variable_port_type takes a
+// data_type, which A.2.2.1 lets name a package's typedef through its scope,
+// with `var` before it or without.
+TEST(PortDeclParsing, BodyPortDeclarationOfAPackageScopedType) {
+  auto r = Parse(
+      "package pk;\n"
+      "  typedef logic [3:0] t;\n"
+      "endpackage\n"
+      "module m(a, b);\n"
+      "  input pk::t a;\n"
+      "  output var pk::t b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  const auto& ports = r.cu->modules[0]->ports;
+  ASSERT_EQ(ports.size(), 2u);
+  for (const auto& port : ports) {
+    EXPECT_EQ(port.data_type.scope_name, "pk");
+    EXPECT_EQ(port.data_type.type_name, "t");
+  }
+  EXPECT_TRUE(ports[1].has_explicit_var);
+}
+
 TEST(PortDeclParsing, ErrorInputMissingIdentifier) {
   // The port_identifier following the data type is required by
   // list_of_port_identifiers; the parser must reject input declarations that

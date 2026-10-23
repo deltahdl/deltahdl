@@ -53,7 +53,8 @@ struct ParserDataDeclHelpers {
 
   // Reads a class property's data type. A.1.9 makes the property a
   // data_declaration behind its qualifiers, which A.2.1.3 opens with an
-  // optional `var`; footnote 14 of A.10 lets the type after `var` be implicit.
+  // optional `var`; footnote 14 of A.10 lets the type after `var` be implicit,
+  // and an implicit type without it is reported under §6.8.
   static DataType ReadClassPropertyType(Parser& p);
 };
 

@@ -74,6 +74,31 @@ TEST(TaskDeclParsing, TaskBodyOldStyleMixedDirectionPorts) {
   EXPECT_EQ(item->func_args[1].direction, Direction::kOutput);
 }
 
+// A tf_port_declaration takes a data_type_or_implicit, and A.2.2.1 lets the
+// data type be a package's typedef named through its scope, which the port
+// then has.
+TEST(TaskDeclParsing, TaskBodyPortOfAPackageScopedType) {
+  auto r = Parse(
+      "package pk;\n"
+      "  typedef logic [3:0] t;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  task my_task;\n"
+      "    input pk::t a;\n"
+      "    output var pk::t b;\n"
+      "    b = a;\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_EQ(item->func_args.size(), 2u);
+  for (const auto& arg : item->func_args) {
+    EXPECT_EQ(arg.data_type.scope_name, "pk");
+    EXPECT_EQ(arg.data_type.type_name, "t");
+  }
+}
+
 // End label on the task_body_declaration alternative that has no parenthesized
 // tf_port_list. test_parser_subclause_13_03.cpp covers the empty-port-list
 // form.

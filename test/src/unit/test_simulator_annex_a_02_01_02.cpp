@@ -92,4 +92,33 @@ TEST(PortDeclSim, PortIdentifierListYieldsIndependentPorts) {
   LowerRunAndCheck(f, design, {{"rx", 7u}, {"ry", 9u}});
 }
 
+// A body port declaration and a function's body port declaration (A.2.7) take
+// a data_type, which A.2.2.1 lets name a package's typedef through its scope.
+// Each port is then pk::nib_t's four bits, so 4'hA crosses whole; a one-bit
+// port would carry its low bit, 0.
+TEST(PortDeclSim, BodyPortsOfAPackageScopedTypeCarryItsWidth) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "package pk;\n"
+      "  typedef logic [3:0] nib_t;\n"
+      "endpackage\n"
+      "module child(a, b);\n"
+      "  input pk::nib_t a;\n"
+      "  output pk::nib_t b;\n"
+      "  assign b = a;\n"
+      "endmodule\n"
+      "module t;\n"
+      "  logic [3:0] result;\n"
+      "  logic [3:0] passed;\n"
+      "  function automatic logic [3:0] pass;\n"
+      "    input pk::nib_t x;\n"
+      "    pass = x;\n"
+      "  endfunction\n"
+      "  child u(4'hA, result);\n"
+      "  initial passed = pass(4'hA);\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"result", 0xAu}, {"passed", 0xAu}});
+}
+
 }  // namespace

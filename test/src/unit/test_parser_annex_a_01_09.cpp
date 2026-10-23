@@ -8,6 +8,8 @@
 
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "fixture_parser.h"
 #include "helpers_reported_error.h"
 #include "parser/ast_class.h"
@@ -179,6 +181,49 @@ TEST(ClassItems, ClassPropertyWrittenWithVar) {
   EXPECT_NE(c->members[2]->data_type.packed_dim_left, nullptr);
   EXPECT_EQ(c->members[3]->name, "s");
   EXPECT_TRUE(c->members[3]->data_type.is_signed);
+}
+
+// Footnote 14 of A.10 has a data_declaration name its data type unless `var`
+// is written, and a class property is one, so a property of implicit type
+// written without `var` -- nothing at all, a signing, `const` alone or packed
+// dimensions alone -- draws the report a module item does.
+TEST(ClassItems, ClassPropertyOfImplicitTypeWithoutVarIsReported) {
+  auto r = Parse(
+      "class C;\n"
+      "  z;\n"
+      "  signed s;\n"
+      "  const k = 1;\n"
+      "  [7:0] w;\n"
+      "endclass\n");
+  for (uint32_t line : {2U, 3U, 4U, 5U}) {
+    EXPECT_TRUE(ReportedError(r.diags,
+                              "data_declaration without an explicit data type "
+                              "requires the 'var' keyword",
+                              line, "6.8"));
+  }
+}
+
+// The same properties stand written with `var` or with their type named.
+TEST(ClassItems, ClassPropertyOfImplicitTypeWithVarStands) {
+  auto r = Parse(
+      "class C;\n"
+      "  var z;\n"
+      "  var signed s;\n"
+      "  const int k = 1;\n"
+      "endclass\n");
+  EXPECT_FALSE(r.has_errors);
+}
+
+// A name followed by the property's name is a type the parse does not know
+// rather than an implicit type, so it draws its own error and no word of
+// `var`.
+TEST(ClassItems, ClassPropertyOfAnUnknownTypeNameDrawsNoVarReport) {
+  auto r = Parse(
+      "class C;\n"
+      "  nosuch_t h;\n"
+      "endclass\n");
+  EXPECT_TRUE(r.has_errors);
+  EXPECT_FALSE(ReportedError(r.diags, "requires the 'var' keyword", 2, "6.8"));
 }
 
 // --- property_qualifier ------------------------------------------------------
