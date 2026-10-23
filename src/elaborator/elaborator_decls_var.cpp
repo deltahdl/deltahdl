@@ -30,6 +30,7 @@
 #include "elaborator/net_data_type.h"
 #include "elaborator/nettype_uses.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_scopes.h"
 #include "elaborator/type_eval.h"
 #include "lexer/token.h"
 #include "parser/ast_design.h"
@@ -798,6 +799,25 @@ bool Elaborator::ElaborateUserNettypeNet(ModuleItem* item, RtlirModule* mod) {
   return true;
 }
 
+// What the variable `item` declares takes from the declaration as it was
+// written: where it stands, which the variable object reports through
+// vpiLineNo and vpiFile (§37.3.3); the kind it was declared with, and whether
+// that names a typedef of an unpacked array; its initializer; and the implicit
+// localparams of the loop generate blocks around it (§27.4).
+static void TakeWrittenFields(
+    const ModuleItem* item,
+    const std::unordered_map<std::string_view, std::vector<Expr*>>&
+        td_array_dims,
+    const GenBlockConsts& gen_loop_consts, RtlirVariable& var) {
+  var.loc = item->loc;
+  var.elem_type_kind = item->data_type.kind;
+  var.element.type_is_unpacked_array =
+      item->data_type.kind == DataTypeKind::kNamed &&
+      td_array_dims.contains(item->data_type.type_name);
+  var.init_expr = item->init_expr;
+  var.gen_block_consts = gen_loop_consts;
+}
+
 void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   // §27.4: the genvar serves as an integer during elaboration, to run the
   // generate loop and create its block instances, and does not exist at
@@ -864,9 +884,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
 
   RtlirVariable var;
   var.name = ScopedName(item->name);
-  // §37.3.3: where the declaration stands, which the variable object reports
-  // through vpiLineNo and vpiFile.
-  var.loc = item->loc;
+  TakeWrittenFields(item, td_array_dims_, gen_loop_consts_, var);
   // §7.2 with §8.4: a structure written in the declaration itself sizes its
   // members of a class type as the handles they hold, as a typedef's does.
   SizeClassHandleMembers(item->data_type, typedefs_, class_names_);
@@ -878,16 +896,8 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   var.is_signed = IsSignedType(item->data_type, typedefs_);
   var.is_signed =
       ReconcilePartialPort(item->name, var.is_signed, NetType::kNone, mod);
-  var.elem_type_kind = item->data_type.kind;
-  var.element.type_is_unpacked_array =
-      item->data_type.kind == DataTypeKind::kNamed &&
-      td_array_dims_.contains(item->data_type.type_name);
-  var.init_expr = item->init_expr;
-  var.gen_block_consts = gen_loop_consts_;
 
-  if (item->init_expr) {
-    var_init_names_.insert(var.name);
-  }
+  if (item->init_expr) var_init_names_.insert(var.name);
 
   SetVariableTypeInfo(item, var, BuildParamScope(mod));
   NameAdoptedArrayTypedef(item, adopted_array_typedef, var);
