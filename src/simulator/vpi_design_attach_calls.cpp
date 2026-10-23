@@ -407,15 +407,13 @@ CallShape MethodCallShape(const Expr& access, const BlockParent& parent,
   return MethodShape(call, access.rhs->text, kVar.object, parent.scope, walk);
 }
 
-// §8.4 with §8.13: the member of kind `kind` named `name` the class `cls`, of
-// the package `package` where one is named, held under the specialization
-// `args`, or a class it extends (VpiBaseOf), declares; null where neither
-// does.
+// §8.4 with §8.13: the member of kind `kind` named `name` the class `held`
+// names, of the package `package` where one is named, held under its
+// specialization, or a class it extends (VpiBaseOf), declares; null where
+// neither does.
 const ClassMember* MemberNamed(const BodyWalk& walk, ClassMemberKind kind,
-                               std::string_view cls, std::string_view name,
-                               std::string_view package = {},
-                               std::span<const DataType> args = {}) {
-  VpiHeldClass held{cls, args};
+                               VpiHeldClass held, std::string_view name,
+                               std::string_view package = {}) {
   for (const ClassDecl* decl = VpiFindClassDecl(walk, held.name, package).decl;
        decl != nullptr;
        decl = VpiFindClassDecl(walk, held.name, package).decl) {
@@ -448,10 +446,10 @@ HandleType PropertyType(const BodyWalk& walk, std::string_view cls,
                         std::string_view name, std::string_view package = {},
                         std::span<const DataType> args = {}) {
   const ClassMember* member =
-      MemberNamed(walk, ClassMemberKind::kProperty, cls, name, package, args);
+      MemberNamed(walk, ClassMemberKind::kProperty, {cls, args}, name, package);
   if (member == nullptr) {
-    const bool kEmbedded = MemberNamed(walk, ClassMemberKind::kCovergroup, cls,
-                                       name, package, args) != nullptr;
+    const bool kEmbedded = MemberNamed(walk, ClassMemberKind::kCovergroup,
+                                       {cls, args}, name, package) != nullptr;
     return kEmbedded ? HandleType{{}, {}, {}, VpiBuiltInHolder::kCovergroup}
                      : HandleType{};
   }
@@ -535,8 +533,8 @@ int MemberIndexKind(const Expr& array, const BlockParent& parent,
   for (std::size_t i = first; i + 1 < names.size(); ++i) {
     held = PropertyType(kAt, held.cls, names[i], {}, held.args);
   }
-  const ClassMember* member = MemberNamed(
-      kAt, ClassMemberKind::kProperty, held.cls, names.back(), {}, held.args);
+  const ClassMember* member = MemberNamed(kAt, ClassMemberKind::kProperty,
+                                          {held.cls, held.args}, names.back());
   return member == nullptr ? vpiIntVar
                            : FirstDimIndexKind(member->unpacked_dims, kAt);
 }
