@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 4b8a993c-534c-43f4-83e5-0185606256e0
-  modified: 2026-10-17T00:54:09.672Z
+  modified: 2026-10-23T13:57:21.912Z
 ---
 
 # Fixing a red run after a push
@@ -14,4 +14,4 @@ When the CI run a push starts goes red, the session that pushed fixes it, whethe
 
 **Why:** A change is unverified until the jobs that build and test have actually run, and a conclusion of `failure` reads the same whether the change broke something or inherited a break. A skipped job reports neither pass nor fail. So an inherited failure hides the change's own result for as long as it stands, and the session that pushed is the one whose change is left unverified.
 
-**How to apply:** Once the push's run has completed, `gh run view --log-failed` tells a break the change caused from one it inherited ([[reading-a-ci-run]]). Fix both kinds — see [solving-what-a-session-finds](solving-what-a-session-finds.md). A failing `sv-tests-coverage` job in `.github/workflows/deltahdl.yml` is no exception. A failing `assert-coverage` job is the exception: its uncovered lines and branches are already filed, one issue per file, under titles beginning `assert-coverage:`, so a run whose only failed job is `assert-coverage` is not a red run to fix before the next batch. Unless the push's own change left new uncovered code, take the next batch. The fix goes in a push of its own, before the next batch of issues ([[grouping-issues-into-a-push]]). Pushed together, a second red run could not say whether the fix or the batch broke it.
+**How to apply:** Once the push's run has completed, `gh run view --log-failed` tells a break the change caused from one it inherited ([[reading-a-ci-run]]). Fix both kinds — see [solving-what-a-session-finds](solving-what-a-session-finds.md). A failing `sv-tests-coverage` job in `.github/workflows/deltahdl.yml` is no exception. A failing `assert-coverage` job is the exception: its uncovered lines and branches are already filed under titles beginning `assert-coverage:` — one issue per directory for `src/elaborator`, `src/parser`, `src/synthesizer` and `src/preprocessor`, one per file elsewhere, and a file whose gap has neither gets one filed in the per-file form — so a run whose only failed job is `assert-coverage` is not a red run to fix before the next batch. Unless the push's own change left new uncovered code, take the next batch. The fix goes in a push of its own, before the next batch of issues ([[grouping-issues-into-a-push]]). Pushed together, a second red run could not say whether the fix or the batch broke it.
