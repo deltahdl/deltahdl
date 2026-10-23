@@ -257,6 +257,23 @@ TEST(StringMethodReceivers, AStringPropertyOfACallsResultTakesStringMethods) {
             "2 XYZ 7\n");
 }
 
+// §6.18 with §6.16: a property declared through a typedef of the string type
+// is a string, whose methods read its text through a call's result and
+// through a handle alike (#7746).
+TEST(StringMethodReceivers, AStringTypedefPropertyTakesStringMethods) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  typedef string str_t;\n"
+                       "  class K; str_t u = \"xyz\"; endclass\n"
+                       "  K k = new;\n"
+                       "  function K f(); return k; endfunction\n"
+                       "  initial $display(\"%s %s\", f().u.toupper(),\n"
+                       "                   k.u.toupper());\n"
+                       "endmodule\n",
+                       f),
+            "XYZ XYZ\n");
+}
+
 // §8.6: a class's own methods are its own whatever they are named, so `len`
 // and `substr` declared by the class run as the class's methods on a handle,
 // on a property holding a handle and through the class scope; a dispatcher

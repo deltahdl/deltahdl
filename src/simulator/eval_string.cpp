@@ -479,10 +479,11 @@ static bool ExtractScopedStringMethodParts(const Expr* expr, std::string& key,
 // §7.4 with §8.5: what the nearest declaration of the property `name` on the
 // class chain from `type` writes of its shape: whether an unpacked dimension
 // -- fixed-size, dynamic, queue or associative -- on itself or on the typedef
-// its type names (PropertyTypedefItem), which makes it an array rather than
-// one value, and, §6.18, whether that typedef's element type is string,
-// `typedef string sq_t[$]` for a property `sq_t tq`, whose own type is the
-// typedef's name.
+// its type names (PropertyNamedTypedef), which makes it an array rather than
+// one value, and, §6.18, whether that typedef's type is string, the array's
+// element type where the typedef writes a dimension, `typedef string sq_t[$]`
+// for a property `sq_t tq`, and the property's own where it writes none,
+// `typedef string str_t` for `str_t u`, whose own type is the typedef's name.
 struct PropertyShape {
   bool is_array = false;
   bool typedef_holds_strings = false;
@@ -495,7 +496,7 @@ static PropertyShape PropertyShapeOf(const ClassTypeInfo* type,
     for (const ClassMember* member : t->decl->members) {
       if (member->kind != ClassMemberKind::kProperty || member->name != name)
         continue;
-      const ModuleItem* item = PropertyTypedefItem(member, t, ctx);
+      const ModuleItem* item = PropertyNamedTypedef(member, t, ctx);
       PropertyShape shape;
       shape.is_array =
           !(item != nullptr ? item->unpacked_dims : member->unpacked_dims)

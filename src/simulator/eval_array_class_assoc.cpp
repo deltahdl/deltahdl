@@ -235,13 +235,19 @@ static const DataType* PropertyWrittenType(const ClassMember* member,
   return SpecializationTypeActual(declaring, type.type_name);
 }
 
-const ModuleItem* PropertyTypedefItem(const ClassMember* member,
-                                      const ClassTypeInfo* declaring,
-                                      SimContext& ctx) {
+const ModuleItem* PropertyNamedTypedef(const ClassMember* member,
+                                       const ClassTypeInfo* declaring,
+                                       SimContext& ctx) {
   if (!member->unpacked_dims.empty()) return nullptr;
   const DataType* type = PropertyWrittenType(member, declaring);
   if (type == nullptr) return nullptr;
-  const ModuleItem* item = TypedefItemSeenFrom(*type, declaring, ctx);
+  return TypedefItemSeenFrom(*type, declaring, ctx);
+}
+
+const ModuleItem* PropertyTypedefItem(const ClassMember* member,
+                                      const ClassTypeInfo* declaring,
+                                      SimContext& ctx) {
+  const ModuleItem* item = PropertyNamedTypedef(member, declaring, ctx);
   if (item == nullptr || item->unpacked_dims.empty()) return nullptr;
   return item;
 }

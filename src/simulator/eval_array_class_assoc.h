@@ -33,10 +33,17 @@ const ModuleItem* TypedefItemSeenFrom(const DataType& type,
                                       const ClassTypeInfo* from,
                                       SimContext& ctx);
 
+// §6.18 with §8.5: the typedef the type of the property `member` of
+// `declaring` names (TypedefItemSeenFrom), a type parameter standing for its
+// specialization's actual, where the declaration writes no unpacked dimension
+// of its own; null otherwise.
+const ModuleItem* PropertyNamedTypedef(const ClassMember* member,
+                                       const ClassTypeInfo* declaring,
+                                       SimContext& ctx);
+
 // §7.4.4 with §8.5: the typedef that gives the property `member` of
-// `declaring` its unpacked dimensions -- the one its type names
-// (TypedefItemSeenFrom) where the declaration writes none of its own and the
-// typedef writes some; null otherwise.
+// `declaring` its unpacked dimensions -- the one PropertyNamedTypedef finds,
+// where it writes some; null otherwise.
 const ModuleItem* PropertyTypedefItem(const ClassMember* member,
                                       const ClassTypeInfo* declaring,
                                       SimContext& ctx);
