@@ -362,8 +362,11 @@ bool TryEvalProcessMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
     return true;
   }
   if (method == "get_randstate") {
-    // §18.13.4 via §9.7: retrieve the process RNG state as a string.
+    // §18.13.4 via §9.7: retrieve the process RNG state as a string, marked
+    // one so that it takes the string methods (§6.16),
+    // p.get_randstate().len().
     out = StringToLogic4Vec(arena, proc ? ctx.GetRandState(proc) : "");
+    out.is_string = true;
     return true;
   }
   if (method == "set_randstate") {

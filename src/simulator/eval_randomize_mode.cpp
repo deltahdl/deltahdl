@@ -669,8 +669,10 @@ bool TryEvalObjectGetRandState(const Expr* expr, SimContext& ctx, Arena& arena,
   // §18.13.4: return the object's current RNG state as a string. The state is
   // of implementation-dependent length and format; here it is the mt19937
   // serialization, packed so it round-trips through a string-typed variable and
-  // back into set_randstate().
+  // back into set_randstate(). Marked a string, the value takes the string
+  // methods (§6.16) where one is applied to it, k.get_randstate().len().
   out = StringToLogic4Vec(arena, ctx.GetRandState(obj));
+  out.is_string = true;
   return true;
 }
 

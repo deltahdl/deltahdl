@@ -48,18 +48,21 @@ class MethodCallsOnValues : public VpiDesignRun {
   }
 };
 
-// §9.7 and §6.16: a built-in method's result takes the built-in methods of its
-// kind, the enumeration process::status() returns and the string toupper()
-// returns (#7719).
+// §9.7, §6.16 and §18.13.4: a built-in method's result takes the built-in
+// methods of its kind, the enumeration process::status() returns and the
+// string toupper() and a class's get_randstate() return (#7719, #7732).
 TEST_F(MethodCallsOnValues, ABuiltInMethodsResultTakesTheMethodsOfItsKind) {
   Run("module top; process p; string s = \"ab\";\n"
+      "  class K; endclass\n"
+      "  K k = new;\n"
       "  initial begin : b\n"
       "    p = process::self();\n"
       "    void'(p.status().name());\n"
       "    void'(s.toupper().len());\n"
+      "    void'(k.get_randstate().len());\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_EQ(BuiltInCallsOfTheBlock(), 2U);
+  EXPECT_EQ(BuiltInCallsOfTheBlock(), 3U);
 }
 
 // §13.4: the string a function or a class's method is declared to return takes

@@ -121,4 +121,27 @@ TEST(GetRandstateRun, TheStateIsReadAndReplayedThroughAHeldHandle) {
   EXPECT_EQ(out, "1 4\n");
 }
 
+// §18.13.4 with §6.16: get_randstate() returns a string, so the string methods
+// apply to its result directly, an object's and a process's alike, reading
+// the length of the state a string variable holds once assigned it (#7732).
+TEST(GetRandstateRun, TheReturnedStateTakesStringMethods) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  class K; endclass\n"
+                 "  K k = new;\n"
+                 "  process p;\n"
+                 "  string s, t;\n"
+                 "  initial begin\n"
+                 "    p = process::self();\n"
+                 "    s = k.get_randstate(); t = p.get_randstate();\n"
+                 "    $display(\"%0d %0d\",\n"
+                 "      s.len() > 0 && k.get_randstate().len() == s.len(),\n"
+                 "      t.len() > 0 && p.get_randstate().len() == t.len());\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "1 1\n");
+}
+
 }  // namespace
