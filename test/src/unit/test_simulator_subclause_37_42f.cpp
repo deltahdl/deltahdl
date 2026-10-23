@@ -141,6 +141,25 @@ TEST_F(MethodCallsOnValues, APackagesVariableTakesTheMethodsOfItsKind) {
   EXPECT_EQ(BuiltInCallsOfTheBlock(), 3U);
 }
 
+// §19.8: a covergroup instance has its predefined methods built in, whether a
+// variable of the module, one a block declares, or a class property selected
+// through a handle holds it (#7740).
+TEST_F(MethodCallsOnValues, ACovergroupInstanceTakesItsPredefinedMethods) {
+  Run("module top;\n"
+      "  covergroup cg_t; endgroup\n"
+      "  class C; cg_t cg; function new(); cg = new; endfunction endclass\n"
+      "  cg_t cg = new;\n"
+      "  C h = new;\n"
+      "  initial begin : b\n"
+      "    automatic cg_t local_cg = new;\n"
+      "    cg.sample();\n"
+      "    local_cg.sample();\n"
+      "    h.cg.sample();\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_EQ(BuiltInCallsOfTheBlock(), 3U);
+}
+
 // §11.3.6 with A.8.4: an assignment in parentheses, ((h = g)), is a handle of
 // its left-hand side's class (#7720).
 TEST_F(MethodCallsOnValues, AParenthesizedAssignmentTakesItsTargetsMethods) {

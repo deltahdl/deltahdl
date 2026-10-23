@@ -6,6 +6,7 @@
 #include <utility>
 #include <vector>
 
+#include "elaborator/covergroup_variables.h"
 #include "elaborator/queue_dim.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast_class.h"
@@ -135,11 +136,22 @@ VpiBuiltInHolder DeclaredHolder(const std::vector<Expr*>& dims, int kind,
   return kind == vpiEnumVar ? VpiBuiltInHolder::kEnum : VpiBuiltInHolder::kNone;
 }
 
-// The same of the variable a block declares with `decl`, its type written
-// directly or through a typedef.
+// The same of a declaration with the unpacked dimensions `dims` and the type
+// `type`, written directly or through a typedef, whose instance of a
+// covergroup the module sees has the methods of §19.8 built in.
+VpiBuiltInHolder TypedHolder(const std::vector<Expr*>& dims,
+                             const DataType& type, const BodyWalk& walk) {
+  if (dims.empty() && type.kind == DataTypeKind::kNamed &&
+      VisibleCovergroup(type.type_name, &walk.mod,
+                        walk.design.compilation_unit) != nullptr) {
+    return VpiBuiltInHolder::kCovergroup;
+  }
+  return DeclaredHolder(dims, TypeVariableKind(type, walk), walk);
+}
+
+// The same of the variable a block declares with `decl`.
 VpiBuiltInHolder BlockHolder(const Stmt& decl, const BodyWalk& walk) {
-  return DeclaredHolder(decl.var_unpacked_dims,
-                        TypeVariableKind(decl.var_decl_type, walk), walk);
+  return TypedHolder(decl.var_unpacked_dims, decl.var_decl_type, walk);
 }
 
 // The same, of a variable of the instance's module.
@@ -149,6 +161,7 @@ VpiBuiltInHolder ModuleHolder(const RtlirVariable& var) {
   if (var.is_assoc) return VpiBuiltInHolder::kAssocArray;
   if (var.num_unpacked_dims > 0) return VpiBuiltInHolder::kFixedArray;
   if (var.is_string) return VpiBuiltInHolder::kString;
+  if (var.covergroup != nullptr) return VpiBuiltInHolder::kCovergroup;
   // An enum declared without a typedef is keyed by its declaration's name
   // (SetEnumTypeInfo), so every enum variable names an enumeration. One of an
   // enumeration's named constants is a value of it too (§6.19), though the
@@ -440,8 +453,7 @@ HandleType PropertyType(const BodyWalk& walk, std::string_view cls,
   return {
       type.kind == DataTypeKind::kNamed ? type.type_name : std::string_view(),
       VifInterface(&type), type.type_params,
-      DeclaredHolder(member->unpacked_dims, TypeVariableKind(type, walk),
-                     walk)};
+      TypedHolder(member->unpacked_dims, type, walk)};
 }
 
 // §7.2 with §8.4: the class the member `name` of the structure `aggregate`
