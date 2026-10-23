@@ -62,6 +62,7 @@ TEST(ClockingSkewConstExpr, LocalparamSkewElaborates) {
 // §14.4: a constant function call (§11.2.1) is a constant expression, hence a
 // legal skew. The call cannot always be folded to an integer at this check, so
 // the rule must accept it as constant rather than rejecting it as non-constant.
+// A call is no delay_value (A.2.2.3), so the skew writes it in parentheses.
 TEST(ClockingSkewConstExpr, ConstantFunctionCallSkewElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -70,7 +71,7 @@ TEST(ClockingSkewConstExpr, ConstantFunctionCallSkewElaborates) {
              "  endfunction\n"
              "  logic clk, data;\n"
              "  clocking cb @(posedge clk);\n"
-             "    input #getskew() data;\n"
+             "    input #(getskew()) data;\n"
              "  endclocking\n"
              "endmodule\n"));
 }

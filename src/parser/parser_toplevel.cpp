@@ -1,3 +1,5 @@
+#include <algorithm>
+#include <cctype>
 #include <cstddef>
 #include <cstdint>
 #include <utility>
@@ -406,6 +408,57 @@ static bool IsStrength1Token(TokenKind k) {
   }
 }
 
+// A.2.2.3 (printed page 1184): whether `delay`, read after `#` with no
+// parenthesis, has one of delay_value's forms: an unsigned_number, decimal
+// digits alone; a real_number or a time_literal; or a ps_identifier, a name
+// alone or behind one package scope, `p::` or `$unit::` (A.9.3). The fifth
+// form, 1step, is read by the sites that take it before they come here.
+static bool IsDelayValueForm(const Expr* delay) {
+  switch (delay->kind) {
+    case ExprKind::kIntegerLiteral:
+      return std::ranges::all_of(delay->text, [](char c) {
+        return std::isdigit(static_cast<unsigned char>(c)) != 0 || c == '_';
+      });
+    case ExprKind::kRealLiteral:
+    case ExprKind::kTimeLiteral:
+      return true;
+    case ExprKind::kIdentifier:
+      return delay->scope_prefix.empty() || delay->scope_prefix == "$unit";
+    case ExprKind::kMemberAccess:
+      return delay->is_scope_resolution &&
+             delay->lhs->kind == ExprKind::kIdentifier &&
+             delay->lhs->scope_prefix.empty();
+    default:
+      return false;
+  }
+}
+
+// A.2.2.3: the delay_value written after `#` with no parenthesis, where A.6.5's
+// delay_control, A.6.11's clocking_skew and every delay2 and delay3 have one.
+// Any other expression is written in parentheses, `# ( mintypmax_expression )`,
+// so one standing here is reported, and read on as far as its selects and
+// member names so that the construct after it still parses. A name stops at
+// a parenthesis, which after `#d` opens what the delay governs, the terminals
+// of a gate instance written with no name (A.3.1).
+Expr* Parser::ParseDelayValue() {
+  SourceLoc loc = CurrentLoc();
+  Expr* delay = nullptr;
+  if (CheckIdentifier()) {
+    delay = ParseMemberAccessChain(Consume());
+    while (AtSelectBracket()) delay = ParseSelectExpr(delay);
+  } else {
+    delay = ParsePrimaryExpr();
+  }
+  if (!IsDelayValueForm(delay)) {
+    diag_.Error(loc,
+                "a delay written after '#' without parentheses is a number, "
+                "a real number, a time literal, 1step or a name behind at "
+                "most one package scope; write this one in parentheses",
+                Subclause("A.2.2.3"));
+  }
+  return delay;
+}
+
 void Parser::ParseGateDelay(Expr*& d1, Expr*& d2, Expr*& d3) {
   if (!Check(TokenKind::kHash)) return;
   Consume();
@@ -429,10 +482,10 @@ void Parser::ParseGateDelay(Expr*& d1, Expr*& d2, Expr*& d3) {
       d1->range.start = one_tok.loc;
     } else {
       lexer_.RestorePos(saved);
-      d1 = ParsePrimaryExpr();
+      d1 = ParseDelayValue();
     }
   } else {
-    d1 = ParsePrimaryExpr();
+    d1 = ParseDelayValue();
   }
 }
 

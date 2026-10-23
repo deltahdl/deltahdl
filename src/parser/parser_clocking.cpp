@@ -69,10 +69,10 @@ void Parser::ParseClockingSkew(Edge& edge, Expr*& delay) {
         delay->range.start = one_tok.loc;
       } else {
         lexer_.RestorePos(saved);
-        delay = ParsePrimaryExpr();
+        delay = ParseDelayValue();
       }
     } else {
-      delay = ParsePrimaryExpr();
+      delay = ParseDelayValue();
     }
   }
 }

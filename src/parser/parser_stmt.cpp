@@ -357,7 +357,7 @@ Stmt* Parser::ParseNbEventTriggerStmt() {
       s->delay = ParseMinTypMaxExpr();
       Expect(TokenKind::kRParen, Subclause("15.5.1"));
     } else {
-      s->delay = ParsePrimaryExpr();
+      s->delay = ParseDelayValue();
     }
   } else if (Check(TokenKind::kKwRepeat)) {
     Consume();
@@ -596,7 +596,7 @@ void Parser::ParseIntraAssignTiming(Stmt* stmt) {
       stmt->delay = ParseMinTypMaxExpr();
       Expect(TokenKind::kRParen, Subclause("9.4.5"));
     } else {
-      stmt->delay = ParsePrimaryExpr();
+      stmt->delay = ParseDelayValue();
     }
   } else if (Check(TokenKind::kAt)) {
     Consume();
@@ -748,7 +748,7 @@ Stmt* Parser::ParseDelayStmt() {
     stmt->delay = ParseMinTypMaxExpr();
     Expect(TokenKind::kRParen, Subclause("9.4.1"));
   } else {
-    stmt->delay = ParsePrimaryExpr();
+    stmt->delay = ParseDelayValue();
   }
   stmt->body = ParseStmt();
   return stmt;
