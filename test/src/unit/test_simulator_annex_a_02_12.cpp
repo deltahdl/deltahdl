@@ -123,4 +123,19 @@ TEST(LetSim, NamedActualsBindByName) {
   LowerRunAndCheck(f, design, {{"x", 20u}});
 }
 
+// A.2.12's let_formal_type may be a type_reference (§6.23): a is x's int, so
+// f(-5) is -4, where a one-bit formal would narrow -5 to 1 and give 2.
+TEST(LetSim, FormalOfATypeReferenceTakesTheReferencedType) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int x;\n"
+      "  let f(type(x) a) = a + 1;\n"
+      "  int r;\n"
+      "  initial r = f(-5);\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"r", 0xFFFFFFFCu}});
+}
+
 }  // namespace

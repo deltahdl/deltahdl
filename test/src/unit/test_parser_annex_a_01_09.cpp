@@ -230,6 +230,35 @@ TEST(ClassItems, ClassPropertyOfAnUnknownTypeNameDrawsNoVarReport) {
   }
 }
 
+// A.2.2.1 counts a type_reference among the data types, which a property, a
+// variable, writes after `var` (§6.23), held for the elaborator to resolve;
+// one written without it is reported as a module's variable is.
+TEST(ClassItems, ClassPropertyOfATypeReferenceAfterVarStands) {
+  auto r = Parse(
+      "class C;\n"
+      "  int x;\n"
+      "  var type(x) w;\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+  const ClassDecl* c = FirstClass(r);
+  ASSERT_NE(c, nullptr);
+  ASSERT_EQ(c->members.size(), 2u);
+  EXPECT_EQ(c->members[1]->name, "w");
+  EXPECT_NE(c->members[1]->data_type.type_ref_expr, nullptr);
+}
+
+TEST(ClassItems, ClassPropertyOfATypeReferenceWithoutVarIsReported) {
+  auto r = Parse(
+      "class C;\n"
+      "  int x;\n"
+      "  type(x) bad;\n"
+      "endclass\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "type_reference in a variable declaration must be "
+                            "preceded by the 'var' keyword",
+                            3, "6.8"));
+}
+
 // --- property_qualifier ------------------------------------------------------
 // property_qualifier ::= random_qualifier | class_item_qualifier. Both branches
 // can prefix a single data_declaration property.

@@ -421,44 +421,85 @@ using ModuleTypeRefResolver = std::function<void(DataType&, SourceLoc)>;
 // enclosing it, or as a formal of the subroutine, hides the module's, and v
 // takes that declaration's type and unpacked dimensions; any other reference
 // is resolved as a module item's is. `locals` holds the procedure's names in
-// declaration order, and a block's own are dropped when the walk leaves it.
+// declaration order.
+void ResolveLocalTypeRef(DataType& dt, std::vector<Expr*>* unpacked_dims,
+                         SourceLoc loc,
+                         const std::vector<ProceduralLocal>& locals,
+                         const ModuleTypeRefResolver& resolve_module_ref) {
+  const Expr* ref = dt.type_ref_expr;
+  if (ref == nullptr) return;
+  auto local = std::find_if(
+      locals.rbegin(), locals.rend(), [&](const ProceduralLocal& l) {
+        return ref->kind == ExprKind::kIdentifier && l.name == ref->text;
+      });
+  if (local == locals.rend()) {
+    resolve_module_ref(dt, loc);
+    return;
+  }
+  dt = *local->type;
+  if (unpacked_dims != nullptr && unpacked_dims->empty())
+    *unpacked_dims = *local->unpacked_dims;
+}
+
+// §6.23 with §12.7.1: the variables the header of `s`, where it is a for loop,
+// declares, each of whose type may be a type reference, resolved as a block's
+// declaration's is and then in scope for the loop's own statements. An
+// initialization whose type is implicit assigns a variable declared elsewhere.
+void DeclareForLoopLocals(Stmt* s, std::vector<ProceduralLocal>& locals,
+                          const ModuleTypeRefResolver& resolve_module_ref) {
+  if (s->kind != StmtKind::kFor) return;
+  static const std::vector<Expr*> kNoUnpackedDims;
+  const size_t kCount = std::min(s->for_inits.size(), s->for_init_types.size());
+  for (size_t k = 0; k < kCount; ++k) {
+    const Stmt* init = s->for_inits[k];
+    DataType& type = s->for_init_types[k];
+    // A type reference declares the variable whatever it resolves to, an
+    // implicit type standing for logic in a variable's declaration.
+    if (type.type_ref_expr != nullptr) {
+      ResolveLocalTypeRef(type, nullptr, s->range.start, locals,
+                          resolve_module_ref);
+      if (type.kind == DataTypeKind::kImplicit)
+        type.kind = DataTypeKind::kLogic;
+    }
+    if (type.kind == DataTypeKind::kImplicit || init == nullptr ||
+        init->lhs == nullptr || init->lhs->kind != ExprKind::kIdentifier) {
+      continue;
+    }
+    locals.push_back({init->lhs->text, &type, &kNoUnpackedDims});
+  }
+}
+
+// Resolves the block type references of `s` and the statements it holds, with
+// `locals` the names in scope ahead of it; a block's own names, and a for
+// loop's, are dropped when the walk leaves it.
 void ResolveTypeRefsInStmt(Stmt* s, std::vector<ProceduralLocal>& locals,
                            const ModuleTypeRefResolver& resolve_module_ref) {
   if (s == nullptr) return;
   if (s->kind != StmtKind::kVarDecl) {
     const size_t kOuter = locals.size();
+    DeclareForLoopLocals(s, locals, resolve_module_ref);
     ForEachChildStmt(s, [&](Stmt* const& sub) {
       ResolveTypeRefsInStmt(sub, locals, resolve_module_ref);
     });
     locals.resize(kOuter);
     return;
   }
-  const Expr* ref = s->var_decl_type.type_ref_expr;
-  if (ref != nullptr) {
-    auto local = std::find_if(
-        locals.rbegin(), locals.rend(), [&](const ProceduralLocal& l) {
-          return ref->kind == ExprKind::kIdentifier && l.name == ref->text;
-        });
-    if (local == locals.rend()) {
-      resolve_module_ref(s->var_decl_type, s->range.start);
-    } else {
-      s->var_decl_type = *local->type;
-      if (s->var_unpacked_dims.empty()) {
-        s->var_unpacked_dims = *local->unpacked_dims;
-      }
-    }
-  }
+  ResolveLocalTypeRef(s->var_decl_type, &s->var_unpacked_dims, s->range.start,
+                      locals, resolve_module_ref);
   locals.push_back({s->var_name, &s->var_decl_type, &s->var_unpacked_dims});
 }
 
 // The procedures an item holds, an initial, final or always block's body and a
 // task's or function's, walked for §6.23's block type references with the
-// subroutine's formals as the first names in scope.
+// subroutine's formals as the first names in scope. A formal's own type may be
+// a type reference, to an earlier formal or to a name of the module.
 void ResolveProceduralTypeRefs(
     ModuleItem* item, const ModuleTypeRefResolver& resolve_module_ref) {
   std::vector<ProceduralLocal> locals;
   locals.reserve(item->func_args.size());
-  for (const auto& arg : item->func_args) {
+  for (auto& arg : item->func_args) {
+    ResolveLocalTypeRef(arg.data_type, &arg.unpacked_dims, item->loc, locals,
+                        resolve_module_ref);
     locals.push_back({arg.name, &arg.data_type, &arg.unpacked_dims});
   }
   ResolveTypeRefsInStmt(item->body, locals, resolve_module_ref);
@@ -525,7 +566,8 @@ std::string_view ModuleNameSpaceEntry(const ModuleItem* item) {
     case ModuleItemKind::kPropertyDecl:
       return item->name;
     case ModuleItemKind::kTypedef:
-      return item->typedef_type.kind == DataTypeKind::kImplicit
+      return item->typedef_type.kind == DataTypeKind::kImplicit &&
+                     item->typedef_type.type_ref_expr == nullptr
                  ? std::string_view{}
                  : item->name;
     case ModuleItemKind::kVarDecl:
@@ -864,7 +906,7 @@ bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
       mod->dpi_import_decls.push_back(item);
       return true;
     case ModuleItemKind::kLetDecl:
-      ValidateLetDecl(item);
+      ElaborateLetFormals(item, mod);
       let_names_.insert(item->name);
       mod->let_decls.push_back(item);
       // §37.12 with §27.4: a generate block instance's let is its gen

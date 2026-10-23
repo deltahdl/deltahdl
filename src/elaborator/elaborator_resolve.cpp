@@ -614,6 +614,7 @@ void Elaborator::RegisterCuScopeItems() {
   // values are converted to the types those name.
   RegisterClassTypedefs(unit_, typedefs_, td_array_dims_, arena_);
   RegisterClassParams(unit_, cu_param_scope_, arena_, diag_);
+  ResolvePropertyTypeRefs(unit_);
   // §13.3 with §7.2.1: after the two typedef registrations above, which are
   // what give the table the "pkg::T" and "Class::T" names a formal's member
   // may be written with; a package's and a compilation-unit class's

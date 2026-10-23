@@ -260,10 +260,7 @@ void Parser::ParseBlockDataDecl(std::vector<Stmt*>& stmts,
                   "preceded by the 'var' keyword",
                   Subclause("6.8"));
     }
-    Consume();
-    Expect(TokenKind::kLParen, Subclause("6.23"));
-    dtype.type_ref_expr = ParseExpr();
-    Expect(TokenKind::kRParen, Subclause("6.23"));
+    ParserDataDeclHelpers::ReadTypeReference(*this, dtype);
   } else if (!TryParseInlineAggregateType(dtype)) {
     dtype = ParseDeclaredDataType();
   }

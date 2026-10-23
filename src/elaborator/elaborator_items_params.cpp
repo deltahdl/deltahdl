@@ -464,6 +464,8 @@ void FoldParamUnpackedBounds(RtlirParamDecl& pd, const ScopeMap& scope) {
 }
 
 void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
+  // §6.23: `localparam type(x) P = -5;` is a value parameter of x's type.
+  ResolveTypeRef(item->data_type, item->loc, mod);
   bool is_type = item->data_type.kind == DataTypeKind::kVoid &&
                  item->typedef_type.kind != DataTypeKind::kImplicit;
   if (!is_type) {

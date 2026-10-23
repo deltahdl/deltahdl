@@ -10,6 +10,7 @@
 #include "parser/ast_type.h"
 #include "parser/param_port_list.h"
 #include "parser/parser.h"
+#include "parser/parser_data_decl_internal.h"
 
 namespace delta {
 
@@ -104,7 +105,8 @@ struct ParserParamPortHelpers {
       group.is_localparam = false;
       group.is_type = false;
     }
-    if (p.Match(TokenKind::kKwType)) {
+    if (!ParserDataDeclHelpers::AtTypeReference(p) &&
+        p.Match(TokenKind::kKwType)) {
       group.is_type = true;
     } else if (group.is_type && !AtContinuedTypeAssignment(p)) {
       group.is_type = false;
@@ -120,9 +122,14 @@ struct ParserParamPortHelpers {
   static void ParseValueParamPortDecl(Parser& p, ParamPortList& out,
                                       bool is_localparam_group) {
     // A.2.2.1 lets the type stand behind a package or class scope, which
-    // ParseDeclaredDataType reads past known_types_.
-    DataType dtype = p.ParseDeclaredDataType();
-    p.ParseImplicitParamRange(dtype);
+    // ParseDeclaredDataType reads past known_types_, or be a type_reference,
+    // `parameter type(W) V = -3` declaring a value parameter of W's type
+    // (§6.23).
+    DataType dtype;
+    if (!ParserDataDeclHelpers::ReadTypeReference(p, dtype)) {
+      dtype = p.ParseDeclaredDataType();
+      p.ParseImplicitParamRange(dtype);
+    }
     auto name = p.Expect(TokenKind::kIdentifier, Subclause("6.20.2"));
     if (p.Check(TokenKind::kLBracket)) {
       p.ParseUnpackedDims((*out.unpacked_dims)[name.text]);

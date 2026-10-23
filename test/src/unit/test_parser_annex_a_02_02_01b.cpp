@@ -139,4 +139,24 @@ TEST(NetAndVariableTypeParsing, MemberNamingItsDataTypeIsRead) {
   EXPECT_EQ(members[2].type_kind, DataTypeKind::kNamed);
 }
 
+// A.2.2.1's struct_union_member writes a data_type before the member's names,
+// and a type_reference is one (§6.23), kept whole on the member for the
+// elaborator to resolve. A member is neither a net nor a variable declaration,
+// so no keyword comes before it.
+TEST(NetAndVariableTypeParsing, StructureMemberOfATypeReference) {
+  auto r = Parse(
+      "module m;\n"
+      "  int x;\n"
+      "  struct { type(x) f; bit k; } s;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  const auto& members = r.cu->modules[0]->items[1]->data_type.struct_members;
+  ASSERT_EQ(members.size(), 2u);
+  EXPECT_EQ(members[0].name, "f");
+  ASSERT_NE(members[0].nested_type, nullptr);
+  EXPECT_NE(members[0].nested_type->type_ref_expr, nullptr);
+  EXPECT_EQ(members[1].name, "k");
+}
+
 }  // namespace

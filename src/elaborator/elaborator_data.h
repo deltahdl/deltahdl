@@ -427,8 +427,8 @@ class ElaboratorData {
   // besides (AddScopedCallFunctions), read only to infer a sensitivity list.
   InferenceFuncs inference_funcs_;
   // §23.8: the declarations of the modules being elaborated, outermost first
-  // and the one whose items are being elaborated last, which an upward or
-  // downward path a procedure calls a function by is resolved through.
+  // and the one whose header or items are in hand last, through which an upward
+  // or downward call path and a type reference's name (ResolveTypeRef) resolve.
   std::vector<const ModuleDecl*> module_decl_path_;
   // §6.14 with §35.5.5: the functions of the module declared to return a
   // chandle, native and imported, whose call is a chandle for the assignment

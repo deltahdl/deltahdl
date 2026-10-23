@@ -677,9 +677,9 @@ class Elaborator : public ElaboratorClassRules {
 
   void ValidateElabSystemTask(const ModuleItem* item, const RtlirModule* mod);
 
-  // §11.12: a typed let formal argument shall be `event` or one of the types
-  // allowed in §16.6.
-  void ValidateLetDecl(const ModuleItem* item);
+  // §11.12: resolves each let formal's type reference (§6.23) in `mod`, null
+  // at unit scope, and requires each type be `event` or one §16.6 allows.
+  void ElaborateLetFormals(ModuleItem* item, const RtlirModule* mod);
 
   // §35.5.2: pure-only restrictions on imported subroutines.
   void ValidateDpiImport(const ModuleItem* item);

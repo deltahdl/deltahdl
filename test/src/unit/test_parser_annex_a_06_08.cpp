@@ -880,4 +880,36 @@ TEST(LoopSyntaxParsing, ForeachScopedAndClassHandleArrayId) {
   EXPECT_EQ(loops[2]->expr->lhs->text, "pkg");
 }
 
+// A.6.8's for_variable_declaration takes a data_type, which A.2.2.1 lets be a
+// type_reference (§6.23), held for the elaborator to resolve. The loop
+// variable is a variable, so its type reference follows `var`, and one written
+// without it is reported.
+TEST(LoopSyntaxParsing, ForVariableOfATypeReference) {
+  auto r = Parse(
+      "module m;\n"
+      "  int x, s;\n"
+      "  initial begin\n"
+      "    for (var type(x) i = -2; i < 1; i++) s += i;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_EQ(stmt->for_init_types.size(), 1u);
+  EXPECT_NE(stmt->for_init_types[0].type_ref_expr, nullptr);
+}
+
+TEST(LoopSyntaxParsing, ForVariableOfATypeReferenceWithoutVarIsReported) {
+  auto r = Parse(
+      "module m;\n"
+      "  int x;\n"
+      "  initial for (type(x) j = 0; j < 1; j++) ;\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "type_reference in a variable declaration must be "
+                            "preceded by the 'var' keyword",
+                            3, "6.23"));
+}
+
 }  // namespace

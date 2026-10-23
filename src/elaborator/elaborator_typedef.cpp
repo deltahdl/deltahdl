@@ -418,6 +418,10 @@ static void AdoptMemberTypedefDims(
 }
 
 void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
+  // §6.23: `typedef type(x) t;` names the type x stands for, and everything
+  // below judges and records that type. Unresolved, the type is implicit, the
+  // mark of a forward typedef.
+  ResolveTypeRef(item->typedef_type, item->loc, mod);
   if (HandleForwardTypedef(item, typedefs_, forward_typedef_kinds_, diag_)) {
     return;
   }
@@ -544,6 +548,8 @@ void Elaborator::EmitBareEnumMembers(const ModuleItem* item, RtlirModule* mod) {
 }
 
 void Elaborator::ElaborateNettypeDecl(ModuleItem* item, RtlirModule* mod) {
+  // §6.23: `nettype type(x) nt;` is a nettype of the type x stands for.
+  ResolveTypeRef(item->typedef_type, item->loc, mod);
   // §6.6.7 judges the data type a nettype names, typedef names and all, and
   // IsLegalNettypeDataType in net_data_type.cpp says which those are.
   if (!IsLegalNettypeDataType(item->typedef_type,

@@ -839,14 +839,20 @@ void Parser::ParseParamDecl(std::vector<ModuleItem*>& items) {
 
   if (ForceLocalparam()) localparam = true;
 
-  if (Match(TokenKind::kKwType)) {
+  if (!ParserDataDeclHelpers::AtTypeReference(*this) &&
+      Match(TokenKind::kKwType)) {
     ParseTypeParamDecl(items, loc, localparam);
     return;
   }
   // A.2.2.1 lets the type stand behind a package or class scope, which
-  // ParseDeclaredDataType reads past known_types_.
-  DataType dtype = ParseDeclaredDataType();
-  ParseImplicitParamRange(dtype);
+  // ParseDeclaredDataType reads past known_types_, or be a type_reference,
+  // `localparam type(x) P = -5;` declaring a value parameter of x's type
+  // (§6.23).
+  DataType dtype;
+  if (!ParserDataDeclHelpers::ReadTypeReference(*this, dtype)) {
+    dtype = ParseDeclaredDataType();
+    ParseImplicitParamRange(dtype);
+  }
   // §40.4.6: a pragma right after the keyword or the bit width makes the
   // parameters declared here the legal states of the FSM it names.
   const std::string_view kFsmEnum = lexer_.ClaimFsmEnumPragma(CurrentLoc());
@@ -888,13 +894,41 @@ void Parser::ParseImplicitParamRange(DataType& dtype) {
   Expect(TokenKind::kRBracket, Subclause("6.20.2"));
 }
 
+bool ParserDataDeclHelpers::ReadTypeReference(Parser& p, DataType& dtype) {
+  if (!p.Check(TokenKind::kKwType)) return false;
+  p.Consume();
+  p.Expect(TokenKind::kLParen, Subclause("6.23"));
+  dtype.type_ref_expr = p.ParseExpr();
+  p.Expect(TokenKind::kRParen, Subclause("6.23"));
+  return true;
+}
+
+bool ParserDataDeclHelpers::ReadKeyedTypeReference(Parser& p, DataType& dtype,
+                                                   bool has_var, bool is_port) {
+  if (!has_var && p.Check(TokenKind::kKwType)) {
+    p.diag_.Error(p.CurrentLoc(),
+                  is_port ? "type_reference in a port declaration must be "
+                            "preceded by the 'var' keyword or a net type "
+                            "keyword"
+                          : "type_reference in a variable declaration must be "
+                            "preceded by the 'var' keyword",
+                  Subclause("6.23"));
+  }
+  return ReadTypeReference(p, dtype);
+}
+
+bool ParserDataDeclHelpers::AtTypeReference(Parser& p) {
+  if (!p.Check(TokenKind::kKwType)) return false;
+  auto saved = p.lexer_.SavePos();
+  p.Consume();
+  bool opens = p.Check(TokenKind::kLParen);
+  p.lexer_.RestorePos(saved);
+  return opens;
+}
+
 bool Parser::TryParseTypeRef(std::vector<ModuleItem*>& items) {
-  if (!Check(TokenKind::kKwType)) return false;
-  Consume();
-  Expect(TokenKind::kLParen, Subclause("6.23"));
   DataType dtype;
-  dtype.type_ref_expr = ParseExpr();
-  Expect(TokenKind::kRParen, Subclause("6.23"));
+  if (!ParserDataDeclHelpers::ReadTypeReference(*this, dtype)) return false;
   // A.2.1.3 follows the data_type with a list_of_variable_decl_assignments, so
   // §6.23's `var type(a+b) c, d;` declares both names of the one type.
   ParseVarDeclList(items, dtype);

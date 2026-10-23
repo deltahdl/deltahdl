@@ -560,6 +560,10 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   RegisterImportedEnumLiterals(decl, mod, enum_ctx);
   RegisterCuEnumLiterals(decl, mod, enum_ctx);
 
+  // The type references of the parameter ports and the ports read the
+  // declaration's own values (Elaborator::ResolveTypeRef), so it is in force
+  // from the parameter ports on, not the instantiating module's.
+  module_decl_path_.push_back(decl);
   ElaborateParamPortList(decl, params, mod);
   if (decl->decl_kind == ModuleDeclKind::kChecker) {
     mod->constant_formals = CheckerConstantFormals(
@@ -608,7 +612,6 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   module_global_clocking_event_ = EnterGlobalClockingChain(
       global_clocking_scopes_, own_gclk, current_inst_path_, arena_);
 
-  module_decl_path_.push_back(decl);
   ElaborateItems(decl, mod);
   module_decl_path_.pop_back();
   ResolveExplicitPortTypes(decl, mod, BuildParamScope(mod));

@@ -121,4 +121,29 @@ TEST(PortDeclSim, BodyPortsOfAPackageScopedTypeCarryItsWidth) {
   LowerRunAndCheck(f, design, {{"result", 0xAu}, {"passed", 0xAu}});
 }
 
+// A.2.1.2's port declarations take a data_type after `var`, which A.2.2.1 lets
+// be a type_reference (§6.23). Each port here is x's int, an earlier port of
+// the header and a variable of the body alike being x, so -5 crosses whole; a
+// one-bit port would carry its low bit, 1.
+TEST(PortDeclSim, VarPortsOfATypeReferenceCarryTheReferencedType) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m(input int x, input var type(x) a, output var type(x) b);\n"
+      "  assign b = a;\n"
+      "endmodule\n"
+      "module n(c, d);\n"
+      "  int x;\n"
+      "  input var type(x) c;\n"
+      "  output var type(x) d;\n"
+      "  assign d = c;\n"
+      "endmodule\n"
+      "module t;\n"
+      "  int r1, r2;\n"
+      "  m u1(0, -5, r1);\n"
+      "  n u2(-5, r2);\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"r1", 0xFFFFFFFBu}, {"r2", 0xFFFFFFFBu}});
+}
+
 }  // namespace

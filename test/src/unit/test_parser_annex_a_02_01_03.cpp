@@ -843,4 +843,26 @@ TEST(TypeDeclParsing, AnAutomaticPackageScopedDeclarationReportsTheLifetime) {
   EXPECT_EQ(items[0]->data_type.scope_name, "P");
 }
 
+// A.2.1.3's type_declaration and nettype_declaration each take a data_type,
+// which A.2.2.1 lets be a type_reference (§6.23), held for the elaborator to
+// resolve.
+TEST(TypeDeclParsing, TypedefAndNettypeOfATypeReference) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [3:0] x;\n"
+      "  typedef type(x) t;\n"
+      "  nettype type(x) nt;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  const auto& items = r.cu->modules[0]->items;
+  ASSERT_EQ(items.size(), 3u);
+  EXPECT_EQ(items[1]->kind, ModuleItemKind::kTypedef);
+  EXPECT_EQ(items[1]->name, "t");
+  EXPECT_NE(items[1]->typedef_type.type_ref_expr, nullptr);
+  EXPECT_EQ(items[2]->kind, ModuleItemKind::kNettypeDecl);
+  EXPECT_EQ(items[2]->name, "nt");
+  EXPECT_NE(items[2]->typedef_type.type_ref_expr, nullptr);
+}
+
 }  // namespace

@@ -52,13 +52,15 @@ struct ValueShape {
 // What a type reference's argument is looked up in beyond the module's own
 // variables and nets: the module, the typedefs in force, the compilation unit
 // and the position of the declaration writing the reference, with the arena a
-// resolved type's packed dimensions are made in.
+// resolved type's packed dimensions are made in, and the declaration of the
+// module being elaborated, null outside one.
 struct TypeRefScope {
   const RtlirModule* mod;
   const TypedefMap& typedefs;
   const CompilationUnit* unit;
   SourceLoc reference;
   Arena& arena;
+  const ModuleDecl* decl;
 };
 
 }  // namespace
@@ -218,6 +220,33 @@ static DataType DeclaredValueType(const ModuleItem& item,
   return type;
 }
 
+// The last of `path`, the declaration of the module being elaborated, or null
+// where the path is empty.
+static const ModuleDecl* InnermostDecl(
+    const std::vector<const ModuleDecl*>& path) {
+  return path.empty() ? nullptr : path.back();
+}
+
+// The type of the value `name` that the module's declaration writes: a port's,
+// or that of a variable, net or parameter of its body. A type reference reads
+// it there where the module has yet to elaborate the value, as a port's does,
+// the ports being elaborated ahead of the items (Elaborator::ElaboratePorts).
+// Nothing where the declaration writes no such value.
+static std::optional<DataType> ModuleValueType(std::string_view name,
+                                               const TypeRefScope& scope) {
+  if (scope.decl == nullptr) return std::nullopt;
+  const auto& ports = scope.decl->ports;
+  auto port = std::ranges::find(ports, name, &PortDecl::name);
+  if (port != ports.end()) return port->data_type;
+  const ModuleItem* item = ItemNamed(scope.decl->items, name);
+  if (item == nullptr || (item->kind != ModuleItemKind::kVarDecl &&
+                          item->kind != ModuleItemKind::kNetDecl &&
+                          item->kind != ModuleItemKind::kParamDecl)) {
+    return std::nullopt;
+  }
+  return DeclaredValueType(*item, scope);
+}
+
 // §26.3 with §3.12.1: the declaration of the value `name` names outside the
 // module: one a package the module imports it from declares, or else one of
 // the compilation unit written before the reference. Null where neither is.
@@ -266,6 +295,31 @@ static std::string_view AdoptEnumerationType(DataType& dt,
   dt = *constant.enumeration;
   dt.is_const = is_const;
   return key;
+}
+
+// §6.23 with §7.2: takes onto each member of the structure or union `dt`
+// whose type is a type reference, `struct { type(x) f; }`, the type the
+// reference stands for, which `resolve` resolves in place, as the parser takes
+// a written member type onto its member (ApplyMemberType). The whole type is
+// kept as the member's nested type, which its width, its state and its layout
+// are read from.
+static void ResolveMemberTypeRefs(
+    DataType& dt, Arena& arena, const std::function<void(DataType&)>& resolve) {
+  for (StructMember& m : dt.struct_members) {
+    if (m.nested_type == nullptr || m.nested_type->type_ref_expr == nullptr) {
+      continue;
+    }
+    DataType type = *m.nested_type;
+    resolve(type);
+    m.type_kind = type.kind;
+    m.is_signed = type.is_signed;
+    m.packed_dim_left = type.packed_dim_left;
+    m.packed_dim_right = type.packed_dim_right;
+    m.extra_packed_dims = type.extra_packed_dims;
+    m.type_name = type.type_name;
+    m.scope_name = type.scope_name;
+    m.nested_type = arena.Create<DataType>(type);
+  }
 }
 
 // §8.23 names the type operator as a context in which a class scope resolution
@@ -328,6 +382,10 @@ static void ResolveNamedTypeRef(DataType& dt, std::string_view name,
     AdoptReferencedType(dt, spelled);
     return;
   }
+  if (std::optional<DataType> own = ModuleValueType(name, scope)) {
+    AdoptReferencedType(dt, *own);
+    return;
+  }
   const ModuleItem* outer = OuterValueNamed(name, scope);
   if (outer == nullptr) return;
   AdoptReferencedType(dt, DeclaredValueType(*outer, scope));
@@ -340,10 +398,13 @@ static void ResolveNamedTypeRef(DataType& dt, std::string_view name,
 // (AdoptEnumerationType), and empty otherwise.
 std::string_view Elaborator::ResolveTypeRef(DataType& dt, SourceLoc loc,
                                             const RtlirModule* mod) {
+  ResolveMemberTypeRefs(
+      dt, arena_, [&](DataType& type) { ResolveTypeRef(type, loc, mod); });
   if (!dt.type_ref_expr) return {};
   auto* ref = dt.type_ref_expr;
   CheckTypeRefArgInner(ref, loc);
-  const TypeRefScope kScope{mod, typedefs_, unit_, loc, arena_};
+  const ModuleDecl* decl = InnermostDecl(module_decl_path_);
+  const TypeRefScope kScope{mod, typedefs_, unit_, loc, arena_, decl};
   if (ResolveScopedTypeRef(dt, ref, kScope)) return {};
   if (ref->kind != ExprKind::kIdentifier) {
     AdoptLogicVector(
@@ -511,6 +572,35 @@ static void AppendClassDecls(const std::vector<ModuleItem*>& items,
       AppendClassAndNested(item->class_decl, out);
     }
     AppendGenerateClassDecls(item, out);
+  }
+}
+
+// The type a class property's type reference to `name` stands for: that of
+// the property of `cls` written `name`, or the built-in type `name` spells.
+// Nothing where `name` is neither.
+static std::optional<DataType> PropertyReferencedType(const ClassDecl& cls,
+                                                      std::string_view name) {
+  auto named = std::ranges::find_if(cls.members, [&](const ClassMember* m) {
+    return m->kind == ClassMemberKind::kProperty && m->name == name;
+  });
+  if (named != cls.members.end()) return (*named)->data_type;
+  DataType spelled = TypeNameToDataType(name);
+  if (spelled.kind == DataTypeKind::kNamed) return std::nullopt;
+  return spelled;
+}
+
+void ResolvePropertyTypeRefs(const CompilationUnit* unit) {
+  for (const ClassDecl* cls : AllClassDecls(unit)) {
+    for (ClassMember* m : cls->members) {
+      const Expr* ref = m->data_type.type_ref_expr;
+      if (m->kind != ClassMemberKind::kProperty || ref == nullptr ||
+          ref->kind != ExprKind::kIdentifier) {
+        continue;
+      }
+      if (std::optional<DataType> type =
+              PropertyReferencedType(*cls, ref->text))
+        AdoptReferencedType(m->data_type, *type);
+    }
   }
 }
 

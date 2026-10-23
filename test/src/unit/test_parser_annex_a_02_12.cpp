@@ -310,4 +310,23 @@ TEST(LetDeclParsing, ErrorMissingSemicolonNoPortList) {
       ReportedError(r.diags, "expected ';', got 'endmodule'", 3, "11.12"));
 }
 
+// A.2.12's let_formal_type is a data_type_or_implicit, which A.2.2.1 lets be
+// a type_reference (§6.23), held on the formal for the elaborator to resolve.
+// A let formal is neither a net nor a variable declaration, so no keyword
+// comes before it.
+TEST(LetDeclParsing, LetFormalOfATypeReference) {
+  auto r = Parse(
+      "module m;\n"
+      "  int x;\n"
+      "  let f(type(x) a) = a + 1;\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* item =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kLetDecl);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->func_args.size(), 1u);
+  EXPECT_EQ(item->func_args[0].name, "a");
+  EXPECT_NE(item->func_args[0].data_type.type_ref_expr, nullptr);
+}
+
 }  // namespace

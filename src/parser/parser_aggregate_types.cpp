@@ -260,6 +260,11 @@ DataType Parser::ParseStructMemberType() {
     return member_type;
   }
   if (Check(TokenKind::kKwEnum)) return ParseEnumType();
+  // A.2.2.1 counts a type_reference among the data types a member takes,
+  // `struct { type(x) f; }`, which the elaborator resolves (§6.23).
+  if (ParserDataDeclHelpers::ReadTypeReference(*this, member_type)) {
+    return member_type;
+  }
   member_type = ParseDeclaredDataType();
   if (member_type.kind != DataTypeKind::kImplicit || !CheckIdentifier()) {
     return member_type;
@@ -291,10 +296,12 @@ void Parser::ParseStructMemberList(DataType& dtype, const DataType& member_type,
     ApplyMemberType(member, member_type);
     // §7.2.1: retain the full type for inline aggregate/enum members so a
     // nested member's bit width can be recovered during width evaluation
-    // (ApplyMemberType keeps only the member's own kind and packed dims).
+    // (ApplyMemberType keeps only the member's own kind and packed dims), and
+    // for a type reference, which the elaborator resolves there (§6.23).
     if (member_type.kind == DataTypeKind::kStruct ||
         member_type.kind == DataTypeKind::kUnion ||
-        member_type.kind == DataTypeKind::kEnum) {
+        member_type.kind == DataTypeKind::kEnum ||
+        member_type.type_ref_expr != nullptr) {
       member.nested_type = arena_.Create<DataType>(member_type);
     }
     member.is_rand = is_rand;
@@ -326,7 +333,8 @@ void Parser::ParseStructMembers(DataType& dtype) {
     // signing or packed dimension alone, a bare name and a lone `;` are each
     // reported. A name after the implicit type is still read as the member's,
     // and anything else is skipped to the semicolon.
-    if (member_type.kind == DataTypeKind::kImplicit) {
+    if (member_type.kind == DataTypeKind::kImplicit &&
+        member_type.type_ref_expr == nullptr) {
       diag_.Error(type_loc,
                   "a structure or union member names a data type or void",
                   Subclause("A.2.2.1"));

@@ -201,4 +201,67 @@ TEST(NetAndVariableTypeSimulation, VarClassPropertyOfImplicitTypeHasItsWidth) {
   EXPECT_EQ(val, 44u);
 }
 
+// A.2.2.1 counts a type_reference among the data types (§6.23). A typedef of
+// one names x's int, so v holds -5 whole where an implicit type's one bit would
+// hold 1; a nettype of one has y's four bits, all of which n carries; and a
+// structure member of one is an int, which holds -5 for r to read back.
+TEST(NetAndVariableTypeSimulation, TypeReferencesNameTheReferencedType) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int x;\n"
+      "  logic [3:0] y;\n"
+      "  typedef type(x) xt;\n"
+      "  nettype type(y) nt;\n"
+      "  xt v;\n"
+      "  nt n;\n"
+      "  struct packed { type(x) f; bit k; } s;\n"
+      "  int r;\n"
+      "  assign n = 4'hA;\n"
+      "  initial begin\n"
+      "    v = -5;\n"
+      "    s.f = -5;\n"
+      "    r = s.f;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design,
+                   {{"v", 0xFFFFFFFBu}, {"n", 0xAu}, {"r", 0xFFFFFFFBu}});
+}
+
+// A class property and a subroutine's formals take a type_reference after
+// `var` (§6.23): w, y and z are each x's int, so -5 stands whole in each,
+// where a one-bit one would hold 1.
+TEST(NetAndVariableTypeSimulation, PropertyAndFormalsOfATypeReference) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class C;\n"
+      "  int x;\n"
+      "  var type(x) w;\n"
+      "endclass\n"
+      "module t;\n"
+      "  int x;\n"
+      "  int rw, ry, rz;\n"
+      "  C c;\n"
+      "  function automatic int f(input var type(x) y);\n"
+      "    return y;\n"
+      "  endfunction\n"
+      "  function automatic int g;\n"
+      "    input var type(x) z;\n"
+      "    return z;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    c = new;\n"
+      "    c.w = -5;\n"
+      "    rw = c.w;\n"
+      "    ry = f(-5);\n"
+      "    rz = g(-5);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(
+      f, design,
+      {{"rw", 0xFFFFFFFBu}, {"ry", 0xFFFFFFFBu}, {"rz", 0xFFFFFFFBu}});
+}
+
 }  // namespace

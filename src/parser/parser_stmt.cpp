@@ -10,6 +10,7 @@
 #include "parser/ast_type.h"
 #include "parser/expr_parser_internal.h"
 #include "parser/parser.h"
+#include "parser/parser_data_decl_internal.h"
 #include "parser/parser_token_skips.h"
 
 namespace delta {
@@ -98,12 +99,14 @@ struct ParserStmtHelpers {
   }
 
   // Syntax 12-5's for_variable_declaration opens with `var` or a data_type: a
-  // type keyword, a name this scope knows as a type, or a type name behind a
-  // package scope (A.2.2.1), which a package name never is a known type for.
+  // type keyword, a type reference, a name this scope knows as a type, or a
+  // type name behind a package scope (A.2.2.1), which a package name never is
+  // a known type for.
   // The last is told from an assignment to a package's variable, `pkg::v = 0`,
   // by what follows the scoped name, as a block item is.
   static bool AtForLocalDecl(Parser& p) {
-    if (p.Check(TokenKind::kKwVar) || IsDataTypeKeyword(p.CurrentToken().kind))
+    if (p.Check(TokenKind::kKwVar) || p.Check(TokenKind::kKwType) ||
+        IsDataTypeKeyword(p.CurrentToken().kind))
       return true;
     if (!p.Check(TokenKind::kIdentifier)) return false;
     if (p.known_types_.count(p.CurrentToken().text) != 0) return true;
@@ -121,9 +124,15 @@ struct ParserStmtHelpers {
   static void ParseForLocalDeclInits(Parser& p, Stmt* stmt) {
     do {
       bool has_var = p.Match(TokenKind::kKwVar);
-      DataType type = p.ParseDeclaredDataType();
+      // A.2.2.1 counts a type_reference among the data types, which the loop
+      // variable, a variable, writes after `var` (§6.23).
+      DataType type;
+      if (!ParserDataDeclHelpers::ReadKeyedTypeReference(p, type, has_var,
+                                                         false)) {
+        type = p.ParseDeclaredDataType();
+      }
       if (!has_var && type.kind == DataTypeKind::kImplicit &&
-          !stmt->for_init_types.empty()) {
+          type.type_ref_expr == nullptr && !stmt->for_init_types.empty()) {
         type = stmt->for_init_types.back();
       }
       stmt->for_init_types.push_back(type);

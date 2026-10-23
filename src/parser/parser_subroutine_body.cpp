@@ -11,6 +11,7 @@
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 #include "parser/parser.h"
+#include "parser/parser_data_decl_internal.h"
 
 namespace delta {
 
@@ -122,18 +123,23 @@ bool Parser::TryParseTfPortDeclaration(
   hdr.dir = ParseTfPortDirection();
   hdr.is_ref_static =
       (hdr.dir == Direction::kRef) && Match(TokenKind::kKwStatic);
-  Match(TokenKind::kKwVar);
+  bool has_var = Match(TokenKind::kKwVar);
   // A.2.2.1 lets the data type be a type_identifier behind a package or class
   // scope, `input pk::t x;`, which ParseDeclaredDataType reads past
-  // known_types_.
-  hdr.dt = ParseDeclaredDataType();
-  // A.2.7's tf_port_declaration takes a data_type_or_implicit, and A.2.2.1's
-  // implicit_data_type may be packed dimensions alone: `input [7:0] a;`
-  // names no type and no signing, and ParseDataType leaves the range unread
-  // when nothing precedes it.
-  bool implicit_type = hdr.dt.kind == DataTypeKind::kImplicit;
-  if (implicit_type) ParsePackedDims(hdr.dt);
-  DefaultImplicitToLogic(hdr.dt);
+  // known_types_, or a type_reference, which a formal writes after `var`
+  // (§6.23).
+  bool implicit_type = false;
+  if (!ParserDataDeclHelpers::ReadKeyedTypeReference(*this, hdr.dt, has_var,
+                                                     false)) {
+    hdr.dt = ParseDeclaredDataType();
+    // A.2.7's tf_port_declaration takes a data_type_or_implicit, and A.2.2.1's
+    // implicit_data_type may be packed dimensions alone: `input [7:0] a;`
+    // names no type and no signing, and ParseDataType leaves the range unread
+    // when nothing precedes it.
+    implicit_type = hdr.dt.kind == DataTypeKind::kImplicit;
+    if (implicit_type) ParsePackedDims(hdr.dt);
+    DefaultImplicitToLogic(hdr.dt);
+  }
 
   size_t first = item->func_args.size();
   ParseTfPortDeclarators(item, hdr);

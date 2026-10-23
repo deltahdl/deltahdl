@@ -14,6 +14,7 @@
 #include "elaborator/elaborator_dpi_signature.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/let_construct.h"
+#include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -765,9 +766,12 @@ static void ReportEventFormalRefs(
   });
 }
 
-void Elaborator::ValidateLetDecl(const ModuleItem* item) {
+void Elaborator::ElaborateLetFormals(ModuleItem* item, const RtlirModule* mod) {
   std::unordered_set<std::string_view> events;
-  for (const auto& arg : item->func_args) {
+  for (auto& arg : item->func_args) {
+    // `let f(type(x) a) = a + 1;` gives a the type of x, which the formal's
+    // checks below and its actual's conversion read.
+    if (mod != nullptr) ResolveTypeRef(arg.data_type, item->loc, mod);
     if (arg.data_type.kind == DataTypeKind::kEvent) events.insert(arg.name);
     LetFormalTypeKind kind = ClassifyLetFormalType(arg.data_type);
     if (!IsLetFormalTypeAllowed(kind)) {

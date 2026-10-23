@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <format>
+#include <functional>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -766,6 +767,20 @@ static bool PortTypeIsArray(
   });
 }
 
+// §6.23: each port of `decl` whose type is written as a type reference,
+// `input var type(x) a`, has it resolved in place by `resolve`, ahead of every
+// reader of the port's type, in ElaboratePorts and in the module's items, as
+// ElaborateVarDecl resolves a variable's in its item. The ports are resolved
+// in order, so a reference to an earlier port reads its resolved type. The
+// parser made the declaration as a mutable object.
+static void ResolvePortTypeRefs(
+    const ModuleDecl* decl,
+    const std::function<void(DataType&, SourceLoc)>& resolve) {
+  for (const auto& port : decl->ports) {
+    resolve(const_cast<DataType&>(port.data_type), port.loc);
+  }
+}
+
 void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
   auto param_scope = BuildParamScope(mod);
   FoldBodyParamsIntoPortScope(decl, param_scope);
@@ -783,6 +798,8 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
 
   DeclarePortExprObjects(decl, mod, ctx);
   RecordPortExprDecls(decl, mod);
+  ResolvePortTypeRefs(
+      decl, [&](DataType& dt, SourceLoc loc) { ResolveTypeRef(dt, loc, mod); });
   for (const auto& port : decl->ports) {
     if (RejectIllegalPortType(port, diag_)) continue;
 

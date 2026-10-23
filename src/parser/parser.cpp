@@ -19,6 +19,7 @@
 #include "parser/ast_module.h"
 #include "parser/ast_specify.h"
 #include "parser/ast_type.h"
+#include "parser/parser_data_decl_internal.h"
 #include "parser/parser_fsm.h"
 #include "parser/parser_token_skips.h"
 #include "parser/parser_type_name_scope.h"
@@ -896,14 +897,14 @@ PackageDecl* Parser::ParsePackageDecl() {
 FunctionArg Parser::ParseLetArg() {
   FunctionArg arg;
   ParseAttributes();
-  if (!Match(TokenKind::kKwUntyped)) {
+  // A.2.12 with A.2.2.1: a let formal's type may be a type_reference (§6.23).
+  if (!Match(TokenKind::kKwUntyped) &&
+      !ParserDataDeclHelpers::ReadTypeReference(*this, arg.data_type)) {
     arg.data_type = ParseDeclaredDataType();
   }
   arg.name = Expect(TokenKind::kIdentifier, Subclause("11.12")).text;
   ParseUnpackedDims(arg.unpacked_dims);
-  if (Match(TokenKind::kEq)) {
-    arg.default_value = ParseExpr();
-  }
+  if (Match(TokenKind::kEq)) arg.default_value = ParseExpr();
   return arg;
 }
 

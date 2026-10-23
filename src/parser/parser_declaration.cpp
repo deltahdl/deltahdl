@@ -10,6 +10,7 @@
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 #include "parser/parser.h"
+#include "parser/parser_data_decl_internal.h"
 #include "parser/parser_type_name_scope.h"
 
 namespace delta {
@@ -44,7 +45,12 @@ void ResolveImplicitArgDataType(FunctionArg& arg,
                                 const DataType& prev_data_type,
                                 bool dir_explicit, bool first_arg,
                                 bool prev_was_default) {
-  if (arg.data_type.kind != DataTypeKind::kImplicit) return;
+  // A type reference is no implicit type, whatever its kind until the
+  // elaborator resolves it (§6.23).
+  if (arg.data_type.kind != DataTypeKind::kImplicit ||
+      arg.data_type.type_ref_expr != nullptr) {
+    return;
+  }
   if (arg.data_type.packed_dim_left != nullptr || arg.data_type.is_signed) {
     arg.data_type.kind = DataTypeKind::kLogic;
     return;
@@ -247,7 +253,10 @@ ModuleItem* Parser::ParseTypedef() {
     // packed array of the structure or union (§7.4.1).
     item->typedef_type = ParseStructOrUnionType();
     ParsePackedDims(item->typedef_type);
-  } else {
+  } else if (!ParserDataDeclHelpers::ReadTypeReference(*this,
+                                                       item->typedef_type)) {
+    // A.2.2.1 counts a type_reference among the data types, so §6.23's
+    // `typedef type(x) t;` names the type of x, which the elaborator resolves.
     item->typedef_type = ParseDeclaredDataType();
   }
 
@@ -288,14 +297,17 @@ ModuleItem* Parser::ParseNettypeDecl() {
   // A.2.2.1's data_type and A.2.1.3's second form, which renames a nettype, may
   // each name the type through a package, `P::T`, whose name is no type the
   // parser knows; ParseDeclaredDataType reads such a scoped name as a data
-  // declaration's type is read.
-  item->typedef_type = ParseDeclaredDataType();
+  // declaration's type is read. A.2.2.1 counts a type_reference among the
+  // data types, so `nettype type(x) nt;` names the type of x (§6.23).
+  if (!ParserDataDeclHelpers::ReadTypeReference(*this, item->typedef_type))
+    item->typedef_type = ParseDeclaredDataType();
   item->name = Expect(TokenKind::kIdentifier, Subclause("6.6.7")).text;
 
   // §6.6.7 / A.2.1.3: a nettype declaration requires an explicit data type
   // (or a source nettype). A lone `nettype name;` is not well formed.
   if (item->typedef_type.kind == DataTypeKind::kImplicit &&
-      item->typedef_type.type_name.empty()) {
+      item->typedef_type.type_name.empty() &&
+      item->typedef_type.type_ref_expr == nullptr) {
     diag_.Error(item->loc, "nettype declaration requires an explicit data type",
                 Subclause("6.6.7"));
   }
@@ -452,11 +464,14 @@ void Parser::ParseOneFunctionArg(std::vector<FunctionArg>& args,
   scan.sticky_dir = ParseArgDirection(arg, scan.sticky_dir, &dir_explicit);
 
   InheritRefQualifiers(args, arg, dir_explicit);
-  Match(TokenKind::kKwVar);
+  bool has_var = Match(TokenKind::kKwVar);
   // A.2.2.1's data_type lets a type_identifier stand behind a package_scope
   // (§26.3), so `ref p::pair_t x` reads the scoped type as a declaration's
-  // does.
-  if (!TryParseInlineAggregateType(arg.data_type)) {
+  // does. It may be a type_reference too, which a formal, a variable of the
+  // subroutine, writes after `var` (§6.23).
+  if (!ParserDataDeclHelpers::ReadKeyedTypeReference(*this, arg.data_type,
+                                                     has_var, false) &&
+      !TryParseInlineAggregateType(arg.data_type)) {
     arg.data_type = ParseDeclaredDataType();
   }
   // A.2.7's tf_port_item takes a data_type_or_implicit, and A.2.2.1's

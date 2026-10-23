@@ -309,6 +309,12 @@ const ClassDecl* FindBaseClass(const ClassDecl* cls,
 // elaborator_validate_struct_types.cpp.
 std::vector<const ClassDecl*> AllClassDecls(const CompilationUnit* unit);
 
+// §6.23 with §8.5: gives each property of a class of `unit` whose type is a
+// type reference, `var type(x) w;`, the type of what its argument names where
+// that is another property of the class or a built-in type, in place. Defined
+// in elaborator_validate_struct_types.cpp.
+void ResolvePropertyTypeRefs(const CompilationUnit* unit);
+
 // Whether any identifier or callee anywhere in `e` is one of `names`. A caller
 // that has failed to fold an expression asks this to tell a value it cannot
 // compute yet from one it can never compute.

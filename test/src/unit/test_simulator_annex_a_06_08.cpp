@@ -165,4 +165,22 @@ TEST(LoopSyntaxSimulation, ForMultipleInitsAndSteps) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
+// A.6.8's for_variable_declaration may take a type_reference after `var`
+// (§6.23): i is x's int, so it counts -2 and -1 up to 0 and s ends at -3,
+// where a one-bit i, never below 0, would leave s at 0.
+TEST(LoopSyntaxSimulation, ForVariableOfATypeReference) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module m;\n"
+      "  int x, s;\n"
+      "  initial begin\n"
+      "    s = 0;\n"
+      "    for (var type(x) i = -2; i < 1; i++) s += i;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "s");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xFFFFFFFDu);
+}
+
 }  // namespace

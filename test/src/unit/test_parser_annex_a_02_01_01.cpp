@@ -214,3 +214,25 @@ TEST(ParameterDeclParsing, SpecparamListOfAssignments) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
+
+// A.2.1.1's parameter declarations take a data_type_or_implicit, which
+// A.2.2.1 lets be a type_reference (§6.23): `type` followed by `(` opens one,
+// declaring a value parameter of that type, where `type` followed by a name
+// declares a type parameter.
+TEST(ParameterDeclParsing, ValueParametersOfATypeReference) {
+  auto r = Parse(
+      "module m #(parameter int W = 4, parameter type(W) V = -3);\n"
+      "  int x;\n"
+      "  localparam type(x) P = -5;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  const auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->param_types.size(), 2u);
+  EXPECT_NE(mod->param_types[1].type_ref_expr, nullptr);
+  EXPECT_EQ(mod->type_param_names.count("V"), 0u);
+  ASSERT_EQ(mod->items.size(), 2u);
+  EXPECT_EQ(mod->items[1]->kind, ModuleItemKind::kParamDecl);
+  EXPECT_EQ(mod->items[1]->name, "P");
+  EXPECT_NE(mod->items[1]->data_type.type_ref_expr, nullptr);
+}

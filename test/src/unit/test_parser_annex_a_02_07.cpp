@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "fixture_parser.h"
 #include "helpers_reported_error.h"
 #include "parser/ast_module.h"
@@ -708,6 +710,54 @@ TEST(TaskDeclParsing, ErrorTaskDeclDynOverrideInitialAndExtends) {
   // form names the report the function form names.
   EXPECT_TRUE(ReportedError(
       r.diags, "':initial' and ':extends' are mutually exclusive", 2, "8.20"));
+}
+
+// A.2.7's tf_port_item and tf_port_declaration take a data_type after `var`,
+// which A.2.2.1 lets be a type_reference (§6.23), held on the formal for the
+// elaborator to resolve.
+TEST(TaskDeclParsing, FormalsOfATypeReference) {
+  auto r = Parse(
+      "module m;\n"
+      "  int x;\n"
+      "  function automatic int f(input var type(x) y);\n"
+      "    return y;\n"
+      "  endfunction\n"
+      "  function automatic int g;\n"
+      "    input var type(x) z;\n"
+      "    return z;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  const auto& items = r.cu->modules[0]->items;
+  ASSERT_EQ(items.size(), 3u);
+  for (const ModuleItem* fn : {items[1], items[2]}) {
+    ASSERT_EQ(fn->func_args.size(), 1u) << fn->name;
+    EXPECT_NE(fn->func_args[0].data_type.type_ref_expr, nullptr) << fn->name;
+  }
+}
+
+// A formal is a variable of its subroutine, so §6.23 has its type reference
+// follow `var`, and one written without it, in the list or in the body, is
+// reported.
+TEST(TaskDeclParsing, FormalOfATypeReferenceWithoutVarIsReported) {
+  auto r = Parse(
+      "module m;\n"
+      "  int x;\n"
+      "  function automatic int h(input type(x) w);\n"
+      "    return w;\n"
+      "  endfunction\n"
+      "  task t;\n"
+      "    input type(x) v;\n"
+      "  endtask\n"
+      "endmodule\n");
+  for (uint32_t line : {3U, 7U}) {
+    EXPECT_TRUE(
+        ReportedError(r.diags,
+                      "type_reference in a variable declaration must be "
+                      "preceded by the 'var' keyword",
+                      line, "6.23"));
+  }
 }
 
 }  // namespace

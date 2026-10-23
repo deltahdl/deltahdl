@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
+#include <cstdint>
 
 #include "fixture_parser.h"
 #include "helpers_reported_error.h"
@@ -266,6 +267,46 @@ TEST(PortDeclParsing, ErrorRefMissingIdentifier) {
   // there rather than under §23.2.2.1.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected identifier, got ')'", 1, "23.2.2.2"));
+}
+
+// A.2.1.2's port declarations take a data_type after `var`, which A.2.2.1
+// lets be a type_reference (§6.23), in the header and in a body port
+// declaration alike.
+TEST(PortDeclParsing, VarPortsOfATypeReference) {
+  auto r = Parse(
+      "module m(input int x, input var type(x) a);\n"
+      "endmodule\n"
+      "module n(c);\n"
+      "  int x;\n"
+      "  input var type(x) c;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules[0]->ports.size(), 2u);
+  EXPECT_NE(r.cu->modules[0]->ports[1].data_type.type_ref_expr, nullptr);
+  ASSERT_EQ(r.cu->modules[1]->ports.size(), 1u);
+  EXPECT_NE(r.cu->modules[1]->ports[0].data_type.type_ref_expr, nullptr);
+}
+
+// §6.23 has a type reference follow a net type keyword in a net's declaration
+// and `var` in a variable's, and a port is one or the other (§23.2.2.3), so a
+// port's written with neither is reported, in the header and in a body port
+// declaration alike.
+TEST(PortDeclParsing, PortOfATypeReferenceWithNeitherKeywordIsReported) {
+  auto r = Parse(
+      "module m(input int x, input type(x) e);\n"
+      "endmodule\n"
+      "module n(c);\n"
+      "  int x;\n"
+      "  input type(x) c;\n"
+      "endmodule\n");
+  for (uint32_t line : {1U, 5U}) {
+    EXPECT_TRUE(ReportedError(r.diags,
+                              "type_reference in a port declaration must be "
+                              "preceded by the 'var' keyword or a net type "
+                              "keyword",
+                              line, "6.23"));
+  }
 }
 
 }  // namespace

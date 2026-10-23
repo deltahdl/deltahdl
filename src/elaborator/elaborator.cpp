@@ -603,7 +603,7 @@ RtlirDesign* Elaborator::ElaborateTops(
   ClassifyCuItems(unit_->cu_items, design->cu_function_decls,
                   design->cu_let_decls);
   for (auto* item : design->cu_let_decls) {
-    ValidateLetDecl(item);
+    ElaborateLetFormals(item, nullptr);
   }
 
   // §3.12.1: the constants a class declared outside every module may name in

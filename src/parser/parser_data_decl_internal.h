@@ -21,8 +21,8 @@ struct DataDeclQualifiers {
 // A friend of Parser, which reads what opens a data_declaration for the module
 // item and block item paths alike: its qualifiers, and a type named through
 // `$unit ::` (src/parser/parser_block_item_decl.cpp); the signing after a type
-// keyword (src/parser/parser_types.cpp); and a class property's data type
-// (src/parser/parser_items_data_decl.cpp).
+// keyword and a type reference (src/parser/parser_types.cpp); and a class
+// property's data type (src/parser/parser_items_data_decl.cpp).
 struct ParserDataDeclHelpers {
   // Reads every `const`, `var`, `static` and `automatic` from the current
   // token on, in whatever order the source wrote them, so that the
@@ -56,6 +56,28 @@ struct ParserDataDeclHelpers {
   // optional `var`; footnote 14 of A.10 lets the type after `var` be implicit,
   // and an implicit type without it is reported under §6.8.
   static DataType ReadClassPropertyType(Parser& p);
+
+  // §6.23 with A.2.2.1: reads a type_reference, `type ( expression )`, into
+  // `dtype` where the `type` keyword stands at the current token, and answers
+  // whether it did. The argument is read as an expression whether it names a
+  // value or a data type, and the elaborator tells the two apart
+  // (Elaborator::ResolveTypeRef).
+  static bool ReadTypeReference(Parser& p, DataType& dtype);
+
+  // Whether a type_reference opens at the current token, `type` followed by
+  // `(`. A.2.1.1 writes `type` followed by a name to open a type parameter's
+  // declaration, and a value parameter's data type may be a type reference.
+  static bool AtTypeReference(Parser& p);
+
+  // ReadTypeReference for the data type of a declaration that may write `var`
+  // before it, `has_var` saying whether it did. §6.23 has a type reference in
+  // a variable's declaration follow `var` and in a net's follow a net type
+  // keyword, which is read with the type it opens
+  // (Parser::TryParseNetDataType), so one standing first without `var` is
+  // reported. `is_port` names a port's declaration in the report, a port being
+  // a net or a variable (§23.2.2.3).
+  static bool ReadKeyedTypeReference(Parser& p, DataType& dtype, bool has_var,
+                                     bool is_port);
 };
 
 }  // namespace delta

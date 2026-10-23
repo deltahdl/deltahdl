@@ -14,6 +14,7 @@
 #include "parser/ast_type.h"
 #include "parser/param_port_list.h"
 #include "parser/parser.h"
+#include "parser/parser_data_decl_internal.h"
 #include "parser/parser_dpi_validate.h"
 #include "parser/parser_headers.h"
 #include "parser/parser_token_skips.h"
@@ -171,9 +172,7 @@ struct ParserPortHelpers {
     }
     port.name = p.ExpectIdentifier(Subclause("25.3.3")).text;
     p.ParseUnpackedDims(port.unpacked_dims);
-    if (p.Match(TokenKind::kEq)) {
-      port.default_value = p.ParseExpr();
-    }
+    if (p.Match(TokenKind::kEq)) port.default_value = p.ParseExpr();
   }
 
   // After `iface_name.modport_name` has been recognized (both identifier
@@ -187,9 +186,7 @@ struct ParserPortHelpers {
     port.data_type.modport_name = modport_name;
     port.name = p.ExpectIdentifier(Subclause("25.5")).text;
     p.ParseUnpackedDims(port.unpacked_dims);
-    if (p.Match(TokenKind::kEq)) {
-      port.default_value = p.ParseExpr();
-    }
+    if (p.Match(TokenKind::kEq)) port.default_value = p.ParseExpr();
   }
 
   // Attempt to match `iface_name.modport_name port_name` from the current
@@ -268,13 +265,17 @@ struct ParserPortHelpers {
   // same reason: the general data-type parse recognizes only a type that is
   // already named, and leaves the keyword unconsumed for the port name to be
   // read from.
-  static DataType ParsePortDataTypeBody(Parser& p) {
+  static DataType ParsePortDataTypeBody(Parser& p, bool has_var) {
+    DataType dtype;
     if (p.Check(TokenKind::kKwStruct) || p.Check(TokenKind::kKwUnion)) {
-      auto dtype = p.ParseStructOrUnionType();
+      dtype = p.ParseStructOrUnionType();
       p.ParsePackedDims(dtype);
       return dtype;
     }
     if (p.Check(TokenKind::kKwEnum)) return p.ParseEnumType();
+    // A.2.2.1 counts a type_reference among the data types (§6.23).
+    if (ParserDataDeclHelpers::ReadKeyedTypeReference(p, dtype, has_var, true))
+      return dtype;
     // §23.2.2.2's port type is A.2.2.1's data_type, a type_identifier behind
     // a package_scope among its forms (§26.3), so `input A::instruction_t a`
     // reads the scoped type rather than taking `A` for the port's name.
@@ -304,7 +305,7 @@ struct ParserPortHelpers {
   static void ParseAnsiPortDataType(Parser& p, PortDecl& port) {
     if (p.Match(TokenKind::kKwVar)) {
       port.has_explicit_var = true;
-      port.data_type = ParsePortDataTypeBody(p);
+      port.data_type = ParsePortDataTypeBody(p, true);
       if (port.data_type.kind == DataTypeKind::kImplicit &&
           p.Check(TokenKind::kLBracket)) {
         p.ParsePackedDims(port.data_type);
@@ -315,7 +316,7 @@ struct ParserPortHelpers {
       ParseInterconnectPortType(p, port);
       return;
     }
-    port.data_type = ParsePortDataTypeBody(p);
+    port.data_type = ParsePortDataTypeBody(p, false);
   }
 
   // Lookahead at the head of a port list: a bare identifier immediately
@@ -922,12 +923,16 @@ void Parser::ParseNonAnsiPortDecls(ModuleDecl& mod,
   // a type_identifier behind a package or class scope, `input pk::t a;`,
   // which ParseDeclaredDataType reads past known_types_.
   bool has_var = Match(TokenKind::kKwVar);
-  auto dtype = ParseDeclaredDataType();
+  DataType dtype;
+  bool is_type_ref = ParserDataDeclHelpers::ReadKeyedTypeReference(
+      *this, dtype, has_var, true);
+  if (!is_type_ref) dtype = ParseDeclaredDataType();
   if (NonAnsiPortDeclIsNet(dir, dtype, has_var)) dtype.is_net = true;
 
   // A.2.2.1's implicit_data_type takes any number of packed dimensions, and
   // ParseDataType reads none of them when no signing opens the type.
-  if (dtype.kind == DataTypeKind::kImplicit) ParsePackedDims(dtype);
+  if (dtype.kind == DataTypeKind::kImplicit && !is_type_ref)
+    ParsePackedDims(dtype);
 
   PortDecl shape;
   shape.direction = dir;

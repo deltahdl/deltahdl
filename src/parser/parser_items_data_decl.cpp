@@ -97,6 +97,18 @@ DataType ParserDataDeclHelpers::ReadClassPropertyType(Parser& p) {
   bool has_var = p.Match(TokenKind::kKwVar);
   SourceLoc type_loc = p.CurrentLoc();
   DataType dtype;
+  // A.2.2.1 counts a type_reference among the data types, which a property
+  // writes after `var` as a module's variable does (§6.8).
+  if (p.Check(TokenKind::kKwType)) {
+    if (!has_var) {
+      p.diag_.Error(type_loc,
+                    "type_reference in a variable declaration must be "
+                    "preceded by the 'var' keyword",
+                    Subclause("6.8"));
+    }
+    ReadTypeReference(p, dtype);
+    return dtype;
+  }
   if (!p.TryParseInlineAggregateType(dtype)) dtype = p.ParseDeclaredDataType();
   if (dtype.kind != DataTypeKind::kImplicit) return dtype;
   if (p.Check(TokenKind::kLBracket)) p.ParsePackedDims(dtype);
