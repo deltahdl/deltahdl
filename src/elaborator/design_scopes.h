@@ -12,8 +12,8 @@ namespace delta {
 // are the complete hierarchical names of every such scope of the elaborated
 // design: each top-level module and each instance under it by its instance
 // path, each task and function declared in one by that path and its name, and
-// each named block of a procedure by the path and the labels of the blocks it
-// stands in.
+// each named block of a procedure, a statement label naming one (§9.3.5), by
+// the path and the labels of the blocks it stands in.
 std::vector<std::string> CompleteHierarchicalScopeNames(
     const RtlirDesign* design);
 

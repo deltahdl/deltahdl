@@ -150,6 +150,15 @@ VpiHandle VpiLabelledAssertionOr(VpiHandle found) {
   return found;
 }
 
+VpiHandle VpiLabelledAssertionsBeginOr(VpiHandle found) {
+  VpiObject* begin = found->parent;
+  if (VpiIsAssertionType(found->type) && begin != nullptr &&
+      begin->type == vpiNamedBegin && begin->full_name == found->full_name) {
+    return begin;
+  }
+  return found;
+}
+
 VpiHandle VpiRegisterAssertionCb(VpiHandle assertion, int reason,
                                  vpi_assertion_callback_func* cb_rtn,
                                  PLI_BYTE8* user_data) {

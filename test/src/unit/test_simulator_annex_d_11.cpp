@@ -113,6 +113,64 @@ TEST(OptionalScopeSim, ScopeAcceptsANamedFork) {
   EXPECT_EQ(f.ctx.InteractiveScope(), "t.fk");
 }
 
+// Annex D.11 with §9.3.5: a label on a statement other than a begin-end or a
+// fork opens a named begin-end around the statement, a named block whose full
+// name $scope takes.
+TEST(OptionalScopeSim, ScopeAcceptsTheBeginALabelOpensAroundAStatement) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic x;\n"
+      "  initial begin\n"
+      "    lbl: x = 1;\n"
+      "    $scope(t.lbl);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerAndRun(design, f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(f.ctx.InteractiveScope(), "t.lbl");
+}
+
+// §9.3.5: a label on a foreach loop names the implicit block the loop
+// creates, which $scope takes as it takes any named block.
+TEST(OptionalScopeSim, ScopeAcceptsTheBlockALabelNamesOnAForeachLoop) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int a[2];\n"
+      "  initial begin\n"
+      "    lp: foreach (a[i]) a[i] = i;\n"
+      "    $scope(t.lp);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerAndRun(design, f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(f.ctx.InteractiveScope(), "t.lp");
+}
+
+// §9.3.5 opens a begin-end only around a procedural statement: the label of a
+// concurrent assertion written as a module item names the assertion, which is
+// none of the scopes $scope takes.
+TEST(OptionalScopeSim, AConcurrentAssertionItemsLabelNamesNoScope) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic clk = 0, x = 1;\n"
+      "  a1: assert property (@(posedge clk) x);\n"
+      "  initial $scope(t.a1);\n"
+      "endmodule\n",
+      f);
+  LowerAndRun(design, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$scope takes the complete hierarchical name of a "
+                            "module, task, function, or named block, and "
+                            "'t.a1' is none",
+                            4, "D.11"));
+  EXPECT_EQ(f.ctx.InteractiveScope(), "t");
+}
+
 // An argument that names no scope of the design -- a name nothing declares,
 // and a variable's -- is reported under D.11 and the scope stays where it
 // was. Any text was recorded as the scope.

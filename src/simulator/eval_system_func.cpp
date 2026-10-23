@@ -24,6 +24,7 @@
 #include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
 #include "simulator/vcd_writer.h"
+#include "simulator/vpi_assertion_cb.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
@@ -587,8 +588,8 @@ static Logic4Vec EvalAnnexDScope(const Expr* expr, SimContext& ctx,
       // cbInteractiveScopeChange callbacks, given the new scope where the
       // VPI model holds one.
       VpiContext& vpi = GetGlobalVpiContext();
-      if (VpiHandle scope = vpi.ScopeByName(name.c_str())) {
-        vpi.NoteInteractiveScope(scope);
+      if (VpiHandle found = vpi.HandleByName(name.c_str(), nullptr)) {
+        vpi.NoteInteractiveScope(VpiLabelledAssertionsBeginOr(found));
       }
     } else {
       ctx.GetDiag().Error(

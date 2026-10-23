@@ -30,6 +30,12 @@ std::string VpiAssertionKeyOf(const VpiObject& obj);
 // other object answers itself.
 VpiHandle VpiLabelledAssertionOr(VpiHandle found);
 
+// D.11 with §9.3.5: the scope `found` stands as when its name is taken as a
+// scope's. An assertion VpiLabelledAssertionOr answered for the full name of
+// the named begin its label opens stands as that begin; any other object
+// stands as itself.
+VpiHandle VpiLabelledAssertionsBeginOr(VpiHandle found);
+
 // §39.4.2: place `cb_rtn` on `assertion` for `reason`, with `user_data` carried
 // through to every call of it. A placement that succeeds answers a handle to
 // the callback, and one that fails answers NULL: no assertion, no routine to

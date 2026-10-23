@@ -13,19 +13,24 @@ namespace delta {
 namespace {
 
 // The named blocks of a statement, each under the path of the blocks it
-// stands in: a labelled begin-end or fork is a scope of its own and the
-// statements it holds are named through it.
+// stands in, the statements a scope holds being named through it. §9.3.5 has
+// a statement label name a scope wherever it stands: on a begin-end or a fork
+// the block itself, on a foreach loop or a for loop declaring its variables
+// the implicit block the loop creates, and on any other statement a named
+// begin-end it opens around the statement. `label_is_statement_label` is false
+// for a statement standing for an assertion rather than in a procedure, whose
+// label names the assertion alone.
 void CollectBlockScopes(const Stmt* s, const std::string& path,
+                        bool label_is_statement_label,
                         std::vector<std::string>& out) {
   if (s == nullptr) return;
   std::string here = path;
-  if ((s->kind == StmtKind::kBlock || s->kind == StmtKind::kFork) &&
-      !s->label.empty()) {
+  if (label_is_statement_label && !s->label.empty()) {
     here = path + "." + std::string(s->label);
     out.push_back(here);
   }
   ForEachChildStmt(
-      s, [&](const Stmt* sub) { CollectBlockScopes(sub, here, out); });
+      s, [&](const Stmt* sub) { CollectBlockScopes(sub, here, true, out); });
 }
 
 // The scopes of one module instance at `path`: the instance itself, the tasks
@@ -38,7 +43,11 @@ void CollectModuleScopes(const RtlirModule* mod, const std::string& path,
     out.push_back(path + "." + std::string(item->name));
   }
   for (const auto& proc : mod->processes) {
-    CollectBlockScopes(proc.body, path, out);
+    // A process carrying an assertion rather than a procedure the source wrote
+    // has the assertion as its body, labelled with the assertion's name.
+    const bool kWrittenProcedure =
+        !proc.is_static_assertion && !proc.is_concurrent_clocked;
+    CollectBlockScopes(proc.body, path, kWrittenProcedure, out);
   }
   for (const auto& child : mod->children) {
     if (child.resolved == nullptr) continue;
