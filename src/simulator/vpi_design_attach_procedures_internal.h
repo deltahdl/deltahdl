@@ -1,5 +1,6 @@
 #pragma once
 
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -11,13 +12,17 @@
 #include "simulator/vpi_object.h"
 
 // Shared between vpi_design_attach_procedures.cpp, which walks a procedure's
-// statements into the VPI model, and vpi_design_attach_calls.cpp, which
-// resolves what a call statement calls and what a foreach loop indexes.
+// statements into the VPI model, vpi_design_attach_calls.cpp, which resolves
+// what a call statement calls and what a foreach loop indexes, and
+// vpi_design_attach_call_lookup.cpp, which finds the classes and the block
+// variables it resolves them against.
 
 namespace delta {
 
+struct ClassDecl;
 struct DataType;
 struct Expr;
+struct ModuleItem;
 
 // Where the objects a statement holds hang: the scope object around it, and
 // the path a named one among them is named under, which an unnamed scope
@@ -118,6 +123,52 @@ VpiObject* MethodCallClassDefn(const Expr& access, const BlockParent& parent,
 // leaving `made` alone, where the call calls nothing the walk resolves.
 bool ShapeExprCall(const Expr& call, VpiObject* made, const BlockParent& parent,
                    const BodyWalk& walk);
+
+// A class declaration with the flat name of the scope its class defn was made
+// under, the key VpiClassDefnObjects files the defn by: the instance's prefix,
+// a package's name or "$unit".
+struct VpiScopedClass {
+  const ClassDecl* decl = nullptr;
+  std::string scope;
+};
+
+// §6.18 with §8.3: the class name `name` stands for, the class at the end of
+// a typedef's chain of names where it is a typedef name, `typedef B B_t;`.
+std::string_view VpiClassNameOf(const BodyWalk& walk, std::string_view name);
+
+// The class the design declares under `name`: in the package `package` where
+// one is named (§26.3), and otherwise in the instance's module, the
+// compilation unit or a package the module imports the name from, by name or
+// with a wildcard (§26.3), a typedef name standing for the class it names. No
+// declaration for a name the design declares no class under, a built-in class
+// among them.
+VpiScopedClass VpiFindClassDecl(const BodyWalk& walk, std::string_view name,
+                                std::string_view package = {});
+
+// §8.3: the method `cls` declares under `name`, null for none.
+const ModuleItem* VpiMethodNamed(const ClassDecl& cls, std::string_view name);
+
+// A class a step of the walk holds: its name, and the arguments the
+// specialization it is held as gives its parameters (§8.25), none for the
+// default one.
+struct VpiHeldClass {
+  std::string_view name;
+  std::span<const DataType> args;
+};
+
+// §8.13 with §8.25: the class `decl`, held under the specialization `args`,
+// extends: the one its extends clause names, with the arguments written
+// there, or, where the clause names one of the class's own type parameters,
+// class C #(type T = B) extends T, the class the specialization's argument for
+// it names, else the parameter's default (§8.25.1).
+VpiHeldClass VpiBaseOf(const ClassDecl& decl, std::span<const DataType> args);
+
+// §9.3.4 with §23.6: the declaration of the variable `name` that a block named
+// `block`, written in one of the procedures of `mod`, declares, which a
+// hierarchical name, block.name, reaches from anywhere in the instance; null
+// where no block of the name declares one.
+const Stmt* VpiNamedBlockVarDecl(const RtlirModule& mod, std::string_view block,
+                                 std::string_view name);
 
 // §37.42 with §37.60: what the expression statement `expr`, standing in the
 // scope `parent` stands for, calls. A task is enabled with or without an

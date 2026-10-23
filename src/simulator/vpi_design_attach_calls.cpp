@@ -49,128 +49,18 @@ CallShape SubroutineCallShape(const VpiCalledSubroutine& sub,
   return shape;
 }
 
-// The class among `decls` named `name`, null for none.
-const ClassDecl* ClassNamed(const std::vector<ClassDecl*>& decls,
-                            std::string_view name) {
-  for (const ClassDecl* decl : decls) {
-    if (decl->name == name) return decl;
-  }
-  return nullptr;
-}
-
-// A class declaration with the flat name of the scope its class defn was made
-// under, the key VpiClassDefnObjects files the defn by: the instance's prefix,
-// a package's name or "$unit".
-struct ScopedClass {
-  const ClassDecl* decl = nullptr;
-  std::string scope;
-};
-
-// The classes the package named `package` declares; none for a name no
-// package of the design has.
-std::vector<ClassDecl*> PackageClasses(const RtlirDesign& design,
-                                       std::string_view package) {
-  std::vector<ClassDecl*> classes;
-  for (const PackageDecl* decl : design.packages) {
-    if (decl->name == package) classes = VpiPackageClasses(*decl);
-  }
-  return classes;
-}
-
-// §6.18 with §8.3: the class name `name` stands for, the class at the end of
-// a typedef's chain of names where it is a typedef name, `typedef B B_t;`.
-std::string_view ClassNameOf(const BodyWalk& walk, std::string_view name) {
-  const auto kTarget = walk.design.type_targets.find(name);
-  return kTarget == walk.design.type_targets.end() ? name : kTarget->second;
-}
-
-// The class the design declares under `name`: in the package `package` where
-// one is named (§26.3), and otherwise in the instance's module, the
-// compilation unit or a package the module imports the name from, by name or
-// with a wildcard (§26.3), a typedef name standing for the class it names. No
-// declaration for a name the design declares no class under, a built-in class
-// among them.
-ScopedClass FindClassDecl(const BodyWalk& walk, std::string_view name,
-                          std::string_view package = {}) {
-  name = ClassNameOf(walk, name);
-  if (!package.empty()) {
-    return {ClassNamed(PackageClasses(walk.design, package), name),
-            std::string(package)};
-  }
-  const ClassDecl* decl = ClassNamed(walk.mod.class_decls, name);
-  if (decl != nullptr) return {decl, walk.prefix};
-  decl = ClassNamed(walk.design.cu_class_decls, name);
-  if (decl != nullptr) return {decl, "$unit"};
-  for (const RtlirImport& entry : walk.mod.imports) {
-    if (!entry.is_wildcard && entry.item_name != name) continue;
-    decl = ClassNamed(PackageClasses(walk.design, entry.package_name), name);
-    if (decl != nullptr) return {decl, std::string(entry.package_name)};
-  }
-  return {};
-}
-
-// §8.3: the method `cls` declares under `name`, null for none.
-const ModuleItem* MethodNamed(const ClassDecl& cls, std::string_view name) {
-  for (const ClassMember* member : cls.members) {
-    if (member->kind == ClassMemberKind::kMethod &&
-        member->method->name == name) {
-      return member->method;
-    }
-  }
-  return nullptr;
-}
-
-// §8.25: the argument of the specialization `args` binding the class parameter
-// `name`, the `index`th the class declares: by name where the specialization
-// names its arguments, .T(B2), and by position otherwise, (2, B2); null where
-// it binds none, which leaves the parameter its default (§8.25.1).
-const DataType* TypeArgument(std::span<const DataType> args, std::size_t index,
-                             std::string_view name) {
-  const auto kNamed = std::ranges::find(args, name, &DataType::param_arg_name);
-  if (kNamed != args.end()) return &*kNamed;
-  const bool kPositional = std::ranges::all_of(
-      args, [](const DataType& arg) { return arg.param_arg_name.empty(); });
-  return kPositional && index < args.size() ? &args[index] : nullptr;
-}
-
-// A class a step of the walk holds: its name, and the arguments the
-// specialization it is held as gives its parameters (§8.25), none for the
-// default one.
-struct HeldClass {
-  std::string_view name;
-  std::span<const DataType> args;
-};
-
-// §8.13 with §8.25: the class `decl`, held under the specialization `args`,
-// extends: the one its extends clause names, with the arguments written
-// there, or, where the clause names one of the class's own type parameters,
-// class C #(type T = B) extends T, the class the specialization's argument for
-// it names, else the parameter's default (§8.25.1).
-HeldClass BaseOf(const ClassDecl& decl, std::span<const DataType> args) {
-  if (!decl.type_param_names.contains(decl.base_class)) {
-    return {decl.base_class, decl.base_class_type_params};
-  }
-  const auto kIndex = static_cast<std::size_t>(
-      std::ranges::find(decl.params, decl.base_class,
-                        &std::pair<std::string_view, Expr*>::first) -
-      decl.params.begin());
-  const DataType* arg = TypeArgument(args, kIndex, decl.base_class);
-  const DataType& base = arg != nullptr ? *arg : decl.param_types.at(kIndex);
-  return {base.type_name, base.type_params};
-}
-
 // §37.42: what a method call calls - the kind of tf call it is, zero for a
 // method the walk resolves to nothing, whether the design declares it, and if
 // it does the class declaring it with the scope its class defn was made in.
 struct MethodCall {
   int type = 0;
   bool declared = false;
-  ScopedClass owner = {};
+  VpiScopedClass owner = {};
 };
 
 // The method `method` of the class `cls`, of the package `package` where one is
 // named, held under the specialization `args`, found in the class or, by
-// §8.13, in the classes it extends (BaseOf). A class the design declares
+// §8.13, in the classes it extends (VpiBaseOf). A class the design declares
 // answers ahead of a built-in one of its name, which §15.2 lets user code
 // redefine. A method none of them declares is one of the built-in methods
 // every class has (§18), a function, or else nothing.
@@ -180,16 +70,17 @@ MethodCall ClassMethodCall(const BodyWalk& walk, std::string_view cls,
                            std::span<const DataType> args = {}) {
   const bool kNamesClass = !cls.empty();
   while (!cls.empty()) {
-    ScopedClass found = FindClassDecl(walk, cls, package);
+    VpiScopedClass found = VpiFindClassDecl(walk, cls, package);
     if (found.decl == nullptr) {
-      return {VpiBuiltInClassCallKind(ClassNameOf(walk, cls), method), false};
+      return {VpiBuiltInClassCallKind(VpiClassNameOf(walk, cls), method),
+              false};
     }
-    const ModuleItem* item = MethodNamed(*found.decl, method);
+    const ModuleItem* item = VpiMethodNamed(*found.decl, method);
     if (item != nullptr) {
       return {CallKindOf(*item, vpiMethodTaskCall, vpiMethodFuncCall), true,
               std::move(found)};
     }
-    const HeldClass kBase = BaseOf(*found.decl, args);
+    const VpiHeldClass kBase = VpiBaseOf(*found.decl, args);
     cls = kBase.name;
     args = kBase.args;
   }
@@ -225,7 +116,7 @@ bool IsAssocDim(const Expr& dim, const BodyWalk& walk) {
   return std::ranges::any_of(
              kIndexTypes, [&](std::string_view t) { return t == dim.text; }) ||
          walk.design.type_kinds.contains(dim.text) ||
-         FindClassDecl(walk, dim.text).decl != nullptr;
+         VpiFindClassDecl(walk, dim.text).decl != nullptr;
 }
 
 // The kind of built-in value a declaration with the unpacked dimensions `dims`
@@ -311,6 +202,20 @@ PrefixVar ModulePrefixVar(const RtlirModule& mod, const std::string& prefix,
   return var;
 }
 
+// The variable the block declaration `item` declares, with `object` standing
+// for it.
+PrefixVar BlockPrefixVar(const Stmt& item, VpiObject* object,
+                         const BodyWalk& walk) {
+  const DataType& type = item.var_decl_type;
+  return {
+      type.kind == DataTypeKind::kNamed ? type.type_name : std::string_view(),
+      BlockHolder(item, walk),
+      object,
+      VifInterface(&type),
+      &type,
+      type.type_params};
+}
+
 // §23.9: the variable `name` names in the scope `parent` stands for: one a
 // block declares, the innermost around the statement first, or else one of the
 // instance's module.
@@ -318,14 +223,7 @@ PrefixVar FindPrefixVar(const BlockParent& parent, std::string_view name,
                         const BodyWalk& walk) {
   const BlockParent* where = nullptr;
   if (const Stmt* item = BlockVarDecl(parent, name, where)) {
-    const DataType& type = item->var_decl_type;
-    return {
-        type.kind == DataTypeKind::kNamed ? type.type_name : std::string_view(),
-        BlockHolder(*item, walk),
-        ChildNamed(where->scope, name),
-        VifInterface(&type),
-        &type,
-        type.type_params};
+    return BlockPrefixVar(*item, ChildNamed(where->scope, name), walk);
   }
   return ModulePrefixVar(walk.mod, walk.prefix, name, walk);
 }
@@ -341,14 +239,16 @@ const RtlirModule* ChildModule(const RtlirModule& mod, std::string_view name) {
 
 // The variable a chain of names, a.b.c, starts from: one of the scope the
 // first name names (FindPrefixVar), or, by §23.6, one of the module of an
-// instance below the walked one the leading names reach downward, u.h; with
-// that instance's module and path, the walked instance's for a variable of the
-// scope, and the number of names the variable took.
+// instance below the walked one the leading names reach downward, u.h, or one a
+// named block of that module declares, b1.h or u.b1.h; with that instance's
+// module and path, the walked instance's for a variable of the scope, the
+// number of names the variable took, and the block's declaration of it.
 struct ChainHead {
   PrefixVar var;
   const RtlirModule* mod = nullptr;
   std::string path;
   std::size_t used = 1;
+  const Stmt* block_decl = nullptr;
 
   // What the rest of the chain is resolved with: the classes and variables of
   // the instance the head belongs to.
@@ -367,6 +267,15 @@ ChainHead ChainHeadVar(const std::vector<std::string_view>& names,
     if (child == nullptr) break;
     mod = child;
     path = VpiFlatName(path, names[i]);
+  }
+  if (i + 1 < names.size()) {
+    if (const Stmt* decl = VpiNamedBlockVarDecl(*mod, names[i], names[i + 1])) {
+      const std::string kFlat =
+          VpiFlatName(VpiFlatName(path, names[i]), names[i + 1]);
+      return {BlockPrefixVar(*decl, FindObjectForFlatName(walk.objects, kFlat),
+                             walk),
+              mod, path, i + 2, decl};
+    }
   }
   if (i == 0) return {FindPrefixVar(parent, names.front(), walk), mod, path, 1};
   return {ModulePrefixVar(*mod, path, names[i], walk), mod, path, i + 1};
@@ -420,11 +329,11 @@ int FirstDimIndexKind(const std::vector<Expr*>& dims, const BodyWalk& walk) {
 
 // §37.42 with §37.31: the task or function the class defn made for `owner`
 // holds under `name`; null for no owner. A defn is made for each class of an
-// instance, a package or the compilation unit, under the scope FindClassDecl
+// instance, a package or the compilation unit, under the scope VpiFindClassDecl
 // reports, holding a method for each method the class declares, and one for
 // a class a generate block declares under each instance of the block, of
 // which a call standing in the scope `around` reaches its own instance's.
-VpiObject* MethodObject(const BodyWalk& walk, const ScopedClass& owner,
+VpiObject* MethodObject(const BodyWalk& walk, const VpiScopedClass& owner,
                         std::string_view name, const VpiObject* around) {
   if (owner.decl == nullptr) return nullptr;
   const VpiObject* defn =
@@ -493,20 +402,21 @@ CallShape MethodCallShape(const Expr& access, const BlockParent& parent,
 
 // §8.4 with §8.13: the property `name` the class `cls`, of the package
 // `package` where one is named, held under the specialization `args`, or a
-// class it extends (BaseOf), declares; null where neither does.
+// class it extends (VpiBaseOf), declares; null where neither does.
 const ClassMember* PropertyNamed(const BodyWalk& walk, std::string_view cls,
                                  std::string_view name,
                                  std::string_view package = {},
                                  std::span<const DataType> args = {}) {
-  HeldClass held{cls, args};
-  for (const ClassDecl* decl = FindClassDecl(walk, held.name, package).decl;
-       decl != nullptr; decl = FindClassDecl(walk, held.name, package).decl) {
+  VpiHeldClass held{cls, args};
+  for (const ClassDecl* decl = VpiFindClassDecl(walk, held.name, package).decl;
+       decl != nullptr;
+       decl = VpiFindClassDecl(walk, held.name, package).decl) {
     for (const ClassMember* member : decl->members) {
       if (member->kind == ClassMemberKind::kProperty && member->name == name) {
         return member;
       }
     }
-    held = BaseOf(*decl, held.args);
+    held = VpiBaseOf(*decl, held.args);
   }
   return nullptr;
 }
@@ -565,6 +475,27 @@ const DataType* StructTypeOf(const BodyWalk& walk, const DataType* type) {
                                                                 : nullptr;
 }
 
+// §7.2: the structure the member `member` of a structure is, written inline or
+// through a typedef the walked module declares; null for a member of any other
+// type.
+const DataType* MemberStructType(const BodyWalk& walk,
+                                 const StructMember& member) {
+  return StructTypeOf(walk, member.type_kind == DataTypeKind::kNamed
+                                ? ModuleTypedef(walk, member.type_name)
+                                : member.nested_type);
+}
+
+// The same, of the member `name` of the structure `aggregate`.
+const DataType* MemberStructNamed(const BodyWalk& walk,
+                                  const DataType& aggregate,
+                                  std::string_view name) {
+  const DataType* found = nullptr;
+  for (const StructMember& member : aggregate.struct_members) {
+    if (member.name == name) found = MemberStructType(walk, member);
+  }
+  return found;
+}
+
 // §7.2 with §8.4: the class the member `name` of the structure `aggregate`
 // holds a handle of, named as its declaration wrote it, with the arguments its
 // specialization gives the class (§8.25), and the kind of built-in value the
@@ -586,33 +517,47 @@ HandleType StructMemberType(const DataType& aggregate, std::string_view name,
   return type;
 }
 
+// §12.7.3 with §23.6: the same for an array a chain's head `head` is, named
+// `name`: one a named block declares, b1.aa, or else a variable of the module
+// of the instance the leading names reach, u.m, `at` walking that instance.
+int HeadIndexKind(const ChainHead& head, std::string_view name,
+                  const BodyWalk& at) {
+  return head.block_decl != nullptr
+             ? FirstDimIndexKind(head.block_decl->var_unpacked_dims, at)
+             : ModuleIndexKind(*head.mod, name, at);
+}
+
 // §12.7.3 with §8.4, §7.2 and §23.6: the same for an array named through
 // members: a variable of the module of an instance the leading names reach,
-// u.m; a member of a structure variable, s.aa, or of a class the member holds
-// a handle of, s.h.m; or else the first unpacked dimension of the property
-// the chain's last name is, of the class the rest of the chain holds a handle
-// of, o.m or o.h.m. An int var where the chain names none of these, such as
-// one through an element select.
+// u.m, or one a named block declares, b1.aa; a member of a structure variable,
+// s.aa, of a structure such a member is, s.inner.aa, or of a class the member
+// holds a handle of, s.h.m; or else the first unpacked dimension of the
+// property the chain's last name is, of the class the rest of the chain holds a
+// handle of, o.m or o.h.m. An int var where the chain names none of these, such
+// as one through an element select.
 int MemberIndexKind(const Expr& array, const BlockParent& parent,
                     const BodyWalk& walk) {
   std::vector<std::string_view> names;
   if (!ChainNames(array, names)) return vpiIntVar;
   const ChainHead kHead = ChainHeadVar(names, parent, walk);
   const BodyWalk kAt = kHead.WalkAt(walk);
-  if (kHead.used == names.size()) {
-    return ModuleIndexKind(*kHead.mod, names.back(), kAt);
-  }
+  if (kHead.used == names.size())
+    return HeadIndexKind(kHead, names.back(), kAt);
   HandleType held{kHead.var.cls, {}, kHead.var.args};
   std::size_t first = kHead.used;
-  if (const DataType* aggregate = StructTypeOf(kAt, kHead.var.type)) {
+  const DataType* aggregate = StructTypeOf(kAt, kHead.var.type);
+  while (aggregate != nullptr) {
+    const DataType* inner = nullptr;
     for (const StructMember& member : aggregate->struct_members) {
       if (member.name != names[first]) continue;
       if (first + 1 == names.size()) {
         return FirstDimIndexKind(member.unpacked_dims, kAt);
       }
       held = HandleType{member.type_name, {}, member.type_params};
+      inner = MemberStructType(kAt, member);
     }
     ++first;
+    aggregate = inner;
   }
   for (std::size_t i = first; i + 1 < names.size(); ++i) {
     held = PropertyType(kAt, held.cls, names[i], {}, held.args);
@@ -632,6 +577,9 @@ struct ExprClassName {
   // §8.25: the arguments the specialization the value is read as gives the
   // class, from the data type it is read from.
   std::span<const DataType> args = {};
+  // §6.16, §6.19.5 and §7.12: whether the value is no class handle but a
+  // string, an enumeration or an array, whose methods are built in.
+  bool built_in = false;
 };
 
 // §26.3: the class the variable `name` the package `package` declares holds a
@@ -651,12 +599,28 @@ ExprClassName PackageVarClass(const RtlirDesign& design,
   return cls;
 }
 
-// §9.7: the built-in class a method of the built-in class `cls` returns a
-// handle of: process::self(), the process it is called in. Empty for any
-// other method, which returns no handle.
-std::string_view BuiltInResultClass(std::string_view cls,
-                                    std::string_view method) {
-  return cls == "process" && method == "self" ? cls : std::string_view();
+// §9.7 with §6.16, §6.19.5, §7.12 and §18.13: what the built-in method
+// `method` of a value of `owner` returns, for a method a call applies to it.
+// process::self() returns a handle of the process it is called in; every other
+// built-in method a call applies a method to returns a value of no class, whose
+// methods are built in: p.status() an enumeration, get_randstate() a string,
+// and a string's, an enumeration's or an array's method a value of its kind.
+// The integral value the rest return has no method (§23.7).
+ExprClassName BuiltInResult(const ExprClassName& owner,
+                            std::string_view method) {
+  if (method == "self") return {owner.cls, owner.package};
+  return {{}, {}, {}, true};
+}
+
+// §13.4: what a subroutine declared to return `returned` returns, its
+// declaration standing in `package` where that is a package: a handle of the
+// class the type names, or a string or an enumeration, whose methods are built
+// in (§6.16, §6.19.5).
+ExprClassName ReturnedValue(const DataType& returned, std::string_view package,
+                            const BodyWalk& walk) {
+  return {returned.type_name, package, returned.type_params,
+          DeclaredHolder({}, TypeVariableKind(returned, walk), walk) !=
+              VpiBuiltInHolder::kNone};
 }
 
 ExprClassName ExprClass(const Expr& expr, const BlockParent& parent,
@@ -683,9 +647,10 @@ ExprClassName CallResultClass(const Expr& callee, const BlockParent& parent,
   const ModuleItem* function =
       VpiCalleeSubroutine(CallSiteOf(parent, walk), callee).decl;
   if (function != nullptr) {
-    return {function->return_type.type_name,
-            callee.is_scope_resolution ? callee.lhs->text : std::string_view(),
-            function->return_type.type_params};
+    return ReturnedValue(
+        function->return_type,
+        callee.is_scope_resolution ? callee.lhs->text : std::string_view(),
+        walk);
   }
   if (callee.kind != ExprKind::kMemberAccess) {
     return LetResultClass(callee.text, parent, walk);
@@ -697,19 +662,23 @@ ExprClassName CallResultClass(const Expr& callee, const BlockParent& parent,
   const ClassDecl* decl =
       ClassMethodCall(walk, kOwner.cls, kMethod, kOwner.package, kOwner.args)
           .owner.decl;
-  if (decl == nullptr) {
-    return {BuiltInResultClass(kOwner.cls, kMethod), kOwner.package};
-  }
-  const DataType& returned = MethodNamed(*decl, kMethod)->return_type;
-  return {returned.type_name, kOwner.package, returned.type_params};
+  if (decl == nullptr) return BuiltInResult(kOwner, kMethod);
+  return ReturnedValue(VpiMethodNamed(*decl, kMethod)->return_type,
+                       kOwner.package, walk);
 }
 
 // §8.4: the class the value `expr` writes is a handle of: a variable's of the
 // scope; an element's of an array of handles, objs[0]; a property's of the
 // class of what it is selected from, a.h; a package's variable's, p::obj; the
-// return type of what a call calls, f() or a.self(); and a conditional's, of
-// the operand it may answer with first (§11.4.11, which has both operands
-// share a class or one extend the other). Empty for any other expression.
+// return type of what a call calls, f() or a.self(); a conditional's, of the
+// operand it may answer with first (§11.4.11, which has both operands share a
+// class or one extend the other); an assignment's in parentheses, ((h = g)),
+// of its left-hand side (§11.3.6); and a cast's, of the casting type a name
+// writes, B'(d), the value of any other casting type being of no class
+// (§6.24.1). Any other expression a method is applied to writes a value of no
+// class whose methods are built in: a string concatenation (§11.4.12.2) or the
+// string a system function returns. The elaborator reports a method applied to
+// any other operator's result (§11.8.1, §11.4.12).
 ExprClassName ExprClass(const Expr& expr, const BlockParent& parent,
                         const BodyWalk& walk) {
   if (expr.kind == ExprKind::kIdentifier) {
@@ -725,7 +694,14 @@ ExprClassName ExprClass(const Expr& expr, const BlockParent& parent,
   if (expr.kind == ExprKind::kTernary) {
     return ExprClass(*expr.true_expr, parent, walk);
   }
-  if (expr.kind != ExprKind::kMemberAccess) return {};
+  if (expr.kind == ExprKind::kBinary) {
+    return ExprClass(*expr.lhs, parent, walk);
+  }
+  if (expr.kind == ExprKind::kCast) {
+    return {
+        expr.text, {}, {}, VpiFindClassDecl(walk, expr.text).decl == nullptr};
+  }
+  if (expr.kind != ExprKind::kMemberAccess) return {{}, {}, {}, true};
   if (expr.is_scope_resolution) {
     return PackageVarClass(walk.design, expr.lhs->text, expr.rhs->text);
   }
@@ -751,9 +727,17 @@ CallShape ExprCallShape(const Expr& access, const BlockParent& parent,
     members.insert(members.begin(), base->rhs->text);
     base = base->lhs;
   }
+  // §37.42 detail 11: a method of a value of no class is one of the built-in
+  // methods of its kind, a function, the elaborator reporting any other name.
+  MethodCall call;
+  if (kClass.built_in) {
+    call.type = vpiMethodFuncCall;
+  } else {
+    call =
+        ClassMethodCall(walk, kClass.cls, kName, kClass.package, kClass.args);
+  }
   CallShape shape = MethodShape(
-      ClassMethodCall(walk, kClass.cls, kName, kClass.package, kClass.args),
-      kName,
+      call, kName,
       VpiCallSiteExpression(base, walk.objects, CallSiteOf(parent, walk),
                             walk.calls.ctx, walk.build),
       parent.scope, walk);
@@ -785,13 +769,19 @@ CallShape MemberChainCallShape(const Expr& access, const BlockParent& parent,
   VpiObject* prefix = kHead.var.object;
   std::size_t first = kHead.used;
   // §7.2: a structure's member is selected in the structure variable itself,
-  // whose member object stands for it, so the chain's class vars start there.
+  // whose member object stands for it, and a member that is a structure in
+  // turn, s.inner.h, in that member's object, so the chain's class vars start
+  // past the last of them.
   const DataType* aggregate =
       first < names.size() ? StructTypeOf(kAt, kHead.var.type) : nullptr;
-  if (aggregate != nullptr) {
-    type = StructMemberType(*aggregate, names[first], kAt);
-    prefix = ChildNamed(prefix, names[first]);
+  while (aggregate != nullptr) {
+    const std::string_view kMember = names[first];
+    type = StructMemberType(*aggregate, kMember, kAt);
+    prefix = ChildNamed(prefix, kMember);
     ++first;
+    aggregate = first < names.size()
+                    ? MemberStructNamed(kAt, *aggregate, kMember)
+                    : nullptr;
   }
   for (std::size_t i = first; i < names.size(); ++i) {
     type = PropertyType(kAt, type.cls, names[i], {}, type.args);
@@ -824,10 +814,10 @@ CallShape MemberChainCallShape(const Expr& access, const BlockParent& parent,
 // (§8.10, §8.23), or of a class a package declares, p::C::f. A static method is
 // called through no object, so the call has no prefix.
 // §8.23 with §8.25: the arguments the parameter_value_assignment a class scope
-// is written with gives, C #(.T(B2)):: or C #(B2)::, as the data types BaseOf
-// binds: the type each names, by the parameter it binds in the named form.
-// A named argument left empty, .T(), binds nothing (§8.25.1); the ordered form
-// leaves none empty.
+// is written with gives, C #(.T(B2)):: or C #(B2)::, as the data types
+// VpiBaseOf binds: the type each names, by the parameter it binds in the named
+// form. A named argument left empty, .T(), binds nothing (§8.25.1); the ordered
+// form leaves none empty.
 std::vector<DataType> ScopeArguments(const Expr& scope) {
   std::vector<DataType> args;
   for (std::size_t i = 0; i < scope.elements.size(); ++i) {
@@ -915,7 +905,8 @@ int ForeachIndexKind(const Expr* array, const BlockParent& parent,
 VpiObject* MethodCallClassDefn(const Expr& access, const BlockParent& parent,
                                const BodyWalk& walk) {
   const ExprClassName kClass = ExprClass(*access.lhs, parent, walk);
-  const ScopedClass kFound = FindClassDecl(walk, kClass.cls, kClass.package);
+  const VpiScopedClass kFound =
+      VpiFindClassDecl(walk, kClass.cls, kClass.package);
   return VpiClassDefnOf(walk.calls.classes, kFound.decl, kFound.scope,
                         parent.scope);
 }

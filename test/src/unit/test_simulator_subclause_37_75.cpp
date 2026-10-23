@@ -573,6 +573,46 @@ TEST_F(DoWhileAndForeachLoopsOfARun, ANestedStructMembersFixedArrayGivesInt) {
   EXPECT_EQ(FirstLoopVarKinds(By("top.b")), (std::vector<int>{vpiIntVar}));
 }
 
+// §12.7.3 with §7.2: over an associative array a structure member's own
+// structure member holds, one written through a typedef, s.inner.aa, or inline,
+// s.flat.aa, the index variable is of the array's index type (#7721).
+TEST_F(DoWhileAndForeachLoopsOfARun, ANestedStructMembersArrayGivesItsIndex) {
+  Run("module top;\n"
+      "  typedef struct { int aa [string]; } in_t;\n"
+      "  typedef struct { in_t inner; struct { int aa [byte]; } flat; } "
+      "out_t;\n"
+      "  out_t s;\n"
+      "  initial begin : b\n"
+      "    foreach (s.inner.aa[k]) begin end\n"
+      "    foreach (s.flat.aa[k]) begin end\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_EQ(FirstLoopVarKinds(By("top.b")),
+            (std::vector<int>{vpiStringVar, vpiByteVar}));
+}
+
+// §9.3.4 and §23.6 with §12.7.3: over an associative array a named block
+// declares, reached from another process through the block's name, b1.aa, the
+// index variable is of the array's index type (#7724).
+TEST_F(DoWhileAndForeachLoopsOfARun, ANamedBlocksArrayGivesItsIndexType) {
+  Run("module top;\n"
+      "  initial begin begin : b1 static int aa [string]; end end\n"
+      "  initial begin : b foreach (b1.aa[k]) begin end end\n"
+      "endmodule\n");
+  EXPECT_EQ(FirstLoopVarKinds(By("top.b")), (std::vector<int>{vpiStringVar}));
+}
+
+// §12.7.3 with §25.9: over a fixed-size array an interface declares, named
+// through a virtual interface, vif.f, the index variable is an int var, as over
+// any fixed-size array.
+TEST_F(DoWhileAndForeachLoopsOfARun, AVirtualInterfacesFixedArrayGivesInt) {
+  Run("interface intf; int f [2]; endinterface\n"
+      "module top; intf i (); virtual intf vif;\n"
+      "  initial begin : b vif = i; foreach (vif.f[k]) begin end end\n"
+      "endmodule\n");
+  EXPECT_EQ(FirstLoopVarKinds(By("top.b")), (std::vector<int>{vpiIntVar}));
+}
+
 // §37.75: a null handle has no do-while condition.
 TEST_F(DoWhileForeach, DoWhileConditionOfANullHandleIsNull) {
   EXPECT_EQ(VpiDoWhileConditionExpr(nullptr), nullptr);
