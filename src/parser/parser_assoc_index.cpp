@@ -36,6 +36,16 @@ bool ParserDataDeclHelpers::AtIndexType(Parser& p) {
   return parameterized;
 }
 
+DataType ParserDataDeclHelpers::ReadIndexDataType(Parser& p) {
+  if (p.Check(TokenKind::kKwEnum)) return p.ParseEnumType();
+  if (p.Check(TokenKind::kKwStruct) || p.Check(TokenKind::kKwUnion)) {
+    DataType type = p.ParseStructOrUnionType();
+    p.ParsePackedDims(type);
+    return type;
+  }
+  return p.ParseDataType();
+}
+
 // Parses the type naming an associative array's index, positioned where
 // AtIndexType found it opening. §7.8 makes an index_type a data_type, so a
 // data_type built on an integer type carries the optional signing that A.2.2.1
@@ -57,7 +67,8 @@ Expr* Parser::ParseAssocIndexDim() {
     auto* ref = arena_.Create<Expr>();
     ref->kind = ExprKind::kTypeRef;
     ref->range.start = CurrentLoc();
-    ref->type_value = arena_.Create<DataType>(ParseDataType());
+    ref->type_value = arena_.Create<DataType>(
+        ParserDataDeclHelpers::ReadIndexDataType(*this));
     ref->text = ref->type_value->type_name;
     return ref;
   }

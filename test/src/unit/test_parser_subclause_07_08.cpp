@@ -2,7 +2,6 @@
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
-#include "helpers_reported_error.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_type.h"
@@ -48,15 +47,23 @@ TEST(AssocArrayParsing, MultipleDeclarations) {
   ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
 }
 
-TEST(AssocArrayParsing, InlineStructTypeAsIndexRejected) {
+// §7.8 makes an index type a data_type, A.2.5 writes the index as one, and
+// §7.8.5 admits any type with equality defined, an unpacked structure among
+// them, so a structure declared in the brackets is read as the index type,
+// kept as a type reference holding it. It drew a parse error.
+TEST(AssocArrayParsing, InlineStructTypeAsIndexIsRead) {
   auto r = Parse(
       "module t;\n"
       "  int aa [ struct { int x; } ];\n"
       "endmodule\n");
-  // `struct` is no index type Parser::ParseUnpackedDims recognizes, so the
-  // dimension falls through to Parser::ParsePrimary, and §11.2 owns the report
-  // that the bracket holds no expression.
-  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 2, "11.2"));
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  const auto* aa = r.cu->modules[0]->items[0];
+  ASSERT_EQ(aa->unpacked_dims.size(), 1u);
+  ASSERT_NE(aa->unpacked_dims[0], nullptr);
+  EXPECT_EQ(aa->unpacked_dims[0]->kind, ExprKind::kTypeRef);
+  ASSERT_NE(aa->unpacked_dims[0]->type_value, nullptr);
+  EXPECT_EQ(aa->unpacked_dims[0]->type_value->kind, DataTypeKind::kStruct);
 }
 
 // Covers Parser::ParseAssocIndexDim in src/parser/parser_types.cpp, which

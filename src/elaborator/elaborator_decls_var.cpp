@@ -11,6 +11,7 @@
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "common/types.h"
 #include "elaborator/aggregate_shape.h"
 #include "elaborator/assoc_index_type.h"
@@ -818,6 +819,16 @@ static void TakeWrittenFields(
   var.gen_block_consts = gen_loop_consts;
 }
 
+// §8.23: resolves a declared type named through a class scope, and reports
+// one that resolves by no route.
+static void ResolveOrReportClassScopedDeclType(DataType& type, SourceLoc loc,
+                                               const TypedefMap& typedefs,
+                                               const CompilationUnit* unit,
+                                               DiagEngine& diag) {
+  ResolveClassScopedDeclType(type, typedefs, unit);
+  ReportUnresolvedClassScopedType(type, loc, typedefs, unit, diag);
+}
+
 void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   // §27.4: the genvar serves as an integer during elaboration, to run the
   // generate loop and create its block instances, and does not exist at
@@ -854,9 +865,8 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   // stands at compilation-unit scope. A class written inside this module
   // reaches the declaration through here instead, and a declaration that
   // resolved by neither route earns the report below.
-  ResolveClassScopedDeclType(item->data_type, typedefs_, unit_);
-  ReportUnresolvedClassScopedType(item->data_type, item->loc, typedefs_, unit_,
-                                  diag_);
+  ResolveOrReportClassScopedDeclType(item->data_type, item->loc, typedefs_,
+                                     unit_, diag_);
 
   if (ElaborateUserNettypeNet(item, mod)) return;
 
@@ -896,9 +906,9 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   var.width = EvalTypeWidth(item->data_type, typedefs_, BuildParamScope(mod));
   ValidatePackedDimRange(item->data_type, item->loc);
   SetVariableKindFlags(item, var, typedefs_);
-  var.is_signed = IsSignedType(item->data_type, typedefs_);
   var.is_signed =
-      ReconcilePartialPort(item->name, var.is_signed, NetType::kNone, mod);
+      ReconcilePartialPort(item->name, IsSignedType(item->data_type, typedefs_),
+                           NetType::kNone, mod);
 
   if (item->init_expr) var_init_names_.insert(var.name);
 

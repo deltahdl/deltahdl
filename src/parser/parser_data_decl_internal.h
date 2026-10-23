@@ -98,6 +98,12 @@ struct ParserDataDeclHelpers {
   // constant sizing the array, is left to the expression reader. Defined in
   // src/parser/parser_assoc_index.cpp.
   static bool AtIndexType(Parser& p);
+
+  // A.2.5: reads an associative array's index that AtIndexType found opening
+  // with no type keyword: an enumeration, or a structure or union with any
+  // packed dimensions after it, read as a declaration reads them (A.2.2.1),
+  // or a parameterized class. Defined in src/parser/parser_assoc_index.cpp.
+  static DataType ReadIndexDataType(Parser& p);
 };
 
 }  // namespace delta
