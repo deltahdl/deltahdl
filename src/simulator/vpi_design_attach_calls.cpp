@@ -541,12 +541,10 @@ int MemberIndexKind(const Expr& array, const BlockParent& parent,
     return HeadIndexKind(kHead, names.back(), kAt);
   HandleType held{kHead.var.cls, {}, kHead.var.args};
   std::size_t first = kHead.used;
-  const ModuleItem* iface_var =
-      kHead.var.vif.empty() || first + 1 != names.size()
-          ? nullptr
-          : VpiInterfaceItem(walk.design, kHead.var.vif, names.back(),
-                             {ModuleItemKind::kVarDecl});
-  if (iface_var != nullptr) {
+  // A head that is no virtual interface refers to no interface (§25.9).
+  const ModuleItem* iface_var = VpiInterfaceItem(
+      walk.design, kHead.var.vif, names[first], {ModuleItemKind::kVarDecl});
+  if (iface_var != nullptr && first + 1 == names.size()) {
     return FirstDimIndexKind(iface_var->unpacked_dims, kAt);
   }
   const DataType* aggregate = StructTypeOf(kAt, kHead.var.type);
