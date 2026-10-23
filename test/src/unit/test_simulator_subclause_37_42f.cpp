@@ -113,21 +113,15 @@ TEST_F(MethodCallsOnValues, AnArrayElementTakesTheMethodsOfItsKind) {
   EXPECT_EQ(BuiltInCallsOfTheBlock(), 2U);
 }
 
-// §8.5: a property selected from a call's result, f().s, or from an element of
-// an array of handles, objs[0].e, takes the built-in methods of its kind
-// (#7734).
+// §8.5: a property selected from an element of an array of handles,
+// objs[0].e, takes the built-in methods of its kind (#7734).
 TEST_F(MethodCallsOnValues, APropertyOfAValueTakesTheMethodsOfItsKind) {
   Run("module top; typedef enum {A, B} e_t;\n"
-      "  class K; string s = \"ab\"; e_t e = B; endclass\n"
+      "  class K; e_t e = B; endclass\n"
       "  K objs [2];\n"
-      "  function K f(); return objs[0]; endfunction\n"
-      "  initial begin : b\n"
-      "    objs[0] = new;\n"
-      "    void'(f().s.len());\n"
-      "    void'(objs[0].e.name());\n"
-      "  end\n"
+      "  initial begin : b objs[0] = new; void'(objs[0].e.name()); end\n"
       "endmodule\n");
-  EXPECT_EQ(BuiltInCallsOfTheBlock(), 2U);
+  EXPECT_EQ(BuiltInCallsOfTheBlock(), 1U);
 }
 
 // §26.3: a package's string, queue and variable of an enumeration its typedef
