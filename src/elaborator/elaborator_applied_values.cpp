@@ -327,20 +327,23 @@ void ReportNoBuiltInMethod(const Expr& access, const DataScope& scope,
   const Expr& root = SelectRoot(*access.lhs, selects);
   const AppliedValue kValue = ValueOf(root, selects, scope);
   const bool kString = kValue.kind == DataTypeKind::kString;
+  const bool kEvent = kValue.kind == DataTypeKind::kEvent;
   const bool kBare = IsMemberlessKind(kValue.kind);
-  if (!kString && !kBare && kValue.kind != DataTypeKind::kEnum) return;
-  const std::string_view kName = access.rhs->text;
-  using Methods = std::span<const std::string_view>;
-  const Methods kMethods = kString ? Methods(kStringMethods)
-                           : kBare ? Methods()
-                                   : Methods(kEnumMethods);
-  if (std::ranges::find(kMethods, kName) != kMethods.end() ||
-      (!kString && kName == "rand_mode" && kValue.property))
+  if (!kString && !kEvent && !kBare && kValue.kind != DataTypeKind::kEnum) {
     return;
-  constexpr const char* kNouns[] = {"string", "integral or real value",
+  }
+  const std::string_view kName = access.rhs->text;
+  const int kWhich = kString ? 0 : kEvent ? 1 : kBare ? 2 : 3;
+  static constexpr std::string_view kEventMethods[] = {"triggered"};
+  using Methods = std::span<const std::string_view>;
+  const Methods kMethods[] = {kStringMethods, kEventMethods, Methods(),
+                              kEnumMethods};
+  if (std::ranges::find(kMethods[kWhich], kName) != kMethods[kWhich].end() ||
+      (kWhich > 1 && kName == "rand_mode" && kValue.property))
+    return;
+  constexpr const char* kNouns[] = {"string", "event", "integral or real value",
                                     "enumeration"};
-  constexpr const char* kRules[] = {"6.16", "23.7", "6.19.5"};
-  const int kWhich = kString ? 0 : (kBare ? 1 : 2);
+  constexpr const char* kRules[] = {"6.16", "15.5.3", "23.7", "6.19.5"};
   diag.Error(access.rhs->range.start,
              std::format("'{}' is not a built-in method of the {} {}", kName,
                          kNouns[kWhich], kValue.named),

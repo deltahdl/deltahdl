@@ -159,11 +159,11 @@ SitedType HeldPropertyType(const Expr& access, const DataScope& scope);
 // property of the class a handle holds; kImplicit for anything else.
 DataTypeKind AppliedValueKind(const Expr& value, const DataScope& scope);
 
-// §6.16 and §6.19.5: a member access `access`, s.m or e.m, applied to a string
-// or an enumeration (AppliedValueKind), naming none of its type's built-in
-// methods, and
+// §6.16, §6.19.5 and §15.5.3: a member access `access`, s.m, e.m or ev.m,
+// applied to a string, an enumeration or a named event (AppliedValueKind),
+// naming none of its type's built-in methods, and
 // §23.7 a): one applied to an integral or real value, which has none. A random
-// property of a class, but a string, also has rand_mode (§18.8).
+// property of a class, but a string or an event, also has rand_mode (§18.8).
 void ReportNoBuiltInMethod(const Expr& access, const DataScope& scope,
                            DiagEngine& diag);
 
