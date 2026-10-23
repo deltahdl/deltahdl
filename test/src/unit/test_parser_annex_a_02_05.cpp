@@ -18,6 +18,7 @@
 
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <string_view>
 
 #include "fixture_parser.h"
@@ -196,6 +197,31 @@ TEST(DeclarationRangeParsing, QueueDimensionColonWithoutBoundRejected) {
   // §11.2 owns the report for a primary that is not an expression; §7.10 states
   // the queue dimension whose bound is missing.
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 1, "11.2"));
+}
+
+// --- Negative: associative_dimension's index is a data_type ---------------
+
+// A.2.5 writes associative_dimension as `[ data_type ]`, and A.2.2.1's net_type
+// is no form of data_type, so `[wire]` and `[supply0]` are each reported on
+// their own line. A keyword data_type, packed dimensions and all, is read with
+// no report. Both net keywords were taken as index types.
+TEST(DeclarationRangeParsing, NetTypeIndexIsReported) {
+  auto r = Parse(
+      "module m;\n"
+      "  int a [wire];\n"
+      "  int b [supply0];\n"
+      "  int c [int];\n"
+      "  int d [logic [3:0]];\n"
+      "endmodule\n");
+  for (uint32_t line : {2u, 3u, 4u, 5u}) {
+    EXPECT_EQ(static_cast<bool>(ReportedError(
+                  r.diags,
+                  "a net type is no data type and cannot index an associative "
+                  "array",
+                  line, "A.2.5")),
+              line < 4u)
+        << "line " << line;
+  }
 }
 
 }  // namespace

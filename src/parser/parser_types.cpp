@@ -623,6 +623,14 @@ static bool TakesSigning(TokenKind tk) {
 // two declarations are different arrays. Each one is appended to `elements` in
 // declaration order as a `[msb:lsb]` range.
 Expr* Parser::ParseAssocIndexDim() {
+  // A.2.5 reads the index as a data_type, which A.2.2.1's net_type is no form
+  // of, so a net type keyword is reported here and the dimension read on.
+  if (IsNetTypeToken(CurrentToken().kind)) {
+    diag_.Error(CurrentLoc(),
+                "a net type is no data type and cannot index an associative "
+                "array",
+                Subclause("A.2.5"));
+  }
   auto* dim = arena_.Create<Expr>();
   dim->kind = ExprKind::kIdentifier;
   bool takes_signing = TakesSigning(CurrentToken().kind);
