@@ -56,7 +56,11 @@ void Parser::ParseClockingSkew(Edge& edge, Expr*& delay) {
   if (Check(TokenKind::kHash)) {
     Consume();
 
-    if (Check(TokenKind::kIntLiteral) && CurrentToken().text == "1") {
+    // A.6.5's delay_control is `# delay_value` or `# ( mintypmax_expression )`;
+    // the second is read as the parenthesized primary it is.
+    if (Check(TokenKind::kLParen)) {
+      delay = ParsePrimaryExpr();
+    } else if (Check(TokenKind::kIntLiteral) && CurrentToken().text == "1") {
       auto saved = lexer_.SavePos();
       auto one_tok = CurrentToken();
       Consume();
