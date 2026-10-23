@@ -143,13 +143,16 @@ static void ValidatePortAssignment(const PortDecl& port, bool port_is_var,
 // ranges than dimensions knows a dimension went unrecorded rather than reading
 // the port as one that is not an array.
 static void ComputePortUnpackedDims(const PortDecl& port, RtlirPort& rp,
-                                    const ScopeMap& scope, DiagEngine& diag) {
+                                    const ScopeMap& scope,
+                                    const TypeShapeTables& shapes,
+                                    DiagEngine& diag) {
   for (auto* dim : port.unpacked_dims) {
-    // §7.5 writes a dynamic array dimension as an empty pair of brackets, which
-    // Parser::ParseUnpackedDims records as a null expression. It declares no
-    // fixed size and no address range, so there is nothing here to fold and
-    // nothing to report.
-    if (dim == nullptr) continue;
+    // A dynamic array's `[]` (§7.5), a queue's `[$]` (§7.10) and an
+    // associative array's index (§7.8) declare no fixed size and no address
+    // range, so there is nothing here to fold and nothing to report. A.2.5
+    // makes each a variable_dimension, which a variable port may take; one on
+    // a net or interface port is reported by ValidateFixedSizePortDims.
+    if (!IsFixedSizeUnpackedDim(dim, shapes)) continue;
     auto folded = FoldUnpackedDimBounds(dim, scope);
     if (!folded) {
       diag.Error(port.loc,
@@ -254,6 +257,9 @@ struct PortElabContext {
   // and the module the port's variable is declared on.
   Arena& arena;
   RtlirModule* mod;
+  // What tells an associative index naming a typedef or a class from a
+  // dimension's size naming a parameter (IsFixedSizeUnpackedDim).
+  const TypeShapeTables& shapes;
 };
 
 // The resolved aggregate a structure or union port carries for its layout,
@@ -394,8 +400,7 @@ static uint32_t SelectPortWidth(const Expr* expr, const ScopeMap& scope) {
   return static_cast<uint32_t>(std::abs(*left - *right) + 1);
 }
 
-// Fill the base (non-interface) fields of an RtlirPort from its declaration,
-// including the folded unpacked-dimension sizes.
+// Fill the base (non-interface) fields of an RtlirPort from its declaration.
 static RtlirPort BuildRtlirPortBase(const PortDecl& port, bool port_is_var,
                                     uint32_t width, const ScopeMap& scope,
                                     DiagEngine& diag) {
@@ -456,7 +461,6 @@ static RtlirPort BuildRtlirPortBase(const PortDecl& port, bool port_is_var,
   } else {
     rp.default_value = port.default_value;
   }
-  ComputePortUnpackedDims(port, rp, scope, diag);
   return rp;
 }
 
@@ -526,6 +530,7 @@ static RtlirPort ElaborateOnePort(const ModuleDecl* decl, const PortDecl& port,
   uint32_t width = EvalTypeWidth(port.data_type, ctx.typedefs, ctx.param_scope);
   RtlirPort rp =
       BuildRtlirPortBase(port, port_is_var, width, ctx.param_scope, ctx.diag);
+  ComputePortUnpackedDims(port, rp, ctx.param_scope, ctx.shapes, ctx.diag);
   rp.data_kind = ResolvedTypeKind(port.data_type, ctx.typedefs);
   // §23.2.2.3: a port whose port kind is omitted defaults to a net of the
   // default net type, the one in force where the module is defined (§22.8). A
@@ -539,6 +544,32 @@ static RtlirPort ElaborateOnePort(const ModuleDecl* decl, const PortDecl& port,
     rp.net_type = ctx.mod->default_nettype;
   }
   return rp;
+}
+
+// A.1.3 and A.2.3 (printed page 1184): the name of a net port or of an
+// interface port takes unpacked_dimensions alone, each a constant range or
+// size, where a variable port's takes variable_dimensions, which add the
+// dynamic, associative and queue forms (A.2.5). A checker's formal is no port,
+// and takes variable_dimensions whatever its type (A.1.8).
+static void ValidateFixedSizePortDims(const ModuleDecl* decl,
+                                      const PortDecl& port, const RtlirPort& rp,
+                                      const PortElabContext& ctx) {
+  if (decl->decl_kind == ModuleDeclKind::kChecker ||
+      (rp.is_var && !rp.is_interface_port)) {
+    return;
+  }
+  if (std::ranges::all_of(port.unpacked_dims, [&](const Expr* dim) {
+        return IsFixedSizeUnpackedDim(dim, ctx.shapes);
+      })) {
+    return;
+  }
+  ctx.diag.Error(
+      port.loc,
+      std::format("{} port '{}' takes fixed-size unpacked "
+                  "dimensions alone; a dynamic, associative or "
+                  "queue dimension belongs to a variable port",
+                  rp.is_interface_port ? "interface" : "net", port.name),
+      Subclause(decl->is_non_ansi_ports ? "A.2.3" : "A.1.3"));
 }
 
 // 23.2.2.4: a default input-port value is a constant expression evaluated in
@@ -787,6 +818,7 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
 
   CheckDuplicatePortNames(decl, ansi_port_names_, diag_);
 
+  const TypeShapeTables kShapes{typedefs_, td_array_dims_, class_names_};
   PortElabContext ctx{typedefs_,
                       param_scope,
                       non_ansi_complete_ports_,
@@ -794,7 +826,8 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
                       non_ansi_signed_ports_,
                       diag_,
                       arena_,
-                      mod};
+                      mod,
+                      kShapes};
 
   DeclarePortExprObjects(decl, mod, ctx);
   RecordPortExprDecls(decl, mod);
@@ -847,6 +880,7 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
       }
     }
 
+    ValidateFixedSizePortDims(decl, port, rp, ctx);
     LayOutAggregatePort(decl, port, rp, ctx);
     mod->ports.push_back(rp);
   }

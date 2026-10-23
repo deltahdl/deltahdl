@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -81,6 +83,75 @@ TEST(ModuleParametersAndPorts, APortSelectByAParameterIsAccepted) {
       "endmodule\n",
       f);
   EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// A.1.3's ansi_port_declaration gives a port declared with a net_port_header
+// or an interface_port_header unpacked_dimensions alone, each a constant range
+// or size (A.2.5), so a dynamic dimension on an interface port, a dynamic
+// dimension on a net port and a queue dimension on an inout net are each
+// reported. The dynamic ones were taken with no report, and the queue was
+// reported as a dimension that is not a constant expression (§7.4.2).
+TEST(ModuleParametersAndPorts,
+     ANetOrInterfacePortOfANonFixedDimensionIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface bus; endinterface\n"
+      "module m (bus c [], input wire a [], inout wire b [$]);\n"
+      "endmodule\n",
+      f);
+  const std::string kRule =
+      " takes fixed-size unpacked dimensions alone; a dynamic, associative or "
+      "queue dimension belongs to a variable port";
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "net port 'a'" + kRule, 2, "A.1.3"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "net port 'b'" + kRule, 2, "A.1.3"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "interface port 'c'" + kRule,
+                            2, "A.1.3"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "unpacked dimension of port 'b' is not a "
+                             "constant expression",
+                             2, "7.4.2"));
+}
+
+// A net port's constant range and constant size are the unpacked_dimensions
+// A.1.3 gives it, and draw no report.
+TEST(ModuleParametersAndPorts, ANetPortOfFixedSizeDimensionsIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m (input wire a [2], input wire b [0:3]);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// A.1.3 gives a port declared with a variable_port_header variable_dimensions,
+// which A.2.5 makes a dynamic, an associative or a queue dimension as well as
+// a fixed one, so none of these four variable ports is reported. The queue and
+// the two associative ones were reported as unpacked dimensions that are not
+// constant expressions (§7.4.2).
+TEST(ModuleParametersAndPorts, AVariablePortTakesEveryVariableDimension) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m (output int q [$], input int a [string], input int w [*],\n"
+      "          input var int v []);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// A variable port's fixed dimension is still folded, and one whose size names
+// nothing the module declares is still reported.
+TEST(ModuleParametersAndPorts, AVariablePortsUnfoldableDimensionIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m (input int a [W]);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unpacked dimension of port 'a' is not a constant "
+                            "expression",
+                            1, "7.4.2"));
 }
 
 }  // namespace
