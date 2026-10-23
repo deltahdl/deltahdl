@@ -184,6 +184,24 @@ TEST_F(MethodCallsOnValues, AnEmbeddedCovergroupTakesItsPredefinedMethods) {
   EXPECT_EQ(BuiltInCallsOfTheBlock(), 1U);
 }
 
+// §15.5.3: a named event has its triggered() method built in, whether a
+// variable of the module, one a block declares, or a class property selected
+// through a handle holds it (#7744).
+TEST_F(MethodCallsOnValues, ANamedEventTakesItsTriggeredMethod) {
+  Run("module top;\n"
+      "  class C; event ev; endclass\n"
+      "  event ev;\n"
+      "  C h = new;\n"
+      "  initial begin : b\n"
+      "    event local_ev;\n"
+      "    void'(ev.triggered());\n"
+      "    void'(local_ev.triggered());\n"
+      "    void'(h.ev.triggered());\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_EQ(BuiltInCallsOfTheBlock(), 3U);
+}
+
 // §8.25 with §6.16: a property written with its class's type parameter is of
 // the type the specialization binds the parameter to, else of the parameter's
 // default, and a string's methods apply to it (#7742).

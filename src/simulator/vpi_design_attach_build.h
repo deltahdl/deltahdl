@@ -526,7 +526,8 @@ int VpiMemberBuiltInCallKind(std::string_view method);
 
 // The kind of value a built-in method is called on: a string (§6.16), an enum
 // (§6.19.5), a fixed-size, dynamic or associative array or a queue (§7.4,
-// §7.5, §7.8, §7.10), a covergroup instance (§19.8), or none of them.
+// §7.5, §7.8, §7.10), a covergroup instance (§19.8), a named event (§15.5.3),
+// or none of them.
 enum class VpiBuiltInHolder : uint8_t {
   kNone,
   kString,
@@ -536,6 +537,7 @@ enum class VpiBuiltInHolder : uint8_t {
   kAssocArray,
   kQueue,
   kCovergroup,
+  kEvent,
 };
 
 // Whether `name` is a system function the standard defines, which a statement

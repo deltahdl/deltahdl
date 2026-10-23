@@ -122,7 +122,7 @@ bool IsAssocDim(const Expr& dim, const BodyWalk& walk) {
 // The kind of built-in value a declaration with the unpacked dimensions `dims`
 // and the variable kind `kind` holds: an array of the kind its first unpacked
 // dimension makes, a dynamic array's `[]` being recorded as no dimension and a
-// queue's as `[$]`; else a string or an enum.
+// queue's as `[$]`; else a string, a named event or an enum.
 VpiBuiltInHolder DeclaredHolder(const std::vector<Expr*>& dims, int kind,
                                 const BodyWalk& walk) {
   if (!dims.empty()) {
@@ -133,6 +133,7 @@ VpiBuiltInHolder DeclaredHolder(const std::vector<Expr*>& dims, int kind,
                                   : VpiBuiltInHolder::kFixedArray;
   }
   if (kind == vpiStringVar) return VpiBuiltInHolder::kString;
+  if (kind == vpiNamedEvent) return VpiBuiltInHolder::kEvent;
   return kind == vpiEnumVar ? VpiBuiltInHolder::kEnum : VpiBuiltInHolder::kNone;
 }
 
@@ -162,6 +163,7 @@ VpiBuiltInHolder ModuleHolder(const RtlirVariable& var) {
   if (var.num_unpacked_dims > 0) return VpiBuiltInHolder::kFixedArray;
   if (var.is_string) return VpiBuiltInHolder::kString;
   if (var.covergroup != nullptr) return VpiBuiltInHolder::kCovergroup;
+  if (var.is_event) return VpiBuiltInHolder::kEvent;
   // An enum declared without a typedef is keyed by its declaration's name
   // (SetEnumTypeInfo), so every enum variable names an enumeration. One of an
   // enumeration's named constants is a value of it too (§6.19), though the
