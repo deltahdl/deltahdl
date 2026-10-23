@@ -510,4 +510,21 @@ TEST(AssocIndexTypeValidation, TypeRefRealIndexReportedInEveryScope) {
   }
 }
 
+// §7.8.5 bars a real index alone, so a typedef whose associative index is a
+// type reference to a value that holds no real, `[type(k)]` of a
+// `bit [3:0]`, draws no report.
+TEST(AssocIndexTypeValidation, TypeRefIndexWithoutRealInTypedefIsNotReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  bit [3:0] k;\n"
+      "  typedef int tk [type(k)];\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "real or shortreal type shall not be used as an "
+                             "associative array index type",
+                             3, "7.8.5"));
+}
+
 }  // namespace
