@@ -224,4 +224,34 @@ TEST(DeclarationRangeParsing, NetTypeIndexIsReported) {
   }
 }
 
+// A.2.5 writes associative_dimension's index as a data_type, so an
+// enumeration, a packed structure and a packed union declared in the brackets,
+// a type reference and a parameterized class are each an index type. Each is
+// read with no report into a type reference, the data_type it holds kept for
+// all but `type(k)`, which the elaborator resolves. The enumeration, the
+// structure, the union and the class each drew a parse error.
+TEST(DeclarationRangeParsing, DataTypeIndexFormsAreRead) {
+  auto r = Parse(
+      "class P #(int N = 1); endclass\n"
+      "module m;\n"
+      "  bit [3:0] k;\n"
+      "  int e [enum {A, B}];\n"
+      "  int s [struct packed {bit [3:0] f;}];\n"
+      "  int u [union packed {bit [3:0] f; bit [3:0] g;}];\n"
+      "  int t [type(k)];\n"
+      "  int c [P#(8)];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  for (std::string_view name : {"e", "s", "u", "t", "c"}) {
+    const auto* item = FindItem(r, name);
+    ASSERT_NE(item, nullptr) << name;
+    ASSERT_EQ(item->unpacked_dims.size(), 1u) << name;
+    ASSERT_NE(item->unpacked_dims[0], nullptr) << name;
+    EXPECT_EQ(item->unpacked_dims[0]->kind, ExprKind::kTypeRef) << name;
+    EXPECT_EQ(item->unpacked_dims[0]->type_value == nullptr, name == "t")
+        << name;
+  }
+}
+
 }  // namespace

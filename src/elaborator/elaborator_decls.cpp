@@ -228,13 +228,37 @@ static bool TryParseUserDefinedAssocDim(
   return true;
 }
 
+// A.2.5 with §6.23: an index written as a data_type an expression cannot
+// spell, `[enum {A, B}]`, or as a type reference, `[type(k)]`, is a type
+// reference whose type_value is the index type, once resolved. A named one is
+// a typedef's or a class's, `[P#(8)]`, applied as a name is; any other gives
+// the index its own width and signing, a string's keys being strings.
+static bool TryParseTypeRefAssocDim(const Expr* dim, RtlirVariable& var,
+                                    const UnpackedDimContext& ctx) {
+  if (dim->kind != ExprKind::kTypeRef || dim->type_value == nullptr) {
+    return false;
+  }
+  const DataType& type = *dim->type_value;
+  if (type.kind == DataTypeKind::kNamed) {
+    ApplyUserDefinedAssocDim(type.type_name, var, ctx.types.typedefs,
+                             ctx.types.class_names);
+    return true;
+  }
+  var.is_assoc = true;
+  var.is_string_index = type.kind == DataTypeKind::kString;
+  var.assoc_index_width = EvalTypeWidth(type, ctx.types.typedefs, ctx.scope);
+  var.is_index_signed = IsSignedType(type, ctx.types.typedefs);
+  return true;
+}
+
 // §7.8 with §7.4 (printed pages 162 and 153): whether `dim` is an associative
 // dimension, parsed onto `var` where it is.
 static bool TryParseAnyAssocDim(const Expr* dim, RtlirVariable& var,
                                 const UnpackedDimContext& ctx) {
   return TryParseAssocDim(dim, var, ctx.scope) ||
          TryParseUserDefinedAssocDim(dim, var, ctx.types.typedefs,
-                                     ctx.types.class_names);
+                                     ctx.types.class_names) ||
+         TryParseTypeRefAssocDim(dim, var, ctx);
 }
 
 // §7.8 with §7.4: an associative array's element type may be an associative

@@ -67,10 +67,16 @@ std::string ScopedTypeKey(const Expr* dim) {
 
 // Whether the unpacked dimension `dim` is an associative one whose index type
 // is, or holds, a real: the parser keeps an index type as the identifier of the
-// keyword or the name written, and a name written through a package or class
-// scope as the scope resolution it is.
+// keyword or the name written, a name written through a package or class
+// scope as the scope resolution it is, and any other type as a type reference.
 static bool IsRealIndexType(const Expr* dim, const TypedefMap& typedefs) {
   if (dim == nullptr) return false;
+  // A.2.5 with §6.23: an index written as a data_type or a type reference
+  // carries its type once resolved, and one not yet resolved names nothing.
+  if (dim->kind == ExprKind::kTypeRef) {
+    return dim->type_value != nullptr &&
+           ContainsRealType(*dim->type_value, typedefs);
+  }
   const std::string kName = dim->kind == ExprKind::kIdentifier
                                 ? std::string(dim->text)
                                 : ScopedTypeKey(dim);

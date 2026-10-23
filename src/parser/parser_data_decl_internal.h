@@ -1,6 +1,9 @@
 #pragma once
 
+#include <optional>
+
 #include "common/source_loc.h"
+#include "lexer/token.h"
 #include "parser/ast_type.h"
 
 namespace delta {
@@ -17,6 +20,15 @@ struct DataDeclQualifiers {
   // Where the lifetime keyword stands, when one was written.
   SourceLoc lifetime_loc;
 };
+
+// A.2.1.3: whether `tk` is one of the twelve net type keywords, `wire` to
+// `uwire`. Defined in src/parser/parser_types.cpp.
+bool IsNetTypeToken(TokenKind tk);
+
+// The data type kind a type keyword opens, the net types' and `void`'s among
+// them; empty for a token that is no type keyword. Defined in
+// src/parser/parser_types.cpp.
+std::optional<DataTypeKind> TokenToTypeKind(TokenKind tk);
 
 // A friend of Parser, which reads what opens a data_declaration for the module
 // item and block item paths alike: its qualifiers, and a type named through
@@ -78,6 +90,14 @@ struct ParserDataDeclHelpers {
   // a net or a variable (§23.2.2.3).
   static bool ReadKeyedTypeReference(Parser& p, DataType& dtype, bool has_var,
                                      bool is_port);
+
+  // A.2.5: whether an associative array's index, a data_type, opens at the
+  // current token: a type keyword other than `void`, or a type an expression
+  // cannot spell, an enumeration, structure or union declared there or a
+  // parameterized class, `P#(8)`. A name alone, which may as well be a
+  // constant sizing the array, is left to the expression reader. Defined in
+  // src/parser/parser_assoc_index.cpp.
+  static bool AtIndexType(Parser& p);
 };
 
 }  // namespace delta

@@ -418,4 +418,59 @@ TEST(UserDefinedTypeAssocArrayElaboration, EventIndexIsAssociative) {
   ExpectKeywordIndexAssociative("event");
 }
 
+// A.2.5 with §7.8.5: an index written as a data_type an expression cannot
+// spell, or as a type reference, is the type it names. `e` takes the
+// enumeration's 32-bit int base, `s` the structure's 4 bits, `t` k's 4
+// unsigned bits, `c` a class index and `str` string keys. A real reached
+// through `type(r)` or held by an unpacked structure is reported (§7.8.5),
+// and a net's type reference index under §6.7. A block's `type(k)`, which no
+// type is resolved for there, draws no §7.8.5 report. Each array was built
+// with no dimension, or its index failed to parse.
+TEST(UserDefinedTypeAssocArrayElaboration, DataTypeIndexFormsAreAssociative) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class P #(int N = 1); endclass\n"
+      "module top;\n"
+      "  bit [3:0] k;\n"
+      "  real r;\n"
+      "  int e [enum {A, B}];\n"
+      "  int s [struct packed {bit [3:0] f;}];\n"
+      "  int t [type(k)];\n"
+      "  int c [P#(8)];\n"
+      "  int z [type(r)];\n"
+      "  int q [struct {real f;}];\n"
+      "  int str [type(string)];\n"
+      "  wire w [type(k)];\n"
+      "  initial begin\n"
+      "    int y [type(k)];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  const auto& vars = design->top_modules[0]->variables;
+  auto var = [&vars](std::string_view name) -> const RtlirVariable* {
+    auto it = std::ranges::find(vars, name, &RtlirVariable::name);
+    return it == vars.end() ? nullptr : &*it;
+  };
+  for (std::string_view name : {"e", "s", "t", "c", "str"}) {
+    ASSERT_NE(var(name), nullptr) << name;
+    EXPECT_TRUE(var(name)->is_assoc) << name;
+  }
+  EXPECT_EQ(var("e")->assoc_index_width, 32u);
+  EXPECT_EQ(var("s")->assoc_index_width, 4u);
+  EXPECT_EQ(var("t")->assoc_index_width, 4u);
+  EXPECT_FALSE(var("t")->is_index_signed);
+  EXPECT_TRUE(var("c")->is_class_index);
+  EXPECT_TRUE(var("str")->is_string_index);
+  const char* const kRealIndex =
+      "real or shortreal type shall not be used as an associative array index "
+      "type";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kRealIndex, 9, "7.8.5"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kRealIndex, 10, "7.8.5"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kRealIndex, 14, "7.8.5"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a net's unpacked dimension must be fixed-size", 12,
+                            "6.7"));
+}
+
 }  // namespace

@@ -76,6 +76,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     parser/parser_subroutine_body.cpp
     parser/parser_fsm.cpp
     parser/parser_types.cpp
+    parser/parser_assoc_index.cpp
     parser/parser_generate.cpp
     parser/parser_class.cpp
     parser/parser_class_constraints.cpp

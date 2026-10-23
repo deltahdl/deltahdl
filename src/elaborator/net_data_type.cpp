@@ -48,6 +48,9 @@ const DataType* FollowTypedefs(const DataType& dtype,
 
 bool IsFixedSizeUnpackedDim(const Expr* dim, const TypeShapeTables& tables) {
   if (dim == nullptr) return false;
+  // A.2.5: a type reference, which an index written as a data_type an
+  // expression cannot spell is kept as too, names an index type.
+  if (dim->kind == ExprKind::kTypeRef) return false;
   if (dim->kind != ExprKind::kIdentifier) {
     // §7.8 with §26.3 and §8.23: an index type may be named through a package
     // or class scope, `[p::idx_t]`, which a constant so named, `[p::N]`, is

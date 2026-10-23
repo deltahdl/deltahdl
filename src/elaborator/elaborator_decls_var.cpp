@@ -834,6 +834,9 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   // gives the declaration that enumeration (Elaborator::ResolveTypeRef).
   std::string_view adopted_enumeration =
       ResolveTypeRef(item->data_type, item->loc, mod);
+  ResolveTypeRefIndexDims(
+      item->unpacked_dims,
+      [&](DataType& type) { ResolveTypeRef(type, item->loc, mod); }, arena_);
 
   SpecializeClassScopedTypedef(item, unit_, BuildParamScope(mod), typedefs_,
                                arena_);
