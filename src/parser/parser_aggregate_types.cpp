@@ -10,10 +10,12 @@
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_type.h"
 #include "parser/parser.h"
+#include "parser/parser_data_decl_internal.h"
 
 namespace delta {
 
@@ -41,6 +43,41 @@ bool IsStructOrUnionKw(TokenKind tk) {
   return tk == TokenKind::kKwStruct || tk == TokenKind::kKwUnion;
 }
 
+// A.2.2.1's enum_base_type: an integer atom type with an optional signing, an
+// integer vector type with an optional signing and at most one packed
+// dimension, or a type name with at most one packed dimension. Whether a name
+// denotes an integer type is footnote 19's, judged by the elaborator where the
+// name resolves. `base` is what ParseDataType read after `enum`, which takes
+// any type keyword, a leading `const` and a signing standing alone, and is
+// implicit with nothing written when the enumeration names no base.
+void CheckEnumBaseForm(const DataType& base, SourceLoc loc, DiagEngine& diag) {
+  if (base.is_const) {
+    diag.Error(loc, "an enumeration's base type takes no 'const'",
+               Subclause("A.2.2.1"));
+  }
+  bool atom = ParserDataDeclHelpers::IsIntegerAtomKind(base.kind);
+  bool vector_or_name = ParserDataDeclHelpers::IsIntegerVectorKind(base.kind) ||
+                        base.kind == DataTypeKind::kNamed;
+  // An implicit type takes packed dimensions only behind a signing.
+  bool none_written =
+      base.kind == DataTypeKind::kImplicit && !base.signing_written;
+  if (!atom && !vector_or_name && !none_written) {
+    diag.Error(loc,
+               "an enumeration's base type is an integer atom type, an "
+               "integer vector type or a type name",
+               Subclause("A.2.2.1"));
+  } else if (atom && base.packed_dim_left != nullptr) {
+    diag.Error(loc,
+               "an integer atom type takes no packed dimension as an "
+               "enumeration's base type",
+               Subclause("A.2.2.1"));
+  } else if (!base.extra_packed_dims.empty()) {
+    diag.Error(loc,
+               "an enumeration's base type takes at most one packed dimension",
+               Subclause("A.2.2.1"));
+  }
+}
+
 }  // namespace
 
 DataType Parser::ParseEnumType() {
@@ -49,7 +86,9 @@ DataType Parser::ParseEnumType() {
   dtype.decl_loc = CurrentLoc();
   Expect(TokenKind::kKwEnum, Subclause("6.19"));
 
+  SourceLoc base_loc = CurrentLoc();
   auto base = ParseDataType();
+  CheckEnumBaseForm(base, base_loc, diag_);
   if (base.kind != DataTypeKind::kImplicit) {
     dtype.is_signed = base.is_signed;
     dtype.packed_dim_left = base.packed_dim_left;
@@ -280,10 +319,21 @@ void Parser::ParseStructMembers(DataType& dtype) {
     bool is_rand = Match(TokenKind::kKwRand);
     bool is_randc = !is_rand && Match(TokenKind::kKwRandc);
 
+    SourceLoc type_loc = CurrentLoc();
     DataType member_type = ParseStructMemberType();
-    if (member_type.kind == DataTypeKind::kImplicit && !CheckIdentifier()) {
-      Synchronize();
-      continue;
+    // A.2.2.1's struct_union_member names a data_type or void before the
+    // member's names, and the body holds members and no null item, so a
+    // signing or packed dimension alone, a bare name and a lone `;` are each
+    // reported. A name after the implicit type is still read as the member's,
+    // and anything else is skipped to the semicolon.
+    if (member_type.kind == DataTypeKind::kImplicit) {
+      diag_.Error(type_loc,
+                  "a structure or union member names a data type or void",
+                  Subclause("A.2.2.1"));
+      if (!CheckIdentifier()) {
+        Synchronize();
+        continue;
+      }
     }
     ParseStructMemberList(dtype, member_type, member_attrs, is_rand, is_randc);
   }

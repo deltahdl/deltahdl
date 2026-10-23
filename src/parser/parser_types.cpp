@@ -1,3 +1,5 @@
+#include <algorithm>
+#include <array>
 #include <cstdint>
 #include <format>
 #include <optional>
@@ -558,14 +560,40 @@ DataType Parser::ParseDataType() {
                          dtype.is_scalared;
   if (dtype.is_net && TryParseNetDataType(dtype, has_intervening)) return dtype;
 
-  if (Match(TokenKind::kKwSigned)) {
-    dtype.is_signed = true;
-  } else if (Match(TokenKind::kKwUnsigned)) {
-    dtype.is_signed = false;
-  }
-
+  ParserDataDeclHelpers::ReadSigning(*this, dtype);
   ParsePackedDims(dtype);
   return dtype;
+}
+
+bool ParserDataDeclHelpers::IsIntegerAtomKind(DataTypeKind kind) {
+  static constexpr std::array kAtoms = {
+      DataTypeKind::kByte,    DataTypeKind::kShortint, DataTypeKind::kInt,
+      DataTypeKind::kLongint, DataTypeKind::kInteger,  DataTypeKind::kTime};
+  return std::ranges::find(kAtoms, kind) != kAtoms.end();
+}
+
+bool ParserDataDeclHelpers::IsIntegerVectorKind(DataTypeKind kind) {
+  static constexpr std::array kVectors = {
+      DataTypeKind::kBit, DataTypeKind::kLogic, DataTypeKind::kReg};
+  return std::ranges::find(kVectors, kind) != kVectors.end();
+}
+
+void ParserDataDeclHelpers::ReadSigning(Parser& p, DataType& dtype) {
+  if (!p.Check(TokenKind::kKwSigned) && !p.Check(TokenKind::kKwUnsigned)) {
+    return;
+  }
+  Token signing = p.Consume();
+  // ParseDataType keeps a net's own kind when no data type keyword followed
+  // the net type keyword, and takes the data type's kind when one did.
+  bool net_alone = dtype.is_net && dtype.kind == dtype.net_keyword;
+  if (net_alone || IsIntegerAtomKind(dtype.kind) ||
+      IsIntegerVectorKind(dtype.kind)) {
+    dtype.is_signed = signing.kind == TokenKind::kKwSigned;
+    return;
+  }
+  p.diag_.Error(signing.loc,
+                "only an integer vector or integer atom type takes a signing",
+                Subclause("A.2.2.1"));
 }
 
 static bool IsAssocIndexType(TokenKind tk) {
@@ -576,20 +604,9 @@ static bool IsAssocIndexType(TokenKind tk) {
 // `integer_vector_type [ signing ] { packed_dimension }` and
 // `integer_atom_type [ signing ]`. No other data_type production admits one.
 static bool TakesSigning(TokenKind tk) {
-  switch (tk) {
-    case TokenKind::kKwBit:
-    case TokenKind::kKwLogic:
-    case TokenKind::kKwReg:
-    case TokenKind::kKwByte:
-    case TokenKind::kKwShortint:
-    case TokenKind::kKwInt:
-    case TokenKind::kKwLongint:
-    case TokenKind::kKwInteger:
-    case TokenKind::kKwTime:
-      return true;
-    default:
-      return false;
-  }
+  DataTypeKind kind = TokenToTypeKind(tk).value_or(DataTypeKind::kImplicit);
+  return ParserDataDeclHelpers::IsIntegerAtomKind(kind) ||
+         ParserDataDeclHelpers::IsIntegerVectorKind(kind);
 }
 
 // Parses the type naming an associative array's index, positioned on the type

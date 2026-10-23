@@ -12,6 +12,7 @@
 #include "helpers_reported_error.h"
 #include "parser/ast_class.h"
 #include "parser/ast_module.h"
+#include "parser/ast_type.h"
 
 using namespace delta;
 
@@ -151,6 +152,33 @@ TEST(ClassItems, ClassPropertyConstWithoutInitializer) {
   EXPECT_TRUE(c->members[0]->is_const);
   EXPECT_EQ(c->members[0]->name, "c");
   EXPECT_EQ(c->members[0]->init_expr, nullptr);
+}
+
+// class_property is a data_declaration behind its qualifiers, and A.2.1.3
+// opens one with an optional `var`, after which footnote 14 of A.10 lets the
+// data type be implicit: packed dimensions alone, or a signing.
+TEST(ClassItems, ClassPropertyWrittenWithVar) {
+  auto r = Parse(
+      "class C;\n"
+      "  var int x;\n"
+      "  rand var bit [3:0] y;\n"
+      "  var [7:0] z;\n"
+      "  var signed s;\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+  const ClassDecl* c = FirstClass(r);
+  ASSERT_NE(c, nullptr);
+  ASSERT_EQ(c->members.size(), 4u);
+  EXPECT_EQ(c->members[0]->name, "x");
+  EXPECT_EQ(c->members[0]->data_type.kind, DataTypeKind::kInt);
+  EXPECT_EQ(c->members[1]->name, "y");
+  EXPECT_TRUE(c->members[1]->is_rand);
+  EXPECT_EQ(c->members[1]->data_type.kind, DataTypeKind::kBit);
+  EXPECT_EQ(c->members[2]->name, "z");
+  EXPECT_EQ(c->members[2]->data_type.kind, DataTypeKind::kImplicit);
+  EXPECT_NE(c->members[2]->data_type.packed_dim_left, nullptr);
+  EXPECT_EQ(c->members[3]->name, "s");
+  EXPECT_TRUE(c->members[3]->data_type.is_signed);
 }
 
 // --- property_qualifier ------------------------------------------------------

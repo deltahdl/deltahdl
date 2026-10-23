@@ -181,4 +181,24 @@ TEST(NetAndVariableTypeSimulation,
       "1\n");
 }
 
+// A class property written with `var` and an implicit_data_type of packed
+// dimensions alone is as wide as they make it: 300 stored in an 8-bit
+// property reads back as 44.
+TEST(NetAndVariableTypeSimulation, VarClassPropertyOfImplicitTypeHasItsWidth) {
+  auto val = RunAndGet(
+      "class C;\n"
+      "  var [7:0] z;\n"
+      "endclass\n"
+      "module t;\n"
+      "  int out;\n"
+      "  initial begin\n"
+      "    static C c = new;\n"
+      "    c.z = 300;\n"
+      "    out = c.z;\n"
+      "  end\n"
+      "endmodule\n",
+      "out");
+  EXPECT_EQ(val, 44u);
+}
+
 }  // namespace

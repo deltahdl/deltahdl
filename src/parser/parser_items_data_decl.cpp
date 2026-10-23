@@ -72,6 +72,22 @@ void Parser::ParseVarPrefixed(std::vector<ModuleItem*>& items, bool is_const) {
   }
 }
 
+// The type is read as ParseVarPrefixed reads a module item's. §8.5 puts no
+// restriction on a property's data type, so an inline enumeration, structure
+// or union and the package-scoped `pk::t` of §26.3 are read as a declaration's
+// type is; packed dimensions with no type before them are read only after
+// `var`, where footnote 14 of A.10 lets the type be implicit.
+DataType ParserDataDeclHelpers::ReadClassPropertyType(Parser& p) {
+  bool has_var = p.Match(TokenKind::kKwVar);
+  DataType dtype;
+  if (!p.TryParseInlineAggregateType(dtype)) dtype = p.ParseDeclaredDataType();
+  if (has_var && dtype.kind == DataTypeKind::kImplicit &&
+      p.Check(TokenKind::kLBracket)) {
+    p.ParsePackedDims(dtype);
+  }
+  return dtype;
+}
+
 // §6.8, footnote 14 of Syntax 6-3: a data declaration whose type is implicit,
 // written as a sign, a packed range or nothing at all behind `const`, declares
 // a variable only after `var`. A declaration that wrote `var` is read by

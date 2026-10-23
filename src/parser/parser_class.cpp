@@ -13,6 +13,7 @@
 #include "parser/ast_type.h"
 #include "parser/param_port_list.h"
 #include "parser/parser.h"
+#include "parser/parser_data_decl_internal.h"
 #include "parser/parser_headers.h"
 #include "parser/parser_type_name_scope.h"
 
@@ -730,14 +731,8 @@ void Parser::ParseClassMembers(std::vector<ClassMember*>& members) {
 
   if (TryParseKeywordClassMember(members, member, proto)) return;
 
-  // (6.19/7.2) a class property may use an inline enum/struct/union data type,
-  // which ParseDataType() does not consume; dispatch those here first, as every
-  // other data-type caller must.
   ParserClassHelpers::RejectPropertyQualifiers(*this, *member);
-  // §8.5 puts no restriction on the property's data type, so the
-  // package-scoped `pk::t` of §26.3 is read as a declaration's type is.
-  DataType dtype;
-  if (!TryParseInlineAggregateType(dtype)) dtype = ParseDeclaredDataType();
+  DataType dtype = ParserDataDeclHelpers::ReadClassPropertyType(*this);
   member->kind = ClassMemberKind::kProperty;
   member->data_type = dtype;
   member->name = Expect(TokenKind::kIdentifier, Subclause("8.5")).text;
