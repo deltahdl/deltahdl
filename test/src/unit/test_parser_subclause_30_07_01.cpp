@@ -166,7 +166,7 @@ TEST(PulseControlSpecparamParsing, TerminalCannotBePartSelect) {
       "module m;\n"
       "  specify\n"
       "    specparam PATHPULSE$a[1:0]$b = (1, 3);\n"
-      "    specparam PATHPULSE$a$b[1] = 2;\n"
+      "    specparam PATHPULSE$a$b[1] = (2);\n"
       "    specparam PATHPULSE$a$b = (1, 3);\n"
       "  endspecify\n"
       "endmodule\n");
