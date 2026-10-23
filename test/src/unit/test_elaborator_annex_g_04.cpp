@@ -235,4 +235,32 @@ TEST(MailboxStdPackageElaborator, CallsAreCheckedAgainstThePrototype) {
   }
 }
 
+// §G.4 with §5.13: a call on a mailbox handle written as a statement without
+// its empty parentheses is the same call, so a method the prototype does not
+// declare and get with no destination are rejected under §G.4, while num and
+// the get_randstate every class has are accepted (#7723).
+TEST(MailboxStdPackageElaborator, CallsWithoutParenthesesAreChecked) {
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  mailbox mb;\n"
+      "  initial begin\n"
+      "    mb = new;\n"
+      "    mb.foo;\n"
+      "    mb.get;\n"
+      "    mb.num;\n"
+      "    mb.get_randstate;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "class 'mailbox' declares no method 'foo'", 5,
+                            "G.4"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "method 'get' of class 'mailbox' takes at least 1 "
+                            "argument; 0 given",
+                            6, "G.4"));
+  EXPECT_EQ(f.diag.ErrorCount(), 2U);
+}
+
 }  // namespace

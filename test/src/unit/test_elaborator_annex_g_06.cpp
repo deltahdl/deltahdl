@@ -229,4 +229,30 @@ TEST(ProcessStdPackageElaborator, CallsAreCheckedAgainstThePrototype) {
   }
 }
 
+// §G.6 with §5.13: a call on a process handle written as a statement without
+// its empty parentheses is the same call, so a method the prototype does not
+// declare and srandom with no seed are rejected under §G.6, while kill is
+// accepted (#7723).
+TEST(ProcessStdPackageElaborator, CallsWithoutParenthesesAreChecked) {
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  initial begin\n"
+      "    static process p = process::self();\n"
+      "    p.baz;\n"
+      "    p.srandom;\n"
+      "    p.kill;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "class 'process' declares no method 'baz'", 4,
+                            "G.6"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "method 'srandom' of class 'process' takes at "
+                            "least 1 argument; 0 given",
+                            5, "G.6"));
+  EXPECT_EQ(f.diag.ErrorCount(), 2U);
+}
+
 }  // namespace

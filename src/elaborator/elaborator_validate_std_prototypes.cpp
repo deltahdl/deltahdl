@@ -202,20 +202,22 @@ void CheckMailboxMessage(const Expr* message, const StdMethodPrototype& method,
 // the class's prototype -- the method shall be one the prototype declares or
 // one every class has built in, and the actuals shall be no fewer than its
 // formals without a default and no more than its formals. The subclause cited
-// is the one giving the prototype, or the method where it is built in.
-void CheckStdMethodCall(const Expr* e, const StdCallScope& scope,
-                        DiagEngine& diag) {
-  if (e->kind != ExprKind::kCall || !e->lhs ||
-      e->lhs->kind != ExprKind::kMemberAccess || e->lhs->is_scope_resolution ||
-      !e->lhs->lhs || e->lhs->lhs->kind != ExprKind::kIdentifier ||
-      !e->lhs->rhs) {
+// is the one giving the prototype, or the method where it is built in. The
+// method is the member `access` selects, and `e` the call whose actuals it is
+// called with: the call written with its argument list, or the access itself,
+// with none, where it is written without one.
+void CheckStdMethodOf(const Expr* access, const Expr* e,
+                      const StdCallScope& scope, DiagEngine& diag) {
+  if (!access || access->kind != ExprKind::kMemberAccess ||
+      access->is_scope_resolution || !access->lhs ||
+      access->lhs->kind != ExprKind::kIdentifier || !access->rhs) {
     return;
   }
-  const auto kFound = scope.handles.find(e->lhs->lhs->text);
+  const auto kFound = scope.handles.find(access->lhs->text);
   if (kFound == scope.handles.end()) return;
   const StdPackageMember kMember = kFound->second;
   const std::string_view kClass = StdPackageMemberName(kMember);
-  const std::string_view kMethod = e->lhs->rhs->text;
+  const std::string_view kMethod = access->rhs->text;
   const std::string_view kSubclause =
       PrototypeSubclauseOfStdPackageMember(kMember);
   const std::string kWhat =
@@ -238,6 +240,12 @@ void CheckStdMethodCall(const Expr* e, const StdCallScope& scope,
   if (kMember == StdPackageMember::kMailbox && !method->formals.empty()) {
     CheckMailboxMessage(e->args[0], *method, scope, diag);
   }
+}
+
+// The same of a call written with its argument list, obj.method(...).
+void CheckStdMethodCall(const Expr* e, const StdCallScope& scope,
+                        DiagEngine& diag) {
+  if (e->kind == ExprKind::kCall) CheckStdMethodOf(e->lhs, e, scope, diag);
 }
 
 void CheckStdCallsInExpr(const Expr* e, const StdCallScope& scope,
@@ -273,6 +281,12 @@ void CheckStdCallsInStmt(const Stmt* s, const StdCallScope& scope,
                          DiagEngine& diag) {
   if (!s) return;
   CheckStdConstructionsInStmt(s, scope, diag);
+  // §5.13 with §13.5.5: a method call passing no actual may leave out its
+  // empty parentheses, so an expression statement selecting a member of a
+  // std handle, `mb.num;`, is a call of it passing none.
+  if (s->kind == StmtKind::kExprStmt) {
+    CheckStdMethodOf(s->expr, s->expr, scope, diag);
+  }
   ForEachChildExpr(
       s, [&](Expr* const& e) { CheckStdCallsInExpr(e, scope, diag); });
   ForEachChildStmt(
