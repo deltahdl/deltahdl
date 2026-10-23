@@ -127,14 +127,16 @@ TEST(ModuleParametersAndPorts, ANetPortOfFixedSizeDimensionsIsAccepted) {
 
 // A.1.3 gives a port declared with a variable_port_header variable_dimensions,
 // which A.2.5 makes a dynamic, an associative or a queue dimension as well as
-// a fixed one, so none of these four variable ports is reported. The queue and
-// the two associative ones were reported as unpacked dimensions that are not
-// constant expressions (§7.4.2).
+// a fixed one, so none of these four variable ports is reported. An output
+// written with a data type is a variable, and an input is one only with `var`,
+// being a net without it (§23.2.2.3). The queue and the two associative ones
+// were reported as unpacked dimensions that are not constant expressions
+// (§7.4.2).
 TEST(ModuleParametersAndPorts, AVariablePortTakesEveryVariableDimension) {
   ElabFixture f;
   ElaborateSrc(
-      "module m (output int q [$], input int a [string], input int w [*],\n"
-      "          input var int v []);\n"
+      "module m (output int q [$], input var int a [string],\n"
+      "          input var int w [*], input var int v []);\n"
       "endmodule\n",
       f);
   EXPECT_FALSE(f.diag.HasErrors());
