@@ -63,7 +63,7 @@ PLI_INT32 SystfStubCompile(PLI_BYTE8*) { return 0; }
 PLI_INT32 SystfStubSize(PLI_BYTE8*) { return 0; }
 }  // namespace
 
-TEST_F(VpiSystfRegistrationSim, RegisterSystfPreservesFigure3818Fields) {
+TEST_F(VpiSystfRegistrationSim, RegisterSystfPreservesEverySystfDataField) {
   int user_payload = 7;
   s_vpi_systf_data data = {};
   data.type = vpiSysFunc;

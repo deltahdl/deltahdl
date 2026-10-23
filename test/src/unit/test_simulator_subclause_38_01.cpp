@@ -50,7 +50,7 @@ TEST_F(VpiArgumentConventions, AnOmittedMandatoryArgumentMakesTheCallFail) {
 // severity level of the pending error when given no structure to describe it in
 // - the argument the definition notes is the one that may be left out, and the
 // routine's answer does not depend on it.
-TEST_F(VpiArgumentConventions, TheExceptionSection38_2NotesIsHonoured) {
+TEST_F(VpiArgumentConventions, ChkErrorAcceptsNullErrorInfo) {
   RaiseError();
 
   s_vpi_error_info info = {};

@@ -113,7 +113,7 @@ namespace {
 
 // §30.5.3's Example 2, with the standard's `A` and `Y` written as the design's
 // own port names and `MODE` left to the parameter the case fixes.
-constexpr std::string_view kExample2Paths =
+constexpr std::string_view kModeConditionedPaths =
     "    if (act[4]) (a => y) = (5, 9);\n"
     "    if (act[3]) (a => y) = (4, 8);\n"
     "    if (act[2]) (a => y) = (6, 5);\n"
@@ -175,7 +175,7 @@ std::string PathSource(std::string_view setup, std::string_view paths) {
 TEST(StateDependentPathActivity, FalseConditionsWithholdTheSmallerRiseDelay) {
   SimFixture f;
   std::string out =
-      RunCapture(PathSource("    act = 5'b11100;\n", kExample2Paths), f);
+      RunCapture(PathSource("    act = 5'b11100;\n", kModeConditionedPaths), f);
   EXPECT_EQ(out, "at 45 y=0\nedge 1 at 54\nat 80 y=1\n");
 }
 
@@ -187,7 +187,7 @@ TEST(StateDependentPathActivity, FalseConditionsWithholdTheSmallerRiseDelay) {
 TEST(StateDependentPathActivity, EveryTrueConditionLeavesEveryPathActive) {
   SimFixture f;
   std::string out =
-      RunCapture(PathSource("    act = 5'b11111;\n", kExample2Paths), f);
+      RunCapture(PathSource("    act = 5'b11111;\n", kModeConditionedPaths), f);
   EXPECT_EQ(out, "at 45 y=0\nedge 1 at 53\nat 80 y=1\n");
 }
 
@@ -201,7 +201,7 @@ TEST(StateDependentPathActivity, EveryTrueConditionLeavesEveryPathActive) {
 TEST(StateDependentPathActivity, NoTrueConditionLeavesNoPathActive) {
   SimFixture f;
   std::string out =
-      RunCapture(PathSource("    act = 5'b00000;\n", kExample2Paths), f);
+      RunCapture(PathSource("    act = 5'b00000;\n", kModeConditionedPaths), f);
   EXPECT_EQ(out, "at 45 y=0\nedge 1 at 50\nat 80 y=1\n");
 }
 

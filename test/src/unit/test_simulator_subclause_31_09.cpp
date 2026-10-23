@@ -220,7 +220,8 @@ TEST(NegativeTimingCheckSwitches, RecremLimitsSummingBelowOneUnitAreReported) {
 // for ti and 2.02 for te, the least delays that leave every adjusted limit at
 // least one unit of precision. Each delayed copy rises that long after the
 // original, which all rise at 100.
-TEST(NegativeTimingCheckSwitches, DelayedSignalsTakeFigure31_6Delays) {
+TEST(NegativeTimingCheckSwitches,
+     DelayedSignalsTakeTheLeastDelaysLeavingEveryLimitOneUnit) {
   SimFixture f;
   EXPECT_EQ(
       RunUnder("`timescale 1ns/10ps\n"

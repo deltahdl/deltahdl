@@ -88,7 +88,8 @@ TEST(SpecifyDelaySelection, NoCandidatesReturnsZero) {
 // Both paths -- (a => y) = (6, 9) and (b => y) = (5, 11) -- are built from
 // real specify source, so what the rule chooses among is what the assignments
 // declared. Returns 0 when the source did not produce the two declarations.
-uint64_t Example1Delay(uint64_t a_time, uint64_t b_time, size_t slot) {
+uint64_t TwoUnconditionalPathsDelay(uint64_t a_time, uint64_t b_time,
+                                    size_t slot) {
   SimFixture f;
   auto p = ElaborateSpecify("input a, b, output y",
                             "  specify\n"
@@ -109,25 +110,25 @@ uint64_t Example1Delay(uint64_t a_time, uint64_t b_time, size_t slot) {
 // are built from real (a => y) / (b => y) assignments; the rule picks the delay
 // of whichever input transitioned most recently, and the smallest on a tie. ---
 
-TEST(SpecifyDelaySelection, Example1SourceAMoreRecentRiseIsSix) {
+TEST(SpecifyDelaySelection, UnconditionalPathsAMoreRecentRiseIsSix) {
   // a transitioned most recently, so only its path is active.
-  EXPECT_EQ(Example1Delay(20, 10, kRiseSlot), 6u);
+  EXPECT_EQ(TwoUnconditionalPathsDelay(20, 10, kRiseSlot), 6u);
 }
 
-TEST(SpecifyDelaySelection, Example1SourceBMoreRecentRiseIsFive) {
-  EXPECT_EQ(Example1Delay(10, 20, kRiseSlot), 5u);
+TEST(SpecifyDelaySelection, UnconditionalPathsBMoreRecentRiseIsFive) {
+  EXPECT_EQ(TwoUnconditionalPathsDelay(10, 20, kRiseSlot), 5u);
 }
 
-TEST(SpecifyDelaySelection, Example1SourceSimultaneousRiseIsSmallest) {
+TEST(SpecifyDelaySelection, UnconditionalPathsSimultaneousRiseIsSmallest) {
   // Simultaneous input transitions leave both paths active; the smaller of the
   // two rise delays (5) is chosen.
-  EXPECT_EQ(Example1Delay(15, 15, kRiseSlot), 5u);
+  EXPECT_EQ(TwoUnconditionalPathsDelay(15, 15, kRiseSlot), 5u);
 }
 
-TEST(SpecifyDelaySelection, Example1SourceAMoreRecentFallIsNine) {
+TEST(SpecifyDelaySelection, UnconditionalPathsAMoreRecentFallIsNine) {
   // The specific transition being scheduled is a fall (1 -> 0); a's fall delay
   // of 9 is used because a transitioned most recently.
-  EXPECT_EQ(Example1Delay(20, 10, kFallSlot), 9u);
+  EXPECT_EQ(TwoUnconditionalPathsDelay(20, 10, kFallSlot), 9u);
 }
 
 // --- LRM Example 2: five state-dependent paths reach y from the same input a.
@@ -140,7 +141,7 @@ TEST(SpecifyDelaySelection, Example1SourceAMoreRecentFallIsNine) {
 // below[k] holds MODE < k, computed outside the specify block, and each
 // condition reads one bit of it. --------------------------------------------
 
-std::vector<PathCandidate> BuildExample2Candidates(
+std::vector<PathCandidate> BuildModeConditionedCandidates(
     uint64_t mode_value, SimFixture& f, std::vector<PathDelay>& store) {
   std::string body =
       "  logic [7:0] MODE;\n"
@@ -174,37 +175,37 @@ std::vector<PathCandidate> BuildExample2Candidates(
   return candidates;
 }
 
-TEST(SpecifyDelaySelection, Example2Mode2RiseIsFour) {
+TEST(SpecifyDelaySelection, ModeConditionedPathsMode2RiseIsFour) {
   SimFixture f;
   std::vector<PathDelay> store;
-  auto candidates = BuildExample2Candidates(2, f, store);
+  auto candidates = BuildModeConditionedCandidates(2, f, store);
   ASSERT_EQ(candidates.size(), 5u);
   // MODE = 2 activates paths with MODE<5, MODE<4, MODE<3: rise delays 5, 4, 6.
   EXPECT_EQ(SelectPathDelay(candidates, kRiseSlot), 4u);
 }
 
-TEST(SpecifyDelaySelection, Example2Mode2FallIsFive) {
+TEST(SpecifyDelaySelection, ModeConditionedPathsMode2FallIsFive) {
   SimFixture f;
   std::vector<PathDelay> store;
-  auto candidates = BuildExample2Candidates(2, f, store);
+  auto candidates = BuildModeConditionedCandidates(2, f, store);
   ASSERT_EQ(candidates.size(), 5u);
   // Same three active paths; fall delays 9, 8, 5 -> smallest is 5.
   EXPECT_EQ(SelectPathDelay(candidates, kFallSlot), 5u);
 }
 
-TEST(SpecifyDelaySelection, Example2Mode0RiseIsThree) {
+TEST(SpecifyDelaySelection, ModeConditionedPathsMode0RiseIsThree) {
   SimFixture f;
   std::vector<PathDelay> store;
-  auto candidates = BuildExample2Candidates(0, f, store);
+  auto candidates = BuildModeConditionedCandidates(0, f, store);
   ASSERT_EQ(candidates.size(), 5u);
   // MODE = 0 activates all five paths; rise delays 5, 4, 6, 3, 7 -> smallest 3.
   EXPECT_EQ(SelectPathDelay(candidates, kRiseSlot), 3u);
 }
 
-TEST(SpecifyDelaySelection, Example2Mode5NoActivePathsReturnsZero) {
+TEST(SpecifyDelaySelection, ModeConditionedPathsMode5NoActivePathsReturnsZero) {
   SimFixture f;
   std::vector<PathDelay> store;
-  auto candidates = BuildExample2Candidates(5, f, store);
+  auto candidates = BuildModeConditionedCandidates(5, f, store);
   ASSERT_EQ(candidates.size(), 5u);
   // MODE = 5 satisfies no `MODE < k` condition, so no path is active.
   EXPECT_EQ(SelectPathDelay(candidates, kRiseSlot), 0u);

@@ -661,7 +661,7 @@ TEST(StrengthResolution, SourceHighzStrengthDriverLeavesTheConflictRangeWhole) {
 // the unambiguous signal. Rule c's gap therefore crosses high impedance: a fill
 // bounded by the unambiguous level would leave the 1 side at strong and the 0
 // side at pull.
-TEST(NetStrengthAmbigUnambig, Figure2823FillsAcrossHighImpedance) {
+TEST(NetStrengthAmbigUnambig, OppositeValueGapFillsAcrossHighImpedance) {
   NetStrength ambig;
   ambig.s1_hi = Strength::kStrong;
   ambig.s1_lo = Strength::kHighz;
@@ -677,7 +677,7 @@ TEST(NetStrengthAmbigUnambig, Figure2823FillsAcrossHighImpedance) {
 // impedance to pull and the unambiguous Me1 stands at medium, and the figure
 // draws the result from Me1 to Pu1 -- the levels below medium disappear rather
 // than being filled back.
-TEST(NetStrengthAmbigUnambig, Figure2822StopsAtTheUnambiguousLevel) {
+TEST(NetStrengthAmbigUnambig, SameSideRangeStopsAtTheUnambiguousLevel) {
   NetStrength ambig;
   ambig.s1_hi = Strength::kPull;
   ambig.s1_lo = Strength::kHighz;
@@ -691,7 +691,7 @@ TEST(NetStrengthAmbigUnambig, Figure2822StopsAtTheUnambiguousLevel) {
 // Figure 28-20, which the clause names as rule b) on its own: an ambiguous 0
 // range against an unambiguous 0 at pull keeps the levels above pull and takes
 // the rest, leaving the range the figure draws from Pu0 to St0.
-TEST(NetStrengthAmbigUnambig, Figure2820EliminatesTheLevelsAtOrBelowSu) {
+TEST(NetStrengthAmbigUnambig, LevelsAtOrBelowTheUnambiguousLevelAreEliminated) {
   NetStrength ambig;
   ambig.s0_hi = Strength::kStrong;
   ambig.s0_lo = Strength::kHighz;
@@ -706,7 +706,8 @@ TEST(NetStrengthAmbigUnambig, Figure2820EliminatesTheLevelsAtOrBelowSu) {
 // value survives rule b), so rule c) has no gap to fill and the result is the
 // range the figure draws, from the unambiguous level to the ambiguous signal's
 // greater extreme.
-TEST(NetStrengthAmbigUnambig, Figure2821LeavesTheRangeFromSuToTheExtreme) {
+TEST(NetStrengthAmbigUnambig,
+     WeakOppositeSideLeavesTheRangeFromSuToTheExtreme) {
   NetStrength ambig;
   ambig.s0_hi = Strength::kWeak;
   ambig.s0_lo = Strength::kHighz;
@@ -765,7 +766,7 @@ void ExpectModelAndCombinerAgree(StrengthSignal ambig, Val4 vu,
 // Figure 28-23's own input, which is where the two used to differ: each filled
 // the opposite side down to one level above the unambiguous signal, and both
 // stopped short of the high impedance the figure draws.
-TEST(NetStrengthAmbigUnambig, ModelAndCombinerAgreeOnFigure2823) {
+TEST(NetStrengthAmbigUnambig, ModelAndCombinerAgreeOnAGapAcrossHighImpedance) {
   ExpectModelAndCombinerAgree(
       AmbiguousRange(Val4::kV1, StrengthLevel::kHighz, StrengthLevel::kStrong),
       Val4::kV0, StrengthLevel::kPull,

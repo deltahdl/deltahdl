@@ -40,7 +40,7 @@ int g_scalar_vector = -1;
 int g_module_scalar = -1;
 int g_module_vector = -1;
 
-PLI_INT32 Figure371Calltf(PLI_BYTE8*) {
+PLI_INT32 WalkModuleNetsCalltf(PLI_BYTE8*) {
   vpiHandle mod = vpi_handle_by_name(VpiText("m1"), nullptr);
   if (mod == nullptr) return 0;
   g_module_scalar = vpi_get(vpiScalar, mod);
@@ -86,14 +86,14 @@ void RegisterFigureProbe() {
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
   data.tfname = VpiText("$probe");
-  data.calltf = &Figure371Calltf;
+  data.calltf = &WalkModuleNetsCalltf;
   ASSERT_NE(vpi_register_systf(&data), nullptr);
 }
 
 // Figure 37-1's design: a module holding nets, instantiated so the application
 // has a module object to start from. One net is a vector and one is not, which
 // is what makes the Boolean property say something.
-void RunFigure371(SimFixture& f) {
+void RunModuleWithTwoNets(SimFixture& f) {
   auto* design = ElaborateSrc(
       "module m;\n"
       "  wire w;\n"
@@ -120,7 +120,7 @@ TEST_F(VpiObjectClassifications, BothRelationsOfTheFigureAreTraversable) {
   RegisterFigureProbe();
 
   SimFixture f;
-  RunFigure371(f);
+  RunModuleWithTwoNets(f);
 
   // The one-to-many: both nets the module declares.
   EXPECT_EQ(g_nets_from_module, 2);
@@ -134,7 +134,7 @@ TEST_F(VpiObjectClassifications, TheThreePropertiesOfANetAreAnswered) {
   RegisterFigureProbe();
 
   SimFixture f;
-  RunFigure371(f);
+  RunModuleWithTwoNets(f);
 
   // vpiName, a string: the name the source declared.
   EXPECT_EQ(g_bus_name, "bus");
@@ -156,7 +156,7 @@ TEST_F(VpiObjectClassifications, TheModuleIsNeitherScalarNorVector) {
   RegisterFigureProbe();
 
   SimFixture f;
-  RunFigure371(f);
+  RunModuleWithTwoNets(f);
 
   EXPECT_EQ(g_module_scalar, 0);
   EXPECT_EQ(g_module_vector, 0);

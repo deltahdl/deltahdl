@@ -581,7 +581,7 @@ TEST(DisableStatementExecution,
 
 // §9.6.2's Example 6: the reset branch disables the block waiting on the
 // event expression, which then never acts, and the fork joins.
-TEST(DisableStatementExecution, ClauseExample6DisablesTheEventExpressionBlock) {
+TEST(DisableStatementExecution, ResetBranchDisablesTheEventExpressionBlock) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
                        "  event ev1, trig, reset; int acted;\n"

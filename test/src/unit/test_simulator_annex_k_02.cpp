@@ -177,7 +177,7 @@ TEST(VpiConstantAndStructSim, VpiTimeDefaultInit) {
   EXPECT_DOUBLE_EQ(time.real, 0.0);
 }
 
-TEST(VpiUserHeader, Constants01) {
+TEST(VpiUserHeader, ConstantsFromAlwaysThroughPathTerm) {
   EXPECT_EQ(vpiAlways, 1);
   EXPECT_EQ(vpiAssignStmt, 2);
   EXPECT_EQ(vpiAssignment, 3);
@@ -220,7 +220,7 @@ TEST(VpiUserHeader, Constants01) {
   EXPECT_EQ(vpiPathTerm, 43);
 }
 
-TEST(VpiUserHeader, Constants02) {
+TEST(VpiUserHeader, ConstantsFromPortBitThroughNamedEventArray) {
   EXPECT_EQ(vpiPortBit, 45);
   EXPECT_EQ(vpiPrimTerm, 46);
   EXPECT_EQ(vpiRealVar, 47);
@@ -263,7 +263,7 @@ TEST(VpiUserHeader, Constants02) {
   EXPECT_EQ(vpiNamedEventArray, 129);
 }
 
-TEST(VpiUserHeader, Constants03) {
+TEST(VpiUserHeader, ConstantsFromIndexedPartSelectThroughInTerm) {
   EXPECT_EQ(vpiIndexedPartSelect, 130);
   EXPECT_EQ(vpiGenScopeArray, 133);
   EXPECT_EQ(vpiGenScope, 134);
@@ -306,7 +306,7 @@ TEST(VpiUserHeader, Constants03) {
   EXPECT_EQ(vpiInTerm, 120);
 }
 
-TEST(VpiUserHeader, Constants04) {
+TEST(VpiUserHeader, ConstantsFromInstanceArrayThroughNetType) {
   EXPECT_EQ(vpiInstanceArray, 121);
   EXPECT_EQ(vpiLocalDriver, 122);
   EXPECT_EQ(vpiLocalLoad, 123);
@@ -349,7 +349,7 @@ TEST(VpiUserHeader, Constants04) {
   EXPECT_EQ(vpiNetType, 22);
 }
 
-TEST(VpiUserHeader, Constants05) {
+TEST(VpiUserHeader, ConstantsFromWireThroughNmosPrim) {
   EXPECT_EQ(vpiWire, 1);
   EXPECT_EQ(vpiWand, 2);
   EXPECT_EQ(vpiWor, 3);
@@ -392,7 +392,7 @@ TEST(VpiUserHeader, Constants05) {
   EXPECT_EQ(vpiNmosPrim, 13);
 }
 
-TEST(VpiUserHeader, Constants06) {
+TEST(VpiUserHeader, ConstantsFromPmosPrimThroughSkew) {
   EXPECT_EQ(vpiPmosPrim, 14);
   EXPECT_EQ(vpiCmosPrim, 15);
   EXPECT_EQ(vpiRnmosPrim, 16);
@@ -435,7 +435,7 @@ TEST(VpiUserHeader, Constants06) {
   EXPECT_EQ(vpiSkew, 5);
 }
 
-TEST(VpiUserHeader, Constants07) {
+TEST(VpiUserHeader, ConstantsFromRecoveryThroughBitXnorOp) {
   EXPECT_EQ(vpiRecovery, 6);
   EXPECT_EQ(vpiNoChange, 7);
   EXPECT_EQ(vpiSetupHold, 8);
@@ -478,7 +478,7 @@ TEST(VpiUserHeader, Constants07) {
   EXPECT_EQ(vpiBitXnorOp, 31);
 }
 
-TEST(VpiUserHeader, Constants08) {
+TEST(VpiUserHeader, ConstantsFromConditionOpThroughScheduled) {
   EXPECT_EQ(vpiConditionOp, 32);
   EXPECT_EQ(vpiConcatOp, 33);
   EXPECT_EQ(vpiMultiConcatOp, 34);
@@ -521,7 +521,7 @@ TEST(VpiUserHeader, Constants08) {
   EXPECT_EQ(vpiScheduled, 46);
 }
 
-TEST(VpiUserHeader, Constants09) {
+TEST(VpiUserHeader, ConstantsFromActiveThroughSuppressVal) {
   EXPECT_EQ(vpiActive, 49);
   EXPECT_EQ(vpiAutomatic, 50);
   EXPECT_EQ(vpiConstantSelect, 53);
@@ -564,7 +564,7 @@ TEST(VpiUserHeader, Constants09) {
   EXPECT_EQ(vpiSuppressVal, 13);
 }
 
-TEST(VpiUserHeader, Constants10) {
+TEST(VpiUserHeader, ConstantsFromShortIntValThroughCbDisable) {
   EXPECT_EQ(vpiShortIntVal, 14);
   EXPECT_EQ(vpiLongIntVal, 15);
   EXPECT_EQ(vpiShortRealVal, 16);

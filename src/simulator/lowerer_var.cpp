@@ -58,7 +58,8 @@ const Expr* StringLiteralSource(const Expr* expr) {
 // and the two makers of array leaves have already drifted once over a
 // per-element property of exactly this kind (the is_4state/is_signed flags), so
 // it is written once.
-static Logic4Vec Table67ElementDefault(const RtlirVariable& var, Arena& arena) {
+static Logic4Vec ElementDefaultInitialValue(const RtlirVariable& var,
+                                            Arena& arena) {
   return var.is_4state ? MakeAllX(arena, var.width)
                        : MakeLogic4VecVal(arena, var.width, 0);
 }
@@ -109,7 +110,7 @@ static void InitArrayElement(const RtlirVariable& var, uint32_t elem_idx,
   Variable* elem = target.elem;
   const StructTypeInfo* layout = target.layout;
   if (!var.init_expr) {
-    elem->value = Table67ElementDefault(var, arena);
+    elem->value = ElementDefaultInitialValue(var, arena);
     return;
   }
 
@@ -127,7 +128,7 @@ static void InitArrayElement(const RtlirVariable& var, uint32_t elem_idx,
   }
   // Past the end of the pattern's items no value was supplied for this element
   // either, so Table 6-7 governs it the same way.
-  elem->value = Table67ElementDefault(var, arena);
+  elem->value = ElementDefaultInitialValue(var, arena);
 }
 
 static void InitArrayFromReplicate(const RtlirVariable& var, uint32_t elem_idx,
@@ -170,7 +171,7 @@ static void InitArrayFromNamed(const RtlirVariable& var, uint32_t idx,
   const Expr* fallback = DefaultKeyedItem(pat);
   if (item == nullptr) item = fallback;
   if (item == nullptr) {
-    target.elem->value = Table67ElementDefault(var, arena);
+    target.elem->value = ElementDefaultInitialValue(var, arena);
     return;
   }
   Logic4Vec val = item == fallback

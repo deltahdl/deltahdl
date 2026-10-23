@@ -191,7 +191,7 @@ TEST(UdpInitialStatement, InitialValueServesAsCurrentState) {
 // and it reaches q through `buf #3` at 3 and qb through `not #5` at 5. The z
 // was taken for a transition from the x the inputs were assumed to start at, no
 // row matched it, and qi went x.
-TEST(UdpInitialStatementRun, Figure29_1InitialValueReachesTheGates) {
+TEST(UdpInitialStatementRun, InitialValueWithUndrivenInputsReachesTheGates) {
   SimFixture f;
   EXPECT_EQ(RunCapture("primitive dff1 (q, clk, d);\n"
                        "  input clk, d;\n"

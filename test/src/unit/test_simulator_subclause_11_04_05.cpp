@@ -182,7 +182,8 @@ TEST(EqualityOperatorSim, CaseInequalityXZMismatchIsKnownTrue) {
 // values of one declared type and one default, with no literal to be right
 // about. The width is 8 rather than 64 because a width that fills its last word
 // leaves no bits above itself to disagree over.
-TEST(EqualityOperatorSim, CaseEqualityMatchesTable67DefaultOfArrayElement) {
+TEST(EqualityOperatorSim,
+     CaseEqualityMatchesDefaultInitialValueOfArrayElement) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

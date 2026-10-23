@@ -74,7 +74,7 @@ namespace {
 // times `y` is sampled at. The samples straddle the transition the case asserts
 // and fall on no time any competing delay would place an edge at, so a sample
 // never reads a value in the same time slot it is being written.
-struct Example1Case {
+struct TwoUnconditionalPathsCase {
   std::string_view driver;
   std::string_view stimulus;
   int early;
@@ -89,7 +89,7 @@ struct Example1Case {
 // is registered, which issue #3383 records. Each sample line names the time it
 // was taken at, and each transition line names the time `y` moved, so a case
 // asserts on times rather than on an order of values.
-std::string Example1Source(const Example1Case& tc) {
+std::string TwoUnconditionalPathsSource(const TwoUnconditionalPathsCase& tc) {
   std::string early = std::to_string(tc.early);
   std::string late = std::to_string(tc.late);
   std::string src = "module top(input a, b, output y);\n";
@@ -125,14 +125,15 @@ std::string Example1Source(const Example1Case& tc) {
 // time exists to state.
 TEST(ActiveModulePathSelection, RiseTakesTheRiseDelayOfTheLaterInputA) {
   SimFixture f;
-  std::string out = RunCapture(Example1Source({"a & b",
-                                               "    sa = 1'b0;\n"
-                                               "    sb = 1'b0;\n"
-                                               "    #20 sb = 1'b1;\n"
-                                               "    #20 armed = 1'b1;\n"
-                                               "    #10 sa = 1'b1;\n",
-                                               54, 58}),
-                               f);
+  std::string out =
+      RunCapture(TwoUnconditionalPathsSource({"a & b",
+                                              "    sa = 1'b0;\n"
+                                              "    sb = 1'b0;\n"
+                                              "    #20 sb = 1'b1;\n"
+                                              "    #20 armed = 1'b1;\n"
+                                              "    #10 sa = 1'b1;\n",
+                                              54, 58}),
+                 f);
   EXPECT_EQ(out, "s54=0\ny=1@56\ns58=1\n");
 }
 
@@ -145,14 +146,15 @@ TEST(ActiveModulePathSelection, RiseTakesTheRiseDelayOfTheLaterInputA) {
 // value.
 TEST(ActiveModulePathSelection, RiseTakesTheRiseDelayOfTheLaterInputB) {
   SimFixture f;
-  std::string out = RunCapture(Example1Source({"a & b",
-                                               "    sa = 1'b0;\n"
-                                               "    sb = 1'b0;\n"
-                                               "    #20 sa = 1'b1;\n"
-                                               "    #20 armed = 1'b1;\n"
-                                               "    #10 sb = 1'b1;\n",
-                                               54, 58}),
-                               f);
+  std::string out =
+      RunCapture(TwoUnconditionalPathsSource({"a & b",
+                                              "    sa = 1'b0;\n"
+                                              "    sb = 1'b0;\n"
+                                              "    #20 sa = 1'b1;\n"
+                                              "    #20 armed = 1'b1;\n"
+                                              "    #10 sb = 1'b1;\n",
+                                              54, 58}),
+                 f);
   EXPECT_EQ(out, "s54=0\ny=1@55\ns58=1\n");
 }
 
@@ -162,14 +164,15 @@ TEST(ActiveModulePathSelection, RiseTakesTheRiseDelayOfTheLaterInputB) {
 // reaches 1 at t=55.
 TEST(ActiveModulePathSelection, SimultaneousInputsRiseOnTheSmallerDelay) {
   SimFixture f;
-  std::string out = RunCapture(Example1Source({"a & b",
-                                               "    sa = 1'b0;\n"
-                                               "    sb = 1'b0;\n"
-                                               "    #40 armed = 1'b1;\n"
-                                               "    #10 sa = 1'b1;\n"
-                                               "    sb = 1'b1;\n",
-                                               54, 58}),
-                               f);
+  std::string out =
+      RunCapture(TwoUnconditionalPathsSource({"a & b",
+                                              "    sa = 1'b0;\n"
+                                              "    sb = 1'b0;\n"
+                                              "    #40 armed = 1'b1;\n"
+                                              "    #10 sa = 1'b1;\n"
+                                              "    sb = 1'b1;\n",
+                                              54, 58}),
+                 f);
   EXPECT_EQ(out, "s54=0\ny=1@55\ns58=1\n");
 }
 
@@ -188,14 +191,15 @@ TEST(ActiveModulePathSelection, SimultaneousInputsRiseOnTheSmallerDelay) {
 // neither places the edge at 69.
 TEST(ActiveModulePathSelection, FallTakesTheFallDelayOfTheLaterInputA) {
   SimFixture f;
-  std::string out = RunCapture(Example1Source({"a | b",
-                                               "    sa = 1'b1;\n"
-                                               "    sb = 1'b1;\n"
-                                               "    #40 armed = 1'b1;\n"
-                                               "    #10 sb = 1'b0;\n"
-                                               "    #10 sa = 1'b0;\n",
-                                               65, 73}),
-                               f);
+  std::string out =
+      RunCapture(TwoUnconditionalPathsSource({"a | b",
+                                              "    sa = 1'b1;\n"
+                                              "    sb = 1'b1;\n"
+                                              "    #40 armed = 1'b1;\n"
+                                              "    #10 sb = 1'b0;\n"
+                                              "    #10 sa = 1'b0;\n",
+                                              65, 73}),
+                 f);
   EXPECT_EQ(out, "s65=1\ny=0@69\ns73=0\n");
 }
 

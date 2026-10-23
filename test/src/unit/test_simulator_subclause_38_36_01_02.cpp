@@ -37,7 +37,7 @@ struct StmtObject {
   const char* label;
 };
 
-constexpr StmtObject kTable386Objects[] = {
+constexpr StmtObject kStatementClassObjects[] = {
     {vpiBegin, "begin"},
     {vpiNamedBegin, "named begin"},
     {vpiFork, "fork"},
@@ -90,9 +90,9 @@ class VpiStmtCallbackByType : public ::testing::Test {
 // §38.36.1.2: every object within the statement class qualifies for a cbStmt
 // callback. Registering a cbStmt callback on each of the objects enumerated in
 // Table 38-6 succeeds and yields a callback handle.
-TEST_F(VpiStmtCallbackByType, EveryTable38_6ObjectQualifies) {
+TEST_F(VpiStmtCallbackByType, EveryStatementClassObjectQualifies) {
   int suffix = 0;
-  for (const StmtObject& obj : kTable386Objects) {
+  for (const StmtObject& obj : kStatementClassObjects) {
     std::string name = "s" + std::to_string(suffix++);
     vpiHandle stmt = MakeHandleOfType(name.c_str(), obj.type);
     ASSERT_NE(stmt, nullptr) << obj.label;

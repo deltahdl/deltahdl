@@ -551,7 +551,7 @@ std::string ResolvedStrengthOf(const std::string& body) {
 // with the strongest driver alone, so the weaker gate's side of the scale was
 // not in the result and the two sides' strongest levels were always equal,
 // which §21.2.1.4 renders with a mnemonic instead.
-TEST(StrengthResolution, SourceFigure289CombinesTwoAmbiguousGates) {
+TEST(StrengthResolution, SourceTwoAmbiguousGatesCombineIntoOneAmbiguousRange) {
   EXPECT_EQ(ResolvedStrengthOf(
                 "  logic d1, d0, c;\n"
                 "  bufif1 (pull0, pull1) g1 (y, d1, c);\n"
@@ -574,7 +574,7 @@ TEST(StrengthResolution, SourceUnknownValueDriverGivesItsOwnStrength) {
 // net it gives a signal of value 1 and strength range (651), every state the
 // two leave the net in being a 1 -- St1 where the switch passes, Pu1 where it
 // does not.
-TEST(StrengthResolution, SourceFigure2811UpperCombinationIs651) {
+TEST(StrengthResolution, SourceStrongHBesideAPullupIs651) {
   SimFixture f;
   auto out = RunCapture(
       "module top;\n"
@@ -591,7 +591,7 @@ TEST(StrengthResolution, SourceFigure2811UpperCombinationIs651) {
 // Figure 28-11's lower combination: a pulldown passed through a switch with an
 // unknown control is an L at the pull level, and with a weak 0 beside it the
 // net has value 0 and strength range (530).
-TEST(StrengthResolution, SourceFigure2811LowerCombinationIs530) {
+TEST(StrengthResolution, SourcePullLBesideAWeakZeroIs530) {
   SimFixture f;
   auto out = RunCapture(
       "module top;\n"
@@ -611,7 +611,7 @@ TEST(StrengthResolution, SourceFigure2811LowerCombinationIs530) {
 // the pullup's pull 1 where neither switch passes, so the 0 side reaches the
 // pull level; combined with the pullup first, the L was dropped as no stronger
 // than it, and the net read 36X.
-TEST(StrengthResolution, SourceFigure2814CombinesBothAt56X) {
+TEST(StrengthResolution, SourceHAndLCombinationsOnOneNetAre56X) {
   SimFixture f;
   auto out = RunCapture(
       "module top;\n"
@@ -632,7 +632,7 @@ TEST(StrengthResolution, SourceFigure2814CombinesBothAt56X) {
 // one input x drives StH, and with a weak 0 beside it the net takes the range
 // (36x) of Figure 28-19; an H beside a pullup alone stays 651, the weak 0 being
 // reached only where the H is z and the pullup is not.
-TEST(StrengthResolution, SourceFigure2816StrongHWithWeakZeroIs36X) {
+TEST(StrengthResolution, SourceStrongHWithWeakZeroIs36X) {
   SimFixture f;
   auto out = RunCapture(
       "module top;\n"

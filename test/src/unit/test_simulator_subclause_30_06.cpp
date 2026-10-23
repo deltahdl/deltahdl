@@ -17,13 +17,13 @@ namespace {
 
 // LRM Example 1 (Figure 30-3): module path delay 22 exceeds the distributed
 // sum 0 + 1 = 1, so the module path delay is used.
-TEST(MixedPathDistributedDelay, ModulePathLargerWinsLrmExample1) {
+TEST(MixedPathDistributedDelay, ModulePathLargerWins) {
   EXPECT_EQ(SelectEffectivePathDelay(22, 1), 22u);
 }
 
 // LRM Example 2 (Figure 30-4): the distributed sum 10 + 20 = 30 exceeds the
 // module path delay 22, so the distributed sum is used.
-TEST(MixedPathDistributedDelay, DistributedSumLargerWinsLrmExample2) {
+TEST(MixedPathDistributedDelay, DistributedSumLargerWins) {
   EXPECT_EQ(SelectEffectivePathDelay(22, 30), 30u);
 }
 
@@ -51,7 +51,7 @@ TEST(MixedPathDistributedDelay, NoModulePathUsesDistributedDelay) {
 // Figure 30-3 of §30.6 (printed page 885) run: the cell's d reaches q through
 // an `and #0` and an `or` of delay `or_delay`, and its module path from d to q
 // is 22, d rising at 40 and falling at 80.
-std::string Figure30Dash3Cell(const std::string& or_delay) {
+std::string CellWithGatesAndAModulePath(const std::string& or_delay) {
   return "module mycell(input a, input b, input c, input d, output q);\n"
          "  wire w1, w2;\n"
          "  and #0 (w1, a, b);\n"
@@ -82,7 +82,7 @@ std::string Figure30Dash3Cell(const std::string& or_delay) {
 // 1 alone.
 TEST(MixedPathDistributedDelayRun, ModulePathLargerWinsOverGates) {
   SimFixture f;
-  EXPECT_EQ(RunCapture(Figure30Dash3Cell("1"), f),
+  EXPECT_EQ(RunCapture(CellWithGatesAndAModulePath("1"), f),
             "t=22 q=0\nt=62 q=1\nt=102 q=0\n");
 }
 
@@ -90,7 +90,7 @@ TEST(MixedPathDistributedDelayRun, ModulePathLargerWinsOverGates) {
 // and q follows d by 30.
 TEST(MixedPathDistributedDelayRun, GatesLargerWinOverModulePath) {
   SimFixture f;
-  EXPECT_EQ(RunCapture(Figure30Dash3Cell("30"), f),
+  EXPECT_EQ(RunCapture(CellWithGatesAndAModulePath("30"), f),
             "t=30 q=0\nt=70 q=1\nt=110 q=0\n");
 }
 

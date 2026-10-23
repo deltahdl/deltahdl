@@ -77,7 +77,7 @@ TEST(StrengthKeywordModel, SupplyKeywordCarriesTheSupplyLevel) {
 // Table 28-7 orders the five drive-strength names highz below weak below pull
 // below strong below supply, so the five keyword indices give five levels that
 // rise with the table's order rather than five equal or five arbitrary ones.
-TEST(StrengthKeywordModel, KeywordLevelsRiseInTable287Order) {
+TEST(StrengthKeywordModel, KeywordLevelsRiseFromHighzToSupply) {
   EXPECT_LT(LevelOf(MapStrengthKeyword(1)), LevelOf(MapStrengthKeyword(2)));
   EXPECT_LT(LevelOf(MapStrengthKeyword(2)), LevelOf(MapStrengthKeyword(3)));
   EXPECT_LT(LevelOf(MapStrengthKeyword(3)), LevelOf(MapStrengthKeyword(4)));
@@ -94,7 +94,7 @@ TEST(StrengthKeywordModel, KeywordLevelsRiseInTable287Order) {
 // claims only that the answer stays inside Table 28-7. The model returns
 // kHighz for both, which is the model's own choice and is deliberately not
 // asserted.
-TEST(StrengthKeywordModel, EveryIndexYieldsALevelTable287Names) {
+TEST(StrengthKeywordModel, EveryIndexYieldsANamedStrengthLevel) {
   for (int index = 0; index <= 255; ++index) {
     EXPECT_LE(LevelOf(MapStrengthKeyword(static_cast<uint8_t>(index))),
               LevelOf(Strength::kSupply))

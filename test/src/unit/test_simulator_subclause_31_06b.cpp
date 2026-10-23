@@ -269,7 +269,7 @@ TEST(NotifierUpdateDriven, SatisfiedWindowLeavesTheDrivenNotifierAtZero) {
 // the clock rises at 70, inside tSU = 10, so the $setup toggles the notifier,
 // the UDP's `? ? ? ? *` row drives its output to x, and the x reaches qbar at
 // 76 and q at 78 through the clock's paths.
-TEST(NotifierUpdateDriven, SubclauseExample2FlipFlopGoesToXOnASetupViolation) {
+TEST(NotifierUpdateDriven, FlipFlopGoesToXOnASetupViolation) {
   SimFixture f;
   const std::string kDesign =
       "primitive posdff_udp(q, clock, data, preset, clear, notifier);\n"

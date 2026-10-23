@@ -400,7 +400,8 @@ TEST(VariableDeclaration, VariableStoresValueBetweenAssignmentAndRead) {
 // the positional maker beside it and the multidimensional one both give §6.8's
 // Table 6-7 default, so one spelling of an illegal pattern read 00 and the
 // other read 'x.
-TEST(VariableDeclaration, KeyedPatternUncoveredElementTakesTable67Default) {
+TEST(VariableDeclaration,
+     KeyedPatternUncoveredElementTakesItsDefaultInitialValue) {
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -424,7 +425,8 @@ TEST(VariableDeclaration, KeyedPatternUncoveredElementTakesTable67Default) {
 // a statement. §10.9.1 forbids the uncovered element there as it does in the
 // declaration, and the report stands at the statement, but the run still gives
 // the element a value, and it has to be the same one.
-TEST(VariableDeclaration, KeyedPatternStatementUncoveredElementTakesTable67) {
+TEST(VariableDeclaration,
+     KeyedPatternStatementUncoveredElementTakesItsDefaultInitialValue) {
   SimFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"

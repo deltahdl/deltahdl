@@ -143,7 +143,7 @@ TEST_F(VirtualInterface, InterfaceModportAndVifAreAlwaysValidInterfaceExprs) {
 // D1 + D2 together through the public path: a ref-obj assignment that fails the
 // detail-2 constraint is not an interface expr, so vpiExpr does not hand it
 // back.
-TEST_F(VirtualInterface, ExprSkipsRefObjThatFailsDetail2) {
+TEST_F(VirtualInterface, ExprSkipsRefObjWhoseActualIsNotAnInterface) {
   VpiObject net;
   net.type = kVpiNet;
   VpiObject ref_to_net;  // bound to a net, not an interface/modport
@@ -191,7 +191,7 @@ TEST_F(VirtualInterface, ExprReachesAssignedNestedVirtualInterface) {
 // D1 + D2 (ref-obj operand, accepting form): the figure's vpiExpr group admits
 // a ref obj, and detail 2 makes it legal when its vpiActual is an interface
 // passed through a port. Such a ref obj is handed back by vpiExpr - the
-// accepting counterpart to ExprSkipsRefObjThatFailsDetail2.
+// accepting counterpart to ExprSkipsRefObjWhoseActualIsNotAnInterface.
 TEST_F(VirtualInterface, ExprReachesAssignedRefObjPassedThroughPort) {
   VpiObject iface;
   iface.type = vpiInterface;

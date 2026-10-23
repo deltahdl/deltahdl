@@ -329,7 +329,7 @@ TEST(StrengthReductionResistive, NonconductingRtranif1LeavesFarNetStrength) {
 // large 1. The charge was offered to no net joined to the trireg, so both read
 // high impedance.
 TEST(StrengthReductionResistive,
-     ATriregsChargeCrossesASwitchReducedByTable288) {
+     ATriregsChargeIsReducedCrossingAResistiveSwitch) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

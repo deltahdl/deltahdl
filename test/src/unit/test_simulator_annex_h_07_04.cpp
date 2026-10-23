@@ -36,7 +36,7 @@ DpiArg Formal(DataTypeKind type, Direction direction, bool is_unsigned,
 // real double, shortreal float, chandle void*, string const char*, and bit
 // and logic -- reg using logic's encoding -- unsigned char, the encodings
 // being svdpi.h's; a type the table has no row for maps to nothing.
-TEST(DpiBasicTypes, TableH1MapsEachBasicTypeToItsCType) {
+TEST(DpiBasicTypes, EachBasicTypeMapsToItsCType) {
   EXPECT_EQ(DpiCTypeOfBasicType(DataTypeKind::kByte, false), "char");
   EXPECT_EQ(DpiCTypeOfBasicType(DataTypeKind::kShortint, false), "short int");
   EXPECT_EQ(DpiCTypeOfBasicType(DataTypeKind::kInt, false), "int");

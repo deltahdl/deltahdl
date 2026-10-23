@@ -423,7 +423,7 @@ TEST(WireTriResolutionE2e, TriHighZDriverDefersToDrivenValue) {
 // whole resolved vector is matched with case equality against 0xx1, so all four
 // cells
 // -- including the two x results -- are checked at once.
-TEST(WireTriResolutionE2e, WireVectorResolvesTable6_2PerBit) {
+TEST(WireTriResolutionE2e, WireVectorResolvesBitByBit) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  wire [3:0] w;\n"
                       "  logic result;\n"

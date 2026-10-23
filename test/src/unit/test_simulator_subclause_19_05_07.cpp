@@ -134,7 +134,7 @@ TEST(ValueResolution, RangeBecomesIntersectionWithEffectiveDomain) {
 
 // LRM 19.5.7 worked example b1: bit[2:0] p1, bins b1 = {1,[2:5],[6:10]} is
 // resolved to {1,[2:5],[6:7]} (the [6:10] range warns and is clamped).
-TEST(ValueResolution, ExampleB1UnsignedThreeBit) {
+TEST(ValueResolution, UnsignedThreeBitBinClampsTheRangePastSeven) {
   CoverpointEffectiveType eff = Unsigned(3);
   EXPECT_TRUE(CoverageDB::SingletonValueParticipates(
       CoverageDB::ResolveBinValue(1, false, false, false, eff)));
@@ -146,7 +146,8 @@ TEST(ValueResolution, ExampleB1UnsignedThreeBit) {
 
 // LRM 19.5.7 worked example b2: bit[2:0] p1, bins b2 = {-1,[1:10],15} is
 // resolved to {[1:7]} (the -1 and 15 singletons warn out, [1:10] clamps).
-TEST(ValueResolution, ExampleB2UnsignedThreeBit) {
+TEST(ValueResolution,
+     UnsignedThreeBitBinDropsMinusOneAndFifteenAndClampsItsRange) {
   CoverpointEffectiveType eff = Unsigned(3);
   EXPECT_FALSE(CoverageDB::SingletonValueParticipates(
       CoverageDB::ResolveBinValue(-1, true, false, false, eff)));
@@ -158,7 +159,8 @@ TEST(ValueResolution, ExampleB2UnsignedThreeBit) {
 
 // LRM 19.5.7 worked example b3: bit signed [2:0] p2, bins b3 = {1,[2:5],[6:10]}
 // is resolved to {1,[2:3]} ([6:10] warns out, [2:5] clamps).
-TEST(ValueResolution, ExampleB3SignedThreeBit) {
+TEST(ValueResolution,
+     SignedThreeBitBinClampsOneRangeAndDropsTheRangeAboveThree) {
   CoverpointEffectiveType eff = Signed(3);
   EXPECT_TRUE(CoverageDB::SingletonValueParticipates(
       CoverageDB::ResolveBinValue(1, false, false, false, eff)));
@@ -170,7 +172,7 @@ TEST(ValueResolution, ExampleB3SignedThreeBit) {
 
 // LRM 19.5.7 worked example b4: bit signed [2:0] p2, bins b4 = {-1,[1:10],15}
 // is resolved to {-1,[1:3]} (-1 survives, 15 warns out, [1:10] clamps).
-TEST(ValueResolution, ExampleB4SignedThreeBit) {
+TEST(ValueResolution, SignedThreeBitBinKeepsMinusOneAndDropsFifteen) {
   CoverpointEffectiveType eff = Signed(3);
   EXPECT_TRUE(CoverageDB::SingletonValueParticipates(
       CoverageDB::ResolveBinValue(-1, true, false, false, eff)));

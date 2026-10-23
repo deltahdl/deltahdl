@@ -49,7 +49,7 @@ TEST(OptionalCountDriversSim, SingleDriverIsNotContention) {
 // Annex D.2 / Table D.1: the optional output arguments receive, in declared
 // order, net_is_forced, number_of_01x_drivers, and the per-state 0/1/x tallies.
 // Here one driver holds 1 and the other holds 0.
-TEST(OptionalCountDriversSim, OptionalArgsCarryTableD1Tallies) {
+TEST(OptionalCountDriversSim, OptionalArgsCarryForcedStateAndDriverTallies) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
