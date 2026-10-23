@@ -89,9 +89,7 @@ void Parser::ParseTfPortDeclarators(ModuleItem* item, const TfPortHeader& hdr) {
 // A.2.7: `tf_port_direction ::= port_direction | [ const ] ref [ static ]`, so
 // `const` opens a tf_port_declaration only where it qualifies a `ref`. Standing
 // alone it opens a data_declaration instead: `const int c = a + 1;` at the head
-// of a subroutine body is a block_item_declaration (A.2.8), and a
-// tf_port_declaration could not carry that initializer in any case -- its
-// declarators are a list_of_tf_variable_identifiers, with no `= expression`.
+// of a subroutine body is a block_item_declaration (A.2.8).
 bool Parser::IsTfPortDeclarationStart() {
   auto tk = CurrentToken().kind;
   if (tk != TokenKind::kKwConst) return IsTfPortDirectionKw(tk);
