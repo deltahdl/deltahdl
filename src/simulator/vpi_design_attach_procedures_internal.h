@@ -17,13 +17,14 @@
 // statements into the VPI model, vpi_design_attach_calls.cpp, which resolves
 // what a call statement calls and what a foreach loop indexes, and
 // vpi_design_attach_call_lookup.cpp, which finds the classes, the block
-// variables and the interface items it resolves them against.
+// variables, the interface items and the structures it resolves them against.
 
 namespace delta {
 
 struct ClassDecl;
 struct DataType;
 struct Expr;
+struct StructMember;
 
 // Where the objects a statement holds hang: the scope object around it, and
 // the path a named one among them is named under, which an unnamed scope
@@ -178,6 +179,21 @@ const ModuleItem* VpiInterfaceItem(const RtlirDesign& design,
                                    std::string_view iface,
                                    std::string_view name,
                                    std::initializer_list<ModuleItemKind> kinds);
+
+// §7.2: the unpacked or packed structure `type` declares, written as one or
+// through a typedef the walked module declares; null for any other type.
+const DataType* VpiStructTypeOf(const BodyWalk& walk, const DataType* type);
+
+// §7.2: the structure the member `member` of a structure is, written inline or
+// through a typedef the walked module declares; null for a member of any other
+// type.
+const DataType* VpiMemberStructType(const BodyWalk& walk,
+                                    const StructMember& member);
+
+// The same, of the member `name` of the structure `aggregate`.
+const DataType* VpiMemberStructNamed(const BodyWalk& walk,
+                                     const DataType& aggregate,
+                                     std::string_view name);
 
 // §37.42 with §37.60: what the expression statement `expr`, standing in the
 // scope `parent` stands for, calls. A task is enabled with or without an

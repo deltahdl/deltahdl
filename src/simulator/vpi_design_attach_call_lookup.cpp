@@ -22,8 +22,8 @@
 // The declarations a call the procedure walk resolves is made against: the
 // class a name stands for where the call stands, the methods it declares, the
 // class it extends under a specialization, the variable a named block declares
-// where a hierarchical name reaches it, and the item an interface declares
-// where a virtual interface reaches it.
+// where a hierarchical name reaches it, the item an interface declares where a
+// virtual interface reaches it, and the structure a chain of members descends.
 
 namespace delta {
 
@@ -78,6 +78,21 @@ const Stmt* NamedBlockVarDecl(const Stmt* s, std::string_view block,
   ForEachChildStmt(s, [&](const Stmt* sub) {
     if (const Stmt* inner = NamedBlockVarDecl(sub, block, name)) found = inner;
   });
+  return found;
+}
+
+// §6.18: the type the typedef `name` the walked module declares stands for;
+// null where the module declares no typedef of that name.
+const DataType* ModuleTypedef(const BodyWalk& walk, std::string_view name) {
+  const DataType* found = nullptr;
+  for (const ModuleDecl* decl : walk.design.compilation_unit->modules) {
+    if (decl->name != walk.mod.name) continue;
+    for (const ModuleItem* item : decl->items) {
+      if (item->kind == ModuleItemKind::kTypedef && item->name == name) {
+        found = &item->typedef_type;
+      }
+    }
+  }
   return found;
 }
 
@@ -153,6 +168,31 @@ const ModuleItem* VpiInterfaceItem(
         found = item;
       }
     }
+  }
+  return found;
+}
+
+const DataType* VpiStructTypeOf(const BodyWalk& walk, const DataType* type) {
+  if (type != nullptr && type->kind == DataTypeKind::kNamed) {
+    type = ModuleTypedef(walk, type->type_name);
+  }
+  return type != nullptr && type->kind == DataTypeKind::kStruct ? type
+                                                                : nullptr;
+}
+
+const DataType* VpiMemberStructType(const BodyWalk& walk,
+                                    const StructMember& member) {
+  return VpiStructTypeOf(walk, member.type_kind == DataTypeKind::kNamed
+                                   ? ModuleTypedef(walk, member.type_name)
+                                   : member.nested_type);
+}
+
+const DataType* VpiMemberStructNamed(const BodyWalk& walk,
+                                     const DataType& aggregate,
+                                     std::string_view name) {
+  const DataType* found = nullptr;
+  for (const StructMember& member : aggregate.struct_members) {
+    if (member.name == name) found = VpiMemberStructType(walk, member);
   }
   return found;
 }

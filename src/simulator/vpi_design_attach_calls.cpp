@@ -9,7 +9,6 @@
 #include "elaborator/queue_dim.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast_class.h"
-#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
@@ -445,52 +444,6 @@ HandleType PropertyType(const BodyWalk& walk, std::string_view cls,
                      walk)};
 }
 
-// §6.18: the type the typedef `name` the walked module declares stands for;
-// null where the module declares no typedef of that name.
-const DataType* ModuleTypedef(const BodyWalk& walk, std::string_view name) {
-  const DataType* found = nullptr;
-  for (const ModuleDecl* decl : walk.design.compilation_unit->modules) {
-    if (decl->name != walk.mod.name) continue;
-    for (const ModuleItem* item : decl->items) {
-      if (item->kind == ModuleItemKind::kTypedef && item->name == name) {
-        found = &item->typedef_type;
-      }
-    }
-  }
-  return found;
-}
-
-// §7.2: the unpacked or packed structure `type` declares, written as one or
-// through a typedef the walked module declares; null for any other type.
-const DataType* StructTypeOf(const BodyWalk& walk, const DataType* type) {
-  if (type != nullptr && type->kind == DataTypeKind::kNamed) {
-    type = ModuleTypedef(walk, type->type_name);
-  }
-  return type != nullptr && type->kind == DataTypeKind::kStruct ? type
-                                                                : nullptr;
-}
-
-// §7.2: the structure the member `member` of a structure is, written inline or
-// through a typedef the walked module declares; null for a member of any other
-// type.
-const DataType* MemberStructType(const BodyWalk& walk,
-                                 const StructMember& member) {
-  return StructTypeOf(walk, member.type_kind == DataTypeKind::kNamed
-                                ? ModuleTypedef(walk, member.type_name)
-                                : member.nested_type);
-}
-
-// The same, of the member `name` of the structure `aggregate`.
-const DataType* MemberStructNamed(const BodyWalk& walk,
-                                  const DataType& aggregate,
-                                  std::string_view name) {
-  const DataType* found = nullptr;
-  for (const StructMember& member : aggregate.struct_members) {
-    if (member.name == name) found = MemberStructType(walk, member);
-  }
-  return found;
-}
-
 // §7.2 with §8.4: the class the member `name` of the structure `aggregate`
 // holds a handle of, named as its declaration wrote it, with the arguments its
 // specialization gives the class (§8.25), and the kind of built-in value the
@@ -547,7 +500,7 @@ int MemberIndexKind(const Expr& array, const BlockParent& parent,
   if (iface_var != nullptr && first + 1 == names.size()) {
     return FirstDimIndexKind(iface_var->unpacked_dims, kAt);
   }
-  const DataType* aggregate = StructTypeOf(kAt, kHead.var.type);
+  const DataType* aggregate = VpiStructTypeOf(kAt, kHead.var.type);
   while (aggregate != nullptr) {
     const DataType* inner = nullptr;
     for (const StructMember& member : aggregate->struct_members) {
@@ -556,7 +509,7 @@ int MemberIndexKind(const Expr& array, const BlockParent& parent,
         return FirstDimIndexKind(member.unpacked_dims, kAt);
       }
       held = HandleType{member.type_name, {}, member.type_params};
-      inner = MemberStructType(kAt, member);
+      inner = VpiMemberStructType(kAt, member);
     }
     ++first;
     aggregate = inner;
@@ -585,17 +538,27 @@ struct ExprClassName {
 };
 
 // §26.3: the class the variable `name` the package `package` declares holds a
-// handle of, looked up in that package; empty where the package declares no
-// such variable of a named type.
-ExprClassName PackageVarClass(const RtlirDesign& design,
-                              std::string_view package, std::string_view name) {
+// handle of, looked up in that package, or whether it is a string, an
+// enumeration or an array, whose methods are built in, its type written
+// directly or through a typedef of the package; empty where the package
+// declares no such variable.
+ExprClassName PackageVarClass(const BodyWalk& walk, std::string_view package,
+                              std::string_view name) {
   ExprClassName cls{{}, package};
-  for (const PackageDecl* decl : design.packages) {
+  for (const PackageDecl* decl : walk.design.packages) {
     if (decl->name != package) continue;
     for (const ModuleItem* item : decl->items) {
-      if (item->kind == ModuleItemKind::kVarDecl && item->name == name) {
-        cls = {item->data_type.type_name, package, item->data_type.type_params};
+      if (item->kind != ModuleItemKind::kVarDecl || item->name != name) {
+        continue;
       }
+      const DataType& type = item->data_type;
+      const int kKind = type.kind == DataTypeKind::kNamed
+                            ? VpiPackageNamedTypeVariableKind(walk.design, decl,
+                                                              type.type_name)
+                            : VpiDataTypeVariableKind(type.kind);
+      cls = {type.type_name, package, type.type_params,
+             DeclaredHolder(item->unpacked_dims, kKind, walk) !=
+                 VpiBuiltInHolder::kNone};
     }
   }
   return cls;
@@ -710,12 +673,13 @@ ExprClassName ExprClass(const Expr& expr, const BlockParent& parent,
   }
   if (expr.kind != ExprKind::kMemberAccess) return {{}, {}, {}, true};
   if (expr.is_scope_resolution) {
-    return PackageVarClass(walk.design, expr.lhs->text, expr.rhs->text);
+    return PackageVarClass(walk, expr.lhs->text, expr.rhs->text);
   }
   const ExprClassName kOuter = ExprClass(*expr.lhs, parent, walk);
   const HandleType kHeld = PropertyType(walk, kOuter.cls, expr.rhs->text,
                                         kOuter.package, kOuter.args);
-  return {kHeld.cls, kOuter.package, kHeld.args};
+  return {kHeld.cls, kOuter.package, kHeld.args,
+          kHeld.holder != VpiBuiltInHolder::kNone};
 }
 
 // §37.42 detail 2: a method call applied to the value of an expression other
@@ -780,14 +744,14 @@ CallShape MemberChainCallShape(const Expr& access, const BlockParent& parent,
   // turn, s.inner.h, in that member's object, so the chain's class vars start
   // past the last of them.
   const DataType* aggregate =
-      first < names.size() ? StructTypeOf(kAt, kHead.var.type) : nullptr;
+      first < names.size() ? VpiStructTypeOf(kAt, kHead.var.type) : nullptr;
   while (aggregate != nullptr) {
     const std::string_view kMember = names[first];
     type = StructMemberType(*aggregate, kMember, kAt);
     prefix = ChildNamed(prefix, kMember);
     ++first;
     aggregate = first < names.size()
-                    ? MemberStructNamed(kAt, *aggregate, kMember)
+                    ? VpiMemberStructNamed(kAt, *aggregate, kMember)
                     : nullptr;
   }
   for (std::size_t i = first; i < names.size(); ++i) {

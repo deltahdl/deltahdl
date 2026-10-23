@@ -113,6 +113,40 @@ TEST_F(MethodCallsOnValues, AnArrayElementTakesTheMethodsOfItsKind) {
   EXPECT_EQ(BuiltInCallsOfTheBlock(), 2U);
 }
 
+// §8.5: a property selected from a call's result, f().s, or from an element of
+// an array of handles, objs[0].e, takes the built-in methods of its kind
+// (#7734).
+TEST_F(MethodCallsOnValues, APropertyOfAValueTakesTheMethodsOfItsKind) {
+  Run("module top; typedef enum {A, B} e_t;\n"
+      "  class K; string s = \"ab\"; e_t e = B; endclass\n"
+      "  K objs [2];\n"
+      "  function K f(); return objs[0]; endfunction\n"
+      "  initial begin : b\n"
+      "    objs[0] = new;\n"
+      "    void'(f().s.len());\n"
+      "    void'(objs[0].e.name());\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_EQ(BuiltInCallsOfTheBlock(), 2U);
+}
+
+// §26.3: a package's string, queue and variable of an enumeration its typedef
+// names, each named through the package, take the built-in methods of their
+// kinds (#7735).
+TEST_F(MethodCallsOnValues, APackagesVariableTakesTheMethodsOfItsKind) {
+  Run("package p; typedef enum {A, B} e_t;\n"
+      "  string s = \"ab\"; int q [$]; e_t e = B;\n"
+      "endpackage\n"
+      "module top;\n"
+      "  initial begin : b\n"
+      "    void'(p::s.len());\n"
+      "    void'(p::q.size());\n"
+      "    void'(p::e.name());\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_EQ(BuiltInCallsOfTheBlock(), 3U);
+}
+
 // §11.3.6 with A.8.4: an assignment in parentheses, ((h = g)), is a handle of
 // its left-hand side's class (#7720).
 TEST_F(MethodCallsOnValues, AParenthesizedAssignmentTakesItsTargetsMethods) {
