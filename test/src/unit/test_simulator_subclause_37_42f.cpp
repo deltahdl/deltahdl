@@ -90,6 +90,39 @@ TEST_F(MethodCallsOnValues, AStringSystemFunctionsResultTakesStringMethods) {
   EXPECT_EQ(BuiltInCallsOfTheBlock(), 1U);
 }
 
+// §11.4.11: a conditional of two strings is a string, and one of two values of
+// an enumeration a value of it (#7728).
+TEST_F(MethodCallsOnValues, AConditionalTakesTheMethodsOfItsOperands) {
+  Run("module top; typedef enum {A, B} e_t;\n"
+      "  string s = \"a\", t = \"bc\"; e_t e = A, f = B; bit c = 1;\n"
+      "  initial begin : b\n"
+      "    void'((c ? s : t).len());\n"
+      "    void'((c ? e : f).name());\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_EQ(BuiltInCallsOfTheBlock(), 2U);
+}
+
+// §7.4 and §7.10: an element of an array of strings is a string, and one of a
+// queue of an enumeration a value of it (#7729).
+TEST_F(MethodCallsOnValues, AnArrayElementTakesTheMethodsOfItsKind) {
+  Run("module top; typedef enum {A, B} e_t;\n"
+      "  string strs [2] = '{\"a\", \"bc\"}; e_t q [$] = '{B};\n"
+      "  initial begin : b void'(strs[0].len()); void'(q[0].name()); end\n"
+      "endmodule\n");
+  EXPECT_EQ(BuiltInCallsOfTheBlock(), 2U);
+}
+
+// §11.3.6 with A.8.4: an assignment in parentheses, ((h = g)), is a handle of
+// its left-hand side's class (#7720).
+TEST_F(MethodCallsOnValues, AParenthesizedAssignmentTakesItsTargetsMethods) {
+  Run("module top; class C; task run(); endtask endclass\n"
+      "  C h; C g = new;\n"
+      "  initial begin : b ((h = g)).run(); end\n"
+      "endmodule\n");
+  ExpectTheBlockCallsRun();
+}
+
 // §7.2: a class var a structure member's own structure member holds,
 // s.inner.h, is reached through both structures (#7721).
 TEST_F(MethodCallsOnValues, ANestedStructureMembersHandleTakesItsMethods) {

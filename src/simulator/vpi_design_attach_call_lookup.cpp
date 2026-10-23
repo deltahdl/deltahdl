@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cstddef>
+#include <initializer_list>
 #include <span>
 #include <string>
 #include <string_view>
@@ -10,6 +11,7 @@
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
 #include "parser/ast_class.h"
+#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
@@ -19,8 +21,9 @@
 
 // The declarations a call the procedure walk resolves is made against: the
 // class a name stands for where the call stands, the methods it declares, the
-// class it extends under a specialization, and the variable a named block
-// declares where a hierarchical name reaches it.
+// class it extends under a specialization, the variable a named block declares
+// where a hierarchical name reaches it, and the item an interface declares
+// where a virtual interface reaches it.
 
 namespace delta {
 
@@ -133,6 +136,22 @@ const Stmt* VpiNamedBlockVarDecl(const RtlirModule& mod, std::string_view block,
   for (const RtlirProcess& proc : mod.processes) {
     if (const Stmt* decl = NamedBlockVarDecl(proc.body, block, name)) {
       found = decl;
+    }
+  }
+  return found;
+}
+
+const ModuleItem* VpiInterfaceItem(
+    const RtlirDesign& design, std::string_view iface, std::string_view name,
+    std::initializer_list<ModuleItemKind> kinds) {
+  const ModuleItem* found = nullptr;
+  for (const ModuleDecl* decl : design.compilation_unit->interfaces) {
+    if (decl->name != iface) continue;
+    for (const ModuleItem* item : decl->items) {
+      if (std::ranges::find(kinds, item->kind) != kinds.end() &&
+          item->name == name) {
+        found = item;
+      }
     }
   }
   return found;

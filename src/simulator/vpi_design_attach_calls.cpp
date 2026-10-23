@@ -367,16 +367,11 @@ CallShape MethodShape(const MethodCall& call, std::string_view name,
 // whether or not anything instantiates the interface.
 CallShape InterfaceCallShape(const BodyWalk& walk, std::string_view iface,
                              std::string_view name) {
-  const ModuleItem* called = nullptr;
-  for (const ModuleDecl* decl : walk.design.compilation_unit->interfaces) {
-    if (decl->name != iface) continue;
-    for (const ModuleItem* item : decl->items) {
-      const bool kSubroutine = item->kind == ModuleItemKind::kTaskDecl ||
-                               item->kind == ModuleItemKind::kFunctionDecl;
-      if (kSubroutine && item->name == name) called = item;
-    }
-  }
-  return SubroutineCallShape({called, nullptr}, name);
+  return SubroutineCallShape({VpiInterfaceItem(walk.design, iface, name,
+                                               {ModuleItemKind::kTaskDecl,
+                                                ModuleItemKind::kFunctionDecl}),
+                              nullptr},
+                             name);
 }
 
 // §37.42: a method task or method function call, applied through `access`,
@@ -529,12 +524,13 @@ int HeadIndexKind(const ChainHead& head, std::string_view name,
 
 // §12.7.3 with §8.4, §7.2 and §23.6: the same for an array named through
 // members: a variable of the module of an instance the leading names reach,
-// u.m, or one a named block declares, b1.aa; a member of a structure variable,
-// s.aa, of a structure such a member is, s.inner.aa, or of a class the member
-// holds a handle of, s.h.m; or else the first unpacked dimension of the
-// property the chain's last name is, of the class the rest of the chain holds a
-// handle of, o.m or o.h.m. An int var where the chain names none of these, such
-// as one through an element select.
+// u.m, one a named block declares, b1.aa, or one the interface a virtual
+// interface refers to an instance of declares, vif.aa (§25.9); a member of a
+// structure variable, s.aa, of a structure such a member is, s.inner.aa, or of
+// a class the member holds a handle of, s.h.m; or else the first unpacked
+// dimension of the property the chain's last name is, of the class the rest of
+// the chain holds a handle of, o.m or o.h.m. An int var where the chain names
+// none of these, such as one through an element select.
 int MemberIndexKind(const Expr& array, const BlockParent& parent,
                     const BodyWalk& walk) {
   std::vector<std::string_view> names;
@@ -545,6 +541,14 @@ int MemberIndexKind(const Expr& array, const BlockParent& parent,
     return HeadIndexKind(kHead, names.back(), kAt);
   HandleType held{kHead.var.cls, {}, kHead.var.args};
   std::size_t first = kHead.used;
+  const ModuleItem* iface_var =
+      kHead.var.vif.empty() || first + 1 != names.size()
+          ? nullptr
+          : VpiInterfaceItem(walk.design, kHead.var.vif, names.back(),
+                             {ModuleItemKind::kVarDecl});
+  if (iface_var != nullptr) {
+    return FirstDimIndexKind(iface_var->unpacked_dims, kAt);
+  }
   const DataType* aggregate = StructTypeOf(kAt, kHead.var.type);
   while (aggregate != nullptr) {
     const DataType* inner = nullptr;
@@ -668,31 +672,39 @@ ExprClassName CallResultClass(const Expr& callee, const BlockParent& parent,
 }
 
 // §8.4: the class the value `expr` writes is a handle of: a variable's of the
-// scope; an element's of an array of handles, objs[0]; a property's of the
-// class of what it is selected from, a.h; a package's variable's, p::obj; the
-// return type of what a call calls, f() or a.self(); a conditional's, of the
-// operand it may answer with first (§11.4.11, which has both operands share a
-// class or one extend the other); and a cast's, of the casting type a name
-// writes, B'(d), the value of any other casting type being of no class
-// (§6.24.1). Any other expression a method is applied to writes a value of no
-// class whose methods are built in: a string concatenation (§11.4.12.2) or the
-// string a system function returns. The elaborator reports a method applied to
-// an operator's result (§11.8.1, §11.4.12), a parenthesized assignment's among
-// them.
+// scope, a string, an enumeration or an array of which is a value of no class
+// whose methods are built in; an element's of an array of handles, objs[0],
+// the element of any other array, strs[0], being of no class (§7.4); a
+// property's of the class of what it is selected from, a.h; a package's
+// variable's, p::obj; the return type of what a call calls, f() or a.self(); a
+// conditional's, of the operand it may answer with first (§11.4.11, which has
+// both operands share a class or one extend the other); an assignment's in
+// parentheses, ((h = g)), of its left-hand side (§11.3.6); and a cast's, of
+// the casting type a name writes, B'(d), the value of any other casting type
+// being of no class (§6.24.1). Any other expression a method is applied to
+// writes a value of no class whose methods are built in: a string
+// concatenation (§11.4.12.2) or the string a system function returns. The
+// elaborator reports a method applied to any other operator's result, the
+// compound assignments' among them (§11.8.1, §11.4.12, §8.4).
 ExprClassName ExprClass(const Expr& expr, const BlockParent& parent,
                         const BodyWalk& walk) {
   if (expr.kind == ExprKind::kIdentifier) {
     const PrefixVar kVar = FindPrefixVar(parent, expr.text, walk);
-    return {kVar.cls, {}, kVar.args};
+    return {kVar.cls, {}, kVar.args, kVar.holder != VpiBuiltInHolder::kNone};
   }
   if (expr.kind == ExprKind::kSelect) {
-    return ExprClass(*expr.base, parent, walk);
+    ExprClassName element = ExprClass(*expr.base, parent, walk);
+    element.built_in = element.cls.empty();
+    return element;
   }
   if (expr.kind == ExprKind::kCall) {
     return CallResultClass(*expr.lhs, parent, walk);
   }
   if (expr.kind == ExprKind::kTernary) {
     return ExprClass(*expr.true_expr, parent, walk);
+  }
+  if (expr.kind == ExprKind::kBinary) {
+    return ExprClass(*expr.lhs, parent, walk);
   }
   if (expr.kind == ExprKind::kCast) {
     return {

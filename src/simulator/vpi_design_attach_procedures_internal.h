@@ -1,5 +1,6 @@
 #pragma once
 
+#include <initializer_list>
 #include <span>
 #include <string>
 #include <string_view>
@@ -7,6 +8,7 @@
 
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
+#include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_object.h"
@@ -14,15 +16,14 @@
 // Shared between vpi_design_attach_procedures.cpp, which walks a procedure's
 // statements into the VPI model, vpi_design_attach_calls.cpp, which resolves
 // what a call statement calls and what a foreach loop indexes, and
-// vpi_design_attach_call_lookup.cpp, which finds the classes and the block
-// variables it resolves them against.
+// vpi_design_attach_call_lookup.cpp, which finds the classes, the block
+// variables and the interface items it resolves them against.
 
 namespace delta {
 
 struct ClassDecl;
 struct DataType;
 struct Expr;
-struct ModuleItem;
 
 // Where the objects a statement holds hang: the scope object around it, and
 // the path a named one among them is named under, which an unnamed scope
@@ -169,6 +170,14 @@ VpiHeldClass VpiBaseOf(const ClassDecl& decl, std::span<const DataType> args);
 // where no block of the name declares one.
 const Stmt* VpiNamedBlockVarDecl(const RtlirModule& mod, std::string_view block,
                                  std::string_view name);
+
+// §25.9: the item of one of the kinds `kinds` named `name` that the interface
+// `iface` of the design declares, which a virtual interface of it reaches
+// whichever instance it refers to; null where the interface declares none.
+const ModuleItem* VpiInterfaceItem(const RtlirDesign& design,
+                                   std::string_view iface,
+                                   std::string_view name,
+                                   std::initializer_list<ModuleItemKind> kinds);
 
 // §37.42 with §37.60: what the expression statement `expr`, standing in the
 // scope `parent` stands for, calls. A task is enabled with or without an

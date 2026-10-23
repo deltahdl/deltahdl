@@ -602,15 +602,24 @@ TEST_F(DoWhileAndForeachLoopsOfARun, ANamedBlocksArrayGivesItsIndexType) {
   EXPECT_EQ(FirstLoopVarKinds(By("top.b")), (std::vector<int>{vpiStringVar}));
 }
 
-// §12.7.3 with §25.9: over a fixed-size array an interface declares, named
-// through a virtual interface, vif.f, the index variable is an int var, as over
-// any fixed-size array.
-TEST_F(DoWhileAndForeachLoopsOfARun, AVirtualInterfacesFixedArrayGivesInt) {
-  Run("interface intf; int f [2]; endinterface\n"
+// §12.7.3 with §25.9: over an associative array an interface declares, named
+// through a virtual interface, vif.aa, the index variable is of the array's
+// index type; over a fixed-size array a structure of the interface holds,
+// vif.s.f, it is an int var, as over any fixed-size array (#7730).
+TEST_F(DoWhileAndForeachLoopsOfARun, AVirtualInterfacesArrayGivesItsIndexType) {
+  Run("interface other; int aa [byte]; endinterface\n"
+      "interface intf; int n; int aa [string]; struct { int f [2]; } s;\n"
+      "  task t(); endtask\n"
+      "endinterface\n"
       "module top; intf i (); virtual intf vif;\n"
-      "  initial begin : b vif = i; foreach (vif.f[k]) begin end end\n"
+      "  initial begin : b\n"
+      "    vif = i;\n"
+      "    foreach (vif.aa[k]) begin end\n"
+      "    foreach (vif.s.f[k]) begin end\n"
+      "  end\n"
       "endmodule\n");
-  EXPECT_EQ(FirstLoopVarKinds(By("top.b")), (std::vector<int>{vpiIntVar}));
+  EXPECT_EQ(FirstLoopVarKinds(By("top.b")),
+            (std::vector<int>{vpiStringVar, vpiIntVar}));
 }
 
 // §37.75: a null handle has no do-while condition.
