@@ -3,12 +3,11 @@
 #include <string>
 #include <vector>
 
-#include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "common/types.h"
+#include "fixture_parser.h"
 #include "lexer/lexer.h"
-#include "parser/ast_design.h"
 #include "parser/parser.h"
 #include "preprocessor/preprocessor.h"
 
@@ -45,31 +44,17 @@ inline PreprocTimescaleResult Preprocess(const std::string& src) {
 }
 
 // What a run of the preprocessor and then the parser left behind for a case to
-// make its claim about. The diagnostics are a copy rather than a view: the
-// engine that recorded them is a local of the call that ran the parser, so a
-// case reading the engine's own record would be reading storage released before
-// the call returned.
-//
-// has_errors stays beside them, because a case asking only whether a source was
-// accepted is asking a question the whole record does not answer more clearly
-// than the boolean does.
-struct PreprocessedParseResult {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-  std::vector<Diagnostic> diags;
+// make its claim about: everything a ParseResult holds, and the global
+// precision the preprocessor ended with. It is a ParseResult, so a case handed
+// one for a source that drew an error is held to reading has_errors or diags
+// as a case handed ParseResult itself is: a rejected source still leaves a
+// CompilationUnit of what the parser recovered and a global precision of
+// whatever the preprocessor ended with, and an absence or a default asserted on
+// either holds whether the rule it covers works or not.
+struct PreprocessedParseResult : ParseResult {
   bool has_preproc_global_precision = false;
   TimeUnit preproc_global_precision = TimeUnit::kS;
 };
-
-// Takes both readings of the engine at once, so no run can copy the record and
-// leave the boolean behind, or the reverse.
-inline void RecordDiagnostics(const DiagEngine& diag,
-                              PreprocessedParseResult& result) {
-  result.has_errors = diag.HasErrors();
-  result.diags = diag.Diagnostics();
-}
 
 inline PreprocessedParseResult PreprocessAndParse(const std::string& src) {
   PreprocessedParseResult result;

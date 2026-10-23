@@ -23,6 +23,7 @@
 
 #include "common/diagnostic.h"
 #include "fixture_parser.h"
+#include "fixture_preprocessor_timescale.h"
 #include "helpers_reported_error.h"
 
 using namespace delta;
@@ -64,6 +65,29 @@ TEST(ParseResultRead, EveryEntryPointFailsAnErrorNeverRead) {
   EXPECT_NONFATAL_FAILURE(PreprocessARejectedSourceNobodyReads(),
                           kUnreadReport);
   EXPECT_NONFATAL_FAILURE(ParseARejectedLibraryNobodyReads(), kUnreadReport);
+}
+
+// PreprocessAndParse, in fixture_preprocessor_timescale.h, hands over a
+// ParseResult as well, with the preprocessor's global precision beside it, and
+// is held to the same read.
+void PreprocessAndParseARejectedSourceNobodyReads() {
+  auto r = PreprocessAndParse(kRejectedSrc);
+}
+
+TEST(ParseResultRead, APreprocessedParseFailsAnErrorNeverRead) {
+  EXPECT_NONFATAL_FAILURE(PreprocessAndParseARejectedSourceNobodyReads(),
+                          kUnreadReport);
+  EXPECT_NONFATAL_FAILURE(PreprocessAndParseARejectedSourceNobodyReads(),
+                          "  logic x\n");
+}
+
+void MoveAnUnreadPreprocessedParse() {
+  auto first = PreprocessAndParse(kRejectedSrc);
+  PreprocessedParseResult second(std::move(first));
+}
+
+TEST(ParseResultRead, AMovedPreprocessedParseRaisesItOnce) {
+  EXPECT_NONFATAL_FAILURE(MoveAnUnreadPreprocessedParse(), kUnreadReport);
 }
 
 // Parses the rejected source and then reads the record with `read`. The reads
