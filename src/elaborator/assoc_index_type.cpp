@@ -72,10 +72,13 @@ std::string ScopedTypeKey(const Expr* dim) {
 static bool IsRealIndexType(const Expr* dim, const TypedefMap& typedefs) {
   if (dim == nullptr) return false;
   // A.2.5 with §6.23: an index written as a data_type or a type reference
-  // carries its type once resolved, and one not yet resolved names nothing.
+  // carries its type, the parser's for a data_type and the elaborator's for
+  // `type(expression)`. Every declaration this is asked of has had its
+  // references resolved first: a module's variables and typedefs where they
+  // are elaborated, its ports in ResolvePortTypeRefs, and every other
+  // declaration in the walks of type_ref_walks.cpp.
   if (dim->kind == ExprKind::kTypeRef) {
-    return dim->type_value != nullptr &&
-           ContainsRealType(*dim->type_value, typedefs);
+    return ContainsRealType(*dim->type_value, typedefs);
   }
   const std::string kName = dim->kind == ExprKind::kIdentifier
                                 ? std::string(dim->text)

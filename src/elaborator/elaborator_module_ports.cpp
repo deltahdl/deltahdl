@@ -14,6 +14,7 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "common/types.h"
+#include "elaborator/assoc_index_type.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/const_eval_internal.h"
 #include "elaborator/elaborator.h"
@@ -803,12 +804,18 @@ static bool PortTypeIsArray(
 // reader of the port's type, in ElaboratePorts and in the module's items, as
 // ElaborateVarDecl resolves a variable's in its item. The ports are resolved
 // in order, so a reference to an earlier port reads its resolved type. The
-// parser made the declaration as a mutable object.
+// parser made the declaration as a mutable object. A.2.5 with A.1.3: a
+// variable port's associative index written as a type reference,
+// `input var int p [type(k)]`, is resolved the same way, its type made in
+// `arena`.
 static void ResolvePortTypeRefs(
     const ModuleDecl* decl,
-    const std::function<void(DataType&, SourceLoc)>& resolve) {
+    const std::function<void(DataType&, SourceLoc)>& resolve, Arena& arena) {
   for (const auto& port : decl->ports) {
     resolve(const_cast<DataType&>(port.data_type), port.loc);
+    ResolveTypeRefIndexDims(
+        port.unpacked_dims, [&](DataType& type) { resolve(type, port.loc); },
+        arena);
   }
 }
 
@@ -832,7 +839,8 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
   DeclarePortExprObjects(decl, mod, ctx);
   RecordPortExprDecls(decl, mod);
   ResolvePortTypeRefs(
-      decl, [&](DataType& dt, SourceLoc loc) { ResolveTypeRef(dt, loc, mod); });
+      decl, [&](DataType& dt, SourceLoc loc) { ResolveTypeRef(dt, loc, mod); },
+      arena_);
   for (const auto& port : decl->ports) {
     if (RejectIllegalPortType(port, diag_)) continue;
 

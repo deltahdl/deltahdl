@@ -562,19 +562,24 @@ TEST(AssocIndexTypeValidation, TypedefTypeRefIndexIsResolvedInEveryScope) {
   EXPECT_FALSE(x->is_index_signed);
 }
 
-// §7.8.5 bars a real index alone, so a variable port whose associative index
-// is a type reference to a port that holds no real, `[type(k)]` of a
-// `bit [3:0]`, draws no report.
-TEST(AssocIndexTypeValidation, TypeRefIndexWithoutRealOnPortIsNotReported) {
+// A.1.3 and A.2.5 with §6.23 and §7.8.5: a variable port's associative index
+// written as a type reference has the type of the earlier port it names, so
+// `[type(r)]` of a real port is reported at its line and `[type(k)]` of a
+// `bit [3:0]` port at the next is not. The port's index was resolved nowhere,
+// naming no type, and so no real.
+TEST(AssocIndexTypeValidation, TypeRefIndexOnVariablePortIsResolved) {
   ElabFixture f;
   ElaborateSrc(
-      "module top (input bit [3:0] k, input var int p [type(k)]);\n"
+      "module top (input var real r, input var int p [type(r)],\n"
+      "            input var bit [3:0] k, input var int q [type(k)]);\n"
       "endmodule\n",
       f);
-  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
-                             "real or shortreal type shall not be used as an "
-                             "associative array index type",
-                             1, "7.8.5"));
+  const auto& diags = f.diag.Diagnostics();
+  const std::string_view kMessage =
+      "real or shortreal type shall not be used as an associative array index "
+      "type";
+  EXPECT_TRUE(ReportedError(diags, kMessage, 1, "7.8.5"));
+  EXPECT_FALSE(ReportedError(diags, kMessage, 2, "7.8.5"));
 }
 
 }  // namespace
