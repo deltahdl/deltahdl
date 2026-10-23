@@ -64,14 +64,12 @@ inline constexpr const char* kVerilog2001AddedKeywords[] = {
     "use",
 };
 
-// Table 22-3 -- what IEEE 1364-2001-noconfig withholds relative to
-// 1364-2001: the configuration keywords it does not reserve.
+// Table 22-3 -- what IEEE 1364-2005 reserves over IEEE 1364-2001.
 inline constexpr const char* kVerilog2005AddedKeywords[] = {
     "uwire",
 };
 
-// Table 22-4 -- what IEEE 1364-2005 and SystemVerilog reserve over the
-// Verilog tables above.
+// Table 22-4 -- what IEEE 1800-2005 reserves over IEEE 1364-2005.
 inline constexpr const char* kSystemVerilog2005AddedKeywords[] = {
     "alias",         "always_comb",  "always_ff",    "always_latch",
     "assert",        "assume",       "before",       "bind",
@@ -148,8 +146,8 @@ inline constexpr VersionedWord kVerilog2001AddedKeywordTokens[] = {
     {"use", TokenKind::kKwUse},
 };
 
-// Table 22-4 -- what IEEE 1364-2005 and SystemVerilog reserve over the
-// Verilog tables above. With the keyword each entry names.
+// Table 22-4 -- what IEEE 1800-2005 reserves over IEEE 1364-2005. With the
+// keyword each entry names.
 inline constexpr VersionedWord kSystemVerilog2005AddedKeywordTokens[] = {
     {"alias", TokenKind::kKwAlias},
     {"always_comb", TokenKind::kKwAlwaysComb},

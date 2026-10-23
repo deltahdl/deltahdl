@@ -44,18 +44,22 @@ enum class DpiPackedArgPassing : uint8_t {
   kSv31aReference,
 };
 
-// §H.14.1: svDpiVersion() lets C code determine an implementation's support
-// for the standard: a simulator supporting only the SV3.1a standard reports
-// "SV3.1a", and users of one shall make use of the opaque handle types for
-// all 2-state and 4-state arguments; an IEEE Std 1800 implementation reports
-// "1800-2005" (§H.10.1.3), and with one users can make use of SV3.1a-
-// compatible semantics on a per-function basis -- a declaration annotated
-// "DPI" yields the SV3.1a argument passing semantics on the C side and one
-// annotated "DPI-C" the IEEE Std 1800 semantics (§35.4, §35.5.4). svdpi.h may
-// contain the definitions and prototypes SV3.1a-compliant packed data access
-// uses, and an IEEE Std 1800 implementation is not obligated to provide
-// them; where an implementation does not support the functionality, DPI C
-// code may not successfully bind to it.
+// Which generation of DPI argument passing an implementation offers, read off
+// the string svDpiVersion() answers (§H.14.1). DpiCompatibilityLevelOf maps
+// "SV3.1a" to kSv31a and every other answer, "1800-2005" among them
+// (§H.10.1.3), to kIeee1800.
+//
+// At kSv31a, every 2-state and 4-state packed argument reaches C code as an
+// svBitPackedArrRef or svLogicPackedArrRef handle rather than in the canonical
+// representation; DpiOpaqueHandlesAreRequiredForAllPackedArguments answers
+// that. At kIeee1800, each import and export chooses for itself by its spec
+// string: DpiPassingSemanticsOfSpecString gives "DPI" the SV3.1a handle
+// passing and "DPI-C" the canonical representation (§35.4, §35.5.4).
+//
+// An IEEE Std 1800 svdpi.h may leave out the declarations that SV3.1a-style
+// packed-data access relies on, which DpiSv31aDefinitionsAreObligatoryInSvdpiH
+// answers, so C code written against them may fail to bind to an
+// implementation that lacks that support, as DpiCCodeMayFailToBind answers.
 enum class DpiCompatibilityLevel : uint8_t { kIeee1800, kSv31a };
 
 DpiCompatibilityLevel DpiCompatibilityLevelOf(std::string_view sv_dpi_version);
