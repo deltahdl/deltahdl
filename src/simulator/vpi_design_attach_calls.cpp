@@ -672,13 +672,13 @@ ExprClassName CallResultClass(const Expr& callee, const BlockParent& parent,
 // class of what it is selected from, a.h; a package's variable's, p::obj; the
 // return type of what a call calls, f() or a.self(); a conditional's, of the
 // operand it may answer with first (§11.4.11, which has both operands share a
-// class or one extend the other); an assignment's in parentheses, ((h = g)),
-// of its left-hand side (§11.3.6); and a cast's, of the casting type a name
+// class or one extend the other); and a cast's, of the casting type a name
 // writes, B'(d), the value of any other casting type being of no class
 // (§6.24.1). Any other expression a method is applied to writes a value of no
 // class whose methods are built in: a string concatenation (§11.4.12.2) or the
 // string a system function returns. The elaborator reports a method applied to
-// any other operator's result (§11.8.1, §11.4.12).
+// an operator's result (§11.8.1, §11.4.12), a parenthesized assignment's among
+// them.
 ExprClassName ExprClass(const Expr& expr, const BlockParent& parent,
                         const BodyWalk& walk) {
   if (expr.kind == ExprKind::kIdentifier) {
@@ -693,9 +693,6 @@ ExprClassName ExprClass(const Expr& expr, const BlockParent& parent,
   }
   if (expr.kind == ExprKind::kTernary) {
     return ExprClass(*expr.true_expr, parent, walk);
-  }
-  if (expr.kind == ExprKind::kBinary) {
-    return ExprClass(*expr.lhs, parent, walk);
   }
   if (expr.kind == ExprKind::kCast) {
     return {

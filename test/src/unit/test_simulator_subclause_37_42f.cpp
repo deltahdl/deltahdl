@@ -37,16 +37,15 @@ class MethodCallsOnValues : public VpiDesignRun {
   }
 };
 
-// §9.7 and §18.13.4: a built-in method's result takes the built-in methods of
-// its kind, the enumeration process::status() returns and the string
-// get_randstate() returns (#7719).
+// §9.7 and §6.16: a built-in method's result takes the built-in methods of its
+// kind, the enumeration process::status() returns and the string toupper()
+// returns (#7719).
 TEST_F(MethodCallsOnValues, ABuiltInMethodsResultTakesTheMethodsOfItsKind) {
-  Run("module top; class K; endclass\n"
-      "  K k = new; process p;\n"
+  Run("module top; process p; string s = \"ab\";\n"
       "  initial begin : b\n"
       "    p = process::self();\n"
       "    void'(p.status().name());\n"
-      "    void'(k.get_randstate().len());\n"
+      "    void'(s.toupper().len());\n"
       "  end\n"
       "endmodule\n");
   EXPECT_EQ(BuiltInCallsOfTheBlock(), 2U);
@@ -89,16 +88,6 @@ TEST_F(MethodCallsOnValues, AStringSystemFunctionsResultTakesStringMethods) {
       "  initial begin : b void'($sformatf(\"%0d\", n).len()); end\n"
       "endmodule\n");
   EXPECT_EQ(BuiltInCallsOfTheBlock(), 1U);
-}
-
-// §11.3.6 with A.8.4: an assignment in parentheses, ((h = g)), is a handle of
-// its left-hand side's class (#7720).
-TEST_F(MethodCallsOnValues, AParenthesizedAssignmentTakesItsTargetsMethods) {
-  Run("module top; class C; task run(); endtask endclass\n"
-      "  C h; C g = new;\n"
-      "  initial begin : b ((h = g)).run(); end\n"
-      "endmodule\n");
-  ExpectTheBlockCallsRun();
 }
 
 // §7.2: a class var a structure member's own structure member holds,
