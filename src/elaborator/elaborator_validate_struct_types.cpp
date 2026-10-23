@@ -298,13 +298,12 @@ static bool ResolveScopedTypeRef(DataType& dt, const Expr* ref,
 // §6.23 with §6.20.2: a type reference whose argument is a name no variable or
 // net of the module carries. A parameter stands for its type: the one it was
 // declared with, or, declared with no type, the logic vector of its declared
-// range or of its final value. A named constant of an enumeration stands for
-// the enumeration's type (AdoptEnumerationType). A built-in type keyword and a
-// typedef name, which the parser reads as identifiers, stand for the type
-// they spell, a typedef's left named for the declaration's own resolution of
-// it. A value of a package or of the compilation unit stands for its type
-// (OuterValueNamed). A name that is none of these leaves the reference as it
-// stands, for the scope rules to report.
+// range or of its final value. A built-in type keyword and a typedef name,
+// which the parser reads as identifiers, stand for the type they spell, a
+// typedef's left named for the declaration's own resolution of it. A value of a
+// package or of the compilation unit stands for its type (OuterValueNamed). A
+// name that is none of these leaves the reference as it stands, for the scope
+// rules to report.
 static void ResolveNamedTypeRef(DataType& dt, std::string_view name,
                                 const TypeRefScope& scope) {
   if (const RtlirParamDecl* pd = ValueParamNamed(scope.mod, name)) {
@@ -314,11 +313,6 @@ static void ResolveNamedTypeRef(DataType& dt, std::string_view name,
     }
     ParamStorageShape shape = ParamStorageShapeOf(*pd);
     AdoptLogicVector(dt, {shape.width, shape.is_signed}, scope.arena);
-    return;
-  }
-  std::string_view enumeration = EnumerationDeclaring(scope.mod, name);
-  if (!enumeration.empty()) {
-    AdoptEnumerationType(dt, enumeration, scope);
     return;
   }
   DataType spelled = TypeNameToDataType(name);
@@ -342,6 +336,16 @@ void Elaborator::ResolveTypeRef(DataType& dt, SourceLoc loc,
     AdoptLogicVector(
         dt, {InferTypeRefExprWidth(ref, mod), InferTypeRefExprSigned(ref, mod)},
         arena_);
+    return;
+  }
+  // A named constant of an enumeration stands for the enumeration's type. It
+  // is looked up before the module's variables, which BuildEnumMembers gives
+  // each constant one of to hold its value: matched there, the constant read
+  // var_types_, which records no such name, and took the implicit type's one
+  // bit.
+  std::string_view enumeration = EnumerationDeclaring(mod, ref->text);
+  if (!enumeration.empty()) {
+    AdoptEnumerationType(dt, enumeration, kScope);
     return;
   }
   for (const auto& v : mod->variables) {
