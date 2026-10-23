@@ -422,7 +422,7 @@ using ModuleTypeRefResolver = std::function<void(DataType&, SourceLoc)>;
 // takes that declaration's type and unpacked dimensions; any other reference
 // is resolved as a module item's is. `locals` holds the procedure's names in
 // declaration order.
-void ResolveLocalTypeRef(DataType& dt, std::vector<Expr*>* unpacked_dims,
+void ResolveLocalTypeRef(DataType& dt, std::vector<Expr*>& unpacked_dims,
                          SourceLoc loc,
                          const std::vector<ProceduralLocal>& locals,
                          const ModuleTypeRefResolver& resolve_module_ref) {
@@ -437,35 +437,27 @@ void ResolveLocalTypeRef(DataType& dt, std::vector<Expr*>* unpacked_dims,
     return;
   }
   dt = *local->type;
-  if (unpacked_dims != nullptr && unpacked_dims->empty())
-    *unpacked_dims = *local->unpacked_dims;
+  if (unpacked_dims.empty()) unpacked_dims = *local->unpacked_dims;
 }
 
 // §6.23 with §12.7.1: the variables the header of `s`, where it is a for loop,
 // declares, each of whose type may be a type reference, resolved as a block's
 // declaration's is and then in scope for the loop's own statements. An
 // initialization whose type is implicit assigns a variable declared elsewhere.
+// A loop variable has no unpacked dimensions to take from what it names.
 void DeclareForLoopLocals(Stmt* s, std::vector<ProceduralLocal>& locals,
                           const ModuleTypeRefResolver& resolve_module_ref) {
   if (s->kind != StmtKind::kFor) return;
   static const std::vector<Expr*> kNoUnpackedDims;
   const size_t kCount = std::min(s->for_inits.size(), s->for_init_types.size());
   for (size_t k = 0; k < kCount; ++k) {
-    const Stmt* init = s->for_inits[k];
     DataType& type = s->for_init_types[k];
-    // A type reference declares the variable whatever it resolves to, an
-    // implicit type standing for logic in a variable's declaration.
-    if (type.type_ref_expr != nullptr) {
-      ResolveLocalTypeRef(type, nullptr, s->range.start, locals,
-                          resolve_module_ref);
-      if (type.kind == DataTypeKind::kImplicit)
-        type.kind = DataTypeKind::kLogic;
-    }
-    if (type.kind == DataTypeKind::kImplicit || init == nullptr ||
-        init->lhs == nullptr || init->lhs->kind != ExprKind::kIdentifier) {
-      continue;
-    }
-    locals.push_back({init->lhs->text, &type, &kNoUnpackedDims});
+    std::vector<Expr*> taken_dims;
+    ResolveLocalTypeRef(type, taken_dims, s->range.start, locals,
+                        resolve_module_ref);
+    if (type.kind == DataTypeKind::kImplicit) continue;
+    locals.push_back(
+        {ExprIdent(s->for_inits[k]->lhs), &type, &kNoUnpackedDims});
   }
 }
 
@@ -484,7 +476,7 @@ void ResolveTypeRefsInStmt(Stmt* s, std::vector<ProceduralLocal>& locals,
     locals.resize(kOuter);
     return;
   }
-  ResolveLocalTypeRef(s->var_decl_type, &s->var_unpacked_dims, s->range.start,
+  ResolveLocalTypeRef(s->var_decl_type, s->var_unpacked_dims, s->range.start,
                       locals, resolve_module_ref);
   locals.push_back({s->var_name, &s->var_decl_type, &s->var_unpacked_dims});
 }
@@ -498,7 +490,7 @@ void ResolveProceduralTypeRefs(
   std::vector<ProceduralLocal> locals;
   locals.reserve(item->func_args.size());
   for (auto& arg : item->func_args) {
-    ResolveLocalTypeRef(arg.data_type, &arg.unpacked_dims, item->loc, locals,
+    ResolveLocalTypeRef(arg.data_type, arg.unpacked_dims, item->loc, locals,
                         resolve_module_ref);
     locals.push_back({arg.name, &arg.data_type, &arg.unpacked_dims});
   }

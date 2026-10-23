@@ -264,4 +264,39 @@ TEST(NetAndVariableTypeSimulation, PropertyAndFormalsOfATypeReference) {
       {{"rw", 0xFFFFFFFBu}, {"ry", 0xFFFFFFFBu}, {"rz", 0xFFFFFFFBu}});
 }
 
+// A class property's type reference names another property of its class,
+// found past the class's other members, a method and a property of another name
+// among them, or a built-in type (§6.23). w is z's byte and k an int, so each
+// holds -5 for rw and rk to read back, where a one-bit property would hold 1.
+// u names a value of the compilation unit, which no property and no built-in
+// type is, and the class stands with it all the same.
+TEST(NetAndVariableTypeSimulation,
+     PropertyTypeReferencesFindAPropertyOrABuiltInType) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "int g;\n"
+      "class C;\n"
+      "  function void touch();\n"
+      "  endfunction\n"
+      "  int x;\n"
+      "  byte z;\n"
+      "  var type(z) w;\n"
+      "  var type(int) k;\n"
+      "  var type(g) u;\n"
+      "endclass\n"
+      "module t;\n"
+      "  int rw, rk;\n"
+      "  C c;\n"
+      "  initial begin\n"
+      "    c = new;\n"
+      "    c.w = -5;\n"
+      "    c.k = -5;\n"
+      "    rw = c.w;\n"
+      "    rk = c.k;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"rw", 0xFFFFFFFBu}, {"rk", 0xFFFFFFFBu}});
+}
+
 }  // namespace

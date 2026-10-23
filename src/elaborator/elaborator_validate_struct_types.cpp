@@ -53,7 +53,8 @@ struct ValueShape {
 // variables and nets: the module, the typedefs in force, the compilation unit
 // and the position of the declaration writing the reference, with the arena a
 // resolved type's packed dimensions are made in, and the declaration of the
-// module being elaborated, null outside one.
+// module being elaborated, the last of Elaborator::module_decl_path_, within
+// whose elaboration every type reference is resolved.
 struct TypeRefScope {
   const RtlirModule* mod;
   const TypedefMap& typedefs;
@@ -220,30 +221,18 @@ static DataType DeclaredValueType(const ModuleItem& item,
   return type;
 }
 
-// The last of `path`, the declaration of the module being elaborated, or null
-// where the path is empty.
-static const ModuleDecl* InnermostDecl(
-    const std::vector<const ModuleDecl*>& path) {
-  return path.empty() ? nullptr : path.back();
-}
-
 // The type of the value `name` that the module's declaration writes: a port's,
 // or that of a variable, net or parameter of its body. A type reference reads
 // it there where the module has yet to elaborate the value, as a port's does,
 // the ports being elaborated ahead of the items (Elaborator::ElaboratePorts).
-// Nothing where the declaration writes no such value.
+// Nothing where the declaration writes nothing of the name.
 static std::optional<DataType> ModuleValueType(std::string_view name,
                                                const TypeRefScope& scope) {
-  if (scope.decl == nullptr) return std::nullopt;
   const auto& ports = scope.decl->ports;
   auto port = std::ranges::find(ports, name, &PortDecl::name);
   if (port != ports.end()) return port->data_type;
   const ModuleItem* item = ItemNamed(scope.decl->items, name);
-  if (item == nullptr || (item->kind != ModuleItemKind::kVarDecl &&
-                          item->kind != ModuleItemKind::kNetDecl &&
-                          item->kind != ModuleItemKind::kParamDecl)) {
-    return std::nullopt;
-  }
+  if (item == nullptr) return std::nullopt;
   return DeclaredValueType(*item, scope);
 }
 
@@ -403,7 +392,7 @@ std::string_view Elaborator::ResolveTypeRef(DataType& dt, SourceLoc loc,
   if (!dt.type_ref_expr) return {};
   auto* ref = dt.type_ref_expr;
   CheckTypeRefArgInner(ref, loc);
-  const ModuleDecl* decl = InnermostDecl(module_decl_path_);
+  const ModuleDecl* decl = module_decl_path_.back();
   const TypeRefScope kScope{mod, typedefs_, unit_, loc, arena_, decl};
   if (ResolveScopedTypeRef(dt, ref, kScope)) return {};
   if (ref->kind != ExprKind::kIdentifier) {

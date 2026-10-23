@@ -521,19 +521,17 @@ void Elaborator::ResolvePackedStructParam(RtlirParamDecl& pd,
   pd.is_resolved = true;
 }
 
-// §6.23: the type of the value parameter port at index `i` of `decl` resolved
-// in place by `resolve` where the port writes it, `parameter type(W) V = -3`
-// being a value parameter of W's type. It is resolved as the port is reached,
-// once the ports before it, which the reference may name, are registered. A
-// type parameter's entry is its default type, which the type parameter's own
-// path reads. The parser made the declaration as a mutable object.
+// §6.23: the type of the parameter port at index `i` of `decl`, where
+// `has_param_type` says it is a value parameter's written type, resolved in
+// place by `resolve`, `parameter type(W) V = -3` being a value parameter of
+// W's type. It is resolved as the port is reached, once the ports before it,
+// which the reference may name, are registered. A type parameter's entry is
+// its default type, which the type parameter's own path reads. The parser
+// made the declaration as a mutable object.
 static void ResolveParamPortTypeRef(
-    const ModuleDecl* decl, size_t i,
+    const ModuleDecl* decl, size_t i, bool has_param_type,
     const std::function<void(DataType&)>& resolve) {
-  if (i < decl->param_types.size() &&
-      decl->type_param_names.count(decl->params[i].first) == 0) {
-    resolve(const_cast<DataType&>(decl->param_types[i]));
-  }
+  if (has_param_type) resolve(const_cast<DataType&>(decl->param_types[i]));
 }
 
 void Elaborator::ElaborateParamPortList(const ModuleDecl* decl,
@@ -549,12 +547,12 @@ void Elaborator::ElaborateParamPortList(const ModuleDecl* decl,
                                           RegisteredModule()};
   for (size_t i = 0; i < decl->params.size(); ++i) {
     const auto& [pname, pval] = decl->params[i];
-    ResolveParamPortTypeRef(decl, i, [&](DataType& dt) {
-      ResolveTypeRef(dt, decl->range.start, mod);
-    });
     auto scope = BuildParamScope(mod);
     bool has_param_type = i < decl->param_types.size() &&
                           decl->type_param_names.count(pname) == 0;
+    ResolveParamPortTypeRef(decl, i, has_param_type, [&](DataType& dt) {
+      ResolveTypeRef(dt, decl->range.start, mod);
+    });
     RtlirParamDecl pd = BuildParamDeclShell(
         decl, i, {typedefs_, scope, real_param_names_, kWrittenTypes, arena_},
         has_param_type);
