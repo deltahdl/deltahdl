@@ -181,6 +181,17 @@ Expr* Parser::ParseParenExpr() {
     return cast;
   }
   lhs->is_parenthesized = true;
+  // A.8.2 roots a method call in a primary, and A.8.3 makes an assignment an
+  // expression only in its own parentheses, so `(h = g)` is no primary and
+  // takes no method or member; `((h = g))` is one, a parenthesized
+  // expression (A.8.4), and does.
+  if (is_assign && Check(TokenKind::kDot)) {
+    diag_.Error(CurrentLoc(),
+                "a method call or member select applies to a primary, and an "
+                "assignment in its own parentheses is none; enclose it in a "
+                "second pair of parentheses",
+                Subclause("A.8.2"));
+  }
   return ParseParenMethodTail(lhs);
 }
 

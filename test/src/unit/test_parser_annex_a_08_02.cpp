@@ -601,4 +601,36 @@ TEST(SubroutineCallExprParsing, SystemTfCallDataTypeAndExpression) {
               "endmodule\n"));
 }
 
+// A.8.2 with A.8.3: an assignment in its own parentheses is no primary, so a
+// method call or member select applied to it is reported (#7725).
+TEST(SubroutineCallExprParsing, AMethodOfAnAssignmentInItsOwnParensIsReported) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    (h = g).run();\n"
+      "    x = (h = g).n;\n"
+      "  end\n"
+      "endmodule\n");
+  constexpr const char* kMessage =
+      "a method call or member select applies to a primary, and an "
+      "assignment in its own parentheses is none; enclose it in a second "
+      "pair of parentheses";
+  EXPECT_TRUE(ReportedError(r.diags, kMessage, 3, "A.8.2"));
+  EXPECT_TRUE(ReportedError(r.diags, kMessage, 4, "A.8.2"));
+}
+
+// A.8.4: an assignment in a second pair of parentheses is a primary a method
+// is called on, and one in its own parentheses is an operand (§11.3.6).
+TEST(SubroutineCallExprParsing, AnAssignmentInASecondPairOfParensTakesAMethod) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    ((h = g)).run();\n"
+      "    x = (y = 1) + 2;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

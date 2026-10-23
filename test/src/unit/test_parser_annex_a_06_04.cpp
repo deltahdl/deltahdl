@@ -499,4 +499,47 @@ TEST(FunctionStatementOrNullSyntaxParsing, MultipleAttrInstancesOnNullInFunc) {
   EXPECT_EQ(null_stmt->attrs[1].name, "b");
 }
 
+// A.6.4: a statement_item holds an expression only as a subroutine call or an
+// increment or decrement, so an operator expression, a negation or a
+// conditional followed by `;` is no statement (#7718).
+TEST(StatementItemSyntaxParsing, AnExpressionThatIsNoCallIsNoStatement) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic a, b, c, x;\n"
+      "  initial begin\n"
+      "    x + 1;\n"
+      "    !x;\n"
+      "    c ? a : b;\n"
+      "  end\n"
+      "endmodule\n");
+  constexpr const char* kMessage =
+      "an expression statement is a subroutine call or an increment or "
+      "decrement; this expression is neither";
+  EXPECT_TRUE(ReportedError(r.diags, kMessage, 4, "A.6.4"));
+  EXPECT_TRUE(ReportedError(r.diags, kMessage, 5, "A.6.4"));
+  EXPECT_TRUE(ReportedError(r.diags, kMessage, 6, "A.6.4"));
+}
+
+// A.6.4 with A.6.9: an increment or decrement, a call written with or without
+// its argument list, through a name or a member select, a void-cast call and
+// a call carrying a `with` clause are each a statement.
+TEST(StatementItemSyntaxParsing, CallsIncrementsAndDecrementsAreStatements) {
+  auto r = Parse(
+      "module m;\n"
+      "  int x, q[$];\n"
+      "  initial begin\n"
+      "    x++;\n"
+      "    --x;\n"
+      "    f();\n"
+      "    t;\n"
+      "    h.run;\n"
+      "    void'(f());\n"
+      "    q.find with (item > 1);\n"
+      "    $display(x);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

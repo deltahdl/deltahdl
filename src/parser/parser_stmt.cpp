@@ -62,6 +62,24 @@ struct ParserStmtHelpers {
     }
   }
 
+  // A.8.3: whether `e` is an inc_or_dec_expression, `x++` or `--x`.
+  static bool IsIncOrDec(const Expr* e) {
+    return (e->kind == ExprKind::kUnary ||
+            e->kind == ExprKind::kPostfixUnary) &&
+           (e->op == TokenKind::kPlusPlus || e->op == TokenKind::kMinusMinus);
+  }
+
+  // A.6.4 with A.6.9: whether `e`, the expression of an expression statement,
+  // is a form a statement_item takes: a subroutine call, written with its
+  // argument list or as a task or method enable by a name, a scoped or
+  // hierarchical name or a member select, any of them with the `with` clause
+  // or inline constraint it carries; or an inc_or_dec_expression.
+  static bool IsStatementExpr(const Expr* e) {
+    return e->kind == ExprKind::kCall || e->kind == ExprKind::kSystemCall ||
+           e->kind == ExprKind::kIdentifier ||
+           e->kind == ExprKind::kMemberAccess || IsIncOrDec(e);
+  }
+
   // One item of A.6.8's for_initialization, which is a list_of_variable_
   // assignments, each `variable_lvalue = expression`, or for_variable_
   // declarations, each `[ var ] data_type variable_identifier = expression
@@ -159,9 +177,7 @@ struct ParserStmtHelpers {
     if (e->kind == ExprKind::kCall || e->kind == ExprKind::kSystemCall) {
       return true;
     }
-    return (e->kind == ExprKind::kUnary ||
-            e->kind == ExprKind::kPostfixUnary) &&
-           (e->op == TokenKind::kPlusPlus || e->op == TokenKind::kMinusMinus);
+    return IsIncOrDec(e);
   }
 
   static Stmt* ParseForStep(Parser& p) {
@@ -676,8 +692,21 @@ void Parser::SkipUnparenthesizedAssignInExpr() {
 }
 
 Stmt* Parser::ParseAssignmentOrExprStmt() {
-  auto* stmt = Check(TokenKind::kKwVoid) ? ParseVoidCastCallStmt()
-                                         : ParseAssignmentOrExprNoSemi();
+  Stmt* stmt = nullptr;
+  if (Check(TokenKind::kKwVoid)) {
+    stmt = ParseVoidCastCallStmt();
+  } else {
+    stmt = ParseAssignmentOrExprNoSemi();
+    // A.6.4: no statement_item is an expression followed by `;` but a call
+    // or an increment or decrement, so `x + 1;` and `a == b;` are none.
+    if (stmt->kind == StmtKind::kExprStmt &&
+        !ParserStmtHelpers::IsStatementExpr(stmt->expr)) {
+      diag_.Error(stmt->expr->range.start,
+                  "an expression statement is a subroutine call or an "
+                  "increment or decrement; this expression is neither",
+                  Subclause("A.6.4"));
+    }
+  }
   SkipUnparenthesizedAssignInExpr();
   Expect(TokenKind::kSemicolon, Subclause("12.3"));
   return stmt;
