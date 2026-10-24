@@ -15,6 +15,7 @@
 #include "elaborator/assertion_body_slots.h"
 #include "elaborator/assertion_rules.h"
 #include "elaborator/assertion_walk.h"
+#include "elaborator/attached_call_target.h"
 #include "elaborator/checker_procedure_rules.h"
 #include "elaborator/concurrent_assertion_expr.h"
 #include "elaborator/const_eval.h"
@@ -49,13 +50,17 @@ enum class Place : uint8_t { kOperand, kDisable, kAbort, kClock };
 
 // What the rules read besides the expression: the module's parameters, its
 // named sequences and properties in the registry, its named sequences and
-// its tasks and functions by name, the module, and the diagnostics sink.
+// its tasks and functions by name, the module, its declaration and the
+// compilation unit holding it, which resolve the subroutine a call attached to
+// a sequence names (AttachedCallTarget), and the diagnostics sink.
 struct RuleEnv {
   const ScopeMap& params;
   const PropertyRegistry& registry;
   const std::unordered_map<std::string_view, const ModuleItem*>& sequences;
   const std::unordered_map<std::string_view, const ModuleItem*>& subroutines;
   const RtlirModule* mod;
+  const ModuleDecl& decl;
+  const CompilationUnit& unit;
   DiagEngine& diag;
 };
 
@@ -397,18 +402,24 @@ void CheckClock(const std::vector<EventExpr>& clock, const Site& site,
 
 // §16.11: how a subroutine's formal `arg` takes its actual.
 SubroutineArgPassing PassingOf(const FunctionArg& arg) {
-  if (arg.direction != Direction::kRef) {
-    return SubroutineArgPassing::kByValueInput;
+  switch (arg.direction) {
+    case Direction::kRef:
+      return arg.is_const ? SubroutineArgPassing::kByConstRef
+                          : SubroutineArgPassing::kByRef;
+    case Direction::kOutput:
+      return SubroutineArgPassing::kCopiedOut;
+    case Direction::kInout:
+      return SubroutineArgPassing::kCopiedInOut;
+    default:
+      return SubroutineArgPassing::kByValueInput;
   }
-  return arg.is_const ? SubroutineArgPassing::kByConstRef
-                      : SubroutineArgPassing::kByRef;
 }
 
-void ReportAttachedArg(const Expr* call, const Expr* arg, std::string_view what,
-                       const RuleEnv& env) {
+void ReportAttachedArg(std::string_view callee, const Expr* arg,
+                       std::string_view what, const RuleEnv& env) {
   env.diag.Error(arg->range.start,
                  std::string(what) + ", in the call of '" +
-                     std::string(call->callee) + "' attached to a sequence",
+                     std::string(callee) + "' attached to a sequence",
                  Subclause("16.11"));
 }
 
@@ -424,33 +435,40 @@ constexpr std::string_view kAttachedResultUnread =
 // function is called there as if it had no return value, which §13.4.1
 // warns of.
 void CheckAttachedCall(const Expr* call, const Site& site, const RuleEnv& env) {
-  auto it = env.subroutines.find(call->callee);
-  if (it == env.subroutines.end()) return;
-  if (ReturnsAValue(it->second)) {
-    WarnDiscardedReturn(call->range.start, call->callee, kAttachedResultUnread,
+  const ModuleItem* target = AttachedCallTarget(*call, env.decl, env.unit);
+  if (target == nullptr) return;
+  if (ReturnsAValue(target)) {
+    WarnDiscardedReturn(call->range.start, target->name, kAttachedResultUnread,
                         env.diag);
   }
-  const std::vector<FunctionArg>& formals = it->second->func_args;
+  const std::vector<FunctionArg>& formals = target->func_args;
   size_t written = std::min(formals.size(), call->args.size());
   for (size_t i = 0; i < written; ++i) {
     const Expr* arg = call->args[i];
     SubroutineArgPassing passing = PassingOf(formals[i]);
+    if (!IsArgPassingAllowedForAttachedCall(passing)) {
+      ReportAttachedArg(target->name, arg,
+                        "an actual shall be passed by value as an input or by "
+                        "reference, which an output or inout formal does not",
+                        env);
+      continue;
+    }
     if (!IsLocalVarArgPassingLegal(MentionsAny(arg, site.locals), passing)) {
-      ReportAttachedArg(call, arg,
+      ReportAttachedArg(target->name, arg,
                         "an actual holding a local variable shall be passed "
                         "by value",
                         env);
     }
     if (!IsAutomaticArgUseAllowed(passing, site.automatics != nullptr, true) &&
         MentionsAny(arg, site.automatics)) {
-      ReportAttachedArg(call, arg,
+      ReportAttachedArg(target->name, arg,
                         "an automatic variable may not be passed by reference",
                         env);
     }
     if (passing == SubroutineArgPassing::kByValueInput &&
         !IsByValueInputArgumentTypeAllowed(
             ConcurrentAssertionExprReferencedChandle(arg, env.mod).empty())) {
-      ReportAttachedArg(call, arg,
+      ReportAttachedArg(target->name, arg,
                         "a variable passed by value shall be of a type an "
                         "assertion may use, which chandle is not",
                         env);
@@ -721,8 +739,9 @@ void CheckProcedure(const ModuleItem* item, const RtlirModule* mod,
 
 }  // namespace
 
-void ValidateAssertionExprRules(const ModuleDecl* decl, const RtlirModule* mod,
-                                const ScopeMap& params,
+void ValidateAssertionExprRules(const ModuleDecl* decl,
+                                const CompilationUnit& unit,
+                                const RtlirModule* mod, const ScopeMap& params,
                                 const PropertyRegistry& registry,
                                 DiagEngine& diag) {
   const std::unordered_map<std::string_view, const ModuleItem*> kSequences =
@@ -734,7 +753,8 @@ void ValidateAssertionExprRules(const ModuleDecl* decl, const RtlirModule* mod,
       subroutines[item->name] = item;
     }
   }
-  const RuleEnv kEnv{params, registry, kSequences, subroutines, mod, diag};
+  const RuleEnv kEnv{params, registry, kSequences, subroutines,
+                     mod,    *decl,    unit,       diag};
   NameSet none;
   for (const ModuleItem* item : decl->items) {
     if (item->kind == ModuleItemKind::kSequenceDecl ||

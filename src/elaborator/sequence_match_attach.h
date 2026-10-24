@@ -35,11 +35,15 @@ bool IsAttachableSubroutineKind(AttachableSubroutineKind k);
 bool IsSequenceMatchItemAttachLegal(SequenceMatchClass seq_class);
 
 // §16.11: each argument of an attached subroutine call shall either be passed
-// by value (as an input) or by reference (ref / const ref).
+// by value (as an input) or by reference (ref / const ref). An output or inout
+// formal copies its argument back to the caller instead (§13.5), which is
+// neither way.
 enum class SubroutineArgPassing : uint8_t {
   kByValueInput,
   kByRef,
   kByConstRef,
+  kCopiedOut,
+  kCopiedInOut,
 };
 
 bool IsArgPassingAllowedForAttachedCall(SubroutineArgPassing kind);

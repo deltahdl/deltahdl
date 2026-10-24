@@ -25,13 +25,8 @@ bool IsSequenceMatchItemAttachLegal(SequenceMatchClass seq_class) {
 }
 
 bool IsArgPassingAllowedForAttachedCall(SubroutineArgPassing kind) {
-  switch (kind) {
-    case SubroutineArgPassing::kByValueInput:
-    case SubroutineArgPassing::kByRef:
-    case SubroutineArgPassing::kByConstRef:
-      return true;
-  }
-  return false;
+  return kind != SubroutineArgPassing::kCopiedOut &&
+         kind != SubroutineArgPassing::kCopiedInOut;
 }
 
 bool IsAutomaticArgUseAllowed(SubroutineArgPassing kind,

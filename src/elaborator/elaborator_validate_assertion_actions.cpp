@@ -205,7 +205,8 @@ void Elaborator::ValidateSequenceEventArgs(const ModuleDecl* decl,
   // The rules of Clause 16 no single item's elaboration checks.
   ValidateAssertionRules(decl, property_registry_, diag_);
   const ScopeMap kParams = BuildParamScope(mod);
-  ValidateAssertionExprRules(decl, mod, kParams, property_registry_, diag_);
+  ValidateAssertionExprRules(decl, *unit_, mod, kParams, property_registry_,
+                             diag_);
   ValidateAssertionBoundRules(decl, kParams, diag_);
   ValidateAssertionContextRules(decl, mod, property_registry_, diag_);
   ValidateLocalVariableFlow(decl, diag_);

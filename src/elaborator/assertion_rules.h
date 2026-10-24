@@ -9,6 +9,7 @@ namespace delta {
 
 class DiagEngine;
 class PropertyRegistry;
+struct CompilationUnit;
 struct ModuleDecl;
 struct ModuleItem;
 struct RtlirModule;
@@ -40,11 +41,13 @@ void ValidateAssertionRules(const ModuleDecl* decl,
 // declares: what a sampled value function may read and how it is clocked,
 // what an abort condition may reference, which sequences `triggered` may be
 // applied to, and what a local variable formal argument may be bound to and
-// must be assigned. `mod` gives the clock a procedure infers and the default
+// must be assigned. `unit` resolves the subroutine a call attached to a
+// sequence names, `mod` gives the clock a procedure infers and the default
 // clocking, `params` the module's parameters by value, and `registry` its
 // named sequences and properties.
-void ValidateAssertionExprRules(const ModuleDecl* decl, const RtlirModule* mod,
-                                const ScopeMap& params,
+void ValidateAssertionExprRules(const ModuleDecl* decl,
+                                const CompilationUnit& unit,
+                                const RtlirModule* mod, const ScopeMap& params,
                                 const PropertyRegistry& registry,
                                 DiagEngine& diag);
 

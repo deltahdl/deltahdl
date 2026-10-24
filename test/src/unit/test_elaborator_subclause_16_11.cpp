@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "elaborator/sequence_degeneracy.h"
 #include "elaborator/sequence_match_attach.h"
 #include "fixture_elaborator.h"
@@ -108,13 +110,18 @@ TEST(AttachSubroutineCall, AllFiveCallableKindsAreAttachable) {
 
 TEST(AttachSubroutineCall, EachArgIsByValueOrByReference) {
   // §16.11: each argument of an attached subroutine call shall be passed
-  // either by value (as an input) or by reference (ref / const ref). The
-  // enumerated trio is the full set of legal passing modes.
+  // either by value (as an input) or by reference (ref / const ref). An
+  // output or inout formal copies its argument back (§13.5), which is
+  // neither.
   EXPECT_TRUE(
       IsArgPassingAllowedForAttachedCall(SubroutineArgPassing::kByValueInput));
   EXPECT_TRUE(IsArgPassingAllowedForAttachedCall(SubroutineArgPassing::kByRef));
   EXPECT_TRUE(
       IsArgPassingAllowedForAttachedCall(SubroutineArgPassing::kByConstRef));
+  EXPECT_FALSE(
+      IsArgPassingAllowedForAttachedCall(SubroutineArgPassing::kCopiedOut));
+  EXPECT_FALSE(
+      IsArgPassingAllowedForAttachedCall(SubroutineArgPassing::kCopiedInOut));
 }
 
 TEST(AttachSubroutineCall, AutomaticAsNonConstantInputFromProceduralRejected) {
@@ -226,6 +233,115 @@ TEST(AttachedSubroutineCall, ACallOnAnEmptyMatchingSequenceIsReported) {
                             "a subroutine call may not be attached to a "
                             "sequence that admits an empty match",
                             4, "16.11"));
+}
+
+// §16.11: an argument of a call attached to a sequence is passed by value
+// as an input or by reference; an output or an inout formal copies it back
+// (§13.5) instead, which is neither way.
+TEST(AttachedSubroutineCall, AnArgumentToAnOutputOrInoutFormalIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit clk, a;\n"
+      "  int count;\n"
+      "  task tick(output int v); v = 1; endtask\n"
+      "  task bump(inout int v); v++; endtask\n"
+      "  task show(input int v); endtask\n"
+      "  sequence s1; @(posedge clk) (a, tick(count)) ##1 a; endsequence\n"
+      "  sequence s2; @(posedge clk) (a, bump(count)) ##1 a; endsequence\n"
+      "  sequence s3; @(posedge clk) (a, show(count)) ##1 a; endsequence\n"
+      "endmodule\n",
+      f);
+  const char* const kReport =
+      "an actual shall be passed by value as an input or by reference";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 7, "16.11"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 8, "16.11"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 9, "16.11"));
+}
+
+// §16.11 with §23.9, §26.3, §8.10, §8.13 and §8.5: the rules on an attached
+// call's actuals reach a subroutine written through a package's scope, one a
+// wildcard or an explicit package import makes visible, one the compilation
+// unit declares, a class's static method written through the class's scope,
+// and a method called through a handle, its own class's or one it inherits;
+// each passes the local variable v by reference here. A call of a task through
+// an instance's name, and of a sequence's formal argument, which stands for
+// its actual, pass nothing by reference and draw no report.
+TEST(AttachedSubroutineCall, ACalleeReachedThroughAScopeOrAHandleIsChecked) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package P;\n"
+      "  task automatic note(ref int v); endtask\n"
+      "endpackage\n"
+      "package Q;\n"
+      "  task automatic stamp(ref int v); endtask\n"
+      "endpackage\n"
+      "task automatic logit(ref int v); endtask\n"
+      "module sub;\n"
+      "  task show(input int v); endtask\n"
+      "endmodule\n"
+      "module m;\n"
+      "  import P::*;\n"
+      "  import Q::stamp;\n"
+      "  bit clk, a;\n"
+      "  class C;\n"
+      "    int p;\n"
+      "    static task mark(ref int v); endtask\n"
+      "    task poke(ref int v); endtask\n"
+      "  endclass\n"
+      "  class D extends C;\n"
+      "  endclass\n"
+      "  C h = new;\n"
+      "  D k = new;\n"
+      "  sub u();\n"
+      "  sequence s1; int v; @(posedge clk) (a, v = 1, P::note(v)); "
+      "endsequence\n"
+      "  sequence s2; int v; @(posedge clk) (a, v = 1, note(v)); "
+      "endsequence\n"
+      "  sequence s3; int v; @(posedge clk) (a, v = 1, stamp(v)); "
+      "endsequence\n"
+      "  sequence s4; int v; @(posedge clk) (a, v = 1, logit(v)); "
+      "endsequence\n"
+      "  sequence s5; int v; @(posedge clk) (a, v = 1, C::mark(v)); "
+      "endsequence\n"
+      "  sequence s6; int v; @(posedge clk) (a, v = 1, h.poke(v)); "
+      "endsequence\n"
+      "  sequence s7; int v; @(posedge clk) (a, v = 1, k.poke(v)); "
+      "endsequence\n"
+      "  sequence s8; int v; @(posedge clk) (a, v = 1, u.show(v)); "
+      "endsequence\n"
+      "  sequence s9(q); @(posedge clk) (a, q); endsequence\n"
+      "endmodule\n",
+      f);
+  const char* const kReport =
+      "an actual holding a local variable shall be passed by value";
+  for (uint32_t line = 25; line <= 31; ++line) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, line, "16.11"))
+        << "line " << line;
+  }
+  for (uint32_t line : {32u, 33u}) {
+    EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "", line, "16.11"))
+        << "line " << line;
+  }
+}
+
+// §16.11 with §35.5: a subroutine the module imports through DPI is a
+// subroutine an attached call may call, and its actuals are held to the
+// same rules: chandle is no type an assertion may use (§16.6).
+TEST(AttachedSubroutineCall, AnImportedDpiCalleeIsChecked) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit clk, a;\n"
+      "  chandle h;\n"
+      "  import \"DPI-C\" function void show(input chandle c);\n"
+      "  sequence s; @(posedge clk) (a, show(h)) ##1 a; endsequence\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a variable passed by value shall be of a type an "
+                            "assertion may use",
+                            5, "16.11"));
 }
 
 }  // namespace
