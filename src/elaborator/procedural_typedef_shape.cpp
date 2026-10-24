@@ -1,11 +1,10 @@
 #include "elaborator/procedural_typedef_shape.h"
 
-#include <cstddef>
 #include <optional>
 #include <string>
 #include <string_view>
-#include <vector>
 
+#include "elaborator/elaborator_class_lookup.h"
 #include "elaborator/elaborator_class_typedef_specialization.h"
 #include "elaborator/net_data_type.h"
 #include "parser/ast_type.h"
@@ -13,15 +12,13 @@
 namespace delta {
 
 // The key a named type's typedef is recorded by: every prefix written before
-// the name, then NamedTypeKey's last prefix and name. A leading `$unit` is
-// left off, the compilation unit's classes' typedefs being recorded by the
-// class's own name (RegisterClassTypedefs in elaborator_resolve.cpp).
+// the name (OuterScopePrefixes, which leaves a leading `$unit` off, the
+// compilation unit's classes' typedefs being recorded by the class's own name
+// in RegisterClassTypedefs), then NamedTypeKey's last prefix and name.
 static std::string TypedefChainKey(const DataType& type) {
-  const std::vector<std::string_view>& outer = type.outer_scope_names;
-  size_t first = !outer.empty() && outer.front() == "$unit" ? 1 : 0;
   std::string key;
-  for (size_t i = first; i < outer.size(); ++i)
-    key += std::string(outer[i]) + "::";
+  for (std::string_view prefix : OuterScopePrefixes(type))
+    key += std::string(prefix) + "::";
   return key + NamedTypeKey(type);
 }
 

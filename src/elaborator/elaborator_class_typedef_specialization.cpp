@@ -12,6 +12,7 @@
 
 #include "common/arena.h"
 #include "elaborator/const_eval.h"
+#include "elaborator/elaborator_class_lookup.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/type_eval.h"
 #include "lexer/token.h"
@@ -325,6 +326,15 @@ std::optional<SpecializedClassType> SpecializeType(
 std::optional<std::pair<const ClassDecl*, const std::vector<DataType>*>>
 SpecializedClass(const DataType& dtype, const CompilationUnit* unit,
                  const TypedefMap& typedefs) {
+  // §8.23: a scope written behind prefixes of its own, `Outer::Inner` or
+  // `pkg::Inner`, is the class those prefixes reach. Read by its last name
+  // alone, it was the compilation unit's class of that name, specialized in
+  // place of the nested or the package's one.
+  if (!OuterScopePrefixes(dtype).empty()) {
+    const ClassDecl* cls = ClassOfChainedScope(dtype, unit);
+    if (cls == nullptr) return std::nullopt;
+    return std::make_pair(cls, &dtype.type_params);
+  }
   std::string_view scope = dtype.scope_name;
   const std::vector<DataType>* args = &dtype.type_params;
   for (int hops = 0; hops < kMaxTypedefHops; ++hops) {

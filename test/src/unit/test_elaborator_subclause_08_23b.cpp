@@ -251,4 +251,84 @@ TEST(ClassScopeResolutionElaboration, UnitLedChainTakesTheUnitClassesDims) {
   EXPECT_EQ(LiteralElementCount(g->func_args[0].unpacked_dims), 2u);
 }
 
+// The compilation unit's own parameterized `Inner`, whose typedef `t` is ten
+// elements longer than the nested class's, and the class `Inner` nested in
+// `Outer` with the same parameter.
+const char* const kNestedSpecializationClasses =
+    "class Inner #(int p = 1);\n"
+    "  typedef int t [p + 10];\n"
+    "endclass\n"
+    "class Outer;\n"
+    "  class Inner #(int p = 1);\n"
+    "    typedef int t [p];\n"
+    "  endclass\n"
+    "endclass\n";
+
+// §8.23 with §8.25: `Outer::Inner#(4)::t` specializes the class Inner nested
+// in Outer, so a module's variable, a function's return type, its formal and
+// its body's variable written so take that class's `[p]` folded with their own
+// values. The specialization found its class by the last prefix alone and took
+// the unit Inner's `[p + 10]`.
+TEST(ClassScopeResolutionElaboration, ChainedSpecializationIsTheNestedClasses) {
+  ElabFixture f;
+  RtlirDesign* design = ElaborateSrc(
+      std::string(kNestedSpecializationClasses) +
+          "module m;\n"
+          "  Outer::Inner#(4)::t v;\n"
+          "  function automatic Outer::Inner#(5)::t g(Outer::Inner#(3)::t a);\n"
+          "    Outer::Inner#(2)::t q;\n"
+          "    q[0] = a[0];\n"
+          "    return '{default: q[0]};\n"
+          "  endfunction\n"
+          "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  const RtlirVariable* v = FindVar(design, "m", "v");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->unpacked_size, 4u);
+  ASSERT_EQ(design->top_modules[0]->function_decls.size(), 1u);
+  const ModuleItem* g = design->top_modules[0]->function_decls[0];
+  ASSERT_FALSE(g->func_body_stmts.empty());
+  EXPECT_EQ(LiteralElementCount(g->return_array_dims), 5u);
+  EXPECT_EQ(LiteralElementCount(g->func_args[0].unpacked_dims), 3u);
+  EXPECT_EQ(LiteralElementCount(g->func_body_stmts[0]->var_unpacked_dims), 2u);
+}
+
+// §8.23 with §26.3: `pkg::Inner#(4)::t` specializes the class Inner the
+// package pkg declares, whose typedef is twenty elements longer, never the
+// unit's Inner.
+TEST(ClassScopeResolutionElaboration, PackageSpecializationIsThePackagesClass) {
+  ElabFixture f;
+  RtlirDesign* design = ElaborateSrc(std::string(kNestedSpecializationClasses) +
+                                         "package pkg;\n"
+                                         "  class Inner #(int p = 1);\n"
+                                         "    typedef int t [p + 20];\n"
+                                         "  endclass\n"
+                                         "endpackage\n"
+                                         "module m;\n"
+                                         "  pkg::Inner#(4)::t w;\n"
+                                         "endmodule\n",
+                                     f, "m");
+  ASSERT_NE(design, nullptr);
+  const RtlirVariable* w = FindVar(design, "m", "w");
+  ASSERT_NE(w, nullptr);
+  EXPECT_EQ(w->unpacked_size, 24u);
+}
+
+// A chain whose prefixes reach no class, `Outer::Missing::Inner`, names no
+// class to specialize, so the declaration takes none of the unit Inner's
+// fourteen elements.
+TEST(ClassScopeResolutionElaboration, ChainReachingNoClassIsNotSpecialized) {
+  ElabFixture f;
+  RtlirDesign* design = ElaborateSrc(std::string(kNestedSpecializationClasses) +
+                                         "module m;\n"
+                                         "  Outer::Missing::Inner#(4)::t w;\n"
+                                         "endmodule\n",
+                                     f, "m");
+  ASSERT_NE(design, nullptr);
+  const RtlirVariable* w = FindVar(design, "m", "w");
+  ASSERT_NE(w, nullptr);
+  EXPECT_EQ(w->unpacked_size, 0u);
+}
+
 }  // namespace

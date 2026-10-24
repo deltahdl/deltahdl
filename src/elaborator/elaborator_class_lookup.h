@@ -68,4 +68,18 @@ const ClassDecl* ClassOfDeclaredType(const DataType& dt,
                                      const std::vector<const ClassDecl*>& chain,
                                      const CompilationUnit* unit);
 
+// The prefixes `dt` writes before its last one, outermost first, a leading
+// `$unit` left off: §3.12.1 names the compilation unit's own declarations
+// through it, and those are reached by their own names. `$unit::A::B::t`
+// gives {A}, and `B::t` nothing.
+std::vector<std::string_view> OuterScopePrefixes(const DataType& dt);
+
+// §8.23: the class `dt`'s scope names through the prefixes written before it
+// (OuterScopePrefixes), read as ClassOfDeclaredType reads a chain, so
+// `Outer::Inner::t` reaches the class Inner nested in Outer and
+// `pkg::Inner::t` the one the package pkg declares. Null where the prefixes
+// reach no class.
+const ClassDecl* ClassOfChainedScope(const DataType& dt,
+                                     const CompilationUnit* unit);
+
 }  // namespace delta

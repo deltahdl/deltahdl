@@ -125,22 +125,44 @@ static std::vector<std::string_view> TypeChainNames(const DataType& dt) {
   return names;
 }
 
+// The class `names` reaches, outermost first: the first read along `chain`
+// outward and then among the unit's classes, or as a package holding the class
+// the second gives, and each later name a class nested in the class so far.
+static const ClassDecl* ClassAlongNames(
+    const std::vector<std::string_view>& names,
+    const std::vector<const ClassDecl*>& chain, const CompilationUnit* unit) {
+  size_t next = 1;
+  const ClassDecl* cls = ClassAmongEnclosing(names[0], chain);
+  if (cls == nullptr && names.size() > 1) {
+    cls = FindClassInPackage(names[0], names[1], unit);
+    if (cls != nullptr) next = 2;
+  }
+  if (cls == nullptr) cls = FindClassDecl(names[0], unit);
+  for (; cls != nullptr && next < names.size(); ++next) {
+    cls = FindNestedClass(cls, names[next]);
+  }
+  return cls;
+}
+
 const ClassDecl* ClassOfDeclaredType(const DataType& dt,
                                      const std::vector<const ClassDecl*>& chain,
                                      const CompilationUnit* unit) {
   if (dt.kind != DataTypeKind::kNamed) return nullptr;
-  const std::vector<std::string_view> kNames = TypeChainNames(dt);
-  size_t next = 1;
-  const ClassDecl* cls = ClassAmongEnclosing(kNames[0], chain);
-  if (cls == nullptr && kNames.size() > 1) {
-    cls = FindClassInPackage(kNames[0], kNames[1], unit);
-    if (cls != nullptr) next = 2;
-  }
-  if (cls == nullptr) cls = FindClassDecl(kNames[0], unit);
-  for (; cls != nullptr && next < kNames.size(); ++next) {
-    cls = FindNestedClass(cls, kNames[next]);
-  }
-  return cls;
+  return ClassAlongNames(TypeChainNames(dt), chain, unit);
+}
+
+std::vector<std::string_view> OuterScopePrefixes(const DataType& dt) {
+  std::vector<std::string_view> prefixes = dt.outer_scope_names;
+  if (!prefixes.empty() && prefixes.front() == "$unit")
+    prefixes.erase(prefixes.begin());
+  return prefixes;
+}
+
+const ClassDecl* ClassOfChainedScope(const DataType& dt,
+                                     const CompilationUnit* unit) {
+  std::vector<std::string_view> names = OuterScopePrefixes(dt);
+  names.push_back(dt.scope_name);
+  return ClassAlongNames(names, {}, unit);
 }
 
 }  // namespace delta
