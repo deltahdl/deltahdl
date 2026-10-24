@@ -481,8 +481,9 @@ TEST(LetActualScopeElaboration, ATypeParametersTypeIsNotTakenFromItsDefault) {
 // module's of the same name, so `$unit::t` is the unit's structure of two
 // ints, which two ints fit by bit-stream cast and three do not, and
 // `$unit::N` the unit's parameter, three, never the module's. The typedefs are
-// structures because a formal written with an array typedef takes the
-// dimensions of the module's typedef of the bare name (#7960).
+// structures, which no earlier pass rewrites into an element type and
+// dimensions as it does an array typedef, so the formal reaches the check
+// written `$unit::t`.
 TEST(LetActualScopeElaboration, UnitScopedNamesPassTheModulesOwn) {
   ElabFixture f;
   ElaborateSrc(

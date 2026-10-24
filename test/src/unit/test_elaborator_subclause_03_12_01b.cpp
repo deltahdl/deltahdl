@@ -1,8 +1,16 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <vector>
+
+#include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 #include "helpers_rtlir_lookup.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 
 using namespace delta;
 
@@ -350,6 +358,40 @@ TEST(CompilationUnitScopeOrder, UnitScopedReferenceToLaterClass) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "'$unit::C' precedes its declaration", 3,
                             "3.12.1"));
+}
+
+// The element count `dims` writes where it is one dimension given as a
+// number, zero otherwise.
+uint64_t LiteralElementCount(const std::vector<Expr*>& dims) {
+  if (dims.size() != 1 || dims[0]->kind != ExprKind::kIntegerLiteral) return 0;
+  return dims[0]->int_val;
+}
+
+// §3.12.1 (printed page 56) with §7.4.4: `$unit::t` names the unit's array
+// typedef past the module's own t, so a function's formal, its return type and
+// its body's variable written with it each take the unit's two elements. Each
+// took the module's three, the typedef's dimensions being looked up by the
+// bare name.
+TEST(CompilationUnitScopeTypes, UnitScopedArrayTypedefKeepsTheUnitsDimensions) {
+  ElabFixture f;
+  const RtlirDesign* design = ElaborateSrc(
+      "typedef int t [2];\n"
+      "module m;\n"
+      "  typedef int t [3];\n"
+      "  function automatic $unit::t g($unit::t a);\n"
+      "    $unit::t v;\n"
+      "    v = a;\n"
+      "    return v;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  ASSERT_EQ(design->top_modules[0]->function_decls.size(), 1u);
+  const ModuleItem* g = design->top_modules[0]->function_decls[0];
+  ASSERT_FALSE(g->func_body_stmts.empty());
+  EXPECT_EQ(LiteralElementCount(g->func_args[0].unpacked_dims), 2u);
+  EXPECT_EQ(LiteralElementCount(g->return_array_dims), 2u);
+  EXPECT_EQ(LiteralElementCount(g->func_body_stmts[0]->var_unpacked_dims), 2u);
 }
 
 }  // namespace

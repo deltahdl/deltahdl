@@ -3,11 +3,16 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 #include "helpers_rtlir_lookup.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 
 namespace {
 
@@ -506,6 +511,40 @@ TEST(PackageImport, ANestedProgramWritesNoVariableItsModuleImportsBelowIt) {
                               6, "23.9"))
         << imported;
   }
+}
+
+// §26.3 with §7.4.4: `p::t` names package p's array typedef whatever t the
+// module declares itself, so a task's formal and its body's variable written
+// with it, and a function returning it, each take p's two elements. Each took
+// the module's three, the typedef's dimensions being looked up by the bare
+// name.
+TEST(PackageScopeReference,
+     PackageScopedArrayTypedefKeepsThePackagesDimensions) {
+  ElabFixture f;
+  const RtlirDesign* design = ElaborateSrc(
+      "package p; typedef int t [2]; endpackage\n"
+      "module m;\n"
+      "  typedef int t [3];\n"
+      "  task automatic k(input p::t a, output int n);\n"
+      "    p::t v;\n"
+      "    v = a;\n"
+      "    n = v[1];\n"
+      "  endtask\n"
+      "  function automatic p::t g(); return '{4, 5}; endfunction\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  const std::vector<ModuleItem*>& subroutines =
+      design->top_modules[0]->function_decls;
+  ASSERT_EQ(subroutines.size(), 2u);
+  ASSERT_FALSE(subroutines[0]->func_body_stmts.empty());
+  auto expect_two_elements = [](const std::vector<Expr*>& dims) {
+    ASSERT_EQ(dims.size(), 1u);
+    EXPECT_EQ(dims[0]->int_val, 2u);
+  };
+  expect_two_elements(subroutines[0]->func_args[0].unpacked_dims);
+  expect_two_elements(subroutines[0]->func_body_stmts[0]->var_unpacked_dims);
+  expect_two_elements(subroutines[1]->return_array_dims);
 }
 
 }  // namespace

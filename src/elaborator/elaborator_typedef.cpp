@@ -330,12 +330,19 @@ void Elaborator::ValidateCuTypedefs() {
 // index past its element as the typedef's dimension rather than as a select
 // within a packed element, as RtlirElementShape::type_is_unpacked_array tells
 // it for the declaration among a module's items.
+//
+// §3.12.1 and §26.3: a name written behind a scope, `$unit::arr_t` or
+// `p::arr_t`, is that scope's typedef whatever the module declares under the
+// bare name, so it is looked up under the key the scope's typedef is recorded
+// by (NamedTypeKey). Looked up by the bare name, it took the dimensions of the
+// module's own arr_t.
 void Elaborator::AdoptTypedefDimsInStmt(Stmt* s) {
   if (s == nullptr) return;
   if ((s->kind == StmtKind::kVarDecl || s->kind == StmtKind::kBlockItemDecl) &&
       s->var_decl_type.kind == DataTypeKind::kNamed) {
-    auto dims = td_array_dims_.find(s->var_decl_type.type_name);
-    auto base = typedefs_.find(s->var_decl_type.type_name);
+    const std::string kKey = NamedTypeKey(s->var_decl_type);
+    auto dims = td_array_dims_.find(kKey);
+    auto base = typedefs_.find(kKey);
     s->var_decl_type.names_unpacked_array =
         dims != td_array_dims_.end() && !s->var_unpacked_dims.empty();
     if (s->var_unpacked_dims.empty() && dims != td_array_dims_.end() &&
@@ -350,11 +357,12 @@ void Elaborator::AdoptTypedefDimsInStmt(Stmt* s) {
                    [this](Stmt* const& sub) { AdoptTypedefDimsInStmt(sub); });
 }
 
-// The name each of `item`'s formals takes its type by, empty where it takes
-// none by a name. A subroutine's formal takes its own; a let formal written
-// with no type of its own takes the one written before it (§11.12 with
-// §16.8), `b` of `let f(arr_t a, b)` arr_t, and so the dimensions with it.
-static std::vector<std::string_view> FormalTypeNames(const ModuleItem* item) {
+// The key each of `item`'s formals takes its type by (NamedTypeKey), the name
+// behind its scope where one is written, empty where it takes none by a name.
+// A subroutine's formal takes its own; a let formal written with no type of
+// its own takes the one written before it (§11.12 with §16.8), `b` of
+// `let f(arr_t a, b)` arr_t, and so the dimensions with it.
+static std::vector<std::string> FormalTypeKeys(const ModuleItem* item) {
   std::vector<const DataType*> types;
   if (item->kind == ModuleItemKind::kLetDecl) {
     types = LetFormalTypes(item->func_args);
@@ -362,14 +370,14 @@ static std::vector<std::string_view> FormalTypeNames(const ModuleItem* item) {
     for (const FunctionArg& arg : item->func_args)
       types.push_back(&arg.data_type);
   }
-  std::vector<std::string_view> names;
-  names.reserve(types.size());
+  std::vector<std::string> keys;
+  keys.reserve(types.size());
   for (const DataType* type : types) {
-    names.push_back(type != nullptr && type->kind == DataTypeKind::kNamed
-                        ? type->type_name
-                        : std::string_view{});
+    keys.push_back(type != nullptr && type->kind == DataTypeKind::kNamed
+                       ? NamedTypeKey(*type)
+                       : std::string{});
   }
-  return names;
+  return keys;
 }
 
 // Every procedure of a module, including the ones a generate construct holds:
@@ -389,17 +397,21 @@ static std::vector<std::string_view> FormalTypeNames(const ModuleItem* item) {
 // A let formal taking the type of the one before it, `b` of
 // `let f(arr_t a, b)`, has the dimensions too, while only `a`'s type, the one
 // written by the name, is rewritten to the element type, which `b` then reads
-// through LetFormalTypes; the names are read before any type is rewritten.
+// through LetFormalTypes; the keys are read before any type is rewritten.
+//
+// A formal's or a return type's name written behind a scope, `$unit::arr_t`
+// or `p::arr_t`, is looked up under that scope's key, as a procedural
+// declaration's is (AdoptTypedefDimsInStmt).
 static void AdoptSubroutineTypedefDims(
     ModuleItem* item,
     const std::unordered_map<std::string_view, std::vector<Expr*>>& td_dims,
     const TypedefMap& typedefs) {
-  const std::vector<std::string_view> kNames = FormalTypeNames(item);
-  for (size_t i = 0; i < kNames.size(); ++i) {
+  const std::vector<std::string> kKeys = FormalTypeKeys(item);
+  for (size_t i = 0; i < kKeys.size(); ++i) {
     FunctionArg& arg = item->func_args[i];
-    if (!arg.unpacked_dims.empty() || kNames[i].empty()) continue;
-    auto dims = td_dims.find(kNames[i]);
-    auto base = typedefs.find(kNames[i]);
+    if (!arg.unpacked_dims.empty() || kKeys[i].empty()) continue;
+    auto dims = td_dims.find(kKeys[i]);
+    auto base = typedefs.find(kKeys[i]);
     if (dims == td_dims.end() || base == typedefs.end()) continue;
     if (arg.data_type.kind == DataTypeKind::kNamed)
       arg.data_type = base->second;
@@ -408,8 +420,9 @@ static void AdoptSubroutineTypedefDims(
   const DataType& ret = item->return_type;
   if (ret.kind != DataTypeKind::kNamed || !item->return_array_dims.empty())
     return;
-  auto dims = td_dims.find(ret.type_name);
-  auto base = typedefs.find(ret.type_name);
+  const std::string kReturnKey = NamedTypeKey(ret);
+  auto dims = td_dims.find(kReturnKey);
+  auto base = typedefs.find(kReturnKey);
   if (dims == td_dims.end() || base == typedefs.end()) return;
   item->return_array_dims = dims->second;
   item->return_array_elem_type = base->second;
