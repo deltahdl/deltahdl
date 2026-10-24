@@ -884,4 +884,38 @@ TEST(CheckerItemsParsing,
   EXPECT_FALSE(r.has_errors);
 }
 
+// A.1.8 lets a checker's data_declaration open with `rand`, and no other body
+// writes one: A.1.4's module_or_generate_item_declaration, which modules,
+// interfaces and programs reach, and A.1.11's package items write the
+// data_declaration bare. A generate block in a checker holds the checker's
+// items.
+TEST(CheckerItemsParsing, RandOutsideACheckerIsReported) {
+  auto r = Parse(
+      "module m;\n"
+      "  rand bit b;\n"
+      "endmodule\n"
+      "interface i;\n"
+      "  rand logic v;\n"
+      "endinterface\n"
+      "program p;\n"
+      "  rand int n;\n"
+      "endprogram\n"
+      "package k;\n"
+      "  rand bit q;\n"
+      "endpackage\n"
+      "checker c;\n"
+      "  rand bit r;\n"
+      "  if (1) begin : g\n"
+      "    rand bit s;\n"
+      "  end\n"
+      "endchecker\n");
+  const char* const kRand = "only a checker's data declaration opens with rand";
+  EXPECT_TRUE(ReportedError(r.diags, kRand, 2, "A.1.8"));
+  EXPECT_TRUE(ReportedError(r.diags, kRand, 5, "A.1.8"));
+  EXPECT_TRUE(ReportedError(r.diags, kRand, 8, "A.1.8"));
+  EXPECT_TRUE(ReportedError(r.diags, kRand, 11, "A.1.8"));
+  EXPECT_FALSE(ReportedError(r.diags, kRand, 14, "A.1.8"));
+  EXPECT_FALSE(ReportedError(r.diags, kRand, 16, "A.1.8"));
+}
+
 }  // namespace

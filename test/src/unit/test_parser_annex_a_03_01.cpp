@@ -787,4 +787,23 @@ TEST(GateInstantiationParsing, SecondInstanceRangeIsRejected) {
   EXPECT_NE(g->inst_range_right, nullptr);
 }
 
+// A.3.1 opens a gate_instantiation with its gate or switch keyword and A.4.2 a
+// case_generate_construct with `case`; the `const` and the lifetime A.2.1.3
+// writes before a data_declaration open neither.
+TEST(GateInstantiationParsing, QualifierBeforeAGateOrAGenerateCase) {
+  auto r = Parse(
+      "module m;\n"
+      "  const and g1(y, a, b);\n"
+      "  static or g2(z, a, b);\n"
+      "  static case (1) 1: begin end endcase\n"
+      "  and g3(w, a, b);\n"
+      "endmodule\n");
+  const char* const kGate = "a gate instantiation takes no const or lifetime";
+  EXPECT_TRUE(ReportedError(r.diags, kGate, 2, "A.3.1"));
+  EXPECT_TRUE(ReportedError(r.diags, kGate, 3, "A.3.1"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a generate construct takes no const or lifetime", 4, "A.4.2"));
+  EXPECT_FALSE(ReportedError(r.diags, kGate, 5, "A.3.1"));
+}
+
 }  // namespace

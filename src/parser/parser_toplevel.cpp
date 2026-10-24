@@ -99,23 +99,33 @@ static bool GateUsesDelay3(GateKind kind) {
   }
 }
 
+// Whether the selects and member accesses `e` is built of stand under a name,
+// as A.8.5 writes a net_lvalue's constant_select after its
+// ps_or_hierarchical_net_identifier. A select of a concatenation, a call or
+// any other expression stands under none.
+static bool IsRootedAtName(const Expr* e) {
+  while (e->kind == ExprKind::kSelect || e->kind == ExprKind::kMemberAccess)
+    e = e->kind == ExprKind::kSelect ? e->base : e->lhs;
+  return e->kind == ExprKind::kIdentifier;
+}
+
 // Whether `e` has one of the forms A.8.5 gives net_lvalue: a
 // ps_or_hierarchical_net_identifier with its constant_select, `{ net_lvalue
 // { , net_lvalue } }`, or `[ assignment_pattern_expression_type ]
-// assignment_pattern_net_lvalue`. Declared in parser_instance_internal.h for
-// the UDP instance in parser_udp.cpp, whose output_terminal is the same
-// net_lvalue a gate's is.
+// assignment_pattern_net_lvalue`, whose elements A.6.7.1 writes with no key.
+// Declared in parser_instance_internal.h for the UDP instance in
+// parser_udp_inst.cpp, whose output_terminal is the same net_lvalue a gate's
+// is.
 bool IsNetLvalue(const Expr* e) {
   switch (e->kind) {
     case ExprKind::kIdentifier:
     case ExprKind::kSelect:
     case ExprKind::kMemberAccess:
-      return true;
-    case ExprKind::kConcatenation:
-      for (auto* child : e->elements)
-        if (!IsNetLvalue(child)) return false;
-      return true;
+      return IsRootedAtName(e);
     case ExprKind::kAssignmentPattern:
+      if (!e->pattern_keys.empty()) return false;
+      [[fallthrough]];
+    case ExprKind::kConcatenation:
       for (auto* child : e->elements)
         if (!IsNetLvalue(child)) return false;
       return true;

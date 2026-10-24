@@ -450,4 +450,58 @@ TEST(PrimitiveTerminalParsing, OutputTerminal_AssignmentPatternNetLvalue) {
                             "28.3"));
 }
 
+// A.8.5 writes a net_lvalue's selects and member accesses under the net's
+// name, ps_or_hierarchical_net_identifier, so a select of a concatenation is
+// no net_lvalue at a gate's output or inout terminal or at a UDP instance's
+// output terminal, while one under a structure net's member still stands under
+// the net's name.
+TEST(PrimitiveTerminalParsing, Error_SelectNotTakenOfANetName) {
+  auto r = Parse(
+      "primitive inv(output out, input in);\n"
+      "  table 0 : 1; 1 : 0; endtable\n"
+      "endprimitive\n"
+      "module m;\n"
+      "  buf ({x, y}[0], a);\n"
+      "  tran ({x, y}[1], b);\n"
+      "  inv u1({x, y}[0], a);\n"
+      "  not (abc.A[0], abc.B[0]);\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "output terminal must be a net lvalue", 5,
+                            "28.3"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "inout terminal must be a net lvalue", 6, "28.3"));
+  EXPECT_TRUE(ReportedError(r.diags, "output terminal must be a net lvalue", 7,
+                            "28.3"));
+  EXPECT_FALSE(ReportedError(r.diags, "output terminal must be a net lvalue", 8,
+                             "28.3"));
+}
+
+// A.6.7.1 writes assignment_pattern_net_lvalue with positional elements alone,
+// so a keyed pattern, typed or not, is no net_lvalue at a gate's output or
+// inout terminal or at a UDP instance's output terminal.
+TEST(PrimitiveTerminalParsing, Error_KeyedPatternTerminal) {
+  auto r = Parse(
+      "primitive inv(output out, input in);\n"
+      "  table 0 : 1; 1 : 0; endtable\n"
+      "endprimitive\n"
+      "module m;\n"
+      "  typedef logic [1:0] pair_t;\n"
+      "  buf ('{0: y}, a);\n"
+      "  tran ('{default: x}, b);\n"
+      "  inv u1(pair_t'{0: y, 1: z}, a);\n"
+      "  buf ('{y}, a);\n"
+      "  buf (pair_t'{y, z}, a);\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "output terminal must be a net lvalue", 6,
+                            "28.3"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "inout terminal must be a net lvalue", 7, "28.3"));
+  EXPECT_TRUE(ReportedError(r.diags, "output terminal must be a net lvalue", 8,
+                            "28.3"));
+  EXPECT_FALSE(ReportedError(r.diags, "output terminal must be a net lvalue", 9,
+                             "28.3"));
+  EXPECT_FALSE(ReportedError(r.diags, "output terminal must be a net lvalue",
+                             10, "28.3"));
+}
+
 }  // namespace

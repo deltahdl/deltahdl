@@ -23,8 +23,15 @@ namespace delta {
 
 void Parser::ParseDataDeclItem(std::vector<ModuleItem*>& items, size_t before,
                                const std::vector<Attribute>& attrs) {
-  // A.1.8 writes a checker's `rand` before the whole data_declaration.
+  // A.1.8 writes a checker's `rand` before the whole data_declaration, and
+  // no other body's data_declaration takes one: A.1.4 and A.1.11 write it
+  // bare.
+  const SourceLoc kRandLoc = CurrentLoc();
   bool is_rand = Match(TokenKind::kKwRand);
+  if (is_rand && !InCheckerBody()) {
+    diag_.Error(kRandLoc, "only a checker's data declaration opens with rand",
+                Subclause("A.1.8"));
+  }
   const DataDeclQualifiers kQuals =
       ParserDataDeclHelpers::ReadQualifiers(*this);
   if (kQuals.is_automatic) {
@@ -85,6 +92,17 @@ static void ReportImplicitTypeWithoutVar(const DataType& dtype, SourceLoc loc,
              Subclause("6.8"));
 }
 
+// A.3.1 opens a gate_instantiation with its keyword and A.4.2 a
+// case_generate_construct with `case`, so the `const` and the `static` that
+// open a data_declaration (A.2.1.3) open neither. `automatic` is reported
+// where it is read, as a lifetime outside a procedural context.
+static void ReportQualifiersBeforeItem(const DataDeclQualifiers& quals,
+                                       SourceLoc loc, const char* msg,
+                                       Subclause subclause, DiagEngine& diag) {
+  if (!quals.is_const && !quals.is_static) return;
+  diag.Error(loc, msg, subclause);
+}
+
 // The type is read as ParseVarPrefixed reads a module item's. §8.5 puts no
 // restriction on a property's data type, so an inline enumeration, structure
 // or union and the package-scoped `pk::t` of §26.3 are read as a declaration's
@@ -139,10 +157,18 @@ void Parser::ParseTypedItemOrInst(std::vector<ModuleItem*>& items,
     return;
   }
   if (Check(TokenKind::kKwCase)) {
+    ReportQualifiersBeforeItem(
+        quals, CurrentLoc(),
+        "a generate construct takes no const or lifetime qualifier",
+        Subclause("A.4.2"), diag_);
     items.push_back(ParseGenerateCase());
     return;
   }
   if (IsAtGateKeyword()) {
+    ReportQualifiersBeforeItem(
+        quals, CurrentLoc(),
+        "a gate instantiation takes no const or lifetime qualifier",
+        Subclause("A.3.1"), diag_);
     RejectMisplacedGate();
     ParseGateInst(items);
     return;
