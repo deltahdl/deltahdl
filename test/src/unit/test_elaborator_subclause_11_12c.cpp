@@ -478,16 +478,19 @@ TEST(LetActualScopeElaboration, ATypeParametersTypeIsNotTakenFromItsDefault) {
 }
 
 // §3.12.1: `$unit::` names the compilation unit's own declaration past a
-// module's of the same name, so `$unit::t` is the unit's array of two ints
-// and `$unit::N` the unit's parameter, three, never the module's.
+// module's of the same name, so `$unit::t` is the unit's structure of two
+// ints, which two ints fit by bit-stream cast and three do not, and
+// `$unit::N` the unit's parameter, three, never the module's. The typedefs are
+// structures because a formal written with an array typedef takes the
+// dimensions of the module's typedef of the bare name (#7960).
 TEST(LetActualScopeElaboration, UnitScopedNamesPassTheModulesOwn) {
   ElabFixture f;
   ElaborateSrc(
-      "typedef int t [2];\n"
+      "typedef struct { int a; int b; } t;\n"
       "parameter int N = 3;\n"
       "module m #(parameter int N = 2);\n"
-      "  typedef int t [3];\n"
-      "  let f($unit::t x) = x[0];\n"
+      "  typedef struct { int a; int b; int c; } t;\n"
+      "  let f($unit::t x) = x.a;\n"
       "  let h(int x [3]) = x[0];\n"
       "  int arr [2]; int a3 [3]; int an [$unit::N];\n"
       "  initial $display(\"%0d\", f(arr) + h(an));\n"
