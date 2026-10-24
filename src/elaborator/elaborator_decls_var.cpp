@@ -756,10 +756,10 @@ static std::string_view AdoptTypedefArrayDims(
   if (item->data_type.kind != DataTypeKind::kNamed) return {};
   // §8.23: `Cfg::my_type` names Cfg's type, never this scope's my_type.
   if (!item->data_type.scope_name.empty()) return {};
-  auto dims_it = td_array_dims.find(item->data_type.type_name);
-  if (dims_it == td_array_dims.end()) return {};
   auto base_it = typedefs.find(item->data_type.type_name);
   if (base_it == typedefs.end()) return {};
+  auto dims_it = td_array_dims.find(item->data_type.type_name);
+  if (dims_it == td_array_dims.end()) return {};
   std::string_view typedef_name = item->data_type.type_name;
   bool was_const = item->data_type.is_const;
   item->data_type = base_it->second;

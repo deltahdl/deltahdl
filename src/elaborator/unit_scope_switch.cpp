@@ -70,6 +70,7 @@ void UnitScopeTables::RunPreElaborationValidations(Elaborator& e) {
   const std::shared_ptr<UnitScopeTables> kMerged = Take(e);
   auto all_typedefs = e.all_typedefs_;
   auto all_cu_param_scope = e.all_cu_param_scope_;
+  auto all_td_array_dims = e.all_td_array_dims_;
   // Each unit's own tables, registered from its own view. What registering
   // reports was reported once already, over the merged view above. The unit's
   // subroutines are then checked against them, which the merged view's would
@@ -90,6 +91,7 @@ void UnitScopeTables::RunPreElaborationValidations(Elaborator& e) {
   Put(*kMerged, e);
   e.all_typedefs_ = std::move(all_typedefs);
   e.all_cu_param_scope_ = std::move(all_cu_param_scope);
+  e.all_td_array_dims_ = std::move(all_td_array_dims);
   e.unit_ = units.merged;
 }
 

@@ -773,11 +773,13 @@ bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
       // ModuleDecl before the item loop that reached here, and
       // ItemElaborationStateSaver takes it back out when the module returns,
       // and property_registry_ for §16.12's instances of a named property or
-      // sequence, which it fills and takes back the same way.
-      pending_generates_.push_back({item, mod, typedefs_, cu_param_scope_,
-                                    func_decls_, property_registry_,
-                                    config_inst_path_, current_library_,
-                                    interface_inst_types_, module_decl_path_});
+      // sequence, which it fills and takes back the same way. td_array_dims_
+      // is copied with typedefs_, the dimensions of the array typedefs this
+      // module's scope holds and no other design element's (§3.13 (e)).
+      pending_generates_.push_back(
+          {item, mod, typedefs_, cu_param_scope_, func_decls_,
+           property_registry_, config_inst_path_, current_library_,
+           interface_inst_types_, module_decl_path_, td_array_dims_});
       return true;
     case ModuleItemKind::kFunctionDecl:
     case ModuleItemKind::kTaskDecl:

@@ -333,14 +333,21 @@ struct ItemElaborationStateSaver {
   // endmodule` sizes b's y from a's import, and a typedef declared in a is
   // equally visible in b.
   //
-  // These two are the exception to the field set above: they are copied and put
-  // back rather than moved out and cleared, because they also hold the
+  // §3.13 (e) puts a typedef in the name space of the module or interface
+  // declaring it, so the unpacked dimensions td_array_dims_ records for an
+  // array typedef are taken back out with it. Left in, an interface's
+  // `typedef int t [2]` gave two elements to every declaration a module
+  // elaborated after it wrote with its own `t` of no unpacked dimensions.
+  //
+  // These three are the exception to the field set above: they are copied and
+  // put back rather than moved out and cleared, because they also hold the
   // compilation unit's own declarations. Elaborator::RegisterCuScopeItems fills
-  // both with $unit's typedefs and parameters and with every package parameter
-  // under its qualified key before any module is elaborated, and §3.12.1 makes
-  // those visible to every design element in the unit. Clearing them would take
-  // those away from the module about to be elaborated, so the copy keeps them
-  // and drops only what that module added.
+  // them with $unit's typedefs, their dimensions and parameters and with every
+  // package's typedefs and parameters under their qualified keys before any
+  // module is elaborated, and §3.12.1 makes those visible to every design
+  // element in the unit. Clearing them would take those away from the module
+  // about to be elaborated, so the copy keeps them and drops only what that
+  // module added.
   // Elaborator::ResetItemElaborationState therefore does not name them.
   //
   // A module elaborated as a child instance still starts from its parent's
@@ -349,9 +356,12 @@ struct ItemElaborationStateSaver {
   // one settled here, which is what one module leaves behind for the next.
   decltype(Elaborator::typedefs_) typedefs;
   decltype(Elaborator::cu_param_scope_) cu_param_scope;
+  decltype(Elaborator::td_array_dims_) td_array_dims;
 
   explicit ItemElaborationStateSaver(Elaborator& e)
-      : typedefs(e.typedefs_), cu_param_scope(e.cu_param_scope_) {
+      : typedefs(e.typedefs_),
+        cu_param_scope(e.cu_param_scope_),
+        td_array_dims(e.td_array_dims_) {
     forward_typedef_kinds = std::move(e.forward_typedef_kinds_);
     declared_names = std::move(e.declared_names_);
     dpi_import_names = std::move(e.dpi_import_names_);
@@ -402,19 +412,22 @@ struct ItemElaborationStateSaver {
     e.ResetItemElaborationState();
   }
 
-  // Hands this module's typedefs and compilation-unit parameters back. What the
-  // module added is kept in the design-wide unions, which a pass running after
-  // every module reads, before the maps the next module reads are taken back to
-  // what they were. insert_or_assign and not insert: two modules may declare
-  // one name, and the design-wide tables named the last one before any of this
-  // existed.
+  // Hands this module's typedefs, their dimensions and the compilation-unit
+  // parameters back. What the module added is kept in the design-wide unions,
+  // which a pass running after every module reads, before the maps the next
+  // module reads are taken back to what they were. insert_or_assign and not
+  // insert: two modules may declare one name, and the design-wide tables named
+  // the last one before any of this existed.
   void RestoreScopeMaps(Elaborator& e) {
     for (const auto& [name, dtype] : e.typedefs_)
       e.all_typedefs_.insert_or_assign(name, dtype);
     for (const auto& [name, val] : e.cu_param_scope_)
       e.all_cu_param_scope_.insert_or_assign(name, val);
+    for (const auto& [name, dims] : e.td_array_dims_)
+      e.all_td_array_dims_.insert_or_assign(name, dims);
     e.typedefs_ = std::move(typedefs);
     e.cu_param_scope_ = std::move(cu_param_scope);
+    e.td_array_dims_ = std::move(td_array_dims);
   }
 
   void Restore(Elaborator& e) {

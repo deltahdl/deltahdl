@@ -43,8 +43,13 @@ namespace delta {
 void Elaborator::ProcessPendingGenerate(const PendingGenerate& pg) {
   TypedefMap saved_typedefs = std::move(typedefs_);
   ScopeMap saved_cu_param_scope = std::move(cu_param_scope_);
+  auto saved_td_array_dims = std::move(td_array_dims_);
   typedefs_ = pg.typedefs;
   cu_param_scope_ = pg.cu_param_scope;
+  // §3.13 (e): the dimensions of the module's own array typedefs, never those
+  // of another design element's typedef of the same name, which the union
+  // holds.
+  td_array_dims_ = pg.td_array_dims;
   // The block is elaborated after the instance holding it has returned, so
   // the configuration's path to that instance and its library are put back
   // for the instances the block holds (§33.4.1.3, §33.4.1.5).
@@ -159,6 +164,7 @@ void Elaborator::ProcessPendingGenerate(const PendingGenerate& pg) {
     saved_typedefs.insert_or_assign(name, dtype);
   typedefs_ = std::move(saved_typedefs);
   cu_param_scope_ = std::move(saved_cu_param_scope);
+  td_array_dims_ = std::move(saved_td_array_dims);
   property_registry_ = std::move(saved_property_registry);
   interface_inst_types_ = std::move(saved_interface_inst_types);
   module_decl_path_ = std::move(saved_decl_path);

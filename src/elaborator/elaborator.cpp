@@ -522,9 +522,10 @@ bool Elaborator::ElaborateTopModules(const std::vector<ModuleDecl*>& top_decls,
   // §26.3 makes an imported name locally visible only before that point in the
   // current scope, so it installs the maps Elaborator::ElaborateBehavioralItem
   // captured onto each ElaboratorData::PendingGenerate instead of reading these
-  // two.
+  // three.
   typedefs_ = all_typedefs_;
   cu_param_scope_ = all_cu_param_scope_;
+  td_array_dims_ = all_td_array_dims_;
   return true;
 }
 

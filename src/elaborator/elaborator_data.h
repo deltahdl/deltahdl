@@ -584,6 +584,11 @@ class ElaboratorData {
     // whose instances an interface port connection written in the body may
     // reach an interface instance; module_decl_path_ is per-module state too.
     std::vector<const ModuleDecl*> module_decl_path;
+    // §3.13 (e) with §6.18: the unpacked dimensions of the array typedefs the
+    // module's scope holds, which a declaration in the selected body written
+    // with one of their names takes; td_array_dims_ is per-module state as
+    // typedefs_ is.
+    std::unordered_map<std::string_view, std::vector<Expr*>> td_array_dims;
   };
   std::vector<PendingGenerate> pending_generates_;
 
@@ -909,6 +914,9 @@ class ElaboratorData {
   ScopeMap cu_param_scope_;
   // The same union for the parameter scope; see all_typedefs_ above.
   ScopeMap all_cu_param_scope_;
+  // The same union for td_array_dims_, whose entries a module adds are taken
+  // back out with its typedefs (§3.13 (e)).
+  std::unordered_map<std::string_view, std::vector<Expr*>> all_td_array_dims_;
 
   // §11.4.12.1: the replication-multiplier checks (non-negative, zero-only-
   // within-a-concatenation) evaluate the multiplier as a constant expression.

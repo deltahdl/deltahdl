@@ -630,6 +630,7 @@ void Elaborator::RegisterCuScopeItems() {
   // compilation unit itself declared (§3.12.1).
   all_typedefs_ = typedefs_;
   all_cu_param_scope_ = cu_param_scope_;
+  all_td_array_dims_ = td_array_dims_;
 }
 
 // §33.4.1.4: a cell clause naming a library applies to an instance bound to,

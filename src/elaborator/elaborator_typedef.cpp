@@ -341,12 +341,12 @@ void Elaborator::AdoptTypedefDimsInStmt(Stmt* s) {
   if ((s->kind == StmtKind::kVarDecl || s->kind == StmtKind::kBlockItemDecl) &&
       s->var_decl_type.kind == DataTypeKind::kNamed) {
     const std::string kKey = NamedTypeKey(s->var_decl_type);
-    auto dims = td_array_dims_.find(kKey);
     auto base = typedefs_.find(kKey);
+    auto dims = td_array_dims_.find(kKey);
     s->var_decl_type.names_unpacked_array =
         dims != td_array_dims_.end() && !s->var_unpacked_dims.empty();
-    if (s->var_unpacked_dims.empty() && dims != td_array_dims_.end() &&
-        base != typedefs_.end()) {
+    if (s->var_unpacked_dims.empty() && base != typedefs_.end() &&
+        dims != td_array_dims_.end()) {
       bool was_const = s->var_decl_type.is_const;
       s->var_decl_type = base->second;
       s->var_decl_type.is_const = was_const;
@@ -410,9 +410,9 @@ static void AdoptSubroutineTypedefDims(
   for (size_t i = 0; i < kKeys.size(); ++i) {
     FunctionArg& arg = item->func_args[i];
     if (!arg.unpacked_dims.empty() || kKeys[i].empty()) continue;
-    auto dims = td_dims.find(kKeys[i]);
     auto base = typedefs.find(kKeys[i]);
-    if (dims == td_dims.end() || base == typedefs.end()) continue;
+    auto dims = td_dims.find(kKeys[i]);
+    if (base == typedefs.end() || dims == td_dims.end()) continue;
     if (arg.data_type.kind == DataTypeKind::kNamed)
       arg.data_type = base->second;
     arg.unpacked_dims = dims->second;
@@ -421,9 +421,9 @@ static void AdoptSubroutineTypedefDims(
   if (ret.kind != DataTypeKind::kNamed || !item->return_array_dims.empty())
     return;
   const std::string kReturnKey = NamedTypeKey(ret);
-  auto dims = td_dims.find(kReturnKey);
   auto base = typedefs.find(kReturnKey);
-  if (dims == td_dims.end() || base == typedefs.end()) return;
+  auto dims = td_dims.find(kReturnKey);
+  if (base == typedefs.end() || dims == td_dims.end()) return;
   item->return_array_dims = dims->second;
   item->return_array_elem_type = base->second;
 }
