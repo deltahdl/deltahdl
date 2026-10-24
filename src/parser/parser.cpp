@@ -18,7 +18,6 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_specify.h"
-#include "parser/ast_type.h"
 #include "parser/parser_fsm.h"
 #include "parser/parser_token_skips.h"
 #include "parser/parser_type_name_scope.h"
