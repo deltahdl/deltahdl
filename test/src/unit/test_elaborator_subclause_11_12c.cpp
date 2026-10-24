@@ -667,6 +667,28 @@ TEST(LetActualScopeElaboration, TypeReferencesFitWhatTheyName) {
       ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 8, "11.12"));
 }
 
+// §6.18: only a typedef written with no type at all is a forward one, so a
+// block's typedef of a type reference declares `kt` within the block, past the
+// module's structure of that name. The reference is not resolved there, which
+// leaves the call unjudged; taken for the module's structure of two ints, an
+// int would be reported.
+TEST(LetActualScopeElaboration, ABlocksTypeReferenceTypedefIsNoForwardOne) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef struct { int a; int b; } kt;\n"
+      "  int j;\n"
+      "  initial begin\n"
+      "    typedef type(j) kt;\n"
+      "    let f(kt x) = x;\n"
+      "    $display(\"%0d\", f(j));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 7, "11.12"));
+}
+
 // §6.18: a chain of typedef names is followed to the type it ends in, 31 names
 // long here, so three ints are no actual for an array of two named at its far
 // end; a chain of 32 is taken for one that may run through a name twice and

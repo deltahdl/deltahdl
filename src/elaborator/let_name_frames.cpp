@@ -87,12 +87,12 @@ void DeclareEnumLiterals(NameFrame& frame, const DataType& type) {
 }
 
 // A typedef, leaving out a forward one (§6.18), which declares nothing the
-// full declaration does not.
+// full declaration does not. A forward typedef alone has no type written; an
+// interface port's typedef names its type.
 void DeclareTypedef(NameFrame& frame, const ModuleItem* item) {
   const DataType& type = item->typedef_type;
-  const bool kForward = type.kind == DataTypeKind::kImplicit &&
-                        type.type_ref_expr == nullptr &&
-                        item->typedef_ifc_port.empty();
+  const bool kForward =
+      type.kind == DataTypeKind::kImplicit && type.type_ref_expr == nullptr;
   if (kForward) return;
   Declare(frame, item->name, {.kind = NameKind::kTypedef, .item = item});
 }
