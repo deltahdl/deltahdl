@@ -14,6 +14,7 @@
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 #include "helpers_rtlir_lookup.h"
+#include "parser/ast_design.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
@@ -779,11 +780,88 @@ TEST(NettypeElaboration, SubroutineBodyNettypeScanStepsOverANullStatement) {
   func->func_body_stmts = {nullptr, nettype_stmt, decl};
   ModuleDecl mod;
   mod.items.push_back(func);
-  CheckNettypeUses(&mod, {}, f.diag);
+  const CompilationUnit kUnit{};
+  CheckNettypeUses(&mod, kUnit, {}, f.diag);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "nettype 'nb' may declare only a net, and is "
                             "named here as the type of variable 'w'",
                             0, "6.6.7"));
+}
+
+// A.2.2.1 lets a data_type name a type through a class_scope, so `C::nt` names
+// the nettype class C declares, and a block variable, a cast, a function's
+// return and argument, and a property of another class each name it without
+// declaring a net.
+TEST(NettypeElaboration, ClassNettypeNamedThroughItsScopeIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C;\n"
+      "  nettype logic [3:0] nt;\n"
+      "endclass\n"
+      "module m;\n"
+      "  initial begin\n"
+      "    C::nt v;\n"
+      "    int i;\n"
+      "    i = int'(C::nt'(i));\n"
+      "  end\n"
+      "  function C::nt f(C::nt a);\n"
+      "    return a;\n"
+      "  endfunction\n"
+      "endmodule\n"
+      "class D;\n"
+      "  C::nt p;\n"
+      "endclass\n",
+      f, "m");
+  const std::pair<uint32_t, std::string_view> kUses[] = {
+      {6, "variable 'v'"},
+      {8, "a cast"},
+      {10, "the return of function 'f'"},
+      {10, "argument 'a' of 'f'"},
+      {15, "property 'p'"}};
+  for (const auto& [line, use] : kUses) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        std::format("nettype 'C::nt' may declare only a net, and is named "
+                    "here as the type of {}",
+                    use),
+        line, "6.6.7"));
+  }
+}
+
+// A.2.1.3 writes a net of a nettype with the nettype's bare name, so an item
+// whose type names a class's nettype through the class's scope declares a
+// variable among a package's, the unit's or a module's items, written with
+// `var` or not, and a package's such variable is no net with an implicit
+// continuous assignment.
+TEST(NettypeElaboration, ItemNamingAClassNettypeThroughItsScopeIsAVariable) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C;\n"
+      "  nettype logic [3:0] nt;\n"
+      "endclass\n"
+      "package P;\n"
+      "  C::nt pw = 0;\n"
+      "endpackage\n"
+      "C::nt uw;\n"
+      "module m;\n"
+      "  C::nt w;\n"
+      "  var C::nt vw;\n"
+      "endmodule\n",
+      f, "m");
+  const std::pair<uint32_t, std::string_view> kVariables[] = {
+      {5, "pw"}, {7, "uw"}, {9, "w"}, {10, "vw"}};
+  for (const auto& [line, name] : kVariables) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        std::format("nettype 'C::nt' may declare only a net, and is named "
+                    "here as the type of variable '{}'",
+                    name),
+        line, "6.6.7"));
+  }
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "net declaration with implicit continuous "
+                             "assignment is not allowed in a package",
+                             5, "26.2"));
 }
 
 }  // namespace

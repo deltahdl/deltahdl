@@ -173,7 +173,7 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl,
   CheckUntypedDefaultPatternValues(decl, diag_);
   CheckContinuousPropertyWrites(decl, class_var_types_, unit_, diag_);
   CheckInstanceLocalTypeAssignments(decl, unit_, diag_);
-  CheckNettypeUses(decl, nettype_names_, diag_);
+  CheckNettypeUses(decl, *unit_, nettype_names_, diag_);
   CheckNewPlacement(decl, diag_);
   const TypeShapeTables kShapeTables{typedefs_, td_array_dims_, class_names_};
   const AggregateShapeCtx kShapeCtx{kShapeTables, &scope, diag_};

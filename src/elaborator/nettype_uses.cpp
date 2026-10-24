@@ -22,11 +22,13 @@ namespace delta {
 
 namespace {
 
-// The nettypes a scope names bare, and those it names through a package or
-// `$unit`, under their NamedTypeKey keys.
+// The nettypes a scope names bare, those it names through a package or
+// `$unit`, and those it names through the scope of the class declaring them,
+// each of the last two under its NamedTypeKey key.
 struct NettypeScan {
   const std::unordered_set<std::string_view>& nettypes;
   const std::unordered_set<std::string_view>& scoped;
+  const std::unordered_set<std::string>& class_scoped;
   DiagEngine& diag;
 };
 
@@ -41,16 +43,23 @@ void ReportNettypeNotNet(std::string_view nettype, std::string_view use,
              Subclause("6.6.7"));
 }
 
+// Whether `key`, a name written behind a scope, names a nettype that scope
+// declares: a package's or the unit's under its "P::nt" key, or a class's
+// under its "C::nt" key.
+static bool IsScopedNettypeKey(const std::string& key,
+                               const NettypeScan& scan) {
+  return scan.scoped.count(key) != 0 || scan.class_scoped.count(key) != 0;
+}
+
 // A name written behind a scope is that scope's type, and no nettype of this
-// module or compilation unit, whatever its spelling: a package's or the unit's
-// nettype under its "P::nt" key. A class's nettype is judged by its bare name
-// within the class (CheckClass) and is recorded under no key, so a name behind
-// a class's scope names none here.
+// module or compilation unit, whatever its spelling. A class's nettype is
+// judged by its bare name within the class (CheckClass) and by its "C::nt"
+// key elsewhere.
 static bool NamesNettype(DataTypeKind kind, std::string_view scope,
                          std::string_view name, const NettypeScan& scan) {
   if (kind != DataTypeKind::kNamed) return false;
   if (scope.empty()) return scan.nettypes.count(name) != 0;
-  return scan.scoped.count(NamedTypeKey(scope, name)) != 0;
+  return IsScopedNettypeKey(NamedTypeKey(scope, name), scan);
 }
 
 static bool IsNettype(const DataType& dtype, const NettypeScan& scan) {
@@ -81,7 +90,7 @@ static std::string CastNettype(const Expr& cast, const NettypeScan& scan) {
       !type->is_scope_resolution || type->lhs->kind != ExprKind::kIdentifier)
     return {};
   std::string key = NamedTypeKey(type->lhs->text, type->rhs->text);
-  return scan.scoped.count(key) != 0 ? key : std::string();
+  return IsScopedNettypeKey(key, scan) ? key : std::string();
 }
 
 static void CheckExpr(const Expr* e, const NettypeScan& scan) {
@@ -116,7 +125,7 @@ static NettypeScan WithLocalNettypes(
     const NettypeScan& outer, std::unordered_set<std::string_view>& local) {
   if (local.empty()) return outer;
   local.insert(outer.nettypes.begin(), outer.nettypes.end());
-  return {local, outer.scoped, outer.diag};
+  return {local, outer.scoped, outer.class_scoped, outer.diag};
 }
 
 // A procedural block declares variables alone, so a nettype naming the type
@@ -177,6 +186,63 @@ static void ReportPackedDimAfterNettype(const DataType& dtype,
 
 static void CheckClass(const ClassDecl* cls, const NettypeScan& scan);
 
+// Whether the class member `m` is a nettype the class declares, which A.1.9
+// admits as a class_property and the parser carries as a typedef member over
+// its item.
+static bool DeclaresNettype(const ClassMember* m) {
+  return m->kind == ClassMemberKind::kTypedef &&
+         m->typedef_item->kind == ModuleItemKind::kNettypeDecl;
+}
+
+// Adds to `keys` each nettype `cls` and the classes nested in it declare,
+// under the key a declaration names it by through its class's scope. A.2.2.1
+// lets a data_type name a type through a class_scope, whose last class the
+// parser keeps as the type's scope_name, so `C::nt` and `P::C::nt` are both
+// "C::nt".
+static void AddClassScopedNettypes(const ClassDecl* cls,
+                                   std::unordered_set<std::string>& keys) {
+  for (const ClassMember* m : cls->members) {
+    if (DeclaresNettype(m)) keys.insert(NamedTypeKey(cls->name, m->name));
+    if (m->nested_class != nullptr)
+      AddClassScopedNettypes(m->nested_class, keys);
+  }
+}
+
+// The same for each class among `items`, a module's or a package's.
+static void AddItemClassScopedNettypes(const std::vector<ModuleItem*>& items,
+                                       std::unordered_set<std::string>& keys) {
+  for (const ModuleItem* item : items) {
+    if (item->class_decl != nullptr)
+      AddClassScopedNettypes(item->class_decl, keys);
+  }
+}
+
+// The same for the classes of the compilation unit and of each package, which
+// a declaration anywhere may name through their scopes.
+static std::unordered_set<std::string> UnitClassScopedNettypes(
+    const CompilationUnit& unit) {
+  std::unordered_set<std::string> keys;
+  for (const ClassDecl* cls : unit.classes) AddClassScopedNettypes(cls, keys);
+  for (const PackageDecl* pkg : unit.packages)
+    AddItemClassScopedNettypes(pkg->items, keys);
+  return keys;
+}
+
+// A.2.1.3 writes a net of a user-defined nettype with the nettype's bare name,
+// so an item, among a module's, a package's or the unit's, whose type names a
+// nettype through the scope of the class declaring it declares a variable
+// whether or not it is written as a data declaration.
+static bool NamesClassNettype(const DataType& dtype, const NettypeScan& scan) {
+  return scan.class_scoped.count(NamedTypeKey(dtype)) != 0;
+}
+
+static void ReportNettypeVariableItem(const ModuleItem* item,
+                                      const NettypeScan& scan) {
+  ReportNettypeNotNet(NamedTypeKey(item->data_type),
+                      std::format("variable '{}'", item->name), item->loc,
+                      scan.diag);
+}
+
 static void CheckItem(const ModuleItem* item, const NettypeScan& scan) {
   if (item->class_decl != nullptr) CheckClass(item->class_decl, scan);
   ReportPackedDimAfterNettype(item->data_type, "A.2.1.3", scan);
@@ -202,9 +268,7 @@ static void CheckItem(const ModuleItem* item, const NettypeScan& scan) {
 static void CheckClass(const ClassDecl* cls, const NettypeScan& outer) {
   std::unordered_set<std::string_view> local;
   for (const ClassMember* m : cls->members) {
-    if (m->kind == ClassMemberKind::kTypedef &&
-        m->typedef_item->kind == ModuleItemKind::kNettypeDecl)
-      local.insert(m->name);
+    if (DeclaresNettype(m)) local.insert(m->name);
   }
   NettypeScan scan = WithLocalNettypes(outer, local);
   for (const ClassMember* m : cls->members) {
@@ -220,14 +284,23 @@ static void CheckClass(const ClassDecl* cls, const NettypeScan& outer) {
   }
 }
 
-void CheckNettypeUses(const ModuleDecl* decl,
+void CheckNettypeUses(const ModuleDecl* decl, const CompilationUnit& unit,
                       const std::unordered_set<std::string_view>& nettypes,
                       DiagEngine& diag) {
-  const NettypeScan kScan{nettypes, nettypes, diag};
+  std::unordered_set<std::string> class_keys = UnitClassScopedNettypes(unit);
+  AddItemClassScopedNettypes(decl->items, class_keys);
+  const NettypeScan kScan{nettypes, nettypes, class_keys, diag};
   for (const PortDecl& port : decl->ports) {
     ReportPackedDimAfterNettype(port.data_type, "A.2.2.1", kScan);
   }
-  for (const ModuleItem* item : decl->items) CheckItem(item, kScan);
+  // Elaborator::ElaborateUserNettypeNet judges an item naming a nettype it
+  // records; a class's nettype, which it records under no key, is judged here.
+  for (const ModuleItem* item : decl->items) {
+    if (item->kind == ModuleItemKind::kVarDecl &&
+        NamesClassNettype(item->data_type, kScan))
+      ReportNettypeVariableItem(item, kScan);
+    CheckItem(item, kScan);
+  }
   for (size_t i = 0; i < decl->param_types.size(); ++i) {
     if (IsNettype(decl->param_types[i], kScan)) {
       ReportNettypeNotNet(NamedTypeKey(decl->param_types[i]),
@@ -257,10 +330,10 @@ static void CheckScopeItems(const std::vector<ModuleItem*>& items,
                             const NettypeScan& scan) {
   for (const ModuleItem* item : items) {
     if (item->kind == ModuleItemKind::kVarDecl &&
-        WrittenAsDataDeclaration(item) && IsNettype(item->data_type, scan)) {
-      ReportNettypeNotNet(NamedTypeKey(item->data_type),
-                          std::format("variable '{}'", item->name), item->loc,
-                          scan.diag);
+        IsNettype(item->data_type, scan) &&
+        (WrittenAsDataDeclaration(item) ||
+         NamesClassNettype(item->data_type, scan))) {
+      ReportNettypeVariableItem(item, scan);
     }
     CheckItem(item, scan);
   }
@@ -276,7 +349,8 @@ static void ReportPackageNettypeNetInits(const std::vector<ModuleItem*>& items,
   for (const ModuleItem* item : items) {
     if (item->kind == ModuleItemKind::kVarDecl &&
         !WrittenAsDataDeclaration(item) && item->init_expr != nullptr &&
-        IsNettype(item->data_type, scan)) {
+        IsNettype(item->data_type, scan) &&
+        !NamesClassNettype(item->data_type, scan)) {
       scan.diag.Error(item->loc,
                       "net declaration with implicit continuous assignment is "
                       "not allowed in a package",
@@ -290,13 +364,15 @@ void CheckUnitNettypeUses(const CompilationUnit* unit,
                           DiagEngine& diag) {
   const std::unordered_set<std::string_view> kUnitNettypes =
       DeclaredNettypes(unit->cu_items);
-  const NettypeScan kUnitScan{kUnitNettypes, scoped, diag};
+  const std::unordered_set<std::string> kClassKeys =
+      UnitClassScopedNettypes(*unit);
+  const NettypeScan kUnitScan{kUnitNettypes, scoped, kClassKeys, diag};
   CheckScopeItems(unit->cu_items, kUnitScan);
   for (const ClassDecl* cls : unit->classes) CheckClass(cls, kUnitScan);
   for (const PackageDecl* pkg : unit->packages) {
     const std::unordered_set<std::string_view> kPackageNettypes =
         DeclaredNettypes(pkg->items);
-    const NettypeScan kPackageScan{kPackageNettypes, scoped, diag};
+    const NettypeScan kPackageScan{kPackageNettypes, scoped, kClassKeys, diag};
     CheckScopeItems(pkg->items, kPackageScan);
     ReportPackageNettypeNetInits(pkg->items, kPackageScan);
   }
