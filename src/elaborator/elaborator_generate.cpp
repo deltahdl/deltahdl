@@ -325,15 +325,23 @@ void Elaborator::ElaborateGenerateBlockItem(ModuleItem* item,
 // still judges the block's own definition, and the enclosing scope's forward
 // kind, back in place below the block, judges the enclosing scope's own
 // definition alone. A block declaring no typedef costs nothing here.
+//
+// §3.13 (f) puts the block's typedefs and classes in the block's name space,
+// so the enclosing scope's unpacked dimensions for each name take the same
+// trip, and the block's own are erased on the way back. A typedef of the block
+// written with none left the module's in the table for the block's variable.
 struct EnclosingTypedefs {
-  // Every name a typedef item of the block declares, forward or definition,
-  // which is what the block's walk may have written into the forward kinds.
+  // Every name a typedef or class item of the block declares, forward or
+  // definition, which is what the block's walk may have written into the
+  // forward kinds and the dimension table.
   std::vector<std::string_view> block_names;
   std::vector<std::pair<std::string_view, DataType>> typedefs;
   std::vector<std::pair<std::string_view, DataTypeKind>> forward_kinds;
+  std::vector<std::pair<std::string_view, std::vector<Expr*>>> td_array_dims;
 };
 
 using ForwardTypedefKinds = std::unordered_map<std::string_view, DataTypeKind>;
+using TypedefDims = std::unordered_map<std::string_view, std::vector<Expr*>>;
 
 template <typename Map>
 static void TakeEnclosingEntry(
@@ -348,26 +356,36 @@ static void TakeEnclosingEntry(
 
 static EnclosingTypedefs TakeEnclosingTypedefs(
     const std::vector<ModuleItem*>& items, TypedefMap& typedefs,
-    ForwardTypedefKinds& forward_kinds) {
+    ForwardTypedefKinds& forward_kinds, TypedefDims& td_dims) {
   EnclosingTypedefs taken;
   for (const auto* item : items) {
-    if (item->kind != ModuleItemKind::kTypedef) continue;
+    if (item->kind != ModuleItemKind::kTypedef &&
+        item->kind != ModuleItemKind::kClassDecl)
+      continue;
     taken.block_names.push_back(item->name);
     TakeEnclosingEntry(item->name, typedefs, taken.typedefs);
     TakeEnclosingEntry(item->name, forward_kinds, taken.forward_kinds);
+    TakeEnclosingEntry(item->name, td_dims, taken.td_array_dims);
   }
   return taken;
 }
 
 static void RestoreEnclosingTypedefs(const EnclosingTypedefs& taken,
                                      TypedefMap& typedefs,
-                                     ForwardTypedefKinds& forward_kinds) {
+                                     ForwardTypedefKinds& forward_kinds,
+                                     TypedefDims& td_dims) {
   for (const auto& [name, dtype] : taken.typedefs) {
     typedefs.insert_or_assign(name, dtype);
   }
-  for (auto name : taken.block_names) forward_kinds.erase(name);
+  for (auto name : taken.block_names) {
+    forward_kinds.erase(name);
+    td_dims.erase(name);
+  }
   for (const auto& [name, kind] : taken.forward_kinds) {
     forward_kinds.insert_or_assign(name, kind);
+  }
+  for (const auto& [name, dims] : taken.td_array_dims) {
+    td_dims.insert_or_assign(name, dims);
   }
 }
 
@@ -456,12 +474,12 @@ void Elaborator::ElaborateGenerateItems(const std::vector<ModuleItem*>& items,
   // step to gen_prefix_scopes_ as the walk reaches it. The steps are the
   // block's and end with its items, so the list is put back as it was found.
   GenBlockPrefixes entry_prefix_scopes = gen_prefix_scopes_;
-  // §27.5 with §23.9 and §6.18: the enclosing scope's typedefs and forward
-  // typedef kinds for the names these items declare as typedefs, out for the
-  // walk and back after it, the block's own forward kinds erased; see
-  // TakeEnclosingTypedefs.
-  EnclosingTypedefs enclosing_typedefs =
-      TakeEnclosingTypedefs(items, typedefs_, forward_typedef_kinds_);
+  // §27.5 with §23.9, §6.18 and §3.13 (f): the enclosing scope's typedefs,
+  // forward typedef kinds and typedef dimensions for the names these items
+  // declare as typedefs or classes, out for the walk and back after it, the
+  // block's own forward kinds and dimensions erased; see TakeEnclosingTypedefs.
+  EnclosingTypedefs enclosing_typedefs = TakeEnclosingTypedefs(
+      items, typedefs_, forward_typedef_kinds_, td_array_dims_);
   // §27.2 with §13.4.3 and §23.9: the constant-function table for these
   // items, installed only when they declare a function; see
   // CollectGenerateBlockFunctions.
@@ -529,7 +547,7 @@ void Elaborator::ElaborateGenerateItems(const std::vector<ModuleItem*>& items,
   // the same type again.
   ResolveModuleSubroutineFormalTypes(items, typedefs_, arena_);
   RestoreEnclosingTypedefs(enclosing_typedefs, typedefs_,
-                           forward_typedef_kinds_);
+                           forward_typedef_kinds_, td_array_dims_);
   gen_prefix_scopes_ = std::move(entry_prefix_scopes);
   mod->default_disable_iff = enclosing_default_disable_iff;
   gen_const_scope_ = saved_gen_const_scope;

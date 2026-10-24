@@ -2,7 +2,8 @@
 // dimensions. A typedef an interface declares is a name of the interface
 // alone, so a module elaborated after it that declares a typedef of the same
 // name with no unpacked dimensions takes none of the interface's, for any
-// declaration written with that name.
+// declaration written with that name. §3.13 (f)'s block name space does the
+// same for a generate block's typedef or class within the module.
 
 #include <gtest/gtest.h>
 
@@ -41,6 +42,16 @@ const char* const kSrc =
     "  m u (i);\n"
     "endmodule\n";
 
+// The variable of `m` whose hierarchical name ends with `suffix`, the name a
+// generate block's variable is recorded by.
+const RtlirVariable* FindVarEndingWith(const RtlirModule* m,
+                                       std::string_view suffix) {
+  for (const RtlirVariable& var : m->variables) {
+    if (var.name.ends_with(suffix)) return &var;
+  }
+  return nullptr;
+}
+
 TEST(ModuleNameSpaceTypedefDims, VariableTakesNoneOfAnInterfacesDimensions) {
   ElabFixture f;
   RtlirDesign* design = ElaborateSrc(kSrc, f, "top");
@@ -58,10 +69,7 @@ TEST(ModuleNameSpaceTypedefDims, GenerateBlockVariableTakesNoneOfThem) {
   ASSERT_NE(design, nullptr);
   const RtlirModule* m = FindModule(design, "m");
   ASSERT_NE(m, nullptr);
-  const RtlirVariable* gv = nullptr;
-  for (const RtlirVariable& var : m->variables) {
-    if (var.name.ends_with("gv")) gv = &var;
-  }
+  const RtlirVariable* gv = FindVarEndingWith(m, "gv");
   ASSERT_NE(gv, nullptr);
   EXPECT_EQ(gv->unpacked_size, 0u);
 }
@@ -78,6 +86,72 @@ TEST(ModuleNameSpaceTypedefDims, SubroutineDeclarationsTakeNoneOfThem) {
   EXPECT_TRUE(fn->func_args[0].unpacked_dims.empty());
   EXPECT_TRUE(fn->return_array_dims.empty());
   EXPECT_TRUE(fn->func_body_stmts[0]->var_unpacked_dims.empty());
+}
+
+// The module's array typedef `t`, hidden within the nested block `h` by a
+// structure typedef and within the nested block `k` by a class, each written
+// with no unpacked dimensions, and in force again for `g`'s variable after
+// both blocks and for the module's own variable.
+const char* const kBlockSrc =
+    "module m;\n"
+    "  typedef int t [2];\n"
+    "  if (1) begin : g\n"
+    "    if (1) begin : h\n"
+    "      typedef struct { int a; int b; } t;\n"
+    "      t hv;\n"
+    "    end\n"
+    "    if (1) begin : k\n"
+    "      class t;\n"
+    "        int v;\n"
+    "      endclass\n"
+    "      t kv;\n"
+    "    end\n"
+    "    t gv;\n"
+    "  end\n"
+    "  t mv;\n"
+    "endmodule\n";
+
+// §3.13 (f) with §27.5: a generate block's typedef stands over the module's
+// for the block's items. The block's typedef left the module's two dimensions
+// in the dimension table, and the block's variable took them.
+TEST(BlockNameSpaceTypedefDims, BlockTypedefHidesTheModulesDimensions) {
+  ElabFixture f;
+  RtlirDesign* design = ElaborateSrc(kBlockSrc, f, "m");
+  ASSERT_NE(design, nullptr);
+  const RtlirModule* m = FindModule(design, "m");
+  ASSERT_NE(m, nullptr);
+  const RtlirVariable* hv = FindVarEndingWith(m, "hv");
+  ASSERT_NE(hv, nullptr);
+  EXPECT_EQ(hv->unpacked_size, 0u);
+}
+
+// §3.13 (f) with §3.12.1: a generate block's class hides the module's typedef
+// of its name, so the block's variable written with it is a handle.
+TEST(BlockNameSpaceTypedefDims, BlockClassHidesTheModulesArrayTypedef) {
+  ElabFixture f;
+  RtlirDesign* design = ElaborateSrc(kBlockSrc, f, "m");
+  ASSERT_NE(design, nullptr);
+  const RtlirModule* m = FindModule(design, "m");
+  ASSERT_NE(m, nullptr);
+  const RtlirVariable* kv = FindVarEndingWith(m, "kv");
+  ASSERT_NE(kv, nullptr);
+  EXPECT_EQ(kv->unpacked_size, 0u);
+}
+
+// The hiding ends with the block: the enclosing block's variable written after
+// the nested blocks, and the module's, keep the module's two elements.
+TEST(BlockNameSpaceTypedefDims, EnclosingScopesKeepTheirDimensionsAfterIt) {
+  ElabFixture f;
+  RtlirDesign* design = ElaborateSrc(kBlockSrc, f, "m");
+  ASSERT_NE(design, nullptr);
+  const RtlirModule* m = FindModule(design, "m");
+  ASSERT_NE(m, nullptr);
+  const RtlirVariable* gv = FindVarEndingWith(m, "gv");
+  ASSERT_NE(gv, nullptr);
+  EXPECT_EQ(gv->unpacked_size, 2u);
+  const RtlirVariable* mv = FindVar(design, "m", "mv");
+  ASSERT_NE(mv, nullptr);
+  EXPECT_EQ(mv->unpacked_size, 2u);
 }
 
 }  // namespace

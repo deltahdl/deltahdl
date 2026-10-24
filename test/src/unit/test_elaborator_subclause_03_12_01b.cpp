@@ -393,4 +393,67 @@ TEST(CompilationUnitScopeTypes, UnitScopedArrayTypedefKeepsTheUnitsDimensions) {
   EXPECT_EQ(LiteralElementCount(g->func_body_stmts[0]->var_unpacked_dims), 2u);
 }
 
+// §3.12.1 (printed page 57) with §3.13 (e) and §7.4.4: the module's own
+// structure typedef t hides the unit's array typedef t, so a variable, a
+// function's formal, its return type and its body's variable written t are
+// each one structure. The module's typedef, written with no unpacked
+// dimensions, left the unit's two in the dimension table, and each took them.
+TEST(CompilationUnitScopeTypes, ModuleTypedefHidesTheUnitsArrayDimensions) {
+  ElabFixture f;
+  RtlirDesign* design = ElaborateSrc(
+      "typedef int t [2];\n"
+      "module m;\n"
+      "  typedef struct { int a; int b; } t;\n"
+      "  t v;\n"
+      "  function automatic t f(t a);\n"
+      "    t q;\n"
+      "    q = a;\n"
+      "    return q;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  const RtlirVariable* v = FindVar(design, "m", "v");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->unpacked_size, 0u);
+  ASSERT_EQ(design->top_modules[0]->function_decls.size(), 1u);
+  const ModuleItem* fn = design->top_modules[0]->function_decls[0];
+  ASSERT_FALSE(fn->func_body_stmts.empty());
+  EXPECT_TRUE(fn->func_args[0].unpacked_dims.empty());
+  EXPECT_TRUE(fn->return_array_dims.empty());
+  EXPECT_TRUE(fn->func_body_stmts[0]->var_unpacked_dims.empty());
+}
+
+// §3.12.1 with §3.13 (e): a class the module declares hides the unit's typedef
+// of its name, so a variable, a function's formal and its body's variable
+// written t are each a handle of the class. The unit's entries stayed in the
+// type tables, which never consult the class names, and each was declared an
+// array of two ints.
+TEST(CompilationUnitScopeTypes, ModuleClassHidesTheUnitsArrayTypedef) {
+  ElabFixture f;
+  RtlirDesign* design = ElaborateSrc(
+      "typedef int t [2];\n"
+      "module m;\n"
+      "  class t;\n"
+      "    int v;\n"
+      "  endclass\n"
+      "  t h;\n"
+      "  function automatic int g(t a);\n"
+      "    t q;\n"
+      "    q = a;\n"
+      "    return q.v;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  const RtlirVariable* h = FindVar(design, "m", "h");
+  ASSERT_NE(h, nullptr);
+  EXPECT_EQ(h->unpacked_size, 0u);
+  ASSERT_EQ(design->top_modules[0]->function_decls.size(), 1u);
+  const ModuleItem* g = design->top_modules[0]->function_decls[0];
+  ASSERT_FALSE(g->func_body_stmts.empty());
+  EXPECT_TRUE(g->func_args[0].unpacked_dims.empty());
+  EXPECT_TRUE(g->func_body_stmts[0]->var_unpacked_dims.empty());
+}
+
 }  // namespace

@@ -543,6 +543,13 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
         fixed_unpacked_typedef_widths_[item->name] = *width;
       }
     }
+  } else {
+    // §3.12.1 (printed page 57) with §3.13 (e): a typedef written with no
+    // unpacked dimensions hides the compilation unit's typedef of its name, so
+    // that typedef's dimensions are none of the name's here. Left in the table,
+    // the unit's `typedef int t [2]` gave a declaration written with the
+    // module's structure typedef `t` its two elements.
+    td_array_dims_.erase(item->name);
   }
   ValidateTypedefShape(item->typedef_type, item->loc, &scope);
   CheckRealAssocIndexTypes(item->unpacked_dims, item->loc, typedefs_, diag_);

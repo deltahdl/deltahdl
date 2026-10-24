@@ -540,6 +540,15 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
 // scope the class stands in.
 void Elaborator::ElaborateModuleClassDecl(ModuleItem* item, RtlirModule* mod) {
   RecordClassDecl(item, mod, class_names_, parameterized_class_names_);
+  // §3.12.1 (printed page 57) with §3.13 (e): the class hides the compilation
+  // unit's typedef of its name, and a declaration's name is looked up in the
+  // type tables before the class names, so that typedef's entries go. Left in
+  // place, `t h;` under the module's `class t` and the unit's
+  // `typedef int t [2]` declared an array of two ints. A generate block's
+  // class has the enclosing scope's entries back after the block
+  // (TakeEnclosingTypedefs in elaborator_generate.cpp).
+  typedefs_.erase(item->name);
+  td_array_dims_.erase(item->name);
   if (item->class_decl == nullptr) return;
   // §37.32 detail 3 with §27.4: a generate block instance's class finds the
   // names its extends clause writes among its block's typedefs.
