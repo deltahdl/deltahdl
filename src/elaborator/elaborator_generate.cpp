@@ -16,6 +16,7 @@
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/gen_block_members.h"
+#include "elaborator/pending_generate.h"
 #include "elaborator/property_rewrite.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"

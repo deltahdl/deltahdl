@@ -12,6 +12,7 @@
 
 #include "common/arena.h"
 #include "elaborator/elaborator_data.h"
+#include "elaborator/pending_generate.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast_design.h"
 #include "parser/ast_module.h"

@@ -19,6 +19,7 @@
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_classes.h"
 #include "elaborator/elaborator_validate_operations.h"
+#include "elaborator/pending_generate.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
 #include "elaborator/type_eval.h"
@@ -507,7 +508,6 @@ class Elaborator : public ElaboratorClassRules {
                                          DefparamTopRooted& rooted);
 
   void WarnUnresolvedDefparams(RtlirModule* mod);
-
   void ReportUnresolvedDefparams(RtlirModule* mod, const ModuleDecl* decl);
 
   void ReportUnresolvedDefparamSite(RtlirModule* mod, const DefparamSite& site,

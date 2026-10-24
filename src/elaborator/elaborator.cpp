@@ -21,6 +21,7 @@
 #include "elaborator/elaborator_type_facts.h"
 #include "elaborator/elaborator_validate_classes.h"
 #include "elaborator/package_assertion_scope.h"
+#include "elaborator/pending_generate.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/sdf_annotate_calls.h"
 #include "elaborator/time_literal_scale.h"
