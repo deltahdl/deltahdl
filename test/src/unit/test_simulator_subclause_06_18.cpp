@@ -2,8 +2,15 @@
 
 #include <string>
 
+#include "common/arena.h"
+#include "elaborator/rtlir.h"
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
+#include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
+#include "simulator/block_enums.h"
+#include "simulator/sim_context.h"
 
 using namespace delta;
 
@@ -404,6 +411,38 @@ TEST(TypedefSim, ArrayOfABlockTypedefHasElementsOfItsType) {
                  "endmodule\n",
                  f),
       "8 255 15\n");
+}
+
+// The walk RegisterBlockEnumTypes makes over a subroutine body steps over a
+// null statement and goes on to the items after it, so a typedef following
+// one still reshapes the declaration by its name to the type it stands for,
+// here int. Parser::ParseSubroutineBody keeps whatever Parser::ParseStmt
+// answers, null included, and no source text the unit tests parse has it
+// answer null, so the body is built here. The module is walked with no
+// design, which leaves the compilation unit's constants and classes out.
+TEST(TypedefSim, BlockTypeNameWalkStepsOverANullStatement) {
+  SimFixture f;
+  auto* td = f.arena.Create<ModuleItem>();
+  td->kind = ModuleItemKind::kTypedef;
+  td->name = "T";
+  td->typedef_type.kind = DataTypeKind::kInt;
+  auto* td_stmt = f.arena.Create<Stmt>();
+  td_stmt->kind = StmtKind::kBlockItemDecl;
+  td_stmt->decl_item = td;
+  auto* decl = f.arena.Create<Stmt>();
+  decl->kind = StmtKind::kVarDecl;
+  decl->var_decl_type.kind = DataTypeKind::kNamed;
+  decl->var_decl_type.type_name = "T";
+  decl->var_name = "x";
+  auto* func = f.arena.Create<ModuleItem>();
+  func->kind = ModuleItemKind::kFunctionDecl;
+  func->func_body_stmts = {nullptr, td_stmt, decl};
+  RtlirModule mod;
+  mod.function_decls.push_back(func);
+  RegisterBlockEnumTypes(&mod, nullptr, f.ctx, f.arena);
+  auto& shaped_decls = f.ctx.ClassTypedefShapedDecls();
+  ASSERT_TRUE(shaped_decls.contains(decl));
+  EXPECT_EQ(shaped_decls.at(decl)->var_decl_type.kind, DataTypeKind::kInt);
 }
 
 }  // namespace
