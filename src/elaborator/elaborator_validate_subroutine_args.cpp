@@ -5,6 +5,8 @@
 #include <unordered_set>
 
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
+#include "common/system_functions.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_validate_internal.h"
@@ -455,6 +457,30 @@ static void CheckParenOmittedCall(
   }
 }
 
+// §13.4.1: what a statement calling a nonvoid function may do about the
+// result it discards.
+constexpr std::string_view kCastToVoid = "cast to void to silence this warning";
+
+bool ReturnsAValue(const ModuleItem* subroutine) {
+  // §35.5 makes an imported function's usage that of a native one, so §13.4.1's
+  // warning about a discarded result covers a call to one. An imported task is
+  // excluded by its keyword: §35.5.4 writes no result type for one, so its
+  // result type would otherwise read as a non-void type here.
+  return (subroutine->kind == ModuleItemKind::kFunctionDecl ||
+          (subroutine->kind == ModuleItemKind::kDpiImport &&
+           !subroutine->dpi_is_task)) &&
+         subroutine->return_type.kind != DataTypeKind::kVoid;
+}
+
+void WarnDiscardedReturn(SourceLoc loc, std::string_view callee,
+                         std::string_view remedy, DiagEngine& diag) {
+  diag.Warning(loc,
+               std::format("return value of nonvoid function '{}' is "
+                           "discarded; {}",
+                           callee, remedy),
+               Subclause("13.4.1"));
+}
+
 // §13.4.1: an expression-statement call discards its result; warn if it is a
 // nonvoid function (a void'(...) cast wraps the call in a kCast and so does not
 // reach this check). Also checks the argument expressions for void operands.
@@ -465,22 +491,21 @@ static void CheckDiscardedCallStmt(
   for (auto* a : s->expr->args) CheckVoidCallInExpr(a, func_decls, diag);
 
   auto fit = func_decls.find(s->expr->callee);
-  if (fit == func_decls.end()) return;
-  const auto* func = fit->second;
-  // §35.5 makes an imported function's usage that of a native one, so §13.4.1's
-  // warning about a discarded result covers a call to one. An imported task is
-  // excluded by its keyword: §35.5.4 writes no result type for one, so its
-  // result type would otherwise read as a non-void type here.
-  if ((func->kind == ModuleItemKind::kFunctionDecl ||
-       (func->kind == ModuleItemKind::kDpiImport && !func->dpi_is_task)) &&
-      func->return_type.kind != DataTypeKind::kVoid) {
-    diag.Warning(
-        s->expr->range.start,
-        std::format("return value of nonvoid function '{}' is discarded; "
-                    "cast to void to silence this warning",
-                    s->expr->callee),
-        Subclause("13.4.1"));
+  if (fit == func_decls.end() || !ReturnsAValue(fit->second)) return;
+  WarnDiscardedReturn(s->expr->range.start, s->expr->callee, kCastToVoid, diag);
+}
+
+// §13.4.1: a statement calling one of the standard's system functions
+// discards its result as one calling a nonvoid function does. A statement
+// calling $cast, $system or $stacktrace calls the task, which
+// IsStandardSystemFunction leaves out.
+static void CheckDiscardedSystemCallStmt(const Stmt* s, DiagEngine& diag) {
+  if (s->expr == nullptr || s->kind != StmtKind::kExprStmt ||
+      s->expr->kind != ExprKind::kSystemCall ||
+      !IsStandardSystemFunction(s->expr->callee)) {
+    return;
   }
+  WarnDiscardedReturn(s->expr->range.start, s->expr->callee, kCastToVoid, diag);
 }
 
 // §9.4.2: an event expression cannot call functions with out/inout/ref
@@ -543,6 +568,7 @@ static void WalkStmtForCallArgs(
     CheckDiscardedCallStmt(s, func_decls, diag);
   } else {
     CheckVoidCallInExpr(s->expr, func_decls, diag);
+    CheckDiscardedSystemCallStmt(s, diag);
   }
   CheckVoidCallInExpr(s->rhs, func_decls, diag);
   CheckVoidCallInExpr(s->condition, func_decls, diag);

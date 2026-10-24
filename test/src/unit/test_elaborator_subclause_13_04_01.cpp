@@ -428,4 +428,83 @@ TEST(FunctionReturnElaboration, ValueReturningProductionInAVoidFunctionOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §13.4.1 with §16.11: a subroutine call attached to a sequence runs at each
+// match, and the assertion receives nothing back from it, so a nonvoid
+// function called there is called as if it had no return value and draws the
+// warning a call written as a statement draws. A void function and a task
+// draw none.
+TEST(FunctionReturnElaboration, NonvoidFunctionAttachedToASequenceWarns) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit clk, a, b;\n"
+      "  int count;\n"
+      "  function int next(int v); return v + 1; endfunction\n"
+      "  function void note(int v); endfunction\n"
+      "  task tick(int v); endtask\n"
+      "  sequence s1; @(posedge clk) (a, next(count)) ##1 b; endsequence\n"
+      "  sequence s2; @(posedge clk) (a, note(count)) ##1 b; endsequence\n"
+      "  sequence s3; @(posedge clk) (a, tick(count)) ##1 b; endsequence\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_TRUE(ReportedWarning(
+      f.diag.Diagnostics(),
+      "return value of nonvoid function 'next' is discarded", 7, "13.4.1"));
+  EXPECT_EQ(f.diag.WarningCount(), 1u);
+}
+
+// §13.4.1 with §16.11: a system function is a nonvoid function, so one
+// attached to a sequence draws the same warning, whether written with its
+// arguments or with none; a system task draws none.
+TEST(FunctionReturnElaboration, SystemFunctionAttachedToASequenceWarns) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit clk, a, b;\n"
+      "  sequence s1; @(posedge clk) (a, $random) ##1 b; endsequence\n"
+      "  sequence s2;\n"
+      "    @(posedge clk) (a, $urandom_range(3)) ##1 b;\n"
+      "  endsequence\n"
+      "  sequence s3; @(posedge clk) (a, $display(\"m\")) ##1 b; endsequence\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "nonvoid function '$random' is discarded", 3,
+                              "13.4.1"));
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "nonvoid function '$urandom_range' is discarded",
+                              5, "13.4.1"));
+  EXPECT_EQ(f.diag.WarningCount(), 2u);
+}
+
+// §13.4.1: a system function written as a statement is called as if it had
+// no return value and draws the warning, with its arguments or without;
+// a cast to void, a system task and $cast, which §8.16 lets a statement call
+// as a task, draw none.
+TEST(FunctionReturnElaboration, SystemFunctionCallAsStatementWarns) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int fd;\n"
+      "  initial begin\n"
+      "    $random;\n"
+      "    $fopen(\"f\");\n"
+      "    void'($random);\n"
+      "    $display(\"x\");\n"
+      "    $cast(fd, 3);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "nonvoid function '$random' is discarded", 4,
+                              "13.4.1"));
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "nonvoid function '$fopen' is discarded", 5,
+                              "13.4.1"));
+  EXPECT_EQ(f.diag.WarningCount(), 2u);
+}
+
 }  // namespace

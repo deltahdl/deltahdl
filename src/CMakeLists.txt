@@ -20,6 +20,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     driver/protect_license_libraries.cpp
     common/diagnostic.cpp
     common/source_mgr.cpp
+    common/system_functions.cpp
     preprocessor/macro_table.cpp
     preprocessor/preprocessor_join.cpp
     preprocessor/protect_des.cpp

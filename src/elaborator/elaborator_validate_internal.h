@@ -704,6 +704,19 @@ std::string EnabledSubroutineName(const Stmt* s);
 void ReportNonEventOperands(const ModuleDecl* decl, const TypeMap& kinds,
                             DiagEngine& diag);
 
+// §13.4.1 with §35.5: whether the task, function or imported subroutine
+// declared by `subroutine` is a function whose return type is not void, which
+// a call made as if it had no return value discards. Defined in
+// elaborator_validate_subroutine_args.cpp.
+bool ReturnsAValue(const ModuleItem* subroutine);
+
+// §13.4.1: the warning owed where the nonvoid function `callee` is called at
+// `loc` as if it had no return value, `remedy` ending the message with what
+// the caller may do about it. Defined in
+// elaborator_validate_subroutine_args.cpp.
+void WarnDiscardedReturn(SourceLoc loc, std::string_view callee,
+                         std::string_view remedy, DiagEngine& diag);
+
 // §6.20.4 of the value parameters the generate construct `item` of `mod`
 // declares, `scope` binding the module's own parameters. Run once the
 // construct is elaborated, when the parameters its blocks declare are

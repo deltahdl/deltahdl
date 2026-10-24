@@ -6,6 +6,7 @@
 #include <utility>
 #include <vector>
 
+#include "common/system_functions.h"
 #include "elaborator/covergroup_variables.h"
 #include "elaborator/queue_dim.h"
 #include "elaborator/rtlir.h"
@@ -97,7 +98,7 @@ CallShape SystemCallShape(const Expr& call, const BodyWalk& walk) {
   const VpiRegisteredSystf kSystf = walk.calls.systf(call.callee);
   const bool kFunction =
       kSystf.type == vpiSysFunc ||
-      (kSystf.type == 0 && VpiIsBuiltInSystemFunction(call.callee));
+      (kSystf.type == 0 && IsStandardSystemFunction(call.callee));
   CallShape shape{kFunction ? vpiSysFuncCall : vpiSysTaskCall, call.callee};
   shape.user_defined = kSystf.type == vpiSysTask || kSystf.type == vpiSysFunc;
   shape.systf = kSystf.object;

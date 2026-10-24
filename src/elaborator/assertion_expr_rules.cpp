@@ -11,6 +11,7 @@
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
+#include "common/system_functions.h"
 #include "elaborator/assertion_body_slots.h"
 #include "elaborator/assertion_rules.h"
 #include "elaborator/assertion_walk.h"
@@ -411,13 +412,24 @@ void ReportAttachedArg(const Expr* call, const Expr* arg, std::string_view what,
                  Subclause("16.11"));
 }
 
+// §13.4.1 with §16.11: what becomes of the result of a nonvoid function
+// attached to a sequence, which A.8.2 gives no void cast to discard.
+constexpr std::string_view kAttachedResultUnread =
+    "a sequence receives nothing back from a call attached to it";
+
 // §16.11: an actual of a subroutine call attached to a sequence that holds
 // a local variable is passed by value; an automatic variable is passed by
 // value, as a constant input, from an assertion in procedural code alone;
-// and a variable passed by value is of a type §16.6 allows.
+// and a variable passed by value is of a type §16.6 allows. A nonvoid
+// function is called there as if it had no return value, which §13.4.1
+// warns of.
 void CheckAttachedCall(const Expr* call, const Site& site, const RuleEnv& env) {
   auto it = env.subroutines.find(call->callee);
   if (it == env.subroutines.end()) return;
+  if (ReturnsAValue(it->second)) {
+    WarnDiscardedReturn(call->range.start, call->callee, kAttachedResultUnread,
+                        env.diag);
+  }
   const std::vector<FunctionArg>& formals = it->second->func_args;
   size_t written = std::min(formals.size(), call->args.size());
   for (size_t i = 0; i < written; ++i) {
@@ -473,11 +485,15 @@ void CheckMatchItems(const std::vector<SeqMatchAssign>& items, const Site& site,
     CheckRoot(item.rhs, site, env);
     // §16.11: a subroutine attached to a sequence may have side effects, so
     // its arguments are checked as the assertion's expressions and the call
-    // by §16.11's own rules.
+    // by §16.11's own rules. The parser records the call as a kCall or, for
+    // a system task or function, a kSystemCall.
     if (item.call == nullptr) continue;
     for (const Expr* arg : item.call->args) CheckRoot(arg, site, env);
     if (item.call->kind == ExprKind::kCall) {
       CheckAttachedCall(item.call, site, env);
+    } else if (IsStandardSystemFunction(item.call->callee)) {
+      WarnDiscardedReturn(item.call->range.start, item.call->callee,
+                          kAttachedResultUnread, env.diag);
     }
   }
 }

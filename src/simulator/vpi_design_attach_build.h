@@ -540,10 +540,6 @@ enum class VpiBuiltInHolder : uint8_t {
   kEvent,
 };
 
-// Whether `name` is a system function the standard defines, which a statement
-// calling it calls as a function.
-bool VpiIsBuiltInSystemFunction(std::string_view name);
-
 // What the objects one statement reaches are built with: the build; the
 // expression object an expression the statement writes stands as, null for
 // one not modelled; and the object a statement it holds stands as, hung from
