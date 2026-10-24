@@ -164,8 +164,9 @@ TEST(RecursivePropertyRestrictions,
       "16.12.17"));
 }
 
-// §16.12.17 Restriction 1: s_always is likewise a strong prefix operator and
-// cannot be applied to an instance of the recursive rec.
+// §16.12.17 Restriction 1: s_always, written with the range A.2.10 gives it,
+// is likewise a strong prefix operator and cannot be applied to an instance
+// of the recursive rec.
 TEST(RecursivePropertyRestrictions, SAlwaysAppliedToRecursivePropertyRejected) {
   ElabFixture f;
   Elaborate(
@@ -174,7 +175,7 @@ TEST(RecursivePropertyRestrictions, SAlwaysAppliedToRecursivePropertyRejected) {
       "    p and (1'b1 |=> rec(p));\n"
       "  endproperty\n"
       "  property bad(p);\n"
-      "    s_always rec(p);\n"
+      "    s_always [1:2] rec(p);\n"
       "  endproperty\n"
       "endmodule\n",
       f);

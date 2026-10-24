@@ -79,6 +79,7 @@ void PortItemShape::End(DiagEngine& diag) {
         Subclause("A.2.10"));
   }
   open = false;
+  typed = false;
   named = false;
   in_tail = false;
   dim_depth = 0;
@@ -120,7 +121,8 @@ struct PropertyPortScan {
 
   // Handles the formal-name harvest branch (§16.12 formal_port_identifier).
   void HarvestFormalName(Lexer& lexer, ModuleItem* item) {
-    if (ParserPropertySpecHelpers::StartsNamedFormalType(*parser)) {
+    if (!shape.typed &&
+        ParserPropertySpecHelpers::StartsNamedFormalType(*parser)) {
       BeginDataTypedItem();
       carry_type = ParserPropertySpecHelpers::ParseNamedFormalType(*parser);
       carry_type_kw = TokenKind::kEof;
@@ -167,6 +169,7 @@ struct PropertyPortScan {
     carry_type = ParserPropertySpecHelpers::ParseFormalType(*parser);
     carry_type_kw =
         carry_type->packed_dim_left != nullptr ? TokenKind::kEof : kind;
+    shape.typed = true;
   }
 
   // §16.12.18: the `property` type keyword begins a run of one or more
@@ -181,6 +184,7 @@ struct PropertyPortScan {
     clock_default_allowed = false;
     carry_type_kw = lexer.Next().kind;
     carry_type = nullptr;
+    shape.typed = true;
   }
 
   // §16.12.18: the `sequence`, `event`, and `untyped` type keywords begin a
@@ -197,6 +201,7 @@ struct PropertyPortScan {
     saw_local = false;
     carry_type_kw = kw == TokenKind::kKwUntyped ? TokenKind::kEof : kw;
     carry_type = nullptr;
+    shape.typed = true;
     lexer.Next();
   }
 

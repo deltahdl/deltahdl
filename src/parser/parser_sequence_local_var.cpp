@@ -494,7 +494,8 @@ struct SequencePortScan {
   // leads it, where one does; §16.8.2: such a type satisfies the
   // explicit-type requirement.
   void HarvestFormalName(Lexer& lexer, ModuleItem* item) {
-    if (ParserPropertySpecHelpers::StartsNamedFormalType(*parser)) {
+    if (!shape.typed &&
+        ParserPropertySpecHelpers::StartsNamedFormalType(*parser)) {
       carry_type = ParserPropertySpecHelpers::ParseNamedFormalType(*parser);
       carry_type_kw = TokenKind::kEof;
       item_saw_explicit_type = true;
@@ -555,10 +556,12 @@ struct SequencePortScan {
           carry_type->packed_dim_left != nullptr ? TokenKind::kEof : kind;
       item_saw_explicit_type = true;
       clock_default_allowed = false;
+      shape.typed = true;
       return true;
     }
     if (item_saw_local || !IsDisallowedLocalVarTypeKw(kind)) return false;
     lexer.Next();
+    shape.typed = true;
     carry_type_kw = kind == TokenKind::kKwUntyped ? TokenKind::kEof : kind;
     carry_type = nullptr;
     clock_default_allowed =
@@ -613,6 +616,7 @@ struct SequencePortScan {
                  "the types allowed in §16.6",
                  Subclause("16.8.2"));
       item_saw_explicit_type = true;
+      shape.typed = true;
       lexer.Next();
     } else if (LexerCheck(lexer, TokenKind::kEq)) {
       HandleDefaultEq(lexer, item);

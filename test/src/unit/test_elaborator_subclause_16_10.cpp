@@ -264,7 +264,9 @@ TEST(LocalVariableFlow, AnAssignmentOnAnEmptyMatchingSequenceIsReported) {
 
 // §16.10 with §16.9.9: a throughout's condition holds at every tick of the
 // sequence it governs, so reads x before (b, x = 1) assigns it; y, assigned
-// before the throughout, may be read there.
+// before the throughout, may be read there. That throughout is parenthesized,
+// since Table 16-1 binds ## tighter, which would make the sequence before it
+// its condition.
 TEST(LocalVariableFlow,
      AThroughoutConditionReadingAnUnassignedLocalIsReported) {
   ElabFixture f;
@@ -277,7 +279,7 @@ TEST(LocalVariableFlow,
       "  endsequence\n"
       "  sequence t;\n"
       "    int y;\n"
-      "    @(posedge clk) (a, y = 1) ##1 (y > 0) throughout (a ##1 b);\n"
+      "    @(posedge clk) (a, y = 1) ##1 ((y > 0) throughout (a ##1 b));\n"
       "  endsequence\n"
       "endmodule\n",
       f);

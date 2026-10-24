@@ -347,12 +347,15 @@ Expr* ParserPropertySpecHelpers::ParseFormalDefault(Parser& p) {
 }
 
 // The `.formal(` opening an actual bound by name, where one is written,
-// the name recorded on `call`; `named` says one was, and the answer is
-// false where it is malformed.
+// the name recorded on `call`. `named` says on entry whether the actual
+// before was bound by name and on return whether this one is; the answer is
+// false where the actual is malformed, A.2.10's property_list_of_arguments
+// taking no positional actual after a named one.
 bool ParserPropertySpecHelpers::ParseNamedActualPrefix(Parser& p, Expr* call,
                                                        bool& named) {
+  const bool kAfterNamed = named;
   named = p.Match(TokenKind::kDot);
-  if (!named) return true;
+  if (!named) return !kAfterNamed;
   if (!p.Check(TokenKind::kIdentifier)) return false;
   call->arg_names.push_back(p.Consume().text);
   return p.Match(TokenKind::kLParen);
@@ -360,23 +363,21 @@ bool ParserPropertySpecHelpers::ParseNamedActualPrefix(Parser& p, Expr* call,
 
 // The `( actuals )` of a property instance into `call`, each actual bound
 // by position or, as `.formal(actual)`, by name; false where the list is
-// malformed, A.2.10's property_list_of_arguments taking no positional actual
-// after a named one among the malformed.
+// malformed, A.2.10's property_list_of_arguments taking no positional actual,
+// an empty one included, after a named one among the malformed.
 bool ParserPropertySpecHelpers::ParsePropertyActualList(Parser& p, Expr* call,
                                                         bool& plain) {
   if (!p.Match(TokenKind::kLParen)) return false;
-  bool any_named = false;
+  bool named = false;
   while (!p.Check(TokenKind::kRParen) && !p.AtEnd()) {
-    bool named = false;
     if (!ParseNamedActualPrefix(p, call, named)) return false;
-    if (any_named && !named) return false;
-    any_named = named;
     Expr* actual = ParsePropertyActualArg(p, plain);
     if (actual == nullptr || (named && !p.Match(TokenKind::kRParen))) {
       return false;
     }
     call->args.push_back(actual);
     if (!p.Match(TokenKind::kComma)) break;
+    if (named && p.Check(TokenKind::kRParen)) return false;
   }
   return p.Match(TokenKind::kRParen);
 }

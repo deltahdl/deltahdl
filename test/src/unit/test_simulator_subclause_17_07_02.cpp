@@ -646,8 +646,8 @@ TEST(CheckerVariableRandomization, ALocalVariableCarriesItsValue) {
       "  sequence s5; bit v; ((1, v = x) ##1 y == v) and (z ##2 1'b1);\n"
       "  endsequence\n"
       "  sequence s6; bit v; (y, v = x)[*2] ##1 x != v; endsequence\n"
-      "  sequence s7; bit v; (y, v = x)[->2] ##1 x != v; endsequence\n"
-      "  sequence s8; bit v; (y, v = x)[=1] ##1 x != v; endsequence\n"
+      "  sequence s7; bit v; (y[->2], v = x) ##1 x != v; endsequence\n"
+      "  sequence s8; bit v; (y[=1], v = x) ##1 x != v; endsequence\n"
 
       "  sequence s2; bit [1:0] v; (1, v = x) ##1 (1, v += x) ##1 "
       "(y == (v == 2'd1)); endsequence\n");

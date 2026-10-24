@@ -19,7 +19,7 @@ TEST(AssertionSemanticsParsing, PropertyIfElse) {
   auto r = Parse(
       "module m;\n"
       "  property p_cond;\n"
-      "    @(posedge clk) if (mode) a |-> b; else c |-> d;\n"
+      "    @(posedge clk) if (mode) a |-> b else c |-> d;\n"
       "  endproperty\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -48,8 +48,8 @@ TEST(AssertionSemanticsParsing, PropertyIfElseIfChain) {
   auto r = Parse(
       "module m;\n"
       "  property p_cond;\n"
-      "    @(posedge clk) if (s == 0) a |-> b;\n"
-      "    else if (s == 1) c |-> d;\n"
+      "    @(posedge clk) if (s == 0) a |-> b\n"
+      "    else if (s == 1) c |-> d\n"
       "    else e |-> f;\n"
       "  endproperty\n"
       "endmodule\n");

@@ -12,16 +12,22 @@ using namespace delta;
 
 namespace {
 
-// §16.12 forbids nested disable iff clauses.
+// §16.12 forbids nested disable iff clauses. A.2.10's property_spec takes
+// one, so the parser reports the second where it stands, and the elaborator
+// still counts both.
 TEST(PropertyDeclarationElaboration, ExplicitDisableIffNestingRejected) {
   ElabFixture f;
-  Elaborate(
+  ElaborateSrcAllowingParseErrors(
       "module m(input logic clk, r1, r2, a, b);\n"
       "  property bad;\n"
       "    @(posedge clk) disable iff (r1) disable iff (r2) a |-> b;\n"
       "  endproperty\n"
       "endmodule\n",
       f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "this declaration's body is not one the grammar "
+                            "admits",
+                            3, "A.2.10"));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "property \"bad\" nests disable iff clauses", 2,
                             "16.12"));

@@ -400,18 +400,21 @@ TEST(CompilerDirectiveParsing,
   // arranged so the table itself makes that comparison: the unbounded maximum
   // is the strong operator's well-formed operand and the weak one's bad
   // operand, the same source rejected on one row and accepted on the other.
+  // Each bad form writes a cycle delay before its operand, so that under the
+  // included lists, where the word is a name and its brackets a select of
+  // it, the body is still a sequence_expr.
   const Form kForms[] = {
-      {"nexttime", "nexttime [-1] a", "nexttime [1] a",
+      {"nexttime", "nexttime [-1] ##1 a", "nexttime [1] a",
        "nexttime index must be a non-negative integer constant expression",
        "16.12.10"},
-      {"s_nexttime", "s_nexttime [-1] a", "s_nexttime [1] a",
+      {"s_nexttime", "s_nexttime [-1] ##1 a", "s_nexttime [1] a",
        "nexttime index must be a non-negative integer constant expression",
        "16.12.10"},
-      {"s_always", "s_always [1:$] a", "s_always [1:2] a",
+      {"s_always", "s_always [1:$] ##1 a", "s_always [1:2] a",
        "s_always needs a finite range", "16.12.11"},
-      {"eventually", "eventually [1:$] a", "eventually [1:2] a",
+      {"eventually", "eventually [1:$] ##1 a", "eventually [1:2] a",
        "weak eventually needs a finite range", "16.12.13"},
-      {"s_eventually", "s_eventually [3:1] a", "s_eventually [1:$] a",
+      {"s_eventually", "s_eventually [3:1] ##1 a", "s_eventually [1:$] a",
        "eventually range minimum must not exceed the maximum", "16.12.13"},
   };
 

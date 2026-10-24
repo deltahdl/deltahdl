@@ -72,12 +72,12 @@ TEST(PropertySpecGrammar, AWellWrittenConstructIsReadPast) {
           {"(if (a) b) until\nc dist zz", 3},
           {"(if (a) b else c) until\nd dist zz", 3},
           {"(case (s) 1, 2: a; default: b; endcase) until\nc dist zz", 3},
-          {"(a, x = 1, y += 2, z++, ++w, --v, $display(\"m\"), f(q)) ##1\n"
-           "b dist zz",
+          {"(a, x = 1, y += 2, z++, ++w, --v, $display(\"m\"), f(q), g, "
+           "obj.m) ##1\nb dist zz",
            3},
           {"pkg::s(a ##1 b) and top.u.s(a ##1 b) ##1\nc dist zz", 3},
-          {"s(, a ##1 b, $, .p(c ##1 d), .q(), posedge clk iff en or "
-           "negedge rst, ) ##1\nc dist zz",
+          {"s(, a ##1 b, $, posedge clk iff en or negedge rst, , "
+           ".p(c ##1 d), .q()) ##1\nc dist zz",
            3},
           {"a[+] ##1 b[*] ##1 c[*2] ##1 d[->1:3] ##1 e[=2] ##1\nf dist zz", 3},
           {"s(a ##1 b)[*2] ##1\nc dist zz", 3},
@@ -148,7 +148,7 @@ TEST(PropertySpecGrammar, ABrokenOperandIsReportedWhereItBreaks) {
                         {"(a ##1 b)\n[3] ##1\nc dist zz", 3},
                         {"(a ##1 b\n; c) ##1\nd dist zz", 3},
                         {"strong(a\n, x = 1) ##1\nb dist zz", 3},
-                        {"(a ##1 b,\nc) ##1\nd dist zz", 3},
+                        {"(a ##1 b, c[0]\n) ##1\nd dist zz", 3},
                         {"(a ##1 b, -x\n) ##1\nd dist zz", 3},
                         {"(a ##1 b, x =\n]) ##1\nd dist zz", 3},
                         {"(a ##1 b,\n]) ##1\nd dist zz", 3},

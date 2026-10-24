@@ -21,14 +21,16 @@ bool IsBuiltinTypeKwForLocalVar(TokenKind k);
 // `[ = actual ]`. `port` names the kind of port, "property" or "sequence", for
 // the reports. Tracks the item the scan stands in: whether one has begun,
 // which tells an empty list from an item with nothing in it; whether it has
-// named its formal; and, between the formal and its default, where only
-// variable dimensions stand, the depth of their brackets. Defined in
-// src/parser/parser_property_port_list.cpp.
+// read its type, after which the next identifier is the formal and never a
+// type name; whether it has named its formal; and, between the formal and its
+// default, where only variable dimensions stand, the depth of their brackets.
+// Defined in src/parser/parser_property_port_list.cpp.
 struct PortItemShape {
   explicit PortItemShape(const char* kind) : port(kind) {}
 
   const char* port;
   bool open = false;
+  bool typed = false;
   bool named = false;
   bool in_tail = false;
   int dim_depth = 0;

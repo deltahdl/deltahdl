@@ -146,7 +146,8 @@ TEST(PropertyCaseParsing, DefaultsInSeparateCasesAreLegal) {
 // a case property nested inside another case item may carry its own default
 // while the enclosing case also has one. The inner default is charged to the
 // inner case, not pooled with the outer, so two single-default case statements
-// nested this way remain legal.
+// nested this way remain legal. The inner case is the outer item's
+// property_expr, which the item's `;` ends.
 TEST(PropertyCaseParsing, NestedCaseDefaultsCountedPerCase) {
   auto r = Parse(
       "module m;\n"
@@ -155,7 +156,7 @@ TEST(PropertyCaseParsing, NestedCaseDefaultsCountedPerCase) {
       "      2'd0 : case (sel)\n"
       "               2'd1    : a;\n"
       "               default : b;\n"
-      "             endcase\n"
+      "             endcase;\n"
       "      default : c;\n"
       "    endcase\n"
       "  endproperty\n"

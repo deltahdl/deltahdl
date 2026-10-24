@@ -196,15 +196,14 @@ TEST(AssertionPortItemParsing, SequencePortAttributesAreReadPast) {
 // A.2.10's property_list_of_arguments and sequence_list_of_arguments are
 // positional actuals, any of them empty, then named ones, or named ones from
 // the first; a named actual's own actual is never named. Each instance below
-// breaks that on line 3, whether it is read as a property instance whose
-// actual is a sequence, as a sequence instance of a sequence_expr, or by the
-// grammar's own scan.
+// breaks that on line 3, a trailing comma's empty actual after a named one
+// among them, whether it is read as a property instance whose actual is a
+// sequence, as a sequence instance of a sequence_expr, or by the grammar's
+// own scan.
 TEST(InstanceArgumentListParsing, APositionalActualAfterANamedOneIsReported) {
   const char* const kSpecs[] = {
-      "p(.x(a ##1 b),\nc)",
-      "s(.x(a),\nb) ##1 c",
-      "p(.x(a ##1 b),\n)",
-      "p(.x(\n.y(a ##1 b)))",
+      "p(.x(a ##1 b),\nc)", "s(.x(a),\nb) ##1 c",   "p(.x(a ##1 b),\n)",
+      "s(.x(a),\n) ##1 c",  "p(.x(\n.y(a ##1 b)))",
   };
   for (const char* spec : kSpecs) {
     SCOPED_TRACE(spec);

@@ -245,8 +245,9 @@ struct ParserSeqLinearHelpers {
     call->text = name.text;
     call->range.start = name.loc;
     p.Expect(TokenKind::kLParen, Subclause("16.8"));
-    // A.2.10's sequence_list_of_arguments takes no positional actual after a
-    // named one, so the operand is not read where one follows.
+    // A.2.10's sequence_list_of_arguments takes no positional actual, an
+    // empty one included, after a named one, so the operand is not read
+    // where one follows.
     bool named = false;
     while (!p.Check(TokenKind::kRParen) && !p.AtEnd()) {
       if (p.Check(TokenKind::kDot)) {
@@ -263,6 +264,7 @@ struct ParserSeqLinearHelpers {
         call->args.push_back(ParseSequenceActualArg(p));
       }
       if (!p.Match(TokenKind::kComma)) break;
+      if (named && p.Check(TokenKind::kRParen)) return nullptr;
     }
     p.Expect(TokenKind::kRParen, Subclause("16.8"));
     return call;

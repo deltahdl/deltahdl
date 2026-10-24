@@ -210,10 +210,15 @@ constexpr std::array<TokenKind, 3> kEdges = {
 
 // §16.10 and §16.11: whether an expression read as a sequence_match_item
 // other than an operator_assignment is one, a subroutine call or an
-// inc_or_dec_expression.
+// inc_or_dec_expression. A.8.2's tf_call and method_call write their list of
+// arguments as optional, so a name, plain, scoped or a member's, is a call
+// with none; which subroutines may be called so turns on what the name
+// denotes, which no grammar tells.
 bool IsMatchItemExpr(const Expr& expr) {
   if (expr.kind == ExprKind::kCall || expr.kind == ExprKind::kSystemCall ||
-      expr.kind == ExprKind::kPostfixUnary) {
+      expr.kind == ExprKind::kPostfixUnary ||
+      expr.kind == ExprKind::kIdentifier ||
+      expr.kind == ExprKind::kMemberAccess) {
     return true;
   }
   return expr.kind == ExprKind::kUnary &&

@@ -694,7 +694,7 @@ TEST(SequenceExprParsing, GotoRepetition) {
 TEST(SequenceDeclParsing, AssertionVariableDeclaration) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
-              "  sequence s; logic v; v = 1; v ##1 a; endsequence\n"
+              "  sequence s; logic v; (a, v = 1) ##1 v; endsequence\n"
               "endmodule\n"));
 }
 
