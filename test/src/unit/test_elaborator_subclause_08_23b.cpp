@@ -340,4 +340,39 @@ TEST(ClassScopeResolutionElaboration, ChainReachingNoClassIsNotSpecialized) {
   EXPECT_EQ(w->unpacked_size, 0u);
 }
 
+// §8.23: `Outer::Inner::s` is the typedef of the class Inner nested in Outer,
+// so a module's variable written so is that typedef's eight bits, not the
+// compilation unit Inner's four, and `Outer::Inner::u`, which the unit's Inner
+// does not declare, is six bits and no error. Both were looked up by their last
+// prefix alone, `Inner::s` and `Inner::u`: the first found the unit's
+// typedef, and the second nothing, reported as a type the unit's Inner lacks.
+TEST(ClassScopeResolutionElaboration, ChainedTypeIsTheNestedClassesTypedef) {
+  ElabFixture f;
+  RtlirDesign* design = ElaborateSrc(
+      "class Inner;\n"
+      "  typedef logic [3:0] s;\n"
+      "  int x;\n"
+      "endclass\n"
+      "class Outer;\n"
+      "  class Inner;\n"
+      "    typedef logic [7:0] s;\n"
+      "    typedef logic [5:0] u;\n"
+      "  endclass\n"
+      "endclass\n"
+      "module m;\n"
+      "  Outer::Inner::s v;\n"
+      "  Outer::Inner::u w;\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "class 'Inner' declares no type 'u'", 13, "8.23"));
+  const RtlirVariable* v = FindVar(design, "m", "v");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->width, 8u);
+  const RtlirVariable* w = FindVar(design, "m", "w");
+  ASSERT_NE(w, nullptr);
+  EXPECT_EQ(w->width, 6u);
+}
+
 }  // namespace

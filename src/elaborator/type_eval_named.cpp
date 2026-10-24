@@ -3,8 +3,9 @@
 // type_eval.cpp verbatim, for room, once that file reached the source-size
 // gate; SizeClassHandleMembers, which sizes a member of a class type as the
 // handle it holds; LastTypeInChain and ResolvedTypeKind, which follow a chain
-// of names to its type; and RecordTypedef, which enters a typedef into the
-// table.
+// of names to its type; RecordTypedef, which enters a typedef into the table;
+// and OuterScopePrefixes and TypeChainKey, which key a name written behind a
+// chain of scopes.
 
 #include <algorithm>
 #include <cstddef>
@@ -24,22 +25,38 @@
 
 namespace delta {
 
+std::vector<std::string_view> OuterScopePrefixes(const DataType& dt) {
+  std::vector<std::string_view> prefixes = dt.outer_scope_names;
+  if (!prefixes.empty() && prefixes.front() == "$unit")
+    prefixes.erase(prefixes.begin());
+  return prefixes;
+}
+
+std::string TypeChainKey(const DataType& type) {
+  if (type.scope_name.empty()) return std::string(type.type_name);
+  std::string key;
+  for (std::string_view prefix : OuterScopePrefixes(type))
+    key += std::string(prefix) + "::";
+  return key + std::string(type.scope_name) +
+         "::" + std::string(type.type_name);
+}
+
 // The type a named type denotes, or null when no declaration matches it. A
 // name behind a scope prefix selects that scope's declaration and never the
 // unqualified one: §8.23 (printed page 200) has the class scope resolution
 // operator pick out one class's member, its example telling `Base::bin` from
 // a `bin` of the enclosing scope, and §26.3 (printed 808) reaches a package's
 // declaration the same way, `ComplexPkg::Complex cout`. So a prefixed name
-// looks up the "Scope::name" key RegisterPackageTypedefs and
-// RegisterClassTypedefs in elaborator_resolve.cpp record, and misses rather
-// than falling back to a bare name, which would size the object wrongly.
+// looks up the key RegisterPackageTypedefs and RegisterClassTypedefs in
+// elaborator_resolve.cpp record, every prefix of a chain included
+// (TypeChainKey), and misses rather than falling back to a bare name, which
+// would size the object wrongly. Keyed by its last prefix alone,
+// `Outer::Inner::s` took the typedef of the compilation unit's own class Inner.
 const DataType* FindNamedType(const DataType& dtype,
                               const TypedefMap& typedefs) {
   if (dtype.kind != DataTypeKind::kNamed) return nullptr;
   if (!dtype.scope_name.empty()) {
-    std::string qualified =
-        std::string(dtype.scope_name) + "::" + std::string(dtype.type_name);
-    auto qit = typedefs.find(qualified);
+    auto qit = typedefs.find(TypeChainKey(dtype));
     // §9.7 with §G.6: process::state is declared by the built-in process
     // class, which no declaration of the design holds.
     return (qit != typedefs.end()) ? &qit->second : StdClassEnumType(dtype);

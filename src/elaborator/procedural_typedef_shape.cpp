@@ -2,25 +2,12 @@
 
 #include <optional>
 #include <string>
-#include <string_view>
 
-#include "elaborator/elaborator_class_lookup.h"
 #include "elaborator/elaborator_class_typedef_specialization.h"
-#include "elaborator/net_data_type.h"
+#include "elaborator/type_eval.h"
 #include "parser/ast_type.h"
 
 namespace delta {
-
-// The key a named type's typedef is recorded by: every prefix written before
-// the name (OuterScopePrefixes, which leaves a leading `$unit` off, the
-// compilation unit's classes' typedefs being recorded by the class's own name
-// in RegisterClassTypedefs), then NamedTypeKey's last prefix and name.
-static std::string TypedefChainKey(const DataType& type) {
-  std::string key;
-  for (std::string_view prefix : OuterScopePrefixes(type))
-    key += std::string(prefix) + "::";
-  return key + NamedTypeKey(type);
-}
 
 std::optional<SpecializedClassType> ArrayTypedefShape(
     const DataType& type, const ProceduralTypeScope& scope) {
@@ -30,7 +17,7 @@ std::optional<SpecializedClassType> ArrayTypedefShape(
     if (spec->unpacked_dims.empty()) return std::nullopt;
     return spec;
   }
-  const std::string kKey = TypedefChainKey(type);
+  const std::string kKey = TypeChainKey(type);
   auto base = scope.typedefs.find(kKey);
   auto dims = scope.td_dims.find(kKey);
   if (base == scope.typedefs.end() || dims == scope.td_dims.end())

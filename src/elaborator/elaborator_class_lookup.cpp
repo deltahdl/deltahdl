@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "elaborator/elaborator_helpers.h"
+#include "elaborator/type_eval.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
@@ -149,13 +150,6 @@ const ClassDecl* ClassOfDeclaredType(const DataType& dt,
                                      const CompilationUnit* unit) {
   if (dt.kind != DataTypeKind::kNamed) return nullptr;
   return ClassAlongNames(TypeChainNames(dt), chain, unit);
-}
-
-std::vector<std::string_view> OuterScopePrefixes(const DataType& dt) {
-  std::vector<std::string_view> prefixes = dt.outer_scope_names;
-  if (!prefixes.empty() && prefixes.front() == "$unit")
-    prefixes.erase(prefixes.begin());
-  return prefixes;
 }
 
 const ClassDecl* ClassOfChainedScope(const DataType& dt,

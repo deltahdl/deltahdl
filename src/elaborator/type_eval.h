@@ -1,9 +1,11 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 #include "elaborator/const_eval.h"
 
@@ -160,11 +162,24 @@ uint32_t FoldedMembersWidth(const DataType& dtype, const TypedefMap& typedefs,
 uint32_t TaggedUnionTagWidth(const DataType& dtype);
 uint32_t TaggedUnionTagBitOffset(const DataType& dtype);
 
-// The typedef a named type denotes, looked up under its "Scope::name" key
-// where the name was written with a class or package prefix (§8.23, §26.3)
-// and under the bare name otherwise; null for an unnamed type or a name the
-// table does not hold. A prefixed name never falls back to the bare one:
-// that would take the layout from a different type.
+// The prefixes `dt` writes before its last one, outermost first, a leading
+// `$unit` left off: §3.12.1 names the compilation unit's own declarations
+// through it, and those are recorded by their own names. `$unit::A::B::t`
+// gives {A}, and `B::t` nothing.
+std::vector<std::string_view> OuterScopePrefixes(const DataType& dt);
+
+// §8.23 with §26.3: the key a scope-qualified type name's declaration is
+// recorded by, every prefix written before the name joined with `::`
+// (OuterScopePrefixes), so `Outer::Inner::s` is "Outer::Inner::s", the key
+// RegisterClassTypedefKeys gives a nested class's typedef; the bare name for a
+// name written with no prefix.
+std::string TypeChainKey(const DataType& type);
+
+// The typedef a named type denotes, looked up under its TypeChainKey where
+// the name was written with a class or package prefix (§8.23, §26.3) and
+// under the bare name otherwise; null for an unnamed type or a name the table
+// does not hold. A prefixed name never falls back to the bare one: that would
+// take the layout from a different type.
 const DataType* FindNamedType(const DataType& dtype,
                               const TypedefMap& typedefs);
 

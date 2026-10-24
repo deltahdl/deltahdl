@@ -732,29 +732,29 @@ const DataType* FindClassScopedTypedefType(std::string_view cls_name,
   return &td->typedef_type;
 }
 
-// The key RegisterScopedTypedef writes a scope-qualified type name under, and
-// the one ResolveNamed looks it up by. Both functions below ask whether that
-// key is present before reaching for a class, so the string is built in one
-// place.
-static std::string QualifiedTypeKey(const DataType& dtype) {
-  return std::string(dtype.scope_name) + "::" + std::string(dtype.type_name);
-}
-
+// Both functions below ask whether a scope-qualified name's key
+// (TypeChainKey, which FindNamedType looks it up by) is present before
+// reaching for a class, and reach for it through every prefix written before
+// the scope (ClassOfChainedScope), §8.23 naming a nested class by the whole
+// chain. Keyed and found by the last prefix alone, `Outer::Inner::u` was
+// judged against the compilation unit's own class Inner, which declares no u.
 bool ResolveClassScopedDeclType(DataType& dtype, const TypedefMap& typedefs,
                                 const CompilationUnit* unit) {
   if (dtype.kind != DataTypeKind::kNamed || dtype.scope_name.empty()) {
     return false;
   }
-  if (typedefs.count(QualifiedTypeKey(dtype)) > 0) return false;
-  const DataType* resolved =
-      FindClassScopedTypedefType(dtype.scope_name, dtype.type_name, unit);
-  if (resolved == nullptr) return false;
-  dtype.kind = resolved->kind;
-  dtype.is_signed = resolved->is_signed;
-  dtype.type_name = resolved->type_name;
-  dtype.packed_dim_left = resolved->packed_dim_left;
-  dtype.packed_dim_right = resolved->packed_dim_right;
-  dtype.extra_packed_dims = resolved->extra_packed_dims;
+  if (typedefs.count(TypeChainKey(dtype)) > 0) return false;
+  const ClassDecl* cls = ClassOfChainedScope(dtype, unit);
+  if (cls == nullptr) return false;
+  const ModuleItem* td = FindClassTypedef(cls, dtype.type_name);
+  if (td == nullptr) return false;
+  const DataType& resolved = td->typedef_type;
+  dtype.kind = resolved.kind;
+  dtype.is_signed = resolved.is_signed;
+  dtype.type_name = resolved.type_name;
+  dtype.packed_dim_left = resolved.packed_dim_left;
+  dtype.packed_dim_right = resolved.packed_dim_right;
+  dtype.extra_packed_dims = resolved.extra_packed_dims;
   return true;
 }
 
@@ -778,8 +778,8 @@ void ReportUnresolvedClassScopedType(const DataType& dtype, SourceLoc loc,
                                      DiagEngine& diag) {
   if (dtype.kind != DataTypeKind::kNamed || dtype.scope_name.empty()) return;
   if (!dtype.type_params.empty()) return;
-  if (typedefs.count(QualifiedTypeKey(dtype)) > 0) return;
-  const ClassDecl* cls = FindClassDecl(dtype.scope_name, unit);
+  if (typedefs.count(TypeChainKey(dtype)) > 0) return;
+  const ClassDecl* cls = ClassOfChainedScope(dtype, unit);
   if (cls == nullptr) return;
   if (!cls->base_class.empty() || !cls->extends_interfaces.empty()) return;
   if (cls->members.empty()) return;
