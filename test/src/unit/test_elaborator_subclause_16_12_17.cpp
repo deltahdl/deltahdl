@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "elaborator/property_rewrite.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
@@ -183,6 +185,33 @@ TEST(RecursivePropertyRestrictions, SAlwaysAppliedToRecursivePropertyRejected) {
       f.diag.Diagnostics(),
       "\"rec\", which reaches a recursive property (Restriction 1)", 5,
       "16.12.17"));
+}
+
+// §16.12.17 Restriction 1: the index of s_nexttime and the range of
+// s_eventually are the operator's own, so the instance after them is still the
+// operand the restriction reaches.
+TEST(RecursivePropertyRestrictions,
+     BracketedStrongOperatorsAppliedToRecursivePropertyRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  property rec(p);\n"
+      "    p and (1'b1 |=> rec(p));\n"
+      "  endproperty\n"
+      "  property bad_next(p);\n"
+      "    s_nexttime [2] rec(p);\n"
+      "  endproperty\n"
+      "  property bad_eventually(p);\n"
+      "    s_eventually [1:2] rec(p);\n"
+      "  endproperty\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {5u, 8u}) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "\"rec\", which reaches a recursive property (Restriction 1)", line,
+        "16.12.17"));
+  }
 }
 
 // §16.12.17 Restriction 1: s_until is an infix strong operator; its right

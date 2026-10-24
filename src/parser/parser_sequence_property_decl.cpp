@@ -422,6 +422,19 @@ static void ValidateLiteralEventuallyRange(Lexer& lexer, DiagEngine& diag,
   }
 }
 
+// Consumes the bracket group at the cursor, with the groups nested in it.
+static void SkipBracketGroup(Lexer& lexer) {
+  int depth = 0;
+  do {
+    if (LexerCheck(lexer, TokenKind::kLBracket)) {
+      ++depth;
+    } else if (LexerCheck(lexer, TokenKind::kRBracket)) {
+      --depth;
+    }
+    lexer.Next();
+  } while (depth > 0 && !lexer.Peek().Is(TokenKind::kEof));
+}
+
 // §16.12.17 Restrictions 1 & 3: handles the prefix-negation operators and the
 // time-advancing operators that update the scan trackers. Returns true if the
 // current token was consumed here.
@@ -446,6 +459,9 @@ static void ScanStrongPropertyOperator(Lexer& lexer, DiagEngine& diag,
     ValidateLiteralAlwaysRange(lexer, diag, /*strong=*/true);
   else if (is_s_eventually)
     ValidateLiteralEventuallyRange(lexer, diag, /*strong=*/true);
+  // The index or range is the operator's own, so the operand Restriction 1
+  // marks is the one after it, and the group is read past whole.
+  SkipBracketGroup(lexer);
 }
 
 static bool ScanOperatorToken(Lexer& lexer, DiagEngine& diag,
