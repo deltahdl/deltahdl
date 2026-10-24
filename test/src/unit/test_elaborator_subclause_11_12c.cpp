@@ -505,9 +505,12 @@ TEST(LetActualScopeElaboration, UnitScopedNamesPassTheModulesOwn) {
 }
 
 // §6.18 and §8.23: a typedef of an interface port's type and a type declared
-// in a class name types the scopes of the check do not hold, each an array of
-// two ints here, so neither formal is judged against the type its declaration
-// is written with.
+// in a class name types the scopes of the check do not hold, the port's an
+// array of two ints and the class's a structure of two, so neither formal is
+// judged against the type its declaration is written with. The class's
+// typedef is a structure, which no earlier pass rewrites into an element type
+// and dimensions as it does an array typedef, so the formal reaches the check
+// written `C::t`.
 TEST(LetActualScopeElaboration, TypesOfAPortOrAClassAreNotFollowed) {
   ElabFixture f;
   ElaborateSrc(
@@ -515,12 +518,12 @@ TEST(LetActualScopeElaboration, TypesOfAPortOrAClassAreNotFollowed) {
       "  typedef int t [2];\n"
       "endinterface\n"
       "class C;\n"
-      "  typedef int t [2];\n"
+      "  typedef struct { int a; int b; } t;\n"
       "endclass\n"
       "module m (ifc p);\n"
       "  typedef p.t lt;\n"
       "  let f(lt x) = x[0];\n"
-      "  let g(C::t x) = x[0];\n"
+      "  let g(C::t x) = x.a;\n"
       "  int arr [2];\n"
       "  initial $display(\"%0d\", f(arr) + g(arr));\n"
       "endmodule\n"
