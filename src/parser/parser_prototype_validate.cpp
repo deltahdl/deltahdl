@@ -32,4 +32,30 @@ void ValidateExternTfPrototype(DiagEngine& diag, const ModuleItem* item) {
   }
 }
 
+// A class's `extern` and `pure virtual` methods are read through the same head,
+// and their method_prototype is the same function_prototype or task_prototype,
+// so the same three things are reported. A `static` lifetime is left to
+// ValidateClassMethod, which reports it on any class method under §8.6, a
+// class method being automatic. A constructor's class_constructor_prototype,
+// `function new`, writes no result type at all.
+void ValidateClassMethodPrototype(DiagEngine& diag, const ModuleItem* item) {
+  if (item->is_automatic) {
+    diag.Error(item->loc, "a class method prototype takes no lifetime",
+               Subclause("A.1.9"));
+  }
+  if (!item->method_class.empty()) {
+    diag.Error(item->loc,
+               "a class method prototype names its method with an identifier "
+               "alone",
+               Subclause("A.1.9"));
+  }
+  if (item->kind == ModuleItemKind::kFunctionDecl && item->name != "new" &&
+      item->return_type.kind == DataTypeKind::kImplicit) {
+    diag.Error(item->loc,
+               "a class function prototype writes its result type out, a data "
+               "type or void",
+               Subclause("A.1.9"));
+  }
+}
+
 }  // namespace delta

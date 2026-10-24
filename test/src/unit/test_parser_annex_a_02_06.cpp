@@ -428,4 +428,65 @@ TEST(FunctionDeclParsing, FunctionBodyInterfaceIdentifierPrefix) {
   EXPECT_EQ(item->name, "f");
 }
 
+// --- A class's extern and pure virtual prototypes ---
+// A.1.9 writes them with a method_prototype, A.2.6's function_prototype or
+// A.2.7's task_prototype, which take no lifetime, name the method with an
+// identifier alone and give a function a data_type_or_void for its result.
+// Read through a declaration's head, a class prototype carrying any of the
+// three drew no report.
+TEST(FunctionDeclParsing, ClassPrototypeLifetimeIsReported) {
+  auto r = Parse(
+      "class C;\n"
+      "  extern function automatic int f();\n"
+      "  pure virtual task automatic t();\n"
+      "endclass\n");
+  for (int line : {2, 3}) {
+    EXPECT_TRUE(ReportedError(
+        r.diags, "a class method prototype takes no lifetime", line, "A.1.9"));
+  }
+}
+
+TEST(FunctionDeclParsing, ClassPrototypeScopedNameIsReported) {
+  auto r = Parse(
+      "class C;\n"
+      "  extern function int D::k();\n"
+      "  pure virtual task b.t();\n"
+      "endclass\n");
+  for (int line : {2, 3}) {
+    EXPECT_TRUE(ReportedError(r.diags,
+                              "a class method prototype names its method with "
+                              "an identifier alone",
+                              line, "A.1.9"));
+  }
+}
+
+TEST(FunctionDeclParsing, ClassPrototypeImplicitResultIsReported) {
+  auto r = Parse(
+      "class C;\n"
+      "  extern function g();\n"
+      "  pure virtual function [3:0] h();\n"
+      "  extern function signed s();\n"
+      "endclass\n");
+  for (int line : {2, 3, 4}) {
+    EXPECT_TRUE(ReportedError(r.diags,
+                              "a class function prototype writes its result "
+                              "type out, a data type or void",
+                              line, "A.1.9"));
+  }
+}
+
+// A constructor's prototype is A.1.9's class_constructor_prototype, which
+// writes no result type.
+TEST(FunctionDeclParsing, ClassPrototypesAsA26WritesThemAreAccepted) {
+  auto r = Parse(
+      "virtual class C;\n"
+      "  extern function int f();\n"
+      "  pure virtual task t();\n"
+      "  extern function new(int a);\n"
+      "  pure virtual function void h();\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

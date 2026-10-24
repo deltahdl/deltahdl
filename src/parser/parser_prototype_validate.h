@@ -10,4 +10,9 @@ struct ModuleItem;
 // do not write.
 void ValidateExternTfPrototype(DiagEngine& diag, const ModuleItem* item);
 
+// A.1.9's class_method: report the parts of an (already-parsed) `extern` or
+// `pure virtual` method prototype of a class that A.2.6's function_prototype
+// and A.2.7's task_prototype do not write.
+void ValidateClassMethodPrototype(DiagEngine& diag, const ModuleItem* item);
+
 }  // namespace delta

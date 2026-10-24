@@ -15,6 +15,7 @@
 #include "parser/parser.h"
 #include "parser/parser_data_decl_internal.h"
 #include "parser/parser_headers.h"
+#include "parser/parser_prototype_validate.h"
 #include "parser/parser_type_name_scope.h"
 
 namespace delta {
@@ -563,6 +564,7 @@ bool Parser::TryParseMethodOrConstraint(std::vector<ClassMember*>& members,
     ParserClassHelpers::RejectMethodQualifierOrder(*this, *member);
     member->kind = ClassMemberKind::kMethod;
     member->method = is_func ? ParseFunctionDecl(proto) : ParseTaskDecl(proto);
+    if (proto) ValidateClassMethodPrototype(diag_, member->method);
     // Mirror the method name onto the ClassMember, like every other member kind
     // (typedef/property/nested class); the name itself lives on member->method.
     member->name = member->method->name;
