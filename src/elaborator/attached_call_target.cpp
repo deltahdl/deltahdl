@@ -98,8 +98,10 @@ const ModuleItem* NamedSubroutine(std::string_view name, const ModuleDecl& decl,
 
 }  // namespace
 
-const ModuleItem* AttachedCallTarget(const Expr& call, const ModuleDecl& decl,
-                                     const CompilationUnit& unit) {
+const ModuleItem* AttachedCallTarget(const Expr& call,
+                                     const ModuleInUnit& scope) {
+  const ModuleDecl& decl = scope.decl;
+  const CompilationUnit& unit = scope.unit;
   if (IsNameRef(call.lhs, call.callee)) {
     return NamedSubroutine(call.callee, decl, unit);
   }

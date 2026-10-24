@@ -50,7 +50,7 @@ enum class Place : uint8_t { kOperand, kDisable, kAbort, kClock };
 
 // What the rules read besides the expression: the module's parameters, its
 // named sequences and properties in the registry, its named sequences and
-// its tasks and functions by name, the module, its declaration and the
+// its tasks and functions by name, the module, its declaration with the
 // compilation unit holding it, which resolve the subroutine a call attached to
 // a sequence names (AttachedCallTarget), and the diagnostics sink.
 struct RuleEnv {
@@ -59,8 +59,7 @@ struct RuleEnv {
   const std::unordered_map<std::string_view, const ModuleItem*>& sequences;
   const std::unordered_map<std::string_view, const ModuleItem*>& subroutines;
   const RtlirModule* mod;
-  const ModuleDecl& decl;
-  const CompilationUnit& unit;
+  const ModuleInUnit& scope;
   DiagEngine& diag;
 };
 
@@ -435,7 +434,7 @@ constexpr std::string_view kAttachedResultUnread =
 // function is called there as if it had no return value, which §13.4.1
 // warns of.
 void CheckAttachedCall(const Expr* call, const Site& site, const RuleEnv& env) {
-  const ModuleItem* target = AttachedCallTarget(*call, env.decl, env.unit);
+  const ModuleItem* target = AttachedCallTarget(*call, env.scope);
   if (target == nullptr) return;
   if (ReturnsAValue(target)) {
     WarnDiscardedReturn(call->range.start, target->name, kAttachedResultUnread,
@@ -739,11 +738,11 @@ void CheckProcedure(const ModuleItem* item, const RtlirModule* mod,
 
 }  // namespace
 
-void ValidateAssertionExprRules(const ModuleDecl* decl,
-                                const CompilationUnit& unit,
+void ValidateAssertionExprRules(const ModuleInUnit& scope,
                                 const RtlirModule* mod, const ScopeMap& params,
                                 const PropertyRegistry& registry,
                                 DiagEngine& diag) {
+  const ModuleDecl* decl = &scope.decl;
   const std::unordered_map<std::string_view, const ModuleItem*> kSequences =
       NamedDeclsByName(decl, false);
   std::unordered_map<std::string_view, const ModuleItem*> subroutines;
@@ -754,7 +753,7 @@ void ValidateAssertionExprRules(const ModuleDecl* decl,
     }
   }
   const RuleEnv kEnv{params, registry, kSequences, subroutines,
-                     mod,    *decl,    unit,       diag};
+                     mod,    scope,    diag};
   NameSet none;
   for (const ModuleItem* item : decl->items) {
     if (item->kind == ModuleItemKind::kSequenceDecl ||

@@ -8,6 +8,7 @@
 
 #include "common/diagnostic.h"
 #include "elaborator/assertion_rules.h"
+#include "elaborator/attached_call_target.h"
 #include "elaborator/checker_actual_rules.h"
 #include "elaborator/checker_procedure_rules.h"
 #include "elaborator/const_eval.h"
@@ -205,8 +206,8 @@ void Elaborator::ValidateSequenceEventArgs(const ModuleDecl* decl,
   // The rules of Clause 16 no single item's elaboration checks.
   ValidateAssertionRules(decl, property_registry_, diag_);
   const ScopeMap kParams = BuildParamScope(mod);
-  ValidateAssertionExprRules(decl, *unit_, mod, kParams, property_registry_,
-                             diag_);
+  ValidateAssertionExprRules(ModuleInUnit{*decl, *unit_}, mod, kParams,
+                             property_registry_, diag_);
   ValidateAssertionBoundRules(decl, kParams, diag_);
   ValidateAssertionContextRules(decl, mod, property_registry_, diag_);
   ValidateLocalVariableFlow(decl, diag_);
