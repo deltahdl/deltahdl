@@ -402,10 +402,10 @@ static void AdoptSubroutineTypedefDims(ModuleItem* item,
       FormalTypeShapes(item, scope);
   for (size_t i = 0; i < kShapes.size(); ++i) {
     FunctionArg& arg = item->func_args[i];
-    if (!arg.unpacked_dims.empty() || !kShapes[i].has_value()) continue;
-    if (arg.data_type.kind == DataTypeKind::kNamed)
-      arg.data_type = kShapes[i]->type;
-    arg.unpacked_dims = kShapes[i]->unpacked_dims;
+    const std::optional<SpecializedClassType>& shape = kShapes[i];
+    if (!arg.unpacked_dims.empty() || !shape.has_value()) continue;
+    if (arg.data_type.kind == DataTypeKind::kNamed) arg.data_type = shape->type;
+    arg.unpacked_dims = shape->unpacked_dims;
   }
   const DataType& ret = item->return_type;
   if (ret.kind != DataTypeKind::kNamed || !item->return_array_dims.empty())

@@ -52,11 +52,10 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl,
   array_arg_dim_scope_ = scope;
   // §20.16.3: the PLA ascending-order check folds declaration range bounds,
   // which may be parameter- or localparam-valued, so give it the same resolved
-  // scope.
-  pla_ascending_scope_ = scope;
-  // §8.25.1: a procedure's declaration written with a specialization folds
-  // the specialization's arguments in the same scope.
-  procedural_typedef_scope_ = scope;
+  // scope; and §8.25.1 the arguments of a specialization a procedure's
+  // declaration is written with. One statement for both keeps the function
+  // within its statement budget.
+  pla_ascending_scope_ = procedural_typedef_scope_ = scope;
   for (const auto* item : decl->items) {
     ValidateItemConstraints(item, *mod, scope);
   }
