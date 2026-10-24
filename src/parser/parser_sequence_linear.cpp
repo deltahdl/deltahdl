@@ -23,27 +23,6 @@ namespace delta {
 // methods as the other helper structs are, so the declarations the parser
 // header carries stay within the gate on its length.
 struct ParserSeqLinearHelpers {
-  // Whether the token is one of §11.4.1's assignment operators other than `=`.
-  static bool IsCompoundAssignToken(TokenKind kind) {
-    switch (kind) {
-      case TokenKind::kPlusEq:
-      case TokenKind::kMinusEq:
-      case TokenKind::kStarEq:
-      case TokenKind::kSlashEq:
-      case TokenKind::kPercentEq:
-      case TokenKind::kAmpEq:
-      case TokenKind::kPipeEq:
-      case TokenKind::kCaretEq:
-      case TokenKind::kLtLtEq:
-      case TokenKind::kGtGtEq:
-      case TokenKind::kLtLtLtEq:
-      case TokenKind::kGtGtGtEq:
-        return true;
-      default:
-        return false;
-    }
-  }
-
   // §16.7: a delay owed before a group and the delay the group's chain opens
   // with add, unbounded where either is. A delay of 0 adds nothing, so the
   // other stands as written, a bound named by a formal among it (§16.8), and
@@ -335,89 +314,6 @@ struct ParserSeqLinearHelpers {
     return true;
   }
 
-  // The literal 1: §16.9.10's abbreviation stands it where an operand does,
-  // and an inc_or_dec_expression adds or subtracts it.
-  static Expr* OneLiteral(Parser& p) {
-    auto* one = p.arena_.Create<Expr>();
-    one->kind = ExprKind::kIntegerLiteral;
-    one->text = "1";
-    one->int_val = 1;
-    one->range.start = p.CurrentToken().loc;
-    return one;
-  }
-
-  // §16.10: an inc_or_dec_expression as a match item, `lvar++`, `lvar--`,
-  // `++lvar` or `--lvar`, is the local updated by one, `lvar += 1` or `lvar
-  // -= 1`; `prefix` says the operator stood before the name.
-  static bool ParseIncDecMatchItem(Parser& p, SeqMatchAssign& item,
-                                   bool prefix) {
-    TokenKind op = p.Consume().kind;
-    if (prefix) {
-      if (!p.Check(TokenKind::kIdentifier)) return false;
-      item.lvar = p.Consume().text;
-    }
-    item.op =
-        op == TokenKind::kPlusPlus ? TokenKind::kPlusEq : TokenKind::kMinusEq;
-    item.rhs = OneLiteral(p);
-    return true;
-  }
-
-  // §16.11: whether the tokens ahead are a subroutine call, a system task's
-  // name or a name followed by `(`, rather than the local an assignment
-  // begins with. The name may be dotted or scoped, a method called through a
-  // handle, `cg_1.sample()` (§17.6), or a subroutine of a package or class,
-  // `p::f()`. The lexer is rewound.
-  static bool AheadIsSubroutineCall(Parser& p) {
-    if (p.Check(TokenKind::kSystemIdentifier)) return true;
-    if (!p.Check(TokenKind::kIdentifier)) return false;
-    auto saved = p.lexer_.SavePos();
-    p.Consume();
-    while (p.Check(TokenKind::kDot) || p.Check(TokenKind::kColonColon)) {
-      p.Consume();
-      p.Consume();
-    }
-    bool call = p.Check(TokenKind::kLParen);
-    p.lexer_.RestorePos(saved);
-    return call;
-  }
-
-  // One match item: §16.11's subroutine call, an inc_or_dec_expression in
-  // either form, or `lvar = rhs` or `lvar op= rhs`.
-  static bool ParseSequenceMatchItem(Parser& p, SeqMatchAssign& item) {
-    if (AheadIsSubroutineCall(p)) {
-      item.call = p.ParseExpr();
-      return item.call != nullptr;
-    }
-    if (p.Check(TokenKind::kPlusPlus) || p.Check(TokenKind::kMinusMinus)) {
-      return ParseIncDecMatchItem(p, item, true);
-    }
-    if (!p.Check(TokenKind::kIdentifier)) return false;
-    item.lvar = p.Consume().text;
-    if (p.Check(TokenKind::kPlusPlus) || p.Check(TokenKind::kMinusMinus)) {
-      return ParseIncDecMatchItem(p, item, false);
-    }
-    if (!p.Check(TokenKind::kEq) &&
-        !IsCompoundAssignToken(p.CurrentToken().kind)) {
-      return false;
-    }
-    item.op = p.Consume().kind;
-    item.rhs = p.ParseExpr();
-    return item.rhs != nullptr;
-  }
-
-  // §16.10: the match items after a group's sequence_expr, each `lvar = rhs`,
-  // `lvar op= rhs` or an inc_or_dec_expression, attached to the group's last
-  // operand.
-  static bool ParseSequenceMatchItems(Parser& p,
-                                      std::vector<SeqMatchAssign>& items) {
-    while (p.Match(TokenKind::kComma)) {
-      SeqMatchAssign item;
-      if (!ParseSequenceMatchItem(p, item)) return false;
-      items.push_back(item);
-    }
-    return true;
-  }
-
   // §16.9.2's boolean_abbrev or sequence_abbrev after an operand: `[*n]`,
   // `[*min:max]`, `[*]` and `[+]` for consecutive repetition, `[->n]` and
   // `[->min:max]` for goto, `[=n]` and `[=min:max]` for nonconsecutive, an
@@ -550,26 +446,48 @@ struct ParserSeqLinearHelpers {
     return ok;
   }
 
-  // §16.10 and §16.11: marks the match items of the group of one operand from
-  // `first` on in `body` where the group admits an empty match, its operand
-  // repeated from zero, `(b[*0:1], x = e)`, not `(a ##1 b[*0:1], x = e)`; the
-  // elaborator reports them, this parse being a trial one.
-  static void MarkEmptyMatchItems(SeqLinearBody& body, size_t first) {
+  // §16.10 and §16.11: marks `items`, the match items of the group of one
+  // operand from `first` on in `body`, where the group admits an empty match,
+  // its operand repeated from zero, `(b[*0:1], x = e)`, not `(a ##1 b[*0:1], x
+  // = e)`; the elaborator reports them, this parse being a trial one.
+  static void MarkEmptyMatchItems(const SeqLinearBody& body, size_t first,
+                                  std::vector<SeqMatchAssign>& items) {
     if (body.operands.size() != first + 1) return;
     const SeqRepetition& rep = body.repetitions[first];
     if (rep.kind == SeqRepetition::Kind::kNone || rep.min_expr != nullptr ||
         rep.min != 0) {
       return;
     }
-    for (SeqMatchAssign& item : body.match_items[first]) {
-      item.on_empty_match = true;
+    for (SeqMatchAssign& item : items) item.on_empty_match = true;
+  }
+
+  // §16.10 and §16.11: a group's match items run once, at each match of its
+  // sequence_expr. Kept on a last operand that repeats, `(b[*2], x++)` or
+  // `(b[->2], x++)`, they would run at each repetition, so they go to the
+  // literal 1 fused to its end, on its clock, as `b[*2] ##0 (1, x++)` has
+  // them; otherwise to the last operand.
+  static void AttachGroupItems(Parser& p, SeqLinearBody& body,
+                               const std::vector<SeqMatchAssign>& items) {
+    if (items.empty()) return;
+    if (body.repetitions.back().kind != SeqRepetition::Kind::kNone) {
+      Expr* one = ParserPropertySpecHelpers::OneLiteral(p);
+      one->range.start = body.operands.back()->range.start;
+      const std::vector<EventExpr> kClock =
+          body.clocks.size() == body.operands.size() ? body.clocks.back()
+                                                     : std::vector<EventExpr>{};
+      SeqCycleDelay fused;
+      fused.min = 0;
+      fused.max = 0;
+      AppendOperand(body, one, fused, SeqRepetition{}, kClock);
     }
+    std::vector<SeqMatchAssign>& last = body.match_items.back();
+    last.insert(last.end(), items.begin(), items.end());
   }
 
   // A parenthesised group, `( sequence_expr [, match_items] )`: its operands
   // are read into `body` as the outer operands are, the delay before the group
-  // adding to the group's leading delay, and its match items are attached to
-  // its last operand.
+  // adding to the group's leading delay, and its match items are attached at
+  // its end (AttachGroupItems).
   static bool ParseSequenceGroup(Parser& p, SeqLinearBody& body,
                                  SeqCycleDelay before,
                                  const std::vector<EventExpr>& clock) {
@@ -580,8 +498,12 @@ struct ParserSeqLinearHelpers {
     size_t first = body.operands.size();
     if (!ParseLinearSeqOperandChain(p, body, before, clock)) return false;
     if (body.operands.size() == first) return false;
-    if (!ParseSequenceMatchItems(p, body.match_items.back())) return false;
-    MarkEmptyMatchItems(body, first);
+    std::vector<SeqMatchAssign> items;
+    if (!ParserPropertySpecHelpers::ParseSequenceMatchItems(p, items)) {
+      return false;
+    }
+    MarkEmptyMatchItems(body, first, items);
+    AttachGroupItems(p, body, items);
     if (!p.Match(TokenKind::kRParen)) return false;
     SeqRepetition rep;
     if (!ParseSequenceRepetition(p, rep)) return false;
@@ -738,7 +660,7 @@ struct ParserSeqLinearHelpers {
     one.min = 1;
     one.max = 1;
     SeqLinearBody wrapped;
-    wrapped.operands.push_back(OneLiteral(p));
+    wrapped.operands.push_back(ParserPropertySpecHelpers::OneLiteral(p));
     wrapped.delays.push_back(none);
     wrapped.match_items.emplace_back();
     wrapped.repetitions.push_back(any);
@@ -749,7 +671,7 @@ struct ParserSeqLinearHelpers {
       wrapped.match_items.push_back(body.match_items[i]);
       wrapped.repetitions.push_back(body.repetitions[i]);
     }
-    wrapped.operands.push_back(OneLiteral(p));
+    wrapped.operands.push_back(ParserPropertySpecHelpers::OneLiteral(p));
     wrapped.delays.push_back(one);
     wrapped.match_items.emplace_back();
     wrapped.repetitions.push_back(any);
@@ -838,7 +760,9 @@ struct ParserSeqLinearHelpers {
     if (!p.Match(TokenKind::kLParen)) return false;
     body.first_match = true;
     if (!ParseLinearSeqDisjunction(p, body)) return false;
-    if (!ParseSequenceMatchItems(p, body.first_match_items)) return false;
+    if (!ParserPropertySpecHelpers::ParseSequenceMatchItems(
+            p, body.first_match_items))
+      return false;
     return p.Match(TokenKind::kRParen);
   }
 };

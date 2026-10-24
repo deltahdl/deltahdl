@@ -155,4 +155,26 @@ TEST(AttachedSubroutine, NeverRunsForASequenceNothingInstantiates) {
   EXPECT_EQ(samples->value.ToUint64(), 0u);
 }
 
+// §16.11 with A.8.2: a void function, or a void function method, written
+// with no list of arguments is called at the match as it is with an empty
+// one.
+TEST(AttachedSubroutine, ACallWrittenWithNoArgumentsIsMadeAtTheMatch) {
+  const char* const kPrelude =
+      "  function void note;\n"
+      "    $display(\"noted at %0t\", $time);\n"
+      "  endfunction\n"
+      "  class C;\n"
+      "    function void note;\n"
+      "      $display(\"method noted at %0t\", $time);\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  C h = new;\n";
+  SimFixture f;
+  std::string out = RunCapture(
+      SequenceTickSource("(te1 ##1 te2, note, h.note)",
+                         DriveTicks({{2}, {3}, {}, {}, {}}), kPrelude),
+      f);
+  EXPECT_EQ(out, "noted at 25\nmethod noted at 25\n$finish at time 160\n");
+}
+
 }  // namespace

@@ -103,6 +103,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     parser/parser_property_port_list.cpp
     parser/parser_sequence_local_var.cpp
     parser/parser_sequence_linear.cpp
+    parser/parser_sequence_match_items.cpp
     parser/sequence_operator_precedence.cpp
     parser/parser_clocking.cpp
     parser/parser_verify.cpp

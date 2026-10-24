@@ -376,4 +376,34 @@ TEST(SequenceLocals, EachMatchEndingAtTheTickFlowsItsOwnValue) {
   EXPECT_NE(out.find("c1=8 c2=7\n"), std::string::npos);
 }
 
+// §16.10: a group's match items are performed once, at the end of each match
+// of its sequence_expr, though the operand ending it repeats. After `(te1, x
+// = 0)` at tick 1, `(te2[*2], x += 1)` with te2 at 2 and 3 adds 1 once, at
+// 3, so `##1 (x == 1)` ends at 4, the tick at 35; `(te2[->2], x += 1)` with
+// te2 at 2 and 4 adds it once, at 4, ending the sequence at 5, the tick at
+// 45.
+TEST(SequenceLocals, AGroupsItemsAfterARepeatedOperandRunOnce) {
+  struct Case {
+    const char* group;
+    std::vector<int> te2;
+    uint64_t last;
+  };
+  const Case kCases[] = {
+      {"(te2[*2], x += 1)", {2, 3}, 35},
+      {"(te2[->2], x += 1)", {2, 4}, 45},
+  };
+  for (const Case& c : kCases) {
+    SCOPED_TRACE(c.group);
+    SimFixture f;
+    auto* hits = RunAndFindVar(
+        SequenceTickSource(
+            std::string("(te1, x = 0) ##1 ") + c.group + " ##1 (x == 1)",
+            DriveTicks({{1}, c.te2, {}, {}, {}}), "", "    int x;\n"),
+        f, "hits");
+    ASSERT_NE(hits, nullptr);
+    EXPECT_EQ(hits->value.ToUint64(), 1u);
+    EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), c.last);
+  }
+}
+
 }  // namespace

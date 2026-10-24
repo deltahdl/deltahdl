@@ -245,4 +245,36 @@ TEST(LocalVariableParsing, AChandleLocalVariableIsReported) {
   EXPECT_TRUE(ReportedError(r.diags, kMessage, 4, "16.10"));
 }
 
+// §16.10: a group's match items run once, at each match of its
+// sequence_expr, so where the operand ending the group repeats, `(b[*2],
+// x++)` or `(b[->2], x++)`, the items are kept off it and captured on a
+// literal 1 fused to its end, as `b[*2] ##0 (1, x++)` writes them; an
+// unrepeated operand keeps the items itself.
+TEST(SequenceLocalVariableParsing,
+     AGroupsItemsAfterARepeatedOperandStandApart) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic clk, a, b;\n"
+      "  sequence s1; int x; @(posedge clk) a ##1 (b[*2], x++); endsequence\n"
+      "  sequence s2; int x; @(posedge clk) a ##1 (b[->2], x++); endsequence\n"
+      "  sequence s3; int x; @(posedge clk) a ##1 (b, x++); endsequence\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  for (const auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kSequenceDecl) continue;
+    SCOPED_TRACE(item->name);
+    const SeqLinearBody& body = item->seq_linear;
+    const bool kFused = item->name != "s3";
+    ASSERT_EQ(body.operands.size(), kFused ? 3u : 2u);
+    EXPECT_EQ(body.match_items[1].size(), kFused ? 0u : 1u);
+    if (!kFused) continue;
+    EXPECT_EQ(body.match_items[2].size(), 1u);
+    EXPECT_EQ(body.operands[2]->text, "1");
+    EXPECT_EQ(body.delays[2].min, 0u);
+    EXPECT_EQ(body.delays[2].max, 0u);
+    EXPECT_EQ(body.repetitions[2].kind, SeqRepetition::Kind::kNone);
+  }
+}
+
 }  // namespace

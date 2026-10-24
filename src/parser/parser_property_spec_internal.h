@@ -95,6 +95,18 @@ struct ParserPropertySpecHelpers {
   // src/parser/parser_sequence_linear.cpp beside the sequence body's.
   static bool ParsePropertyLocalDecls(Parser& p,
                                       std::vector<SeqLocalDecl>& locals);
+  // §16.10 and §16.11: the sequence_match_items after a group's
+  // sequence_expr, each a local's assignment, an inc_or_dec_expression or a
+  // subroutine call, and the literal 1 an inc_or_dec_expression adds or
+  // subtracts. Defined in src/parser/parser_sequence_match_items.cpp.
+  static Expr* OneLiteral(Parser& p);
+  static bool ParseIncDecMatchItem(Parser& p, SeqMatchAssign& item,
+                                   bool prefix);
+  static bool AheadIsSubroutineCall(Parser& p);
+  static Expr* ParseAttachedCall(Parser& p);
+  static bool ParseSequenceMatchItem(Parser& p, SeqMatchAssign& item);
+  static bool ParseSequenceMatchItems(Parser& p,
+                                      std::vector<SeqMatchAssign>& items);
   // §16.14.5: the concurrent assertion item an always procedure whose body
   // opens with one of §16.14's statements is equivalent to, or nullptr,
   // nothing consumed, where the body opens with anything else. Defined in
