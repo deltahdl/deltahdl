@@ -43,10 +43,7 @@ Expr* ParserPropertySpecHelpers::ParseEventActual(Parser& p) {
 // scoped or a member's, `(a, b)`, is ahead. It reads as an event expression,
 // the `or` of its names' events, and as a sequence calling the names after
 // the first at its match, A.8.2 writing a call's list of arguments as
-// optional. Which one an actual is turns on the formal it binds to
-// (§16.8.1), which the parse does not know, so such an actual is read as the
-// event list, which needs no subroutine of those names. The lexer is
-// rewound.
+// optional; ParseListedNamesActual reads it both ways. The lexer is rewound.
 bool ParserPropertySpecHelpers::AheadListsNamesOnly(Parser& p) {
   auto saved = p.lexer_.SavePos();
   p.Consume();  // (
@@ -63,6 +60,27 @@ bool ParserPropertySpecHelpers::AheadListsNamesOnly(Parser& p) {
   const bool kListed = name && names > 1 && p.Check(TokenKind::kRParen);
   p.lexer_.RestorePos(saved);
   return kListed;
+}
+
+// §16.8.1: an actual that is a parenthesized list of names, `(a, f)`, is the
+// event list or the sequence it reads as by the formal it binds to, which the
+// parse does not know. So it is read as the event list, which needs no
+// subroutine of those names, with the sequence kept as its
+// sequence_reading, for a formal used as a sequence. Null, the lexer rewound,
+// where no such list is ahead or its event list does not end the actual:
+// `(a, f) ##1 b` is a sequence alone.
+Expr* ParserPropertySpecHelpers::ParseListedNamesActual(Parser& p) {
+  if (!p.Check(TokenKind::kLParen) || !AheadListsNamesOnly(p)) return nullptr;
+  auto saved = p.lexer_.SavePos();
+  PropertyExprNode* sequence = ParseWholeSequenceActual(p);
+  p.lexer_.RestorePos(saved);
+  Expr* events = ParseEventActual(p);
+  if (!p.Check(TokenKind::kComma) && !p.Check(TokenKind::kRParen)) {
+    p.lexer_.RestorePos(saved);
+    return nullptr;
+  }
+  events->sequence_reading = sequence;
+  return events;
 }
 
 }  // namespace delta

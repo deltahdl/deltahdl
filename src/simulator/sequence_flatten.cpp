@@ -400,17 +400,25 @@ std::vector<EventExpr> InstanceOperandClock(const LinearSequence& body,
   return op.clock;
 }
 
+// §16.12.18: the declaration holding the sequence_expr an operand was
+// substituted with, where the operand referenced a formal whose actual is
+// one (ActualTree); nullptr for any other operand.
+const ModuleItem* SequenceActual(const Expr* operand) {
+  if (operand == nullptr) return nullptr;
+  const PropertyExprNode* tree = ActualTree(operand);
+  if (tree == nullptr || tree->kind != PropertyExprNode::Kind::kSequence) {
+    return nullptr;
+  }
+  return tree->sequence;
+}
+
 // §16.8.1 (a): the sequence an operand of an instantiated body stands for
 // once a formal of type sequence in it is replaced by its actual: a named
 // sequence the actual names or instantiates, or the sequence_expr the parser
-// carries in a placeholder's property_actual; nullptr for any other operand.
+// read it into (SequenceActual); nullptr for any other operand.
 const ModuleItem* SequenceActualOf(const Expr* operand, SimContext& ctx) {
-  if (operand->property_actual != nullptr) {
-    const PropertyExprNode* tree = operand->property_actual;
-    return tree->kind == PropertyExprNode::Kind::kSequence ? tree->sequence
-                                                           : nullptr;
-  }
-  return InstantiatedSequence(operand, ctx);
+  if (ActualTree(operand) == nullptr) return InstantiatedSequence(operand, ctx);
+  return SequenceActual(operand);
 }
 
 bool ExpandInstance(const InstanceOperand& op, SimContext& ctx, Arena& arena,
@@ -843,16 +851,6 @@ const LinearSequence* NestedOperand(const LinearSequence& body, size_t pos) {
 }
 
 namespace {
-
-// §16.12.18: the declaration holding the sequence_expr an operand was
-// substituted with, where the operand referenced a formal whose actual is
-// one; nullptr for any other operand.
-const ModuleItem* SequenceActual(const Expr* operand) {
-  if (operand == nullptr || operand->property_actual == nullptr) return nullptr;
-  const PropertyExprNode* tree = operand->property_actual;
-  if (tree->kind != PropertyExprNode::Kind::kSequence) return nullptr;
-  return tree->sequence;
-}
 
 SubstitutedOperand SubstituteOperand(const LinearSequence& body, size_t j,
                                      const ActualsByFormal& actuals,

@@ -1,7 +1,13 @@
 #include <gtest/gtest.h>
 
+#include <vector>
+
 #include "fixture_parser.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
+#include "parser/expr_substitute.h"
 
 using namespace delta;
 
@@ -150,6 +156,52 @@ TEST(TypedSequenceFormalSyntax, EventFormalPassedWholeToAnInstanceAccepted) {
               "    inner(ev) ##1 a;\n"
               "  endsequence\n"
               "endmodule\n"));
+}
+
+// §16.8.1 with §9.4 and §16.11: a parenthesized list of names, `(a, note)`,
+// is an event list, the `or` of its names' events, and a sequence, a with
+// note called at its match, and which one it is turns on the formal it binds
+// to, which the parse does not know. So the actual is the event list, with
+// the sequence it also reads as kept beside it for a formal used as a
+// sequence. A list a sequence operator follows, `(a, note) ##1 b`, is no
+// event list and is read as the sequence alone.
+TEST(SequenceActualParsing, AListOfNamesKeepsItsSequenceReading) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic clk, a, b;\n"
+      "  function void note; endfunction\n"
+      "  property p(q);\n"
+      "    @(posedge clk) q |-> b;\n"
+      "  endproperty\n"
+      "  assert property (p((a, note)));\n"
+      "  assert property (p((a, note) ##1 b));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  std::vector<const Expr*> actuals;
+  for (const ModuleItem* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kAssertProperty) continue;
+    ASSERT_NE(item->assert_expr, nullptr);
+    ASSERT_EQ(item->assert_expr->args.size(), 1u);
+    actuals.push_back(item->assert_expr->args[0]);
+  }
+  ASSERT_EQ(actuals.size(), 2u);
+  const Expr* listed = actuals[0];
+  ASSERT_NE(listed, nullptr);
+  EXPECT_TRUE(IsEventActual(listed));
+  ASSERT_NE(listed->sequence_reading, nullptr);
+  const ModuleItem* sequence = listed->sequence_reading->sequence;
+  ASSERT_NE(sequence, nullptr);
+  const SeqLinearBody& body = sequence->seq_linear;
+  ASSERT_EQ(body.operands.size(), 1u);
+  ASSERT_NE(body.operands[0], nullptr);
+  EXPECT_EQ(body.operands[0]->text, "a");
+  ASSERT_EQ(body.match_items[0].size(), 1u);
+  ASSERT_NE(body.match_items[0][0].call, nullptr);
+  EXPECT_EQ(body.match_items[0][0].call->callee, "note");
+  ASSERT_NE(actuals[1], nullptr);
+  EXPECT_EQ(actuals[1]->text, "<property_actual>");
+  EXPECT_EQ(actuals[1]->sequence_reading, nullptr);
 }
 
 }  // namespace

@@ -150,6 +150,11 @@ struct Expr {
   // the node is an identifier standing in the argument's place, and the
   // substitution of the actuals for the formals reads the tree.
   PropertyExprNode* property_actual = nullptr;
+  // §16.8.1 with §9.4 and §16.11: for an event actual written as a
+  // parenthesized list of names, `(a, f)`, the sequence it reads as too, `a`
+  // with `f` called at its match, which a formal used as a sequence takes in
+  // place of the events; nullptr for any other actual.
+  PropertyExprNode* sequence_reading = nullptr;
   // §16.9.3: for a call of a sampled value function written with a clocking
   // event, `$rose(req, @(posedge clk))`, that event, at whose ticks the
   // argument is sampled; nullptr where none is written.

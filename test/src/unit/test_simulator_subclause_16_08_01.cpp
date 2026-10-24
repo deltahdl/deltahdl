@@ -205,4 +205,25 @@ TEST(TypedSequenceFormals, AnActualBuiltWithOrOrAndIsOneSequence) {
   EXPECT_EQ(g.ctx.FindVariable("last")->value.ToUint64(), 45u);
 }
 
+// §16.8.1 (a) with §16.11: a parenthesized list of names, `(te1, note)`,
+// bound to a formal of type sequence is the sequence it reads as, te1 with
+// note called at its match, and not the event list it reads as too. With te1
+// at ticks 2 and 5, note runs at the ticks at 15 and 45, whether or not te2
+// follows; read as the event list, it never ran.
+TEST(TypedSequenceFormals, AListOfNamesIsTheSequenceItReadsAs) {
+  const std::string kPrelude =
+      "  function void note;\n"
+      "    $display(\"noted at %0t\", $time);\n"
+      "  endfunction\n"
+      "  sequence framed(sequence q);\n"
+      "    q ##1 te2;\n"
+      "  endsequence\n";
+  SimFixture f;
+  std::string out =
+      RunCapture(SequenceTickSource("framed((te1, note))",
+                                    DriveTicks({{2, 5}, {3}}), kPrelude),
+                 f);
+  EXPECT_EQ(out, "noted at 15\nnoted at 45\n$finish at time 160\n");
+}
+
 }  // namespace

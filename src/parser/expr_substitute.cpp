@@ -160,6 +160,11 @@ bool IsEventActual(const Expr* actual) {
           IsJoint(actual, TokenKind::kKwOr));
 }
 
+const PropertyExprNode* ActualTree(const Expr* actual) {
+  return actual->property_actual != nullptr ? actual->property_actual
+                                            : actual->sequence_reading;
+}
+
 std::vector<EventExpr> EventsOfActual(Expr* actual) {
   std::vector<EventExpr> events;
   CollectEvents(actual, events);

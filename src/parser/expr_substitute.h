@@ -51,6 +51,12 @@ Expr* EitherEventActual(Expr* lhs, Expr* rhs, Arena& arena);
 // signal, an `iff` over an event and its guard, or an `or` of two events.
 bool IsEventActual(const Expr* actual);
 
+// §16.8.1 (a): the tree the parser read `actual` into, taken where the formal
+// it stands for is used as a sequence or a property: a placeholder's
+// property_actual, or, for a list of names read as events, `(a, f)`, the
+// sequence it reads as too; nullptr for any other actual.
+const PropertyExprNode* ActualTree(const Expr* actual);
+
 // §9.4.2: the events the event expression `actual` joins by `or`, each with
 // its edge, none where no edge keyword is written, its signal and its guard.
 std::vector<EventExpr> EventsOfActual(Expr* actual);

@@ -171,14 +171,14 @@ PropertyExprNode* SubstituteTree(const PropertyExprNode* node,
                                  const ActualsByFormal& actuals, Arena& arena);
 
 // §16.12.18: the tree the actual of a formal carries where `e` references
-// the formal and the actual is a sequence_expr or a property_expr; nullptr
-// for any other expression.
+// the formal and the actual is a sequence_expr or a property_expr
+// (ActualTree); nullptr for any other expression.
 const PropertyExprNode* ActualProperty(const Expr* e,
                                        const ActualsByFormal& actuals) {
   if (e == nullptr || e->kind != ExprKind::kIdentifier) return nullptr;
   auto it = actuals.find(e->text);
   if (it == actuals.end() || it->second == nullptr) return nullptr;
-  return it->second->property_actual;
+  return ActualTree(it->second);
 }
 
 // §16.12.18: the sequences and properties passed as actuals to an instance

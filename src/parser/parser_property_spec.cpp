@@ -252,9 +252,10 @@ Expr* ParserPropertySpecHelpers::ParseWholeExpressionActual(Parser& p) {
 // and carried by an identifier standing in the argument's place. `plain` is
 // cleared where the argument is not an expression. Parentheses holding a `,`,
 // an `or` or an `iff` at their own level, which no expression holds there,
-// are a group of events where they list names only, `(a, b)`
-// (AheadListsNamesOnly); otherwise a sequence's group with its match items or
-// its `or`, a property's group, or else, their events needing no edge
+// are a group of events where they list names only and end the argument,
+// `(a, b)`, kept with the sequence they read as too
+// (ParseListedNamesActual); otherwise a sequence's group with its match items
+// or its `or`, a property's group, or else, their events needing no edge
 // keyword (§9.4.2), a group of events (footnote 36 to Syntax 9-4).
 Expr* ParserPropertySpecHelpers::ParsePropertyActualArg(Parser& p,
                                                         bool& plain) {
@@ -268,10 +269,13 @@ Expr* ParserPropertySpecHelpers::ParsePropertyActualArg(Parser& p,
     return dollar;
   }
   if (IsEdgeKeyword(p.CurrentToken().kind) ||
-      (p.Check(TokenKind::kLParen) &&
-       (p.OpensEventGroup(true) || AheadListsNamesOnly(p)))) {
+      (p.Check(TokenKind::kLParen) && p.OpensEventGroup(true))) {
     plain = false;
     return ParseEventActual(p);
+  }
+  if (Expr* listed = ParseListedNamesActual(p)) {
+    plain = false;
+    return listed;
   }
   const bool kGroup = p.Check(TokenKind::kLParen) && p.OpensEventGroup(false);
   if (!kGroup) {
