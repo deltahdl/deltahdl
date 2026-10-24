@@ -9,11 +9,13 @@
 #include <utility>
 #include <vector>
 
+#include "common/arena.h"
 #include "common/diagnostic.h"
 #include "elaborator/aggregate_shape.h"
 #include "elaborator/bit_stream_width.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator_class_lookup.h"
+#include "elaborator/elaborator_class_typedef_specialization.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_classes_internal.h"
 #include "elaborator/elaborator_validate_internal.h"
@@ -213,6 +215,13 @@ class LetActualWalk {
     for (const ModuleItem* item : items) CheckItem(item, frame);
   }
 
+  // The implicit nets the items of the scope of `frame` declare (§6.10),
+  // where the design element assumes any.
+  void DeclareImplicit(NameFrame& frame,
+                       const std::vector<ModuleItem*>& items) const {
+    if (ctx_.implicit_nets) DeclareImplicitNets(frame, items);
+  }
+
  private:
   void CheckItem(const ModuleItem* item, const NameFrame& frame) const {
     switch (item->kind) {
@@ -258,6 +267,7 @@ class LetActualWalk {
     NameFrame block(&frame);
     DeclareOther(block, genvar);
     DeclareScope(block, items, packages_);
+    DeclareImplicit(block, items);
     CheckItems(items, block);
   }
 
@@ -398,6 +408,13 @@ class LetActualWalk {
         return side;
       }
       const NameBinding* named = TypeName(*at, *in);
+      if (named == nullptr) {
+        const std::optional<SpecializedClassType> kSpecialized =
+            SpecializeClassScopedType(*at, ctx_.unit, ctx_.parameters,
+                                      ctx_.shapes.typedefs, ctx_.arena);
+        if (kSpecialized)
+          return EndInSpecialization(std::move(side), *kSpecialized, *in);
+      }
       if (named == nullptr || named->kind == NameKind::kClass)
         return EndInClass(std::move(side), *at, named);
       if (named->kind != NameKind::kTypedef ||
@@ -450,6 +467,20 @@ class LetActualWalk {
   const NameFrame* ClassFrame(const NameBinding* named) const {
     if (named == nullptr || named->kind != NameKind::kClass) return nullptr;
     return classes_.Of(*named->cls, *named->scope);
+  }
+
+  // §8.25.1: a type behind a class with parameters, `P#()::t` or `P#(4)::t`,
+  // which no frame of the class follows, is the typedef of that
+  // specialization, with its dimensions and the specialization's values
+  // folded in (SpecializeClassScopedType). Nothing where the specialized type
+  // is still a name: written in the class, it has no frame to be followed in.
+  std::optional<ResolvedSide> EndInSpecialization(
+      ResolvedSide side, const SpecializedClassType& specialized,
+      const NameFrame& scope) const {
+    if (specialized.type.kind == DataTypeKind::kNamed) return std::nullopt;
+    AddDims(side, &specialized.unpacked_dims, &scope);
+    side.end = ctx_.arena.Create<DataType>(specialized.type);
+    return side;
   }
 
   // A chain ending in `type`, the name of a class: the class `named` declares,
@@ -628,8 +659,9 @@ void CheckLetActualsOfDesignElement(const ModuleDecl& decl,
   NameFrame element(&unit);
   DeclareHeader(element, decl);
   DeclareScope(element, decl.items, kPackages);
-  ClassFrames classes;
+  ClassFrames classes(kPackages);
   const LetActualWalk kWalk(ctx, kPackages, classes, unit, element);
+  kWalk.DeclareImplicit(element, decl.items);
   kWalk.CheckItems(decl.items, element);
 }
 
@@ -637,7 +669,7 @@ void CheckLetActualsOfUnitAndPackages(const LetActualContext& ctx) {
   const PackageFrames kPackages(ctx.unit);
   NameFrame unit(nullptr);
   DeclareUnitScope(unit, ctx.unit->cu_items, *ctx.unit, kPackages);
-  ClassFrames classes;
+  ClassFrames classes(kPackages);
   const LetActualWalk kUnitWalk(ctx, kPackages, classes, unit, unit);
   kUnitWalk.CheckItems(ctx.unit->cu_items, unit);
   // A package's parameters are held under keys of their package's, not under
@@ -645,7 +677,7 @@ void CheckLetActualsOfUnitAndPackages(const LetActualContext& ctx) {
   // dimensions fold from literals alone.
   const ScopeMap kNoParameters;
   const LetActualContext kPackageCtx{ctx.unit, ctx.shapes, kNoParameters,
-                                     ctx.diag};
+                                     ctx.diag, ctx.arena,  false};
   for (const auto& [pkg, frame] : kPackages.All()) {
     const LetActualWalk kWalk(kPackageCtx, kPackages, classes, unit, *frame);
     kWalk.CheckItems(pkg->items, *frame);

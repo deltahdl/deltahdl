@@ -572,44 +572,25 @@ TEST(LetActualScopeElaboration, ATypeAClassDeclaresIsFollowed) {
       ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 22, "11.12"));
 }
 
-// §8.23: a class that derives from another class or interface class, or one
-// with parameters, is not followed, so its typedefs leave the calls passing
-// them unjudged, though an array of two ints is no actual for three, nor three
-// ints for a structure of two; nor is a chain whose next prefix names a member
-// of C that is no class, or nothing C declares. A typedef of a class with
-// parameters is named through its default specialization, `P#()::`, as
-// §8.25.1 requires outside the class; a formal of a structure typedef, unlike
-// an array typedef's, is not rewritten to the specialization's type before
-// the check.
-TEST(LetActualScopeElaboration, ClassesNotFollowedLeaveTheirTypesUnjudged) {
+// §8.23: a chain of prefixes is followed only through classes, so one whose
+// next prefix names a member of C that is no class, or nothing C declares,
+// reaches no typedef, and the calls passing variables declared with it are
+// left unjudged.
+TEST(LetActualScopeElaboration, AChainThroughNoClassLeavesItsTypeUnjudged) {
   ElabFixture f;
   ElaborateSrc(
       "class C;\n"
       "  int x;\n"
       "  typedef int t [2];\n"
       "endclass\n"
-      "class E extends C;\n"
-      "  class EN;\n"
-      "    typedef int e_t [2];\n"
-      "  endclass\n"
-      "endclass\n"
-      "class P #(int K = 2);\n"
-      "  typedef struct { int a; int b; } s_t;\n"
-      "endclass\n"
-      "interface class I1;\n"
-      "endclass\n"
-      "interface class I2 extends I1;\n"
-      "  typedef int i_t [2];\n"
-      "endclass\n"
       "module m;\n"
       "  let h(int x [3]) = x[0];\n"
-      "  let z(P#()::s_t x) = x.a;\n"
-      "  E::EN::e_t ev; I2::i_t iv; C::x::t xv; C::y::t yv; int a3 [3];\n"
-      "  initial $display(\"%0d\", h(ev) + h(iv) + h(xv) + h(yv) + z(a3));\n"
+      "  C::x::t xv; C::y::t yv;\n"
+      "  initial $display(\"%0d\", h(xv) + h(yv));\n"
       "endmodule\n",
       f);
   EXPECT_FALSE(
-      ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 22, "11.12"));
+      ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 8, "11.12"));
 }
 
 // §11.12, rule 2, judges an actual by the declared type of the variable it

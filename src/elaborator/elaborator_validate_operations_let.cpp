@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "common/types.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/elaborator_validate_operations.h"
 #include "elaborator/let_actual_check.h"
@@ -191,16 +192,20 @@ void ElaboratorOperationRules::CheckLetReferencedHierarchically(
 // gives the rule.
 void ElaboratorOperationRules::CheckLetActualTypes(const ModuleDecl* decl) {
   const TypeShapeTables kShapes{typedefs_, td_array_dims_, class_names_};
+  const NetType kDefaultNettype =
+      decl->has_net_directives ? decl->default_nettype : unit_->default_nettype;
   CheckLetActualsOfDesignElement(*decl,
                                  UnitItemsBefore(unit_, decl->range.start),
-                                 {unit_, kShapes, array_arg_dim_scope_, diag_});
+                                 {unit_, kShapes, array_arg_dim_scope_, diag_,
+                                  arena_, kDefaultNettype != NetType::kNone});
 }
 
 // The same rule for the compilation unit's own items and each package's,
 // judged once rather than in every design element.
 void ElaboratorOperationRules::CheckUnitLetActualTypes() {
   const TypeShapeTables kShapes{typedefs_, td_array_dims_, class_names_};
-  CheckLetActualsOfUnitAndPackages({unit_, kShapes, cu_param_scope_, diag_});
+  CheckLetActualsOfUnitAndPackages(
+      {unit_, kShapes, cu_param_scope_, diag_, arena_, false});
 }
 
 void ElaboratorOperationRules::ValidateLetScope(const ModuleDecl* decl) {

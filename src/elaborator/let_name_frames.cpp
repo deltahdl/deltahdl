@@ -1,7 +1,9 @@
 #include "elaborator/let_name_frames.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "elaborator/elaborator_enum_constants.h"
@@ -10,16 +12,34 @@
 #include "elaborator/std_package.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
+#include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 
 namespace delta {
 
+namespace {
+
+// What a class's frame inherits under `name`: the first of the classes it
+// extends to declare or inherit it.
+const NameBinding* FindInherited(const NameFrame& frame,
+                                 std::string_view name) {
+  for (const NameFrame* base : frame.bases) {
+    if (const NameBinding* inherited = FindOwnName(base, name))
+      return inherited;
+  }
+  return nullptr;
+}
+
+}  // namespace
+
 const NameBinding* FindName(const NameFrame& frame, std::string_view name) {
   for (const NameFrame* at = &frame; at != nullptr; at = at->outer) {
     auto it = at->names.find(name);
     if (it != at->names.end()) return &it->second;
+    if (const NameBinding* inherited = FindInherited(*at, name))
+      return inherited;
   }
   return nullptr;
 }
@@ -27,8 +47,8 @@ const NameBinding* FindName(const NameFrame& frame, std::string_view name) {
 const NameBinding* FindOwnName(const NameFrame* frame, std::string_view name) {
   if (frame == nullptr) return nullptr;
   auto it = frame->names.find(name);
-  if (it == frame->names.end() || it->second.scope != frame) return nullptr;
-  return &it->second;
+  if (it != frame->names.end() && it->second.scope == frame) return &it->second;
+  return FindInherited(*frame, name);
 }
 
 namespace {
@@ -176,6 +196,37 @@ void DeclareForVariables(NameFrame& frame, const Stmt& s) {
   }
 }
 
+// A scalar net's data type, a 1-bit logic, whatever its net type (§6.7.1).
+const DataType& ScalarNetType() {
+  static const DataType kScalar = [] {
+    DataType type;
+    type.kind = DataTypeKind::kLogic;
+    return type;
+  }();
+  return kScalar;
+}
+
+// `e`, where it is a name alone that no scope `frame` reaches declares, as an
+// implicit scalar net.
+void DeclareImplicitNet(NameFrame& frame, const Expr* e) {
+  if (e == nullptr || e->kind != ExprKind::kIdentifier ||
+      FindName(frame, e->text) != nullptr)
+    return;
+  Declare(frame, e->text,
+          {.kind = NameKind::kVariable, .type = &ScalarNetType()});
+}
+
+// A continuous assignment's target, each name a concatenation of targets
+// holds among them.
+void DeclareTargetNets(NameFrame& frame, const Expr* target) {
+  if (target->kind != ExprKind::kConcatenation) {
+    DeclareImplicitNet(frame, target);
+    return;
+  }
+  for (const Expr* element : target->elements)
+    DeclareTargetNets(frame, element);
+}
+
 // §8.23: what a class declares, each member a name of its scope. A typedef
 // and a nested class are what a type may be named through.
 void DeclareClassMembers(NameFrame& frame, const ClassDecl& cls) {
@@ -215,17 +266,39 @@ const NameFrame* PackageFrames::Find(std::string_view package) const {
   return package == "std" ? &std_ : nullptr;
 }
 
+// A class asked for again while its bases are being found, as a cycle of
+// bases would ask for it, finds the entry still empty and has no frame.
 const NameFrame* ClassFrames::Of(const ClassDecl& cls,
                                  const NameFrame& declaring) {
-  // An interface class's first base is its base_class, as a class's is.
-  if (!cls.base_class.empty() || !cls.params.empty()) return nullptr;
   auto [it, inserted] = built_.try_emplace(&cls, nullptr);
-  if (inserted) {
-    NameFrame& frame = frames_.emplace_back(&declaring);
-    DeclareClassMembers(frame, cls);
-    it->second = &frame;
-  }
-  return it->second;
+  if (!inserted) return it->second;
+  if (!cls.params.empty()) return nullptr;
+  // §8.26.2: an interface class extends any number of interface classes, the
+  // first recorded as its base_class and the rest as extends_interfaces, and
+  // inherits their members; one it implements gives it none.
+  std::vector<const NameFrame*> bases;
+  if (!cls.base_class.empty())
+    bases.push_back(BaseFrame(cls.base_class, cls.base_class_scope, declaring));
+  for (const InterfaceRef& extended : cls.extends_interfaces)
+    bases.push_back(BaseFrame(extended.name, extended.scope, declaring));
+  if (std::ranges::find(bases, nullptr) != bases.end()) return nullptr;
+  NameFrame& frame = frames_.emplace_back(&declaring);
+  frame.bases = std::move(bases);
+  DeclareClassMembers(frame, cls);
+  built_[&cls] = &frame;
+  return &frame;
+}
+
+// §8.13: the class a class extends, named in the scope declaring it, or
+// behind the package declaring it (§26.3).
+const NameFrame* ClassFrames::BaseFrame(std::string_view name,
+                                        std::string_view scope,
+                                        const NameFrame& declaring) {
+  const NameBinding* named = scope.empty()
+                                 ? FindName(declaring, name)
+                                 : FindOwnName(packages_.Find(scope), name);
+  if (named == nullptr || named->kind != NameKind::kClass) return nullptr;
+  return Of(*named->cls, *named->scope);
 }
 
 void DeclareOther(NameFrame& frame, std::string_view name) {
@@ -244,6 +317,31 @@ void DeclareUnitScope(NameFrame& frame, const std::vector<ModuleItem*>& items,
   DeclareScope(frame, items, packages);
   for (const ClassDecl* cls : unit.classes)
     Declare(frame, cls->name, {.kind = NameKind::kClass, .cls = cls});
+}
+
+void DeclareImplicitNets(NameFrame& frame,
+                         const std::vector<ModuleItem*>& items) {
+  for (const ModuleItem* item : items) {
+    switch (item->kind) {
+      case ModuleItemKind::kGateInst:
+      case ModuleItemKind::kUdpInst:
+        for (const Expr* terminal : item->gate_terminals)
+          DeclareImplicitNet(frame, terminal);
+        break;
+      case ModuleItemKind::kAlias:
+        for (const Expr* net : item->alias_nets) DeclareImplicitNet(frame, net);
+        break;
+      case ModuleItemKind::kModuleInst:
+        for (const auto& [port, actual] : item->inst_ports)
+          DeclareImplicitNet(frame, actual);
+        break;
+      case ModuleItemKind::kContAssign:
+        DeclareTargetNets(frame, item->assign_lhs);
+        break;
+      default:
+        break;
+    }
+  }
 }
 
 void DeclareHeader(NameFrame& frame, const ModuleDecl& decl) {

@@ -60,14 +60,18 @@ struct NameFrame {
 
   const NameFrame* outer;
   std::unordered_map<std::string_view, NameBinding> names;
+  // A class's: the frames of the classes it extends (§8.13, §8.26.2), whose
+  // members it inherits, searched before the scope around it.
+  std::vector<const NameFrame*> bases;
 };
 
 // The binding `name` has at `frame`, from the frame itself or the nearest one
-// around it holding the name; null where none does.
+// around it holding the name, a class's frame holding what it inherits; null
+// where none does.
 const NameBinding* FindName(const NameFrame& frame, std::string_view name);
 
-// The binding the scope of `frame` itself declares for `name`, null for a name
-// it imports or does not hold, and for a null frame.
+// The binding the scope of `frame` itself declares for `name`, or a class
+// inherits, null for a name it imports or does not hold, and for a null frame.
 const NameBinding* FindOwnName(const NameFrame* frame, std::string_view name);
 
 // The frame of each package of a compilation unit (§26.2), its declarations
@@ -92,16 +96,23 @@ class PackageFrames {
 };
 
 // The frame of each class a type is named through (§8.23), built the first
-// time it is asked for: the names the class declares, within the frame of
-// the scope declaring it, which a name the class does not declare is looked
-// up in. A class deriving from another, or one with parameters, has none:
-// its names include those it inherits, and its typedefs may stand for the
-// values a specialization gives.
+// time it is asked for: the names the class declares, over those it inherits
+// from the classes it extends, within the frame of the scope declaring it,
+// which a name the class neither declares nor inherits is looked up in. A
+// class with parameters has none, as its typedefs may stand for the values a
+// specialization gives; nor has one extending a class this cannot find a
+// frame for, by its bare name in the scope declaring the class or behind a
+// package's name.
 class ClassFrames {
  public:
+  explicit ClassFrames(const PackageFrames& packages) : packages_(packages) {}
   const NameFrame* Of(const ClassDecl& cls, const NameFrame& declaring);
 
  private:
+  const NameFrame* BaseFrame(std::string_view name, std::string_view scope,
+                             const NameFrame& declaring);
+
+  const PackageFrames& packages_;
   std::deque<NameFrame> frames_;
   std::unordered_map<const ClassDecl*, const NameFrame*> built_;
 };
@@ -122,6 +133,14 @@ void DeclareScope(NameFrame& frame, const std::vector<ModuleItem*>& items,
 void DeclareUnitScope(NameFrame& frame, const std::vector<ModuleItem*>& items,
                       const CompilationUnit& unit,
                       const PackageFrames& packages);
+
+// §6.10: the implicit nets the scope of `items`, filled in `frame`, declares.
+// A name that a primitive's terminal list, an instance's port connections, an
+// alias or a continuous assignment's target writes alone, and that no scope
+// the use reaches declares, is a scalar net of the default net type, of the
+// scope it is written in.
+void DeclareImplicitNets(NameFrame& frame,
+                         const std::vector<ModuleItem*>& items);
 
 // The names a design element's header declares: its ports and its parameter
 // ports.

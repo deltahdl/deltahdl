@@ -7,6 +7,7 @@
 
 namespace delta {
 
+class Arena;
 class DiagEngine;
 struct CompilationUnit;
 struct ModuleDecl;
@@ -14,13 +15,18 @@ struct ModuleItem;
 
 // What the check of a let's actuals reads besides the declarations it walks:
 // the compilation unit, the typedef tables a type's members and dimensions are
-// sized with, the parameter values of the design element checked, and where
-// the reports go.
+// sized with, the parameter values of the design element checked, where the
+// reports go, the arena a class's specialized type is built in, and whether
+// the design element assumes §6.10's implicit nets, which `default_nettype
+// none forbids (§22.8) and which the compilation unit and the packages, with
+// no instance or continuous assignment, never declare.
 struct LetActualContext {
   const CompilationUnit* unit;
   const TypeShapeTables& shapes;
   const ScopeMap& parameters;
   DiagEngine& diag;
+  Arena& arena;
+  bool implicit_nets;
 };
 
 // §11.12, rule 2: a typed let formal other than an event takes an actual cast
