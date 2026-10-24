@@ -23,9 +23,10 @@ struct ModuleInUnit {
 // scope, p::note(v), names a subroutine the package `p` declares, or else a
 // method of the class `p` (§8.10). A name written through a handle, h.note(v),
 // names a method of the class whose handle the module's variable `h` holds, or
-// of a class it extends (§8.13). Null where none of them is found, a call of a
-// task through an instance's name or of a sequence's formal argument among
-// those.
+// of a class it extends (§8.13); one written through an instance's
+// hierarchical name, u.note(v) or u.w.note(v), names a task or function of the
+// module or interface instantiated (§23.6). Null where none of them is found,
+// a call of a sequence's formal argument among those.
 //
 // The parser records such a call (ParseAttachedCall in
 // src/parser/parser_sequence_match_items.cpp) with the name it calls as its

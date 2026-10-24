@@ -86,6 +86,40 @@ const ClassDecl* HandleClassOf(const std::vector<ModuleItem*>& items,
   return nullptr;
 }
 
+// §23.6: the items of the module or interface the unit declares as `name`;
+// none where it declares neither.
+const std::vector<ModuleItem*>& ElementItems(const CompilationUnit& unit,
+                                             std::string_view name) {
+  static const std::vector<ModuleItem*> kNone;
+  for (const std::vector<ModuleDecl*>* decls :
+       {&unit.modules, &unit.interfaces}) {
+    for (const ModuleDecl* element : *decls) {
+      if (element->name == name) return element->items;
+    }
+  }
+  return kNone;
+}
+
+// §23.6: the items of the module or interface the hierarchical name `path`
+// names an instance of from `decl`: an instance `decl` declares, u, or one
+// within it, u.w; none where `path` names no instance.
+const std::vector<ModuleItem*>& InstanceItems(const Expr& path,
+                                              const ModuleDecl& decl,
+                                              const CompilationUnit& unit) {
+  const bool kWithin = path.kind == ExprKind::kMemberAccess;
+  const std::vector<ModuleItem*>& outer =
+      kWithin ? InstanceItems(*path.lhs, decl, unit) : decl.items;
+  const std::string_view kName = kWithin ? path.rhs->text : path.text;
+  const auto kInstance =
+      std::ranges::find_if(outer, [kName](const ModuleItem* item) {
+        return item->kind == ModuleItemKind::kModuleInst &&
+               item->inst_name == kName;
+      });
+  return ElementItems(unit, kInstance == outer.end()
+                                ? std::string_view()
+                                : (*kInstance)->inst_module);
+}
+
 // §23.9 and §26.3: the subroutine a name alone calls from `decl`.
 const ModuleItem* NamedSubroutine(std::string_view name, const ModuleDecl& decl,
                                   const CompilationUnit& unit) {
@@ -109,7 +143,11 @@ const ModuleItem* AttachedCallTarget(const Expr& call,
   const std::string_view kScope = access.lhs->text;
   const std::string_view kName = access.rhs->text;
   if (!access.is_scope_resolution) {
-    return MethodOf(HandleClassOf(decl.items, kScope, unit), kName, unit);
+    if (const ModuleItem* method =
+            MethodOf(HandleClassOf(decl.items, kScope, unit), kName, unit)) {
+      return method;
+    }
+    return SubroutineAmong(InstanceItems(*access.lhs, decl, unit), kName);
   }
   if (const ModuleItem* found =
           SubroutineAmong(PackageItems(unit, kScope), kName)) {

@@ -265,8 +265,9 @@ TEST(AttachedSubroutineCall, AnArgumentToAnOutputOrInoutFormalIsReported) {
 // unit declares, a class's static method written through the class's scope,
 // and a method called through a handle, its own class's or one it inherits;
 // each passes the local variable v by reference here. A call of a task through
-// an instance's name, and of a sequence's formal argument, which stands for
-// its actual, pass nothing by reference and draw no report.
+// an instance's name, of a sequence's formal argument, which stands for its
+// actual, and of a queue's built-in push_back (§7.10.2) pass nothing by
+// reference and draw no report.
 TEST(AttachedSubroutineCall, ACalleeReachedThroughAScopeOrAHandleIsChecked) {
   ElabFixture f;
   ElaborateSrc(
@@ -283,7 +284,7 @@ TEST(AttachedSubroutineCall, ACalleeReachedThroughAScopeOrAHandleIsChecked) {
       "module m;\n"
       "  import P::*;\n"
       "  import Q::stamp;\n"
-      "  bit clk, a;\n"
+      "  bit clk, a; int q[$];\n"
       "  class C;\n"
       "    int p;\n"
       "    static task mark(ref int v); endtask\n"
@@ -310,7 +311,8 @@ TEST(AttachedSubroutineCall, ACalleeReachedThroughAScopeOrAHandleIsChecked) {
       "endsequence\n"
       "  sequence s8; int v; @(posedge clk) (a, v = 1, u.show(v)); "
       "endsequence\n"
-      "  sequence s9(q); @(posedge clk) (a, q); endsequence\n"
+      "  sequence s9(r); @(posedge clk) (a, r); endsequence\n"
+      "  sequence s10; @(posedge clk) (a, q.push_back(1)); endsequence\n"
       "endmodule\n",
       f);
   const char* const kReport =
@@ -319,8 +321,45 @@ TEST(AttachedSubroutineCall, ACalleeReachedThroughAScopeOrAHandleIsChecked) {
     EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, line, "16.11"))
         << "line " << line;
   }
-  for (uint32_t line : {32u, 33u}) {
+  for (uint32_t line : {32u, 33u, 34u}) {
     EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "", line, "16.11"))
+        << "line " << line;
+  }
+}
+
+// §16.11 with §23.6: the rules on an attached call's actuals reach a task of
+// another instance named hierarchically: of a module instance, of an instance
+// within one, and of an interface instance; each passes the local variable v
+// by reference here.
+TEST(AttachedSubroutineCall, ACalleeReachedThroughAnInstanceIsChecked) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module sub;\n"
+      "  task automatic tick(ref int v); endtask\n"
+      "endmodule\n"
+      "module mid;\n"
+      "  sub w();\n"
+      "endmodule\n"
+      "interface bus;\n"
+      "  task automatic tick(ref int v); endtask\n"
+      "endinterface\n"
+      "module m;\n"
+      "  bit clk, a;\n"
+      "  sub u();\n"
+      "  mid n();\n"
+      "  bus i();\n"
+      "  sequence s1; int v; @(posedge clk) (a, v = 1, u.tick(v)); "
+      "endsequence\n"
+      "  sequence s2; int v; @(posedge clk) (a, v = 1, n.w.tick(v)); "
+      "endsequence\n"
+      "  sequence s3; int v; @(posedge clk) (a, v = 1, i.tick(v)); "
+      "endsequence\n"
+      "endmodule\n",
+      f);
+  const char* const kReport =
+      "an actual holding a local variable shall be passed by value";
+  for (uint32_t line = 15; line <= 17; ++line) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, line, "16.11"))
         << "line " << line;
   }
 }
