@@ -54,6 +54,9 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl,
   // which may be parameter- or localparam-valued, so give it the same resolved
   // scope.
   pla_ascending_scope_ = scope;
+  // §8.25.1: a procedure's declaration written with a specialization folds
+  // the specialization's arguments in the same scope.
+  procedural_typedef_scope_ = scope;
   for (const auto* item : decl->items) {
     ValidateItemConstraints(item, *mod, scope);
   }

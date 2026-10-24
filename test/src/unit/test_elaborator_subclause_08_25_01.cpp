@@ -2,9 +2,13 @@
 
 #include <initializer_list>
 
+#include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
+#include "helpers_literal_dims.h"
 #include "helpers_reported_error.h"
 #include "helpers_rtlir_lookup.h"
+#include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
 
 using namespace delta;
 
@@ -472,6 +476,41 @@ TEST(ParameterizedScopeResolutionElaboration,
   for (const int kLine : {3, 4, 5, 7, 15, 16}) {
     EXPECT_FALSE(ReportedError(diags, kMessage, kLine, "8.25.1")) << kLine;
   }
+}
+
+// §8.25.1 (printed page 205) with §7.4.4: `C#(4)::t` is the typedef t of C's
+// specialization with p = 4, so a function's return type, its formal and its
+// body's variable written with a specialization each take that
+// specialization's element count, never the generic `[p]` folded against the
+// module's own p. Each took the class's generic dimension, looked up by the
+// key `C::t` whatever the specialization. A typedef with no unpacked
+// dimensions, `w`, gives the formal none.
+TEST(ParameterizedScopeResolutionElaboration,
+     SubroutineDeclarationsTakeTheSpecializationsDimensions) {
+  ElabFixture f;
+  RtlirDesign* design = ElaborateSrc(
+      "class C #(int p = 1);\n"
+      "  typedef int t [p];\n"
+      "  typedef logic [p-1:0] w;\n"
+      "endclass\n"
+      "module m;\n"
+      "  localparam int p = 9;\n"
+      "  function automatic C#(5)::t g(C#(4)::t a, C#(4)::w b);\n"
+      "    C#(3)::t v;\n"
+      "    v[0] = a[0] + b;\n"
+      "    return '{default: v[0]};\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  ASSERT_EQ(design->top_modules[0]->function_decls.size(), 1u);
+  const ModuleItem* g = design->top_modules[0]->function_decls[0];
+  ASSERT_EQ(g->func_args.size(), 2u);
+  ASSERT_FALSE(g->func_body_stmts.empty());
+  EXPECT_EQ(LiteralElementCount(g->return_array_dims), 5u);
+  EXPECT_EQ(LiteralElementCount(g->func_args[0].unpacked_dims), 4u);
+  EXPECT_TRUE(g->func_args[1].unpacked_dims.empty());
+  EXPECT_EQ(LiteralElementCount(g->func_body_stmts[0]->var_unpacked_dims), 3u);
 }
 
 }  // namespace

@@ -27,6 +27,7 @@
 #include "elaborator/net_data_type.h"
 #include "elaborator/nettype_registration.h"
 #include "elaborator/nettype_resolution_lookup.h"
+#include "elaborator/procedural_typedef_shape.h"
 #include "elaborator/resolution_function_body.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_enum_member.h"
@@ -331,38 +332,35 @@ void Elaborator::ValidateCuTypedefs() {
 // within a packed element, as RtlirElementShape::type_is_unpacked_array tells
 // it for the declaration among a module's items.
 //
-// §3.12.1 and §26.3: a name written behind a scope, `$unit::arr_t` or
-// `p::arr_t`, is that scope's typedef whatever the module declares under the
-// bare name, so it is looked up under the key the scope's typedef is recorded
-// by (NamedTypeKey). Looked up by the bare name, it took the dimensions of the
-// module's own arr_t.
+// The type and dimensions a name stands for, written behind a scope or a
+// specialization as much as bare, are ArrayTypedefShape's.
 void Elaborator::AdoptTypedefDimsInStmt(Stmt* s) {
   if (s == nullptr) return;
   if ((s->kind == StmtKind::kVarDecl || s->kind == StmtKind::kBlockItemDecl) &&
       s->var_decl_type.kind == DataTypeKind::kNamed) {
-    const std::string kKey = NamedTypeKey(s->var_decl_type);
-    auto base = typedefs_.find(kKey);
-    auto dims = td_array_dims_.find(kKey);
+    auto shape = ArrayTypedefShape(
+        s->var_decl_type,
+        {typedefs_, td_array_dims_, unit_, procedural_typedef_scope_, arena_});
     s->var_decl_type.names_unpacked_array =
-        dims != td_array_dims_.end() && !s->var_unpacked_dims.empty();
-    if (s->var_unpacked_dims.empty() && base != typedefs_.end() &&
-        dims != td_array_dims_.end()) {
+        shape.has_value() && !s->var_unpacked_dims.empty();
+    if (s->var_unpacked_dims.empty() && shape.has_value()) {
       bool was_const = s->var_decl_type.is_const;
-      s->var_decl_type = base->second;
+      s->var_decl_type = shape->type;
       s->var_decl_type.is_const = was_const;
-      s->var_unpacked_dims = dims->second;
+      s->var_unpacked_dims = shape->unpacked_dims;
     }
   }
   ForEachChildStmt(s,
                    [this](Stmt* const& sub) { AdoptTypedefDimsInStmt(sub); });
 }
 
-// The key each of `item`'s formals takes its type by (NamedTypeKey), the name
-// behind its scope where one is written, empty where it takes none by a name.
-// A subroutine's formal takes its own; a let formal written with no type of
-// its own takes the one written before it (§11.12 with §16.8), `b` of
-// `let f(arr_t a, b)` arr_t, and so the dimensions with it.
-static std::vector<std::string> FormalTypeKeys(const ModuleItem* item) {
+// The shape each of `item`'s formals takes by its type's name
+// (ArrayTypedefShape), nothing where it takes none. A subroutine's formal
+// takes its own; a let formal written with no type of its own takes the one
+// written before it (§11.12 with §16.8), `b` of `let f(arr_t a, b)` arr_t, and
+// so the dimensions with it.
+static std::vector<std::optional<SpecializedClassType>> FormalTypeShapes(
+    const ModuleItem* item, const ProceduralTypeScope& scope) {
   std::vector<const DataType*> types;
   if (item->kind == ModuleItemKind::kLetDecl) {
     types = LetFormalTypes(item->func_args);
@@ -370,14 +368,14 @@ static std::vector<std::string> FormalTypeKeys(const ModuleItem* item) {
     for (const FunctionArg& arg : item->func_args)
       types.push_back(&arg.data_type);
   }
-  std::vector<std::string> keys;
-  keys.reserve(types.size());
+  std::vector<std::optional<SpecializedClassType>> shapes;
+  shapes.reserve(types.size());
   for (const DataType* type : types) {
-    keys.push_back(type != nullptr && type->kind == DataTypeKind::kNamed
-                       ? NamedTypeKey(*type)
-                       : std::string{});
+    shapes.push_back(type != nullptr && type->kind == DataTypeKind::kNamed
+                         ? ArrayTypedefShape(*type, scope)
+                         : std::nullopt);
   }
-  return keys;
+  return shapes;
 }
 
 // Every procedure of a module, including the ones a generate construct holds:
@@ -397,43 +395,35 @@ static std::vector<std::string> FormalTypeKeys(const ModuleItem* item) {
 // A let formal taking the type of the one before it, `b` of
 // `let f(arr_t a, b)`, has the dimensions too, while only `a`'s type, the one
 // written by the name, is rewritten to the element type, which `b` then reads
-// through LetFormalTypes; the keys are read before any type is rewritten.
-//
-// A formal's or a return type's name written behind a scope, `$unit::arr_t`
-// or `p::arr_t`, is looked up under that scope's key, as a procedural
-// declaration's is (AdoptTypedefDimsInStmt).
-static void AdoptSubroutineTypedefDims(
-    ModuleItem* item,
-    const std::unordered_map<std::string_view, std::vector<Expr*>>& td_dims,
-    const TypedefMap& typedefs) {
-  const std::vector<std::string> kKeys = FormalTypeKeys(item);
-  for (size_t i = 0; i < kKeys.size(); ++i) {
+// through LetFormalTypes; the shapes are read before any type is rewritten.
+static void AdoptSubroutineTypedefDims(ModuleItem* item,
+                                       const ProceduralTypeScope& scope) {
+  const std::vector<std::optional<SpecializedClassType>> kShapes =
+      FormalTypeShapes(item, scope);
+  for (size_t i = 0; i < kShapes.size(); ++i) {
     FunctionArg& arg = item->func_args[i];
-    if (!arg.unpacked_dims.empty() || kKeys[i].empty()) continue;
-    auto base = typedefs.find(kKeys[i]);
-    auto dims = td_dims.find(kKeys[i]);
-    if (base == typedefs.end() || dims == td_dims.end()) continue;
+    if (!arg.unpacked_dims.empty() || !kShapes[i].has_value()) continue;
     if (arg.data_type.kind == DataTypeKind::kNamed)
-      arg.data_type = base->second;
-    arg.unpacked_dims = dims->second;
+      arg.data_type = kShapes[i]->type;
+    arg.unpacked_dims = kShapes[i]->unpacked_dims;
   }
   const DataType& ret = item->return_type;
   if (ret.kind != DataTypeKind::kNamed || !item->return_array_dims.empty())
     return;
-  const std::string kReturnKey = NamedTypeKey(ret);
-  auto base = typedefs.find(kReturnKey);
-  auto dims = td_dims.find(kReturnKey);
-  if (base == typedefs.end() || dims == td_dims.end()) return;
-  item->return_array_dims = dims->second;
-  item->return_array_elem_type = base->second;
+  auto shape = ArrayTypedefShape(ret, scope);
+  if (!shape.has_value()) return;
+  item->return_array_dims = shape->unpacked_dims;
+  item->return_array_elem_type = shape->type;
 }
 
 void Elaborator::AdoptProceduralTypedefDims(const ModuleDecl* decl) {
+  const ProceduralTypeScope kScope{typedefs_, td_array_dims_, unit_,
+                                   procedural_typedef_scope_, arena_};
   std::function<void(ModuleItem*)> visit = [&](ModuleItem* item) {
     if (item == nullptr) return;
     AdoptTypedefDimsInStmt(item->body);
     for (auto* s : item->func_body_stmts) AdoptTypedefDimsInStmt(s);
-    AdoptSubroutineTypedefDims(item, td_array_dims_, typedefs_);
+    AdoptSubroutineTypedefDims(item, kScope);
     for (auto* child : item->gen_body) visit(child);
     visit(item->gen_else);
     for (auto& case_item : item->gen_case_items) {

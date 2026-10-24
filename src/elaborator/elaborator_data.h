@@ -904,6 +904,12 @@ class ElaboratorData {
   // with symbolic bounds). The check folds each bound in the module's parameter
   // scope so a parameter-valued bound resolves the same way a literal one does.
   ScopeMap pla_ascending_scope_;
+
+  // §8.25.1: a subroutine's formal, its return type or a procedural variable
+  // written with a specialization, `C#(W)::t`, has the specialization's
+  // arguments folded in the parameter scope of the module currently under
+  // constraint validation (Elaborator::AdoptProceduralTypedefDims).
+  ScopeMap procedural_typedef_scope_;
 };
 
 }  // namespace delta

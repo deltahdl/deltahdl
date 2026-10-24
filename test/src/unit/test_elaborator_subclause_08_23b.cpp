@@ -7,11 +7,15 @@
 #include <utility>
 
 #include "elaborator/const_eval.h"
+#include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "fixture_evaluator.h"
+#include "helpers_literal_dims.h"
 #include "helpers_param_value.h"
 #include "helpers_reported_error.h"
 #include "helpers_rtlir_lookup.h"
+#include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
 
 using namespace delta;
 
@@ -192,6 +196,59 @@ TEST(ClassScopeResolutionElaboration, SelectInAScopedChainHasNoKey) {
   auto* e = ParseExprFrom("a[0].b", f);
   EXPECT_EQ(ConstEvalInt(e, scope), std::nullopt);
   EXPECT_FALSE(IsConstantExpr(e, scope));
+}
+
+// §8.23 with §7.4.4: `Outer::Inner::t` is the typedef of the class Inner
+// declared within Outer, never that of the compilation unit's own Inner, so a
+// function's return type, its formal and its body's variable written with the
+// chain each take the nested class's three elements. Each was looked up by its
+// last prefix alone, `Inner::t`, and took the unit Inner's two.
+TEST(ClassScopeResolutionElaboration, ChainedTypedefTakesTheNestedClassesDims) {
+  ElabFixture f;
+  RtlirDesign* design = ElaborateSrc(
+      "class Inner;\n"
+      "  typedef int t [2];\n"
+      "endclass\n"
+      "class Outer;\n"
+      "  class Inner;\n"
+      "    typedef int t [3];\n"
+      "  endclass\n"
+      "endclass\n"
+      "module m;\n"
+      "  function automatic Outer::Inner::t g(Outer::Inner::t a);\n"
+      "    Outer::Inner::t v;\n"
+      "    v = a;\n"
+      "    return v;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  ASSERT_EQ(design->top_modules[0]->function_decls.size(), 1u);
+  const ModuleItem* g = design->top_modules[0]->function_decls[0];
+  ASSERT_FALSE(g->func_body_stmts.empty());
+  EXPECT_EQ(LiteralElementCount(g->return_array_dims), 3u);
+  EXPECT_EQ(LiteralElementCount(g->func_args[0].unpacked_dims), 3u);
+  EXPECT_EQ(LiteralElementCount(g->func_body_stmts[0]->var_unpacked_dims), 3u);
+}
+
+// §3.12.1 with §8.23: `$unit::C::t` heads its chain with the compilation unit,
+// whose class C's typedef it names, so the formal keeps C's two elements.
+TEST(ClassScopeResolutionElaboration, UnitLedChainTakesTheUnitClassesDims) {
+  ElabFixture f;
+  RtlirDesign* design = ElaborateSrc(
+      "class C;\n"
+      "  typedef int t [2];\n"
+      "endclass\n"
+      "module m;\n"
+      "  function automatic int g($unit::C::t a);\n"
+      "    return a[0];\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  ASSERT_EQ(design->top_modules[0]->function_decls.size(), 1u);
+  const ModuleItem* g = design->top_modules[0]->function_decls[0];
+  EXPECT_EQ(LiteralElementCount(g->func_args[0].unpacked_dims), 2u);
 }
 
 }  // namespace

@@ -546,6 +546,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_import.cpp
     elaborator/elaborator_child_type_params.cpp
     elaborator/elaborator_class_typedef_specialization.cpp
+    elaborator/procedural_typedef_shape.cpp
     elaborator/elaborator_config_params.cpp
     elaborator/elaborator_module_inst.cpp
     elaborator/elaborator_module.cpp
