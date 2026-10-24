@@ -201,6 +201,34 @@ TEST(EventActualParsing, OnlyAListOfNamesIsReadAsAnEventList) {
   }
 }
 
+// §9.4 with §16.10: a parenthesized list holding a select after its comma is
+// no sequence, `w[1]` being neither the assignment nor the call a match item
+// is, so it is read as the event list it also is, the `or` of its events.
+TEST(EventActualParsing, AListNoSequenceReadsIsAnEventList) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic a, c;\n"
+      "  logic [1:0] w;\n"
+      "  property p(event e, logic v);\n"
+      "    @(e) v;\n"
+      "  endproperty\n"
+      "  assert property (p((a, w[1]), c));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  const std::vector<Expr*>* args = AssertedActuals(r);
+  ASSERT_NE(args, nullptr);
+  ASSERT_EQ(args->size(), 2u);
+  const Expr* events = (*args)[0];
+  ASSERT_NE(events, nullptr);
+  EXPECT_TRUE(IsEventActual(events));
+  EXPECT_EQ(events->op, TokenKind::kKwOr);
+  ASSERT_NE(events->lhs, nullptr);
+  EXPECT_EQ(events->lhs->text, "a");
+  ASSERT_NE(events->rhs, nullptr);
+  EXPECT_EQ(events->rhs->kind, ExprKind::kSelect);
+}
+
 // §9.4 with §17.3: a checker's port actual that is a list of bare signals is
 // one event actual as well, ahead of the expression after it.
 TEST(EventActualParsing, ACheckerPortTakesAnUnedgedCommaList) {
