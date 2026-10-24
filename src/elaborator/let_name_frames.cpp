@@ -7,6 +7,7 @@
 #include "elaborator/elaborator_enum_constants.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "elaborator/std_package.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_module.h"
@@ -19,7 +20,6 @@ const NameBinding* FindName(const NameFrame& frame, std::string_view name) {
   for (const NameFrame* at = &frame; at != nullptr; at = at->outer) {
     auto it = at->names.find(name);
     if (it != at->names.end()) return &it->second;
-    if (at->imports_unknown) return nullptr;
   }
   return nullptr;
 }
@@ -39,12 +39,11 @@ void Declare(NameFrame& frame, std::string_view name, NameBinding binding) {
 }
 
 // §26.3: each name `package` declares is a candidate for the scope, and a
-// name two wildcard imports offer from two packages is taken for neither.
+// name two wildcard imports offer from two packages is taken for neither. A
+// package no source declares, nor the standard, offers none: importing from
+// it is itself an error (§26.3).
 void AddWildcardCandidates(NameFrame& frame, const NameFrame* package) {
-  if (package == nullptr) {
-    frame.imports_unknown = true;
-    return;
-  }
+  if (package == nullptr) return;
   for (const auto& [name, binding] : package->names) {
     if (binding.scope != package) continue;
     auto [it, inserted] = frame.names.try_emplace(name, binding);
@@ -177,9 +176,31 @@ void DeclareForVariables(NameFrame& frame, const Stmt& s) {
   }
 }
 
+// §8.23: what a class declares, each member a name of its scope. A typedef
+// and a nested class are what a type may be named through.
+void DeclareClassMembers(NameFrame& frame, const ClassDecl& cls) {
+  for (const ClassMember* m : cls.members) {
+    switch (m->kind) {
+      case ClassMemberKind::kTypedef:
+        DeclareEnumLiterals(frame, m->typedef_item->typedef_type);
+        DeclareTypedef(frame, m->typedef_item);
+        break;
+      case ClassMemberKind::kClassDecl:
+        Declare(frame, m->name,
+                {.kind = NameKind::kClass, .cls = m->nested_class});
+        break;
+      default:
+        DeclareOther(frame, m->name);
+        break;
+    }
+  }
+}
+
 }  // namespace
 
 PackageFrames::PackageFrames(const CompilationUnit* unit) {
+  for (const StdPackageEntry& entry : StdPackageContents())
+    DeclareOther(std_, entry.name);
   for (const PackageDecl* pkg : unit->packages) {
     NameFrame& frame = frames_.emplace_back(nullptr);
     DeclareScope(frame, pkg->items, *this);
@@ -191,7 +212,20 @@ const NameFrame* PackageFrames::Find(std::string_view package) const {
   for (const auto& [pkg, frame] : packages_) {
     if (pkg->name == package) return frame;
   }
-  return nullptr;
+  return package == "std" ? &std_ : nullptr;
+}
+
+const NameFrame* ClassFrames::Of(const ClassDecl& cls,
+                                 const NameFrame& declaring) {
+  // An interface class's first base is its base_class, as a class's is.
+  if (!cls.base_class.empty() || !cls.params.empty()) return nullptr;
+  auto [it, inserted] = built_.try_emplace(&cls, nullptr);
+  if (inserted) {
+    NameFrame& frame = frames_.emplace_back(&declaring);
+    DeclareClassMembers(frame, cls);
+    it->second = &frame;
+  }
+  return it->second;
 }
 
 void DeclareOther(NameFrame& frame, std::string_view name) {

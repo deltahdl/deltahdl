@@ -528,13 +528,14 @@ TEST(LetDeclElaboration, FormalTakingEventFromTheOneBeforeItReported) {
 // §11.12, rule 2: an integral or real formal takes no actual of an unpacked
 // array, structure or union type that neither assignment nor a bit-stream cast
 // of as many bits (§6.24.3) converts to it, whether a call binds it by
-// position or by name or the declaration gives it as the default, nor, by
-// §6.22.5, a class handle. An untyped formal, a formal of the structure's own
-// type, and actuals of integral or packed types are left alone.
+// position or by name or the declaration gives it as the default, nor a handle
+// of a class with a local member, which §6.24.3 makes no cast's source. An
+// untyped formal, a formal of the structure's own type, and actuals of
+// integral or packed types are left alone.
 TEST(LetDeclElaboration, ActualNotCastCompatibleWithTypedFormalReported) {
   ElabFixture f;
   ElaborateSrc(
-      "class C; endclass\n"
+      "class C; local int v; endclass\n"
       "module m;\n"
       "  typedef struct { int a; byte b; } s_t;\n"
       "  typedef struct packed { int a; } p_t;\n"
@@ -670,13 +671,13 @@ TEST(LetDeclElaboration, ActualTypesAreJudgedByCastCompatibility) {
 // §11.12 with §6.22.5, §8.12 and §8.16: a class handle fits a formal of its
 // own class, of a class it derives from, or of one derived from it, the last
 // by $cast, a typedef of a class standing for that class and a package's
-// typedef of int for int; a handle of an unrelated class, a class handle for
-// an int or a string formal, and an int or a string for a class formal are
-// reported.
+// typedef of int for int; a handle of an unrelated class, a handle of a class
+// with a protected member, its own or inherited, for an int or a string
+// formal (§6.24.3), and an int or a string for a class formal are reported.
 TEST(LetDeclElaboration, ClassActualsAndFormalsAreJudgedByTheirHierarchy) {
   ElabFixture f;
   ElaborateSrc(
-      "class B; endclass\n"
+      "class B; protected int p; endclass\n"
       "class D extends B; endclass\n"
       "class U; endclass\n"
       "package pk; typedef int int_t; endpackage\n"

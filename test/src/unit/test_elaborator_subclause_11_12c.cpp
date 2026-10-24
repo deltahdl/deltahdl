@@ -504,28 +504,20 @@ TEST(LetActualScopeElaboration, UnitScopedNamesPassTheModulesOwn) {
       ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 9, "11.12"));
 }
 
-// §6.18 and §8.23: a typedef of an interface port's type and a type declared
-// in a class name types the scopes of the check do not hold, the port's an
-// array of two ints and the class's a structure of two, so neither formal is
-// judged against the type its declaration is written with. The class's
-// typedef is a structure, which no earlier pass rewrites into an element type
-// and dimensions as it does an array typedef, so the formal reaches the check
-// written `C::t`.
-TEST(LetActualScopeElaboration, TypesOfAPortOrAClassAreNotFollowed) {
+// §6.18: a typedef of an interface port's type names a type the scopes of the
+// check do not hold, the port's array of two ints, so the formal written with
+// it is not judged, and three ints are not reported for it.
+TEST(LetActualScopeElaboration, TypesOfAnInterfacePortAreNotFollowed) {
   ElabFixture f;
   ElaborateSrc(
       "interface ifc;\n"
       "  typedef int t [2];\n"
       "endinterface\n"
-      "class C;\n"
-      "  typedef struct { int a; int b; } t;\n"
-      "endclass\n"
       "module m (ifc p);\n"
       "  typedef p.t lt;\n"
       "  let f(lt x) = x[0];\n"
-      "  let g(C::t x) = x.a;\n"
-      "  int arr [2];\n"
-      "  initial $display(\"%0d\", f(arr) + g(arr));\n"
+      "  int a3 [3];\n"
+      "  initial $display(\"%0d\", f(a3));\n"
       "endmodule\n"
       "module top;\n"
       "  ifc i ();\n"
@@ -533,28 +525,126 @@ TEST(LetActualScopeElaboration, TypesOfAPortOrAClassAreNotFollowed) {
       "endmodule\n",
       f);
   EXPECT_FALSE(
-      ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 12, "11.12"));
+      ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 8, "11.12"));
 }
 
-// §26.3: a wildcard import of a package the compilation unit does not declare,
-// std's (§26.7), may bring in any name, so a name the module does not declare
-// is not looked for in the unit, while the module's own `a3` is still judged.
-TEST(LetActualScopeElaboration, AnUnknownPackagesImportHoldsOuterNamesBack) {
+// §8.23: a type a class declares is reached through the class's name, `C::t`,
+// a nested class's through the chain, `C::N::t`, and followed in the class's
+// scope, so `C::s2_t` is C's structure of two ints. Three ints are no actual
+// for it, nor it for three ints, nor three bytes for an int; two ints fit it
+// by bit-stream cast (§6.24.3). A prefix naming a variable the module
+// declares, `q`, still names the package q (§26.3).
+TEST(LetActualScopeElaboration, ATypeAClassDeclaresIsFollowed) {
   ElabFixture f;
   ElaborateSrc(
-      "int uarr [2];\n"
+      "class C;\n"
+      "  int x;\n"
+      "  typedef struct { int a; int b; } s_t;\n"
+      "  typedef s_t s2_t;\n"
+      "  class N;\n"
+      "    typedef byte n_t [3];\n"
+      "  endclass\n"
+      "endclass\n"
+      "package q;\n"
+      "  typedef int qt [2];\n"
+      "endpackage\n"
       "module m;\n"
-      "  import std::*;\n"
-      "  let f(int x [2]) = x[0];\n"
-      "  int a3 [3];\n"
-      "  initial $display(\"%0d\", f(uarr));\n"
+      "  let f(C::s_t x) = x.a;\n"
+      "  let h(int x [3]) = x[0];\n"
+      "  let g(C::s2_t x) = x.a;\n"
+      "  let n(int x) = x;\n"
+      "  int q;\n"
+      "  int a3 [3]; int arr [2];\n"
+      "  C::s_t v; C::N::n_t nv; q::qt qv;\n"
       "  initial $display(\"%0d\", f(a3));\n"
+      "  initial $display(\"%0d\", h(v));\n"
+      "  initial $display(\"%0d\", f(arr) + g(arr));\n"
+      "  initial $display(\"%0d\", n(nv));\n"
+      "  initial $display(\"%0d\", h(qv));\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {20u, 21u, 23u, 24u}) {
+    EXPECT_TRUE(
+        ReportedError(f.diag.Diagnostics(), kNotCastCompatible, line, "11.12"))
+        << line;
+  }
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 22, "11.12"));
+}
+
+// §8.23: a class that derives from another class or interface class, or one
+// with parameters, is not followed, so its typedefs, each an array of two
+// ints, leave the calls passing them unjudged; nor is a chain whose next
+// prefix names a member of C that is no class, or nothing C declares.
+TEST(LetActualScopeElaboration, ClassesNotFollowedLeaveTheirTypesUnjudged) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C;\n"
+      "  int x;\n"
+      "  typedef int t [2];\n"
+      "endclass\n"
+      "class E extends C;\n"
+      "  class EN;\n"
+      "    typedef int e_t [2];\n"
+      "  endclass\n"
+      "endclass\n"
+      "class P #(int K = 2);\n"
+      "  typedef int p_t [2];\n"
+      "endclass\n"
+      "interface class I1;\n"
+      "endclass\n"
+      "interface class I2 extends I1;\n"
+      "  typedef int i_t [2];\n"
+      "endclass\n"
+      "module m;\n"
+      "  let h(int x [3]) = x[0];\n"
+      "  E::EN::e_t ev; P::p_t pv; I2::i_t iv; C::x::t xv; C::y::t yv;\n"
+      "  initial $display(\"%0d\", h(ev) + h(pv) + h(iv) + h(xv) + h(yv));\n"
       "endmodule\n",
       f);
   EXPECT_FALSE(
-      ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 6, "11.12"));
+      ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 21, "11.12"));
+}
+
+// §26.3 with §26.7: a wildcard import of the built-in package std offers the
+// names Annex G gives it and no other, so `u3` is still the compilation
+// unit's array of three ints, no actual for two, while `mailbox` is std's
+// class, which hides the unit's array of that name.
+TEST(LetActualScopeElaboration, AStdImportOffersStdsNamesAlone) {
+  ElabFixture f;
+  ElaborateSrc(
+      "int u3 [3];\n"
+      "int mailbox [3];\n"
+      "module m;\n"
+      "  import std::*;\n"
+      "  let f(int x [2]) = x[0];\n"
+      "  initial $display(\"%0d\", f(u3));\n"
+      "  initial $display(\"%0d\", f(mailbox));\n"
+      "endmodule\n",
+      f);
   EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 6, "11.12"));
+  EXPECT_FALSE(
       ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 7, "11.12"));
+}
+
+// §26.3: importing from a package no source declares is an error, and the
+// import brings in no name, so `u3` is the compilation unit's array of three
+// ints, no actual for two.
+TEST(LetActualScopeElaboration, AnUndeclaredPackagesImportBringsInNoName) {
+  ElabFixture f;
+  ElaborateSrc(
+      "int u3 [3];\n"
+      "module m;\n"
+      "  import nopkg::*;\n"
+      "  let f(int x [2]) = x[0];\n"
+      "  initial $display(\"%0d\", f(u3));\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "import from unknown package 'nopkg'", 3, "26.3"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 5, "11.12"));
 }
 
 // §26.3: a package imported twice by wildcard offers its own `f` once, which
@@ -714,6 +804,102 @@ TEST(LetActualScopeElaboration, ALongTypedefChainIsFollowedToABound) {
       ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 37, "11.12"));
   EXPECT_FALSE(
       ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 38, "11.12"));
+}
+
+// §6.24.3 names no unpacked union among the bit-stream types, so neither an
+// unpacked union nor a structure holding one is an actual for an int, which
+// no assignment converts them to either (§6.22.3); a packed union is an
+// integral type, which fits.
+TEST(LetActualScopeElaboration, AnUnpackedUnionIsNoBitStreamType) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef union { int a; byte b; } u_t;\n"
+      "  typedef struct { u_t u; } su_t;\n"
+      "  typedef union packed { int a; bit [31:0] b; } pu_t;\n"
+      "  u_t u; su_t s; pu_t pu;\n"
+      "  let g(int x) = x;\n"
+      "  initial $display(\"%0d\", g(u));\n"
+      "  initial $display(\"%0d\", g(s));\n"
+      "  initial $display(\"%0d\", g(pu));\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 7, "11.12"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 8, "11.12"));
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 9, "11.12"));
+}
+
+// §6.24.3 makes a class no bit-stream cast's destination, so a formal holding
+// class handles takes only what §7.6 assigns to it: handles of its own class
+// (§6.22.2), as many dimensions and, fixed size, as many elements. Two handles
+// for one, one for two, two ints, three handles or two of an unrelated class
+// for two are reported. Two handles for two ints are a bit-stream cast whose
+// size the objects decide when the design runs (§11.4.14.1).
+TEST(LetActualScopeElaboration, ArraysOfHandlesAreJudgedByAssignment) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C; int v; endclass\n"
+      "class D; int w; endclass\n"
+      "module m;\n"
+      "  let h(C x) = x;\n"
+      "  let k(C x [2]) = x[0];\n"
+      "  let f(int x [2]) = x[0];\n"
+      "  int arr [2]; C c; C ca [2]; C c3 [3]; D da [2];\n"
+      "  initial $display(\"%0d\", h(ca) == null);\n"
+      "  initial $display(\"%0d\", k(c) == null);\n"
+      "  initial $display(\"%0d\", k(arr) == null);\n"
+      "  initial $display(\"%0d\", k(c3) == null);\n"
+      "  initial $display(\"%0d\", k(da) == null);\n"
+      "  initial $display(\"%0d\", f(ca));\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {8u, 9u, 10u, 11u, 12u}) {
+    EXPECT_TRUE(
+        ReportedError(f.diag.Diagnostics(), kNotCastCompatible, line, "11.12"))
+        << line;
+  }
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 13, "11.12"));
+}
+
+// §6.24.3: a class handle is a bit-stream cast's source unless its class
+// declares a local or protected member, or inherits one, and a handle gives
+// the members of the object it refers to, or nothing when null (§11.4.14.1),
+// so a C handle for an int or a string formal is not known to fail before the
+// design runs. A handle of L or of Q is reported, and so is a C handle for a
+// real, which is no bit-stream type, or for an associative array, which is
+// never the destination.
+TEST(LetActualScopeElaboration, AHandleIsABitStreamCastsSource) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C; int v; endclass\n"
+      "class L; local int v; endclass\n"
+      "class P; protected int v; endclass\n"
+      "class Q extends P; endclass\n"
+      "module m;\n"
+      "  typedef int aa_t [string];\n"
+      "  C c; L l; Q q; C ca [2];\n"
+      "  let g(int x) = x;\n"
+      "  let s(string x) = x.len();\n"
+      "  let r(real x) = x;\n"
+      "  let a(aa_t x) = x.num();\n"
+      "  initial $display(\"%0d\", g(c) + s(c));\n"
+      "  initial $display(\"%0d\", g(l));\n"
+      "  initial $display(\"%0d\", s(q));\n"
+      "  initial $display(\"%0d\", r(c));\n"
+      "  initial $display(\"%0d\", a(ca));\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 12, "11.12"));
+  for (uint32_t line : {13u, 14u, 15u, 16u}) {
+    EXPECT_TRUE(
+        ReportedError(f.diag.Diagnostics(), kNotCastCompatible, line, "11.12"))
+        << line;
+  }
 }
 
 }  // namespace

@@ -60,14 +60,10 @@ struct NameFrame {
 
   const NameFrame* outer;
   std::unordered_map<std::string_view, NameBinding> names;
-  // Set by a wildcard import of a package no frame was built for, any of
-  // whose names the scope may then hold.
-  bool imports_unknown = false;
 };
 
 // The binding `name` has at `frame`, from the frame itself or the nearest one
-// around it holding the name; null where none does, or where a frame on the
-// way imports a package whose names are not known.
+// around it holding the name; null where none does.
 const NameBinding* FindName(const NameFrame& frame, std::string_view name);
 
 // The binding the scope of `frame` itself declares for `name`, null for a name
@@ -76,7 +72,9 @@ const NameBinding* FindOwnName(const NameFrame* frame, std::string_view name);
 
 // The frame of each package of a compilation unit (§26.2), its declarations
 // over its imports' names. A package may import only a package written before
-// it, so each is built from those before it.
+// it, so each is built from those before it. The built-in package std
+// (§26.7), which no source declares, has a frame of the names Annex G gives
+// it, unless the unit declares a package of that name itself.
 class PackageFrames {
  public:
   explicit PackageFrames(const CompilationUnit* unit);
@@ -90,6 +88,22 @@ class PackageFrames {
  private:
   std::deque<NameFrame> frames_;
   std::vector<std::pair<const PackageDecl*, const NameFrame*>> packages_;
+  NameFrame std_{nullptr};
+};
+
+// The frame of each class a type is named through (§8.23), built the first
+// time it is asked for: the names the class declares, within the frame of
+// the scope declaring it, which a name the class does not declare is looked
+// up in. A class deriving from another, or one with parameters, has none:
+// its names include those it inherits, and its typedefs may stand for the
+// values a specialization gives.
+class ClassFrames {
+ public:
+  const NameFrame* Of(const ClassDecl& cls, const NameFrame& declaring);
+
+ private:
+  std::deque<NameFrame> frames_;
+  std::unordered_map<const ClassDecl*, const NameFrame*> built_;
 };
 
 // Declares `name`, when there is one, as a declaration other than a let, a

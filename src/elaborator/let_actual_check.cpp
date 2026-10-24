@@ -49,9 +49,9 @@ bool IsBitStreamKind(DataTypeKind kind) {
 
 bool IsBitStreamType(const DataType& t, const TypedefMap& typedefs);
 
-// A member of an unpacked structure or union as IsBitStreamType asks of it:
-// its inline aggregate or enum, its built-in kind, or the type its name
-// resolves to. A name resolving to no type, a class's, is taken as one.
+// A member of an unpacked structure as IsBitStreamType asks of it: its inline
+// aggregate or enum, its built-in kind, or the type its name resolves to. A
+// name resolving to no type, a class's, is taken as one.
 bool IsBitStreamMember(const StructMember& m, const TypedefMap& typedefs) {
   if (m.nested_type != nullptr)
     return IsBitStreamType(*m.nested_type, typedefs);
@@ -63,14 +63,16 @@ bool IsBitStreamMember(const StructMember& m, const TypedefMap& typedefs) {
 }
 
 // §6.24.3: whether `t` is a bit-stream type -- an integral, packed or string
-// type, or an unpacked structure or union whose members all are -- which an
-// explicit cast converts to or from a string (§6.16) or another bit-stream
-// type. An unpacked array of one is too, so an array's element type is what
-// this is asked of.
+// type, or an unpacked structure whose members all are -- which an explicit
+// cast converts to or from a string (§6.16) or another bit-stream type. An
+// unpacked array of one is too, so an array's element type is what this is
+// asked of. The clause's list names no unpacked union, so none is one, nor a
+// structure holding one.
 bool IsBitStreamType(const DataType& t, const TypedefMap& typedefs) {
   if (t.kind != DataTypeKind::kStruct && t.kind != DataTypeKind::kUnion)
     return IsBitStreamKind(t.kind);
   if (t.is_packed || t.is_soft) return true;
+  if (t.kind == DataTypeKind::kUnion) return false;
   return std::ranges::all_of(t.struct_members, [&](const StructMember& m) {
     return IsBitStreamMember(m, typedefs);
   });
@@ -136,13 +138,21 @@ Verdict Both(Verdict a, Verdict b) {
 
 Verdict FitsWhen(bool fits) { return fits ? Verdict::kFits : Verdict::kFails; }
 
+// Whether `cls`, or a class it derives from, declares a local or protected
+// member (§8.18), which an object of the class holds whether or not it is
+// seen.
+bool DeclaresHiddenMember(const ClassDecl* cls, const CompilationUnit* unit) {
+  for (; cls != nullptr; cls = FindBaseClass(cls, unit)) {
+    for (const ClassMember* m : cls->members) {
+      if (m->is_local || m->is_protected) return true;
+    }
+  }
+  return false;
+}
+
 bool IsBlockLet(const Stmt* s) {
   return s->kind == StmtKind::kBlockItemDecl &&
          s->decl_item->kind == ModuleItemKind::kLetDecl;
-}
-
-bool IsUnpackedUnion(const DataType& t) {
-  return t.kind == DataTypeKind::kUnion && !t.is_packed && !t.is_soft;
 }
 
 void AddDims(ResolvedSide& side, const std::vector<Expr*>* dims,
@@ -190,9 +200,11 @@ struct BoundFormal {
 class LetActualWalk {
  public:
   LetActualWalk(const LetActualContext& ctx, const PackageFrames& packages,
-                const NameFrame& unit, const NameFrame& parameter_frame)
+                ClassFrames& classes, const NameFrame& unit,
+                const NameFrame& parameter_frame)
       : ctx_(ctx),
         packages_(packages),
+        classes_(classes),
         unit_(unit),
         parameter_frame_(parameter_frame) {}
 
@@ -399,15 +411,45 @@ class LetActualWalk {
   }
 
   // The declaration a type's name reaches: a bare name through the scopes
-  // around `scope`, `$unit::T` the compilation unit's own and `p::T` the
-  // package's own. None for a name behind a class, which ClassOfDeclaredType
-  // follows.
+  // around `scope`, and a name behind prefixes the one the scope they name
+  // declares (ScopeNamed). None where the prefixes name no scope with a
+  // frame, which leaves a class's name to ClassOfDeclaredType.
   const NameBinding* TypeName(const DataType& type,
                               const NameFrame& scope) const {
-    if (!type.outer_scope_names.empty()) return nullptr;
     if (type.scope_name.empty()) return FindName(scope, type.type_name);
-    if (type.scope_name == "$unit") return FindOwnName(&unit_, type.type_name);
-    return FindOwnName(packages_.Find(type.scope_name), type.type_name);
+    return FindOwnName(ScopeNamed(type, scope), type.type_name);
+  }
+
+  // The frame of the scope a type's prefixes name, outermost first: `$unit`
+  // the compilation unit's (§3.12.1), a class the scopes around `scope` see
+  // under the first prefix (§8.23), else the package of that name (§26.3),
+  // and each later prefix a class the scope before it declares, so that
+  // `C::t`, `p::C::t` and `Outer::Inner::t` each reach the typedef the class
+  // declares. Null where a prefix names none, or a class with no frame
+  // (ClassFrames).
+  const NameFrame* ScopeNamed(const DataType& type,
+                              const NameFrame& scope) const {
+    std::vector<std::string_view> prefixes = type.outer_scope_names;
+    prefixes.push_back(type.scope_name);
+    const NameFrame* frame = OutermostScope(prefixes.front(), scope);
+    for (size_t i = 1; frame != nullptr && i < prefixes.size(); ++i)
+      frame = ClassFrame(FindOwnName(frame, prefixes[i]));
+    return frame;
+  }
+
+  const NameFrame* OutermostScope(std::string_view prefix,
+                                  const NameFrame& scope) const {
+    if (prefix == "$unit") return &unit_;
+    const NameBinding* named = FindName(scope, prefix);
+    if (named == nullptr || named->kind != NameKind::kClass)
+      return packages_.Find(prefix);
+    return classes_.Of(*named->cls, *named->scope);
+  }
+
+  // The frame of the class `named` declares, null where it is no class's.
+  const NameFrame* ClassFrame(const NameBinding* named) const {
+    if (named == nullptr || named->kind != NameKind::kClass) return nullptr;
+    return classes_.Of(*named->cls, *named->scope);
   }
 
   // A chain ending in `type`, the name of a class: the class `named` declares,
@@ -443,21 +485,45 @@ class LetActualWalk {
                                         : kAssigned;
   }
 
-  // §6.22.5: a class handle is type incompatible with every type but a
-  // class's. §8.12 passes one up its hierarchy by assignment and §8.16 down it
-  // by $cast, so two class types fit where they are one class or one derives
-  // from the other (IsClassDeclDerivedFrom, which follows interface classes
-  // too). An array of handles is left alone.
+  // §6.24.3 makes a class illegal as a bit-stream cast's destination, so a
+  // formal holding class handles takes an actual by assignment alone: a lone
+  // handle by its hierarchy -- §8.12 passes one up it and §8.16 down it by
+  // $cast, so two classes fit where they are one or one derives from the
+  // other (IsClassDeclDerivedFrom, which follows interface classes too) --
+  // and an array by §7.6, its elements of the formal's own class, which
+  // §6.22.2 makes equivalent to itself alone. Handles for a formal holding
+  // none are HandlesAsBitStream's.
   Verdict ClassesFit(const ResolvedSide& actual,
                      const ResolvedSide& formal) const {
-    const ResolvedSide& handle = actual.cls != nullptr ? actual : formal;
-    if (actual.cls == nullptr || formal.cls == nullptr)
-      return handle.dims.empty() ? Verdict::kFails : Verdict::kUnknown;
-    if (!actual.dims.empty() || !formal.dims.empty()) return Verdict::kUnknown;
-    return FitsWhen(
-        actual.cls == formal.cls ||
-        IsClassDeclDerivedFrom(actual.cls, formal.cls->name, ctx_.unit) ||
-        IsClassDeclDerivedFrom(formal.cls, actual.cls->name, ctx_.unit));
+    if (formal.cls == nullptr) return HandlesAsBitStream(actual, formal);
+    if (actual.cls == nullptr) return Verdict::kFails;
+    if (actual.dims.empty() && formal.dims.empty())
+      return FitsWhen(
+          actual.cls == formal.cls ||
+          IsClassDeclDerivedFrom(actual.cls, formal.cls->name, ctx_.unit) ||
+          IsClassDeclDerivedFrom(formal.cls, actual.cls->name, ctx_.unit));
+    if (actual.cls != formal.cls) return Verdict::kFails;
+    return DimensionsAssign(actual, formal);
+  }
+
+  // §6.24.3: class handles convert by a bit-stream cast to a bit-stream type
+  // other than an associative array, unless their class, or one it derives
+  // from, declares a local or protected member. A non-null handle gives the
+  // members of the object it refers to, which may be of a class derived from
+  // its own, and a null one gives nothing (§11.4.14.1), so how many bits
+  // handles give is not known before the design runs. §6.22.5 has a handle
+  // type incompatible with every type but a class's; were that to decide
+  // here, §6.24.3's rule on a source's local and protected members would
+  // have nothing to apply to.
+  Verdict HandlesAsBitStream(const ResolvedSide& actual,
+                             const ResolvedSide& formal) const {
+    const bool kAssociative =
+        !formal.dims.empty() &&
+        Shape(formal.dims.front()).kind == DimKind::kAssociative;
+    if (kAssociative || !IsBitStreamType(*formal.end, ctx_.shapes.typedefs) ||
+        DeclaresHiddenMember(actual.cls, ctx_.unit))
+      return Verdict::kFails;
+    return Verdict::kUnknown;
   }
 
   // §7.6: an unpacked array is assignment compatible with another of as many
@@ -467,9 +533,16 @@ class LetActualWalk {
   // equivalent to it alone, which no integral or real rule widens.
   Verdict AssignmentRoute(const ResolvedSide& actual,
                           const ResolvedSide& formal) const {
-    if (actual.dims.size() != formal.dims.size() ||
-        !TypesEquivalent(*actual.end, *formal.end))
-      return Verdict::kFails;
+    if (!TypesEquivalent(*actual.end, *formal.end)) return Verdict::kFails;
+    return DimensionsAssign(actual, formal);
+  }
+
+  // §7.6: the unpacked dimensions of two sides whose element types are
+  // equivalent assign where they are as many, each faster-varying one of the
+  // other's size, and the slowest as SlowestDimensionsAssign has it.
+  Verdict DimensionsAssign(const ResolvedSide& actual,
+                           const ResolvedSide& formal) const {
+    if (actual.dims.size() != formal.dims.size()) return Verdict::kFails;
     if (actual.dims.empty()) return Verdict::kFits;
     Verdict verdict = SlowestDimensionsAssign(Shape(actual.dims.front()),
                                               Shape(formal.dims.front()));
@@ -498,11 +571,9 @@ class LetActualWalk {
 
   // The number of bits a fixed-size side holds; nothing for a side of a
   // dynamically sized type, a string being a dynamic array of bytes to a
-  // bit-stream cast (§6.24.3), or of a size not known here. An unpacked
-  // union's is not taken.
+  // bit-stream cast (§6.24.3), or of a size not known here.
   std::optional<uint64_t> BitSize(const ResolvedSide& side) const {
-    if (side.end->kind == DataTypeKind::kString || IsUnpackedUnion(*side.end))
-      return std::nullopt;
+    if (side.end->kind == DataTypeKind::kString) return std::nullopt;
     const uint32_t kWidth = BitStreamTypeWidth(*side.end, ctx_.shapes.typedefs);
     if (kWidth == 0) return std::nullopt;
     uint64_t bits = kWidth;
@@ -541,6 +612,7 @@ class LetActualWalk {
 
   const LetActualContext& ctx_;
   const PackageFrames& packages_;
+  ClassFrames& classes_;
   const NameFrame& unit_;
   const NameFrame& parameter_frame_;
 };
@@ -556,7 +628,8 @@ void CheckLetActualsOfDesignElement(const ModuleDecl& decl,
   NameFrame element(&unit);
   DeclareHeader(element, decl);
   DeclareScope(element, decl.items, kPackages);
-  const LetActualWalk kWalk(ctx, kPackages, unit, element);
+  ClassFrames classes;
+  const LetActualWalk kWalk(ctx, kPackages, classes, unit, element);
   kWalk.CheckItems(decl.items, element);
 }
 
@@ -564,7 +637,8 @@ void CheckLetActualsOfUnitAndPackages(const LetActualContext& ctx) {
   const PackageFrames kPackages(ctx.unit);
   NameFrame unit(nullptr);
   DeclareUnitScope(unit, ctx.unit->cu_items, *ctx.unit, kPackages);
-  const LetActualWalk kUnitWalk(ctx, kPackages, unit, unit);
+  ClassFrames classes;
+  const LetActualWalk kUnitWalk(ctx, kPackages, classes, unit, unit);
   kUnitWalk.CheckItems(ctx.unit->cu_items, unit);
   // A package's parameters are held under keys of their package's, not under
   // the bare names its dimensions are written with, so a package's
@@ -573,7 +647,7 @@ void CheckLetActualsOfUnitAndPackages(const LetActualContext& ctx) {
   const LetActualContext kPackageCtx{ctx.unit, ctx.shapes, kNoParameters,
                                      ctx.diag};
   for (const auto& [pkg, frame] : kPackages.All()) {
-    const LetActualWalk kWalk(kPackageCtx, kPackages, unit, *frame);
+    const LetActualWalk kWalk(kPackageCtx, kPackages, classes, unit, *frame);
     kWalk.CheckItems(pkg->items, *frame);
   }
 }
