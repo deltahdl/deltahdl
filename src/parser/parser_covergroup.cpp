@@ -98,7 +98,33 @@ void ReportUnboundedExcludingTransitions(const BinsOrOptions& bins,
   }
 }
 
+// A.6.5: whether `e` is the name an unparenthesized clocking event writes
+// after its '@': an identifier, a package-scoped one, or a hierarchical one.
+// `prefix` marks an `e` standing before a '.' or '::', the one place A.9.3's
+// hierarchical_identifier lets a bit-select stand.
+bool IsClockingEventName(const Expr* e, bool prefix) {
+  if (e->kind == ExprKind::kIdentifier) return true;
+  if (e->kind == ExprKind::kMemberAccess) {
+    return IsClockingEventName(e->lhs, true);
+  }
+  return e->kind == ExprKind::kSelect && prefix;
+}
+
 }  // namespace
+
+void ReportStrayCoverageToken(const Token& stray, DiagEngine& diag) {
+  if (stray.Is(TokenKind::kEof)) return;
+  diag.Error(stray.loc,
+             std::format("a covergroup item is complete here; '{}' is not "
+                         "part of it",
+                         stray.text),
+             Subclause("A.2.11"));
+}
+
+void ReportUnnamedBin(SourceLoc at, DiagEngine& diag) {
+  diag.Error(at, "a bin is named; a bin_identifier follows its bins keyword",
+             Subclause("A.2.11"));
+}
 
 void Parser::ParseCovergroupDecl(std::vector<ModuleItem*>& items) {
   auto* item = arena_.Create<ModuleItem>();
@@ -219,6 +245,12 @@ void Parser::ParseCoverageEvent(CovergroupBodyState& state) {
     if (Check(TokenKind::kIdentifier) || Check(TokenKind::kSystemIdentifier)) {
       EventExpr named;
       named.signal = ParseExpr();
+      if (!IsClockingEventName(named.signal, false)) {
+        diag_.Error(named.signal->range.start,
+                    "an unparenthesized clocking event is '@' and a name; an "
+                    "expression is parenthesized",
+                    Subclause("A.6.5"));
+      }
       event.clocking.push_back(named);
       return;
     }
@@ -350,6 +382,12 @@ void Parser::ParseLabelledCoverageSpec(CovergroupBodyState& state,
   Token label = Consume();
   if (Match(TokenKind::kColon) && IsCoverpointOrCross(CurrentToken().kind)) {
     if (Check(TokenKind::kKwCross)) {
+      if (data_type != nullptr) {
+        diag_.Error(label.loc,
+                    "a cross takes no data type; one is written before a "
+                    "coverpoint's label alone",
+                    Subclause("A.2.11"));
+      }
       ParseCoverCross(state, label.text, label.loc);
     } else {
       ParseCoverPoint(state, label.text, label.loc, data_type);
@@ -443,6 +481,9 @@ void Parser::ParseCovergroupOption(CovergroupBodyState& state) {
     }
     RejectFormalInTypeOption(item.option, state);
     state.cg->items.push_back(item);
+  }
+  if (item.option.value != nullptr && !Check(TokenKind::kSemicolon)) {
+    ReportStrayCoverageToken(CurrentToken(), diag_);
   }
   while (!Check(TokenKind::kSemicolon) && !Check(TokenKind::kKwEndgroup) &&
          !AtEnd()) {
@@ -596,6 +637,9 @@ void Parser::ParseCoverPoint(CovergroupBodyState& state, std::string_view label,
   item.kind = CoverageSpecKind::kCoverPoint;
   item.cover_point = cp;
   state.cg->items.push_back(item);
+  if (!Check(TokenKind::kSemicolon) && !Check(TokenKind::kLBrace)) {
+    ReportStrayCoverageToken(CurrentToken(), diag_);
+  }
   while (!Check(TokenKind::kSemicolon) && !Check(TokenKind::kLBrace) &&
          !AtEnd()) {
     Consume();
@@ -692,7 +736,11 @@ bool Parser::ParseBinsOrOptions(BinsOrOptions& bins,
     return false;
   }
   bins.keyword = BinsKeywordOf(Consume().kind);
-  if (Check(TokenKind::kIdentifier)) bins.name = Consume().text;
+  if (Check(TokenKind::kIdentifier)) {
+    bins.name = Consume().text;
+  } else {
+    ReportUnnamedBin(CurrentLoc(), diag_);
+  }
   if (Match(TokenKind::kLBracket)) {
     bins.is_array = true;
     if (!Check(TokenKind::kRBracket)) bins.array_size = ParseExpr();

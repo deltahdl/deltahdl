@@ -1,3 +1,4 @@
+#include <optional>
 #include <string_view>
 #include <vector>
 
@@ -42,6 +43,21 @@ void ReadOtherNamesAsCrossSets(SelectExpression* select, std::string_view label,
   select->cross_name = {};
 }
 
+// A.2.11: reports, at `at`, a `$` standing other than as one bound of a `:`
+// value range.
+void ReportMisplacedDollar(SourceLoc at, DiagEngine& diag) {
+  diag.Error(at,
+             "'$' stands for one bound of a '[ lo : hi ]' value range alone",
+             Subclause("A.2.11"));
+}
+
+// A.2.11: notes, in `stray`, the first comma of a cross's list of items met
+// at `at` while an item is due, `item_due`.
+void NoteStrayCrossComma(bool item_due, SourceLoc at,
+                         std::optional<SourceLoc>& stray) {
+  if (item_due && !stray.has_value()) stray = at;
+}
+
 }  // namespace
 
 // A.2.11 covergroup_range_list: covergroup_value_ranges joined by ','.
@@ -53,14 +69,17 @@ void Parser::ParseCovergroupRangeList(
 }
 
 // A.2.11 covergroup_value_range: an expression, `[ lo : hi ]` with either
-// bound `$`, `[ center +/- tolerance ]` or `[ center +%- percent ]` (§19.5.1).
+// bound but not both `$`, `[ center +/- tolerance ]` or `[ center +%- percent
+// ]` (§19.5.1). A `$` standing anywhere else is reported where it stands.
 CovergroupValueRange Parser::ParseCovergroupValueRange() {
   CovergroupValueRange range;
   if (!Match(TokenKind::kLBracket)) {
     range.lo = ParseExpr();
     return range;
   }
-  if (!Match(TokenKind::kDollar)) range.lo = ParseExpr();
+  const SourceLoc kLowLoc = CurrentLoc();
+  const bool kLowDollar = Match(TokenKind::kDollar);
+  if (!kLowDollar) range.lo = ParseExpr();
   if (Match(TokenKind::kPlusSlashMinus)) {
     range.kind = CovergroupValueRangeKind::kAbsoluteTolerance;
     range.hi = ParseExpr();
@@ -70,7 +89,15 @@ CovergroupValueRange Parser::ParseCovergroupValueRange() {
   } else {
     range.kind = CovergroupValueRangeKind::kRange;
     Expect(TokenKind::kColon, Subclause("A.2.11"));
-    if (!Match(TokenKind::kDollar)) range.hi = ParseExpr();
+    const SourceLoc kHighLoc = CurrentLoc();
+    if (!Match(TokenKind::kDollar)) {
+      range.hi = ParseExpr();
+    } else if (kLowDollar) {
+      ReportMisplacedDollar(kHighLoc, diag_);
+    }
+  }
+  if (kLowDollar && range.kind != CovergroupValueRangeKind::kRange) {
+    ReportMisplacedDollar(kLowLoc, diag_);
   }
   Expect(TokenKind::kRBracket, Subclause("A.2.11"));
   return range;
@@ -151,6 +178,7 @@ void Parser::ValidateCrossItemList(std::vector<CrossItem>& items) {
   SourceLoc start = CurrentLoc();
   bool expr_item = false;
   bool expect_item = true;
+  std::optional<SourceLoc> stray_comma;
   while (!AtEnd()) {
     TokenKind k = CurrentToken().kind;
     if (k == TokenKind::kKwIff || k == TokenKind::kLBrace ||
@@ -158,7 +186,7 @@ void Parser::ValidateCrossItemList(std::vector<CrossItem>& items) {
       break;
     }
     if (k == TokenKind::kComma) {
-      Consume();
+      NoteStrayCrossComma(expect_item, Consume().loc, stray_comma);
       expect_item = true;
       continue;
     }
@@ -173,6 +201,7 @@ void Parser::ValidateCrossItemList(std::vector<CrossItem>& items) {
     expr_item = true;
     Consume();
   }
+  NoteStrayCrossComma(expect_item && !items.empty(), CurrentLoc(), stray_comma);
   if (expr_item) {
     diag_.Error(start,
                 "a cross item names a coverage point or a variable; to cross "
@@ -182,11 +211,20 @@ void Parser::ValidateCrossItemList(std::vector<CrossItem>& items) {
     diag_.Error(start, "a cross shall list at least two coverage points",
                 Subclause("19.6"));
   }
+  if (stray_comma.has_value()) {
+    diag_.Error(*stray_comma,
+                "a cross lists its items with one ',' between each two of "
+                "them",
+                Subclause("A.2.11"));
+  }
 }
 
 // A.2.11 cross_body: `;`, or a brace holding function declarations, options
 // and bins selections, each item but a function ending in ';'.
 void Parser::ParseCrossBody(CoverCrossDecl& cross, CovergroupBodyState& state) {
+  if (!Check(TokenKind::kSemicolon) && !Check(TokenKind::kLBrace)) {
+    ReportStrayCoverageToken(CurrentToken(), diag_);
+  }
   while (!Check(TokenKind::kSemicolon) && !Check(TokenKind::kLBrace) &&
          !AtEnd()) {
     Consume();
@@ -256,7 +294,11 @@ bool Parser::ParseBinsSelection(BinsSelection& bins) {
     return false;
   }
   bins.keyword = BinsKeywordOf(Consume().kind);
-  if (Check(TokenKind::kIdentifier)) bins.name = Consume().text;
+  if (Check(TokenKind::kIdentifier)) {
+    bins.name = Consume().text;
+  } else {
+    ReportUnnamedBin(CurrentLoc(), diag_);
+  }
   if (Check(TokenKind::kLBracket)) {
     diag_.Error(CurrentLoc(),
                 "a cross bin is not an array; a bins_selection subscripts "
@@ -355,6 +397,11 @@ bool Parser::IdentifierIsCrossName() {
 SelectExpression* Parser::ParseSelectPrimary() {
   SourceLoc loc = CurrentLoc();
   if (Match(TokenKind::kBang)) {
+    if (!Check(TokenKind::kKwBinsof)) {
+      diag_.Error(loc,
+                  "'!' negates a binsof select_condition; 'binsof' follows it",
+                  Subclause("A.2.11"));
+    }
     auto* negated = NewSelectExpression(SelectExpressionKind::kNot, loc);
     negated->lhs = ParseSelectPrimary();
     return negated;
@@ -391,6 +438,11 @@ SelectExpression* Parser::ParseSelectCondition() {
     if (Match(TokenKind::kDot)) {
       condition->bins_of_bin = ExpectIdentifier(Subclause("A.2.11")).text;
     }
+  } else {
+    diag_.Error(CurrentLoc(),
+                "binsof names a coverpoint, a coverpoint's bin or a variable; "
+                "none is written",
+                Subclause("A.2.11"));
   }
   ExpectCoverageCloseParen();
   if (Match(TokenKind::kKwIntersect)) {

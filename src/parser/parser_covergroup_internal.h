@@ -5,10 +5,13 @@
 #include <unordered_set>
 #include <vector>
 
+#include "common/source_loc.h"
 #include "lexer/token.h"
 #include "parser/ast_covergroup.h"
 
 namespace delta {
+
+class DiagEngine;
 
 // The token tests the covergroup body readers in parser_covergroup.cpp and
 // parser_covergroup_cross.cpp share (A.2.11).
@@ -35,6 +38,14 @@ struct CovergroupBodyState {
   std::vector<std::string_view> formals;
   std::unordered_set<std::string_view> names;
 };
+
+// A.2.11: reports `stray`, a token standing where a complete covergroup
+// item's ';' or body is due. The end of the file is a missing terminator, not
+// a stray token, and is left to the report of the covergroup's 'endgroup'.
+void ReportStrayCoverageToken(const Token& stray, DiagEngine& diag);
+
+// A.2.11: reports, at `at`, a bins keyword no bin_identifier follows.
+void ReportUnnamedBin(SourceLoc at, DiagEngine& diag);
 
 inline BinsKeyword BinsKeywordOf(TokenKind k) {
   if (k == TokenKind::kKwIllegalBins) return BinsKeyword::kIllegalBins;
