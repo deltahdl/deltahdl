@@ -354,14 +354,14 @@ struct ItemElaborationStateSaver {
   // entry, which is what a lexically nested module (§23.4) requires and a
   // separately instantiated one does not; that is a different question from the
   // one settled here, which is what one module leaves behind for the next.
-  decltype(Elaborator::typedefs_) typedefs;
-  decltype(Elaborator::cu_param_scope_) cu_param_scope;
-  decltype(Elaborator::td_array_dims_) td_array_dims;
+  struct ScopeMaps {
+    decltype(Elaborator::typedefs_) typedefs;
+    decltype(Elaborator::cu_param_scope_) cu_param_scope;
+    decltype(Elaborator::td_array_dims_) td_array_dims;
+  } scope_maps;
 
   explicit ItemElaborationStateSaver(Elaborator& e)
-      : typedefs(e.typedefs_),
-        cu_param_scope(e.cu_param_scope_),
-        td_array_dims(e.td_array_dims_) {
+      : scope_maps{e.typedefs_, e.cu_param_scope_, e.td_array_dims_} {
     forward_typedef_kinds = std::move(e.forward_typedef_kinds_);
     declared_names = std::move(e.declared_names_);
     dpi_import_names = std::move(e.dpi_import_names_);
@@ -425,9 +425,9 @@ struct ItemElaborationStateSaver {
       e.all_cu_param_scope_.insert_or_assign(name, val);
     for (const auto& [name, dims] : e.td_array_dims_)
       e.all_td_array_dims_.insert_or_assign(name, dims);
-    e.typedefs_ = std::move(typedefs);
-    e.cu_param_scope_ = std::move(cu_param_scope);
-    e.td_array_dims_ = std::move(td_array_dims);
+    e.typedefs_ = std::move(scope_maps.typedefs);
+    e.cu_param_scope_ = std::move(scope_maps.cu_param_scope);
+    e.td_array_dims_ = std::move(scope_maps.td_array_dims);
   }
 
   void Restore(Elaborator& e) {

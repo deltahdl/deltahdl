@@ -521,8 +521,8 @@ bool Elaborator::ElaborateTopModules(const std::vector<ModuleDecl*>& top_decls,
   // the last one happened to leave behind. ProcessPendingGenerate does not:
   // §26.3 makes an imported name locally visible only before that point in the
   // current scope, so it installs the maps Elaborator::ElaborateBehavioralItem
-  // captured onto each ElaboratorData::PendingGenerate instead of reading these
-  // three.
+  // captured onto each PendingGenerate (elaborator/pending_generate.h) instead
+  // of reading these three.
   typedefs_ = all_typedefs_;
   cu_param_scope_ = all_cu_param_scope_;
   td_array_dims_ = all_td_array_dims_;
