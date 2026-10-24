@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
@@ -481,6 +483,73 @@ TEST(RandsequenceSyntaxParsing, RandJoinSingleItemErrors) {
   // where §18.17 requires the second one's identifier.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected identifier, got ';'", 4, "18.17"));
+}
+
+// rs_code_block ::= { { data_declaration } { statement_or_null } }, so of
+// A.2.8's block item declarations a code block takes the data_declarations
+// alone: a localparam, a parameter or a let is reported, in a production's
+// code block and in a weight's, while a variable, a typedef and a variable of
+// the typedef's type are not.
+TEST(RandsequenceSyntaxParsing, CodeBlockDeclaresDataOnly) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    randsequence (main)\n"
+      "      main : { localparam int L = 1; $display(L); };\n"
+      "    endsequence\n"
+      "    randsequence (top)\n"
+      "      top : { parameter int P = 2; $display(P); };\n"
+      "    endsequence\n"
+      "    randsequence (go)\n"
+      "      go : { let twice(a) = 2 * a; $display(twice(3)); };\n"
+      "    endsequence\n"
+      "    randsequence (ok)\n"
+      "      ok : { int i = 4; typedef bit t; t j; $display(i, j); };\n"
+      "    endsequence\n"
+      "    randsequence (w)\n"
+      "      w : a := 2 { localparam int W = 1; };\n"
+      "      a : { ; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n");
+  const char* msg =
+      "a randsequence code block declares data, never a parameter or a let";
+  for (uint32_t line : {4U, 7U, 10U, 16U}) {
+    EXPECT_TRUE(ReportedError(r.diags, msg, line, "A.6.12"));
+  }
+  EXPECT_FALSE(ReportedError(r.diags, msg, 13, "A.6.12"));
+}
+
+// A code block's data_declarations all come before its first
+// statement_or_null, so a declaration after a statement, or after a null
+// statement, is reported, and the one opening a code block is not.
+TEST(RandsequenceSyntaxParsing, CodeBlockDeclarationAfterAStatementIsReported) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    randsequence (main)\n"
+      "      main : {\n"
+      "        int a = 1;\n"
+      "        $display(a);\n"
+      "        int b = 2;\n"
+      "        $display(b);\n"
+      "      };\n"
+      "    endsequence\n"
+      "    randsequence (top)\n"
+      "      top : {\n"
+      "        ;\n"
+      "        int c = 3;\n"
+      "        $display(c);\n"
+      "      };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n");
+  const char* msg =
+      "a declaration cannot follow a statement in a randsequence code block";
+  for (uint32_t line : {7U, 14U}) {
+    EXPECT_TRUE(ReportedError(r.diags, msg, line, "A.6.12"));
+  }
+  EXPECT_FALSE(ReportedError(r.diags, msg, 5, "A.6.12"));
 }
 
 }  // namespace

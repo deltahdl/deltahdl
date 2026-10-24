@@ -11,14 +11,39 @@
 // file, randcase being the weighted selection randsequence's rule lists are
 // built on.
 
+#include <cstddef>
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "lexer/token.h"
+#include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 #include "parser/parser.h"
 
 namespace delta {
+
+namespace {
+
+// A.6.12 writes an rs_code_block's declarations as data_declarations, and
+// three of A.2.8's block item declarations are none: a
+// local_parameter_declaration and a parameter_declaration, which
+// Parser::ParseBlockVarDecls carries as a parameter's kVarDecl, and a
+// let_declaration, which it carries as a kBlockItemDecl over the let's item.
+// Reports one at `loc`, where the declaration whose first statement is `decl`
+// opens.
+void ReportNonDataCodeBlockDecl(const Stmt* decl, SourceLoc loc,
+                                DiagEngine& diag) {
+  const bool kIsLet = decl->kind == StmtKind::kBlockItemDecl &&
+                      decl->decl_item->kind == ModuleItemKind::kLetDecl;
+  if (!decl->var_is_param && !kIsLet) return;
+  diag.Error(loc,
+             "a randsequence code block declares data, never a parameter or "
+             "a let",
+             Subclause("A.6.12"));
+}
+
+}  // namespace
 
 Stmt* Parser::ParseRandcaseStmt() {
   auto* stmt = arena_.Create<Stmt>();
@@ -85,12 +110,27 @@ void Parser::ParseRsCodeBlockStmts(std::vector<Stmt*>& stmts) {
     ~DepthGuard() { --d; }
   } guard(rs_code_block_depth_);
 
+  // A.6.12 writes a code block's declarations before its statement_or_nulls,
+  // so a declaration after the first statement, a null one included, is
+  // reported. Each declaration is still read, so that the names it declares
+  // resolve in the block.
+  bool before_stmts = true;
   while (!Check(TokenKind::kRBrace) && !AtEnd()) {
-    if (IsBlockVarDeclStart()) {
-      ParseBlockVarDecls(stmts);
-    } else {
+    if (!IsBlockVarDeclStart()) {
+      before_stmts = false;
       stmts.push_back(ParseStmt());
+      continue;
     }
+    const SourceLoc kLoc = CurrentLoc();
+    if (!before_stmts) {
+      diag_.Error(kLoc,
+                  "a declaration cannot follow a statement in a randsequence "
+                  "code block",
+                  Subclause("A.6.12"));
+    }
+    const size_t kFirst = stmts.size();
+    ParseBlockVarDecls(stmts);
+    ReportNonDataCodeBlockDecl(stmts[kFirst], kLoc, diag_);
   }
 }
 

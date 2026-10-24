@@ -102,13 +102,15 @@ bool Parser::IsBlockVarDeclStart() {
 }
 
 // The keywords that open a block-item declaration outright, with nothing
-// after them to look at: a lifetime, a parameter, `const`, a typedef, an
-// import, a let, an aggregate or enum type, `var`, a type reference -- which
-// A.2.2.1 makes a data_type and no statement opens with -- and `virtual` --
-// A.2.2.1 lists `virtual [interface] interface_identifier` among data_type's
-// alternatives, so a block item opening with it is a §25.9 virtual interface
-// declaration wherever A.2.8 places one, the locals of a task or function body
-// and the head of a seq_block; no statement opens with the keyword, and
+// after them to look at: a lifetime, a parameter, `const`, a typedef, a
+// nettype -- A.2.1.3 counts a nettype_declaration among data_declaration's
+// forms, and A.2.8 makes each a block item -- an import, a let, an aggregate
+// or enum type, `var`, a type reference -- which A.2.2.1 makes a data_type
+// and no statement opens with -- and `virtual` -- A.2.2.1 lists `virtual
+// [interface] interface_identifier` among data_type's alternatives, so a
+// block item opening with it is a §25.9 virtual interface declaration
+// wherever A.2.8 places one, the locals of a task or function body and the
+// head of a seq_block; no statement opens with the keyword, and
 // ParseDataType reads the type from it.
 static bool OpensBlockDeclOutright(TokenKind tk) {
   switch (tk) {
@@ -118,6 +120,7 @@ static bool OpensBlockDeclOutright(TokenKind tk) {
     case TokenKind::kKwLocalparam:
     case TokenKind::kKwConst:
     case TokenKind::kKwTypedef:
+    case TokenKind::kKwNettype:
     case TokenKind::kKwImport:
     case TokenKind::kKwLet:
     case TokenKind::kKwStruct:
@@ -297,8 +300,9 @@ void Parser::ParseBlockDataDecl(std::vector<Stmt*>& stmts,
 
 namespace {
 
-// A let, typedef or import among a block's items, carried as a kBlockItemDecl
-// statement over the ModuleItem its parse returned, starting at `loc`.
+// A let, typedef, nettype or import among a block's items, carried as a
+// kBlockItemDecl statement over the ModuleItem its parse returned, starting
+// at `loc`.
 Stmt* BlockItemDeclStmt(Arena& arena, ModuleItem* item, SourceLoc loc,
                         std::vector<Attribute> attrs) {
   auto* s = arena.Create<Stmt>();
@@ -325,6 +329,13 @@ void Parser::ParseBlockVarDecls(std::vector<Stmt*>& stmts) {
     SourceLoc loc = CurrentLoc();
     stmts.push_back(
         BlockItemDeclStmt(arena_, ParseTypedef(), loc, std::move(attrs)));
+    return;
+  }
+
+  if (Check(TokenKind::kKwNettype)) {
+    SourceLoc loc = CurrentLoc();
+    stmts.push_back(
+        BlockItemDeclStmt(arena_, ParseNettypeDecl(), loc, std::move(attrs)));
     return;
   }
 

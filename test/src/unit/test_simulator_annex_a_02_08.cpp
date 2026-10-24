@@ -70,4 +70,33 @@ TEST(BlockItemDeclSim, ParameterBlockItemProducesRuntimeValue) {
   LowerRunAndCheck(f, design, {{"x", 4u}});
 }
 
+// A nettype_declaration block item, one of data_declaration's forms
+// (A.2.1.3). It declares a type for nets, which no procedural block declares,
+// so what is observed is that an initial block, a task body and a function
+// body each run the statements after it: the task writes 5 to x and the
+// function's 7 brings y to 37.
+TEST(BlockItemDeclSim, NettypeBlockItemLeavesTheStatementsAfterItRunning) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  logic [7:0] y;\n"
+      "  task automatic tk(output logic [7:0] o);\n"
+      "    nettype real rt;\n"
+      "    o = 8'd5;\n"
+      "  endtask\n"
+      "  function int f;\n"
+      "    nettype bit nb;\n"
+      "    return 7;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    nettype logic [3:0] nt;\n"
+      "    tk(x);\n"
+      "    y = f() + 8'd30;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"x", 5u}, {"y", 37u}});
+}
+
 }  // namespace

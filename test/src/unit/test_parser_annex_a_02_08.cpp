@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string_view>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
@@ -358,6 +360,40 @@ TEST(BlockItemDeclParsing, InlineAggregateVariablesInAnInitialBlock) {
   EXPECT_NE(body[3]->var_init, nullptr);
   for (int i = 0; i < 4; ++i) EXPECT_EQ(body[i]->kind, StmtKind::kVarDecl);
   EXPECT_NE(body[4]->kind, StmtKind::kVarDecl);
+}
+
+// A.2.1.3 counts a nettype_declaration among data_declaration's forms, and
+// A.2.8 makes every data_declaration a block item, so a seq_block, a task body
+// and a function body each declare a nettype among their items. Each is
+// carried as a block's typedef is, over the item Parser::ParseNettypeDecl
+// returns.
+TEST(BlockItemDeclParsing, NettypeDeclIsABlockItem) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    nettype logic [3:0] nt;\n"
+      "    $display(\"x\");\n"
+      "  end\n"
+      "  task t;\n"
+      "    nettype real rt;\n"
+      "  endtask\n"
+      "  function int f;\n"
+      "    nettype bit nb;\n"
+      "    return 0;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto declares_nettype = [](const Stmt* s, std::string_view name) {
+    return s->kind == StmtKind::kBlockItemDecl &&
+           s->decl_item->kind == ModuleItemKind::kNettypeDecl &&
+           s->decl_item->name == name;
+  };
+  EXPECT_TRUE(declares_nettype(FirstInitialStmt(r), "nt"));
+  const auto& items = r.cu->modules[0]->items;
+  ASSERT_EQ(items.size(), 3U);
+  EXPECT_TRUE(declares_nettype(items[1]->func_body_stmts[0], "rt"));
+  EXPECT_TRUE(declares_nettype(items[2]->func_body_stmts[0], "nb"));
 }
 
 }  // namespace

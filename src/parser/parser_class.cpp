@@ -160,19 +160,43 @@ struct ParserClassHelpers {
                   Subclause("A.1.9"));
   }
 
-  // A.1.9's interface_class_item: an interface_class_method takes no qualifier
-  // but `pure virtual`, and a type_declaration takes none, where a class's
-  // items take more. Each member `decl` gained from `first` on is reported
-  // only for the qualifiers its item in a class that is no interface class
-  // admits, the others having been reported there already. `static` on a
-  // method is left to §8.10, since an interface class's methods are virtual.
-  static void RejectInterfaceClassItemQualifiers(Parser& p,
-                                                 const ClassDecl& decl,
-                                                 size_t first) {
+  // A type_declaration, or a nettype_declaration where `is_nettype` says so,
+  // as a class_property: A.1.9 makes the property a data_declaration behind
+  // its qualifiers, and A.2.1.3 counts both among data_declaration's forms, so
+  // each takes the qualifiers a class_property takes. The member is carried
+  // over the item its parse returns, a nettype's as a typedef's is.
+  static void ParseTypeMember(Parser& p, std::vector<ClassMember*>& members,
+                              ClassMember* member, bool is_nettype) {
+    p.RejectMisplacedClassQualifiers(
+        *member,
+        Parser::kQualRand | Parser::kQualRandc | Parser::kQualStatic |
+            Parser::kQualProtected | Parser::kQualLocal,
+        is_nettype ? "nettype declaration" : "type declaration");
+    member->kind = ClassMemberKind::kTypedef;
+    member->typedef_item = is_nettype ? p.ParseNettypeDecl() : p.ParseTypedef();
+    member->name = member->typedef_item->name;
+    members.push_back(member);
+  }
+
+  // A.1.9's interface_class_item (printed page 1179): an interface_class_method
+  // takes no qualifier but `pure virtual`, and a type_declaration takes none,
+  // where a class's items take more. Each member `decl` gained from `first` on
+  // is reported only for the qualifiers its item in a class that is no
+  // interface class admits, the others having been reported there already.
+  // `static` on a method is left to §8.10, since an interface class's methods
+  // are virtual. A nettype_declaration is a data_declaration and no
+  // type_declaration, so a nettype member is reported as no item of the class.
+  static void CheckInterfaceClassItems(Parser& p, const ClassDecl& decl,
+                                       size_t first) {
     if (!decl.is_interface) return;
     for (size_t i = first; i < decl.members.size(); ++i) {
       const ClassMember& m = *decl.members[i];
-      if (m.kind == ClassMemberKind::kMethod) {
+      if (m.kind == ClassMemberKind::kTypedef &&
+          m.typedef_item->kind == ModuleItemKind::kNettypeDecl) {
+        p.diag_.Error(m.loc,
+                      "a nettype declaration is no item of an interface class",
+                      Subclause("A.1.9"));
+      } else if (m.kind == ClassMemberKind::kMethod) {
         p.RejectMisplacedClassQualifiers(
             m,
             static_cast<uint16_t>(~(Parser::kQualProtected |
@@ -314,8 +338,7 @@ ClassDecl* Parser::ParseClassDecl() {
     auto before = lexer_.SavePos().pos;
     const size_t kFirstNew = decl->members.size();
     ParseClassMembers(decl->members);
-    ParserClassHelpers::RejectInterfaceClassItemQualifiers(*this, *decl,
-                                                           kFirstNew);
+    ParserClassHelpers::CheckInterfaceClassItems(*this, *decl, kFirstNew);
 
     if (lexer_.SavePos().pos == before) Consume();
   }
@@ -325,95 +348,6 @@ ClassDecl* Parser::ParseClassDecl() {
   MatchEndLabel(decl->name);
   decl->range.end = CurrentLoc();
   return decl;
-}
-
-bool Parser::TryConsumeClassQualifier(ClassMember* m, TokenKind kw,
-                                      bool ClassMember::* flag,
-                                      const char* dup_msg) {
-  if (!Check(kw)) return false;
-  if (m->*flag) diag_.Error(CurrentLoc(), dup_msg, Subclause("8.3"));
-  m->*flag = true;
-  Consume();
-  return true;
-}
-
-bool Parser::TryConsumeAccessQualifier(ClassMember* m) {
-  if (Check(TokenKind::kKwLocal)) {
-    if (m->is_protected)
-      diag_.Error(CurrentLoc(),
-                  "cannot combine 'local' and 'protected' qualifiers",
-                  Subclause("8.3"));
-    if (m->is_local)
-      diag_.Error(CurrentLoc(), "duplicate 'local' qualifier",
-                  Subclause("8.3"));
-    m->is_local = true;
-    Consume();
-    return true;
-  }
-  if (Check(TokenKind::kKwProtected)) {
-    if (m->is_local)
-      diag_.Error(CurrentLoc(),
-                  "cannot combine 'local' and 'protected' qualifiers",
-                  Subclause("8.3"));
-    if (m->is_protected)
-      diag_.Error(CurrentLoc(), "duplicate 'protected' qualifier",
-                  Subclause("8.3"));
-    m->is_protected = true;
-    Consume();
-    return true;
-  }
-  return false;
-}
-
-bool Parser::TryConsumeRandQualifier(ClassMember* m) {
-  if (Check(TokenKind::kKwRand)) {
-    if (m->is_randc)
-      diag_.Error(CurrentLoc(), "cannot combine 'rand' and 'randc' qualifiers",
-                  Subclause("8.3"));
-    if (m->is_rand)
-      diag_.Error(CurrentLoc(), "duplicate 'rand' qualifier", Subclause("8.3"));
-    m->is_rand = true;
-    Consume();
-    return true;
-  }
-  if (Check(TokenKind::kKwRandc)) {
-    if (m->is_rand)
-      diag_.Error(CurrentLoc(), "cannot combine 'rand' and 'randc' qualifiers",
-                  Subclause("8.3"));
-    if (m->is_randc)
-      diag_.Error(CurrentLoc(), "duplicate 'randc' qualifier",
-                  Subclause("8.3"));
-    m->is_randc = true;
-    Consume();
-    return true;
-  }
-  return false;
-}
-
-// §25.9: 'virtual' is overloaded inside a class body. It begins a virtual
-// interface property type only when followed by an interface name ('virtual Bus
-// b;') or the explicit 'interface' keyword ('virtual interface Bus b;'); that
-// case must be left for ParseDataType. In every other position it is a member
-// qualifier (virtual function/task, a nested virtual class, or ahead of further
-// method qualifiers such as 'pure virtual protected function'). Peeks one token
-// past 'virtual'.
-bool Parser::VirtualIsClassQualifier() {
-  auto saved = lexer_.SavePos();
-  Consume();
-  bool is_interface_type =
-      Check(TokenKind::kIdentifier) || Check(TokenKind::kKwInterface);
-  lexer_.RestorePos(saved);
-  return !is_interface_type;
-}
-
-bool Parser::TryConsumeVirtualQualifier(ClassMember* m) {
-  if (!Check(TokenKind::kKwVirtual) || !VirtualIsClassQualifier()) return false;
-  if (m->is_virtual)
-    diag_.Error(CurrentLoc(), "duplicate 'virtual' qualifier",
-                Subclause("8.3"));
-  m->is_virtual = true;
-  Consume();
-  return true;
 }
 
 bool Parser::ParseClassQualifiers(ClassMember* m) {
@@ -426,46 +360,6 @@ bool Parser::ParseClassQualifiers(ClassMember* m) {
                                            extern_first);
   }
   return proto;
-}
-
-// A.1.9 gives each kind of class_item its own qualifiers: class_property
-// takes `{ property_qualifier }`, rand, randc, static, protected and local,
-// and the const form `const { class_item_qualifier }`; class_method takes
-// `{ method_qualifier }`, `[ pure ] virtual`, static, protected and local,
-// and `extern` before a prototype; A.1.10's constraint_prototype and
-// constraint_declaration take extern, pure and static; a nested
-// class_declaration opens with `[ virtual ]`; a type_declaration is a
-// data_declaration and takes what a class_property takes; and a
-// local_parameter_declaration, a parameter_declaration and a
-// covergroup_declaration take none. ParseClassQualifiers reads every qualifier
-// before it knows which item follows, so what it read is checked here against
-// `allowed`, the set the item admits, and each qualifier outside it is
-// reported at the item under A.1.9 and left as it was read.
-void Parser::RejectMisplacedClassQualifiers(const ClassMember& member,
-                                            uint16_t allowed,
-                                            const char* item) {
-  struct Qualifier {
-    bool present;
-    uint16_t bit;
-    const char* keyword;
-  };
-  const Qualifier kQualifiers[] = {
-      {member.is_rand, kQualRand, "rand"},
-      {member.is_randc, kQualRandc, "randc"},
-      {member.is_static, kQualStatic, "static"},
-      {member.is_protected, kQualProtected, "protected"},
-      {member.is_local, kQualLocal, "local"},
-      {member.is_virtual, kQualVirtual, "virtual"},
-      {member.is_pure_virtual, kQualPure, "pure"},
-      {member.is_const, kQualConst, "const"},
-      {member.is_constraint_extern, kQualExtern, "extern"},
-  };
-  for (const auto& q : kQualifiers) {
-    if (!q.present || (allowed & q.bit) != 0) continue;
-    diag_.Error(member.loc,
-                std::format("'{}' is no qualifier of a {}", q.keyword, item),
-                Subclause("A.1.9"));
-  }
 }
 
 void Parser::ValidateClassMethod(ClassMember* member) {
@@ -633,15 +527,9 @@ void Parser::ParseClassParameterMembers(std::vector<ClassMember*>& members,
 bool Parser::TryParseKeywordClassMember(std::vector<ClassMember*>& members,
                                         ClassMember* member, bool proto) {
   if (TryParseMethodOrConstraint(members, member, proto)) return true;
-  if (Check(TokenKind::kKwTypedef)) {
-    RejectMisplacedClassQualifiers(
-        *member,
-        kQualRand | kQualRandc | kQualStatic | kQualProtected | kQualLocal,
-        "type declaration");
-    member->kind = ClassMemberKind::kTypedef;
-    member->typedef_item = ParseTypedef();
-    member->name = member->typedef_item->name;
-    members.push_back(member);
+  const bool kNettype = Check(TokenKind::kKwNettype);
+  if (kNettype || Check(TokenKind::kKwTypedef)) {
+    ParserClassHelpers::ParseTypeMember(*this, members, member, kNettype);
     return true;
   }
   if (Check(TokenKind::kKwParameter) || Check(TokenKind::kKwLocalparam)) {
