@@ -252,9 +252,10 @@ Expr* ParserPropertySpecHelpers::ParseWholeExpressionActual(Parser& p) {
 // and carried by an identifier standing in the argument's place. `plain` is
 // cleared where the argument is not an expression. Parentheses holding a `,`,
 // an `or` or an `iff` at their own level, which no expression holds there,
-// are a sequence's group with its match items or its `or`, a property's
-// group, or else, their events needing no edge keyword (§9.4.2), `(a, b)`
-// among them, a group of events (footnote 36 to Syntax 9-4).
+// are a group of events where they list names only, `(a, b)`
+// (AheadListsNamesOnly); otherwise a sequence's group with its match items or
+// its `or`, a property's group, or else, their events needing no edge
+// keyword (§9.4.2), a group of events (footnote 36 to Syntax 9-4).
 Expr* ParserPropertySpecHelpers::ParsePropertyActualArg(Parser& p,
                                                         bool& plain) {
   SourceLoc loc = p.CurrentLoc();
@@ -267,7 +268,8 @@ Expr* ParserPropertySpecHelpers::ParsePropertyActualArg(Parser& p,
     return dollar;
   }
   if (IsEdgeKeyword(p.CurrentToken().kind) ||
-      (p.Check(TokenKind::kLParen) && p.OpensEventGroup(true))) {
+      (p.Check(TokenKind::kLParen) &&
+       (p.OpensEventGroup(true) || AheadListsNamesOnly(p)))) {
     plain = false;
     return ParseEventActual(p);
   }
@@ -277,7 +279,6 @@ Expr* ParserPropertySpecHelpers::ParsePropertyActualArg(Parser& p,
     if (expr != nullptr) return expr;
   }
   plain = false;
-  if (kGroup && AheadListsNamesOnly(p)) return ParseEventActual(p);
   PropertyExprNode* tree = ParseWholeSequenceActual(p);
   if (tree == nullptr && kGroup && !OpensPropertyGroup(p)) {
     return ParseEventActual(p);
