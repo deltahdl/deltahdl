@@ -92,6 +92,14 @@ static bool IsLetFormalTwoState(DataTypeKind kind) {
   }
 }
 
+// Whether `dt` is a type written before a let formal's name: any type but an
+// implicit one, and an implicit one that writes a signing or a packed
+// dimension (A.2.2.1's implicit_data_type), which is `logic` with them.
+static bool WritesLetFormalType(const DataType& dt) {
+  return dt.kind != DataTypeKind::kImplicit || dt.packed_dim_left != nullptr ||
+         dt.signing_written;
+}
+
 // §11.12 casts an actual to its formal's type, which a typedef name stands for
 // as written out: `bits x` under `typedef bit [15:0] bits` is a sixteen-bit
 // two-state formal (§6.18). The name alone gave neither a width nor a kind.
@@ -103,8 +111,7 @@ static Logic4Vec ResizeLetActualToFormal(Logic4Vec val,
   // An untyped formal takes the actual as it is, its sign among it (§11.12's
   // substitution); a typed integral one its own width and sign, an integer
   // atom type's included, `int x` taking 8'hFF as 32 bits.
-  if (dt.kind == DataTypeKind::kImplicit && dt.packed_dim_left == nullptr)
-    return val;
+  if (!WritesLetFormalType(dt)) return val;
   uint32_t formal_width = EvalTypeWidth(dt);
   if (!val.is_real && formal_width > 0 && formal_width != val.width) {
     val = ResizeToWidth(val, formal_width, arena);
@@ -138,8 +145,7 @@ static std::vector<Logic4Vec> EvalLetActuals(ModuleItem* decl, const Expr* call,
   const DataType* written = nullptr;
   for (size_t i = 0; i < formals.size(); ++i) {
     const DataType& own = formals[i].data_type;
-    if (own.kind != DataTypeKind::kImplicit || own.packed_dim_left != nullptr)
-      written = &own;
+    if (WritesLetFormalType(own)) written = &own;
     Logic4Vec val = EvalLetActualForFormal(formals[i], i, binding);
     val = ResizeLetActualToFormal(val, written != nullptr ? *written : own, ctx,
                                   arena);

@@ -673,6 +673,26 @@ TEST(LetConstructSim, ATypedefNamedFormalCastsItsActual) {
   EXPECT_EQ(out, "0 1\n");
 }
 
+// A signing or a packed dimension written before a let formal is an implicit
+// type, `logic` with them, so the formal is typed and §11.12 casts its actual
+// to it: 8'hFF is -1 as a one-bit signed logic, 1 as a one-bit unsigned one
+// and 15 in four bits, and `y` takes the signing written before it. A signing
+// alone left the formal untyped, and each actual stayed 255.
+TEST(LetConstructSim, AnImplicitTypeOfASigningAloneCastsItsActual) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module m;\n"
+      "  let f(signed x) = x;\n"
+      "  let g(signed x, y) = y;\n"
+      "  let h(unsigned x) = x;\n"
+      "  let p([3:0] x) = x;\n"
+      "  initial $display(\"%0d %0d %0d %0d\", f(8'hFF), g(1'b0, 8'hFF),\n"
+      "                   h(8'hFF), p(8'hFF));\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "-1 -1 1 15\n");
+}
+
 // §11.12 lets a let be declared in a subroutine body and used there after its
 // declaration: `plus(7)` with the default `y = 4` is 11. The declaration was
 // never made known, and the call read 0.
