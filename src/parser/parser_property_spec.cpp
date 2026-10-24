@@ -277,6 +277,7 @@ Expr* ParserPropertySpecHelpers::ParsePropertyActualArg(Parser& p,
     if (expr != nullptr) return expr;
   }
   plain = false;
+  if (kGroup && AheadListsNamesOnly(p)) return ParseEventActual(p);
   PropertyExprNode* tree = ParseWholeSequenceActual(p);
   if (tree == nullptr && kGroup && !OpensPropertyGroup(p)) {
     return ParseEventActual(p);

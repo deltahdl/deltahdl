@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <string_view>
 #include <vector>
 
@@ -159,6 +160,45 @@ TEST(EventActualParsing, AnUnedgedCommaListIsOneEventActual) {
   EXPECT_TRUE(IsEitherOfSignals((*args)[0], "a", "b"));
   ASSERT_NE((*args)[1], nullptr);
   EXPECT_EQ((*args)[1]->text, "c");
+}
+
+// §9.4 with §16.11: a parenthesized list of names reads both as an event list
+// and as a sequence calling the names after the first at its match, A.8.2
+// writing a call's list of arguments as optional, and is read as the event
+// list, a scoped or a member's name among them as well. A list holding
+// anything else, a sequence before the comma, a literal or an assignment, is
+// a sequence with its match items.
+TEST(EventActualParsing, OnlyAListOfNamesIsReadAsAnEventList) {
+  auto r = Parse(
+      "package P; logic b; endpackage\n"
+      "module m;\n"
+      "  logic a, c;\n"
+      "  int x;\n"
+      "  property p(e, logic v);\n"
+      "    @(e) v;\n"
+      "  endproperty\n"
+      "  assert property (p((m.a, P::b), c));\n"
+      "  assert property (p((a ##1 c, x = 1), c));\n"
+      "  assert property (p((1, x = 1), c));\n"
+      "  assert property (p((a, x = 1), c));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  std::vector<const Expr*> firsts;
+  for (const auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kAssertProperty) continue;
+    ASSERT_NE(item->assert_expr, nullptr);
+    ASSERT_EQ(item->assert_expr->args.size(), 2u);
+    firsts.push_back(item->assert_expr->args[0]);
+  }
+  ASSERT_EQ(firsts.size(), 4u);
+  ASSERT_NE(firsts[0], nullptr);
+  EXPECT_EQ(firsts[0]->kind, ExprKind::kBinary);
+  EXPECT_EQ(firsts[0]->op, TokenKind::kKwOr);
+  for (size_t i = 1; i < firsts.size(); ++i) {
+    ASSERT_NE(firsts[i], nullptr);
+    EXPECT_EQ(firsts[i]->text, "<property_actual>");
+  }
 }
 
 // §9.4 with §17.3: a checker's port actual that is a list of bare signals is
