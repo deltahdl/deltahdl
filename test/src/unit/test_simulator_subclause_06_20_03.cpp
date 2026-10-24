@@ -131,4 +131,73 @@ TEST(TypeParameterSim, OverridesSwappingTwoNamesReadTheParents) {
   EXPECT_EQ(RunAndGet(kSrc, "u.wb"), 8u);
 }
 
+// A.2.8 admits a parameter_declaration among a begin-end block's items, and
+// §6.20.3 has a type parameter name a data type, so `T x` is a `logic [7:0]`
+// that keeps eight bits of 9'h1FF, and `U y` a signed shortint holding -1.
+// The block's type parameter named no type a declaration was sized by, so
+// both fell to the 32-bit carrier of a type nothing sizes.
+TEST(TypeParameterSim, BlockTypeParamNamesTheTypeOfALaterDeclaration) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  initial begin\n"
+                 "    parameter type T = logic [7:0];\n"
+                 "    localparam type U = shortint;\n"
+                 "    T x;\n"
+                 "    U y;\n"
+                 "    x = 9'h1FF;\n"
+                 "    y = -1;\n"
+                 "    $display(\"%0d %0d %0d %0d\", $bits(x), x, $bits(y),"
+                 " y);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "8 255 16 -1\n");
+}
+
+// The same rule in a subroutine body, whose block_item_declarations A.2.6 and
+// A.2.7 take from A.2.8: a function's `bit [3:0]` local keeps four bits of
+// 5'h1F, and a task's `byte` local holds 9'h181 as the signed -127.
+TEST(TypeParameterSim, SubroutineTypeParamNamesTheTypeOfALocal) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  function automatic int f();\n"
+                       "    parameter type T = bit [3:0];\n"
+                       "    T v;\n"
+                       "    v = 5'h1F;\n"
+                       "    return v;\n"
+                       "  endfunction\n"
+                       "  task automatic tk(output int o);\n"
+                       "    localparam type B = byte;\n"
+                       "    B b;\n"
+                       "    b = 9'h181;\n"
+                       "    o = b;\n"
+                       "  endtask\n"
+                       "  initial begin\n"
+                       "    int r;\n"
+                       "    tk(r);\n"
+                       "    $display(\"%0d %0d\", f(), r);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "15 -127\n");
+}
+
+// §6.20.3 with §7.4: a declaration writing unpacked dimensions after a
+// block's type parameter is an array of the parameter's type, so each element
+// of `P b [2]` is a signed shortint holding -1.
+TEST(TypeParameterSim, ArrayOfABlockTypeParamHasElementsOfItsType) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  initial begin\n"
+                       "    parameter type P = shortint;\n"
+                       "    P b [2];\n"
+                       "    b[0] = -1;\n"
+                       "    $display(\"%0d %0d\", $bits(b[0]), b[0]);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "16 -1\n");
+}
+
 }  // namespace

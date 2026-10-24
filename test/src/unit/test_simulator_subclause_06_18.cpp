@@ -296,4 +296,114 @@ TEST(TypedefSim, MethodEnumTypedefLocalAnswersName) {
             "K\n");
 }
 
+// §6.18 with A.2.8: a block's typedef of a type that is no enumeration,
+// structure or union names that type for the declarations after it, so `T x`
+// is a 4-state `logic [7:0]` that starts at x and keeps eight bits of 9'h1FF,
+// `I i` a signed int and `R r` a real. §7.4.4 stacks a packed dimension
+// written where the name is used outside the type's own: `T [1:0] w` keeps
+// sixteen bits of 17'h1ABCD, and `B1 [3:0] v` four bits of 5'h1F. A function
+// body's `N n` keeps four bits of 5'h1F too. A4, whose unpacked dimension a
+// declaration would adopt, names no plain type and declares nothing here.
+// Each fell to the 32-bit carrier of a type nothing sizes, the real included.
+TEST(TypedefSim, BlockTypedefOfAPlainTypeNamesALaterDeclarationsType) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  function automatic int f();\n"
+                 "    typedef bit [3:0] N;\n"
+                 "    N n;\n"
+                 "    n = 5'h1F;\n"
+                 "    return n;\n"
+                 "  endfunction\n"
+                 "  initial begin\n"
+                 "    typedef logic [7:0] T;\n"
+                 "    typedef int I;\n"
+                 "    typedef real R;\n"
+                 "    typedef bit B1;\n"
+                 "    typedef int A4 [4];\n"
+                 "    T x;\n"
+                 "    I i;\n"
+                 "    R r;\n"
+                 "    T [1:0] w;\n"
+                 "    B1 [3:0] v;\n"
+                 "    $display(\"%b\", x);\n"
+                 "    x = 9'h1FF;\n"
+                 "    i = -1;\n"
+                 "    r = 1.5;\n"
+                 "    w = 17'h1ABCD;\n"
+                 "    v = 5'h1F;\n"
+                 "    $display(\"%0d %0d %0d %f %0d %h %0d %0d\", $bits(x),"
+                 " x, i, r, $bits(w), w, v, f());\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "xxxxxxxx\n8 255 -1 1.500000 16 abcd 15 15\n");
+}
+
+// §6.18 with §7.4.4: a block typedef whose type is another of the block's
+// type names stands for whatever that one does. `T2 z` is T's eight bits,
+// `T3 y` sixteen with T3's `[1:0]` stacked outside them, `E2 e` the block's
+// enumeration, whose name() answers K, and the type parameter `P q`, given
+// T2, eight bits again. A typedef of a package's type, `PT u`, is that
+// type's three bits. Each name through a block name stood for only the bare
+// name, which no table sizes.
+TEST(TypedefSim, BlockTypedefOfAnotherBlockTypeNameStandsForWhatThatOneDoes) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("package p;\n"
+                 "  typedef logic [2:0] pt;\n"
+                 "endpackage\n"
+                 "module t;\n"
+                 "  initial begin\n"
+                 "    typedef logic [7:0] T;\n"
+                 "    typedef T T2;\n"
+                 "    typedef T [1:0] T3;\n"
+                 "    typedef enum {A, B, K} E;\n"
+                 "    typedef E E2;\n"
+                 "    typedef p::pt PT;\n"
+                 "    parameter type P = T2;\n"
+                 "    T2 z;\n"
+                 "    T3 y;\n"
+                 "    E2 e;\n"
+                 "    PT u;\n"
+                 "    P q;\n"
+                 "    z = 10'h3FE;\n"
+                 "    y = 17'h1ABCD;\n"
+                 "    e = K;\n"
+                 "    u = 4'hF;\n"
+                 "    q = 9'h1FF;\n"
+                 "    $display(\"%0d %0d %0d %h %s %0d %0d %0d\", $bits(z), z,"
+                 " $bits(y), y, e.name(), $bits(u), u, q);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "8 254 16 abcd K 3 7 255\n");
+}
+
+// §6.18 with §7.4: a declaration writing unpacked dimensions after a block
+// typedef's name is an array of the typedef's type, so each element of
+// `T a [2]` is a `logic [7:0]` keeping eight bits of 9'h1FF, in a begin-end
+// block and a function body alike. The elements took nothing from the name
+// and fell to the 32-bit carrier.
+TEST(TypedefSim, ArrayOfABlockTypedefHasElementsOfItsType) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  function automatic int f();\n"
+                 "    typedef bit [3:0] N;\n"
+                 "    N n [3];\n"
+                 "    n[2] = 5'h1F;\n"
+                 "    return n[2];\n"
+                 "  endfunction\n"
+                 "  initial begin\n"
+                 "    typedef logic [7:0] T;\n"
+                 "    T a [2];\n"
+                 "    a[1] = 9'h1FF;\n"
+                 "    $display(\"%0d %0d %0d\", $bits(a[1]), a[1], f());\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "8 255 15\n");
+}
+
 }  // namespace

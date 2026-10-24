@@ -61,8 +61,9 @@ const ModuleItem* PropertyTypedefItem(const ClassMember* member,
 // ran once with a null key, and `ue_t u;` under a compilation-unit `typedef
 // bit ue_t[int];` took none of `u[3] = 1`. The declaration `stmt` with the
 // typedef's element type and dimensions written on it, built once per
-// declaration; `stmt` itself where it writes dimensions of its own or names no
-// such typedef.
+// declaration; `stmt` itself where it names no such typedef, or where it
+// writes dimensions of its own and no block's type name reshaped it
+// (RegisterBlockEnumTypes).
 const Stmt* DeclShapedByTypedef(const Stmt* stmt, SimContext& ctx,
                                 Arena& arena);
 

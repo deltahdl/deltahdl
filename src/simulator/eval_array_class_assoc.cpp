@@ -255,10 +255,16 @@ const ModuleItem* PropertyTypedefItem(const ClassMember* member,
 const Stmt* DeclShapedByTypedef(const Stmt* stmt, SimContext& ctx,
                                 Arena& arena) {
   const DataType& type = stmt->var_decl_type;
-  if (!stmt->var_unpacked_dims.empty() || type.kind != DataTypeKind::kNamed) {
-    return stmt;
+  if (type.kind != DataTypeKind::kNamed) return stmt;
+  auto& shaped_decls = ctx.ClassTypedefShapedDecls();
+  // §7.4: a declaration writing unpacked dimensions of its own takes only its
+  // element type from the name, which is the copy RegisterBlockEnumTypes
+  // reshaped where the name is a block's typedef or type parameter.
+  if (!stmt->var_unpacked_dims.empty()) {
+    auto reshaped = shaped_decls.find(stmt);
+    return reshaped == shaped_decls.end() ? stmt : reshaped->second;
   }
-  auto [it, fresh] = ctx.ClassTypedefShapedDecls().try_emplace(stmt, stmt);
+  auto [it, fresh] = shaped_decls.try_emplace(stmt, stmt);
   if (!fresh) return it->second;
   const ClassTypeInfo* from = nullptr;
   if (!type.scope_name.empty()) {
