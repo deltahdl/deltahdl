@@ -408,15 +408,8 @@ class LetActualWalk {
         return side;
       }
       const NameBinding* named = TypeName(*at, *in);
-      if (named == nullptr) {
-        const std::optional<SpecializedClassType> kSpecialized =
-            SpecializeClassScopedType(*at, ctx_.unit, ctx_.parameters,
-                                      ctx_.shapes.typedefs, ctx_.arena);
-        if (kSpecialized)
-          return EndInSpecialization(std::move(side), *kSpecialized, *in);
-      }
       if (named == nullptr || named->kind == NameKind::kClass)
-        return EndInClass(std::move(side), *at, named);
+        return EndInClassOrSpecialization(std::move(side), *at, *in, named);
       if (named->kind != NameKind::kTypedef ||
           !named->item->typedef_ifc_port.empty())
         return std::nullopt;
@@ -467,6 +460,22 @@ class LetActualWalk {
   const NameFrame* ClassFrame(const NameBinding* named) const {
     if (named == nullptr || named->kind != NameKind::kClass) return nullptr;
     return classes_.Of(*named->cls, *named->scope);
+  }
+
+  // A chain whose name `type`, written in the scope of `scope`, reaches no
+  // typedef: a specialization's (EndInSpecialization) where it reaches none
+  // at all, else a class's (EndInClass).
+  std::optional<ResolvedSide> EndInClassOrSpecialization(
+      ResolvedSide side, const DataType& type, const NameFrame& scope,
+      const NameBinding* named) const {
+    if (named == nullptr) {
+      const std::optional<SpecializedClassType> kSpecialized =
+          SpecializeClassScopedType(type, ctx_.unit, ctx_.parameters,
+                                    ctx_.shapes.typedefs, ctx_.arena);
+      if (kSpecialized)
+        return EndInSpecialization(std::move(side), *kSpecialized, scope);
+    }
+    return EndInClass(std::move(side), type, named);
   }
 
   // §8.25.1: a type behind a class with parameters, `P#()::t` or `P#(4)::t`,

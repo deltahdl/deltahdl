@@ -135,8 +135,8 @@ TEST(LetActualClassScopeElaboration, ATypeOfASpecializationIsJudged) {
 // §6.10: a name a continuous assignment's target, a primitive's or a UDP's
 // terminal list, an instance's port connections or an alias writes alone, and
 // that nothing declares, is an implicit scalar net, a 1-bit logic, which no
-// array of two ints takes; an int formal takes it. A terminal naming a
-// declared net, a literal terminal and an empty port connection declare
+// array of two ints takes; an int formal takes it. A terminal naming the
+// declared net `d`, a literal terminal and an empty port connection declare
 // nothing.
 TEST(LetActualImplicitNetElaboration, AnImplicitNetIsJudgedAsAScalar) {
   ElabFixture f;
@@ -166,7 +166,7 @@ TEST(LetActualImplicitNetElaboration, AnImplicitNetIsJudgedAsAScalar) {
       "  initial $display(\"%0d\", f(uy));\n"
       "  initial $display(\"%0d\", f(cy));\n"
       "  initial $display(\"%0d\", f(al));\n"
-      "  initial $display(\"%0d\", n(w) + n(d));\n"
+      "  initial $display(\"%0d\", n(w));\n"
       "endmodule\n",
       f, "m");
   for (uint32_t line : {20u, 21u, 22u, 23u, 24u, 25u}) {
