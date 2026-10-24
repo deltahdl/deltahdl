@@ -245,14 +245,20 @@ struct ParserSeqLinearHelpers {
     call->text = name.text;
     call->range.start = name.loc;
     p.Expect(TokenKind::kLParen, Subclause("16.8"));
+    // A.2.10's sequence_list_of_arguments takes no positional actual after a
+    // named one, so the operand is not read where one follows.
+    bool named = false;
     while (!p.Check(TokenKind::kRParen) && !p.AtEnd()) {
       if (p.Check(TokenKind::kDot)) {
+        named = true;
         p.Consume();
         call->arg_names.push_back(
             p.Expect(TokenKind::kIdentifier, Subclause("16.8")).text);
         p.Expect(TokenKind::kLParen, Subclause("16.8"));
         call->args.push_back(ParseSequenceActualArg(p));
         p.Expect(TokenKind::kRParen, Subclause("16.8"));
+      } else if (named) {
+        return nullptr;
       } else {
         call->args.push_back(ParseSequenceActualArg(p));
       }
@@ -277,16 +283,18 @@ struct ParserSeqLinearHelpers {
   }
 
   // §16.10 with §6.18, §6.11 and §7.4.1: a local's var_data_type, into
-  // `typed`: its type keyword or the type name written in its place, then the
-  // signing keyword and the packed dimensions written after it, each
-  // dimension a left and a right bound in the order written.
+  // `typed`: its type keyword or the type name written in its place, with the
+  // package or class scope A.2.2.1 lets it stand behind, then the signing
+  // keyword and the packed dimensions written after it, each dimension a left
+  // and a right bound in the order written. A.2.2.1 lets `var` open it, and
+  // §6.8 has one written with no data type after the `var` be logic.
   static void ParseLocalType(Parser& p, SeqLocalDecl& typed) {
-    const Token kType = p.Consume();
-    if (kType.kind == TokenKind::kIdentifier) {
-      typed.named_type.kind = DataTypeKind::kNamed;
-      typed.named_type.type_name = kType.text;
+    if (p.Match(TokenKind::kKwVar) && !VarWritesDataType(p.lexer_)) {
+      typed.type_kw = TokenKind::kKwLogic;
+    } else if (p.Check(TokenKind::kIdentifier)) {
+      typed.named_type = p.ParseNamedType();
     } else {
-      typed.type_kw = kType.kind;
+      typed.type_kw = p.Consume().kind;
     }
     if (p.Check(TokenKind::kKwSigned) || p.Check(TokenKind::kKwUnsigned)) {
       typed.signing = p.Consume().kind;

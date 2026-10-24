@@ -360,13 +360,17 @@ bool ParserPropertySpecHelpers::ParseNamedActualPrefix(Parser& p, Expr* call,
 
 // The `( actuals )` of a property instance into `call`, each actual bound
 // by position or, as `.formal(actual)`, by name; false where the list is
-// malformed.
+// malformed, A.2.10's property_list_of_arguments taking no positional actual
+// after a named one among the malformed.
 bool ParserPropertySpecHelpers::ParsePropertyActualList(Parser& p, Expr* call,
                                                         bool& plain) {
   if (!p.Match(TokenKind::kLParen)) return false;
+  bool any_named = false;
   while (!p.Check(TokenKind::kRParen) && !p.AtEnd()) {
     bool named = false;
     if (!ParseNamedActualPrefix(p, call, named)) return false;
+    if (any_named && !named) return false;
+    any_named = named;
     Expr* actual = ParsePropertyActualArg(p, plain);
     if (actual == nullptr || (named && !p.Match(TokenKind::kRParen))) {
       return false;

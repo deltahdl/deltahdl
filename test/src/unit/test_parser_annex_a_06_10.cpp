@@ -782,4 +782,48 @@ TEST(AssertionStatementSyntaxParsing, ConcurrentAssertionItemModuleLevel) {
   ASSERT_NE(item, nullptr);
 }
 
+// procedural_assertion_statement takes every concurrent_assertion_statement,
+// a restrict_property_statement among them, and §16.14.6 lets one stand in an
+// always or an initial procedure. §16.14.4 has a simulator not check it, so
+// the statement does nothing when reached.
+TEST(AssertionStatementSyntaxParsing, ProceduralRestrictPropertyIsAccepted) {
+  auto r = Parse(
+      "module m(input logic clk, a);\n"
+      "  initial restrict property (@(posedge clk) a ##1 a);\n"
+      "  always @(posedge clk) begin\n"
+      "    restrict property (a);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kNull);
+}
+
+// A procedural restrict is held to the places §16.14 lets a concurrent
+// assertion statement stand in procedural code, and its spec to A.2.10's
+// grammar; without `property` it is the immediate restrict §16.2 rules out.
+TEST(AssertionStatementSyntaxParsing, ProceduralRestrictPropertyIsChecked) {
+  auto r = Parse(
+      "module m(input logic clk, a);\n"
+      "  task t;\n"
+      "    restrict property (a);\n"
+      "  endtask\n"
+      "  initial restrict property (a ##1);\n"
+      "  initial restrict (a);\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "a concurrent assertion statement in procedural "
+                            "code shall be in an always or an initial "
+                            "procedure",
+                            3, "16.14"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "is not one the grammar admits", 5, "A.2.10"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "restrict has no immediate form", 6, "16.2"));
+  EXPECT_FALSE(
+      ReportedError(r.diags, "restrict has no immediate form", 5, "16.2"));
+}
+
 }  // namespace

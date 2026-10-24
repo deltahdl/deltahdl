@@ -100,6 +100,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     parser/parser_stmt_loop.cpp
     parser/parser_assert.cpp
     parser/parser_sequence_property_decl.cpp
+    parser/parser_property_port_list.cpp
     parser/parser_sequence_local_var.cpp
     parser/parser_sequence_linear.cpp
     parser/sequence_operator_precedence.cpp

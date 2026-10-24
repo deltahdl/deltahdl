@@ -190,11 +190,13 @@ const PrefixForm* FindPrefixForm(TokenKind kind, bool sequence) {
 // The tokens an operand read as an expression may stand before, besides a
 // binary operator of the chain and a repetition: a group's or the spec's
 // closing parenthesis, the comma before a match item or the next actual
-// argument, the semicolon ending a case item, a cycle delay, and the else
-// of an if.
-constexpr std::array<TokenKind, 5> kOperandEnds = {
-    TokenKind::kRParen, TokenKind::kComma, TokenKind::kSemicolon,
-    TokenKind::kHashHash, TokenKind::kKwElse};
+// argument, the semicolon ending a case item or a declaration's body, a
+// cycle delay, the else of an if, and the `endsequence` or `endproperty` a
+// declaration's body may end at with no semicolon.
+constexpr std::array<TokenKind, 7> kOperandEnds = {
+    TokenKind::kRParen,       TokenKind::kComma,  TokenKind::kSemicolon,
+    TokenKind::kHashHash,     TokenKind::kKwElse, TokenKind::kKwEndsequence,
+    TokenKind::kKwEndproperty};
 
 // The token after the `[` of §16.9.2's repetitions: `[*`, `[->`, `[=` and
 // `[+]`.
@@ -238,21 +240,32 @@ enum class Reading : uint8_t { kExpression, kExpressionOrDist, kPrimary };
 
 }  // namespace
 
-// One recognition of a spec: the parser it reads from, whether the spec is
-// a cover sequence statement's, and the furthest point a reading of it
-// failed at.
+// One recognition of a spec or of a declaration's body: the parser it reads
+// from, whether it is a sequence_expr, as a cover sequence statement's spec
+// and a sequence declaration's body are, whether it is a declaration's body,
+// and the furthest point a reading of it failed at.
 class ParserPropertyGrammar::Scan {
  public:
-  Scan(Parser& p, bool sequence) : p_(p), sequence_(sequence) {}
+  Scan(Parser& p, bool sequence, bool body)
+      : p_(p), sequence_(sequence), body_(body) {}
 
   // property_spec, or the cover sequence statement's spec, up to the
   // parenthesis closing it.
   bool Spec() {
-    if (p_.Check(TokenKind::kAt) && !ClockingEvent()) return false;
-    if (p_.Match(TokenKind::kKwDisable) && !DisableIff()) return false;
-    Kind kind = Kind::kBoolean;
-    if (!Chain(sequence_, kind)) return false;
+    if (!SpecChain()) return false;
     if (p_.Check(TokenKind::kRParen)) return true;
+    return Fail();
+  }
+
+  // A declaration's body after its assertion variable declarations, up to
+  // `end`, the keyword closing the declaration: a sequence_declaration's
+  // sequence_expr, or a property_declaration's property_spec, and the `;`
+  // that may follow it.
+  bool Body(TokenKind end) {
+    Kind kind = Kind::kBoolean;
+    if (sequence_ ? !Chain(true, kind) : !SpecChain()) return false;
+    p_.Match(TokenKind::kSemicolon);
+    if (p_.Check(end)) return true;
     return Fail();
   }
 
@@ -262,8 +275,11 @@ class ParserPropertyGrammar::Scan {
       return;
     }
     p_.diag_.Error(furthest_,
-                   "this concurrent assertion's spec is not one the grammar "
-                   "admits: no reading of it gets past this point",
+                   body_ ? "this declaration's body is not one the grammar "
+                           "admits: no reading of it gets past this point"
+                         : "this concurrent assertion's spec is not one the "
+                           "grammar admits: no reading of it gets past this "
+                           "point",
                    Subclause("A.2.10"));
   }
 
@@ -327,6 +343,15 @@ class ParserPropertyGrammar::Scan {
   }
 
   bool Expression(Reading reading) { return Read(reading) != nullptr; }
+
+  // `[ clocking_event ] [ disable iff ( expression_or_dist ) ]` and the chain
+  // after them, a property_expr, or a sequence_expr where sequence_ is set.
+  bool SpecChain() {
+    if (p_.Check(TokenKind::kAt) && !ClockingEvent()) return false;
+    if (p_.Match(TokenKind::kKwDisable) && !DisableIff()) return false;
+    Kind kind = Kind::kBoolean;
+    return Chain(sequence_, kind);
+  }
 
   // `disable iff ( expression_or_dist )`, its `disable` read.
   bool DisableIff() { return Expect(TokenKind::kKwIff) && Condition(); }
@@ -533,20 +558,31 @@ class ParserPropertyGrammar::Scan {
       if (!p_.Match(TokenKind::kIdentifier)) return Fail();
     }
     if (!p_.Match(TokenKind::kLParen)) return Fail();
+    bool named = false;
     do {
-      if (!ActualArg()) return false;
+      if (!ListArg(named)) return false;
     } while (p_.Match(TokenKind::kComma));
     return Expect(TokenKind::kRParen);
   }
 
-  // One actual argument: none, `.name ( [actual] )`, `$`, an
-  // event_expression opening with an edge, or a property_expr, which a
-  // sequence_expr and the other event_expressions are.
-  bool ActualArg() {
-    if (p_.Check(TokenKind::kComma) || p_.Check(TokenKind::kRParen)) {
-      return true;
+  // One entry of an instance's list of arguments: none, an actual, or
+  // `.name ( [actual] )`. A.2.10's property_list_of_arguments and
+  // sequence_list_of_arguments take only named entries after a named one,
+  // which `named` records.
+  bool ListArg(bool& named) {
+    const bool kEmpty =
+        p_.Check(TokenKind::kComma) || p_.Check(TokenKind::kRParen);
+    if (p_.Match(TokenKind::kDot)) {
+      named = true;
+      return NamedArg();
     }
-    if (p_.Match(TokenKind::kDot)) return NamedArg();
+    if (named) return Fail();
+    return kEmpty || ActualArg();
+  }
+
+  // One actual argument: `$`, an event_expression opening with an edge, or a
+  // property_expr, which a sequence_expr and the other event_expressions are.
+  bool ActualArg() {
     if (p_.Match(TokenKind::kDollar)) return true;
     if (std::find(kEdges.begin(), kEdges.end(), p_.CurrentToken().kind) !=
         kEdges.end()) {
@@ -556,11 +592,12 @@ class ParserPropertyGrammar::Scan {
     return Chain(false, kind);
   }
 
-  // `name ( [actual] )`, its `.` read.
+  // `name ( [actual] )`, its `.` read, the actual never a named one.
   bool NamedArg() {
     if (!p_.Match(TokenKind::kIdentifier) || !p_.Match(TokenKind::kLParen)) {
       return Fail();
     }
+    if (p_.Check(TokenKind::kRParen)) return Expect(TokenKind::kRParen);
     return ActualArg() && Expect(TokenKind::kRParen);
   }
 
@@ -679,6 +716,7 @@ class ParserPropertyGrammar::Scan {
 
   Parser& p_;
   bool sequence_;
+  bool body_;
   SourceLoc furthest_;
   // Where an operand stands that the grammar does not admit there, and the
   // report made of it, which a misreading of the spec does not override.
@@ -687,12 +725,22 @@ class ParserPropertyGrammar::Scan {
 };
 
 bool ParserPropertyGrammar::CheckPropertySpec(Parser& p, bool sequence) {
+  return Recognize(p, sequence, false, TokenKind::kRParen);
+}
+
+bool ParserPropertyGrammar::CheckDeclarationBody(Parser& p, bool sequence,
+                                                 TokenKind end) {
+  return Recognize(p, sequence, true, end);
+}
+
+bool ParserPropertyGrammar::Recognize(Parser& p, bool sequence, bool body,
+                                      TokenKind end) {
   auto saved = p.lexer_.SavePos();
   bool was_in_sequence_body = p.in_sequence_body_;
   p.in_sequence_body_ = true;
   p.diag_.PushSuppress();
-  Scan scan(p, sequence);
-  const bool kAdmitted = scan.Spec();
+  Scan scan(p, sequence, body);
+  const bool kAdmitted = body ? scan.Body(end) : scan.Spec();
   p.diag_.PopSuppress();
   p.in_sequence_body_ = was_in_sequence_body;
   p.lexer_.RestorePos(saved);

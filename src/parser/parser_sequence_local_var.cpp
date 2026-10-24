@@ -10,6 +10,7 @@
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
 #include "parser/parser.h"
+#include "parser/parser_property_grammar.h"
 #include "parser/parser_property_spec_internal.h"
 #include "parser/parser_sequence_property_decl_internal.h"
 
@@ -229,17 +230,76 @@ void Parser::ValidateCycleDelayIntegerValue(SourceLoc range_loc) {
   }
 }
 
-// Consumes the var_data_type prefix of an assertion_variable_declaration: the
-// leading type keyword followed by any signing token and packed dimensions.
+// Skips the groups opened by `open` and closed by `close` at the cursor, one
+// after another, each with the groups nested in it: a type's packed
+// dimensions or a variable's unpacked ones, or a class's parameter values.
+static void SkipGroups(Lexer& lexer, TokenKind open, TokenKind close) {
+  while (LexerCheck(lexer, open)) {
+    int depth = 1;
+    lexer.Next();
+    while (depth > 0 && !lexer.Peek().Is(TokenKind::kEof)) {
+      if (LexerCheck(lexer, open))
+        ++depth;
+      else if (LexerCheck(lexer, close))
+        --depth;
+      lexer.Next();
+    }
+  }
+}
+
+static void SkipBracketGroups(Lexer& lexer) {
+  SkipGroups(lexer, TokenKind::kLBracket, TokenKind::kRBracket);
+}
+
+// Skips the type name at the cursor, an identifier A.2.2.1 lets stand behind
+// a package_scope or a class_scope, `P::t` or `C#(8)::t`, each class's
+// parameter values read past. Answers whether a scope was read.
+static bool SkipTypeName(Lexer& lexer) {
+  bool scoped = false;
+  while (LexerCheck(lexer, TokenKind::kIdentifier)) {
+    lexer.Next();
+    if (LexerCheck(lexer, TokenKind::kHash)) {
+      lexer.Next();
+      SkipGroups(lexer, TokenKind::kLParen, TokenKind::kRParen);
+    }
+    if (!LexerCheck(lexer, TokenKind::kColonColon)) break;
+    lexer.Next();
+    scoped = true;
+  }
+  return scoped;
+}
+
+// Whether the identifier at the cursor, with its scope and packed
+// dimensions, is followed by another identifier, which makes it a type name
+// written before the name a declaration declares. The lexer is rewound.
+static bool AtTypeNameBeforeIdentifier(Lexer& lexer) {
+  auto saved = lexer.SavePos();
+  SkipTypeName(lexer);
+  SkipBracketGroups(lexer);
+  const bool kTyped = LexerCheck(lexer, TokenKind::kIdentifier);
+  lexer.RestorePos(saved);
+  return kTyped;
+}
+
+bool VarWritesDataType(Lexer& lexer) {
+  if (IsBuiltinTypeKwForLocalVar(lexer.Peek().kind)) return true;
+  return LexerCheck(lexer, TokenKind::kIdentifier) &&
+         AtTypeNameBeforeIdentifier(lexer);
+}
+
 bool AtAssertionVariableDecl(
     Lexer& lexer, const std::unordered_set<std::string_view>& known_types) {
   const Token kType = lexer.Peek();
-  if (IsBuiltinTypeKwForLocalVar(kType.kind)) return true;
-  if (kType.kind != TokenKind::kIdentifier ||
-      !known_types.contains(kType.text)) {
-    return false;
+  if (kType.kind == TokenKind::kKwVar ||
+      IsBuiltinTypeKwForLocalVar(kType.kind)) {
+    return true;
   }
+  if (kType.kind != TokenKind::kIdentifier) return false;
   auto saved = lexer.SavePos();
+  const bool kScoped = SkipTypeName(lexer);
+  lexer.RestorePos(saved);
+  if (kScoped) return AtTypeNameBeforeIdentifier(lexer);
+  if (!known_types.contains(kType.text)) return false;
   lexer.Next();
   const bool kDeclares = LexerCheck(lexer, TokenKind::kIdentifier) ||
                          LexerCheck(lexer, TokenKind::kLBracket);
@@ -247,23 +307,25 @@ bool AtAssertionVariableDecl(
   return kDeclares;
 }
 
+// Consumes the var_data_type prefix of an assertion_variable_declaration: its
+// `var`, where written, the type keyword or the type name with its scope, and
+// any signing token and packed dimensions. After `var` the type may be
+// implicit, and only the signing and dimensions are written.
 static void SkipAssertVarTypePrefix(Lexer& lexer) {
-  lexer.Next();  // var_data_type's leading type keyword.
+  const bool kVar = LexerCheck(lexer, TokenKind::kKwVar);
+  if (kVar) lexer.Next();
+  if (!kVar || VarWritesDataType(lexer)) {
+    if (LexerCheck(lexer, TokenKind::kIdentifier)) {
+      SkipTypeName(lexer);
+    } else {
+      lexer.Next();
+    }
+  }
   while (LexerCheck(lexer, TokenKind::kKwSigned) ||
          LexerCheck(lexer, TokenKind::kKwUnsigned)) {
     lexer.Next();
   }
-  while (LexerCheck(lexer, TokenKind::kLBracket)) {
-    int b_depth = 1;
-    lexer.Next();
-    while (b_depth > 0 && !lexer.Peek().Is(TokenKind::kEof)) {
-      if (LexerCheck(lexer, TokenKind::kLBracket))
-        ++b_depth;
-      else if (LexerCheck(lexer, TokenKind::kRBracket))
-        --b_depth;
-      lexer.Next();
-    }
-  }
+  SkipBracketGroups(lexer);
 }
 
 // Skips the initializer expression of one variable_decl_assignment, stopping at
@@ -300,12 +362,15 @@ void Parser::HarvestAssertionVariableDecl(ModuleItem* item) {
   // until the closing semicolon. Each identifier names a distinct local
   // variable in the sequence/property body.
   // §16.10 with §16.6: chandle is not among the types a local variable may
-  // be declared with.
+  // be declared with, whether or not `var` is written before it.
+  auto type_pos = lexer_.SavePos();
+  Match(TokenKind::kKwVar);
   if (Check(TokenKind::kKwChandle)) {
     diag_.Error(CurrentLoc(),
                 "an assertion variable may not be declared of type chandle",
                 Subclause("16.10"));
   }
+  lexer_.RestorePos(type_pos);
   SkipAssertVarTypePrefix(lexer_);
   while (!Check(TokenKind::kSemicolon) && !AtEnd()) {
     if (Check(TokenKind::kIdentifier)) {
@@ -361,6 +426,8 @@ struct SequencePortScan {
   // data type, written or carried from an earlier formal (§16.8), or
   // `sequence`, does not.
   bool clock_default_allowed = true;
+  // A.2.10: the shape of the sequence_port_item the scan stands in.
+  PortItemShape shape{"sequence"};
 
   void FinalizePortItem(DiagEngine& diag, ModuleItem* item) {
     if (!item_saw_local) return;
@@ -452,12 +519,15 @@ struct SequencePortScan {
     item->prop_formal_defaults.push_back(nullptr);
     item->prop_formal_inferred.push_back(InferredDefault::kNone);
     expect_formal_name = false;
+    shape.NameFormal();
   }
 
   // depth==1 comma: finalize the closing port item, then prepare for the next.
   void HandleComma(Lexer& lexer, DiagEngine& diag, ModuleItem* item) {
     FinalizePortItem(diag, item);
+    shape.End(diag);
     lexer.Next();
+    shape.Begin(lexer.Peek());
     item_start = lexer.Peek().loc;
     ResetAfterComma(lexer);
   }
@@ -504,6 +574,7 @@ struct SequencePortScan {
   // formal a default actual argument.
   void HandleDefaultEq(Lexer& lexer, ModuleItem* item) {
     item_saw_eq = true;
+    shape.BeginDefault();
     if (!item->prop_formal_has_default.empty()) {
       item->prop_formal_has_default.back() = true;
     }
@@ -562,19 +633,29 @@ struct SequencePortScan {
   // matching ')' for the opening '(' has been consumed (list complete).
   bool Step(Lexer& lexer, DiagEngine& diag, ModuleItem* item) {
     TokenKind this_kind = lexer.Peek().kind;
+    if (depth == 1 && this_kind != TokenKind::kRParen) {
+      shape.Begin(lexer.Peek());
+    }
     bool keep_going = StepDispatch(lexer, diag, item);
     prev_kind = this_kind;
     return keep_going;
   }
 
   bool StepDispatch(Lexer& lexer, DiagEngine& diag, ModuleItem* item) {
+    if (depth == 1 &&
+        (shape.SkipAttributes(lexer) || shape.SkipTailToken(lexer, diag))) {
+      return true;
+    }
     if (LexerCheck(lexer, TokenKind::kLParen)) {
       lexer.Next();
       ++depth;
       return true;
     }
     if (LexerCheck(lexer, TokenKind::kRParen)) {
-      if (depth == 1) FinalizePortItem(diag, item);
+      if (depth == 1) {
+        FinalizePortItem(diag, item);
+        shape.End(diag);
+      }
       lexer.Next();
       --depth;
       return depth != 0;
@@ -587,8 +668,8 @@ struct SequencePortScan {
 
 // §16.8 sequence_port_list. On entry the opening '(' has already been consumed;
 // drains the comma-separated formal list through its matching ')', harvesting
-// formal_port_identifier names and policing the §16.8.2 local-variable rules.
-// Behaviour matches the original inline loop exactly.
+// formal_port_identifier names, policing the §16.8.2 local-variable rules and
+// holding each item to A.2.10's sequence_port_item (PortItemShape).
 static void ParseSequencePortList(Parser& parser, Lexer& lexer,
                                   DiagEngine& diag, ModuleItem* item) {
   SequencePortScan scan;
@@ -666,21 +747,20 @@ void Parser::ScanSequenceClockEvent(ModuleItem* item) {
 }
 
 // §16.10: assertion_variable_declarations precede the sequence_expr in the
-// body, so they are harvested while still at the head of the body; once a token
-// appears that does not start a declaration the scan falls through to the
-// sequence_instance reference scan the §16.8 cycle rule needs.
+// body, so they are harvested while still at the head of the body. What
+// follows them is A.2.10's sequence_expr, held to the grammar, and the scan
+// then falls through to the sequence_instance reference scan the §16.8 cycle
+// rule needs.
 void Parser::ScanSequenceBody(ModuleItem* item) {
-  bool in_decl_prefix = true;
+  while (AtAssertionVariableDecl(lexer_, known_types_)) {
+    HarvestAssertionVariableDecl(item);
+  }
+  ParserPropertyGrammar::CheckDeclarationBody(*this, true,
+                                              TokenKind::kKwEndsequence);
   // Whether the token before stands for a member or a scope selection, `.` or
   // `::`, so an identifier after it names a member rather than a formal.
   bool after_select = false;
   while (!Check(TokenKind::kKwEndsequence) && !AtEnd()) {
-    if (in_decl_prefix && AtAssertionVariableDecl(lexer_, known_types_)) {
-      HarvestAssertionVariableDecl(item);
-      continue;
-    }
-    in_decl_prefix = false;
-
     if (Check(TokenKind::kAt)) {
       ScanSequenceClockEvent(item);
       continue;

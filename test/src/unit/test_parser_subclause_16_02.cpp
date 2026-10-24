@@ -18,8 +18,9 @@ using namespace delta;
 namespace {
 
 // §16.2: there is no immediate restrict assertion statement. A restrict
-// written as a procedural statement is refused where it stands, under this
-// clause, since the rule that rules it out is this clause's.
+// written as an immediate assertion, with no `property`, is refused where it
+// stands, under this clause, since the rule that rules it out is this
+// clause's.
 TEST(AssertionKindsParsing, ImmediateRestrictIsRefused) {
   auto r = Parse(
       "module m;\n"

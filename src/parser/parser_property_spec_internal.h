@@ -100,6 +100,11 @@ struct ParserPropertySpecHelpers {
   // nothing consumed, where the body opens with anything else. Defined in
   // src/parser/parser_assert.cpp beside the statements.
   static ModuleItem* TryParseAlwaysConcurrentAssertion(Parser& p);
+  // A.6.10 with §16.14.6: a statement opening with `restrict` in procedural
+  // code, which is a procedural restrict property statement or else the
+  // immediate restrict §16.2 rules out. Defined in
+  // src/parser/parser_assert.cpp.
+  static Stmt* ParseProceduralRestrict(Parser& p);
   // §23.9, §16.8 and §16.10: records on `item` what the text from the current
   // token to `end` reads, declares, bounds with and passes to instances,
   // leaving the lexer where it was. Defined in

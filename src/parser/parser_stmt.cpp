@@ -11,6 +11,7 @@
 #include "parser/expr_parser_internal.h"
 #include "parser/parser.h"
 #include "parser/parser_data_decl_internal.h"
+#include "parser/parser_property_spec_internal.h"
 #include "parser/parser_token_skips.h"
 
 namespace delta {
@@ -311,13 +312,7 @@ Stmt* Parser::ParseStmtBody(std::string_view prefix_label) {
     case TokenKind::kKwCover:
       return ParseImmediateCover();
     case TokenKind::kKwRestrict:
-
-      diag_.Error(CurrentLoc(),
-                  "restrict has no immediate (procedural) form; "
-                  "use `restrict property (...)` at module-item level",
-                  Subclause("16.2"));
-      Consume();
-      return arena_.Create<Stmt>();
+      return ParserPropertySpecHelpers::ParseProceduralRestrict(*this);
     case TokenKind::kKwWaitOrder:
       return ParseWaitOrderStmt();
     case TokenKind::kKwRandcase:

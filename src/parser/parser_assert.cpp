@@ -120,6 +120,20 @@ struct ParserAssertHelpers {
     // gives a cover nowhere to keep one, and Stmt::assert_fail_stmt stays null.
     p.ParseStmt();
   }
+
+  // §16.14 lists the places a concurrent assertion statement may be
+  // specified, and the only procedural code among them is an always or an
+  // initial procedure: a task, a function, a class method and a final
+  // procedure are not on it. Reports one at `loc` standing elsewhere.
+  static void RejectOutsideAlwaysOrInitial(Parser& p, SourceLoc loc) {
+    if (p.always_or_initial_depth_ != 0 || p.cover_pass_statement_depth_ != 0) {
+      return;
+    }
+    p.diag_.Error(loc,
+                  "a concurrent assertion statement in procedural code shall "
+                  "be in an always or an initial procedure",
+                  Subclause("16.14"));
+  }
 };
 
 static void SkipBalancedPropertySpec(Lexer& lexer) {
@@ -148,16 +162,7 @@ static void SkipBalancedPropertySpec(Lexer& lexer) {
 // is reported and skipped.
 Stmt* Parser::ParseProceduralConcurrentAssertLike(StmtKind kind) {
   SourceLoc loc = CurrentLoc();
-  // §16.14 lists the places a concurrent assertion statement may be
-  // specified, and the only procedural code among them is an always or an
-  // initial procedure: a task, a function, a class method and a final
-  // procedure are not on it.
-  if (always_or_initial_depth_ == 0 && cover_pass_statement_depth_ == 0) {
-    diag_.Error(loc,
-                "a concurrent assertion statement in procedural code shall be "
-                "in an always or an initial procedure",
-                Subclause("16.14"));
-  }
+  ParserAssertHelpers::RejectOutsideAlwaysOrInitial(*this, loc);
   bool sequence = Match(TokenKind::kKwSequence);
   if (!sequence) Expect(TokenKind::kKwProperty, Subclause("16.14.6"));
   Stmt* stmt =
@@ -174,12 +179,16 @@ Stmt* Parser::ParseProceduralConcurrentAssertLike(StmtKind kind) {
 // tool evaluates is skipped and the statement left with no property,
 // reported as a spec the grammar does not admit where it is none and as
 // one not evaluated otherwise. `sequence` marks a cover sequence's spec, a
-// sequence_expr after the clock and the disable condition.
+// sequence_expr after the clock and the disable condition, which is held to
+// the grammar before the evaluation's parse, that parse reading a property
+// spec (ParseCoverProperty).
 Stmt* Parser::ParseProceduralPropertySpec(StmtKind kind, SourceLoc loc,
                                           Subclause subclause, bool sequence) {
   auto* spec = arena_.Create<ModuleItem>();
   spec->loc = loc;
   Expect(TokenKind::kLParen, subclause);
+  bool admitted =
+      !sequence || ParserPropertyGrammar::CheckPropertySpec(*this, true);
   Stmt* stmt = nullptr;
   if (TryParseSimpleConcurrentProperty(spec, kind)) {
     stmt = spec->body;
@@ -188,7 +197,10 @@ Stmt* Parser::ParseProceduralPropertySpec(StmtKind kind, SourceLoc loc,
     stmt = arena_.Create<Stmt>();
     stmt->kind = kind;
     stmt->range.start = spec->loc;
-    if (ParserPropertyGrammar::CheckPropertySpec(*this, sequence)) {
+    if (!sequence) {
+      admitted = ParserPropertyGrammar::CheckPropertySpec(*this, false);
+    }
+    if (admitted) {
       diag_.Warning(spec->loc,
                     "procedural concurrent assertion is not evaluated: its "
                     "property_spec holds more than the forms this tool "
@@ -618,14 +630,20 @@ ModuleItem* Parser::ParseCoverProperty() {
   // covered at every match of the sequence, which the body is marked for; a
   // cover whose spec is an instance of a named property or sequence, §16.12.1
   // and §16.14, is recorded for the elaborator as ParsePropertyAssertLike
-  // records one, and a cover whose spec is neither has its spec skipped.
+  // records one, and a cover whose spec is neither has its spec skipped. That
+  // parse reads a property spec, so a cover sequence's spec is held to
+  // A.2.10's sequence_expr before it, whatever it then reads, and reported
+  // once where the grammar does not admit it.
+  const bool kSequence = item->kind == ModuleItemKind::kCoverSequence;
+  bool admitted =
+      !kSequence || ParserPropertyGrammar::CheckPropertySpec(*this, true);
   bool simple_concurrent =
       ReadStaticPropertySpec(item, StmtKind::kCoverImmediate);
   if (!simple_concurrent && item->prop_instance_name.empty()) {
-    if (ParserPropertyGrammar::CheckPropertySpec(
-            *this, item->kind == ModuleItemKind::kCoverSequence)) {
-      WarnUnevaluatedConcurrentAssertion(item->loc);
+    if (!kSequence) {
+      admitted = ParserPropertyGrammar::CheckPropertySpec(*this, false);
     }
+    if (admitted) WarnUnevaluatedConcurrentAssertion(item->loc);
     item->assert_expr = SkipPropertySpec(arena_, lexer_, CurrentLoc());
   }
   Expect(TokenKind::kRParen, Subclause("16.14.3"));
@@ -674,6 +692,34 @@ ModuleItem* ParserPropertySpecHelpers::TryParseAlwaysConcurrentAssertion(
     default:
       return p.ParseRestrictProperty();
   }
+}
+
+// A.6.10's procedural_assertion_statement takes every
+// concurrent_assertion_statement, and §16.14.6 lets one stand in procedural
+// code, so a restrict_property_statement, `restrict property ( property_spec
+// ) ;`, is one there as well. §16.14.4 has a simulator not check it, so its
+// spec is held to the grammar and skipped, and the statement does nothing
+// when reached. A restrict without `property` is the immediate restrict §16.2
+// rules out, reported at its keyword.
+Stmt* ParserPropertySpecHelpers::ParseProceduralRestrict(Parser& p) {
+  auto* stmt = p.arena_.Create<Stmt>();
+  stmt->kind = StmtKind::kNull;
+  stmt->range.start = p.CurrentLoc();
+  p.Consume();
+  if (!p.Match(TokenKind::kKwProperty)) {
+    p.diag_.Error(stmt->range.start,
+                  "restrict has no immediate form; a restrict assertion is "
+                  "written `restrict property (...)`",
+                  Subclause("16.2"));
+    return stmt;
+  }
+  ParserAssertHelpers::RejectOutsideAlwaysOrInitial(p, stmt->range.start);
+  p.Expect(TokenKind::kLParen, Subclause("16.14.4"));
+  ParserPropertyGrammar::CheckPropertySpec(p, false);
+  SkipBalancedPropertySpec(p.lexer_);
+  p.Expect(TokenKind::kRParen, Subclause("16.14.4"));
+  p.Expect(TokenKind::kSemicolon, Subclause("16.14.4"));
+  return Spanning(stmt, stmt->range.start, p.lexer_);
 }
 
 ModuleItem* Parser::ParseRestrictProperty() {
