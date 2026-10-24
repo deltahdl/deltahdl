@@ -375,4 +375,33 @@ TEST(ClassScopeResolutionElaboration, ChainedTypeIsTheNestedClassesTypedef) {
   EXPECT_EQ(w->width, 6u);
 }
 
+// §8.23 with §26.3: a typedef of a class a package declares is reached through
+// the package, `pkg::C::t`, or through the class's bare name once the package
+// is imported, `C::u`. The type tables key no package class's typedef, so each
+// is resolved from the class itself, six bits and five.
+TEST(ClassScopeResolutionElaboration, PackageClassTypedefTakesItsType) {
+  ElabFixture f;
+  RtlirDesign* design = ElaborateSrc(
+      "package pkg;\n"
+      "  class C;\n"
+      "    typedef logic [5:0] t;\n"
+      "    typedef logic [4:0] u;\n"
+      "  endclass\n"
+      "endpackage\n"
+      "module m;\n"
+      "  import pkg::*;\n"
+      "  pkg::C::t v;\n"
+      "  C::u w;\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  const RtlirVariable* v = FindVar(design, "m", "v");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->width, 6u);
+  const RtlirVariable* w = FindVar(design, "m", "w");
+  ASSERT_NE(w, nullptr);
+  EXPECT_EQ(w->width, 5u);
+}
+
 }  // namespace
