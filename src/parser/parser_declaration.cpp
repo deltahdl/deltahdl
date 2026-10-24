@@ -641,6 +641,21 @@ static void RejectConstructorReturnType(ModuleItem* item, SourceLoc type_loc,
   item->return_type = DataType{};
 }
 
+// A.2.6 writes a function_body_declaration's name as
+// `[ interface_identifier . | class_scope ] function_identifier`, one prefix
+// or the other, so a `.` at `dot_loc` after the class scope `item` was named
+// in is reported; the caller still reads the interface prefix it opens.
+static void RejectInterfacePrefixAfterClassScope(const ModuleItem* item,
+                                                 bool dot_follows,
+                                                 SourceLoc dot_loc,
+                                                 DiagEngine& diag) {
+  if (item->method_class.empty() || !dot_follows) return;
+  diag.Error(dot_loc,
+             "a function's name takes an interface prefix or a class scope, "
+             "not both",
+             Subclause("A.2.6"));
+}
+
 void Parser::ParseFuncName(ModuleItem* item) {
   if (Check(TokenKind::kKwNew)) {
     item->name = "new";
@@ -680,16 +695,8 @@ void Parser::ParseFuncName(ModuleItem* item) {
   if (!item->method_class.empty()) RejectStaticOutOfBlockMethod(item, diag_);
   if (type_written) RejectConstructorReturnType(item, kTypeLoc, diag_);
 
-  // A.2.6 writes a function_body_declaration's name as
-  // `[ interface_identifier . | class_scope ] function_identifier`, one prefix
-  // or the other, so an interface prefix after a class scope is reported and
-  // still read.
-  if (!item->method_class.empty() && Check(TokenKind::kDot)) {
-    diag_.Error(CurrentLoc(),
-                "a function's name takes an interface prefix or a class scope, "
-                "not both",
-                Subclause("A.2.6"));
-  }
+  RejectInterfacePrefixAfterClassScope(item, Check(TokenKind::kDot),
+                                       CurrentLoc(), diag_);
   if (Match(TokenKind::kDot)) {
     item->method_class = item->name;
     item->name = Expect(TokenKind::kIdentifier, Subclause("25.7")).text;
