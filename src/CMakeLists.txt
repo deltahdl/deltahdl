@@ -112,6 +112,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     parser/parser_covergroup.cpp
     parser/parser_covergroup_cross.cpp
     parser/parser_randsequence.cpp
+    parser/parser_let.cpp
     parser/parser_specify.cpp
     parser/parser_config.cpp
     parser/parser_inst.cpp

@@ -19,7 +19,6 @@
 #include "parser/ast_module.h"
 #include "parser/ast_specify.h"
 #include "parser/ast_type.h"
-#include "parser/parser_data_decl_internal.h"
 #include "parser/parser_fsm.h"
 #include "parser/parser_token_skips.h"
 #include "parser/parser_type_name_scope.h"
@@ -892,42 +891,6 @@ PackageDecl* Parser::ParsePackageDecl() {
   MatchEndLabel(pkg->name);
   pkg->range.end = CurrentLoc();
   return pkg;
-}
-
-FunctionArg Parser::ParseLetArg() {
-  FunctionArg arg;
-  ParseAttributes();
-  // A.2.12 with A.2.2.1: a let formal's type may be a type_reference (§6.23).
-  if (!Match(TokenKind::kKwUntyped) &&
-      !ParserDataDeclHelpers::ReadTypeReference(*this, arg.data_type)) {
-    arg.data_type = ParseDeclaredDataType();
-  }
-  arg.name = Expect(TokenKind::kIdentifier, Subclause("11.12")).text;
-  ParseUnpackedDims(arg.unpacked_dims);
-  if (Match(TokenKind::kEq)) arg.default_value = ParseExpr();
-  return arg;
-}
-
-ModuleItem* Parser::ParseLetDecl() {
-  Consume();
-  auto* item = arena_.Create<ModuleItem>();
-  item->kind = ModuleItemKind::kLetDecl;
-  item->loc = CurrentLoc();
-  item->name = ExpectIdentifier(Subclause("11.12")).text;
-  if (Check(TokenKind::kLParen)) {
-    Consume();
-    if (!Check(TokenKind::kRParen)) {
-      item->func_args.push_back(ParseLetArg());
-      while (Match(TokenKind::kComma)) {
-        item->func_args.push_back(ParseLetArg());
-      }
-    }
-    Expect(TokenKind::kRParen, Subclause("11.12"));
-  }
-  Expect(TokenKind::kEq, Subclause("11.12"));
-  item->init_expr = ParseExpr();
-  Expect(TokenKind::kSemicolon, Subclause("11.12"));
-  return item;
 }
 
 void Parser::ParseGenvarDecl(std::vector<ModuleItem*>& items) {

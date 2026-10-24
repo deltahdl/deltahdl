@@ -1,8 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <vector>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
 
@@ -327,6 +330,71 @@ TEST(LetDeclParsing, LetFormalOfATypeReference) {
   ASSERT_EQ(item->func_args.size(), 1u);
   EXPECT_EQ(item->func_args[0].name, "a");
   EXPECT_NE(item->func_args[0].data_type.type_ref_expr, nullptr);
+}
+
+// A.2.12's let_formal_type is a data_type_or_implicit or `untyped`, and
+// A.2.2.1's data_type opens with no `const`, so a `const` before a formal is
+// reported and the type after it still read.
+TEST(LetDeclParsing, ALetFormalTakesNoConst) {
+  auto r = Parse(
+      "module m;\n"
+      "  let f(const int x) = x + 1;\n"
+      "  let g(int x) = x + 1;\n"
+      "endmodule\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "a let formal takes no 'const'", 2, "A.2.12"));
+  EXPECT_FALSE(
+      ReportedError(r.diags, "a let formal takes no 'const'", 3, "A.2.12"));
+  auto* item =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kLetDecl);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->func_args.size(), 1u);
+  EXPECT_EQ(item->func_args[0].data_type.kind, DataTypeKind::kInt);
+  EXPECT_EQ(item->func_args[0].name, "x");
+}
+
+// A.2.2.1's implicit_data_type may be a packed dimension with no signing, so
+// `[3:0] x` is a formal of an implicit type that carries the dimension.
+TEST(LetDeclParsing, ALetFormalOfAnImplicitPackedType) {
+  auto r = Parse(
+      "module m;\n"
+      "  let f([3:0] x) = x + 1;\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* item =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kLetDecl);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->func_args.size(), 1u);
+  const DataType& type = item->func_args[0].data_type;
+  EXPECT_EQ(type.kind, DataTypeKind::kImplicit);
+  EXPECT_FALSE(type.signing_written);
+  ASSERT_NE(type.packed_dim_left, nullptr);
+  ASSERT_NE(type.packed_dim_right, nullptr);
+  EXPECT_EQ(type.packed_dim_left->int_val, 3u);
+  EXPECT_EQ(type.packed_dim_right->int_val, 0u);
+  EXPECT_EQ(item->func_args[0].name, "x");
+}
+
+// A.2.2.1's data_type includes an inline struct, union or enum, which a let
+// formal may take as its type.
+TEST(LetDeclParsing, ALetFormalOfAnInlineAggregateType) {
+  auto r = Parse(
+      "module m;\n"
+      "  let f(struct packed { bit a; bit b; } s) = s.a;\n"
+      "  let g(enum { A, B } e) = e == A;\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  std::vector<const ModuleItem*> lets;
+  for (const ModuleItem* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kLetDecl) lets.push_back(item);
+  }
+  ASSERT_EQ(lets.size(), 2u);
+  ASSERT_EQ(lets[0]->func_args.size(), 1u);
+  EXPECT_EQ(lets[0]->func_args[0].data_type.kind, DataTypeKind::kStruct);
+  EXPECT_EQ(lets[0]->func_args[0].name, "s");
+  ASSERT_EQ(lets[1]->func_args.size(), 1u);
+  EXPECT_EQ(lets[1]->func_args[0].data_type.kind, DataTypeKind::kEnum);
+  EXPECT_EQ(lets[1]->func_args[0].name, "e");
 }
 
 }  // namespace
