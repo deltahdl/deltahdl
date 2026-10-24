@@ -14,6 +14,8 @@
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
+#include "elaborator/assertion_body_slots.h"
+#include "elaborator/assertion_walk.h"
 #include "elaborator/class_member_names.h"
 #include "elaborator/elaborator_call_targets_internal.h"
 #include "elaborator/elaborator_enclosing_subroutines.h"
@@ -35,16 +37,20 @@ namespace delta {
 
 namespace {
 
-// Reports a call of `name` written at `loc` where the scope sees the name as
-// a variable or a net.
-void ReportIfData(std::string_view name, SourceLoc loc, const DataScope& scope,
-                  DiagEngine& diag) {
-  if (!scope.Names(name)) return;
+// Reports a call of `name`, a variable or a net, written at `loc`.
+void ReportDataCall(std::string_view name, SourceLoc loc, DiagEngine& diag) {
   diag.Error(loc,
              std::format("'{}' names a variable or a net, and a call names a "
                          "task or a function",
                          name),
              Subclause("A.8.2"));
+}
+
+// Reports a call of `name` written at `loc` where the scope sees the name as
+// a variable or a net.
+void ReportIfData(std::string_view name, SourceLoc loc, const DataScope& scope,
+                  DiagEngine& diag) {
+  if (scope.Names(name)) ReportDataCall(name, loc, diag);
 }
 
 // The plain name the call `expr` calls, null where `expr` is no call by a
@@ -489,6 +495,85 @@ void CheckSiteClasses(const DataScope& site,
   }
 }
 
+// The names the calls attached to a sequence are judged by besides the
+// scope's: the local variables the sequence reads, data whatever the scope
+// sees, and the formal arguments of the declaration holding it, which stand
+// for their actuals (§16.8.1) whatever the scope sees.
+struct AttachedNames {
+  std::unordered_set<std::string_view> locals;
+  std::unordered_set<std::string_view> formals;
+};
+
+// §16.11 with A.8.2: each of the match items `items` that calls, by a plain
+// name, one of `names.locals` or a variable or a net the scope sees, a
+// formal among `names.formals` aside.
+void CheckAttachedItems(const std::vector<SeqMatchAssign>& items,
+                        const AttachedNames& names, const DataScope& scope,
+                        DiagEngine& diag) {
+  for (const SeqMatchAssign& item : items) {
+    const Expr* callee =
+        item.call == nullptr ? nullptr : NamedCallee(*item.call);
+    if (callee == nullptr || names.formals.contains(callee->text)) continue;
+    if (names.locals.contains(callee->text)) {
+      ReportDataCall(callee->text, item.call->range.start, diag);
+    } else {
+      ReportIfData(callee->text, item.call->range.start, scope, diag);
+    }
+  }
+}
+
+// The calls attached to the sequence `body` and to each body nested in it,
+// first_match's among them.
+void CheckAttachedCalls(const SeqLinearBody& body, const AttachedNames& names,
+                        const DataScope& scope, DiagEngine& diag) {
+  ForEachBody(body, [&](const SeqLinearBody& nested) {
+    for (const std::vector<SeqMatchAssign>& items : nested.match_items) {
+      CheckAttachedItems(items, names, scope, diag);
+    }
+    CheckAttachedItems(nested.first_match_items, names, scope, diag);
+  });
+}
+
+// The calls attached to each sequence of the property tree under `node`.
+void CheckTreeAttachedCalls(const PropertyExprNode* node,
+                            const AttachedNames& names, const DataScope& scope,
+                            DiagEngine& diag) {
+  ForEachTreeNode(node, [&](const PropertyExprNode& at) {
+    if (at.sequence != nullptr) {
+      CheckAttachedCalls(at.sequence->seq_linear, names, scope, diag);
+    }
+  });
+}
+
+// The calls attached to the sequences of the sequence or property
+// declaration `decl`, judged by the locals its sequences and its property
+// declare and by its formals.
+void CheckDeclarationCalls(const ModuleItem& decl, const DataScope& scope,
+                           DiagEngine& diag) {
+  AttachedNames names;
+  CollectBodyLocals(decl.seq_linear, names.locals);
+  if (decl.prop_body_tree != nullptr) {
+    CollectTreeLocals(decl.prop_body_tree, names.locals);
+  }
+  for (const SeqLocalDecl& local : decl.prop_locals) {
+    names.locals.insert(local.name);
+  }
+  names.formals.insert(decl.prop_formals.begin(), decl.prop_formals.end());
+  CheckAttachedCalls(decl.seq_linear, names, scope, diag);
+  CheckTreeAttachedCalls(decl.prop_body_tree, names, scope, diag);
+}
+
+// The calls attached to the sequences of the concurrent assertion statement
+// `stmt`, whose sequences declare no locals and bind no formals.
+void CheckAssertionCalls(const Stmt& stmt, const DataScope& scope,
+                         DiagEngine& diag) {
+  const AttachedNames kNone;
+  CheckTreeAttachedCalls(stmt.assert_property, kNone, scope, diag);
+  if (stmt.assert_sequence != nullptr) {
+    CheckAttachedCalls(stmt.assert_sequence->seq_linear, kNone, scope, diag);
+  }
+}
+
 void CheckItemCalls(const std::vector<ModuleItem*>& items, DataScope& scope,
                     DiagEngine& diag);
 
@@ -535,8 +620,9 @@ void CheckGenerateCalls(const ModuleItem& construct, DataScope& scope,
 
 // Each call the items `items` of a module or of a generate block write: in
 // their procedures, in the tasks and functions they declare, a method defined
-// out of its class's body (§8.24) excepted, and in the generate constructs
-// among them.
+// out of its class's body (§8.24) excepted, in the generate constructs among
+// them, and attached to the sequences their sequence and property
+// declarations write.
 void CheckItemCalls(const std::vector<ModuleItem*>& items, DataScope& scope,
                     DiagEngine& diag) {
   for (const ModuleItem* item : items) {
@@ -550,6 +636,9 @@ void CheckItemCalls(const std::vector<ModuleItem*>& items, DataScope& scope,
                item->kind == ModuleItemKind::kGenerateIf ||
                item->kind == ModuleItemKind::kGenerateCase) {
       CheckGenerateCalls(*item, scope, diag);
+    } else if (item->kind == ModuleItemKind::kSequenceDecl ||
+               item->kind == ModuleItemKind::kPropertyDecl) {
+      CheckDeclarationCalls(*item, scope, diag);
     }
   }
 }
@@ -565,6 +654,11 @@ void ReportCallsOfDataNames(
   DeclareModuleItems(decl, unit, scope);
   DeclareUnitData(unit, scope);
   CheckItemCalls(decl.items, scope, diag);
+  // §16.11: the calls attached to the sequences of its concurrent assertion
+  // statements, at module level and in its procedures.
+  ForEachConcurrentAssertion(&decl, [&](const Stmt* stmt) {
+    CheckAssertionCalls(*stmt, scope, diag);
+  });
 }
 
 void ReportClassMethodCalls(const CompilationUnit& unit, DiagEngine& diag) {

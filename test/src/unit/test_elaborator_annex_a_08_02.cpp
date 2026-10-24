@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <initializer_list>
 #include <string>
 #include <utility>
 
@@ -385,6 +386,64 @@ TEST(SubroutineCallElaborationSyntax, ACallNamingAVariableOrANetIsReported) {
                             7, "A.8.2"));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), std::string("'w") + kMessage,
                             8, "A.8.2"));
+}
+
+// A.8.2 with §16.11: a call attached to a sequence names a task or a function
+// too, so one naming a module's variable or net, written with an argument list
+// or without, or a local variable of the sequence is reported, in a sequence
+// declaration, a first_match, a property declaration, one of its local
+// variables among them, a concurrent assertion at module level, a cover
+// sequence and an assertion in a procedure. A task
+// draws no report, nor does a formal argument, which stands for its actual
+// (§16.8.1) though a variable of the module bears its name.
+TEST(SubroutineCallElaborationSyntax,
+     ACallAttachedToASequenceNamingDataIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m(input logic clk, a, b);\n"
+      "  int count;\n"
+      "  wire w;\n"
+      "  task tick; endtask\n"
+      "  sequence s1; @(posedge clk) (a, count) ##1 b; endsequence\n"
+      "  sequence s2; @(posedge clk) (a, count()) ##1 b; endsequence\n"
+      "  sequence s3; int v; @(posedge clk) (a, v = 1, v) ##1 b; endsequence\n"
+      "  sequence s4; @(posedge clk) (a, tick) ##1 b; endsequence\n"
+      "  sequence s5(q); @(posedge clk) (a, q) ##1 b; endsequence\n"
+      "  sequence s6(count); @(posedge clk) (a, count) ##1 b; endsequence\n"
+      "  sequence s7; @(posedge clk) first_match(a ##1 b, count); endsequence\n"
+      "  property p1; @(posedge clk) (a, w) |-> b; endproperty\n"
+      "  property p2; int v; @(posedge clk) (a, v = 1, v) |-> b; endproperty\n"
+      "  a1: assert property (@(posedge clk) (a, count) |-> b);\n"
+      "  c1: cover sequence (@(posedge clk) (a, count) ##1 b);\n"
+      "  initial begin a2: assert property (@(posedge clk) (a, count) |-> b); "
+      "end\n"
+      "endmodule\n",
+      f);
+  const std::string kMessage =
+      "' names a variable or a net, and a call names a task or a function";
+  for (const auto& [name, line] :
+       std::initializer_list<std::pair<const char*, uint32_t>>{{"count", 5},
+                                                               {"count", 6},
+                                                               {"v", 7},
+                                                               {"count", 11},
+                                                               {"w", 12},
+                                                               {"v", 13},
+                                                               {"count", 14},
+                                                               {"count", 15},
+                                                               {"count", 16}}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              std::string("'") + name + kMessage, line,
+                              "A.8.2"))
+        << "line " << line;
+  }
+  for (const auto& [name, line] :
+       std::initializer_list<std::pair<const char*, uint32_t>>{
+           {"tick", 8}, {"q", 9}, {"count", 10}}) {
+    EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                               std::string("'") + name + kMessage, line,
+                               "A.8.2"))
+        << "line " << line;
+  }
 }
 
 // A.8.2: a call of a task or a function the module declares, a call through a
