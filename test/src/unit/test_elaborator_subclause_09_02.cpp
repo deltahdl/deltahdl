@@ -123,12 +123,12 @@ TEST(StructuredProcedureElaboration,
       "  function :initial int f(); return 0; endfunction\n"
       "endmodule\n",
       f);
-  // Rejected under §8.20, which is the clause the emission site names.
-  EXPECT_TRUE(
-      ReportedError(f.diag.Diagnostics(),
-                    "dynamic_override_specifiers belong on a class method "
-                    "declaration, and an interface class takes none",
-                    2, "8.20"));
+  // Rejected under §13.4, whose Syntax 13-2 prints footnote 25.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "a function's dynamic_override_specifiers belong on a class "
+      "method declaration, and an interface class takes none",
+      2, "13.4"));
 }
 
 TEST(StructuredProcedureElaboration, DynamicOverrideRejectedOnModuleLevelTask) {
@@ -138,12 +138,12 @@ TEST(StructuredProcedureElaboration, DynamicOverrideRejectedOnModuleLevelTask) {
       "  task :final t(); endtask\n"
       "endmodule\n",
       f);
-  // Rejected under §8.20, which is the clause the emission site names.
+  // Rejected under §13.3, whose Syntax 13-1 prints footnote 25.
   EXPECT_TRUE(
       ReportedError(f.diag.Diagnostics(),
-                    "dynamic_override_specifiers belong on a class method "
-                    "declaration, and an interface class takes none",
-                    2, "8.20"));
+                    "a task's dynamic_override_specifiers belong on a class "
+                    "method declaration, and an interface class takes none",
+                    2, "13.3"));
 }
 
 TEST(StructuredProcedureElaboration,
@@ -154,12 +154,12 @@ TEST(StructuredProcedureElaboration,
       "  task :extends t(); endtask\n"
       "endmodule\n",
       f);
-  // Rejected under §8.20, which is the clause the emission site names.
+  // Rejected under §13.3, whose Syntax 13-1 prints footnote 25.
   EXPECT_TRUE(
       ReportedError(f.diag.Diagnostics(),
-                    "dynamic_override_specifiers belong on a class method "
-                    "declaration, and an interface class takes none",
-                    2, "8.20"));
+                    "a task's dynamic_override_specifiers belong on a class "
+                    "method declaration, and an interface class takes none",
+                    2, "13.3"));
 }
 
 // Footnote 25 accepting path: the override specifier IS legal when the method

@@ -443,9 +443,14 @@ TEST(ModportDeclarationParsing, PrototypeWithOverrideSpecifierIsRejected) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_TRUE(
       ReportedError(r.diags,
-                    "dynamic_override_specifiers belong on a class method "
-                    "declaration, and an interface class takes none",
-                    2, "8.20"));
+                    "a task's dynamic_override_specifiers belong on a class "
+                    "method declaration, and an interface class takes none",
+                    2, "13.3"));
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "a function's dynamic_override_specifiers belong on a class "
+      "method declaration, and an interface class takes none",
+      2, "13.4"));
   EXPECT_FALSE(ReportedError(r.diags, "expected identifier", 2, "25.5"));
   auto* mp = r.cu->interfaces[0]->modports[0];
   ASSERT_EQ(mp->ports.size(), 2u);

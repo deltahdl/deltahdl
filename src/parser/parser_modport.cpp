@@ -10,6 +10,7 @@
 #include "lexer/token.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
+#include "parser/override_specifier_placement.h"
 #include "parser/parser.h"
 #include "parser/parser_token_skips.h"
 
@@ -25,13 +26,7 @@ namespace delta {
 // as a missing identifier at the ':'.
 void Parser::ParseModportPrototypeSpecifiers(ModuleItem* item) {
   ParseDynamicOverrideSpecifiers(item);
-  if (item->is_method_initial || item->is_method_extends ||
-      item->is_method_final) {
-    diag_.Error(item->loc,
-                "dynamic_override_specifiers belong on a class method "
-                "declaration, and an interface class takes none",
-                Subclause("8.20"));
-  }
+  ReportMisplacedOverrideSpecifiers(*item, diag_);
 }
 
 ModportPort Parser::ParseModportTfPort(bool is_import) {

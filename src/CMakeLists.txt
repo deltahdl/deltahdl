@@ -71,6 +71,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     parser/parser_dpi.cpp
     parser/parser_dpi_validate.cpp
     parser/parser_prototype_validate.cpp
+    parser/override_specifier_placement.cpp
     parser/parser_aggregate_types.cpp
     parser/parser_declaration.cpp
     parser/parser_subroutine_body.cpp

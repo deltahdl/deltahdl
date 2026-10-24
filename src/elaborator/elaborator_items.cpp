@@ -41,6 +41,7 @@
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
+#include "parser/override_specifier_placement.h"
 
 namespace delta {
 
@@ -332,19 +333,6 @@ void CheckGateInstanceArrayTerminalWidths(
                  Subclause("28.3.6"));
       break;
     }
-  }
-}
-
-// Emits the dynamic-override-specifier diagnostic for a function or task
-// declaration item.
-void CheckFunctionDeclDiagnostics(const ModuleItem* item, DiagEngine& diag) {
-  if (item->method_class.empty() &&
-      (item->is_method_initial || item->is_method_extends ||
-       item->is_method_final)) {
-    diag.Error(item->loc,
-               "dynamic_override_specifiers belong on a class method "
-               "declaration, and an interface class takes none",
-               Subclause("8.20"));
   }
 }
 
@@ -786,7 +774,7 @@ bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
       // stands in, as the kGateInst case in Elaborator::ElaborateDeclItem does
       // and for the same reason.
       DeclareInModuleNameSpace(item->name, item->loc);
-      CheckFunctionDeclDiagnostics(item, diag_);
+      ReportMisplacedOverrideSpecifiers(*item, diag_);
       ValidateFunctionBody(item);
       ValidateFunctionArgDefaultsScope(item);
       ResolveFormalAggregateTypes(item, typedefs_, arena_);

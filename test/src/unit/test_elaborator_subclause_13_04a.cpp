@@ -449,13 +449,14 @@ TEST(FunctionElaboration, DynamicOverrideOnModuleScopeFunctionError) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  // §8.20 is the rule that rejects this, not §13.4: the specifier parses on any
-  // subroutine, and the elaborator refuses it outside a class scope.
-  EXPECT_TRUE(
-      ReportedError(f.diag.Diagnostics(),
-                    "dynamic_override_specifiers belong on a class method "
-                    "declaration, and an interface class takes none",
-                    2, "8.20"));
+  // Footnote 25 of Syntax 13-2 in §13.4 is the rule that rejects this: the
+  // specifier parses on any subroutine, and the elaborator refuses it outside
+  // a class scope.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "a function's dynamic_override_specifiers belong on a class "
+      "method declaration, and an interface class takes none",
+      2, "13.4"));
 }
 
 TEST(FunctionElaboration, DynamicOverrideFinalOnModuleScopeFunctionError) {
@@ -466,12 +467,12 @@ TEST(FunctionElaboration, DynamicOverrideFinalOnModuleScopeFunctionError) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  // §8.20 is the rule that rejects this, not §13.4.
-  EXPECT_TRUE(
-      ReportedError(f.diag.Diagnostics(),
-                    "dynamic_override_specifiers belong on a class method "
-                    "declaration, and an interface class takes none",
-                    2, "8.20"));
+  // Footnote 25 of Syntax 13-2 in §13.4 is the rule that rejects this.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "a function's dynamic_override_specifiers belong on a class "
+      "method declaration, and an interface class takes none",
+      2, "13.4"));
 }
 
 TEST(FunctionElaboration, DynamicOverrideExtendsOnModuleScopeFunctionError) {
@@ -484,12 +485,12 @@ TEST(FunctionElaboration, DynamicOverrideExtendsOnModuleScopeFunctionError) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  // §8.20 is the rule that rejects this, not §13.4.
-  EXPECT_TRUE(
-      ReportedError(f.diag.Diagnostics(),
-                    "dynamic_override_specifiers belong on a class method "
-                    "declaration, and an interface class takes none",
-                    2, "8.20"));
+  // Footnote 25 of Syntax 13-2 in §13.4 is the rule that rejects this.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "a function's dynamic_override_specifiers belong on a class "
+      "method declaration, and an interface class takes none",
+      2, "13.4"));
 }
 
 TEST(FunctionElaboration, NestedForkJoinInFunctionIsError) {

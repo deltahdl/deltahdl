@@ -25,6 +25,7 @@
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
+#include "parser/override_specifier_placement.h"
 
 namespace delta {
 
@@ -273,6 +274,15 @@ void Elaborator::ValidatePerDeclarationRulesInUnitScopes() {
     CheckRandsequenceNamesIn(items);
     CheckForeachLoopsIn(items);
     CheckPatternsIn(items);
+    // Footnote 25 of Syntax 13-1 and 13-2 for the same two scopes, whose
+    // subroutines, a class's out-of-block definitions among them, are in no
+    // module's item list for Elaborator::ElaborateDeclItem to report.
+    for (const ModuleItem* item : items) {
+      if (item->kind == ModuleItemKind::kFunctionDecl ||
+          item->kind == ModuleItemKind::kTaskDecl) {
+        ReportMisplacedOverrideSpecifiers(*item, diag_);
+      }
+    }
   };
 
   run_over(unit_->cu_items);

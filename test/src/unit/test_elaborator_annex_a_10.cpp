@@ -166,11 +166,11 @@ TEST(BnfClarificationElaboration, DynamicOverrideOutsideClassError) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(
-      ReportedError(f.diag.Diagnostics(),
-                    "dynamic_override_specifiers belong on a class method "
-                    "declaration, and an interface class takes none",
-                    2, "8.20"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "a function's dynamic_override_specifiers belong on a class "
+      "method declaration, and an interface class takes none",
+      2, "13.4"));
 }
 
 // §A.10 item 41: every argument of a constant_function_call must itself be a
