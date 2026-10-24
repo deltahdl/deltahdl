@@ -576,4 +576,16 @@ TEST(ExternTfDeclaration, PrototypesAsA26AndA27WriteThemAreAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// A type reference is one of A.2.2.1's data_types, so an extern prototype
+// whose result is one writes its result type out.
+TEST(ExternTfDeclaration, ATypeReferenceResultInAPrototypeIsAccepted) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  extern function type(int) peek(input int a);\n"
+      "  extern function type(byte) pop();\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

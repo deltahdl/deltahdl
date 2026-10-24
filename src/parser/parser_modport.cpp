@@ -7,11 +7,13 @@
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "lexer/token.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
 #include "parser/override_specifier_placement.h"
 #include "parser/parser.h"
+#include "parser/parser_prototype_validate.h"
 #include "parser/parser_token_skips.h"
 
 namespace delta {
@@ -50,6 +52,14 @@ ModportPort Parser::ParseModportTfPort(bool is_import) {
     Consume();
     ParseModportPrototypeSpecifiers(item);
     item->data_type = ParseFunctionReturnType();
+    // A.2.9's method_prototype is A.2.6's function_prototype, whose
+    // data_type_or_void takes no implicit result type.
+    if (IsImplicitResultType(item->data_type)) {
+      diag_.Error(item->loc,
+                  "a modport's function prototype writes its result type out, "
+                  "a data type or void",
+                  Subclause("A.2.9"));
+    }
     item->name = Expect(TokenKind::kIdentifier, Subclause("25.5")).text;
     if (Check(TokenKind::kLParen)) item->func_args = ParseFunctionArgs(false);
     port.prototype = item;
@@ -97,10 +107,14 @@ static Direction TokenToDirection(TokenKind tk) {
 // item, or the one after a modport_clocking_declaration, which is `clocking
 // clocking_identifier` and continues with nothing -- is reported under A.2.9
 // and read as a simple port of no direction, so that the item's list is read
-// to its ')'.
+// to its ')'. Attribute instances open a modport_ports_declaration, and
+// neither a modport_simple_port nor a modport_tf_port takes any, so those
+// written before a port continuing the open declaration are reported under
+// A.2.9 where they stand, and the port is read as the declaration's next.
 void Parser::ParseModportPortEntry(ModportDecl* mp, ModportScan& scan) {
   using Opened = ModportScan::Opened;
-  ParseAttributes();
+  const SourceLoc kAttrLoc = CurrentLoc();
+  const bool kAttributed = !ParseAttributes().empty();
   if (Check(TokenKind::kKwClocking)) {
     scan.opened = Opened::kClocking;
     Consume();
@@ -123,6 +137,13 @@ void Parser::ParseModportPortEntry(ModportDecl* mp, ModportScan& scan) {
     Consume();
     mp->ports.push_back(ParseModportSimplePort(scan.dir));
     return;
+  }
+  if (kAttributed &&
+      (scan.opened == Opened::kSimple || scan.opened == Opened::kTf)) {
+    diag_.Error(kAttrLoc,
+                "an attribute instance opens a modport_ports_declaration, and "
+                "a port continuing one takes none",
+                Subclause("A.2.9"));
   }
   if (scan.opened == Opened::kTf) {
     mp->ports.push_back(ParseModportTfPort(scan.is_import));

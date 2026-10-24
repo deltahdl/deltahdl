@@ -538,4 +538,16 @@ TEST(FunctionDeclParsing, ClassScopeWithAnInterfacePrefixIsReported) {
   EXPECT_FALSE(ReportedError(r.diags, msg, 11, "A.2.6"));
 }
 
+// A type reference is one of A.2.2.1's data_types, so a class's extern or pure
+// virtual prototype whose result is one writes its result type out.
+TEST(FunctionDeclParsing, ClassPrototypeTypeReferenceResultIsAccepted) {
+  auto r = Parse(
+      "virtual class C;\n"
+      "  pure virtual function type(this) clone();\n"
+      "  extern function type(int) h();\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

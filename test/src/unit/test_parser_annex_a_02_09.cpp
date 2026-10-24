@@ -458,4 +458,82 @@ TEST(ModportDeclarationParsing, PrototypeWithOverrideSpecifierIsRejected) {
   EXPECT_EQ(mp->ports[1].name, "f");
 }
 
+// A modport_tf_port's method_prototype is A.2.6's function_prototype, whose
+// data_type_or_void takes no implicit result type: no bare signing, no bare
+// packed dimensions and not nothing at all. Each prototype is still read to
+// its name.
+TEST(ModportDeclarationParsing, PrototypeWithImplicitResultTypeIsRejected) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  modport mp(import function g(),\n"
+      "             import function [3:0] h(),\n"
+      "             export function signed s());\n"
+      "endinterface\n");
+  for (int line : {2, 3, 4}) {
+    EXPECT_TRUE(ReportedError(r.diags,
+                              "a modport's function prototype writes its "
+                              "result type out, a data type or void",
+                              line, "A.2.9"));
+  }
+  ASSERT_NE(r.cu, nullptr);
+  auto* mp = r.cu->interfaces[0]->modports[0];
+  ASSERT_EQ(mp->ports.size(), 3u);
+  EXPECT_EQ(mp->ports[0].name, "g");
+  EXPECT_EQ(mp->ports[1].name, "h");
+  EXPECT_EQ(mp->ports[2].name, "s");
+  EXPECT_TRUE(mp->ports[2].is_export);
+}
+
+// A data_type_or_void is `void` or any data type: a keyword type with its
+// packed dimensions, a typedef's name, and a type reference (A.2.2.1).
+TEST(ModportDeclarationParsing, PrototypesWritingTheirResultTypeAreAccepted) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  typedef logic [3:0] nib_t;\n"
+      "  modport mp(import function void v(), function logic [7:0] l(),\n"
+      "             function nib_t n(), function type(int) t());\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->interfaces[0]->modports[0]->ports.size(), 4u);
+}
+
+// Attribute instances open a modport_ports_declaration, and neither a
+// modport_simple_port nor a modport_tf_port continuing one takes any, so the
+// attributes before `b` and `g` fit no production while those before
+// `input a` and `import f` do. Each continuing port is still read as its
+// declaration's next. An attributed port that opens nothing where nothing is
+// open draws the report on the declaration it fails to open, and no second.
+TEST(ModportDeclarationParsing, AttributeBeforeAContinuingPortIsRejected) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  logic a, b;\n"
+      "  function void f(); endfunction\n"
+      "  function void g(); endfunction\n"
+      "  modport mp((* keep *) input a,\n"
+      "             (* keep *) b,\n"
+      "             (* keep *) import f,\n"
+      "             (* keep *) g);\n"
+      "  modport mq((* keep *) a);\n"
+      "endinterface\n");
+  const char* const kMsg =
+      "an attribute instance opens a modport_ports_declaration, and a port "
+      "continuing one takes none";
+  EXPECT_TRUE(ReportedError(r.diags, kMsg, 6, "A.2.9"));
+  EXPECT_TRUE(ReportedError(r.diags, kMsg, 8, "A.2.9"));
+  EXPECT_FALSE(ReportedError(r.diags, kMsg, 5, "A.2.9"));
+  EXPECT_FALSE(ReportedError(r.diags, kMsg, 7, "A.2.9"));
+  EXPECT_FALSE(ReportedError(r.diags, kMsg, 9, "A.2.9"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a modport_ports_declaration opens with a port_direction", 9,
+      "A.2.9"));
+  ASSERT_NE(r.cu, nullptr);
+  auto* mp = r.cu->interfaces[0]->modports[0];
+  ASSERT_EQ(mp->ports.size(), 4u);
+  EXPECT_EQ(mp->ports[1].name, "b");
+  EXPECT_EQ(mp->ports[1].direction, Direction::kInput);
+  EXPECT_EQ(mp->ports[3].name, "g");
+  EXPECT_TRUE(mp->ports[3].is_import);
+}
+
 }  // namespace

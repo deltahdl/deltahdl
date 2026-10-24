@@ -6,12 +6,17 @@
 
 namespace delta {
 
+bool IsImplicitResultType(const DataType& result) {
+  return result.kind == DataTypeKind::kImplicit &&
+         result.type_ref_expr == nullptr;
+}
+
 // The prototype is read through the head of a task or function declaration,
 // which A.2.6 and A.2.7 let carry three things a prototype does not: a
 // lifetime, an `interface_identifier .` or class_scope prefix on the name, and
-// for a function an implicit result type, function_prototype taking a
-// data_type_or_void. Each is reported at the prototype's `task` or `function`
-// keyword.
+// for a function an implicit result type (IsImplicitResultType),
+// function_prototype taking a data_type_or_void. Each is reported at the
+// prototype's `task` or `function` keyword.
 void ValidateExternTfPrototype(DiagEngine& diag, const ModuleItem* item) {
   if (item->is_automatic || item->is_static) {
     diag.Error(item->loc, "a task or function prototype takes no lifetime",
@@ -24,7 +29,7 @@ void ValidateExternTfPrototype(DiagEngine& diag, const ModuleItem* item) {
                Subclause("A.1.6"));
   }
   if (item->kind == ModuleItemKind::kFunctionDecl &&
-      item->return_type.kind == DataTypeKind::kImplicit) {
+      IsImplicitResultType(item->return_type)) {
     diag.Error(item->loc,
                "an extern function prototype writes its result type out, a "
                "data type or void",
@@ -50,7 +55,7 @@ void ValidateClassMethodPrototype(DiagEngine& diag, const ModuleItem* item) {
                Subclause("A.1.9"));
   }
   if (item->kind == ModuleItemKind::kFunctionDecl && item->name != "new" &&
-      item->return_type.kind == DataTypeKind::kImplicit) {
+      IsImplicitResultType(item->return_type)) {
     diag.Error(item->loc,
                "a class function prototype writes its result type out, a data "
                "type or void",
