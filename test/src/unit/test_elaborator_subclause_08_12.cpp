@@ -47,9 +47,9 @@ TEST(ClassAssignRenameElaboration, ShallowCopyWithInheritanceOk) {
              "  initial begin\n"
              "    Ext e;\n"
              "    Base b;\n"
+             "    Base b2;\n"
              "    e = new;\n"
              "    b = e;\n"
-             "    Base b2;\n"
              "    b2 = new b;\n"
              "  end\n"
              "endmodule\n"));
@@ -64,7 +64,9 @@ TEST(ClassAssignRenameElaboration, ShallowCopyInDeclarationOk) {
              "  initial begin\n"
              "    C c1;\n"
              "    c1 = new;\n"
-             "    static C c2 = new c1;\n"
+             "    begin\n"
+             "      automatic C c2 = new c1;\n"
+             "    end\n"
              "  end\n"
              "endmodule\n"));
 }

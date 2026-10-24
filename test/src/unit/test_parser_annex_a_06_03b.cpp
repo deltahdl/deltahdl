@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
@@ -125,6 +127,40 @@ TEST(BlockStatementSyntaxParsing, BeginEndAsStatement) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlock);
+}
+
+// A seq_block's declarations all come before its first statement, a null
+// statement and a nested block among them, so a declaration after one is
+// reported and one before it is not; a block is checked apart from the block
+// it stands in.
+TEST(BlockStatementSyntaxParsing,
+     SeqBlockDeclarationAfterAStatementIsReported) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    int a;\n"
+      "    a = 1;\n"
+      "    int b;\n"
+      "  end\n"
+      "  initial begin : named\n"
+      "    ;\n"
+      "    parameter int P = 2;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    begin\n"
+      "      int c;\n"
+      "    end\n"
+      "    let l = 3;\n"
+      "  end\n"
+      "endmodule\n");
+  const char* msg =
+      "a declaration cannot follow a statement in a begin-end block";
+  for (uint32_t line : {5U, 9U, 15U}) {
+    EXPECT_TRUE(ReportedError(r.diags, msg, line, "9.3.1"));
+  }
+  for (uint32_t line : {3U, 13U}) {
+    EXPECT_FALSE(ReportedError(r.diags, msg, line, "9.3.1"));
+  }
 }
 
 // -------------------------------------------------------------------------
@@ -296,6 +332,31 @@ TEST(BlockStatementSyntaxParsing, ForkJoinAsDirectBody) {
   ASSERT_NE(body, nullptr);
   EXPECT_EQ(body->kind, StmtKind::kFork);
   EXPECT_EQ(body->join_kind, TokenKind::kKwJoin);
+}
+
+// A par_block's declarations all come before its first statement, whichever
+// join keyword closes it, so a declaration after one is reported and one
+// before it is not.
+TEST(BlockStatementSyntaxParsing,
+     ParBlockDeclarationAfterAStatementIsReported) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial fork\n"
+      "    int a;\n"
+      "    #1 a = 1;\n"
+      "    int b;\n"
+      "  join\n"
+      "  initial fork : named\n"
+      "    #1 $display(\"x\");\n"
+      "    localparam int P = 2;\n"
+      "  join_none\n"
+      "endmodule\n");
+  const char* msg =
+      "a declaration cannot follow a statement in a fork-join block";
+  for (uint32_t line : {5U, 9U}) {
+    EXPECT_TRUE(ReportedError(r.diags, msg, line, "9.3.2"));
+  }
+  EXPECT_FALSE(ReportedError(r.diags, msg, 3, "9.3.2"));
 }
 
 // -------------------------------------------------------------------------

@@ -86,9 +86,9 @@ TEST(OverriddenMemberParsing, MultiLevelOverrideAccessThroughBase) {
               "  initial begin\n"
               "    C c;\n"
               "    A a;\n"
+              "    automatic integer j;\n"
               "    c = new;\n"
               "    a = c;\n"
-              "    automatic integer j;\n"
               "    j = a.x;\n"
               "  end\n"
               "endmodule\n"));
@@ -105,9 +105,9 @@ TEST(OverriddenMemberParsing, NonOverriddenMemberThroughBaseHandle) {
               "  initial begin\n"
               "    LinkedPacket lp;\n"
               "    Packet p;\n"
+              "    automatic integer j;\n"
               "    lp = new;\n"
               "    p = lp;\n"
-              "    automatic integer j;\n"
               "    j = p.x;\n"
               "  end\n"
               "endmodule\n"));

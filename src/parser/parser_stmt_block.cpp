@@ -171,12 +171,24 @@ Stmt* Parser::ParseBlockStmt(std::string_view prefix_label) {
   // for one missing `end`. The right brace of an open rs_code_block closes an
   // enclosing construct too and is asked for separately, being punctuation that
   // closes one construct among several uses.
+  //
+  // §9.3.1's seq_block writes the block's declarations before its statements,
+  // so a declaration after the first statement is reported and still read,
+  // which keeps the names it declares resolving in the block.
+  bool before_stmts = true;
   while (!Check(TokenKind::kKwEnd) && !AtEnd() &&
          !ClosesEnclosingConstruct(CurrentToken().kind) &&
          !ClosesOpenRsCodeBlock(CurrentToken().kind)) {
     if (IsBlockVarDeclStart()) {
+      if (!before_stmts) {
+        diag_.Error(
+            CurrentLoc(),
+            "a declaration cannot follow a statement in a begin-end block",
+            Subclause("9.3.1"));
+      }
       ParseBlockVarDecls(stmt->stmts);
     } else if (!RejectMisplacedStmtLabel()) {
+      before_stmts = false;
       auto* s = ParseStmt();
       if (s != nullptr) {
         stmt->stmts.push_back(s);
@@ -213,13 +225,24 @@ Stmt* Parser::ParseForkStmt(std::string_view prefix_label) {
   // block would stay. The right brace of an open rs_code_block closes an
   // enclosing construct too and is asked for separately, being punctuation that
   // closes one construct among several uses.
+  //
+  // §9.3.2's par_block writes the block's declarations before its statements,
+  // so a declaration after the first statement is reported and still read.
+  bool before_stmts = true;
   while (!Check(TokenKind::kKwJoin) && !Check(TokenKind::kKwJoinAny) &&
          !Check(TokenKind::kKwJoinNone) && !AtEnd() &&
          !ClosesEnclosingConstruct(CurrentToken().kind) &&
          !ClosesOpenRsCodeBlock(CurrentToken().kind)) {
     if (IsBlockVarDeclStart()) {
+      if (!before_stmts) {
+        diag_.Error(
+            CurrentLoc(),
+            "a declaration cannot follow a statement in a fork-join block",
+            Subclause("9.3.2"));
+      }
       ParseBlockVarDecls(stmt->fork_stmts);
     } else if (!RejectMisplacedStmtLabel()) {
+      before_stmts = false;
       auto* s = ParseStmt();
       if (s != nullptr) stmt->fork_stmts.push_back(s);
     }

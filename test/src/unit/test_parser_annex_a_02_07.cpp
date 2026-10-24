@@ -760,4 +760,106 @@ TEST(TaskDeclParsing, FormalOfATypeReferenceWithoutVarIsReported) {
   }
 }
 
+// A.2.7 writes a task body's declarations before its statements in both body
+// forms, so a declaration after the body's first statement is reported, and
+// one before it, beside a port declaration or after a port list, is not.
+TEST(TaskDeclParsing, DeclarationAfterAStatementIsReported) {
+  auto r = Parse(
+      "module m;\n"
+      "  task t;\n"
+      "    input a;\n"
+      "    int n;\n"
+      "    $display(a);\n"
+      "    int x;\n"
+      "  endtask\n"
+      "  task u(input int b);\n"
+      "    logic k;\n"
+      "    ;\n"
+      "    localparam int P = 1;\n"
+      "    k = b;\n"
+      "  endtask\n"
+      "endmodule\n");
+  const char* msg = "a declaration cannot follow a statement in a task body";
+  EXPECT_TRUE(ReportedError(r.diags, msg, 6, "13.3"));
+  EXPECT_TRUE(ReportedError(r.diags, msg, 11, "13.3"));
+  for (uint32_t line : {4U, 9U}) {
+    EXPECT_FALSE(ReportedError(r.diags, msg, line, "13.3"));
+  }
+}
+
+// A.2.7's tf_port_direction writes `const` only before `ref`, so a formal's
+// `const` before another direction or before its data type is reported, and
+// the formal is read without it; `const ref` is not reported and keeps it.
+TEST(TaskDeclParsing, ConstWithoutRefOnAFormalIsReported) {
+  auto r = Parse(
+      "module m;\n"
+      "  task t(const int a);\n"
+      "  endtask\n"
+      "  function void f(input int x,\n"
+      "                  const input int b);\n"
+      "  endfunction\n"
+      "  task u(const ref int d, e);\n"
+      "  endtask\n"
+      "endmodule\n");
+  const char* msg = "'const' in a formal qualifies only a 'ref' direction";
+  for (uint32_t line : {2U, 5U}) {
+    EXPECT_TRUE(ReportedError(r.diags, msg, line, "A.2.7"));
+  }
+  EXPECT_FALSE(ReportedError(r.diags, msg, 7, "A.2.7"));
+  ASSERT_NE(r.cu, nullptr);
+  const auto& items = r.cu->modules[0]->items;
+  ASSERT_EQ(items.size(), 3u);
+  ASSERT_EQ(items[0]->func_args.size(), 1u);
+  EXPECT_FALSE(items[0]->func_args[0].is_const);
+  ASSERT_EQ(items[2]->func_args.size(), 2u);
+  EXPECT_TRUE(items[2]->func_args[0].is_const);
+  EXPECT_TRUE(items[2]->func_args[1].is_const);
+}
+
+// A.2.7 writes a tf_port_item's unpacked dimensions and default value after
+// its port_identifier, so a prototype's formal written without a name, which
+// footnote 28 allows, takes neither: a default and an unpacked dimension on
+// one are reported, and a nameless formal with neither is not.
+TEST(TaskDeclParsing, NamelessPrototypeFormalTakesNoDimensionOrDefault) {
+  auto r = Parse(
+      "interface ifc;\n"
+      "  extern task t(input int = 5);\n"
+      "  extern function void f(input logic [7:0] [4], output byte);\n"
+      "  extern task g(input int a = 1);\n"
+      "endinterface\n");
+  const char* msg =
+      "a formal written without a name takes no unpacked dimension and no "
+      "default value";
+  for (uint32_t line : {2U, 3U}) {
+    EXPECT_TRUE(ReportedError(r.diags, msg, line, "A.2.7"));
+  }
+  EXPECT_FALSE(ReportedError(r.diags, msg, 4, "A.2.7"));
+}
+
+// A.2.7 prefixes a task_body_declaration's name with an interface_identifier
+// and `.` or with a class_scope, one or the other, so a name written with an
+// interface prefix and then a class scope is reported, and either prefix alone
+// is not.
+TEST(TaskDeclParsing, InterfacePrefixWithAClassScopeIsReported) {
+  auto r = Parse(
+      "class C;\n"
+      "  extern task t;\n"
+      "  extern task u;\n"
+      "endclass\n"
+      "task ifc.C::t;\n"
+      "endtask\n"
+      "task C::u;\n"
+      "endtask\n"
+      "module m;\n"
+      "  task ifc.v;\n"
+      "  endtask\n"
+      "endmodule\n");
+  const char* msg =
+      "a task's name takes an interface prefix or a class scope, not both";
+  EXPECT_TRUE(ReportedError(r.diags, msg, 5, "A.2.7"));
+  for (uint32_t line : {7U, 10U}) {
+    EXPECT_FALSE(ReportedError(r.diags, msg, line, "A.2.7"));
+  }
+}
+
 }  // namespace

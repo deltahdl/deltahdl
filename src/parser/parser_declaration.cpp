@@ -449,13 +449,24 @@ bool Parser::TryParseDefaultArgSentinel(std::vector<FunctionArg>& args,
 // optional default value (§13.3 / §8.17).
 void Parser::ParseFunctionArgTrailer(FunctionArg& arg,
                                      bool require_identifiers) {
-  if (CheckIdentifier()) {
+  const bool kNamed = CheckIdentifier();
+  if (kNamed) {
     arg.name = Consume().text;
   } else if (require_identifiers) {
     diag_.Error(CurrentLoc(),
                 "tf_port_item shall include a port_identifier outside of a "
                 "function_prototype or task_prototype",
                 Subclause("13.3"));
+  }
+  // A.2.7 writes the unpacked dimensions and the default value inside the
+  // optional group the port_identifier opens, so a prototype's formal written
+  // without a name has neither. Each is still read, so the list goes on.
+  if (!kNamed && !require_identifiers &&
+      (Check(TokenKind::kLBracket) || Check(TokenKind::kEq))) {
+    diag_.Error(CurrentLoc(),
+                "a formal written without a name takes no unpacked dimension "
+                "and no default value",
+                Subclause("A.2.7"));
   }
   ParseUnpackedDims(arg.unpacked_dims);
   if (Match(TokenKind::kEq)) {
@@ -476,8 +487,18 @@ void Parser::ParseOneFunctionArg(std::vector<FunctionArg>& args,
   if (TryParseDefaultArgSentinel(args, scan)) return;
 
   FunctionArg arg;
-  if (Match(TokenKind::kKwConst)) {
-    arg.is_const = true;
+  // A.2.7's tf_port_direction writes `const` only before `ref`, as
+  // `[ const ] ref [ static ]`, so a `const` that no `ref` follows is reported
+  // and the formal read as if it were not there.
+  if (Check(TokenKind::kKwConst)) {
+    const SourceLoc kConstLoc = CurrentLoc();
+    Consume();
+    arg.is_const = Check(TokenKind::kKwRef);
+    if (!arg.is_const) {
+      diag_.Error(kConstLoc,
+                  "'const' in a formal qualifies only a 'ref' direction",
+                  Subclause("A.2.7"));
+    }
   }
   // §8.17: the argument following 'default' starts from the default direction
   // (input) rather than inheriting the previous argument's direction via
@@ -659,6 +680,16 @@ void Parser::ParseFuncName(ModuleItem* item) {
   if (!item->method_class.empty()) RejectStaticOutOfBlockMethod(item, diag_);
   if (type_written) RejectConstructorReturnType(item, kTypeLoc, diag_);
 
+  // A.2.6 writes a function_body_declaration's name as
+  // `[ interface_identifier . | class_scope ] function_identifier`, one prefix
+  // or the other, so an interface prefix after a class scope is reported and
+  // still read.
+  if (!item->method_class.empty() && Check(TokenKind::kDot)) {
+    diag_.Error(CurrentLoc(),
+                "a function's name takes an interface prefix or a class scope, "
+                "not both",
+                Subclause("A.2.6"));
+  }
   if (Match(TokenKind::kDot)) {
     item->method_class = item->name;
     item->name = Expect(TokenKind::kIdentifier, Subclause("25.7")).text;
@@ -737,11 +768,21 @@ ModuleItem* Parser::ParseTaskDecl(bool prototype_only) {
 
   item->name = Expect(TokenKind::kIdentifier, Subclause("13.3")).text;
 
-  if (Match(TokenKind::kDot)) {
+  const bool kInterfacePrefixed = Match(TokenKind::kDot);
+  if (kInterfacePrefixed) {
     item->method_class = item->name;
     item->name = Expect(TokenKind::kIdentifier, Subclause("25.7")).text;
   }
 
+  // A.2.7 writes `[ interface_identifier . | class_scope ] task_identifier`,
+  // one prefix or the other, so a class scope after an interface prefix is
+  // reported and still read.
+  if (kInterfacePrefixed && Check(TokenKind::kColonColon)) {
+    diag_.Error(
+        CurrentLoc(),
+        "a task's name takes an interface prefix or a class scope, not both",
+        Subclause("A.2.7"));
+  }
   bool class_scoped = false;
   while (Match(TokenKind::kColonColon)) {
     item->method_class = item->name;

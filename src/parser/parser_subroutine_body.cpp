@@ -175,13 +175,29 @@ static void TypeFormalsFromBodyDecls(
   }
 }
 
+// A.2.6 and A.2.7 write both forms of a function's and a task's body as its
+// declarations followed by its statements, so a block_item_declaration at
+// `loc`, after the body's first statement, is reported for the subroutine
+// `end_kw` closes.
+static void ReportDeclarationAfterStatement(DiagEngine& diag, SourceLoc loc,
+                                            TokenKind end_kw) {
+  if (end_kw == TokenKind::kKwEndtask) {
+    diag.Error(loc, "a declaration cannot follow a statement in a task body",
+               Subclause("13.3"));
+    return;
+  }
+  diag.Error(loc, "a declaration cannot follow a statement in a function body",
+             Subclause("13.4"));
+}
+
 // A.2.6 and A.2.7: a subroutine body up to `end_kw`. Without a port list in
 // parentheses it opens with tf_item_declarations, each a tf_port_declaration
 // or a block_item_declaration in either order (§13.3, §13.4), and after a
 // port list with block_item_declarations alone; its statements follow. A port
 // declaration is read wherever it stands and reported, under `subclause`,
 // where the grammar admits none: after a port list, or after the body's first
-// statement.
+// statement. A block_item_declaration after the first statement is read and
+// reported too, so that the names it declares still resolve.
 void Parser::ParseSubroutineBody(ModuleItem* item, TokenKind end_kw,
                                  Subclause subclause) {
   std::unordered_set<std::string_view> untyped;
@@ -203,6 +219,7 @@ void Parser::ParseSubroutineBody(ModuleItem* item, TokenKind end_kw,
       continue;
     }
     if (IsBlockVarDeclStart()) {
+      if (!before_stmts) ReportDeclarationAfterStatement(diag_, loc, end_kw);
       size_t first = item->func_body_stmts.size();
       ParseBlockVarDecls(item->func_body_stmts);
       TypeFormalsFromBodyDecls(item, first, untyped);

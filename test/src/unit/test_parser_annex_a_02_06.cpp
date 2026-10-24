@@ -489,4 +489,53 @@ TEST(FunctionDeclParsing, ClassPrototypesAsA26WritesThemAreAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// A.2.6 writes a function body's declarations before its statements in both
+// body forms, so a declaration after the body's first statement is reported,
+// and one before it is not.
+TEST(FunctionDeclParsing, DeclarationAfterAStatementIsReported) {
+  auto r = Parse(
+      "module m;\n"
+      "  function int f(int a);\n"
+      "    int m;\n"
+      "    f = a;\n"
+      "    int y;\n"
+      "  endfunction\n"
+      "  function void g;\n"
+      "    input int c;\n"
+      "    $display(c);\n"
+      "    let l = c;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  const char* msg =
+      "a declaration cannot follow a statement in a function body";
+  EXPECT_TRUE(ReportedError(r.diags, msg, 5, "13.4"));
+  EXPECT_TRUE(ReportedError(r.diags, msg, 10, "13.4"));
+  EXPECT_FALSE(ReportedError(r.diags, msg, 3, "13.4"));
+}
+
+// A.2.6 prefixes a function_body_declaration's name with an
+// interface_identifier and `.` or with a class_scope, one or the other, so a
+// name written with a class scope and then an interface prefix is reported,
+// and either prefix alone is not.
+TEST(FunctionDeclParsing, ClassScopeWithAnInterfacePrefixIsReported) {
+  auto r = Parse(
+      "class C;\n"
+      "  extern function void f();\n"
+      "  extern function int g();\n"
+      "endclass\n"
+      "function void C::ifc.f();\n"
+      "endfunction\n"
+      "function int C::g();\n"
+      "  return 0;\n"
+      "endfunction\n"
+      "module m;\n"
+      "  function int ifc.h(); return 0; endfunction\n"
+      "endmodule\n");
+  const char* msg =
+      "a function's name takes an interface prefix or a class scope, not both";
+  EXPECT_TRUE(ReportedError(r.diags, msg, 5, "A.2.6"));
+  EXPECT_FALSE(ReportedError(r.diags, msg, 7, "A.2.6"));
+  EXPECT_FALSE(ReportedError(r.diags, msg, 11, "A.2.6"));
+}
+
 }  // namespace
