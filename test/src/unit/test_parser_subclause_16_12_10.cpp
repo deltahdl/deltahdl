@@ -78,4 +78,16 @@ TEST(NexttimeIndexParsing, SymbolicParameterIndexIsDeferred) {
   ASSERT_NE(item, nullptr);
 }
 
+// §16.12.10: the strong form's index is the operator's own, so a source
+// ending inside it ends the property's body there, and the body is reported
+// where the grammar's reading of it stops.
+TEST(NexttimeIndexParsing, ASourceEndingInTheStrongFormsIndexEndsTheBody) {
+  auto r = Parse(
+      "module m;\n"
+      "  property p;\n"
+      "    s_nexttime [1");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "is not one the grammar admits", 3, "A.2.10"));
+}
+
 }  // namespace

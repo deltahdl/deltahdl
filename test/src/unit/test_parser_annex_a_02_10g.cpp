@@ -130,18 +130,20 @@ TEST(AssertionVariableDeclParsing, ATruncatedTypeEndsTheDeclaration) {
 
 // A.2.10's property_port_item and sequence_port_item each name one
 // formal_port_identifier, after which only variable dimensions and a default
-// stand. An item with no formal, a trailing comma's empty item, and a token
-// after a formal that is none of those are reported; an empty list, a
-// dimension and a default are not.
+// stand. An item with no formal, a trailing comma's empty item, a token
+// after a formal that is none of those, and a parenthesized group standing
+// where an item would are reported; an empty list, a dimension and a default
+// are not.
 void ExpectPortItemsHeldToTheirShape(const char* port, const char* end) {
   SCOPED_TRACE(port);
   const std::string kPort = port;
-  auto r = Parse(
-      "module m(input logic a, b);\n  " + kPort + " p1(int, b);\n    b;\n  " +
-      end + "\n  " + kPort + " p2(int x y);\n    x;\n  " + end + "\n  " +
-      kPort + " p3(a, );\n    a;\n  " + end + "\n  " + kPort +
-      " p4();\n    a;\n  " + end + "\n  " + kPort +
-      " p5(int x [2][3], y = 1);\n    x == y;\n  " + end + "\nendmodule\n");
+  auto r = Parse("module m(input logic a, b);\n  " + kPort +
+                 " p1(int, b);\n    b;\n  " + end + "\n  " + kPort +
+                 " p2(int x y);\n    x;\n  " + end + "\n  " + kPort +
+                 " p3(a, );\n    a;\n  " + end + "\n  " + kPort +
+                 " p4();\n    a;\n  " + end + "\n  " + kPort +
+                 " p5(int x [2][3], y = 1);\n    x == y;\n  " + end + "\n  " +
+                 kPort + " p6((a));\n    a;\n  " + end + "\nendmodule\n");
   const std::string kNoFormal =
       kPort + " port item names a formal_port_identifier";
   const std::string kStray = kPort +
@@ -150,6 +152,7 @@ void ExpectPortItemsHeldToTheirShape(const char* port, const char* end) {
   EXPECT_TRUE(ReportedError(r.diags, kNoFormal, 2, "A.2.10"));
   EXPECT_TRUE(ReportedError(r.diags, kStray, 5, "A.2.10"));
   EXPECT_TRUE(ReportedError(r.diags, kNoFormal, 8, "A.2.10"));
+  EXPECT_TRUE(ReportedError(r.diags, kNoFormal, 17, "A.2.10"));
   for (uint32_t line : {11u, 14u}) {
     EXPECT_FALSE(ReportedError(r.diags, kNoFormal, line, "A.2.10"));
     EXPECT_FALSE(ReportedError(r.diags, kStray, line, "A.2.10"));
