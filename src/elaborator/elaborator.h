@@ -315,9 +315,8 @@ class Elaborator : public ElaboratorClassRules {
                           RtlirModule* mod);
 
   // Reports a gate or user-defined primitive instance whose terminals are the
-  // wrong width, under whichever of the two rules the instance is held to.
-  void CheckInstanceTerminalWidths(const ModuleItem* item,
-                                   const RtlirModule* mod);
+  // wrong width, or whose driven terminals A.8.5's net_lvalue does not admit.
+  void CheckPrimitiveTerminals(const ModuleItem* item, const RtlirModule* mod);
 
   // §29.8: records on `mod` every instance of a user-defined primitive that one
   // instantiation writes, so that the primitive drives the nets its output

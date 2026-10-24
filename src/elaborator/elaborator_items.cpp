@@ -484,15 +484,19 @@ std::string_view ModuleNameSpaceEntry(const ModuleItem* item) {
 // instantiated module or primitive against the length of an array, and there is
 // no array here to measure against. ValidatePrimitiveOutputTerminalWidths asks
 // the complementary question, so it is asked of every item, and one ScopeMap
-// answers both.
-void Elaborator::CheckInstanceTerminalWidths(const ModuleItem* item,
-                                             const RtlirModule* mod) {
+// answers both. The driven terminals' selects may also name the genvars of the
+// loop generate block the instance stands in (§27.4), which
+// ValidatePrimitiveDrivenTerminals is handed beside the parameters.
+void Elaborator::CheckPrimitiveTerminals(const ModuleItem* item,
+                                         const RtlirModule* mod) {
   ScopeMap scope = BuildParamScope(mod);
   if (HasInstanceArrayRange(item)) {
     CheckGateInstanceArrayTerminalWidths(item, mod, scope, interconnect_names_,
                                          diag_);
   }
   ValidatePrimitiveOutputTerminalWidths(item, mod, scope, diag_);
+  for (const auto& [name, value] : gen_const_scope_) scope[name] = value;
+  ValidatePrimitiveDrivenTerminals(item, mod, scope, gen_prefix_scopes_, diag_);
 }
 
 void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
@@ -626,7 +630,7 @@ bool Elaborator::ElaborateDeclItem(ModuleItem* item, RtlirModule* mod) {
       DeclareInModuleNameSpace(item->gate_inst_name, item->loc);
       CreateImplicitNetsForTerminals(item->gate_terminals, item->loc,
                                      make_implicit_net);
-      CheckInstanceTerminalWidths(item, mod);
+      CheckPrimitiveTerminals(item, mod);
       ValidateBidirectionalSwitchConnections(item, mod, diag_,
                                              nettype_canonical_);
       ElaborateGateInst(item, mod, arena_, BuildParamScope(mod));
@@ -641,7 +645,7 @@ bool Elaborator::ElaborateDeclItem(ModuleItem* item, RtlirModule* mod) {
                                      make_implicit_net);
       // Checked before ElaborateUdpInst expands the array, so a terminal the
       // widths rule rejects is reported rather than expanded.
-      CheckInstanceTerminalWidths(item, mod);
+      CheckPrimitiveTerminals(item, mod);
       ElaborateUdpInst(item, mod);
       ResolveInterconnectPrimitiveTerminals(item->gate_terminals, mod);
       return true;

@@ -349,6 +349,31 @@ static bool NamesParameter(std::string_view name, const RtlirModule* mod,
   return false;
 }
 
+// A driven terminal is read as a continuous assignment's target is, since
+// A.8.5's net_lvalue gives the two their elements; a form the parser already
+// reported as no net_lvalue yields no element, or fewer.
+void ValidatePrimitiveDrivenTerminals(
+    const ModuleItem* item, const RtlirModule* mod, const ScopeMap& scope,
+    const std::vector<std::string_view>& gen_scopes, DiagEngine& diag) {
+  std::vector<ContTargetLeaf> leaves;
+  for (size_t i : PrimitiveDrivenTerminalIndices(item))
+    CollectContTargetLeaves(item->gate_terminals[i], leaves);
+  for (const ContTargetLeaf& leaf : leaves) {
+    if (NamesParameter(leaf.root, mod, gen_scopes)) {
+      diag.Error(item->loc,
+                 std::format("a primitive's output or inout terminal names "
+                             "parameter '{}', a constant no primitive drives",
+                             leaf.root),
+                 Subclause("A.8.5"));
+    } else if (!SelectPathIsConstant(leaf.expr, scope)) {
+      diag.Error(item->loc,
+                 "a primitive's output or inout terminal selects with an "
+                 "expression that is not constant",
+                 Subclause("A.8.5"));
+    }
+  }
+}
+
 static size_t UnpackedDimsOfNet(std::string_view name, const RtlirModule* mod) {
   for (const auto& n : mod->nets)
     if (n.name == name) return n.num_unpacked_dims;

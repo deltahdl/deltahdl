@@ -213,6 +213,19 @@ void ValidatePrimitiveOutputTerminalWidths(const ModuleItem* item,
                                            const ScopeMap& scope,
                                            DiagEngine& diag);
 
+// The indices of the terminals a gate or user-defined primitive instance
+// drives: A.3.1's output and inout terminals of a gate, and a UDP instance's
+// one output terminal (A.5.4).
+std::vector<size_t> PrimitiveDrivenTerminalIndices(const ModuleItem* item);
+
+// A.3.3 and A.5.4 with A.8.5: reports each terminal a gate or user-defined
+// primitive instance drives that names a parameter or selects with an
+// expression that is not constant. `scope` holds the constants a select may
+// name, and `gen_scopes` the generate blocks the instance stands in.
+void ValidatePrimitiveDrivenTerminals(
+    const ModuleItem* item, const RtlirModule* mod, const ScopeMap& scope,
+    const std::vector<std::string_view>& gen_scopes, DiagEngine& diag);
+
 void PopulateParamTypeInfo(RtlirParamDecl& pd, const DataType& dtype);
 
 void PopulateParamTypeInfo(RtlirParamDecl& pd, const DataType& dtype,

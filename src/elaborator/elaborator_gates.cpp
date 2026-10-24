@@ -292,6 +292,13 @@ static std::vector<size_t> UdpOutputTerminalIndices(size_t nterms) {
   return (nterms >= 1) ? std::vector<size_t>{0} : std::vector<size_t>{};
 }
 
+std::vector<size_t> PrimitiveDrivenTerminalIndices(const ModuleItem* item) {
+  const size_t kCount = item->gate_terminals.size();
+  if (item->kind == ModuleItemKind::kUdpInst)
+    return UdpOutputTerminalIndices(kCount);
+  return OutputOrInoutTerminalIndices(item->gate_kind, kCount);
+}
+
 void ValidatePrimitiveOutputTerminalWidths(const ModuleItem* item,
                                            const RtlirModule* mod,
                                            const ScopeMap& scope,
@@ -318,10 +325,7 @@ void ValidatePrimitiveOutputTerminalWidths(const ModuleItem* item,
   if (item->inst_range_left || item->inst_range_right) return;
 
   const auto& terms = item->gate_terminals;
-  const std::vector<size_t> kOuts =
-      kIsUdp ? UdpOutputTerminalIndices(terms.size())
-             : OutputOrInoutTerminalIndices(item->gate_kind, terms.size());
-  for (size_t i : kOuts) {
+  for (size_t i : PrimitiveDrivenTerminalIndices(item)) {
     auto* t = terms[i];
     if (!t) continue;
     uint32_t w = StructuralNetExprWidth(t, mod, scope);
