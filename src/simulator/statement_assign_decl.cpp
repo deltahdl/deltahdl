@@ -190,7 +190,7 @@ static bool CreateBlockAssocArray(const Stmt* stmt, uint32_t elem_width,
   const Expr* dim = stmt->var_unpacked_dims.front();
   if (!IsAssocIndexDim(dim, ctx)) return false;
   AssocArrayObject* aa = ctx.CreateAssocArray(
-      stmt->var_name, elem_width, IsStringIndexDim(dim),
+      stmt->var_name, elem_width, IsStringIndexDim(dim, ctx),
       AssocIndexSpec(dim, DeclaredTypeIs4State(stmt->var_decl_type, ctx), ctx));
   aa->is_signed = DeclaredTypeIsSigned(stmt->var_decl_type, ctx);
   if (queue_type != nullptr) {

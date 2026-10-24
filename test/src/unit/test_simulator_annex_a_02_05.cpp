@@ -308,4 +308,102 @@ TEST(DeclarationRangeSim, StructureIndexOfPackageVariableIsAssociative) {
   EXPECT_EQ(v, 16u);
 }
 
+// associative_dimension ::= [ data_type ] in a procedural block, the
+// data_type a typedef named through its package (§26.3): the 4-bit index
+// reads key 17 as key 1, while a constant named the same way, `p::N`, still
+// sizes a fixed array of four. The result packs a.num(), a[1] and $size(f).
+// Read as no index type, `a` kept no entry.
+TEST(DeclarationRangeSim, ScopedTypedefIndexInBlockIsAssociative) {
+  auto v = RunAndGet(
+      "package p;\n"
+      "  typedef bit [3:0] idx_t;\n"
+      "  parameter int N = 4;\n"
+      "endpackage\n"
+      "module t;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    int a [p::idx_t];\n"
+      "    int f [p::N];\n"
+      "    a[17] = 5;\n"
+      "    result = a.num() * 100 + a[1] * 10 + $size(f);\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 154u);
+}
+
+// The same index in a function body, where key 19 is key 3, and on a class
+// property, where key 18 is key 2. The result packs the function's
+// a.num() * 10 + a[3], then the property's num() and its entry.
+TEST(DeclarationRangeSim, ScopedTypedefIndexInSubroutineAndClassIsAssociative) {
+  auto v = RunAndGet(
+      "package p;\n"
+      "  typedef bit [3:0] idx_t;\n"
+      "endpackage\n"
+      "module t;\n"
+      "  int result;\n"
+      "  class C;\n"
+      "    int m [p::idx_t];\n"
+      "  endclass\n"
+      "  function automatic int count();\n"
+      "    int a [p::idx_t];\n"
+      "    a[19] = 4;\n"
+      "    return a.num() * 10 + a[3];\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    C o;\n"
+      "    o = new;\n"
+      "    o.m[18] = 3;\n"
+      "    result = count() * 100 + o.m.num() * 10 + o.m[2];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 1413u);
+}
+
+// A package's variable indexed by another package's typedef: key 20 is key 4.
+// The result packs num() and that entry.
+TEST(DeclarationRangeSim, ScopedTypedefIndexOfPackageVariableIsAssociative) {
+  auto v = RunAndGet(
+      "package p;\n"
+      "  typedef bit [3:0] idx_t;\n"
+      "endpackage\n"
+      "package q;\n"
+      "  int a [p::idx_t];\n"
+      "endpackage\n"
+      "module t;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    q::a[20] = 6;\n"
+      "    result = q::a.num() * 10 + q::a[4];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 16u);
+}
+
+// §8.23: a class nested in another is named through the outer one's scope,
+// and as an index type keys its array by handle (§7.8.3). Two handles key two
+// entries. The result packs num() and the second handle's entry.
+TEST(DeclarationRangeSim, NestedClassScopedIndexKeysByHandle) {
+  auto v = RunAndGet(
+      "class Outer;\n"
+      "  class Inner; endclass\n"
+      "endclass\n"
+      "module t;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    int a [Outer::Inner];\n"
+      "    Outer::Inner h1, h2;\n"
+      "    h1 = new;\n"
+      "    h2 = new;\n"
+      "    a[h1] = 8;\n"
+      "    a[h2] = 9;\n"
+      "    result = a.num() * 10 + a[h2];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 29u);
+}
+
 }  // namespace

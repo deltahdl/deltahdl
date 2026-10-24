@@ -208,20 +208,23 @@ void RecordClassParamActuals(std::string_view var_name,
 // Defined in statement_assign_assoc_index.cpp; used by every builder of an
 // array from its declaration. §7.8: whether the unpacked dimension `dim` is an
 // index type -- a keyword type, the `*` wildcard, a class, a name the
-// elaborated typedef table sizes, or a type reference (A.2.5), which also
-// holds an index written as a data_type no expression can spell -- and so
-// declares an associative array rather than a fixed-size one.
+// elaborated typedef table sizes, bare or through a package or class scope,
+// or a type reference (A.2.5), which also holds an index written as a
+// data_type no expression can spell -- and so declares an associative array
+// rather than a fixed-size one.
 bool IsAssocIndexDim(const Expr* dim, SimContext& ctx);
 
 // Defined in statement_assign_assoc_index.cpp. §7.8: the index type the
 // dimension `dim`, which IsAssocIndexDim has answered for, writes: a type
 // reference's own, which the elaborator resolved where it was written
-// `type(expression)`, or else the type the name spells.
-DataType AssocIndexType(const Expr* dim);
+// `type(expression)`; for a name written through a package or class scope,
+// the type the run's tables hold under its "p::idx_t" key, kept in the run's
+// arena (§26.3, §8.23); or else the type the name spells.
+DataType AssocIndexType(const Expr* dim, SimContext& ctx);
 
 // Defined in statement_assign_assoc_index.cpp. §7.8.2: whether the dimension
 // `dim`, which IsAssocIndexDim has answered for, keys its array by string.
-bool IsStringIndexDim(const Expr* dim);
+bool IsStringIndexDim(const Expr* dim, SimContext& ctx);
 
 // Defined in statement_assign_assoc_index.cpp; also used by
 // eval_array_class_assoc.cpp. §7.8: the index-type attributes of an associative

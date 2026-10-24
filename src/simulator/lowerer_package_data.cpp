@@ -395,7 +395,7 @@ static void CreatePackageAggregate(const ModuleItem* item, std::string_view pkg,
     q->holds_class_handles = !ctx.GetVariableClassType(qname).empty();
   } else if (item->unpacked_dims.size() == 1 && IsAssocIndexDim(dim, ctx)) {
     AssocArrayObject* aa =
-        ctx.CreateAssocArray(qname, width, IsStringIndexDim(dim),
+        ctx.CreateAssocArray(qname, width, IsStringIndexDim(dim, ctx),
                              AssocIndexSpec(dim, is_4state, ctx));
     aa->is_signed = is_signed;
   } else {

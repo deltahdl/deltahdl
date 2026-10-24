@@ -1,7 +1,11 @@
 #include <cstdint>
 #include <cstdlib>
+#include <string>
+#include <utility>
 
+#include "common/arena.h"
 #include "common/types.h"
+#include "elaborator/assoc_index_type.h"
 #include "elaborator/type_eval.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
@@ -34,6 +38,13 @@ bool IsAssocIndexDim(const Expr* dim, SimContext& ctx) {
   // A.2.5: an index written as a data_type no expression can spell, or as a
   // type reference, is kept as a type reference, which no size is.
   if (dim->kind == ExprKind::kTypeRef) return true;
+  // §7.8 with §26.3 and §8.23: a type named through a package or class scope,
+  // `[p::idx_t]`, is an index type where the run's tables hold one under its
+  // "p::idx_t" key, as the elaborator's UserDefinedIndexName tells one apart;
+  // a constant so named, `[p::N]`, is a size.
+  if (const std::string kKey = ScopedTypeKey(dim); !kKey.empty()) {
+    return ctx.FindTypeWidth(kKey) != 0 || ctx.FindClassType(kKey) != nullptr;
+  }
   if (dim->kind != ExprKind::kIdentifier) return false;
   if (dim->text == "*") return true;
   if (TypeNameToDataType(dim->text).kind != DataTypeKind::kNamed) return true;
@@ -76,19 +87,24 @@ AssocArraySpec AssocIndexSpecOfType(const DataType& index_type,
   return spec;
 }
 
-DataType AssocIndexType(const Expr* dim) {
+DataType AssocIndexType(const Expr* dim, SimContext& ctx) {
   if (dim->kind == ExprKind::kTypeRef) return *dim->type_value;
-  return TypeNameToDataType(dim->text);
+  std::string key = ScopedTypeKey(dim);
+  if (key.empty()) return TypeNameToDataType(dim->text);
+  DataType named;
+  named.kind = DataTypeKind::kNamed;
+  named.type_name = *ctx.GetArena().Create<std::string>(std::move(key));
+  return named;
 }
 
-bool IsStringIndexDim(const Expr* dim) {
-  return AssocIndexType(dim).kind == DataTypeKind::kString;
+bool IsStringIndexDim(const Expr* dim, SimContext& ctx) {
+  return AssocIndexType(dim, ctx).kind == DataTypeKind::kString;
 }
 
 AssocArraySpec AssocIndexSpec(const Expr* dim, bool elem_4state,
                               SimContext& ctx) {
   AssocArraySpec spec =
-      AssocIndexSpecOfType(AssocIndexType(dim), elem_4state, ctx);
+      AssocIndexSpecOfType(AssocIndexType(dim, ctx), elem_4state, ctx);
   spec.is_wildcard = dim->text == "*";
   // A.2.2.1 lets an integer type carry its own signing, and §7.8.4 keys an
   // entry off the index under it: the keys of a `byte unsigned` index order 0
