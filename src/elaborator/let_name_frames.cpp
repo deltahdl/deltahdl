@@ -5,10 +5,10 @@
 #include <vector>
 
 #include "elaborator/elaborator_enum_constants.h"
+#include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
-#include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
@@ -147,12 +147,11 @@ std::vector<const ImportItem*> ImportsOf(
 }
 
 bool IsBlockImport(const Stmt* s) {
-  return s != nullptr && s->kind == StmtKind::kBlockItemDecl &&
+  return s->kind == StmtKind::kBlockItemDecl &&
          s->decl_item->kind == ModuleItemKind::kImportDecl;
 }
 
 void DeclareStatement(NameFrame& frame, const Stmt* s) {
-  if (s == nullptr) return;
   if (s->kind == StmtKind::kBlockItemDecl) {
     DeclareItem(frame, s->decl_item);
     return;
@@ -167,16 +166,13 @@ void DeclareStatement(NameFrame& frame, const Stmt* s) {
 }
 
 // §12.7.1: an initialization of a for loop written with a type declares the
-// loop's variable, local to the loop.
+// loop's variable, local to the loop. The parser keeps one type for each
+// initialization.
 void DeclareForVariables(NameFrame& frame, const Stmt& s) {
-  for (size_t i = 0; i < s.for_inits.size() && i < s.for_init_types.size();
-       ++i) {
-    const Stmt* init = s.for_inits[i];
+  for (size_t i = 0; i < s.for_inits.size(); ++i) {
     const DataType& type = s.for_init_types[i];
-    if (type.kind == DataTypeKind::kImplicit || init == nullptr ||
-        init->lhs == nullptr || init->lhs->kind != ExprKind::kIdentifier)
-      continue;
-    Declare(frame, init->lhs->text,
+    if (type.kind == DataTypeKind::kImplicit) continue;
+    Declare(frame, ExprIdent(s.for_inits[i]->lhs),
             {.kind = NameKind::kVariable, .type = &type});
   }
 }

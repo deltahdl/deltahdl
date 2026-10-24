@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <format>
+#include <string>
 #include <string_view>
 
 #include "fixture_elaborator.h"
@@ -361,6 +363,328 @@ TEST(LetActualScopeElaboration, AggregateActualsFitByBitStreamCast) {
     EXPECT_TRUE(
         ReportedError(f.diag.Diagnostics(), kNotCastCompatible, line, "11.12"));
   }
+}
+
+// §11.12, rule 2, with §7.6: an array of two dimensions fits a formal of two
+// only where its faster-varying dimension is of the formal's size too, so two
+// rows of four ints, and three rows of three, fit two rows of three neither by
+// assignment nor by bit-stream cast (§6.24.3). A dimension written with the
+// module's parameter `K` folds from its value; one written with a generate
+// block's localparam is the block's own (§27.3), whose value is not folded
+// here, so `b2k` is not taken for two rows of the module's four.
+TEST(LetActualScopeElaboration, ArrayDimensionsFoldFromTheirOwnScopesNames) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m #(parameter int K = 4);\n"
+      "  let f(int x [2][3]) = x[0][0];\n"
+      "  let s(int x [2]) = x[0];\n"
+      "  int a23 [2][3]; int a2k1 [2][K-1];\n"
+      "  int a2k [2][K]; int a33 [3][3];\n"
+      "  initial $display(\"%0d\", f(a23) + f(a2k1));\n"
+      "  initial $display(\"%0d\", f(a2k));\n"
+      "  initial $display(\"%0d\", f(a33));\n"
+      "  if (1) begin : g\n"
+      "    localparam int K = 3;\n"
+      "    localparam int J = 2;\n"
+      "    localparam int L = 8;\n"
+      "    let fj(int x [J][K]) = x[0][0];\n"
+      "    int b2k [2][K]; int cj [J][3]; byte bl [L];\n"
+      "    initial $display(\"%0d\", f(b2k) + f(cj) + fj(a23) + s(bl));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {6u, 15u}) {
+    EXPECT_FALSE(
+        ReportedError(f.diag.Diagnostics(), kNotCastCompatible, line, "11.12"));
+  }
+  for (uint32_t line : {7u, 8u}) {
+    EXPECT_TRUE(
+        ReportedError(f.diag.Diagnostics(), kNotCastCompatible, line, "11.12"));
+  }
+}
+
+// §11.12, rule 2, with §6.24.3: an array of six ints fits two rows of three by
+// bit-stream cast, the same 192 bits, where five ints do not. A queue's size,
+// or a dynamic formal's, is not known before the design runs, and a dynamic
+// array of reals takes two reals by assignment (§7.6), as no bit-stream cast
+// could convert a real.
+TEST(LetActualScopeElaboration, ArrayActualsOfOtherShapesFitByBitStreamCast) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  let f(int x [2][3]) = x[0][0];\n"
+      "  let fq(int x [2][$]) = x[0][0];\n"
+      "  let d(real x []) = x[0];\n"
+      "  let dd(int x []) = x[0];\n"
+      "  int a23 [2][3]; int a6 [6]; int a5 [5];\n"
+      "  int q2 [2][$]; int q [$]; real ra [2]; byte b2 [2];\n"
+      "  initial $display(\"%0d\", f(a6) + f(q2) + f(q) + fq(a23));\n"
+      "  initial $display(\"%0d\", d(ra) + dd(b2));\n"
+      "  initial $display(\"%0d\", f(a5));\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {8u, 9u}) {
+    EXPECT_FALSE(
+        ReportedError(f.diag.Diagnostics(), kNotCastCompatible, line, "11.12"));
+  }
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 10, "11.12"));
+}
+
+// §11.12, rule 2, with §7.9.9 and §6.24.3: an associative array formal takes
+// another associative array by assignment and nothing by bit-stream cast, of
+// which it is never the destination, so an array of two ints does not fit it.
+// An associative actual is converted by a bit-stream cast whose size is known
+// only when the design runs.
+TEST(LetActualScopeElaboration,
+     AnAssociativeFormalTakesOnlyAnAssociativeArray) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef int aa_t [string];\n"
+      "  let f(int x [2]) = x[0];\n"
+      "  let g(aa_t x) = x.num();\n"
+      "  int aa [string]; int arr [2];\n"
+      "  initial $display(\"%0d\", f(aa) + g(aa));\n"
+      "  initial $display(\"%0d\", g(arr));\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 6, "11.12"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 7, "11.12"));
+}
+
+// §11.12, rule 2, with §6.20.3: a type parameter's type is the one each
+// instance gives it, here an array of two ints where the default is an int, so
+// neither a formal nor a variable of the parameter's type is judged by the
+// default.
+TEST(LetActualScopeElaboration, ATypeParametersTypeIsNotTakenFromItsDefault) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m #(parameter type T = int);\n"
+      "  let f(T x) = x[0];\n"
+      "  let g(int x [2]) = x[0];\n"
+      "  int arr [2]; T v;\n"
+      "  initial $display(\"%0d\", f(arr) + g(v));\n"
+      "endmodule\n"
+      "module top;\n"
+      "  typedef int a_t [2];\n"
+      "  m #(.T(a_t)) u ();\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 5, "11.12"));
+}
+
+// §3.12.1: `$unit::` names the compilation unit's own declaration past a
+// module's of the same name, so `$unit::t` is the unit's array of two ints
+// and `$unit::N` the unit's parameter, three, never the module's.
+TEST(LetActualScopeElaboration, UnitScopedNamesPassTheModulesOwn) {
+  ElabFixture f;
+  ElaborateSrc(
+      "typedef int t [2];\n"
+      "parameter int N = 3;\n"
+      "module m #(parameter int N = 2);\n"
+      "  typedef int t [3];\n"
+      "  let f($unit::t x) = x[0];\n"
+      "  let h(int x [3]) = x[0];\n"
+      "  int arr [2]; int a3 [3]; int an [$unit::N];\n"
+      "  initial $display(\"%0d\", f(arr) + h(an));\n"
+      "  initial $display(\"%0d\", f(a3));\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 8, "11.12"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 9, "11.12"));
+}
+
+// §6.18 and §8.23: a typedef of an interface port's type and a type declared
+// in a class name types the scopes of the check do not hold, each an array of
+// two ints here, so neither formal is judged against the type its declaration
+// is written with.
+TEST(LetActualScopeElaboration, TypesOfAPortOrAClassAreNotFollowed) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface ifc;\n"
+      "  typedef int t [2];\n"
+      "endinterface\n"
+      "class C;\n"
+      "  typedef int t [2];\n"
+      "endclass\n"
+      "module m (ifc p);\n"
+      "  typedef p.t lt;\n"
+      "  let f(lt x) = x[0];\n"
+      "  let g(C::t x) = x[0];\n"
+      "  int arr [2];\n"
+      "  initial $display(\"%0d\", f(arr) + g(arr));\n"
+      "endmodule\n"
+      "module top;\n"
+      "  ifc i ();\n"
+      "  m u (i);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 12, "11.12"));
+}
+
+// §26.3: a wildcard import of a package the compilation unit does not declare,
+// std's (§26.7), may bring in any name, so a name the module does not declare
+// is not looked for in the unit, while the module's own `a3` is still judged.
+TEST(LetActualScopeElaboration, AnUnknownPackagesImportHoldsOuterNamesBack) {
+  ElabFixture f;
+  ElaborateSrc(
+      "int uarr [2];\n"
+      "module m;\n"
+      "  import std::*;\n"
+      "  let f(int x [2]) = x[0];\n"
+      "  int a3 [3];\n"
+      "  initial $display(\"%0d\", f(uarr));\n"
+      "  initial $display(\"%0d\", f(a3));\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 6, "11.12"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 7, "11.12"));
+}
+
+// §26.3: a package imported twice by wildcard offers its own `f` once, which
+// stays the module's candidate. §12.7.1: a for loop's variable is declared by
+// its header, so an int for a 64-bit structure fits neither by assignment nor
+// by bit-stream cast, while the structure's own type fits it.
+TEST(LetActualScopeElaboration, ARepeatedImportAndALoopVariableAreJudged) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package p;\n"
+      "  let f(int x) = x;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  import p::*;\n"
+      "  import p::*;\n"
+      "  typedef struct { int a; int b; } d_t;\n"
+      "  let h(d_t x) = x.a;\n"
+      "  int arr [2]; d_t dv;\n"
+      "  initial $display(\"%0d\", f(arr));\n"
+      "  initial $display(\"%0d\", h(dv));\n"
+      "  initial for (int i = 0; i < 2; i++) $display(\"%0d\", h(i));\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {10u, 12u}) {
+    EXPECT_TRUE(
+        ReportedError(f.diag.Diagnostics(), kNotCastCompatible, line, "11.12"));
+  }
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 11, "11.12"));
+}
+
+// §6.24.3: a structure's members are sized through their typedefs, so two
+// members of a typedef of a typedef of byte make 16 bits, a shortint's size,
+// and three make 24; a member whose typedef names a real makes no bit-stream
+// type. An array declared with a range, [0:1], holds two elements and [1:3]
+// three.
+TEST(LetActualScopeElaboration, StructureMembersAreSizedThroughTheirTypedefs) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef byte b_t;\n"
+      "  typedef b_t c_t;\n"
+      "  typedef real r_t;\n"
+      "  typedef struct { c_t a; c_t b; } p_t;\n"
+      "  typedef struct { c_t a; c_t b; c_t c; } q_t;\n"
+      "  typedef struct { r_t a; } rs_t;\n"
+      "  let g(shortint x) = x;\n"
+      "  let s(int x [2]) = x[0];\n"
+      "  let w(p_t x) = x.a;\n"
+      "  p_t pv; q_t qv; rs_t rv; int ar [0:1]; int ar3 [1:3];\n"
+      "  initial $display(\"%0d\", g(pv) + s(ar) + w(pv));\n"
+      "  initial $display(\"%0d\", g(qv));\n"
+      "  initial $display(\"%0d\", g(rv));\n"
+      "  initial $display(\"%0d\", s(ar3));\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 12, "11.12"));
+  for (uint32_t line : {13u, 14u, 15u}) {
+    EXPECT_TRUE(
+        ReportedError(f.diag.Diagnostics(), kNotCastCompatible, line, "11.12"));
+  }
+}
+
+// §6.22.5: a chandle is cast compatible with no type but its own, so a real is
+// no actual for a chandle formal.
+TEST(LetActualScopeElaboration, ARealIsNoActualForAChandleFormal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  let h(chandle x) = x;\n"
+      "  real r;\n"
+      "  initial $display(\"%0d\", h(r) == null);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 4, "11.12"));
+}
+
+// §7.6: an array of class handles takes another of its class, of as many
+// elements, by assignment.
+TEST(LetActualScopeElaboration, AnArrayOfHandlesFitsAnArrayOfItsClass) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C;\n"
+      "  int v;\n"
+      "endclass\n"
+      "module m;\n"
+      "  let k(C x [2]) = x[0];\n"
+      "  C ca [2];\n"
+      "  initial $display(\"%0d\", k(ca) == null);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 7, "11.12"));
+}
+
+// §6.23: a variable or a typedef written with a type reference takes the type
+// of what it names, an int for each here, which fits an int formal.
+TEST(LetActualScopeElaboration, TypeReferencesFitWhatTheyName) {
+  ElabFixture f;
+  ElaborateSrc(
+      "int i;\n"
+      "var type(i) w;\n"
+      "module m;\n"
+      "  int j;\n"
+      "  typedef type(j) jt;\n"
+      "  let f(jt x) = x;\n"
+      "  let g(int x) = x;\n"
+      "  initial $display(\"%0d\", f(j) + g(w));\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 8, "11.12"));
+}
+
+// §6.18: a chain of typedef names is followed to the type it ends in, 31 names
+// long here, so three ints are no actual for an array of two named at its far
+// end; a chain of 32 is taken for one that may run through a name twice and
+// is left unjudged.
+TEST(LetActualScopeElaboration, ALongTypedefChainIsFollowedToABound) {
+  std::string src = "module m;\n  typedef int t0 [2];\n";
+  for (int i = 1; i < 32; ++i)
+    src += std::format("  typedef t{} t{};\n", i - 1, i);
+  src +=
+      "  let f(t30 x) = x[0];\n"
+      "  let g(t31 x) = x[0];\n"
+      "  int a3 [3]; int arr [2];\n"
+      "  initial $display(\"%0d\", f(a3));\n"
+      "  initial $display(\"%0d\", g(arr));\n"
+      "endmodule\n";
+  ElabFixture f;
+  ElaborateSrc(src, f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 37, "11.12"));
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 38, "11.12"));
 }
 
 }  // namespace

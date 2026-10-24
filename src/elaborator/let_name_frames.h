@@ -113,8 +113,8 @@ void DeclareUnitScope(NameFrame& frame, const std::vector<ModuleItem*>& items,
 // ports.
 void DeclareHeader(NameFrame& frame, const ModuleDecl& decl);
 
-// The scope a subroutine's or a block's statements `stmts` make: their
-// imports and their declarations.
+// The scope a subroutine's or a block's statements `stmts`, none of them null,
+// make: their imports and their declarations.
 void DeclareStatements(NameFrame& frame, const std::vector<Stmt*>& stmts,
                        const PackageFrames& packages);
 

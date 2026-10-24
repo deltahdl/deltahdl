@@ -33,11 +33,12 @@ namespace delta {
 namespace {
 
 // Whether `t` is a value an integral or a real type gives: an integer type, an
-// enum, a real, or a packed structure or union, which §6.11.1 makes integral.
+// enum, a real, or a structure or union, which ActualFitsFormal is asked of
+// only packed or soft (Judge takes an unpacked one by assignment or bit-stream
+// cast) and which §6.11.1 then makes integral.
 bool IsIntegralOrRealLike(const DataType& t) {
-  if (t.kind == DataTypeKind::kStruct || t.kind == DataTypeKind::kUnion)
-    return t.is_packed || t.is_soft;
-  return IsIntegralType(t.kind) || IsRealType(t.kind);
+  return t.kind == DataTypeKind::kStruct || t.kind == DataTypeKind::kUnion ||
+         IsIntegralType(t.kind) || IsRealType(t.kind);
 }
 
 // §6.24.3: the built-in kinds of a bit-stream type, a string or an integral
@@ -89,8 +90,8 @@ bool ActualFitsFormal(const DataType& actual, const DataType& formal,
          (IsIntegralOrRealLike(actual) && IsIntegralOrRealLike(formal));
 }
 
-// The hops a chain of typedef names is followed through; a longer one runs
-// through a name twice.
+// The hops a chain of typedef names is followed through. A longer chain, as a
+// cycle of names makes one, is left unjudged.
 constexpr int kMaxTypedefHops = 32;
 
 // One unpacked dimension of a side, with the frame the names its bounds are
@@ -233,8 +234,7 @@ class LetActualWalk {
         CheckGenerateBlock(choice.body, frame, {});
       return;
     }
-    const bool kLoop =
-        item->kind == ModuleItemKind::kGenerateFor && item->gen_init != nullptr;
+    const bool kLoop = item->kind == ModuleItemKind::kGenerateFor;
     CheckGenerateBlock(item->gen_body, frame,
                        kLoop ? item->gen_init->var_name : std::string_view{});
     if (item->gen_else != nullptr) CheckGenerate(item->gen_else, frame);
@@ -263,10 +263,12 @@ class LetActualWalk {
 
   void CheckBody(const std::vector<Stmt*>& stmts,
                  const NameFrame& frame) const {
-    if (stmts.empty()) return;
+    std::vector<Stmt*> present = stmts;
+    std::erase(present, nullptr);
+    if (present.empty()) return;
     NameFrame body(&frame);
-    DeclareStatements(body, stmts, packages_);
-    for (const Stmt* s : stmts) CheckStmt(s, body);
+    DeclareStatements(body, present, packages_);
+    for (const Stmt* s : present) CheckStmt(s, body);
   }
 
   // A let's defaults are its declaration's (§11.12), judged where it is
@@ -325,7 +327,6 @@ class LetActualWalk {
   const NameBinding* Callee(const Expr& callee, const NameFrame& frame) const {
     if (callee.kind == ExprKind::kIdentifier) return Named(callee, frame);
     if (callee.kind != ExprKind::kMemberAccess || !callee.is_scope_resolution ||
-        callee.lhs == nullptr || callee.rhs == nullptr ||
         callee.lhs->kind != ExprKind::kIdentifier)
       return nullptr;
     const NameBinding* prefix = FindName(frame, callee.lhs->text);
@@ -462,18 +463,14 @@ class LetActualWalk {
   // §7.6: an unpacked array is assignment compatible with another of as many
   // unpacked dimensions whose element types are equivalent (§6.22.2), the
   // faster-varying dimensions included, and, where the formal is fixed size,
-  // of as many elements. An unpacked structure or union is with its own type.
+  // of as many elements. An unpacked structure or union is with a type
+  // equivalent to it alone, which no integral or real rule widens.
   Verdict AssignmentRoute(const ResolvedSide& actual,
                           const ResolvedSide& formal) const {
-    if (actual.dims.empty() != formal.dims.empty()) return Verdict::kFails;
-    if (actual.dims.empty())
-      return FitsWhen(actual.end == formal.end ||
-                      TypesEquivalent(*actual.end, *formal.end) ||
-                      IsCastCompatible(*actual.end, *formal.end));
     if (actual.dims.size() != formal.dims.size() ||
-        (actual.end != formal.end &&
-         !TypesEquivalent(*actual.end, *formal.end)))
+        !TypesEquivalent(*actual.end, *formal.end))
       return Verdict::kFails;
+    if (actual.dims.empty()) return Verdict::kFits;
     Verdict verdict = SlowestDimensionsAssign(Shape(actual.dims.front()),
                                               Shape(formal.dims.front()));
     for (size_t i = 1; i < actual.dims.size(); ++i)
