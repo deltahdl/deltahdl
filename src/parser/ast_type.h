@@ -175,9 +175,6 @@ struct DataType {
 
 struct FunctionArg {
   Direction direction = Direction::kNone;
-  // A let formal written with the `untyped` keyword (A.2.12), which takes no
-  // type written before it in the port list (§11.12).
-  bool is_untyped = false;
   bool is_const = false;
   bool is_ref_static = false;
   bool is_default = false;
@@ -185,6 +182,10 @@ struct FunctionArg {
   std::string_view name;
   Expr* default_value = nullptr;
   std::vector<Expr*> unpacked_dims;
+  // A let formal written with the `untyped` keyword (A.2.12), which takes no
+  // type written before it in the port list (§11.12). It stands last because
+  // tests and helpers brace-initialize the members before it in order.
+  bool is_untyped = false;
 };
 
 }  // namespace delta
