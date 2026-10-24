@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 
@@ -88,6 +89,23 @@ TEST(AssertionSemanticsParsing, FirstMatchAsTheAntecedentOfAnImplication) {
   ASSERT_NE(tree->sequence, nullptr);
   EXPECT_TRUE(tree->sequence->seq_linear.first_match);
   EXPECT_EQ(tree->sequence->seq_linear.operands.size(), 2u);
+}
+
+// §16.9.8 with §16.10: a match item of first_match that names no variable,
+// `++` alone, leaves the named sequence's body uncaptured, though the `)`
+// after it would close the first_match.
+TEST(AssertionSemanticsParsing, AFirstMatchItemNamingNoVariableIsNotCaptured) {
+  auto r = Parse(
+      "module m;\n"
+      "  sequence s;\n"
+      "    @(posedge clk) first_match(a ##1 b, ++);\n"
+      "  endsequence\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FindItemByKind(r, ModuleItemKind::kSequenceDecl);
+  ASSERT_NE(item, nullptr);
+  EXPECT_FALSE(item->seq_linear.first_match);
+  EXPECT_TRUE(item->seq_linear.operands.empty());
 }
 
 }  // namespace
