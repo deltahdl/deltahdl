@@ -708,6 +708,13 @@ void Parser::ParseScopedTypeOrInst(const Token& name_tok,
   // the name before it the scope, as ParseNamedType reads the same type in a
   // procedure. Read one scope deep, the declaration expected its variable at
   // the second `::`.
+  //
+  // §8.23 reaches the type through the whole chain, so the scope each step
+  // displaces is kept among the outer prefixes, and §8.25.1's parameter values
+  // written on the class stay with the type, `pkg::Inner#(4)::t`, as
+  // ParseNamedType keeps them. Dropped and cleared, the declaration reached
+  // the elaborator as an unspecialized `Inner::t`, which the compilation
+  // unit's own class Inner answered.
   while (Check(TokenKind::kColonColon)) {
     auto saved = lexer_.SavePos();
     Consume();
@@ -715,10 +722,10 @@ void Parser::ParseScopedTypeOrInst(const Token& name_tok,
       lexer_.RestorePos(saved);
       break;
     }
+    dtype.outer_scope_names.push_back(dtype.scope_name);
     dtype.scope_name = dtype.type_name;
     dtype.scope_param_assignment_written = assignment_written;
     dtype.type_name = Consume().text;
-    dtype.type_params.clear();
     assignment_written = Check(TokenKind::kHash);
     if (assignment_written) {
       Consume();

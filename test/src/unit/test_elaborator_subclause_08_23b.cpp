@@ -296,10 +296,8 @@ TEST(ClassScopeResolutionElaboration, ChainedSpecializationIsTheNestedClasses) {
 
 // §8.23 with §26.3: `pkg::Inner#(4)::t` specializes the class Inner the
 // package pkg declares, whose typedef is twenty elements longer, never the
-// unit's Inner, so a function's body variable written so takes twenty-four.
-// The variable is a procedure's: a module item whose type opens with a name
-// not known as a type is read by Parser::ParseScopedTypeOrInst, which keeps
-// neither the package nor the specialization past a second `::`.
+// unit's Inner, so a module's variable and a function's body variable written
+// so each take twenty-four.
 TEST(ClassScopeResolutionElaboration, PackageSpecializationIsThePackagesClass) {
   ElabFixture f;
   RtlirDesign* design = ElaborateSrc(std::string(kNestedSpecializationClasses) +
@@ -309,6 +307,7 @@ TEST(ClassScopeResolutionElaboration, PackageSpecializationIsThePackagesClass) {
                                          "  endclass\n"
                                          "endpackage\n"
                                          "module m;\n"
+                                         "  pkg::Inner#(4)::t w;\n"
                                          "  function automatic int g();\n"
                                          "    pkg::Inner#(4)::t q;\n"
                                          "    return q[0];\n"
@@ -316,6 +315,9 @@ TEST(ClassScopeResolutionElaboration, PackageSpecializationIsThePackagesClass) {
                                          "endmodule\n",
                                      f, "m");
   ASSERT_NE(design, nullptr);
+  const RtlirVariable* w = FindVar(design, "m", "w");
+  ASSERT_NE(w, nullptr);
+  EXPECT_EQ(w->unpacked_size, 24u);
   ASSERT_EQ(design->top_modules[0]->function_decls.size(), 1u);
   const ModuleItem* g = design->top_modules[0]->function_decls[0];
   ASSERT_FALSE(g->func_body_stmts.empty());

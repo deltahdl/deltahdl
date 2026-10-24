@@ -301,4 +301,29 @@ TEST(ClassScopeResolutionParsing, TypeNamedThroughAChainKeepsEveryPrefix) {
   EXPECT_EQ(h->data_type.type_name, "C");
 }
 
+// The same chain opened by a package, whose name the parser does not know as
+// a type, with the class written as a specialization: `pkg::Inner#(4)::t`
+// keeps pkg among its outer prefixes and the class's parameter value with the
+// type. The module item was read one scope at a time, the package dropped and
+// the value cleared at the second `::`.
+TEST(ClassScopeResolutionParsing, PackageLedChainKeepsItsPrefixAndValues) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  class Inner #(int p = 1);\n"
+      "    typedef int t [p];\n"
+      "  endclass\n"
+      "endpackage\n"
+      "module m; pkg::Inner#(4)::t w; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* w = FindItemByName(r.cu->modules[0]->items, "w");
+  ASSERT_NE(w, nullptr);
+  ASSERT_EQ(w->data_type.outer_scope_names.size(), 1u);
+  EXPECT_EQ(w->data_type.outer_scope_names[0], "pkg");
+  EXPECT_EQ(w->data_type.scope_name, "Inner");
+  EXPECT_EQ(w->data_type.type_name, "t");
+  EXPECT_TRUE(w->data_type.scope_param_assignment_written);
+  EXPECT_EQ(w->data_type.type_params.size(), 1u);
+}
+
 }  // namespace
