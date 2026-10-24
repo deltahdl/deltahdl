@@ -24,12 +24,14 @@
 namespace delta {
 namespace {
 
-// The types one specialization binds a class's type parameters to, and the
+// The types one specialization binds a class's type parameters to, the type
+// parameters among them an argument gives rather than a default, and the
 // scope its value parameters' values stand in, the declaring module's names
 // with the class's parameters over them.
 struct SpecializationBindings {
   std::unordered_map<std::string_view, DataType> types;
   ScopeMap scope;
+  std::unordered_set<std::string_view> given;
 };
 
 // The argument of `args` binding the class parameter `name`, the `index`th the
@@ -125,6 +127,7 @@ std::optional<SpecializationBindings> BindSpecialization(
       DataType type = TypeParamActual(cls, i, arg);
       if (type.kind == DataTypeKind::kImplicit) return std::nullopt;
       bound.types[name] = InDeclaringModule(type, typedefs);
+      if (GivesArgument(arg)) bound.given.insert(name);
       continue;
     }
     std::optional<int64_t> value =
@@ -191,15 +194,18 @@ std::optional<std::vector<Expr*>> FoldUnpackedDims(
 }
 
 // The typedef's type with a type parameter it names replaced by the type the
-// specialization binds it to. False where the parameter's name carries a
-// packed dimension of its own, which would stack on the actual (§7.4.4), a
-// shape this does not carry.
-bool SubstituteTypeParam(DataType& type, const SpecializationBindings& bound) {
+// specialization binds it to, noting whether an argument gave it. False where
+// the parameter's name carries a packed dimension of its own, which would
+// stack on the actual (§7.4.4), a shape this does not carry.
+bool SubstituteTypeParam(SpecializedClassType& spec,
+                         const SpecializationBindings& bound) {
+  DataType& type = spec.type;
   if (type.kind != DataTypeKind::kNamed || !type.scope_name.empty())
     return true;
   auto actual = bound.types.find(type.type_name);
   if (actual == bound.types.end()) return true;
   if (type.packed_dim_left != nullptr) return false;
+  spec.names_argument = bound.given.count(actual->first) != 0;
   type = actual->second;
   return true;
 }
@@ -306,7 +312,7 @@ std::optional<SpecializedClassType> SpecializeType(
   auto followed = FollowClassTypedef(type, ctx, hops);
   if (!followed) return std::nullopt;
   SpecializedClassType spec = *followed;
-  if (!SubstituteTypeParam(spec.type, ctx.bound)) return std::nullopt;
+  if (!SubstituteTypeParam(spec, ctx.bound)) return std::nullopt;
   if (!FoldPackedDims(spec.type, ctx.bound.scope, ctx.arena))
     return std::nullopt;
   if (!SpecializeMembers(spec.type, ctx, hops)) return std::nullopt;

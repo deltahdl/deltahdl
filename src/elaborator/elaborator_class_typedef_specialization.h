@@ -15,10 +15,13 @@ struct Expr;
 struct ModuleItem;
 
 // A type specialized, with the unpacked dimensions it carries: a typedef's own,
-// `T t_array [SIZE-1:0]`, or a member's.
+// `T t_array [SIZE-1:0]`, or a member's. `names_argument` says the type is the
+// one an argument of the specialization gives a type parameter, written where
+// the specialization is rather than in the class.
 struct SpecializedClassType {
   DataType type;
   std::vector<Expr*> unpacked_dims;
+  bool names_argument = false;
 };
 
 // §6.25 with §8.25: the type `dtype` names when it reaches a typedef of a

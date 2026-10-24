@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <span>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -49,6 +50,13 @@ const NameBinding* FindOwnName(const NameFrame* frame, std::string_view name) {
   auto it = frame->names.find(name);
   if (it != frame->names.end() && it->second.scope == frame) return &it->second;
   return FindInherited(*frame, name);
+}
+
+const DataType* TypedefTypeOf(const NameBinding* named) {
+  if (named == nullptr || named->kind != NameKind::kTypedef ||
+      !named->item->typedef_ifc_port.empty())
+    return nullptr;
+  return &named->item->typedef_type;
 }
 
 namespace {
@@ -227,6 +235,18 @@ void DeclareTargetNets(NameFrame& frame, const Expr* target) {
     DeclareTargetNets(frame, element);
 }
 
+// `named` where it declares a class, null where it is null or declares none.
+const NameBinding* ClassBinding(const NameBinding* named) {
+  return named != nullptr && named->kind == NameKind::kClass ? named : nullptr;
+}
+
+// A type's prefixes, outermost first: `p` and `C` of `p::C::t`.
+std::vector<std::string_view> PrefixesOf(const DataType& type) {
+  std::vector<std::string_view> prefixes = type.outer_scope_names;
+  if (!type.scope_name.empty()) prefixes.push_back(type.scope_name);
+  return prefixes;
+}
+
 // §8.23: what a class declares, each member a name of its scope. A typedef
 // and a nested class are what a type may be named through.
 void DeclareClassMembers(NameFrame& frame, const ClassDecl& cls) {
@@ -266,13 +286,18 @@ const NameFrame* PackageFrames::Find(std::string_view package) const {
   return package == "std" ? &std_ : nullptr;
 }
 
-// A class asked for again while its bases are being found, as a cycle of
-// bases would ask for it, finds the entry still empty and has no frame.
 const NameFrame* ClassFrames::Of(const ClassDecl& cls,
                                  const NameFrame& declaring) {
+  if (!cls.params.empty()) return nullptr;
+  return MembersOf(cls, declaring);
+}
+
+// A class asked for again while its bases are being found, as a cycle of
+// bases would ask for it, finds the entry still empty and has no frame.
+const NameFrame* ClassFrames::MembersOf(const ClassDecl& cls,
+                                        const NameFrame& declaring) {
   auto [it, inserted] = built_.try_emplace(&cls, nullptr);
   if (!inserted) return it->second;
-  if (!cls.params.empty()) return nullptr;
   // §8.26.2: an interface class extends any number of interface classes, the
   // first recorded as its base_class and the rest as extends_interfaces, and
   // inherits their members; one it implements gives it none.
@@ -289,16 +314,77 @@ const NameFrame* ClassFrames::Of(const ClassDecl& cls,
   return &frame;
 }
 
-// §8.13: the class a class extends, named in the scope declaring it, or
-// behind the package declaring it (§26.3).
+const NameBinding* ClassFrames::TypeName(const DataType& type,
+                                         const NameFrame& scope) {
+  const std::vector<std::string_view> kPrefixes = PrefixesOf(type);
+  return Named(kPrefixes, type.type_name, scope);
+}
+
+const NameFrame* ClassFrames::PrefixClassMembers(const DataType& type,
+                                                 const NameFrame& scope) {
+  std::vector<std::string_view> prefixes = PrefixesOf(type);
+  const std::string_view kLast = prefixes.back();
+  prefixes.pop_back();
+  const NameBinding* named =
+      ClassBinding(ThroughTypedefs(Named(prefixes, kLast, scope)));
+  if (named == nullptr) return nullptr;
+  return MembersOf(*named->cls, *named->scope);
+}
+
+// The declaration `name` reaches behind `prefixes`, outermost first, or
+// through the scopes around `scope` where there are none.
+const NameBinding* ClassFrames::Named(
+    std::span<const std::string_view> prefixes, std::string_view name,
+    const NameFrame& scope) {
+  if (prefixes.empty()) return FindName(scope, name);
+  return FindOwnName(ScopeNamed(prefixes, scope), name);
+}
+
+// The frame of the scope `prefixes` name, outermost first, as TypeName reads
+// them.
+const NameFrame* ClassFrames::ScopeNamed(
+    std::span<const std::string_view> prefixes, const NameFrame& scope) {
+  const NameFrame* frame = OutermostScope(prefixes.front(), scope);
+  for (size_t i = 1; frame != nullptr && i < prefixes.size(); ++i)
+    frame = ClassFrame(FindOwnName(frame, prefixes[i]));
+  return frame;
+}
+
+const NameFrame* ClassFrames::OutermostScope(std::string_view prefix,
+                                             const NameFrame& scope) {
+  if (prefix == "$unit") return &unit_;
+  const NameBinding* named = ClassBinding(FindName(scope, prefix));
+  if (named == nullptr) return packages_.Find(prefix);
+  return Of(*named->cls, *named->scope);
+}
+
+// The frame of the class `named` declares, null where it is no class's.
+const NameFrame* ClassFrames::ClassFrame(const NameBinding* named) {
+  const NameBinding* cls = ClassBinding(named);
+  if (cls == nullptr) return nullptr;
+  return Of(*cls->cls, *cls->scope);
+}
+
+// The declaration `named` reaches once each typedef on the way is followed to
+// the declaration its type names; null past kMaxTypedefHops of them.
+const NameBinding* ClassFrames::ThroughTypedefs(const NameBinding* named) {
+  for (int hop = 0; hop < kMaxTypedefHops; ++hop) {
+    const DataType* type = TypedefTypeOf(named);
+    if (type == nullptr) return named;
+    named = TypeName(*type, *named->scope);
+  }
+  return nullptr;
+}
+
+// §8.13: the class a class extends, a class_type (A.2.2.1) named in the scope
+// declaring it as TypeName reads a type's name, behind a package's or a
+// class's name, or through a typedef naming the class (§8.25).
 const NameFrame* ClassFrames::BaseFrame(std::string_view name,
                                         std::string_view scope,
                                         const NameFrame& declaring) {
-  const NameBinding* named = scope.empty()
-                                 ? FindName(declaring, name)
-                                 : FindOwnName(packages_.Find(scope), name);
-  if (named == nullptr || named->kind != NameKind::kClass) return nullptr;
-  return Of(*named->cls, *named->scope);
+  std::vector<std::string_view> prefixes;
+  if (!scope.empty()) prefixes.push_back(scope);
+  return ClassFrame(ThroughTypedefs(Named(prefixes, name, declaring)));
 }
 
 void DeclareOther(NameFrame& frame, std::string_view name) {

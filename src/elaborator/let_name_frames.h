@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <deque>
+#include <span>
 #include <string_view>
 #include <unordered_map>
 #include <utility>
@@ -74,6 +75,15 @@ const NameBinding* FindName(const NameFrame& frame, std::string_view name);
 // inherits, null for a name it imports or does not hold, and for a null frame.
 const NameBinding* FindOwnName(const NameFrame* frame, std::string_view name);
 
+// The hops a chain of typedef names is followed through. A longer chain, as a
+// cycle of names makes one, is left unfollowed.
+inline constexpr int kMaxTypedefHops = 32;
+
+// The type the typedef `named` declares, null where `named` is null, no
+// typedef's, or an interface port's (§25.10), whose type the interface the
+// port connects declares.
+const DataType* TypedefTypeOf(const NameBinding* named);
+
 // The frame of each package of a compilation unit (§26.2), its declarations
 // over its imports' names. A package may import only a package written before
 // it, so each is built from those before it. The built-in package std
@@ -98,21 +108,55 @@ class PackageFrames {
 // The frame of each class a type is named through (§8.23), built the first
 // time it is asked for: the names the class declares, over those it inherits
 // from the classes it extends, within the frame of the scope declaring it,
-// which a name the class neither declares nor inherits is looked up in. A
-// class with parameters has none, as its typedefs may stand for the values a
-// specialization gives; nor has one extending a class this cannot find a
-// frame for, by its bare name in the scope declaring the class or behind a
-// package's name.
+// which a name the class neither declares nor inherits is looked up in. And
+// the declarations the names of types reach through those frames, the
+// packages' (§26.3) and `unit`, the compilation unit's (§3.12.1).
 class ClassFrames {
  public:
-  explicit ClassFrames(const PackageFrames& packages) : packages_(packages) {}
+  ClassFrames(const PackageFrames& packages, const NameFrame& unit)
+      : packages_(packages), unit_(unit) {}
+
+  // The frame a type named through `cls`, declared in the scope of
+  // `declaring`, is followed in. A class with parameters has none, as its
+  // typedefs may stand for the values a specialization gives.
   const NameFrame* Of(const ClassDecl& cls, const NameFrame& declaring);
 
+  // The frame of what `cls` declares and inherits, whether or not it has
+  // parameters, which a name written in the class is looked up in. None where
+  // a class it extends has no frame (Of), or one this cannot find.
+  const NameFrame* MembersOf(const ClassDecl& cls, const NameFrame& declaring);
+
+  // The declaration a type's name reaches, written in the scope of `scope`: a
+  // bare name through the scopes around it, and a name behind prefixes the
+  // one the scope they name declares. `$unit` names the compilation unit's
+  // scope; a first prefix names a class the scopes around `scope` see under
+  // that name (§8.23), else the package of that name; and each later prefix
+  // names a class the scope before it declares, so that `C::t`, `p::C::t`
+  // and `Outer::Inner::t` each reach the typedef the class declares. Null
+  // where a prefix names none, or a class with no frame.
+  const NameBinding* TypeName(const DataType& type, const NameFrame& scope);
+
+  // MembersOf the class a type's prefixes end in, `P` of `P#(4)::t`, followed
+  // through typedefs naming it (§8.25), where a name written in that class is
+  // looked up; null where they end in no class. The type is one written with
+  // prefixes.
+  const NameFrame* PrefixClassMembers(const DataType& type,
+                                      const NameFrame& scope);
+
  private:
+  const NameBinding* Named(std::span<const std::string_view> prefixes,
+                           std::string_view name, const NameFrame& scope);
+  const NameFrame* ScopeNamed(std::span<const std::string_view> prefixes,
+                              const NameFrame& scope);
+  const NameFrame* OutermostScope(std::string_view prefix,
+                                  const NameFrame& scope);
+  const NameFrame* ClassFrame(const NameBinding* named);
+  const NameBinding* ThroughTypedefs(const NameBinding* named);
   const NameFrame* BaseFrame(std::string_view name, std::string_view scope,
                              const NameFrame& declaring);
 
   const PackageFrames& packages_;
+  const NameFrame& unit_;
   std::deque<NameFrame> frames_;
   std::unordered_map<const ClassDecl*, const NameFrame*> built_;
 };

@@ -6,7 +6,6 @@
 #include <format>
 #include <optional>
 #include <string_view>
-#include <utility>
 #include <vector>
 
 #include "common/arena.h"
@@ -94,14 +93,17 @@ bool ActualFitsFormal(const DataType& actual, const DataType& formal,
          (IsIntegralOrRealLike(actual) && IsIntegralOrRealLike(formal));
 }
 
-// The hops a chain of typedef names is followed through. A longer chain, as a
-// cycle of names makes one, is left unjudged.
-constexpr int kMaxTypedefHops = 32;
-
 // One unpacked dimension of a side, with the frame the names its bounds are
 // written with are looked up in.
 struct SideDim {
   const Expr* dim;
+  const NameFrame* scope;
+};
+
+// A type with the frame of the scope it is written in, where the names it is
+// written with are looked up.
+struct TypeAt {
+  const DataType* type;
   const NameFrame* scope;
 };
 
@@ -139,6 +141,16 @@ Verdict Both(Verdict a, Verdict b) {
 }
 
 Verdict FitsWhen(bool fits) { return fits ? Verdict::kFits : Verdict::kFails; }
+
+// §6.7.1: a net declared with no data type, whose type the parser leaves of
+// its net type's kind, `wire [7:0] v`, is of the implicit type logic, with the
+// range and signing the declaration writes.
+const DataType* WithImplicitNetType(const DataType& type, Arena& arena) {
+  if (!IsNetTypeKind(type.kind)) return &type;
+  auto* logic = arena.Create<DataType>(type);
+  logic->kind = DataTypeKind::kLogic;
+  return logic;
+}
 
 // Whether `cls`, or a class it derives from, declares a local or protected
 // member (§8.18), which an object of the class holds whether or not it is
@@ -392,118 +404,78 @@ class LetActualWalk {
 
   // `type`, declared with the unpacked dimensions `dims` in the scope of
   // `scope`, followed through each typedef name to the type the chain ends
-  // in, each name looked up in the scope declaring the typedef before it.
-  // Nothing where a name is not known or a type reference is not resolved.
+  // in, each name looked up in the scope declaring the typedef before it, or
+  // to the class it names. Nothing where a name is not known or a type
+  // reference is not resolved.
   std::optional<ResolvedSide> Resolve(const DataType& type,
                                       const std::vector<Expr*>* dims,
                                       const NameFrame& scope) const {
     ResolvedSide side;
     AddDims(side, dims, &scope);
-    const DataType* at = &type;
-    const NameFrame* in = &scope;
+    TypeAt at{&type, &scope};
     for (int hop = 0; hop < kMaxTypedefHops; ++hop) {
-      if (at->type_ref_expr != nullptr) return std::nullopt;
-      if (at->kind != DataTypeKind::kNamed) {
-        side.end = at;
+      if (at.type->type_ref_expr != nullptr) return std::nullopt;
+      if (at.type->kind != DataTypeKind::kNamed) {
+        side.end = WithImplicitNetType(*at.type, ctx_.arena);
         return side;
       }
-      const NameBinding* named = TypeName(*at, *in);
-      if (named == nullptr || named->kind == NameKind::kClass)
-        return EndInClassOrSpecialization(std::move(side), *at, *in, named);
-      if (named->kind != NameKind::kTypedef ||
-          !named->item->typedef_ifc_port.empty())
-        return std::nullopt;
-      AddDims(side, &named->item->unpacked_dims, named->scope);
-      at = &named->item->typedef_type;
-      in = named->scope;
+      const NameBinding* named = classes_.TypeName(*at.type, *at.scope);
+      side.cls = ClassReached(*at.type, named);
+      if (side.cls != nullptr) {
+        side.end = at.type;
+        return side;
+      }
+      const std::optional<TypeAt> kNext = NextInChain(side, at, named);
+      if (!kNext) return std::nullopt;
+      at = *kNext;
     }
     return std::nullopt;
   }
 
-  // The declaration a type's name reaches: a bare name through the scopes
-  // around `scope`, and a name behind prefixes the one the scope they name
-  // declares (ScopeNamed). None where the prefixes name no scope with a
-  // frame, which leaves a class's name to ClassOfDeclaredType.
-  const NameBinding* TypeName(const DataType& type,
-                              const NameFrame& scope) const {
-    if (type.scope_name.empty()) return FindName(scope, type.type_name);
-    return FindOwnName(ScopeNamed(type, scope), type.type_name);
+  // The class a chain's name `type` reaches: the one its binding `named`
+  // declares, or, where it reaches no declaration, the one
+  // ClassOfDeclaredType finds by the name as written, a class nested in a
+  // class or a package's (§8.23, §26.3). Null where it reaches none.
+  const ClassDecl* ClassReached(const DataType& type,
+                                const NameBinding* named) const {
+    if (named != nullptr) return named->cls;
+    return ClassOfDeclaredType(type, {}, ctx_.unit);
   }
 
-  // The frame of the scope a type's prefixes name, outermost first: `$unit`
-  // the compilation unit's (§3.12.1), a class the scopes around `scope` see
-  // under the first prefix (§8.23), else the package of that name (§26.3),
-  // and each later prefix a class the scope before it declares, so that
-  // `C::t`, `p::C::t` and `Outer::Inner::t` each reach the typedef the class
-  // declares. Null where a prefix names none, or a class with no frame
-  // (ClassFrames).
-  const NameFrame* ScopeNamed(const DataType& type,
-                              const NameFrame& scope) const {
-    std::vector<std::string_view> prefixes = type.outer_scope_names;
-    prefixes.push_back(type.scope_name);
-    const NameFrame* frame = OutermostScope(prefixes.front(), scope);
-    for (size_t i = 1; frame != nullptr && i < prefixes.size(); ++i)
-      frame = ClassFrame(FindOwnName(frame, prefixes[i]));
-    return frame;
-  }
-
-  const NameFrame* OutermostScope(std::string_view prefix,
-                                  const NameFrame& scope) const {
-    if (prefix == "$unit") return &unit_;
-    const NameBinding* named = FindName(scope, prefix);
-    if (named == nullptr || named->kind != NameKind::kClass)
-      return packages_.Find(prefix);
-    return classes_.Of(*named->cls, *named->scope);
-  }
-
-  // The frame of the class `named` declares, null where it is no class's.
-  const NameFrame* ClassFrame(const NameBinding* named) const {
-    if (named == nullptr || named->kind != NameKind::kClass) return nullptr;
-    return classes_.Of(*named->cls, *named->scope);
-  }
-
-  // A chain whose name `type`, written in the scope of `scope`, reaches no
-  // typedef: a specialization's (EndInSpecialization) where it reaches none
-  // at all, else a class's (EndInClass).
-  std::optional<ResolvedSide> EndInClassOrSpecialization(
-      ResolvedSide side, const DataType& type, const NameFrame& scope,
-      const NameBinding* named) const {
-    if (named == nullptr) {
-      const std::optional<SpecializedClassType> kSpecialized =
-          SpecializeClassScopedType(type, ctx_.unit, ctx_.parameters,
-                                    ctx_.shapes.typedefs, ctx_.arena);
-      if (kSpecialized)
-        return EndInSpecialization(std::move(side), *kSpecialized, scope);
-    }
-    return EndInClass(std::move(side), type, named);
+  // Where a chain goes from a name, written as `at` holds it, that names no
+  // class: into the type the typedef its binding `named` declares, with the
+  // typedef's unpacked dimensions, or, where it reaches no declaration, into
+  // the type a specialization gives it (Specialized). Nothing where it
+  // reaches neither, or a declaration of no type.
+  std::optional<TypeAt> NextInChain(ResolvedSide& side, const TypeAt& at,
+                                    const NameBinding* named) const {
+    if (named == nullptr) return Specialized(side, at);
+    const DataType* type = TypedefTypeOf(named);
+    if (type == nullptr) return std::nullopt;
+    AddDims(side, &named->item->unpacked_dims, named->scope);
+    return TypeAt{type, named->scope};
   }
 
   // §8.25.1: a type behind a class with parameters, `P#()::t` or `P#(4)::t`,
   // which no frame of the class follows, is the typedef of that
   // specialization, with its dimensions and the specialization's values
-  // folded in (SpecializeClassScopedType). Nothing where the specialized type
-  // is still a name: written in the class, it has no frame to be followed in.
-  std::optional<ResolvedSide> EndInSpecialization(
-      ResolvedSide side, const SpecializedClassType& specialized,
-      const NameFrame& scope) const {
-    if (specialized.type.kind == DataTypeKind::kNamed) return std::nullopt;
-    AddDims(side, &specialized.unpacked_dims, &scope);
-    side.end = ctx_.arena.Create<DataType>(specialized.type);
-    return side;
-  }
-
-  // A chain ending in `type`, the name of a class: the class `named` declares,
-  // or else the one ClassOfDeclaredType finds by the name as written, a class
-  // nested in a class or a package's (§8.23, §26.3). Nothing where neither is
-  // one.
-  std::optional<ResolvedSide> EndInClass(ResolvedSide side,
-                                         const DataType& type,
-                                         const NameBinding* named) const {
-    side.cls = named != nullptr ? named->cls
-                                : ClassOfDeclaredType(type, {}, ctx_.unit);
-    if (side.cls == nullptr) return std::nullopt;
-    side.end = &type;
-    return side;
+  // folded in (SpecializeClassScopedType). A type it gives that is still a
+  // name is looked up where it was written: at `at`, for a type an argument
+  // of the specialization gives a type parameter, else in the class, among
+  // what it declares and inherits within the scope declaring it.
+  std::optional<TypeAt> Specialized(ResolvedSide& side,
+                                    const TypeAt& at) const {
+    const std::optional<SpecializedClassType> kSpecialized =
+        SpecializeClassScopedType(*at.type, ctx_.unit, ctx_.parameters,
+                                  ctx_.shapes.typedefs, ctx_.arena);
+    if (!kSpecialized) return std::nullopt;
+    AddDims(side, &kSpecialized->unpacked_dims, at.scope);
+    const DataType* type = ctx_.arena.Create<DataType>(kSpecialized->type);
+    if (type->kind != DataTypeKind::kNamed || kSpecialized->names_argument)
+      return TypeAt{type, at.scope};
+    const NameFrame* written = classes_.PrefixClassMembers(*at.type, *at.scope);
+    if (written == nullptr) return std::nullopt;
+    return TypeAt{type, written};
   }
 
   // §6.22.4: an actual fits where it is assignment compatible with the formal
@@ -668,7 +640,7 @@ void CheckLetActualsOfDesignElement(const ModuleDecl& decl,
   NameFrame element(&unit);
   DeclareHeader(element, decl);
   DeclareScope(element, decl.items, kPackages);
-  ClassFrames classes(kPackages);
+  ClassFrames classes(kPackages, unit);
   const LetActualWalk kWalk(ctx, kPackages, classes, unit, element);
   kWalk.DeclareImplicit(element, decl.items);
   kWalk.CheckItems(decl.items, element);
@@ -678,7 +650,7 @@ void CheckLetActualsOfUnitAndPackages(const LetActualContext& ctx) {
   const PackageFrames kPackages(ctx.unit);
   NameFrame unit(nullptr);
   DeclareUnitScope(unit, ctx.unit->cu_items, *ctx.unit, kPackages);
-  ClassFrames classes(kPackages);
+  ClassFrames classes(kPackages, unit);
   const LetActualWalk kUnitWalk(ctx, kPackages, classes, unit, unit);
   kUnitWalk.CheckItems(ctx.unit->cu_items, unit);
   // A package's parameters are held under keys of their package's, not under
