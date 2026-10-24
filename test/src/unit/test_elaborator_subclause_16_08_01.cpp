@@ -1,12 +1,16 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <string>
 #include <vector>
 
+#include "elaborator/property_instance.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/typed_sequence_formal.h"
 #include "fixture_elaborator.h"
+#include "fixture_parser.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 
 using namespace delta;
@@ -171,6 +175,55 @@ TEST(TypedSequenceFormal, AnInstancesClockTakesTheSignalFormalsActual) {
           "  cover property (s_ev2(clk, a));\n"
           "endmodule\n"),
       std::vector<std::string>{"posedge clk"});
+}
+
+// §16.8.1 (a) with §16.12.18: an instance of a property whose body is the
+// clocked boolean form takes the boolean substitution unless an actual is one
+// the boolean does not read. A list of names bound to the formal the boolean
+// is, `(a, note)`, stands there as the sequence it reads as, so that instance
+// is evaluated as the body's tree. The list bound to a formal the boolean is
+// not, an expression or no actual at all bound to the boolean's formal, a
+// boolean that is no formal, and one that is more than a formal leave the
+// substitution in place; a body of another form is always the tree.
+TEST(TypedSequenceFormal, AListBoundToTheBooleanFormalTakesTheTree) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic clk, a, b, c;\n"
+      "  function void note; endfunction\n"
+      "  property p(q, r); @(posedge clk) q; endproperty\n"
+      "  property w(q); @(posedge clk) a; endproperty\n"
+      "  property v(q); @(posedge clk) q && b; endproperty\n"
+      "  property t(q); @(posedge clk) q |-> b; endproperty\n"
+      "  assert property (p((a, note), c));\n"
+      "  assert property (p(c, (a, note)));\n"
+      "  assert property (p(b, c));\n"
+      "  assert property (p(, c));\n"
+      "  assert property (w((a, note)));\n"
+      "  assert property (v((a, note)));\n"
+      "  assert property (t(b));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  std::vector<const ModuleItem*> decls;
+  std::vector<const Expr*> instances;
+  for (const ModuleItem* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kPropertyDecl) decls.push_back(item);
+    if (item->kind == ModuleItemKind::kAssertProperty) {
+      instances.push_back(item->assert_expr);
+    }
+  }
+  ASSERT_EQ(decls.size(), 4u);
+  ASSERT_EQ(instances.size(), 7u);
+  const std::vector<const ModuleItem*> kDeclOf = {
+      decls[0], decls[0], decls[0], decls[0], decls[1], decls[2], decls[3]};
+  const std::vector<bool> kSubstituted = {false, true, true, true,
+                                          true,  true, false};
+  for (size_t i = 0; i < instances.size(); ++i) {
+    ASSERT_NE(instances[i], nullptr) << "instance " << i;
+    EXPECT_EQ(TakesBooleanSubstitution(instances[i], kDeclOf[i]),
+              kSubstituted[i])
+        << "instance " << i;
+  }
 }
 
 }  // namespace

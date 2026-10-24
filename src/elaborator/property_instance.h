@@ -22,10 +22,15 @@ struct RtlirModuleInst;
 // (elaborator_items_assertions.cpp) or inside it (§16.14.6,
 // procedural_concurrent_assertion.cpp).
 
-// §16.12.18: whether an actual argument of `instance` is a sequence_expr or
-// a property_expr, which the boolean substitution does not read, so the
-// instance is evaluated as the body's tree.
-bool InstanceHasTreeActual(const Expr* instance);
+// §16.12.18: whether the instance `instance` of the property `decl` is
+// evaluated as the boolean of decl's clocked boolean body with the actuals
+// substituted, rather than as the body's tree: the body is that form, and no
+// actual is one the boolean substitution does not read. Those are a
+// sequence_expr or a property_expr read into a tree, and, §16.8.1, a list of
+// names bound to the formal the boolean is, which stands where a
+// sequence_expr does, so the list is the sequence it reads as
+// (Expr::sequence_reading) rather than its events.
+bool TakesBooleanSubstitution(const Expr* instance, const ModuleItem* decl);
 
 // §16.12.18 by way of §16.8.1: the clock of the instantiated property or
 // sequence with the actuals in the formals' places, each event actual an

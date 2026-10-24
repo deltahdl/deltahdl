@@ -237,7 +237,7 @@ void SubstitutePropertyBody(Stmt* stmt, const ModuleItem* decl,
   Expr* instance = stmt->assert_expr;
   ActualsByFormal actuals = BindActualsWithDefaults(
       decl->prop_formals, decl->prop_formal_defaults, instance);
-  if (decl->prop_body_expr != nullptr && !InstanceHasTreeActual(instance)) {
+  if (TakesBooleanSubstitution(instance, decl)) {
     stmt->assert_expr = SubstituteFormals(decl->prop_body_expr, actuals, arena);
     stmt->assert_negated = decl->prop_negated;
   } else {

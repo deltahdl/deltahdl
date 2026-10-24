@@ -286,12 +286,12 @@ bool SubstituteSequenceInstance(ModuleItem* item, const ModuleItem* decl,
 
 // The body the statement of the instance `instance` of `decl` carries: the
 // boolean with the actuals substituted where the body is the clocked
-// boolean form and every actual an expression, and otherwise, §16.12.17, a
-// tree whose root is the instance, expanded at the run, its recursion
-// included, with the actuals substituted there.
+// boolean form and the boolean reads every actual (TakesBooleanSubstitution),
+// and otherwise, §16.12.17, a tree whose root is the instance, expanded at
+// the run, its recursion included, with the actuals substituted there.
 void GiveInstanceBody(Stmt* stmt, Expr* instance, const ModuleItem* decl,
                       const ActualsByFormal& actuals, Arena& arena) {
-  if (decl->prop_body_expr != nullptr && !InstanceHasTreeActual(instance)) {
+  if (TakesBooleanSubstitution(instance, decl)) {
     stmt->assert_expr = SubstituteFormals(decl->prop_body_expr, actuals, arena);
     stmt->assert_negated = decl->prop_negated;
     return;
@@ -444,11 +444,9 @@ void PromotePropertyInstanceBoolean(ModuleItem* item, Arena& arena,
   here.clock = item->sensitivity;
   FillInferredDefaults(instance, decl, here, arena);
   // §16.12.18: an instance of the clocked boolean form is left as the
-  // boolean it was read as unless an actual is a tree, which the boolean
-  // does not read.
-  if (decl->prop_body_expr != nullptr && !InstanceHasTreeActual(instance)) {
-    return;
-  }
+  // boolean it was read as unless an actual is one the boolean does not
+  // read.
+  if (TakesBooleanSubstitution(instance, decl)) return;
   auto* root = arena.Create<PropertyExprNode>();
   root->boolean = stmt->assert_expr;
   if (stmt->assert_negated) {

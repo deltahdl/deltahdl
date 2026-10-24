@@ -226,4 +226,29 @@ TEST(TypedSequenceFormals, AListOfNamesIsTheSequenceItReadsAs) {
   EXPECT_EQ(out, "noted at 15\nnoted at 45\n$finish at time 160\n");
 }
 
+// §16.8.1 (a) with §16.12: a property whose body is the clocked boolean form,
+// `@(posedge clk) q`, has its formal stand where a sequence_expr does, so a
+// list of names bound to it, `(a, note)`, is the sequence it reads as. a is
+// high at the posedges at 15 and 45, so the cover holds at both and note runs
+// at both; read as the event list, `a or note`, note never ran.
+TEST(TypedSequenceFormals, AClockedBooleanBodyTakesAListAsItsSequence) {
+  SimFixture f;
+  auto* notes = RunAndFindVar(
+      "module t;\n"
+      "  logic clk = 0, a = 0;\n"
+      "  int notes = 0, hits = 0;\n"
+      "  function void note; notes++; endfunction\n"
+      "  property p(q); @(posedge clk) q; endproperty\n"
+      "  c1: cover property (p((a, note))) hits++;\n"
+      "  always #5 clk = ~clk;\n"
+      "  initial begin\n"
+      "    #12 a = 1; #10 a = 0; #20 a = 1; #10 a = 0; #20 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "notes");
+  ASSERT_NE(notes, nullptr);
+  EXPECT_EQ(notes->value.ToUint64(), 2u);
+  EXPECT_EQ(f.ctx.FindVariable("hits")->value.ToUint64(), 2u);
+}
+
 }  // namespace

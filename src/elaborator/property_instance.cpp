@@ -18,15 +18,35 @@
 
 namespace delta {
 
+namespace {
+
 // §16.12.18: whether an actual argument of `instance` is a sequence_expr or
-// a property_expr, which the boolean substitution does not read, so the
-// instance is evaluated as the body's tree.
+// a property_expr read into a tree.
 bool InstanceHasTreeActual(const Expr* instance) {
   if (instance == nullptr || instance->kind != ExprKind::kCall) return false;
   for (const Expr* arg : instance->args) {
     if (arg != nullptr && arg->property_actual != nullptr) return true;
   }
   return false;
+}
+
+// §16.8.1: whether the boolean of `decl`'s clocked boolean body is a formal
+// that `instance` binds to a list of names, `(a, f)`, which stands there as
+// the sequence the list reads as.
+bool BindsListToBoolean(const Expr* instance, const ModuleItem* decl) {
+  const Expr* boolean = decl->prop_body_expr;
+  if (boolean->kind != ExprKind::kIdentifier) return false;
+  const ActualsByFormal kActuals = BindActuals(decl->prop_formals, instance);
+  const auto kBound = kActuals.find(boolean->text);
+  return kBound != kActuals.end() && kBound->second != nullptr &&
+         kBound->second->sequence_reading != nullptr;
+}
+
+}  // namespace
+
+bool TakesBooleanSubstitution(const Expr* instance, const ModuleItem* decl) {
+  return decl->prop_body_expr != nullptr && !InstanceHasTreeActual(instance) &&
+         !BindsListToBoolean(instance, decl);
 }
 
 // §16.12.18 by way of §16.8.1: the clock of the instantiated property or
