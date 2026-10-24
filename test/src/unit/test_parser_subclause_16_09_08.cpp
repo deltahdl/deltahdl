@@ -2,6 +2,7 @@
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 
@@ -92,8 +93,8 @@ TEST(AssertionSemanticsParsing, FirstMatchAsTheAntecedentOfAnImplication) {
 }
 
 // §16.9.8 with §16.10: a match item of first_match that names no variable,
-// `++` alone, leaves the named sequence's body uncaptured, though the `)`
-// after it would close the first_match.
+// `++` alone, is refused by A.2.10's grammar and leaves the named sequence's
+// body uncaptured, though the `)` after it would close the first_match.
 TEST(AssertionSemanticsParsing, AFirstMatchItemNamingNoVariableIsNotCaptured) {
   auto r = Parse(
       "module m;\n"
@@ -102,6 +103,8 @@ TEST(AssertionSemanticsParsing, AFirstMatchItemNamingNoVariableIsNotCaptured) {
       "  endsequence\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(ReportedError(r.diags, "no reading of it gets past this point", 3,
+                            "A.2.10"));
   auto* item = FindItemByKind(r, ModuleItemKind::kSequenceDecl);
   ASSERT_NE(item, nullptr);
   EXPECT_FALSE(item->seq_linear.first_match);
