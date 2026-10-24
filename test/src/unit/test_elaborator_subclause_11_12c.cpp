@@ -573,9 +573,14 @@ TEST(LetActualScopeElaboration, ATypeAClassDeclaresIsFollowed) {
 }
 
 // §8.23: a class that derives from another class or interface class, or one
-// with parameters, is not followed, so its typedefs, each an array of two
-// ints, leave the calls passing them unjudged; nor is a chain whose next
-// prefix names a member of C that is no class, or nothing C declares.
+// with parameters, is not followed, so its typedefs leave the calls passing
+// them unjudged, though an array of two ints is no actual for three, nor three
+// ints for a structure of two; nor is a chain whose next prefix names a member
+// of C that is no class, or nothing C declares. A typedef of a class with
+// parameters is named through its default specialization, `P#()::`, as
+// §8.25.1 requires outside the class; a formal of a structure typedef, unlike
+// an array typedef's, is not rewritten to the specialization's type before
+// the check.
 TEST(LetActualScopeElaboration, ClassesNotFollowedLeaveTheirTypesUnjudged) {
   ElabFixture f;
   ElaborateSrc(
@@ -589,7 +594,7 @@ TEST(LetActualScopeElaboration, ClassesNotFollowedLeaveTheirTypesUnjudged) {
       "  endclass\n"
       "endclass\n"
       "class P #(int K = 2);\n"
-      "  typedef int p_t [2];\n"
+      "  typedef struct { int a; int b; } s_t;\n"
       "endclass\n"
       "interface class I1;\n"
       "endclass\n"
@@ -598,12 +603,13 @@ TEST(LetActualScopeElaboration, ClassesNotFollowedLeaveTheirTypesUnjudged) {
       "endclass\n"
       "module m;\n"
       "  let h(int x [3]) = x[0];\n"
-      "  E::EN::e_t ev; P::p_t pv; I2::i_t iv; C::x::t xv; C::y::t yv;\n"
-      "  initial $display(\"%0d\", h(ev) + h(pv) + h(iv) + h(xv) + h(yv));\n"
+      "  let z(P#()::s_t x) = x.a;\n"
+      "  E::EN::e_t ev; I2::i_t iv; C::x::t xv; C::y::t yv; int a3 [3];\n"
+      "  initial $display(\"%0d\", h(ev) + h(iv) + h(xv) + h(yv) + z(a3));\n"
       "endmodule\n",
       f);
   EXPECT_FALSE(
-      ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 21, "11.12"));
+      ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 22, "11.12"));
 }
 
 // §26.3 with §26.7: a wildcard import of the built-in package std offers the
