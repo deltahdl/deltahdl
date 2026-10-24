@@ -121,6 +121,11 @@ struct ParserAssertHelpers {
     p.ParseStmt();
   }
 
+  // The deferred cover statement whose `cover` was read at `loc`, read here
+  // rather than through Parser::ParseDeferredImmediateItem, its tail being a
+  // cover's. Defined after WrapStmtAsItem, which it ends with.
+  static ModuleItem* ParseDeferredCoverItem(Parser& p, SourceLoc loc);
+
   // §16.14 lists the places a concurrent assertion statement may be
   // specified, and the only procedural code among them is an always or an
   // initial procedure: a task, a function, a class method and a final
@@ -286,6 +291,26 @@ static ModuleItem* WrapStmtAsItem(Arena& arena, Stmt* stmt, SourceLoc loc,
   item->loc = loc;
   item->body = stmt;
   return EndedAtLastToken(item, lexer);
+}
+
+ModuleItem* ParserAssertHelpers::ParseDeferredCoverItem(Parser& p,
+                                                        SourceLoc loc) {
+  RejectDeferredInProgram(p, loc);
+  auto* stmt = p.arena_.Create<Stmt>();
+  stmt->kind = StmtKind::kCoverImmediate;
+  stmt->range.start = loc;
+  stmt->is_deferred = true;
+  if (p.Match(TokenKind::kHash)) {
+    auto tok = p.Expect(TokenKind::kIntLiteral, Subclause("16.4"));
+    ExpectDeferredHashZero(p.diag_, tok);
+  } else if (p.Match(TokenKind::kKwFinal)) {
+    stmt->is_final_deferred = true;
+  }
+  p.Expect(TokenKind::kLParen, Subclause("16.4"));
+  stmt->assert_expr = p.ParseExpr();
+  p.Expect(TokenKind::kRParen, Subclause("16.4"));
+  ParseCoverTail(p, stmt, Subclause("16.4"));
+  return WrapStmtAsItem(p.arena_, stmt, loc, p.lexer_);
 }
 
 ModuleItem* Parser::ParseDeferredImmediateItem(SourceLoc loc, StmtKind kind) {
@@ -589,25 +614,7 @@ ModuleItem* Parser::ParseCoverProperty() {
   Expect(TokenKind::kKwCover, Subclause("16.14.3"));
 
   if (IsDeferredImmediate(lexer_)) {
-    // The deferred cover is read here rather than through
-    // ParseDeferredImmediateItem, its tail being a cover's.
-    ParserAssertHelpers::RejectDeferredInProgram(*this, item->loc);
-    auto* stmt = arena_.Create<Stmt>();
-    stmt->kind = StmtKind::kCoverImmediate;
-    stmt->range.start = item->loc;
-    stmt->is_deferred = true;
-    if (Match(TokenKind::kHash)) {
-      auto tok = Expect(TokenKind::kIntLiteral, Subclause("16.4"));
-
-      ExpectDeferredHashZero(diag_, tok);
-    } else if (Match(TokenKind::kKwFinal)) {
-      stmt->is_final_deferred = true;
-    }
-    Expect(TokenKind::kLParen, Subclause("16.4"));
-    stmt->assert_expr = ParseExpr();
-    Expect(TokenKind::kRParen, Subclause("16.4"));
-    ParserAssertHelpers::ParseCoverTail(*this, stmt, Subclause("16.4"));
-    return WrapStmtAsItem(arena_, stmt, item->loc, lexer_);
+    return ParserAssertHelpers::ParseDeferredCoverItem(*this, item->loc);
   }
 
   if (Check(TokenKind::kKwSequence)) {

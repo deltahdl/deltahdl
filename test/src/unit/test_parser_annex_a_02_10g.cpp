@@ -16,6 +16,8 @@ using namespace delta;
 
 namespace {
 
+constexpr const char* kNotAdmitted = "is not one the grammar admits";
+
 // A.2.10's assertion_variable_declaration is `var_data_type
 // list_of_variable_decl_assignments ;`, and A.2.2.1's var_data_type is a
 // data_type or `var` before a data_type_or_implicit, a data_type naming a type
@@ -110,7 +112,7 @@ TEST(AssertionVariableDeclParsing, ChandleAfterVarIsReported) {
 
 // A scope with no name after it, and a packed dimension the source ends in,
 // end the reading of a declaration's type rather than running past the
-// tokens there are.
+// tokens there are, and what is left of the body is no sequence_expr.
 TEST(AssertionVariableDeclParsing, ATruncatedTypeEndsTheDeclaration) {
   auto scope = Parse(
       "module m;\n"
@@ -118,12 +120,12 @@ TEST(AssertionVariableDeclParsing, ATruncatedTypeEndsTheDeclaration) {
       "    P::;\n"
       "  endsequence\n"
       "endmodule\n");
-  EXPECT_TRUE(scope.has_errors);
+  EXPECT_TRUE(ReportedError(scope.diags, kNotAdmitted, 3, "A.2.10"));
   auto dimension = Parse(
       "module m;\n"
       "  sequence s;\n"
       "    int [3");
-  EXPECT_TRUE(dimension.has_errors);
+  EXPECT_TRUE(ReportedError(dimension.diags, kNotAdmitted, 3, "A.2.10"));
 }
 
 // A.2.10's property_port_item and sequence_port_item each name one
@@ -178,7 +180,7 @@ void ExpectAttributesReadPast(const char* port, const char* end,
   const std::vector<std::string_view> kFormals = {"x", "y"};
   EXPECT_EQ(item->prop_formals, kFormals);
   auto truncated = Parse(std::string("module m;\n  ") + port + " q((* keep");
-  EXPECT_TRUE(truncated.has_errors);
+  EXPECT_TRUE(ReportedError(truncated.diags, kNotAdmitted, 2, "A.2.10"));
 }
 
 TEST(AssertionPortItemParsing, PropertyPortAttributesAreReadPast) {
@@ -190,8 +192,6 @@ TEST(AssertionPortItemParsing, SequencePortAttributesAreReadPast) {
   ExpectAttributesReadPast("sequence", "endsequence",
                            ModuleItemKind::kSequenceDecl);
 }
-
-constexpr const char* kNotAdmitted = "is not one the grammar admits";
 
 // A.2.10's property_list_of_arguments and sequence_list_of_arguments are
 // positional actuals, any of them empty, then named ones, or named ones from

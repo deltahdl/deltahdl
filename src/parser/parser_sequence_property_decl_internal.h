@@ -25,6 +25,8 @@ bool IsBuiltinTypeKwForLocalVar(TokenKind k);
 // variable dimensions stand, the depth of their brackets. Defined in
 // src/parser/parser_property_port_list.cpp.
 struct PortItemShape {
+  explicit PortItemShape(const char* kind) : port(kind) {}
+
   const char* port;
   bool open = false;
   bool named = false;
