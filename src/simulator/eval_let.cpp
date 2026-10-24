@@ -10,6 +10,7 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/types.h"
+#include "elaborator/let_construct.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
@@ -92,14 +93,6 @@ static bool IsLetFormalTwoState(DataTypeKind kind) {
   }
 }
 
-// Whether `dt` is a type written before a let formal's name: any type but an
-// implicit one, and an implicit one that writes a signing or a packed
-// dimension (A.2.2.1's implicit_data_type), which is `logic` with them.
-static bool WritesLetFormalType(const DataType& dt) {
-  return dt.kind != DataTypeKind::kImplicit || dt.packed_dim_left != nullptr ||
-         dt.signing_written;
-}
-
 // §11.12 casts an actual to its formal's type, which a typedef name stands for
 // as written out: `bits x` under `typedef bit [15:0] bits` is a sixteen-bit
 // two-state formal (§6.18). The name alone gave neither a width nor a kind.
@@ -108,10 +101,8 @@ static Logic4Vec ResizeLetActualToFormal(Logic4Vec val,
                                          SimContext& ctx, Arena& arena) {
   const DataType* resolved = ctx.PackedTypeBehind(formal_type);
   const auto& dt = resolved != nullptr ? *resolved : formal_type;
-  // An untyped formal takes the actual as it is, its sign among it (§11.12's
-  // substitution); a typed integral one its own width and sign, an integer
-  // atom type's included, `int x` taking 8'hFF as 32 bits.
-  if (!WritesLetFormalType(dt)) return val;
+  // A typed integral formal takes its own width and sign, an integer atom
+  // type's included, `int x` taking 8'hFF as 32 bits.
   uint32_t formal_width = EvalTypeWidth(dt);
   if (!val.is_real && formal_width > 0 && formal_width != val.width) {
     val = ResizeToWidth(val, formal_width, arena);
@@ -139,16 +130,14 @@ static std::vector<Logic4Vec> EvalLetActuals(ModuleItem* decl, const Expr* call,
   ActualBindingCtx binding{call, positional_count, ctx, arena};
   std::vector<Logic4Vec> vals;
   vals.reserve(formals.size());
-  // §11.12's example e expands `let ones_match(bits x, y)` with `bits'(b)` for
-  // `y`: a formal written with no type of its own takes the type written
-  // before it in the list.
-  const DataType* written = nullptr;
+  // An untyped formal takes the actual as it is, its sign among it (§11.12's
+  // substitution); a typed one has it cast to the type it takes.
+  std::vector<const DataType*> types = LetFormalTypes(formals);
   for (size_t i = 0; i < formals.size(); ++i) {
-    const DataType& own = formals[i].data_type;
-    if (WritesLetFormalType(own)) written = &own;
     Logic4Vec val = EvalLetActualForFormal(formals[i], i, binding);
-    val = ResizeLetActualToFormal(val, written != nullptr ? *written : own, ctx,
-                                  arena);
+    if (types[i] != nullptr) {
+      val = ResizeLetActualToFormal(val, *types[i], ctx, arena);
+    }
     vals.push_back(val);
   }
   return vals;

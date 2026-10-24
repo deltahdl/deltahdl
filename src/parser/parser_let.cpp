@@ -25,8 +25,9 @@ FunctionArg Parser::ParseLetArg() {
   }
   if (Check(TokenKind::kLBracket)) {
     ParsePackedDims(arg.data_type);
-  } else if (!Match(TokenKind::kKwUntyped) &&
-             !TryParseInlineAggregateType(arg.data_type) &&
+  } else if (Match(TokenKind::kKwUntyped)) {
+    arg.is_untyped = true;
+  } else if (!TryParseInlineAggregateType(arg.data_type) &&
              !ParserDataDeclHelpers::ReadTypeReference(*this, arg.data_type)) {
     arg.data_type = ParseDeclaredDataType();
   }

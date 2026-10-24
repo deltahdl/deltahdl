@@ -6,6 +6,7 @@
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
 #include "parser/ast_module.h"
+#include "parser/ast_type.h"
 
 using namespace delta;
 
@@ -153,6 +154,24 @@ TEST(LetDeclParsing, LetFormalType_MixedUntypedAndTyped) {
       ParseOk("module m;\n"
               "  let f(untyped a, logic [7:0] b) = b;\n"
               "endmodule\n"));
+}
+
+// §11.12's formals take the type written before them, and `untyped` is how a
+// formal after a typed one is written untyped, so the keyword is recorded on
+// the formal that writes it and on no other.
+TEST(LetDeclParsing, AnUntypedFormalIsRecordedAsWrittenUntyped) {
+  auto r = Parse(
+      "module m;\n"
+      "  let f(int x, untyped y, z) = y;\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* item =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kLetDecl);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->func_args.size(), 3u);
+  EXPECT_FALSE(item->func_args[0].is_untyped);
+  EXPECT_TRUE(item->func_args[1].is_untyped);
+  EXPECT_FALSE(item->func_args[2].is_untyped);
 }
 
 TEST(LetDeclParsing, LetFormalType_Untyped) {

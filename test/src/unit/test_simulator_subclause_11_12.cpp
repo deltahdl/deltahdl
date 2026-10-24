@@ -693,6 +693,25 @@ TEST(LetConstructSim, AnImplicitTypeOfASigningAloneCastsItsActual) {
   EXPECT_EQ(out, "-1 -1 1 15\n");
 }
 
+// A formal written `untyped` after a typed one is untyped, and so is one
+// written with no type after it: their actuals are substituted as written,
+// 8'hFF reading 255. A formal written with no type after a typed one takes
+// that type, 8'hFF cast to a one-bit signed logic reading -1. The keyword was
+// not recorded, and `y` of h took the signing written before it.
+TEST(LetConstructSim, AnUntypedFormalTakesNoTypeWrittenBeforeIt) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module m;\n"
+      "  let h(signed x, untyped y) = y;\n"
+      "  let k(signed x, y) = y;\n"
+      "  let n(signed x, untyped y, z) = z;\n"
+      "  initial $display(\"%0d %0d %0d\", h(1'b0, 8'hFF), k(1'b0, 8'hFF),\n"
+      "                   n(1'b0, 1'b0, 8'hFF));\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "255 -1 255\n");
+}
+
 // §11.12 lets a let be declared in a subroutine body and used there after its
 // declaration: `plus(7)` with the default `y = 4` is 11. The declaration was
 // never made known, and the call read 0.

@@ -175,6 +175,9 @@ struct DataType {
 
 struct FunctionArg {
   Direction direction = Direction::kNone;
+  // A let formal written with the `untyped` keyword (A.2.12), which takes no
+  // type written before it in the port list (§11.12).
+  bool is_untyped = false;
   bool is_const = false;
   bool is_ref_static = false;
   bool is_default = false;

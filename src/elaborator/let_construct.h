@@ -1,8 +1,12 @@
 #pragma once
 
 #include <cstdint>
+#include <vector>
 
 namespace delta {
+
+struct DataType;
+struct FunctionArg;
 
 // Semantic rules for the let construct (§11.12). A let declaration defines a
 // template expression that is expanded into the places where it is
@@ -24,6 +28,19 @@ enum class LetFormalTypeKind : uint8_t {
 };
 
 bool IsLetFormalTypeAllowed(LetFormalTypeKind kind);
+
+// A.2.12 with A.2.2.1: whether `type` is one written before a let formal's
+// name. Any type but an implicit one is, and so is an implicit type that
+// writes a signing or a packed dimension, `logic` with them.
+bool WritesLetFormalType(const DataType& type);
+
+// §11.12: the type each of a let's `formals` takes, in their order. A formal
+// whose own type is written takes it, and one written `untyped` takes none
+// (null). One written with no type takes the last type written before it in
+// the list, as §11.12's example e expands `ones_match(bits x, y)` and §16.8
+// says of a sequence's formals; null where none was.
+std::vector<const DataType*> LetFormalTypes(
+    const std::vector<FunctionArg>& formals);
 
 // §11.12, rule 1: if the formal is of type `event`, the corresponding actual
 // argument shall be an event_expression.

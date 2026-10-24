@@ -1,6 +1,31 @@
 #include "elaborator/let_construct.h"
 
+#include <vector>
+
+#include "parser/ast_type.h"
+
 namespace delta {
+
+bool WritesLetFormalType(const DataType& type) {
+  return type.kind != DataTypeKind::kImplicit ||
+         type.packed_dim_left != nullptr || type.signing_written;
+}
+
+std::vector<const DataType*> LetFormalTypes(
+    const std::vector<FunctionArg>& formals) {
+  std::vector<const DataType*> types;
+  types.reserve(formals.size());
+  const DataType* written = nullptr;
+  for (const FunctionArg& formal : formals) {
+    if (formal.is_untyped) {
+      written = nullptr;
+    } else if (WritesLetFormalType(formal.data_type)) {
+      written = &formal.data_type;
+    }
+    types.push_back(written);
+  }
+  return types;
+}
 
 bool IsLetFormalTypeAllowed(LetFormalTypeKind kind) {
   switch (kind) {
