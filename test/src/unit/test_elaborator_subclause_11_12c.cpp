@@ -612,6 +612,21 @@ TEST(LetActualScopeElaboration, ClassesNotFollowedLeaveTheirTypesUnjudged) {
       ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 22, "11.12"));
 }
 
+// §11.12, rule 2, judges an actual by the declared type of the variable it
+// names, so an actual naming nothing any scope declares has no type to judge,
+// and the call is left to the report of the undeclared name.
+TEST(LetActualScopeElaboration, AnActualDeclaredNowhereIsNotJudged) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  let f(int x [2]) = x[0];\n"
+      "  initial $display(\"%0d\", f(nope));\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 3, "11.12"));
+}
+
 // §26.3 with §26.7: a wildcard import of the built-in package std offers the
 // names Annex G gives it and no other, so `u3` is still the compilation
 // unit's array of three ints, no actual for two, while `mailbox` is std's
