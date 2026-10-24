@@ -1,16 +1,22 @@
 #include <gtest/gtest.h>
 
+#include <array>
 #include <cstdint>
 #include <format>
 #include <initializer_list>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <utility>
 
+#include "elaborator/nettype_uses.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 #include "helpers_rtlir_lookup.h"
+#include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 
 using namespace delta;
 
@@ -610,6 +616,174 @@ TEST(NettypeElaboration, NettypeWrittenThroughAPackageAtUnitScopeRejected) {
                     use),
         line, "6.6.7"));
   }
+}
+
+// A.2.8 lets a block or a subroutine body declare a nettype among its items,
+// and §6.6.7's list of the data types a nettype may name holds wherever one is
+// declared: a string and an event are refused in an initial block and in a
+// function body, and the logic vector beside them is not.
+TEST(NettypeElaboration, BlockNettypeIsHeldToTheLegalDataTypes) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  initial begin\n"
+      "    nettype string ns;\n"
+      "    nettype logic [3:0] ok;\n"
+      "  end\n"
+      "  function int f;\n"
+      "    nettype event ne;\n"
+      "    return 0;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  const std::pair<uint32_t, std::string_view> kRefused[] = {{3, "ns"},
+                                                            {7, "ne"}};
+  for (const auto& [line, name] : kRefused) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        std::format("data type of user-defined nettype '{}' is not a legal "
+                    "nettype data type",
+                    name),
+        line, "6.6.7"));
+  }
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "is not a legal nettype", 4,
+                             "6.6.7"));
+}
+
+// A.1.9 makes a class_property a data_declaration, a nettype among them, and
+// §6.6.7's list holds there too: a string in a class of the compilation unit
+// and a chandle in a class a module declares are refused, and a real is not.
+TEST(NettypeElaboration, ClassNettypeIsHeldToTheLegalDataTypes) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C;\n"
+      "  nettype string ns;\n"
+      "  nettype real ok;\n"
+      "  int x;\n"
+      "endclass\n"
+      "module m;\n"
+      "  class D;\n"
+      "    nettype chandle nc;\n"
+      "  endclass\n"
+      "endmodule\n",
+      f);
+  const std::pair<uint32_t, std::string_view> kRefused[] = {{2, "ns"},
+                                                            {8, "nc"}};
+  for (const auto& [line, name] : kRefused) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        std::format("data type of user-defined nettype '{}' is not a legal "
+                    "nettype data type",
+                    name),
+        line, "6.6.7"));
+  }
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "is not a legal nettype", 3,
+                             "6.6.7"));
+}
+
+// A nettype a begin-end block, a fork-join block or a task body declares is a
+// nettype for the declarations after it there and in the blocks inside it, and
+// a procedural block declares variables alone, so each declaration below
+// names a nettype without declaring a net.
+TEST(NettypeElaboration, BlockNettypeNamedAsAVariablesTypeIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  initial begin\n"
+      "    nettype bit nb;\n"
+      "    nb w;\n"
+      "    begin\n"
+      "      nb inner;\n"
+      "    end\n"
+      "  end\n"
+      "  task t;\n"
+      "    nettype logic [1:0] tn;\n"
+      "    tn v;\n"
+      "  endtask\n"
+      "  initial fork\n"
+      "    nettype real fr;\n"
+      "    fr r;\n"
+      "  join\n"
+      "endmodule\n",
+      f);
+  const std::array<std::tuple<uint32_t, std::string_view, std::string_view>, 4>
+      kUses = {{{4, "nb", "w"},
+                {6, "nb", "inner"},
+                {11, "tn", "v"},
+                {15, "fr", "r"}}};
+  for (const auto& [line, nettype, var] : kUses) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        std::format("nettype '{}' may declare only a net, and is named here "
+                    "as the type of variable '{}'",
+                    nettype, var),
+        line, "6.6.7"));
+  }
+}
+
+// A nettype a class declares is a nettype for the class's properties, for the
+// variables its methods declare and for a class nested in it, none of which
+// declares a net.
+TEST(NettypeElaboration, ClassNettypeNamedAsAPropertysTypeIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C;\n"
+      "  nettype logic [3:0] nt;\n"
+      "  nt v;\n"
+      "  function void f();\n"
+      "    nt local_v;\n"
+      "  endfunction\n"
+      "  class Inner;\n"
+      "    nt q;\n"
+      "  endclass\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f, "m");
+  const std::pair<uint32_t, std::string_view> kUses[] = {
+      {3, "property 'v'"}, {5, "variable 'local_v'"}, {8, "property 'q'"}};
+  for (const auto& [line, use] : kUses) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        std::format("nettype 'nt' may declare only a net, and is named here "
+                    "as the type of {}",
+                    use),
+        line, "6.6.7"));
+  }
+}
+
+// The walk over a subroutine body steps over a null statement on its way to
+// the body's nettypes and the declarations after them.
+// Parser::ParseSubroutineBody keeps whatever Parser::ParseStmt answers, null
+// included, and no source the tests parse has it answer null, so the body is
+// built here. The module declares no nettype of its own, which leaves the
+// body's the only one, and the statements carry no source location, so the
+// report stands at line 0.
+TEST(NettypeElaboration, SubroutineBodyNettypeScanStepsOverANullStatement) {
+  ElabFixture f;
+  auto* nettype = f.arena.Create<ModuleItem>();
+  nettype->kind = ModuleItemKind::kNettypeDecl;
+  nettype->name = "nb";
+  nettype->typedef_type.kind = DataTypeKind::kBit;
+  auto* nettype_stmt = f.arena.Create<Stmt>();
+  nettype_stmt->kind = StmtKind::kBlockItemDecl;
+  nettype_stmt->decl_item = nettype;
+  auto* decl = f.arena.Create<Stmt>();
+  decl->kind = StmtKind::kVarDecl;
+  decl->var_decl_type.kind = DataTypeKind::kNamed;
+  decl->var_decl_type.type_name = "nb";
+  decl->var_name = "w";
+  auto* func = f.arena.Create<ModuleItem>();
+  func->kind = ModuleItemKind::kFunctionDecl;
+  func->name = "fn";
+  func->func_body_stmts = {nullptr, nettype_stmt, decl};
+  ModuleDecl mod;
+  mod.items.push_back(func);
+  CheckNettypeUses(&mod, {}, f.diag);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "nettype 'nb' may declare only a net, and is "
+                            "named here as the type of variable 'w'",
+                            0, "6.6.7"));
 }
 
 }  // namespace

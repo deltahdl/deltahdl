@@ -5,6 +5,7 @@
 #include "elaborator/aggregate_shape.h"
 #include "elaborator/assoc_index_type.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "elaborator/net_data_type.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
@@ -14,10 +15,25 @@
 
 namespace delta {
 
+// A typedef or a nettype, whichever `item` declares: the two are written alike
+// (A.2.1.3), and a nettype's type answers to §6.6.7 besides.
+static void VisitTypedef(const ModuleItem* item,
+                         const DeclaredTypeVisit& visit) {
+  const bool kIsNettype = item->kind == ModuleItemKind::kNettypeDecl;
+  visit({item->typedef_type, item->unpacked_dims, item->loc,
+         kIsNettype ? item : nullptr});
+}
+
+// A block's nettype is carried as a kBlockItemDecl statement over its item
+// (Parser::ParseBlockVarDecls).
 static void VisitStmt(const Stmt* s, const DeclaredTypeVisit& visit) {
   if (s == nullptr) return;
   if (s->kind == StmtKind::kVarDecl) {
     visit({s->var_decl_type, s->var_unpacked_dims, s->range.start});
+  }
+  if (s->kind == StmtKind::kBlockItemDecl &&
+      s->decl_item->kind == ModuleItemKind::kNettypeDecl) {
+    VisitTypedef(s->decl_item, visit);
   }
   ForEachChildStmt(s, [&visit](Stmt* const& sub) { VisitStmt(sub, visit); });
 }
@@ -48,11 +64,6 @@ static void VisitInner(const ModuleItem* item, const DeclaredTypeVisit& visit) {
     VisitSubroutine(item, visit);
   }
   VisitStmt(item->body, visit);
-}
-
-static void VisitTypedef(const ModuleItem* item,
-                         const DeclaredTypeVisit& visit) {
-  visit({item->typedef_type, item->unpacked_dims, item->loc});
 }
 
 static void VisitVariable(const ModuleItem* item,
@@ -100,6 +111,9 @@ void CheckDeclaredTypeRules(const DeclaredType& declared,
   CheckAggregateShape(declared.type, declared.loc, ctx);
   CheckRealAssocIndexTypes(declared.unpacked_dims, declared.loc,
                            ctx.tables.typedefs, ctx.diag);
+  if (declared.nettype != nullptr) {
+    ReportIllegalNettypeDataType(*declared.nettype, ctx.tables, ctx.diag);
+  }
 }
 
 }  // namespace delta

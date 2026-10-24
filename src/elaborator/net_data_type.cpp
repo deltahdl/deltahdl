@@ -1,6 +1,7 @@
 #include "elaborator/net_data_type.h"
 
 #include <array>
+#include <format>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -13,6 +14,7 @@
 #include "elaborator/queue_dim.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 #include "parser/ast_type.h"
 
 namespace delta {
@@ -279,6 +281,17 @@ bool IsLegalNettypeDataType(const DataType& dtype,
     type = it != tables.typedefs.end() ? &it->second : nullptr;
   }
   return true;
+}
+
+void ReportIllegalNettypeDataType(const ModuleItem& nettype,
+                                  const TypeShapeTables& tables,
+                                  DiagEngine& diag) {
+  if (IsLegalNettypeDataType(nettype.typedef_type, tables)) return;
+  diag.Error(nettype.loc,
+             std::format("data type of user-defined nettype '{}' is not a "
+                         "legal nettype data type",
+                         nettype.name),
+             Subclause("6.6.7"));
 }
 
 }  // namespace delta

@@ -24,10 +24,12 @@ void ReportNettypeNotNet(std::string_view nettype, std::string_view use,
 // (src/elaborator/net_data_type.h), "P::nt" or "$unit::nt": a member of a
 // structure or union, a function's return, a subroutine's argument, a
 // parameter, a cast, a variable a procedural block declares and a class
-// property. A data declaration among the module's items is judged as it is
-// elaborated instead, since naming a nettype makes it a net's unless it is
-// written with `var`, `const` or `static`. A packed dimension written after a
-// nettype's name is reported too, on a port (A.2.2.1) and on a declaration
+// property. Within a begin-end block, a fork-join block, a subroutine body or
+// a class, the nettypes that scope declares for itself are judged by their
+// bare names as well. A data declaration among the module's items is judged as
+// it is elaborated instead, since naming a nettype makes it a net's unless it
+// is written with `var`, `const` or `static`. A packed dimension written after
+// a nettype's name is reported too, on a port (A.2.2.1) and on a declaration
 // (A.2.1.3), since a net of a nettype takes the nettype's data type.
 void CheckNettypeUses(const ModuleDecl* decl,
                       const std::unordered_set<std::string_view>& nettypes,

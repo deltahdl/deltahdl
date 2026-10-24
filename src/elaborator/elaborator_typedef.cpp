@@ -558,14 +558,8 @@ void Elaborator::ElaborateNettypeDecl(ModuleItem* item, RtlirModule* mod) {
   ResolveTypeRef(item->typedef_type, item->loc, mod);
   // §6.6.7 judges the data type a nettype names, typedef names and all, and
   // IsLegalNettypeDataType in net_data_type.cpp says which those are.
-  if (!IsLegalNettypeDataType(item->typedef_type,
-                              {typedefs_, td_array_dims_, class_names_})) {
-    diag_.Error(item->loc,
-                std::format("data type of user-defined nettype '{}' is not a "
-                            "legal nettype data type",
-                            item->name),
-                Subclause("6.6.7"));
-  }
+  ReportIllegalNettypeDataType(*item, {typedefs_, td_array_dims_, class_names_},
+                               diag_);
   // §6.6.7 with §8.25: a nettype's data type may be a structure a
   // parameterized class declares, named through a typedef of a
   // specialization, `MyBaseT::S`; the nettype is of that type as the

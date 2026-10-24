@@ -43,8 +43,9 @@ void ReportNettypeNotNet(std::string_view nettype, std::string_view use,
 
 // A name written behind a scope is that scope's type, and no nettype of this
 // module or compilation unit, whatever its spelling: a package's or the unit's
-// nettype under its "P::nt" key, and nothing behind a class, which declares no
-// nettype.
+// nettype under its "P::nt" key. A class's nettype is judged by its bare name
+// within the class (CheckClass) and is recorded under no key, so a name behind
+// a class's scope names none here.
 static bool NamesNettype(DataTypeKind kind, std::string_view scope,
                          std::string_view name, const NettypeScan& scan) {
   if (kind != DataTypeKind::kNamed) return false;
@@ -93,20 +94,51 @@ static void CheckExpr(const Expr* e, const NettypeScan& scan) {
   ForEachExprChild(e, [&scan](const Expr* child) { CheckExpr(child, scan); });
 }
 
-// A procedural block declares variables alone, so a nettype naming the type
-// of one of its declarations is never a net's.
-static void CheckStmt(const Stmt* s, const NettypeScan& scan) {
-  if (s == nullptr) return;
-  if (s->kind == StmtKind::kVarDecl && IsNettype(s->var_decl_type, scan)) {
-    ReportNettypeNotNet(NamedTypeKey(s->var_decl_type),
-                        std::format("variable '{}'", s->var_name),
-                        s->range.start, scan.diag);
+// Adds to `names` the nettypes the statements `body` declare among their
+// items: A.2.8 lets a begin-end block, a fork-join block and a subroutine body
+// declare one (A.2.1.3), which Parser::ParseBlockVarDecls carries as a
+// kBlockItemDecl statement over its item.
+static void AddBodyNettypes(const std::vector<Stmt*>& body,
+                            std::unordered_set<std::string_view>& names) {
+  for (const Stmt* s : body) {
+    if (s != nullptr && s->kind == StmtKind::kBlockItemDecl &&
+        s->decl_item->kind == ModuleItemKind::kNettypeDecl)
+      names.insert(s->decl_item->name);
   }
-  ForEachChildExpr(s, [&scan](const Expr* e) { CheckExpr(e, scan); });
-  ForEachChildStmt(s, [&scan](Stmt* const& sub) { CheckStmt(sub, scan); });
 }
 
-// A function's return and a subroutine's arguments.
+// `outer`, or, where a scope declares nettypes of its own, `local`, a scan
+// that judges a bare name against them as well: §23.9 makes a name a block,
+// a subroutine body or a class declares a type of that scope and of the
+// scopes inside it. `local` holds those names on the way in and outlives the
+// scan returned.
+static NettypeScan WithLocalNettypes(
+    const NettypeScan& outer, std::unordered_set<std::string_view>& local) {
+  if (local.empty()) return outer;
+  local.insert(outer.nettypes.begin(), outer.nettypes.end());
+  return {local, outer.scoped, outer.diag};
+}
+
+// A procedural block declares variables alone, so a nettype naming the type
+// of one of its declarations is never a net's, whether the module declares it
+// or the block, or a block around it, does.
+static void CheckStmt(const Stmt* s, const NettypeScan& outer) {
+  if (s == nullptr) return;
+  if (s->kind == StmtKind::kVarDecl && IsNettype(s->var_decl_type, outer)) {
+    ReportNettypeNotNet(NamedTypeKey(s->var_decl_type),
+                        std::format("variable '{}'", s->var_name),
+                        s->range.start, outer.diag);
+  }
+  ForEachChildExpr(s, [&outer](const Expr* e) { CheckExpr(e, outer); });
+  std::unordered_set<std::string_view> local;
+  AddBodyNettypes(s->stmts, local);
+  AddBodyNettypes(s->fork_stmts, local);
+  const NettypeScan kScan = WithLocalNettypes(outer, local);
+  ForEachChildStmt(s, [&kScan](Stmt* const& sub) { CheckStmt(sub, kScan); });
+}
+
+// A function's return and a subroutine's arguments, and the statements of its
+// body under the nettypes the body declares.
 static void CheckSubroutine(const ModuleItem* item, const NettypeScan& scan) {
   if (IsNettype(item->return_type, scan)) {
     ReportNettypeNotNet(NamedTypeKey(item->return_type),
@@ -121,7 +153,10 @@ static void CheckSubroutine(const ModuleItem* item, const NettypeScan& scan) {
           scan.diag);
     }
   }
-  for (const Stmt* s : item->func_body_stmts) CheckStmt(s, scan);
+  std::unordered_set<std::string_view> local;
+  AddBodyNettypes(item->func_body_stmts, local);
+  const NettypeScan kBodyScan = WithLocalNettypes(scan, local);
+  for (const Stmt* s : item->func_body_stmts) CheckStmt(s, kBodyScan);
 }
 
 // A.2.1.3 writes a net of a user-defined nettype as the nettype's name, an
@@ -161,8 +196,17 @@ static void CheckItem(const ModuleItem* item, const NettypeScan& scan) {
 }
 
 // A class property is a variable (§8.3), and a method, a typedef and a class
-// nested in the class are judged as the module's own would be.
-static void CheckClass(const ClassDecl* cls, const NettypeScan& scan) {
+// nested in the class are judged as the module's own would be. A nettype the
+// class declares, which A.1.9 admits as a class_property and the parser
+// carries as a typedef member over its item, is a nettype for all of them.
+static void CheckClass(const ClassDecl* cls, const NettypeScan& outer) {
+  std::unordered_set<std::string_view> local;
+  for (const ClassMember* m : cls->members) {
+    if (m->kind == ClassMemberKind::kTypedef &&
+        m->typedef_item->kind == ModuleItemKind::kNettypeDecl)
+      local.insert(m->name);
+  }
+  NettypeScan scan = WithLocalNettypes(outer, local);
   for (const ClassMember* m : cls->members) {
     if (m->kind == ClassMemberKind::kProperty &&
         IsNettype(m->data_type, scan)) {
@@ -179,7 +223,6 @@ static void CheckClass(const ClassDecl* cls, const NettypeScan& scan) {
 void CheckNettypeUses(const ModuleDecl* decl,
                       const std::unordered_set<std::string_view>& nettypes,
                       DiagEngine& diag) {
-  if (nettypes.empty()) return;
   const NettypeScan kScan{nettypes, nettypes, diag};
   for (const PortDecl& port : decl->ports) {
     ReportPackedDimAfterNettype(port.data_type, "A.2.2.1", kScan);

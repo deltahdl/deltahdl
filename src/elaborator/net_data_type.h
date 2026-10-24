@@ -14,6 +14,7 @@ namespace delta {
 
 struct DataType;
 struct Expr;
+struct ModuleItem;
 
 // What a judgement of a net's data type reads besides the typedefs: the
 // unpacked dimensions each typedef wrote, which a TypedefMap entry does not
@@ -90,5 +91,13 @@ std::string NamedTypeKey(const DataType& type);
 // accepted.
 bool IsLegalNettypeDataType(const DataType& dtype,
                             const TypeShapeTables& tables);
+
+// §6.6.7: reports the nettype declaration `nettype` at its location where the
+// data type it names is no legal nettype data type (IsLegalNettypeDataType),
+// wherever it is declared: among a module's, a package's or the unit's items,
+// in a block or a subroutine body, or in a class.
+void ReportIllegalNettypeDataType(const ModuleItem& nettype,
+                                  const TypeShapeTables& tables,
+                                  DiagEngine& diag);
 
 }  // namespace delta
