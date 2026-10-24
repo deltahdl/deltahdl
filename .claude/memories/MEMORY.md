@@ -23,6 +23,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 - [Sharing code a change mirrors](sharing-code-a-change-mirrors.md) — when a change makes two parallel bodies or two tests equal, share them before pushing; CPD refuses 100 identical tokens.
 - [No comments or docstrings in the Python trees](no-comments-or-docstrings-in-python.md) — `assert-no-comments` refuses both under lib/python, scripts, their tests and scripts.yml; the why goes in the commit message.
 - [The module's own terms](module-terms-in-descriptions.md) — write about module M so a reader who has never heard of its callers understands it.
+- [New struct members go last](new-struct-members-go-last.md) — tests brace-initialize AST structs by position; a member inserted before the last one they name shifts them all and breaks the build.
 - [Names say what a thing does](names-say-what-a-thing-does.md) — an identifier names its thing's meaning, never the clause, table, figure or annex number it was written for, nor a bare serial; editions, mandated names and literals keep their digits.
 
 ## Formatting and prose
