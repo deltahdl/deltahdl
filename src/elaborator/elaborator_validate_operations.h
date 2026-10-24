@@ -165,6 +165,7 @@ class ElaboratorOperationRules : public ElaboratorData {
   void CheckLetUsedBeforeDeclared(const ModuleDecl* decl);
   void CheckLetReferencedHierarchically(const ModuleDecl* decl);
   void CheckLetActualTypes(const ModuleDecl* decl);
+  void CheckUnitLetActualTypes();
 
   void ValidateAssignInExprRestrictions(const ModuleDecl* decl);
   void WalkExprForAssignInExpr(const Expr* expr, bool in_event_or_cont);

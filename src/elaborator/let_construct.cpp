@@ -17,7 +17,7 @@ std::vector<const DataType*> LetFormalTypes(
   types.reserve(formals.size());
   const DataType* written = nullptr;
   for (const FunctionArg& formal : formals) {
-    if (formal.is_untyped) {
+    if (formal.is_untyped || formal.data_type.type_ref_expr != nullptr) {
       written = nullptr;
     } else if (WritesLetFormalType(formal.data_type)) {
       written = &formal.data_type;

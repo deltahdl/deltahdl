@@ -38,7 +38,9 @@ bool WritesLetFormalType(const DataType& type);
 // whose own type is written takes it, and one written `untyped` takes none
 // (null). One written with no type takes the last type written before it in
 // the list, as §11.12's example e expands `ones_match(bits x, y)` and §16.8
-// says of a sequence's formals; null where none was.
+// says of a sequence's formals; null where none was. A type reference (§6.23)
+// not resolved yet is a type written whose kind is not known, so the formal
+// writing it takes null, and so do the formals after it that take its type.
 std::vector<const DataType*> LetFormalTypes(
     const std::vector<FunctionArg>& formals);
 

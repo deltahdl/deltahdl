@@ -523,6 +523,11 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
   };
   FoldTypeRefComparesInStmt(item->body, fold);
   for (auto* s : item->func_body_stmts) FoldTypeRefComparesInStmt(s, fold);
+  // §11.12's rules on a let's formals, for each let the item's procedure or
+  // subroutine body declares.
+  auto elaborate_let = [&](ModuleItem* let) { ElaborateLetFormals(let, mod); };
+  ForEachBlockLet(item->body, elaborate_let);
+  for (const Stmt* s : item->func_body_stmts) ForEachBlockLet(s, elaborate_let);
   ElaborateBehavioralItem(item, mod);
 }
 
@@ -567,6 +572,12 @@ void Elaborator::ElaborateModuleClassDecl(ModuleItem* item, RtlirModule* mod) {
       *item->class_decl,
       [&](DataType& dt, SourceLoc loc) { ResolveTypeRef(dt, loc, mod); },
       arena_);
+  // §11.12's rules on a let's formals, for each let a method's body declares.
+  auto elaborate_let = [&](ModuleItem* let) { ElaborateLetFormals(let, mod); };
+  ForEachClassBodyItem(item->class_decl, [&](const ModuleItem* method) {
+    for (const Stmt* s : method->func_body_stmts)
+      ForEachBlockLet(s, elaborate_let);
+  });
 }
 
 // Declarations, types, instances, and structural items (§6, §23, §25, §28).

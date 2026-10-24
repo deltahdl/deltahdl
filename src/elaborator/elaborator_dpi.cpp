@@ -767,12 +767,10 @@ static void ReportEventFormalRefs(
 }
 
 void Elaborator::ElaborateLetFormals(ModuleItem* item, const RtlirModule* mod) {
-  std::unordered_set<std::string_view> events;
   for (auto& arg : item->func_args) {
     // `let f(type(x) a) = a + 1;` gives a the type of x, which the formal's
     // checks below and its actual's conversion read.
     if (mod != nullptr) ResolveTypeRef(arg.data_type, item->loc, mod);
-    if (arg.data_type.kind == DataTypeKind::kEvent) events.insert(arg.name);
     LetFormalTypeKind kind = ClassifyLetFormalType(arg.data_type);
     if (!IsLetFormalTypeAllowed(kind)) {
       diag_.Error(item->loc,
@@ -781,6 +779,14 @@ void Elaborator::ElaborateLetFormals(ModuleItem* item, const RtlirModule* mod) {
                               arg.name),
                   Subclause("11.12"));
     }
+  }
+  // The event formals are those taking `event`, `y` of `f(event e, y)` among
+  // them, as LetFormalTypes carries a type to a formal written with none.
+  std::unordered_set<std::string_view> events;
+  const std::vector<const DataType*> kTypes = LetFormalTypes(item->func_args);
+  for (size_t i = 0; i < kTypes.size(); ++i) {
+    if (kTypes[i] != nullptr && kTypes[i]->kind == DataTypeKind::kEvent)
+      events.insert(item->func_args[i].name);
   }
   ReportEventFormalRefs(item->init_expr, events, diag_);
 }

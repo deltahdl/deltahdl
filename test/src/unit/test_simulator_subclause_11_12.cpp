@@ -875,4 +875,18 @@ TEST(LetSim, ASubroutineBlocksLetEndsWithTheBlock) {
             "31\n4\n1\n");
 }
 
+// §6.23 with §11.12, rule 2: a compilation unit's let formal written `type(b)`
+// takes the type of the unit's byte `b`, so its actual is cast to a byte,
+// 16'h1FF to -1, rather than passed through as 511.
+TEST(LetSim, ACompilationUnitLetsTypeReferenceFormalCastsItsActual) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("byte b;\n"
+                       "let g(type(b) y) = y;\n"
+                       "module top;\n"
+                       "  initial $display(\"%0d\", g(16'h1FF));\n"
+                       "endmodule\n",
+                       f),
+            "-1\n");
+}
+
 }  // namespace

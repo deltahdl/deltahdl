@@ -1,4 +1,5 @@
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <format>
 #include <functional>
@@ -22,6 +23,7 @@
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/interface_port_typedef.h"
+#include "elaborator/let_construct.h"
 #include "elaborator/net_data_type.h"
 #include "elaborator/nettype_registration.h"
 #include "elaborator/nettype_resolution_lookup.h"
@@ -348,6 +350,28 @@ void Elaborator::AdoptTypedefDimsInStmt(Stmt* s) {
                    [this](Stmt* const& sub) { AdoptTypedefDimsInStmt(sub); });
 }
 
+// The name each of `item`'s formals takes its type by, empty where it takes
+// none by a name. A subroutine's formal takes its own; a let formal written
+// with no type of its own takes the one written before it (§11.12 with
+// §16.8), `b` of `let f(arr_t a, b)` arr_t, and so the dimensions with it.
+static std::vector<std::string_view> FormalTypeNames(const ModuleItem* item) {
+  std::vector<const DataType*> types;
+  if (item->kind == ModuleItemKind::kLetDecl) {
+    types = LetFormalTypes(item->func_args);
+  } else {
+    for (const FunctionArg& arg : item->func_args)
+      types.push_back(&arg.data_type);
+  }
+  std::vector<std::string_view> names;
+  names.reserve(types.size());
+  for (const DataType* type : types) {
+    names.push_back(type != nullptr && type->kind == DataTypeKind::kNamed
+                        ? type->type_name
+                        : std::string_view{});
+  }
+  return names;
+}
+
 // Every procedure of a module, including the ones a generate construct holds:
 // §27.6 makes a generate block's declarations declarations of the module, so a
 // declaration written in one is written in the module's scope and stands under
@@ -361,18 +385,24 @@ void Elaborator::AdoptTypedefDimsInStmt(Stmt* s) {
 // was one element to which an assignment pattern could not be distributed,
 // and the implicit variable of the function one element wide, so `fn[1] = 8`
 // and `return '{7, 8, 9}` handed the caller nothing.
+//
+// A let formal taking the type of the one before it, `b` of
+// `let f(arr_t a, b)`, has the dimensions too, while only `a`'s type, the one
+// written by the name, is rewritten to the element type, which `b` then reads
+// through LetFormalTypes; the names are read before any type is rewritten.
 static void AdoptSubroutineTypedefDims(
     ModuleItem* item,
     const std::unordered_map<std::string_view, std::vector<Expr*>>& td_dims,
     const TypedefMap& typedefs) {
-  for (FunctionArg& arg : item->func_args) {
-    if (!arg.unpacked_dims.empty() ||
-        arg.data_type.kind != DataTypeKind::kNamed)
-      continue;
-    auto dims = td_dims.find(arg.data_type.type_name);
-    auto base = typedefs.find(arg.data_type.type_name);
+  const std::vector<std::string_view> kNames = FormalTypeNames(item);
+  for (size_t i = 0; i < kNames.size(); ++i) {
+    FunctionArg& arg = item->func_args[i];
+    if (!arg.unpacked_dims.empty() || kNames[i].empty()) continue;
+    auto dims = td_dims.find(kNames[i]);
+    auto base = typedefs.find(kNames[i]);
     if (dims == td_dims.end() || base == typedefs.end()) continue;
-    arg.data_type = base->second;
+    if (arg.data_type.kind == DataTypeKind::kNamed)
+      arg.data_type = base->second;
     arg.unpacked_dims = dims->second;
   }
   const DataType& ret = item->return_type;

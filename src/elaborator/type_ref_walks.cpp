@@ -96,12 +96,36 @@ void ResolveLocalIndexTypeRefs(std::vector<Expr*>& dims, SourceLoc loc,
       arena);
 }
 
+// The formals of `item`, a subroutine or a let, each resolved with `locals`,
+// the names in scope ahead of the item, and the formals before it, which are
+// added to `locals` in turn. A formal's own type may be a type reference, to
+// an earlier formal or to a name of the scope around the item.
+void ResolveFormalTypeRefs(ModuleItem* item,
+                           std::vector<ProceduralLocal>& locals,
+                           const TypeRefResolver& resolve_outer, Arena& arena) {
+  for (auto& arg : item->func_args) {
+    ResolveLocalTypeRef(arg.data_type, arg.unpacked_dims, item->loc, locals,
+                        resolve_outer);
+    ResolveLocalIndexTypeRefs(arg.unpacked_dims, item->loc, locals,
+                              resolve_outer, arena);
+    locals.push_back({arg.name, &arg.data_type, &arg.unpacked_dims});
+  }
+}
+
 // Resolves the block type references of `s` and the statements it holds, with
 // `locals` the names in scope ahead of it; a block's own names, and a for
-// loop's, are dropped when the walk leaves it.
+// loop's, are dropped when the walk leaves it. §11.12 lets a block declare a
+// let, whose formals see the block's names ahead of them and are in scope
+// only within the let.
 void ResolveTypeRefsInStmt(Stmt* s, std::vector<ProceduralLocal>& locals,
                            const TypeRefResolver& resolve_outer, Arena& arena) {
   if (s == nullptr) return;
+  if (s->kind == StmtKind::kBlockItemDecl &&
+      s->decl_item->kind == ModuleItemKind::kLetDecl) {
+    std::vector<ProceduralLocal> in_let = locals;
+    ResolveFormalTypeRefs(s->decl_item, in_let, resolve_outer, arena);
+    return;
+  }
   if (s->kind != StmtKind::kVarDecl) {
     const size_t kOuter = locals.size();
     DeclareForLoopLocals(s, locals, resolve_outer);
@@ -142,9 +166,9 @@ void ResolveItemIndexTypeRefs(ModuleItem& item, const TypeRefResolver& resolve,
 
 // The type references the declarations of `items`, a package's or the
 // compilation unit's, write in their typedefs' and nettypes' types, their
-// typedefs' and variables' associative indexes (A.2.5), their subroutines and
-// their classes, with `resolve` resolving a name none of them declares more
-// closely.
+// typedefs' and variables' associative indexes (A.2.5), their subroutines,
+// their lets' formals (§11.12) and their classes, with `resolve` resolving a
+// name none of them declares more closely.
 void ResolveScopeItemTypeRefs(const std::vector<ModuleItem*>& items,
                               const TypeRefResolver& resolve, Arena& arena) {
   for (ModuleItem* item : items) {
@@ -161,6 +185,7 @@ void ResolveScopeItemTypeRefs(const std::vector<ModuleItem*>& items,
         break;
       case ModuleItemKind::kFunctionDecl:
       case ModuleItemKind::kTaskDecl:
+      case ModuleItemKind::kLetDecl:
         ResolveProceduralTypeRefs(item, resolve, arena);
         break;
       case ModuleItemKind::kClassDecl:
@@ -176,20 +201,13 @@ void ResolveScopeItemTypeRefs(const std::vector<ModuleItem*>& items,
 
 // The procedures an item holds, an initial, final or always block's body and a
 // task's or function's, are walked with the subroutine's formals as the first
-// names in scope. A formal's own type may be a type reference, to an earlier
-// formal or to a name of the scope around the subroutine.
+// names in scope.
 void ResolveProceduralTypeRefs(ModuleItem* item,
                                const TypeRefResolver& resolve_outer,
                                Arena& arena) {
   std::vector<ProceduralLocal> locals;
   locals.reserve(item->func_args.size());
-  for (auto& arg : item->func_args) {
-    ResolveLocalTypeRef(arg.data_type, arg.unpacked_dims, item->loc, locals,
-                        resolve_outer);
-    ResolveLocalIndexTypeRefs(arg.unpacked_dims, item->loc, locals,
-                              resolve_outer, arena);
-    locals.push_back({arg.name, &arg.data_type, &arg.unpacked_dims});
-  }
+  ResolveFormalTypeRefs(item, locals, resolve_outer, arena);
   ResolveTypeRefsInStmt(item->body, locals, resolve_outer, arena);
   for (auto* s : item->func_body_stmts) {
     ResolveTypeRefsInStmt(s, locals, resolve_outer, arena);

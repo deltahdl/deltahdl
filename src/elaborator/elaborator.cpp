@@ -602,9 +602,6 @@ RtlirDesign* Elaborator::ElaborateTops(
 
   ClassifyCuItems(unit_->cu_items, design->cu_function_decls,
                   design->cu_let_decls);
-  for (auto* item : design->cu_let_decls) {
-    ElaborateLetFormals(item, nullptr);
-  }
 
   // §3.12.1: the constants a class declared outside every module may name in
   // a property's packed dimension (see RtlirDesign::unit_constants). Read here

@@ -1,6 +1,5 @@
 #include <charconv>
 #include <cstdint>
-#include <cstdlib>
 #include <format>
 #include <optional>
 #include <string>
@@ -11,13 +10,13 @@
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "elaborator/bit_stream_width.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/elaborator_validate_operations.h"
 #include "elaborator/type_eval.h"
-#include "lexer/token.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -399,72 +398,6 @@ struct BitStreamCastCtx {
   const std::unordered_map<std::string_view, const DataType*>& var_decl_types;
   CompilationUnit* unit;
 };
-
-// The number of elements a declaration's unpacked dimensions give it, each
-// written `[size]` or `[left:right]`; zero where one does not fold to a fixed
-// size, a dynamic, queue or associative dimension among them.
-uint32_t FixedUnpackedElementCount(const std::vector<Expr*>& dims) {
-  uint32_t count = 1;
-  for (const Expr* dim : dims) {
-    if (dim == nullptr) return 0;
-    if (dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon) {
-      auto left = ConstEvalInt(dim->lhs);
-      auto right = ConstEvalInt(dim->rhs);
-      if (!left || !right) return 0;
-      count *= static_cast<uint32_t>(std::abs(*left - *right) + 1);
-    } else if (auto size = ConstEvalInt(dim); size && *size > 0) {
-      count *= static_cast<uint32_t>(*size);
-    } else {
-      return 0;
-    }
-  }
-  return count;
-}
-
-// §6.24.3 (printed page 142): the size of a fixed-size bit-stream type is the
-// number of bits it holds, an unpacked structure's being every bit of every
-// member, so its `byte command [2]` holds sixteen. EvalTypeWidth gives such a
-// member the width of one element, so an unpacked structure is summed here,
-// each member's element size times its element count, and any other type is
-// EvalTypeWidth's. Zero where a member's size is not fixed. The depth bounds a
-// cyclic typedef.
-uint32_t BitStreamTypeWidth(const DataType& type, const TypedefMap& typedefs,
-                            int depth = 0);
-
-// One member's share of an unpacked structure's bit-stream size: its element
-// size times its unpacked element count, zero where either is not fixed. A
-// string is a dynamic array of bytes to a bit-stream cast (printed page 143),
-// so its size is never fixed; the 64 bits EvalStructMemberWidth gives it are
-// the simulator's storage for the string's handle.
-uint32_t MemberBitStreamWidth(const StructMember& m, const TypedefMap& typedefs,
-                              int depth) {
-  if (m.type_kind == DataTypeKind::kString) return 0;
-  const DataType* member_type =
-      m.nested_type != nullptr ? m.nested_type : MemberNamedType(m, typedefs);
-  uint32_t element = member_type == nullptr
-                         ? EvalStructMemberWidth(m, typedefs)
-                         : BitStreamTypeWidth(*member_type, typedefs, depth);
-  return element * FixedUnpackedElementCount(m.unpacked_dims);
-}
-
-uint32_t BitStreamTypeWidth(const DataType& type, const TypedefMap& typedefs,
-                            int depth) {
-  if (depth > 8) return 0;
-  if (type.kind == DataTypeKind::kNamed) {
-    auto td = typedefs.find(type.type_name);
-    if (td == typedefs.end()) return 0;
-    return BitStreamTypeWidth(td->second, typedefs, depth + 1);
-  }
-  if (type.kind != DataTypeKind::kStruct || type.is_packed)
-    return EvalTypeWidth(type, typedefs);
-  uint32_t total = 0;
-  for (const StructMember& m : type.struct_members) {
-    uint32_t member = MemberBitStreamWidth(m, typedefs, depth + 1);
-    if (member == 0) return 0;
-    total += member;
-  }
-  return total;
-}
 
 // The size of the cast's destination type, a keyword type, an unpacked-array
 // typedef, or another typedef; zero where none is known.

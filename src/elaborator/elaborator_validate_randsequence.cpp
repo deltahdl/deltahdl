@@ -269,7 +269,15 @@ void Elaborator::CheckRandsequenceNamesIn(
 void Elaborator::ValidatePerDeclarationRulesInUnitScopes() {
   if (unit_ == nullptr) return;
 
-  auto run_over = [this](const std::vector<ModuleItem*>& items) {
+  // §11.12's rules on a let's formals for the lets the two scopes declare, and
+  // their subroutines and classes' methods; ResolveUnitScopeTypeRefs has
+  // resolved their type references in the scope declaring them.
+  auto elaborate_let = [this](ModuleItem* let) {
+    ElaborateLetFormals(let, nullptr);
+  };
+  auto run_over = [this,
+                   &elaborate_let](const std::vector<ModuleItem*>& items) {
+    ForEachScopeLet(items, elaborate_let);
     CheckJumpStatementsIn(items);
     CheckRandsequenceNamesIn(items);
     CheckForeachLoopsIn(items);
@@ -286,6 +294,7 @@ void Elaborator::ValidatePerDeclarationRulesInUnitScopes() {
   };
 
   run_over(unit_->cu_items);
+  CheckUnitLetActualTypes();
   for (const auto* pkg : unit_->packages) {
     if (pkg != nullptr) run_over(pkg->items);
   }
@@ -318,6 +327,7 @@ void Elaborator::ValidatePerDeclarationRulesInUnitScopes() {
     ForEachClassBodyItem(cls, [&](const ModuleItem* m) {
       methods.push_back(const_cast<ModuleItem*>(m));
     });
+    ForEachScopeLet(methods, elaborate_let);
     CheckJumpStatementsIn(methods);
     CheckRandsequenceNamesIn(methods);
     CheckForeachLoopsInClass(cls);

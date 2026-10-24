@@ -1,0 +1,246 @@
+#include "elaborator/let_name_frames.h"
+
+#include <cstddef>
+#include <string_view>
+#include <vector>
+
+#include "elaborator/elaborator_enum_constants.h"
+#include "elaborator/elaborator_validate_internal.h"
+#include "parser/ast_class.h"
+#include "parser/ast_design.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
+
+namespace delta {
+
+const NameBinding* FindName(const NameFrame& frame, std::string_view name) {
+  for (const NameFrame* at = &frame; at != nullptr; at = at->outer) {
+    auto it = at->names.find(name);
+    if (it != at->names.end()) return &it->second;
+    if (at->imports_unknown) return nullptr;
+  }
+  return nullptr;
+}
+
+const NameBinding* FindOwnName(const NameFrame* frame, std::string_view name) {
+  if (frame == nullptr) return nullptr;
+  auto it = frame->names.find(name);
+  if (it == frame->names.end() || it->second.scope != frame) return nullptr;
+  return &it->second;
+}
+
+namespace {
+
+void Declare(NameFrame& frame, std::string_view name, NameBinding binding) {
+  binding.scope = &frame;
+  frame.names.insert_or_assign(name, binding);
+}
+
+// §26.3: each name `package` declares is a candidate for the scope, and a
+// name two wildcard imports offer from two packages is taken for neither.
+void AddWildcardCandidates(NameFrame& frame, const NameFrame* package) {
+  if (package == nullptr) {
+    frame.imports_unknown = true;
+    return;
+  }
+  for (const auto& [name, binding] : package->names) {
+    if (binding.scope != package) continue;
+    auto [it, inserted] = frame.names.try_emplace(name, binding);
+    if (!inserted && it->second.scope != package) Declare(frame, name, {});
+  }
+}
+
+// §26.3: an explicit import brings in the one name the package declares; one
+// naming what the package does not itself declare is taken for an unknown
+// declaration of the name.
+void AddExplicitImport(NameFrame& frame, const ImportItem& import,
+                       const NameFrame* package) {
+  const NameBinding* declared = FindOwnName(package, import.item_name);
+  if (declared == nullptr) {
+    Declare(frame, import.item_name, {});
+    return;
+  }
+  frame.names.insert_or_assign(import.item_name, *declared);
+}
+
+void ImportInto(NameFrame& frame, const std::vector<const ImportItem*>& imports,
+                const PackageFrames& packages) {
+  for (const ImportItem* import : imports) {
+    if (import->is_wildcard)
+      AddWildcardCandidates(frame, packages.Find(import->package_name));
+  }
+  for (const ImportItem* import : imports) {
+    if (!import->is_wildcard)
+      AddExplicitImport(frame, *import, packages.Find(import->package_name));
+  }
+}
+
+// §6.19: an enumeration written in a declaration declares its literals in the
+// declaration's scope.
+void DeclareEnumLiterals(NameFrame& frame, const DataType& type) {
+  ForEachEnumTypeIn(type, [&frame](std::string_view, const DataType& e) {
+    for (const EnumMember& member : e.enum_members)
+      DeclareOther(frame, member.name);
+  });
+}
+
+// A typedef, leaving out a forward one (§6.18), which declares nothing the
+// full declaration does not.
+void DeclareTypedef(NameFrame& frame, const ModuleItem* item) {
+  const DataType& type = item->typedef_type;
+  const bool kForward = type.kind == DataTypeKind::kImplicit &&
+                        type.type_ref_expr == nullptr &&
+                        item->typedef_ifc_port.empty();
+  if (kForward) return;
+  Declare(frame, item->name, {.kind = NameKind::kTypedef, .item = item});
+}
+
+void DeclareItem(NameFrame& frame, const ModuleItem* item) {
+  DeclareEnumLiterals(frame, item->typedef_type);
+  DeclareEnumLiterals(frame, item->data_type);
+  switch (item->kind) {
+    case ModuleItemKind::kLetDecl:
+      Declare(frame, item->name, {.kind = NameKind::kLet, .item = item});
+      break;
+    case ModuleItemKind::kVarDecl:
+    case ModuleItemKind::kNetDecl:
+      Declare(frame, item->name,
+              {.kind = item->is_genvar ? NameKind::kOther : NameKind::kVariable,
+               .type = &item->data_type,
+               .dims = &item->unpacked_dims});
+      break;
+    case ModuleItemKind::kTypedef:
+      DeclareTypedef(frame, item);
+      break;
+    case ModuleItemKind::kClassDecl:
+      Declare(frame, item->name,
+              {.kind = NameKind::kClass, .cls = item->class_decl});
+      break;
+    case ModuleItemKind::kModuleInst:
+      DeclareOther(frame, item->inst_name);
+      break;
+    case ModuleItemKind::kGateInst:
+    case ModuleItemKind::kUdpInst:
+      DeclareOther(frame, item->gate_inst_name);
+      break;
+    case ModuleItemKind::kImportDecl:
+    case ModuleItemKind::kExportDecl:
+      break;
+    default:
+      // An out-of-block subroutine body declares its class's method, not a
+      // name of the scope it is written in (§8.24).
+      if (item->method_class.empty()) DeclareOther(frame, item->name);
+      break;
+  }
+}
+
+std::vector<const ImportItem*> ImportsOf(
+    const std::vector<ModuleItem*>& items) {
+  std::vector<const ImportItem*> imports;
+  for (const ModuleItem* item : items) {
+    if (item->kind == ModuleItemKind::kImportDecl)
+      imports.push_back(&item->import_item);
+  }
+  return imports;
+}
+
+bool IsBlockImport(const Stmt* s) {
+  return s != nullptr && s->kind == StmtKind::kBlockItemDecl &&
+         s->decl_item->kind == ModuleItemKind::kImportDecl;
+}
+
+void DeclareStatement(NameFrame& frame, const Stmt* s) {
+  if (s == nullptr) return;
+  if (s->kind == StmtKind::kBlockItemDecl) {
+    DeclareItem(frame, s->decl_item);
+    return;
+  }
+  if (s->kind != StmtKind::kVarDecl) return;
+  DeclareEnumLiterals(frame, s->var_decl_type);
+  // §6.20.2: a block's parameter is a constant, not a variable.
+  Declare(frame, s->var_name,
+          {.kind = s->var_is_param ? NameKind::kOther : NameKind::kVariable,
+           .type = &s->var_decl_type,
+           .dims = &s->var_unpacked_dims});
+}
+
+// §12.7.1: an initialization of a for loop written with a type declares the
+// loop's variable, local to the loop.
+void DeclareForVariables(NameFrame& frame, const Stmt& s) {
+  for (size_t i = 0; i < s.for_inits.size() && i < s.for_init_types.size();
+       ++i) {
+    const Stmt* init = s.for_inits[i];
+    const DataType& type = s.for_init_types[i];
+    if (type.kind == DataTypeKind::kImplicit || init == nullptr ||
+        init->lhs == nullptr || init->lhs->kind != ExprKind::kIdentifier)
+      continue;
+    Declare(frame, init->lhs->text,
+            {.kind = NameKind::kVariable, .type = &type});
+  }
+}
+
+}  // namespace
+
+PackageFrames::PackageFrames(const CompilationUnit* unit) {
+  for (const PackageDecl* pkg : unit->packages) {
+    NameFrame& frame = frames_.emplace_back(nullptr);
+    DeclareScope(frame, pkg->items, *this);
+    packages_.emplace_back(pkg, &frame);
+  }
+}
+
+const NameFrame* PackageFrames::Find(std::string_view package) const {
+  for (const auto& [pkg, frame] : packages_) {
+    if (pkg->name == package) return frame;
+  }
+  return nullptr;
+}
+
+void DeclareOther(NameFrame& frame, std::string_view name) {
+  if (!name.empty()) Declare(frame, name, {});
+}
+
+void DeclareScope(NameFrame& frame, const std::vector<ModuleItem*>& items,
+                  const PackageFrames& packages) {
+  ImportInto(frame, ImportsOf(items), packages);
+  for (const ModuleItem* item : items) DeclareItem(frame, item);
+}
+
+void DeclareUnitScope(NameFrame& frame, const std::vector<ModuleItem*>& items,
+                      const CompilationUnit& unit,
+                      const PackageFrames& packages) {
+  DeclareScope(frame, items, packages);
+  for (const ClassDecl* cls : unit.classes)
+    Declare(frame, cls->name, {.kind = NameKind::kClass, .cls = cls});
+}
+
+void DeclareHeader(NameFrame& frame, const ModuleDecl& decl) {
+  for (const PortDecl& port : decl.ports) DeclareOther(frame, port.name);
+  for (const auto& param : decl.params) DeclareOther(frame, param.first);
+  for (std::string_view name : decl.type_param_names) DeclareOther(frame, name);
+}
+
+void DeclareStatements(NameFrame& frame, const std::vector<Stmt*>& stmts,
+                       const PackageFrames& packages) {
+  std::vector<const ImportItem*> imports;
+  for (const Stmt* s : stmts) {
+    if (IsBlockImport(s)) imports.push_back(&s->decl_item->import_item);
+  }
+  ImportInto(frame, imports, packages);
+  for (const Stmt* s : stmts) DeclareStatement(frame, s);
+}
+
+void DeclareStatementScope(NameFrame& frame, const Stmt* s,
+                           const PackageFrames& packages) {
+  std::vector<Stmt*> children;
+  ForEachChildStmt(s, [&children](Stmt* const& child) {
+    if (child != nullptr) children.push_back(child);
+  });
+  DeclareStatements(frame, children, packages);
+  DeclareForVariables(frame, *s);
+  for (std::string_view name : s->foreach_vars) DeclareOther(frame, name);
+}
+
+}  // namespace delta

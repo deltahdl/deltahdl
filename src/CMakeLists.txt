@@ -622,6 +622,9 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_validate_patterns.cpp
     elaborator/elaborator_validate_operations_arrays.cpp
     elaborator/elaborator_validate_operations_let.cpp
+    elaborator/let_actual_check.cpp
+    elaborator/let_name_frames.cpp
+    elaborator/bit_stream_width.cpp
     elaborator/elaborator_validate_operations_aggregate.cpp
     elaborator/elaborator_validate_operations_streaming.cpp
     elaborator/elaborator_validate_operations_tagged.cpp

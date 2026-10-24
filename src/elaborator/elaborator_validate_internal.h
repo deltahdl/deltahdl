@@ -151,6 +151,33 @@ void ForEachChildStmt(S* s, Visit visit) {
   ForEachRandsequenceStmt(s, visit);
 }
 
+// §11.12 lists a sequential and a parallel block and a subroutine among the
+// scopes a let may be declared in, and the parser keeps such a let as a
+// kBlockItemDecl statement over the let's item (Parser::ParseBlockVarDecls):
+// `visit` receives the item of each let `s` and the statements under it
+// declare.
+template <typename Visit>
+void ForEachBlockLet(const Stmt* s, Visit visit) {
+  if (s == nullptr) return;
+  if (s->kind == StmtKind::kBlockItemDecl &&
+      s->decl_item->kind == ModuleItemKind::kLetDecl)
+    visit(s->decl_item);
+  ForEachChildStmt(s,
+                   [&visit](const Stmt* sub) { ForEachBlockLet(sub, visit); });
+}
+
+// The lets `items`, a package's or a compilation unit's, declare, and those
+// the bodies of their subroutines and of their classes' methods declare.
+template <typename Visit>
+void ForEachScopeLet(const std::vector<ModuleItem*>& items, Visit visit) {
+  for (ModuleItem* item : items) {
+    if (item->kind == ModuleItemKind::kLetDecl) visit(item);
+  }
+  ForEachBodyOwningItem(items, [&visit](const ModuleItem* owner) {
+    for (const Stmt* s : owner->func_body_stmts) ForEachBlockLet(s, visit);
+  });
+}
+
 // The expressions a randsequence production item holds: A.6.12 gives an
 // rs_production a list of actual arguments, written the way a task call writes
 // them.
@@ -402,6 +429,21 @@ void ForEachExprChild(const Expr* e, Fn&& fn) {
     fn(child);
     return false;
   });
+}
+
+// Runs `fn` over `e` and every expression under it, the member a member
+// access selects excepted: `h.tmp` and `L0[0].L1.my_let` name `tmp` and
+// `my_let` within the scope their prefix names, not the scope written in.
+template <typename Fn>
+void ForEachExprUnder(const Expr* e, Fn& fn) {
+  if (e == nullptr) return;
+  fn(e);
+  if (e->kind == ExprKind::kMemberAccess) {
+    ForEachExprUnder(e->lhs, fn);
+    return;
+  }
+  ForEachExprChild(e,
+                   [&fn](const Expr* child) { ForEachExprUnder(child, fn); });
 }
 
 // One statement tree written in a module, together with the item that holds

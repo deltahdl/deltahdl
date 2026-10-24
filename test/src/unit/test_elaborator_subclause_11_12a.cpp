@@ -496,17 +496,47 @@ TEST(LetDeclElaboration, EventFormalReferencedAsAValueReported) {
                              "11.12"));
 }
 
+// §11.12, example e, with §16.8: a formal written with no type of its own takes
+// the last type written before it, so `y` of `f(event e, y)` is an event formal
+// too and its reference as an operand of `+` is reported, in a module and in
+// the compilation unit alike; `y` written untyped takes no type, and `y`
+// written `type(i)` takes the type of `i`, not `event`.
+TEST(LetDeclElaboration, FormalTakingEventFromTheOneBeforeItReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "int i;\n"
+      "let k(event e, y) = y + 1;\n"
+      "let h(event e, type(i) y) = y + 1;\n"
+      "module m;\n"
+      "  let f(event e, y) = y + 1;\n"
+      "  let g(event e, untyped y) = y;\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {2u, 5u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "event formal 'y' of a let is referenced where "
+                              "no event_expression may be written",
+                              line, "11.12"));
+  }
+  for (uint32_t line : {3u, 6u}) {
+    EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                               "event formal 'y' of a let is referenced", line,
+                               "11.12"));
+  }
+}
+
 // §11.12, rule 2: an integral or real formal takes no actual of an unpacked
-// array, structure or union type, whether a call binds it by position or by
-// name or the declaration gives it as the default, nor, by §6.22.5, a class
-// handle. An untyped formal, a formal of the structure's own type, and actuals
-// of integral or packed types are left alone.
+// array, structure or union type that neither assignment nor a bit-stream cast
+// of as many bits (§6.24.3) converts to it, whether a call binds it by
+// position or by name or the declaration gives it as the default, nor, by
+// §6.22.5, a class handle. An untyped formal, a formal of the structure's own
+// type, and actuals of integral or packed types are left alone.
 TEST(LetDeclElaboration, ActualNotCastCompatibleWithTypedFormalReported) {
   ElabFixture f;
   ElaborateSrc(
       "class C; endclass\n"
       "module m;\n"
-      "  typedef struct { int a; } s_t;\n"
+      "  typedef struct { int a; byte b; } s_t;\n"
       "  typedef struct packed { int a; } p_t;\n"
       "  s_t s; p_t p; C h; int i; int arr [2];\n"
       "  union { int x; real y; } un;\n"
@@ -591,14 +621,15 @@ TEST(LetDeclElaboration, LetSampledValueClockedByDefaultClockingAccepted) {
 
 // §11.12, rule 2, by cast compatibility (§6.22.4): an unpacked array is no
 // actual for a structure formal, a structure of another typedef none for
-// either's formal, and a structure a block declares none for an int formal;
+// either's formal, and a structure a block declares none for an int formal,
+// none of them of as many bits as the formal for a bit-stream cast (§6.24.3);
 // an int for a real one, an enum for an int one and a structure for its own
 // type's are.
 TEST(LetDeclElaboration, ActualTypesAreJudgedByCastCompatibility) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
-      "  typedef struct { int a; } s_t;\n"
+      "  typedef struct { int a; byte b; } s_t;\n"
       "  typedef struct { int a; } t_t;\n"
       "  typedef enum {E0, E1} e_t;\n"
       "  s_t s; t_t t; int arr [2], brr [2]; int i; e_t e; string str;"
@@ -791,6 +822,89 @@ TEST(LetDeclElaboration, StringActualsAndFormalsAreJudgedAsBitStreamTypes) {
     EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                               "is not cast compatible with the type of formal",
                               line, "11.12"));
+  }
+}
+
+// §11.12, rule 2, with A.2.2.1 and §6.8: a signing or a packed dimension
+// written alone before a formal's name is a type, logic with them, so an
+// unpacked array or structure is no actual for `[3:0] x` or `signed x`, while
+// an int, a real and a string are; a formal written with no type at all takes
+// any actual.
+TEST(LetDeclElaboration, ActualForFormalWritingOnlySigningOrDimensionJudged) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef struct { int a; } s_t;\n"
+      "  s_t s; int arr [2]; int i; real rv; string str;\n"
+      "  let w([3:0] x) = x;\n"
+      "  let g(signed x) = x;\n"
+      "  let u(x) = x;\n"
+      "  initial begin\n"
+      "    $display(\"%0d\", w(arr));\n"
+      "    $display(\"%0d\", g(arr));\n"
+      "    $display(\"%0d\", w(s));\n"
+      "    $display(\"%0d\", g(.x(s)));\n"
+      "    $display(\"%0d\", w(i) + w(rv) + g(str) + u(arr) + u(s));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {8u, 9u, 10u, 11u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "is not cast compatible with the type of formal",
+                              line, "11.12"));
+  }
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "is not cast compatible with the type of formal",
+                             12, "11.12"));
+}
+
+// §11.12, example e, with §16.8: a formal written with no type of its own takes
+// the last type written before it, so `y` of `f(int x, y)` takes int and an
+// unpacked array or structure of other than 32 bits is no actual for it,
+// whether bound by position, by name or as its default, and `y` of
+// `w([3:0] x, y)` takes logic [3:0]. `y` of `p(arr_t x, y)` takes the
+// typedef's unpacked dimensions with it, and `y` of `q(int x [3], y)` none of
+// the dimensions written after `x`. A formal written untyped takes no type,
+// nor does one after it with none of its own, so any actual fits `y` and `z`
+// of `g(int x, untyped y, z)`; nor is a type carried past a type reference the
+// generate block's let has not resolved.
+TEST(LetDeclElaboration, ActualForFormalTakingTypeWrittenBeforeItJudged) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef struct { int a; byte b; } s_t;\n"
+      "  typedef int arr_t [3];\n"
+      "  s_t s; int arr [2]; int i; arr_t u;\n"
+      "  let f(int x, y) = x + y;\n"
+      "  let w([3:0] x, y) = x;\n"
+      "  let g(int x, untyped y, z) = x;\n"
+      "  let d(int x, y = arr) = x;\n"
+      "  let p(arr_t x, y) = x[0];\n"
+      "  let q(int x [3], y) = y;\n"
+      "  if (1) begin : gb\n"
+      "    let t(int x, type(s) y, z) = x;\n"
+      "    initial $display(\"%0d\", t(1, s, s));\n"
+      "  end\n"
+      "  initial begin\n"
+      "    $display(\"%0d\", f(1, arr));\n"
+      "    $display(\"%0d\", f(.x(1), .y(s)));\n"
+      "    $display(\"%0d\", w(1, s));\n"
+      "    $display(\"%0d\", g(1, arr, s) + g(.x(1), .y(s), .z(arr)));\n"
+      "    $display(\"%0d\", f(1, i) + p(u, u));\n"
+      "    $display(\"%0d\", p(u, i));\n"
+      "    $display(\"%0d\", q(u, u));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {8u, 16u, 17u, 18u, 21u, 22u}) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "is not cast compatible with the type of formal 'y'", line, "11.12"));
+  }
+  for (uint32_t line : {13u, 19u, 20u}) {
+    EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                               "is not cast compatible with the type of formal",
+                               line, "11.12"));
   }
 }
 
