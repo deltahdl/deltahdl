@@ -692,4 +692,37 @@ TEST(UdpInstanceElaboration, ModuleWrittenAsAPrimitiveInstanceIsReported) {
                             5, "29.8"));
 }
 
+// §29.8 gives an array of UDP instances the one range §28.3.5 gives an array
+// of gates. Read before p_fwd's declaration, the instance is parsed as a
+// module's, whose name_of_instance takes any number of unpacked dimensions,
+// and the conversion kept the first range and dropped the second unreported.
+TEST(UdpInstanceElaboration, ForwardDeclaredUdpArrayWithASecondRange) {
+  ElabFixture f;
+  ElaborateSrc(ForwardUdpSrc("p_fwd u[1:0][1:0](f_out, f_a, f_b);"), f,
+               "fwd_top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "an array of instances takes a single range after "
+                            "its instance identifier, not a second one",
+                            3, "28.3.5"));
+}
+
+// A size written alone is the unpacked_dimension a module instance array may
+// take, and no range of two constant expressions at all.
+TEST(UdpInstanceElaboration, ForwardDeclaredUdpArrayWithASizeAlone) {
+  ElabFixture f;
+  ElaborateSrc(ForwardUdpSrc("p_fwd u[2](f_out, f_a, f_b);"), f, "fwd_top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "an array of instances is declared by a range of "
+                            "two constant expressions",
+                            3, "28.3.5"));
+}
+
+// The single range §28.3.5 describes draws neither report.
+TEST(UdpInstanceElaboration, ForwardDeclaredUdpArrayWithOneRange) {
+  ElabFixture f;
+  ElaborateSrc(ForwardUdpSrc("p_fwd u[1:0](f_out, f_a, f_b);"), f, "fwd_top");
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "an array of instances", 3,
+                             "28.3.5"));
+}
+
 }  // namespace

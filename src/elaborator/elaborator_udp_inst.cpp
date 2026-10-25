@@ -192,6 +192,29 @@ static void ReportNamedUdpConnections(const ModuleItem* item,
              Subclause("29.8"));
 }
 
+// §29.8 gives an array of UDP instances the range §28.3.5 gives an array of
+// gates: two constant expressions written [lhi:rhi], and no more than one to an
+// instance identifier. Read as a module instance, whose name_of_instance takes
+// any number of unpacked dimensions, a size alone among them, the instance was
+// spared Parser::ParseInstanceRange's reports of either form, made here in the
+// same words.
+static void ReportForwardUdpArrayRange(const ModuleItem* item,
+                                       DiagEngine& diag) {
+  if (item->inst_dims.empty()) return;
+  if (item->inst_dims[0].second == nullptr) {
+    diag.Error(item->loc,
+               "an array of instances is declared by a range of two "
+               "constant expressions, [lhi:rhi]; a size alone is no range",
+               Subclause("28.3.5"));
+  }
+  if (item->inst_dims.size() > 1) {
+    diag.Error(item->loc,
+               "an array of instances takes a single range after its "
+               "instance identifier, not a second one",
+               Subclause("28.3.5"));
+  }
+}
+
 void Elaborator::ReclassifyForwardUdpInstances(const ModuleDecl* decl) {
   for (auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kModuleInst) continue;
@@ -213,6 +236,7 @@ void Elaborator::ReclassifyForwardUdpInstances(const ModuleDecl* decl) {
     if (udp == nullptr) continue;
 
     ReportNamedUdpConnections(item, diag_);
+    ReportForwardUdpArrayRange(item, diag_);
     TakeForwardUdpDelays(item, diag_);
     item->kind = ModuleItemKind::kUdpInst;
     item->gate_inst_name = item->inst_name;
