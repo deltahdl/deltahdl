@@ -37,6 +37,26 @@ TEST(ContAssignStatementElaboration, VarWithInitializerAndContAssignErrors) {
       "10.3.2"));
 }
 
+// §10.3.2 (printed page 249): a variable driven by a continuous assignment has
+// no initializer, and an assignment to a member of a structure variable drives
+// the variable as one to a select of it does.
+TEST(ContAssignStatementElaboration,
+     StructVarWithInitializerAndMemberContAssignErrors) {
+  ElabFixture f;
+  Elaborate(
+      "module t;\n"
+      "  typedef struct packed { logic a; logic b; } s_t;\n"
+      "  s_t s = '0;\n"
+      "  logic x;\n"
+      "  assign s.a = x;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "variable 's' has both an initializer and a continuous assignment", 5,
+      "10.3.2"));
+}
+
 TEST(ContAssignStatementElaboration,
      VarWithoutInitializerAndContAssignSucceeds) {
   ElabFixture f;

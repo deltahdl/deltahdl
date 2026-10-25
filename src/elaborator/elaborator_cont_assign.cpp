@@ -387,6 +387,20 @@ static size_t UnpackedDimsOfNet(std::string_view name, const RtlirModule* mod) {
   return 0;
 }
 
+// §10.3.2 (printed page 249): a variable a continuous assignment writes any
+// part of has no initializer. `declared` is the declaration `name` binds.
+static void ReportContTargetInitializer(
+    const ModuleItem* item, std::string_view name, std::string_view declared,
+    const std::unordered_set<std::string_view>& var_init_names,
+    DiagEngine& diag) {
+  if (var_init_names.count(declared) == 0) return;
+  diag.Error(item->loc,
+             std::format("variable '{}' has both an initializer and a "
+                         "continuous assignment",
+                         name),
+             Subclause("10.3.2"));
+}
+
 // The rules §10.3 and §10.3.2 state of one element of a continuous
 // assignment's target, and whether it is a variable, whose form (Syntax 10-1)
 // takes no drive strength and a delay_control alone.
@@ -429,8 +443,17 @@ bool Elaborator::ValidateContAssignLeaf(ModuleItem* item, RtlirModule* mod,
                 Subclause("10.3.2"));
   }
   // A.6.1: a member of a variable this module declares is a variable_lvalue as
-  // the variable is, so the assignment takes the variable form all the same.
-  return is_var || (!is_net && var_types_.count(leaf.root) != 0);
+  // the variable is, so the assignment takes the variable form all the same,
+  // and drives the variable as §10.3.2 reads it. §6.5 weighs the member as a
+  // term of its own, which a procedural assignment's name does not tell apart.
+  bool is_var_member = !is_var && !is_net && var_types_.count(leaf.root) != 0;
+  if (is_var_member) {
+    ReportContTargetInitializer(
+        item, leaf.root,
+        DeclaredScopedName(leaf.root, gen_prefix_scopes_, declared_names_),
+        var_init_names_, diag_);
+  }
+  return is_var || is_var_member;
 }
 
 // §6.5 and §10.3.2 of a variable an element of a continuous assignment's
@@ -451,13 +474,7 @@ void Elaborator::ValidateContAssignVarLeaf(ModuleItem* item,
                             name),
                 Subclause("6.5"));
   }
-  if (var_init_names_.count(declared) != 0) {
-    diag_.Error(item->loc,
-                std::format("variable '{}' has both an initializer and a "
-                            "continuous assignment",
-                            name),
-                Subclause("10.3.2"));
-  }
+  ReportContTargetInitializer(item, name, declared, var_init_names_, diag_);
 }
 
 // Whether any element of a continuous assignment's target is a variable.
