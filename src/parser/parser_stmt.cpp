@@ -308,10 +308,19 @@ static CaseQualifier TokenToCaseQualifier(TokenKind tk) {
 }
 
 Stmt* Parser::ParseStmt() {
+  SourceLoc label_loc = CurrentLoc();
   auto prefix_label = TryParseStmtLabel();
   auto attrs = ParseAttributes();
 
   if (Match(TokenKind::kSemicolon)) {
+    // A.6.4 writes statement_or_null's null form as attribute instances and
+    // a semicolon, and the label belongs to a statement, whose statement_item
+    // is never a bare semicolon.
+    if (!prefix_label.empty()) {
+      diag_.Error(label_loc,
+                  "a null statement takes attribute instances and no label",
+                  Subclause("A.6.4"));
+    }
     auto* stmt = arena_.Create<Stmt>();
     stmt->kind = StmtKind::kNull;
     stmt->label = prefix_label;

@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <initializer_list>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
@@ -57,6 +60,34 @@ TEST(StatementOrNullSyntaxParsing, NullStmtWithMultipleAttributeInstances) {
   ASSERT_GE(body->stmts[0]->attrs.size(), 2u);
   EXPECT_EQ(body->stmts[0]->attrs[0].name, "a");
   EXPECT_EQ(body->stmts[0]->attrs[1].name, "b");
+}
+
+// statement_or_null's null form is attribute instances and a semicolon, with
+// no label, and the label belongs to a statement, whose statement_item is
+// never a bare semicolon. A label before `;` is therefore reported wherever a
+// statement is read: in a block, as an if branch and in a function body,
+// with or without attribute instances after it. The null statement it stood
+// before is still read, so nothing after it is reported.
+TEST(StatementOrNullSyntaxParsing, LabelOnNullStmtIsReported) {
+  auto r = Parse(
+      "module m;\n"
+      "  function void f;\n"
+      "    l1: ;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    l2: ;\n"
+      "    if (1) l3: ;\n"
+      "    l4: (* a *) ;\n"
+      "    (* b *) ;\n"
+      "  end\n"
+      "endmodule\n");
+  for (uint32_t line : {3u, 6u, 7u, 8u}) {
+    EXPECT_TRUE(ReportedError(r.diags,
+                              "a null statement takes attribute instances and "
+                              "no label",
+                              line, "A.6.4"));
+  }
+  EXPECT_EQ(r.diags.size(), 4u);
 }
 
 TEST(StatementSyntaxParsing, StmtLabelOnAssignment) {

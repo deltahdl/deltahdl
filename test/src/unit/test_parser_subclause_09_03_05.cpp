@@ -167,21 +167,6 @@ TEST(StatementLabelParsing, StatementLabelOnTaskCall) {
   EXPECT_EQ(item->body->stmts[0]->label, "lbl");
 }
 
-TEST(StatementLabelParsing, StatementLabelOnNullStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    marker: ;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kNull);
-  EXPECT_EQ(stmt->label, "marker");
-}
-
 TEST(StatementLabelParsing, StatementWithLabelAndAttribute) {
   auto r = Parse(
       "module m;\n"

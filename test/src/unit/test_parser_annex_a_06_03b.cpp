@@ -442,8 +442,9 @@ TEST(BlockStatementSyntaxParsing, ActionBlockNullStatement) {
 
 // Second alternative with a null statement before the else: A.6.4 builds a
 // statement from a statement_item, and no statement_item is a bare semicolon,
-// so one written there is reported whether attribute instances or a label
-// stand before its semicolon. Every construct that ends in an action_block
+// so one written there with attribute instances before its semicolon is
+// reported; a bare semicolon there is the first alternative, which ends the
+// action block. Every construct that ends in an action_block
 // reads it alike: an immediate and a deferred assertion, a concurrent
 // assertion in procedural code, expect and wait_order. A null statement after
 // the else, or one standing alone as the first alternative, draws no report.
@@ -453,7 +454,6 @@ TEST(BlockStatementSyntaxParsing, ActionBlockNullPassStatementBeforeElse) {
       "  event e1, e2;\n"
       "  initial begin\n"
       "    assert (a) (* x *) ; else $error;\n"
-      "    assert (a) l: ; else $error;\n"
       "    assume #0 (a) (* x *) ; else $error;\n"
       "    assert property (@(posedge clk) a) (* x *) ; else $error;\n"
       "    expect (@(posedge clk) a) (* x *) ; else $error;\n"
@@ -462,13 +462,13 @@ TEST(BlockStatementSyntaxParsing, ActionBlockNullPassStatementBeforeElse) {
       "    assert (a) (* x *) ;\n"
       "  end\n"
       "endmodule\n");
-  for (uint32_t line : {4u, 5u, 6u, 7u, 8u, 9u}) {
+  for (uint32_t line : {4u, 5u, 6u, 7u, 8u}) {
     EXPECT_TRUE(ReportedError(r.diags,
                               "an action block's statement before 'else' is a "
                               "statement, which cannot be null",
                               line, "A.6.3"));
   }
-  EXPECT_EQ(r.diags.size(), 6u);
+  EXPECT_EQ(r.diags.size(), 5u);
 }
 
 // -------------------------------------------------------------------------

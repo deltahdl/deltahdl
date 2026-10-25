@@ -313,7 +313,7 @@ TEST(DefparamSimulation, AnElementsGenerateLoopFollowsItsOwnDefparam) {
 // §23.10.1 with §23.10.2: a real or a string parameter a named block
 // declares takes the value its defparam writes, and a fork named inside the
 // block is a further step of the path, u.blk.fk.F; the block's variable, its
-// other parameter and a labelled null statement are passed over.
+// other parameter and a labelled assignment are passed over.
 TEST(DefparamSimulation, RealStringAndForkBlockParametersTakeDefparams) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module child;\n"
@@ -322,7 +322,7 @@ TEST(DefparamSimulation, RealStringAndForkBlockParametersTakeDefparams) {
                        "    parameter A = 1;\n"
                        "    parameter real R = 1.5;\n"
                        "    parameter string S = \"ab\";\n"
-                       "    L: ;\n"
+                       "    L: v = 0;\n"
                        "    fork : fk\n"
                        "      parameter F = 2;\n"
                        "      $display(\"%0d %0d %0.2f %s\", A, F, R, S);\n"

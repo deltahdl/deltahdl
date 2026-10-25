@@ -169,19 +169,6 @@ TEST(StatementLabelElaboration, LabelOnForeachElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(StatementLabelElaboration, LabelOnNullStatementElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  initial begin\n"
-      "    nop: ;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(StatementLabelElaboration, LabelOnNonblockingAssignElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
