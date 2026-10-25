@@ -118,9 +118,10 @@ ModuleItem* Parser::ParseClockingDecl() {
     item->clocking_event = ParseEventList();
     Expect(TokenKind::kRParen, Subclause("14.3"));
   } else {
-    EventExpr ev;
-    ev.signal = ParseExpr();
-    item->clocking_event.push_back(ev);
+    // A.6.5: without parentheses the clocking event is a name alone, read as
+    // the event control statement reads it, so an expression written there
+    // leaves its operator or argument list where the semicolon belongs.
+    item->clocking_event.push_back(ParseNamedClockingEvent());
   }
 
   Expect(TokenKind::kSemicolon, Subclause("14.3"));

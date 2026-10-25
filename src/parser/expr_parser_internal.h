@@ -9,6 +9,7 @@
 namespace delta {
 
 class Arena;
+class DiagEngine;
 struct Expr;
 
 // Parse the numeric value of an integer literal token's text, ignoring the
@@ -59,5 +60,12 @@ bool IsHierarchicalName(const Expr* e, bool trailing_select);
 // ParseIdentifierExpr, which is why it is declared here rather than in the
 // file's anonymous namespace.
 Expr* MakePostfixUnary(Arena& arena, TokenKind op, Expr* operand);
+
+// Reports `e`, the primary Parser::ParsePrimaryExpr read after a `##` with no
+// parenthesis behind it, unless it is one of the two forms A.6.11's
+// cycle_delay admits there: an integral number or an identifier. Defined in
+// parser_stmt_timing.cpp beside the cycle delay statement, and shared with the
+// synchronous drive's cycle delay in parser_stmt.cpp.
+void CheckUnparenthesizedCycleDelay(const Expr* e, DiagEngine& diag);
 
 }  // namespace delta

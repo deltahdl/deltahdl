@@ -9,6 +9,7 @@
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
+#include "parser/expr_parser_internal.h"
 #include "parser/parser.h"
 
 namespace delta {
@@ -24,9 +25,23 @@ Stmt* Parser::ParseCycleDelayStmt() {
     Expect(TokenKind::kRParen, Subclause("14.11"));
   } else {
     stmt->cycle_delay = ParsePrimaryExpr();
+    CheckUnparenthesizedCycleDelay(stmt->cycle_delay, diag_);
   }
   stmt->body = ParseStmt();
   return stmt;
+}
+
+void CheckUnparenthesizedCycleDelay(const Expr* e, DiagEngine& diag) {
+  if (e->kind == ExprKind::kIntegerLiteral) return;
+  // ParsePrimaryExpr builds `$` and `null` as identifiers too, and neither is
+  // one.
+  if (e->kind == ExprKind::kIdentifier && e->text != "$" && e->text != "null") {
+    return;
+  }
+  diag.Error(e->range.start,
+             "a cycle delay written without parentheses is an integral number "
+             "or an identifier; any other expression is parenthesized",
+             Subclause("A.6.11"));
 }
 
 Stmt* Parser::ParseDelayStmt() {
@@ -52,6 +67,8 @@ Stmt* Parser::ParseDelayStmt() {
 // expression. Read as an expression, it took in what the controlled statement
 // opens with: `@e -> f;` became a wait on §11.4.7's implication `e -> f`
 // guarding an empty statement, and `@e ++n;` a postfix increment of `e`.
+// Parser::ParseClockingDecl reads a clocking declaration's event here too,
+// A.6.11 writing the same clocking_event there.
 EventExpr Parser::ParseNamedClockingEvent() {
   EventExpr ev;
   Token first = CurrentToken();

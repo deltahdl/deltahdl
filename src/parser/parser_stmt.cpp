@@ -763,6 +763,7 @@ void Parser::ParseIntraAssignTiming(Stmt* stmt) {
       Expect(TokenKind::kRParen, Subclause("14.16"));
     } else {
       stmt->cycle_delay = ParsePrimaryExpr();
+      CheckUnparenthesizedCycleDelay(stmt->cycle_delay, diag_);
     }
   } else if (Check(TokenKind::kHash)) {
     Consume();
