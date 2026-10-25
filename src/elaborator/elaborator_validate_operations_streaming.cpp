@@ -15,6 +15,7 @@
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/elaborator_validate_operations.h"
 #include "elaborator/type_eval.h"
+#include "lexer/token.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -213,6 +214,16 @@ void ElaboratorOperationRules::WalkExprForStreamingContext(
     WalkExprForStreamingContext(expr->lhs, true);
     return;
   }
+  // A.8.3 makes `( operator_assignment )` an expression, which the parser keeps
+  // as a kBinary carrying the assignment operator. Its `=` form is an
+  // assignment, whose target and source §11.4.14 allows; A.10 footnote 52 lets
+  // no compound operator take a streaming target, so one is read below as the
+  // operator it applies.
+  if (expr->kind == ExprKind::kBinary && expr->op == TokenKind::kEq) {
+    WalkExprForStreamingContext(expr->lhs, true);
+    WalkExprForStreamingContext(expr->rhs, true);
+    return;
+  }
 
   WalkExprForStreamingContext(expr->lhs, false);
   WalkExprForStreamingContext(expr->rhs, false);
@@ -278,25 +289,28 @@ void ElaboratorOperationRules::CheckStreamingUnpackSourceType(const Expr* lhs,
 
 void ElaboratorOperationRules::WalkStmtsForStreamingContext(const Stmt* s) {
   if (!s) return;
-  if (s->kind == StmtKind::kBlockingAssign ||
-      s->kind == StmtKind::kNonblockingAssign || s->kind == StmtKind::kAssign ||
-      s->kind == StmtKind::kForce) {
-    WalkExprForStreamingContext(s->lhs, true);
-    WalkExprForStreamingContext(s->rhs, true);
+  bool is_assign = s->kind == StmtKind::kBlockingAssign ||
+                   s->kind == StmtKind::kNonblockingAssign ||
+                   s->kind == StmtKind::kAssign || s->kind == StmtKind::kForce;
+  if (is_assign) {
     CheckStreamingSourceTargetType(s->lhs, s->rhs);
     CheckStreamingUnpackSourceType(s->lhs, s->rhs);
-  } else {
-    WalkExprForStreamingContext(s->lhs, false);
-    WalkExprForStreamingContext(s->rhs, false);
   }
-  // §13.4.1 assigns a return statement's expression to the function's result,
-  // and §6.8 a block variable's initializer to the variable, so each is the
-  // source of an assignment, where a streaming concatenation may stand whole.
-  WalkExprForStreamingContext(s->expr, s->kind == StmtKind::kReturn);
-  if (s->kind == StmtKind::kVarDecl)
-    WalkExprForStreamingContext(s->var_init, true);
-  WalkExprForStreamingContext(s->condition, false);
-  WalkExprForStreamingContext(s->assert_expr, false);
+  // §11.4.14 lets a streaming concatenation stand whole as an assignment's
+  // target or source. §13.4.1 assigns a return statement's expression to the
+  // function's result, and §6.8 a block variable's initializer to the
+  // variable, so each is the source of an assignment as well. Every other
+  // expression a statement holds, a loop's condition, a case item, an event
+  // control and a delay among them, holds the concatenation as an operand.
+  // ForEachChildExpr in elaborator_validate_internal.h names those positions
+  // once for the whole elaborator, and an assignment's own expressions are told
+  // from the rest by the member each one stands in.
+  ForEachChildExpr(s, [&](const Expr* e) {
+    bool assigned = (is_assign && (e == s->lhs || e == s->rhs)) ||
+                    (s->kind == StmtKind::kReturn && e == s->expr) ||
+                    (s->kind == StmtKind::kVarDecl && e == s->var_init);
+    WalkExprForStreamingContext(e, assigned);
+  });
   // §11.4.14 confines a streaming concatenation to an assignment or a
   // bit-stream cast, §11.4.14.1 rules on its operands and §11.4.14.2 on its
   // slice_size, and none of the three names a statement the concatenation is

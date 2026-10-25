@@ -380,4 +380,63 @@ TEST(StreamingConcatElaboration, StreamAsInitializerOrReturnValueAccepted) {
              "endmodule\n"));
 }
 
+// A.8.3 counts `( operator_assignment )` among an expression's forms, so an
+// assignment written within an expression is an assignment still, and its
+// target and its source are where §11.4.14 lets a streaming concatenation
+// stand.
+TEST(StreamingConcatElaboration, StreamAssignedWithinAnExpressionAccepted) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  logic [7:0] a, b, x, y;\n"
+             "  initial begin\n"
+             "    x = ({>> {a}} = b);\n"
+             "    x = (y = {<< {a}});\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+// A.10 footnote 52 lets no assignment operator but `=` and `<=` take a
+// streaming target, so a compound operator within an expression applies its
+// operator to the concatenation, which then stands as an operand.
+TEST(StreamingConcatElaboration,
+     StreamCompoundAssignedWithinAnExpressionReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] a, b, x;\n"
+      "  initial x = ({>> {a}} += b);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "streaming concatenation shall not be used as an operand of an "
+      "expression other than an assignment or bit-stream cast",
+      3, "11.4.14"));
+}
+
+// A loop's condition, a case item, an event control and a delay are neither an
+// assignment nor a bit-stream cast, so §11.4.14 bars a streaming concatenation
+// from each of them as from any operand position.
+TEST(StreamingConcatElaboration, StreamInAStatementsOtherExpressionsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] a, x;\n"
+      "  initial begin\n"
+      "    for (int i = 0; {>> {a}}; i++) x = 0;\n"
+      "    case (x) {>> {a}}: x = 1; endcase\n"
+      "    @({>> {a}}) x = 2;\n"
+      "    #({>> {a}}) x = 3;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {4u, 5u, 6u, 7u}) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "streaming concatenation shall not be used as an operand of an "
+        "expression other than an assignment or bit-stream cast",
+        line, "11.4.14"));
+  }
+}
+
 }  // namespace
