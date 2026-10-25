@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <initializer_list>
 #include <string>
 
 #include "fixture_simulator.h"
@@ -651,6 +653,37 @@ TEST(PatternMatching, StructurePatternsFittingTheStructureAccepted) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+}
+
+// §12.6 checks statically that a pattern has the type of the value it is
+// matched with, and a structure pattern matches a structure's members, so one
+// matched with an int, a vector or an int member of a structure is reported.
+// One matched with a structure member draws no report.
+TEST(PatternMatching, StructurePatternAgainstANonStructureValueRejected) {
+  SimFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef struct { int a; logic [3:0] b; } S;\n"
+      "  typedef struct { S inner; int k; } T;\n"
+      "  int x;\n"
+      "  logic [7:0] v;\n"
+      "  T t;\n"
+      "  initial begin\n"
+      "    if (x matches '{1, 2}) ;\n"
+      "    if (v matches '{.p, .q}) ;\n"
+      "    if (t matches '{'{1, 2}, '{3}}) ;\n"
+      "    if (t matches '{inner: '{.p, .q}}) ;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {8u, 9u, 10u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "structure pattern is matched against a value "
+                              "that is not a structure",
+                              line, "12.6"))
+        << "line " << line;
+  }
+  EXPECT_EQ(f.diag.ErrorCount(), 3u);
 }
 
 // A constant leaf of a pattern is a constant expression (§11.2.1); a variable

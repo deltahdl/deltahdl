@@ -146,12 +146,20 @@ void CheckTaggedPattern(const Expr* p, const MatchedType& target,
   }
 }
 
-// §12.6: a structure pattern's member names are members of the structure,
-// and only such a pattern may leave members out, so a positional one gives
-// one element per member. Each element is matched with its member's value.
+// §12.6: a structure pattern is matched with a structure value, its member
+// names are members of the structure, and only such a pattern may leave
+// members out, so a positional one gives one element per member. Each element
+// is matched with its member's value.
 void CheckStructurePattern(const Expr* p, const MatchedType& target,
                            const PatternCtx& ctx) {
-  if (target.kind != DataTypeKind::kStruct) return;
+  if (target.kind == DataTypeKind::kImplicit) return;
+  if (target.kind != DataTypeKind::kStruct) {
+    ctx.diag.Error(p->range.start,
+                   "structure pattern is matched against a value that is not "
+                   "a structure",
+                   Subclause("12.6"));
+    return;
+  }
   const auto& members = target.decl->struct_members;
   if (!p->pattern_keys.empty()) {
     for (size_t i = 0; i < p->pattern_keys.size(); ++i) {
