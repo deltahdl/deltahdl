@@ -48,6 +48,7 @@ static void CollectExprVars(const Expr* expr, SimContext& ctx,
   CollectExprVars(expr->index, ctx, vars);
   CollectExprVars(expr->index_end, ctx, vars);
   CollectExprVars(expr->with_expr, ctx, vars);
+  CollectExprVars(expr->stream_range, ctx, vars);
   CollectExprVars(expr->repeat_count, ctx, vars);
   for (auto* e : expr->elements) CollectExprVars(e, ctx, vars);
   for (auto* a : expr->args) CollectExprVars(a, ctx, vars);

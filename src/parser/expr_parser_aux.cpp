@@ -67,13 +67,16 @@ Expr* Parser::ParseStreamingConcat(TokenKind dir) {
   // A.8.1's stream_expression is an expression and then, optionally, `with [
   // array_range_expression ]`, the range applying to the whole operand. The
   // operand is read short of Parser::ParseExpr, which reports a range after
-  // any other expression, and the range is read here. Footnote 40 keeps `{}`
-  // out of a stream.
+  // any other expression, and the range is read here into Expr::stream_range,
+  // apart from a with clause the operand carries itself. Footnote 40 keeps
+  // `{}` out of a stream.
   Expect(TokenKind::kLBrace, Subclause("11.4.14"));
   do {
     Expr* operand = ParseExprBp(0);
     ReportPredicateOperator(operand, diag_);
-    if (WithOpensRange(lexer_)) operand->with_expr = ParseWithClauseRange(true);
+    if (WithOpensRange(lexer_)) {
+      operand->stream_range = ParseWithClauseRange(true);
+    }
     sc->elements.push_back(operand);
   } while (Match(TokenKind::kComma));
   ReportEmptyConcatItems(sc, diag_);

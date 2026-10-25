@@ -229,9 +229,7 @@ ValueKind KindOfMemberSelect(const Expr* e, const ValueScope& scope) {
 ValueKind KindOfSelect(const Expr* e, const ValueScope& scope) {
   std::vector<const Expr*> selects;
   const Expr* base = e;
-  // The `with [...]` range of §11.4.14.4 is a select with no base at all.
-  for (; base != nullptr && base->kind == ExprKind::kSelect;
-       base = base->base) {
+  for (; base->kind == ExprKind::kSelect; base = base->base) {
     selects.push_back(base);
   }
   std::string_view name = ExprIdent(base);

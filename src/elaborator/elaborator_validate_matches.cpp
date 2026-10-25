@@ -549,6 +549,7 @@ void CheckArrayQueryOnDynamicTypeExpr(
   CheckArrayQueryOnDynamicTypeExpr(e->index_end, dyn_types, diag);
   CheckArrayQueryOnDynamicTypeExpr(e->repeat_count, dyn_types, diag);
   CheckArrayQueryOnDynamicTypeExpr(e->with_expr, dyn_types, diag);
+  CheckArrayQueryOnDynamicTypeExpr(e->stream_range, dyn_types, diag);
   for (auto* a : e->args) CheckArrayQueryOnDynamicTypeExpr(a, dyn_types, diag);
   for (auto* el : e->elements)
     CheckArrayQueryOnDynamicTypeExpr(el, dyn_types, diag);
@@ -632,6 +633,7 @@ void CheckRandomSeedExpr(const Expr* e, const TypeMap& types,
   CheckRandomSeedExpr(e->index_end, types, diag);
   CheckRandomSeedExpr(e->repeat_count, types, diag);
   CheckRandomSeedExpr(e->with_expr, types, diag);
+  CheckRandomSeedExpr(e->stream_range, types, diag);
   for (auto* a : e->args) CheckRandomSeedExpr(a, types, diag);
   for (auto* el : e->elements) CheckRandomSeedExpr(el, types, diag);
 }

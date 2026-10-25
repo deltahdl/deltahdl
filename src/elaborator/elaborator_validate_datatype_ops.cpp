@@ -313,8 +313,9 @@ static bool ExprUsesVirtualInterface(const Expr* e, const TypeMap& types) {
     return true;
   }
   const Expr* const kChildren[] = {
-      e->lhs,       e->rhs,       e->base,       e->index,        e->index_end,
-      e->condition, e->true_expr, e->false_expr, e->repeat_count, e->with_expr};
+      e->lhs,          e->rhs,       e->base,        e->index,
+      e->index_end,    e->condition, e->true_expr,   e->false_expr,
+      e->repeat_count, e->with_expr, e->stream_range};
   for (const auto* child : kChildren) {
     if (ExprUsesVirtualInterface(child, types)) return true;
   }

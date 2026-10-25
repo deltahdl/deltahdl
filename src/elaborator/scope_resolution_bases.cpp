@@ -28,6 +28,7 @@ void CollectScopeBases(const Expr* e, std::vector<const Expr*>& out) {
   CollectScopeBases(e->false_expr, out);
   CollectScopeBases(e->repeat_count, out);
   CollectScopeBases(e->with_expr, out);
+  CollectScopeBases(e->stream_range, out);
   for (const auto* a : e->args) CollectScopeBases(a, out);
   for (const auto* el : e->elements) CollectScopeBases(el, out);
 }

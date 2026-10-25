@@ -353,7 +353,7 @@ void ForEachChildExpr(S* s, Visit visit) {
 }
 
 // Whether `fn` holds for any child expression of `e`. Expr in
-// src/parser/ast_expr.h carries thirteen links to other expressions, and this
+// src/parser/ast_expr.h carries fourteen links to other expressions, and this
 // is the one place they are enumerated: a walk that names some of them answers
 // a question about part of the tree while reading as though it answered it
 // about all of it. ExprContainsIdent in elaborator_validate.cpp followed lhs
@@ -401,9 +401,9 @@ void ForEachPatternBinding(const Expr* p, Visit visit) {
 
 template <typename Fn>
 bool AnyExprChild(const Expr* e, Fn&& fn) {
-  for (const Expr* child :
-       {e->lhs, e->rhs, e->condition, e->true_expr, e->false_expr, e->base,
-        e->index, e->index_end, e->with_expr, e->repeat_count}) {
+  for (const Expr* child : {e->lhs, e->rhs, e->condition, e->true_expr,
+                            e->false_expr, e->base, e->index, e->index_end,
+                            e->with_expr, e->stream_range, e->repeat_count}) {
     if (fn(child)) return true;
   }
   for (const Expr* child : e->args) {

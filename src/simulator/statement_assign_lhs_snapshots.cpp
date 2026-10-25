@@ -97,9 +97,9 @@ static void CollectSelectIndices(const Expr* sel, IndexWalk& walk) {
 static void CollectElementIndices(const Expr* expr, IndexWalk& walk) {
   for (const auto* elem : expr->elements) {
     if (!elem) continue;
-    if (elem->with_expr) {
-      CollectIndexSnapshot(elem->with_expr->index, walk);
-      CollectIndexSnapshot(elem->with_expr->index_end, walk);
+    if (elem->stream_range) {
+      CollectIndexSnapshot(elem->stream_range->index, walk);
+      CollectIndexSnapshot(elem->stream_range->index_end, walk);
     }
     CollectLhsIndexSnapshotsInto(elem, walk);
   }

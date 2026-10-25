@@ -60,6 +60,7 @@ Expr* Qualified(const Expr* e, const Qualifying& q) {
   copy->false_expr = Qualified(e->false_expr, q);
   copy->repeat_count = Qualified(e->repeat_count, q);
   copy->with_expr = Qualified(e->with_expr, q);
+  copy->stream_range = Qualified(e->stream_range, q);
   for (Expr*& arg : copy->args) arg = Qualified(arg, q);
   for (Expr*& element : copy->elements) element = Qualified(element, q);
   return copy;

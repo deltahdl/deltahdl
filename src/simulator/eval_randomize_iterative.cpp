@@ -41,6 +41,7 @@ Expr* RewriteExpr(const Expr* e, const ExprRewrite& rewrite, Arena& arena) {
   copy->index = RewriteExpr(e->index, rewrite, arena);
   copy->index_end = RewriteExpr(e->index_end, rewrite, arena);
   copy->with_expr = RewriteExpr(e->with_expr, rewrite, arena);
+  copy->stream_range = RewriteExpr(e->stream_range, rewrite, arena);
   copy->repeat_count = RewriteExpr(e->repeat_count, rewrite, arena);
   for (auto*& arg : copy->args) arg = RewriteExpr(arg, rewrite, arena);
   for (auto*& elem : copy->elements) elem = RewriteExpr(elem, rewrite, arena);

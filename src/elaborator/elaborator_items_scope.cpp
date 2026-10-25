@@ -85,8 +85,9 @@ bool ExprContainsDollarSubexpr(const Expr* e);
 // walk so the driver stays below the cognitive-complexity threshold.
 bool AnyScalarChildContainsDollar(const Expr* e) {
   const Expr* const kChildren[] = {
-      e->lhs,  e->rhs,   e->condition, e->true_expr, e->false_expr,
-      e->base, e->index, e->index_end, e->with_expr, e->repeat_count};
+      e->lhs,        e->rhs,          e->condition,   e->true_expr,
+      e->false_expr, e->base,         e->index,       e->index_end,
+      e->with_expr,  e->stream_range, e->repeat_count};
   for (const Expr* c : kChildren) {
     if (ExprContainsDollarSubexpr(c)) return true;
   }

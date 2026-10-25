@@ -327,9 +327,9 @@ struct StreamExpandSink {
 // honoring an optional `with` slice range.
 static void ExpandArrayAggregate(const Expr* elem, const ArrayInfo* ainfo,
                                  StreamExpandSink& sink) {
-  if (elem->with_expr) {
+  if (elem->stream_range) {
     StreamSliceRange r{0, 0};
-    ResolveWithRange(elem->with_expr, sink.ctx, sink.arena,
+    ResolveWithRange(elem->stream_range, sink.ctx, sink.arena,
                      {ainfo->size, ainfo->lo}, r);
     ExpandArrayElementsSliced(elem->text, sink.ctx, sink.parts,
                               sink.total_width, r);
@@ -342,9 +342,9 @@ static void ExpandArrayAggregate(const Expr* elem, const ArrayInfo* ainfo,
 // optional `with` slice range.
 static void ExpandQueueAggregate(const Expr* elem, QueueObject* queue,
                                  StreamExpandSink& sink) {
-  if (elem->with_expr) {
+  if (elem->stream_range) {
     StreamSliceRange r{0, 0};
-    ResolveWithRange(elem->with_expr, sink.ctx, sink.arena,
+    ResolveWithRange(elem->stream_range, sink.ctx, sink.arena,
                      {static_cast<uint32_t>(queue->elements.size()), 0}, r);
     ExpandQueueElementsSliced(queue, sink.parts, sink.total_width, sink.arena,
                               r);
@@ -481,7 +481,7 @@ static Logic4Vec StreamReorderSlices(const Logic4Vec& concat,
 static bool TryExpandPropertyArray(const Expr* elem, SimContext& ctx,
                                    Arena& arena, std::vector<Logic4Vec>& parts,
                                    uint32_t& total_width) {
-  if (elem->kind != ExprKind::kMemberAccess || elem->with_expr != nullptr)
+  if (elem->kind != ExprKind::kMemberAccess || elem->stream_range != nullptr)
     return false;
   std::vector<Logic4Vec> elems;
   if (!PropertyArrayElements(elem, ctx, arena, elems)) return false;

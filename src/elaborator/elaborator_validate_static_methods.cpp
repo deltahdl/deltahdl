@@ -44,11 +44,10 @@ static bool ExprRefsThisOrSuper(const Expr* e) {
   if (e->kind == ExprKind::kIdentifier &&
       (e->text == "this" || e->text == "super"))
     return true;
-  if (ExprRefsThisOrSuper(e->lhs) || ExprRefsThisOrSuper(e->rhs) ||
-      ExprRefsThisOrSuper(e->base) || ExprRefsThisOrSuper(e->index) ||
-      ExprRefsThisOrSuper(e->condition) || ExprRefsThisOrSuper(e->true_expr) ||
-      ExprRefsThisOrSuper(e->false_expr) || ExprRefsThisOrSuper(e->with_expr)) {
-    return true;
+  for (const Expr* child :
+       {e->lhs, e->rhs, e->base, e->index, e->condition, e->true_expr,
+        e->false_expr, e->with_expr, e->stream_range}) {
+    if (ExprRefsThisOrSuper(child)) return true;
   }
   for (const auto* elem : e->elements) {
     if (ExprRefsThisOrSuper(elem)) return true;

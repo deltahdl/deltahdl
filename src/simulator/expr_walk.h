@@ -22,6 +22,7 @@ void ForEachSubExpr(const Expr* e, const Fn& fn) {
   ForEachSubExpr(e->index, fn);
   ForEachSubExpr(e->index_end, fn);
   ForEachSubExpr(e->with_expr, fn);
+  ForEachSubExpr(e->stream_range, fn);
   ForEachSubExpr(e->repeat_count, fn);
   for (auto* sub : e->elements) ForEachSubExpr(sub, fn);
   for (auto* sub : e->args) ForEachSubExpr(sub, fn);

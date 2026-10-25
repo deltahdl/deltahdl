@@ -465,6 +465,7 @@ static void WalkExprForProgramCall(const Expr* e, const ProgramScopes& scopes,
   WalkExprForProgramCall(e->index, scopes, diag, loc);
   WalkExprForProgramCall(e->index_end, scopes, diag, loc);
   WalkExprForProgramCall(e->with_expr, scopes, diag, loc);
+  WalkExprForProgramCall(e->stream_range, scopes, diag, loc);
   WalkExprForProgramCall(e->repeat_count, scopes, diag, loc);
   for (auto* arg : e->args) WalkExprForProgramCall(arg, scopes, diag, loc);
   for (auto* elem : e->elements)

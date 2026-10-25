@@ -255,7 +255,7 @@ bool ExprMentionsAny(const Expr* e,
   if (!e->callee.empty() && names.count(e->callee)) return true;
   for (const Expr* child :
        {e->lhs, e->rhs, e->condition, e->true_expr, e->false_expr, e->base,
-        e->index, e->index_end, e->with_expr}) {
+        e->index, e->index_end, e->with_expr, e->stream_range}) {
     if (ExprMentionsAny(child, names)) return true;
   }
   for (const Expr* arg : e->args) {

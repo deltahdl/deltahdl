@@ -52,14 +52,12 @@ static bool ExprCallsModeMethod(const Expr* e);
 // True if any single-expression operand field of 'e' contains a
 // rand_mode()/constraint_mode() call.
 static bool ScalarExprFieldsCallModeMethod(const Expr* e) {
-  return ExprCallsModeMethod(e->lhs) || ExprCallsModeMethod(e->rhs) ||
-         ExprCallsModeMethod(e->base) || ExprCallsModeMethod(e->index) ||
-         ExprCallsModeMethod(e->index_end) ||
-         ExprCallsModeMethod(e->condition) ||
-         ExprCallsModeMethod(e->true_expr) ||
-         ExprCallsModeMethod(e->false_expr) ||
-         ExprCallsModeMethod(e->repeat_count) ||
-         ExprCallsModeMethod(e->with_expr);
+  for (const Expr* child : {e->lhs, e->rhs, e->base, e->index, e->index_end,
+                            e->condition, e->true_expr, e->false_expr,
+                            e->repeat_count, e->with_expr, e->stream_range}) {
+    if (ExprCallsModeMethod(child)) return true;
+  }
+  return false;
 }
 
 // True if any element of the list-valued operand fields of 'e' (call arguments

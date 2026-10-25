@@ -87,6 +87,7 @@ static void CheckExprForRefArgs(
   CheckExprForRefArgs(e->index, ref_names, diag);
   CheckExprForRefArgs(e->index_end, ref_names, diag);
   CheckExprForRefArgs(e->with_expr, ref_names, diag);
+  CheckExprForRefArgs(e->stream_range, ref_names, diag);
   CheckExprForRefArgs(e->repeat_count, ref_names, diag);
   for (auto* arg : e->args) CheckExprForRefArgs(arg, ref_names, diag);
   for (auto* elem : e->elements) CheckExprForRefArgs(elem, ref_names, diag);
@@ -341,8 +342,9 @@ static bool ExprRefsAutoVar(
 static bool AnyChildExprRefsAutoVar(
     const Expr* e, const std::unordered_set<std::string_view>& auto_vars) {
   const Expr* const kChildren[] = {
-      e->lhs,       e->rhs,       e->base,       e->index,     e->index_end,
-      e->condition, e->true_expr, e->false_expr, e->with_expr, e->repeat_count};
+      e->lhs,       e->rhs,          e->base,        e->index,
+      e->index_end, e->condition,    e->true_expr,   e->false_expr,
+      e->with_expr, e->stream_range, e->repeat_count};
   for (const Expr* child : kChildren)
     if (ExprRefsAutoVar(child, auto_vars)) return true;
   for (auto* a : e->args)

@@ -149,7 +149,7 @@ static bool IsNullClassHandleTarget(const Expr* elem, SimContext& ctx) {
 // makes the unpack greedily size that queue from the leftover stream bits.
 static bool LhsHasGreedyDynamicElement(const Expr* lhs, SimContext& ctx) {
   for (auto* elem : lhs->elements) {
-    if (elem->with_expr) continue;
+    if (elem->stream_range) continue;
     if (elem->kind == ExprKind::kIdentifier && ctx.FindQueue(elem->text)) {
       return true;
     }
@@ -163,14 +163,15 @@ static uint32_t FixedWithRangeElementWidth(const Expr* elem, SimContext& ctx,
                                            Arena& arena) {
   if (auto* ainfo = ctx.FindArrayInfo(elem->text)) {
     StreamSliceRange r{0, 0};
-    ResolveWithRange(elem->with_expr, ctx, arena, {ainfo->size, ainfo->lo}, r);
+    ResolveWithRange(elem->stream_range, ctx, arena, {ainfo->size, ainfo->lo},
+                     r);
     if (r.start + r.count > ainfo->size)
       r.count = (r.start < ainfo->size) ? ainfo->size - r.start : 0;
     return r.count * ainfo->elem_width;
   }
   if (auto* queue = ctx.FindQueue(elem->text)) {
     StreamSliceRange r{0, 0};
-    ResolveWithRange(elem->with_expr, ctx, arena,
+    ResolveWithRange(elem->stream_range, ctx, arena,
                      {static_cast<uint32_t>(queue->elements.size()), 0}, r);
     return r.count * queue->elem_width;
   }
@@ -228,7 +229,7 @@ static uint32_t SumFixedElementWidths(const Expr* lhs, SimContext& ctx,
                                       Arena& arena) {
   uint32_t fixed_sum = 0;
   for (auto* elem : lhs->elements) {
-    if (elem->with_expr && elem->kind == ExprKind::kIdentifier) {
+    if (elem->stream_range && elem->kind == ExprKind::kIdentifier) {
       fixed_sum += FixedWithRangeElementWidth(elem, ctx, arena);
       continue;
     }
@@ -249,7 +250,7 @@ static uint32_t CollectArrayWithRangeElements(
     const Expr* elem, ArrayInfo* ainfo, SimContext& ctx, Arena& arena,
     std::vector<StreamElemInfo>& elems) {
   StreamSliceRange r{0, 0};
-  bool in_range = ResolveWithRange(elem->with_expr, ctx, arena,
+  bool in_range = ResolveWithRange(elem->stream_range, ctx, arena,
                                    {ainfo->size, ainfo->lo}, r);
   uint32_t start = r.start;
   uint32_t count = r.count;
@@ -280,7 +281,7 @@ static uint32_t CollectQueueWithRangeElements(
     const Expr* elem, QueueObject* queue, SimContext& ctx, Arena& arena,
     std::vector<StreamElemInfo>& elems) {
   StreamSliceRange r{0, 0};
-  ResolveWithRange(elem->with_expr, ctx, arena,
+  ResolveWithRange(elem->stream_range, ctx, arena,
                    {static_cast<uint32_t>(queue->elements.size()), 0}, r);
   uint32_t start = r.start;
   uint32_t count = r.count;
@@ -333,7 +334,7 @@ static bool TryCollectWithRangeElement(const Expr* elem, SimContext& ctx,
                                        Arena& arena,
                                        std::vector<StreamElemInfo>& elems,
                                        uint32_t& added) {
-  if (!elem->with_expr || elem->kind != ExprKind::kIdentifier) return false;
+  if (!elem->stream_range || elem->kind != ExprKind::kIdentifier) return false;
   if (auto* ainfo = ctx.FindArrayInfo(elem->text)) {
     added = CollectArrayWithRangeElements(elem, ainfo, ctx, arena, elems);
     return true;
@@ -351,7 +352,7 @@ static bool TryCollectWithRangeElement(const Expr* elem, SimContext& ctx,
 static bool TryCollectGreedyDynamicElement(const Expr* elem, StreamEnv env,
                                            const GreedyFill& fill,
                                            const GreedyUnpackSink& sink) {
-  if (elem->with_expr || elem->kind != ExprKind::kIdentifier) return false;
+  if (elem->stream_range || elem->kind != ExprKind::kIdentifier) return false;
   auto* queue = env.ctx.FindQueue(elem->text);
   if (!queue) return false;
   if (!sink.first_dynamic_consumed) {
@@ -510,17 +511,17 @@ static bool ShouldForwardResolveUnpack(const Expr* lhs, SimContext& ctx) {
   std::vector<std::string_view> earlier;
   bool dependency = false;
   for (auto* elem : lhs->elements) {
-    if (elem->kind == ExprKind::kIdentifier && !elem->with_expr &&
+    if (elem->kind == ExprKind::kIdentifier && !elem->stream_range &&
         ctx.FindQueue(elem->text)) {
       // A bare dynamic queue triggers greedy sizing; leave that to the
       // established pass.
       return false;
     }
-    if (elem->with_expr && elem->kind == ExprKind::kIdentifier &&
-        ExprRefsIdentifierIn(elem->with_expr, earlier)) {
+    if (elem->stream_range && elem->kind == ExprKind::kIdentifier &&
+        ExprRefsIdentifierIn(elem->stream_range, earlier)) {
       dependency = true;
     }
-    if (!elem->with_expr && elem->kind == ExprKind::kIdentifier &&
+    if (!elem->stream_range && elem->kind == ExprKind::kIdentifier &&
         !ctx.FindArrayInfo(elem->text) && !ctx.FindQueue(elem->text)) {
       earlier.push_back(elem->text);
     }
@@ -538,7 +539,7 @@ static void ForwardUnpackArrayWithRange(const Expr* elem, ArrayInfo* ainfo,
                                         StreamEnv env, const StreamTaker& take,
                                         uint32_t& cursor) {
   StreamSliceRange r{0, 0};
-  bool in_range = ResolveWithRange(elem->with_expr, env.ctx, env.arena,
+  bool in_range = ResolveWithRange(elem->stream_range, env.ctx, env.arena,
                                    {ainfo->size, ainfo->lo}, r);
   uint32_t start = r.start;
   uint32_t count = r.count;
@@ -580,7 +581,7 @@ static void ForwardUnpackQueueWithRange(const Expr* elem, QueueObject* queue,
                                         StreamEnv env, const StreamTaker& take,
                                         uint32_t& cursor) {
   StreamSliceRange r{0, 0};
-  ResolveWithRange(elem->with_expr, env.ctx, env.arena,
+  ResolveWithRange(elem->stream_range, env.ctx, env.arena,
                    {static_cast<uint32_t>(queue->elements.size()), 0}, r);
   uint32_t start = r.start;
   uint32_t count = r.count;
@@ -634,7 +635,7 @@ static void ForwardUnpackOneElement(const Expr* elem, SimContext& ctx,
                                     uint32_t& cursor) {
   // §11.4.14.3: a null class handle target is skipped, consuming no bits.
   if (IsNullClassHandleTarget(elem, ctx)) return;
-  if (elem->with_expr && elem->kind == ExprKind::kIdentifier) {
+  if (elem->stream_range && elem->kind == ExprKind::kIdentifier) {
     // §7.5: a dynamic array keeps its elements in a queue and is resized by
     // the range like one; only a fixed-size array is bounded by it.
     if (auto* ainfo = ctx.FindArrayInfo(elem->text);

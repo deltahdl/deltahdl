@@ -46,6 +46,7 @@ void WalkExprIdents(Expr* e, std::vector<Expr*>& out) {
   WalkExprIdents(e->false_expr, out);
   WalkExprIdents(e->repeat_count, out);
   WalkExprIdents(e->with_expr, out);
+  WalkExprIdents(e->stream_range, out);
   for (auto* a : e->args) WalkExprIdents(a, out);
   for (auto* el : e->elements) WalkExprIdents(el, out);
 }

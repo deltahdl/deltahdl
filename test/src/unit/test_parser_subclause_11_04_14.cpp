@@ -115,7 +115,7 @@ TEST(StreamingOperatorParsing, StreamExpressionWithArrayRange) {
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kStreamingConcat);
   ASSERT_FALSE(rhs->elements.empty());
-  EXPECT_NE(rhs->elements[0]->with_expr, nullptr);
+  EXPECT_NE(rhs->elements[0]->stream_range, nullptr);
 }
 
 TEST(StreamingOperatorParsing, StreamExpressionWithPlusColonRange) {
@@ -132,7 +132,7 @@ TEST(StreamingOperatorParsing, StreamExpressionWithPlusColonRange) {
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kStreamingConcat);
   ASSERT_FALSE(rhs->elements.empty());
-  auto* with = rhs->elements[0]->with_expr;
+  auto* with = rhs->elements[0]->stream_range;
   ASSERT_NE(with, nullptr);
   EXPECT_TRUE(with->is_part_select_plus);
 }
@@ -151,7 +151,7 @@ TEST(StreamingOperatorParsing, StreamExpressionWithMinusColonRange) {
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kStreamingConcat);
   ASSERT_FALSE(rhs->elements.empty());
-  auto* with = rhs->elements[0]->with_expr;
+  auto* with = rhs->elements[0]->stream_range;
   ASSERT_NE(with, nullptr);
   EXPECT_TRUE(with->is_part_select_minus);
 }
@@ -171,7 +171,7 @@ TEST(StreamingOperatorParsing, StreamExpressionWithBareIndex) {
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kStreamingConcat);
   ASSERT_FALSE(rhs->elements.empty());
-  auto* with = rhs->elements[0]->with_expr;
+  auto* with = rhs->elements[0]->stream_range;
   ASSERT_NE(with, nullptr);
   EXPECT_FALSE(with->is_part_select_plus);
   EXPECT_FALSE(with->is_part_select_minus);

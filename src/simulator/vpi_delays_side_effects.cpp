@@ -118,9 +118,9 @@ bool VpiSourceExprHasSideEffects(const Expr* expr) {
   // subexpression can be written is one of those three, so the whole expression
   // is walked rather than a chosen few of its edges.
   const Expr* const kEdges[] = {
-      expr->lhs,        expr->rhs,         expr->condition, expr->true_expr,
-      expr->false_expr, expr->base,        expr->index,     expr->index_end,
-      expr->with_expr,  expr->repeat_count};
+      expr->lhs,        expr->rhs,          expr->condition,   expr->true_expr,
+      expr->false_expr, expr->base,         expr->index,       expr->index_end,
+      expr->with_expr,  expr->stream_range, expr->repeat_count};
   for (const Expr* edge : kEdges) {
     if (VpiSourceExprHasSideEffects(edge)) return true;
   }

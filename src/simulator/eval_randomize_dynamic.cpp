@@ -92,11 +92,13 @@ bool HoldsSizeCall(const Expr* e, const ClassTypeInfo* type, SimContext& ctx) {
   auto holds = [type, &ctx](const Expr* sub) {
     return HoldsSizeCall(sub, type, ctx);
   };
+  const Expr* const kChildren[] = {
+      e->lhs,       e->rhs,          e->base,        e->index,
+      e->index_end, e->condition,    e->true_expr,   e->false_expr,
+      e->with_expr, e->stream_range, e->repeat_count};
   return std::any_of(e->args.begin(), e->args.end(), holds) ||
          std::any_of(e->elements.begin(), e->elements.end(), holds) ||
-         holds(e->lhs) || holds(e->rhs) || holds(e->base) || holds(e->index) ||
-         holds(e->index_end) || holds(e->condition) || holds(e->true_expr) ||
-         holds(e->false_expr) || holds(e->with_expr) || holds(e->repeat_count);
+         std::ranges::any_of(kChildren, holds);
 }
 
 // The solver variable for the size of the dynamic array `array` declared at

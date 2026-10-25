@@ -30,6 +30,7 @@ Expr* SubstituteFormals(const Expr* e, const ActualsByFormal& actuals,
   copy->index = SubstituteFormals(e->index, actuals, arena);
   copy->index_end = SubstituteFormals(e->index_end, actuals, arena);
   copy->with_expr = SubstituteFormals(e->with_expr, actuals, arena);
+  copy->stream_range = SubstituteFormals(e->stream_range, actuals, arena);
   copy->repeat_count = SubstituteFormals(e->repeat_count, actuals, arena);
   for (auto& sub : copy->elements) sub = SubstituteFormals(sub, actuals, arena);
   for (auto& sub : copy->args) sub = SubstituteFormals(sub, actuals, arena);

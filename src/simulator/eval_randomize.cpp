@@ -629,6 +629,7 @@ void CollectConstraintArgRefs(const Expr* e, bool in_arg,
   CollectConstraintArgRefs(e->index, in_arg, all_names, arg_names);
   CollectConstraintArgRefs(e->index_end, in_arg, all_names, arg_names);
   CollectConstraintArgRefs(e->with_expr, in_arg, all_names, arg_names);
+  CollectConstraintArgRefs(e->stream_range, in_arg, all_names, arg_names);
   CollectConstraintArgRefs(e->repeat_count, in_arg, all_names, arg_names);
   // A call's arguments (and everything nested within them) are in-argument.
   for (const Expr* a : e->args)

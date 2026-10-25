@@ -46,6 +46,7 @@ void CollectIdentLeaves(const Expr* e, std::vector<const Expr*>& out) {
   CollectIdentLeaves(e->false_expr, out);
   CollectIdentLeaves(e->repeat_count, out);
   CollectIdentLeaves(e->with_expr, out);
+  CollectIdentLeaves(e->stream_range, out);
   for (auto* a : e->args) CollectIdentLeaves(a, out);
   for (auto* el : e->elements) CollectIdentLeaves(el, out);
 }

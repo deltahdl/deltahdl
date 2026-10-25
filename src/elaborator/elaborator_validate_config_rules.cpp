@@ -204,6 +204,7 @@ void WalkPackageRefExpr(const PackageRefContext& ctx, const Expr* e) {
   WalkPackageRefExpr(ctx, e->false_expr);
   WalkPackageRefExpr(ctx, e->repeat_count);
   WalkPackageRefExpr(ctx, e->with_expr);
+  WalkPackageRefExpr(ctx, e->stream_range);
   for (const auto* a : e->args) WalkPackageRefExpr(ctx, a);
   for (const auto* el : e->elements) WalkPackageRefExpr(ctx, el);
 }

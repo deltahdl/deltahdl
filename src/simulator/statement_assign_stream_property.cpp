@@ -168,9 +168,10 @@ void SubstituteWithRanges(const Expr* lhs, Expr& rewritten, Arena& arena) {
       names[MemberPath(lhs->elements[i])] = rewritten.elements[i]->text;
   }
   for (size_t i = 0; i < rewritten.elements.size(); ++i) {
-    const Expr* with = lhs->elements[i]->with_expr;
+    const Expr* with = lhs->elements[i]->stream_range;
     if (with == nullptr || rewritten.elements[i] == lhs->elements[i]) continue;
-    rewritten.elements[i]->with_expr = SubstituteStandIns(with, names, arena);
+    rewritten.elements[i]->stream_range =
+        SubstituteStandIns(with, names, arena);
   }
 }
 

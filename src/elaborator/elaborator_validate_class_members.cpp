@@ -447,11 +447,10 @@ void ElaboratorClassRules::ApplyClassMethodAutomaticDefault() {
 static bool ExprRefsSuper(const Expr* e) {
   if (!e) return false;
   if (e->kind == ExprKind::kIdentifier && e->text == "super") return true;
-  if (ExprRefsSuper(e->lhs) || ExprRefsSuper(e->rhs) ||
-      ExprRefsSuper(e->base) || ExprRefsSuper(e->index) ||
-      ExprRefsSuper(e->condition) || ExprRefsSuper(e->true_expr) ||
-      ExprRefsSuper(e->false_expr) || ExprRefsSuper(e->with_expr)) {
-    return true;
+  for (const Expr* child :
+       {e->lhs, e->rhs, e->base, e->index, e->condition, e->true_expr,
+        e->false_expr, e->with_expr, e->stream_range}) {
+    if (ExprRefsSuper(child)) return true;
   }
   for (const auto* elem : e->elements)
     if (ExprRefsSuper(elem)) return true;
@@ -585,6 +584,7 @@ static void CheckConstExprForSuperParam(const Expr* e, const ClassDecl* cls,
   CheckConstExprForSuperParam(e->true_expr, cls, unit, diag);
   CheckConstExprForSuperParam(e->false_expr, cls, unit, diag);
   CheckConstExprForSuperParam(e->with_expr, cls, unit, diag);
+  CheckConstExprForSuperParam(e->stream_range, cls, unit, diag);
   for (const auto* elem : e->elements)
     CheckConstExprForSuperParam(elem, cls, unit, diag);
   for (const auto* arg : e->args)
@@ -671,13 +671,10 @@ static bool ExprRefsAnyName(const Expr* e,
                             const std::unordered_set<std::string_view>& names) {
   if (!e) return false;
   if (e->kind == ExprKind::kIdentifier && names.count(e->text)) return true;
-  if (ExprRefsAnyName(e->lhs, names) || ExprRefsAnyName(e->rhs, names) ||
-      ExprRefsAnyName(e->base, names) || ExprRefsAnyName(e->index, names) ||
-      ExprRefsAnyName(e->condition, names) ||
-      ExprRefsAnyName(e->true_expr, names) ||
-      ExprRefsAnyName(e->false_expr, names) ||
-      ExprRefsAnyName(e->with_expr, names)) {
-    return true;
+  for (const Expr* child :
+       {e->lhs, e->rhs, e->base, e->index, e->condition, e->true_expr,
+        e->false_expr, e->with_expr, e->stream_range}) {
+    if (ExprRefsAnyName(child, names)) return true;
   }
   for (const auto* elem : e->elements)
     if (ExprRefsAnyName(elem, names)) return true;

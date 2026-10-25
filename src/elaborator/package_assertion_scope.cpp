@@ -58,9 +58,10 @@ void ScopeCallees(Expr* e, const ActualsByFormal& scoped) {
       e->callee = {};
     }
   }
-  Expr* children[] = {
-      e->lhs,       e->rhs,       e->base,       e->index,        e->index_end,
-      e->condition, e->true_expr, e->false_expr, e->repeat_count, e->with_expr};
+  Expr* children[] = {e->lhs,       e->rhs,         e->base,
+                      e->index,     e->index_end,   e->condition,
+                      e->true_expr, e->false_expr,  e->repeat_count,
+                      e->with_expr, e->stream_range};
   for (Expr* c : children) ScopeCallees(c, scoped);
   for (Expr* a : e->args) ScopeCallees(a, scoped);
   for (Expr* el : e->elements) ScopeCallees(el, scoped);

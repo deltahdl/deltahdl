@@ -41,13 +41,12 @@ bool ExprRefsGlobalClock(const Expr* e);
 
 // Recurse into every scalar (single-child) sub-expression slot of `e`.
 bool AnyScalarChildRefsGlobalClock(const Expr* e) {
-  return ExprRefsGlobalClock(e->lhs) || ExprRefsGlobalClock(e->rhs) ||
-         ExprRefsGlobalClock(e->condition) ||
-         ExprRefsGlobalClock(e->true_expr) ||
-         ExprRefsGlobalClock(e->false_expr) || ExprRefsGlobalClock(e->base) ||
-         ExprRefsGlobalClock(e->index) || ExprRefsGlobalClock(e->index_end) ||
-         ExprRefsGlobalClock(e->repeat_count) ||
-         ExprRefsGlobalClock(e->with_expr);
+  for (const Expr* child : {e->lhs, e->rhs, e->condition, e->true_expr,
+                            e->false_expr, e->base, e->index, e->index_end,
+                            e->repeat_count, e->with_expr, e->stream_range}) {
+    if (ExprRefsGlobalClock(child)) return true;
+  }
+  return false;
 }
 
 bool ExprRefsGlobalClock(const Expr* e) {
@@ -185,9 +184,9 @@ const Expr* FindGclkFunctionRef(const Expr* e, GclkKindPredicate match) {
       return e;
     }
   }
-  for (const Expr* c :
-       {e->lhs, e->rhs, e->condition, e->true_expr, e->false_expr, e->base,
-        e->index, e->index_end, e->repeat_count, e->with_expr}) {
+  for (const Expr* c : {e->lhs, e->rhs, e->condition, e->true_expr,
+                        e->false_expr, e->base, e->index, e->index_end,
+                        e->repeat_count, e->with_expr, e->stream_range}) {
     if (const Expr* hit = FindGclkFunctionRef(c, match)) return hit;
   }
   for (auto* a : e->args) {

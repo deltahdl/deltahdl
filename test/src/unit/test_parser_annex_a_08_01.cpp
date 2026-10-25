@@ -371,17 +371,47 @@ TEST(ConcatenationParsing, StreamExpressionRangeFollowsTheWholeOperand) {
   ASSERT_FALSE(r.has_errors);
   const auto& items = r.cu->modules[0]->items;
   ASSERT_EQ(items.size(), 2u);
-  const Expr* range = items[0]->body->rhs->elements[0]->with_expr;
+  const Expr* range = items[0]->body->rhs->elements[0]->stream_range;
   ASSERT_NE(range, nullptr);
   EXPECT_EQ(range->kind, ExprKind::kSelect);
   EXPECT_EQ(range->range.start.line, 2u);
   EXPECT_EQ(range->range.start.column, 28u);
   const auto& operands = items[1]->body->rhs->elements;
   ASSERT_EQ(operands.size(), 2u);
-  EXPECT_NE(operands[0]->with_expr, nullptr);
+  EXPECT_NE(operands[0]->stream_range, nullptr);
   EXPECT_EQ(operands[1]->kind, ExprKind::kMemberAccess);
-  ASSERT_NE(operands[1]->with_expr, nullptr);
-  EXPECT_TRUE(operands[1]->with_expr->is_part_select_plus);
+  ASSERT_NE(operands[1]->stream_range, nullptr);
+  EXPECT_TRUE(operands[1]->stream_range->is_part_select_plus);
+}
+
+// §11.4.14.4 lets the expression before a stream's `with` be any
+// one-dimensional unpacked array, the queue an array locator call returns
+// among them, so the operand of A.8.1's stream_expression may carry A.8.2's
+// with clause of its own. The two are kept apart: the locator's parenthesized
+// predicate stays its with expression and the bracketed range is the
+// stream's, where one used to overwrite the other. A plain name carries the
+// range alone.
+TEST(ConcatenationParsing, StreamRangeKeptApartFromTheOperandsWithClause) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = {>> {q.find with (item > 1) with [0:1], a with [2]}};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_FALSE(r.has_errors);
+  const Expr* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  ASSERT_EQ(rhs->elements.size(), 2u);
+  const Expr* locator = rhs->elements[0];
+  ASSERT_NE(locator->with_expr, nullptr);
+  EXPECT_TRUE(locator->with_has_parens);
+  EXPECT_EQ(locator->with_expr->kind, ExprKind::kBinary);
+  ASSERT_NE(locator->stream_range, nullptr);
+  EXPECT_EQ(locator->stream_range->kind, ExprKind::kSelect);
+  EXPECT_NE(locator->stream_range->index_end, nullptr);
+  const Expr* name = rhs->elements[1];
+  EXPECT_EQ(name->with_expr, nullptr);
+  ASSERT_NE(name->stream_range, nullptr);
+  EXPECT_EQ(name->stream_range->index_end, nullptr);
 }
 
 // A.8.1 writes `with [ array_range_expression ]` in stream_expression alone.

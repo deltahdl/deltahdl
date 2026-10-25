@@ -45,6 +45,7 @@ void CollectMemberAccess(const Expr* e, std::vector<const Expr*>& out) {
   CollectMemberAccess(e->false_expr, out);
   CollectMemberAccess(e->repeat_count, out);
   CollectMemberAccess(e->with_expr, out);
+  CollectMemberAccess(e->stream_range, out);
   for (const auto* a : e->args) CollectMemberAccess(a, out);
   for (const auto* el : e->elements) CollectMemberAccess(el, out);
 }

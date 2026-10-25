@@ -110,6 +110,7 @@ void CheckBitsCallExpr(const Expr* e, const BitsDynamicNames& names,
   CheckBitsCallExpr(e->index_end, names, diag);
   CheckBitsCallExpr(e->repeat_count, names, diag);
   CheckBitsCallExpr(e->with_expr, names, diag);
+  CheckBitsCallExpr(e->stream_range, names, diag);
   for (auto* a : e->args) CheckBitsCallExpr(a, names, diag);
   for (auto* el : e->elements) CheckBitsCallExpr(el, names, diag);
 }
@@ -244,15 +245,12 @@ bool ExprNamesSignal(const Expr* e,
 // of the given run-time signals.
 bool ScalarChildNamesSignal(
     const Expr* e, const std::unordered_set<std::string_view>& signals) {
-  return ExprNamesSignal(e->lhs, signals) || ExprNamesSignal(e->rhs, signals) ||
-         ExprNamesSignal(e->condition, signals) ||
-         ExprNamesSignal(e->true_expr, signals) ||
-         ExprNamesSignal(e->false_expr, signals) ||
-         ExprNamesSignal(e->base, signals) ||
-         ExprNamesSignal(e->index, signals) ||
-         ExprNamesSignal(e->index_end, signals) ||
-         ExprNamesSignal(e->with_expr, signals) ||
-         ExprNamesSignal(e->repeat_count, signals);
+  for (const Expr* child : {e->lhs, e->rhs, e->condition, e->true_expr,
+                            e->false_expr, e->base, e->index, e->index_end,
+                            e->with_expr, e->stream_range, e->repeat_count}) {
+    if (ExprNamesSignal(child, signals)) return true;
+  }
+  return false;
 }
 
 bool ExprNamesSignal(const Expr* e,
@@ -388,6 +386,7 @@ void CheckPartSelectBoundsExpr(const Expr* e, const PartSelectBoundsCtx& ctx) {
   CheckPartSelectBoundsExpr(e->index, ctx);
   CheckPartSelectBoundsExpr(e->index_end, ctx);
   CheckPartSelectBoundsExpr(e->with_expr, ctx);
+  CheckPartSelectBoundsExpr(e->stream_range, ctx);
   CheckPartSelectBoundsExpr(e->repeat_count, ctx);
   for (const auto* a : e->args) CheckPartSelectBoundsExpr(a, ctx);
   for (const auto* el : e->elements) CheckPartSelectBoundsExpr(el, ctx);

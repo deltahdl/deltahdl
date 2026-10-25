@@ -333,7 +333,8 @@ void PopulatePackageProvidedNames(const CompilationUnit* unit,
 // name an array method's `with` clause reads -- `q.sum() with (item)` declares
 // `item` at the call -- and §18.7 resolves the names of an inline constraint
 // block against the object being randomized, so neither is a name the enclosing
-// module declares.
+// module declares. Expr::stream_range, the range of a stream operand
+// (§11.4.14.4), binds no name and is collected like any other operand.
 static void CollectBareIdentOperands(const Expr* e,
                                      std::vector<const Expr*>& out) {
   bool lhs_names_no_value =
@@ -347,6 +348,7 @@ static void CollectBareIdentOperands(const Expr* e,
   CollectBareIdents(e->true_expr, out);
   CollectBareIdents(e->false_expr, out);
   CollectBareIdents(e->repeat_count, out);
+  CollectBareIdents(e->stream_range, out);
   if (!CallArgsNameNoValue(e) && !ArgNamesDesignElement(e)) {
     for (std::size_t i = 0; i < e->args.size(); ++i) {
       if (!ArgNamesCoverageScope(e, i)) CollectBareIdents(e->args[i], out);

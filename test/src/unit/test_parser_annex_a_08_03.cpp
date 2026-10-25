@@ -26,9 +26,9 @@ void ExpectSubtreeLocated(const Expr* e, std::set<ExprKind>& reached) {
       << "an expression node of ExprKind value " << static_cast<int>(e->kind)
       << " carries no position";
   reached.insert(e->kind);
-  for (const Expr* sub :
-       {e->lhs, e->rhs, e->condition, e->true_expr, e->false_expr, e->base,
-        e->index, e->index_end, e->repeat_count, e->with_expr}) {
+  for (const Expr* sub : {e->lhs, e->rhs, e->condition, e->true_expr,
+                          e->false_expr, e->base, e->index, e->index_end,
+                          e->repeat_count, e->with_expr, e->stream_range}) {
     ExpectSubtreeLocated(sub, reached);
   }
   for (const Expr* sub : e->elements) ExpectSubtreeLocated(sub, reached);

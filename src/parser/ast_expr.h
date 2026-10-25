@@ -177,6 +177,12 @@ struct Expr {
   DataType* type_value = nullptr;
   // §5.12: the attributes written after the operator an operation is.
   std::vector<Attribute> attrs;
+  // A.8.1: on the operand of a stream_expression written with `with [
+  // array_range_expression ]`, the range, a kSelect with no base holding its
+  // bounds (§11.4.14.4); nullptr on any other node. It is kept apart from
+  // with_expr, an array manipulation call's own with clause (A.8.2), because
+  // §11.4.14.4 lets the queue such a call returns be the operand.
+  Expr* stream_range = nullptr;
 };
 
 // §11.5: an operand is "simple" iff it is not parenthesized AND is a primary

@@ -30,9 +30,10 @@ std::string_view FindChandleRef(const Expr* e, const RtlirModule* mod) {
   if (e->kind == ExprKind::kIdentifier && NamesChandleVariable(e->text, mod)) {
     return e->text;
   }
-  const Expr* children[] = {
-      e->lhs,       e->rhs,       e->base,       e->index,        e->index_end,
-      e->condition, e->true_expr, e->false_expr, e->repeat_count, e->with_expr};
+  const Expr* children[] = {e->lhs,       e->rhs,         e->base,
+                            e->index,     e->index_end,   e->condition,
+                            e->true_expr, e->false_expr,  e->repeat_count,
+                            e->with_expr, e->stream_range};
   for (const Expr* c : children) {
     auto hit = FindChandleRef(c, mod);
     if (!hit.empty()) return hit;
@@ -91,9 +92,10 @@ bool FindNonStaticMemberRef(const Expr* e, const RtlirModule* mod,
     out = std::string(e->lhs->text) + "." + std::string(e->rhs->text);
     return true;
   }
-  const Expr* children[] = {
-      e->lhs,       e->rhs,       e->base,       e->index,        e->index_end,
-      e->condition, e->true_expr, e->false_expr, e->repeat_count, e->with_expr};
+  const Expr* children[] = {e->lhs,       e->rhs,         e->base,
+                            e->index,     e->index_end,   e->condition,
+                            e->true_expr, e->false_expr,  e->repeat_count,
+                            e->with_expr, e->stream_range};
   for (const Expr* c : children) {
     if (FindNonStaticMemberRef(c, mod, unit, out)) return true;
   }

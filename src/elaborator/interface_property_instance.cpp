@@ -39,9 +39,10 @@ void CollectFreeNames(const Expr* e,
     CollectFreeNames(e->lhs, out);
     return;
   }
-  const Expr* children[] = {
-      e->lhs,       e->rhs,       e->base,       e->index,        e->index_end,
-      e->condition, e->true_expr, e->false_expr, e->repeat_count, e->with_expr};
+  const Expr* children[] = {e->lhs,       e->rhs,         e->base,
+                            e->index,     e->index_end,   e->condition,
+                            e->true_expr, e->false_expr,  e->repeat_count,
+                            e->with_expr, e->stream_range};
   for (const Expr* c : children) CollectFreeNames(c, out);
   for (const Expr* a : e->args) CollectFreeNames(a, out);
   for (const Expr* el : e->elements) CollectFreeNames(el, out);

@@ -472,9 +472,9 @@ bool WalkExprAny(const Expr* expr, Visitor&& v) {
 template <typename Visitor>
 bool WalkExprAnyChildren(const Expr* expr, Visitor&& v) {
   const Expr* const kScalarChildren[] = {
-      expr->lhs,          expr->rhs,      expr->condition, expr->true_expr,
-      expr->false_expr,   expr->base,     expr->index,     expr->index_end,
-      expr->repeat_count, expr->with_expr};
+      expr->lhs,          expr->rhs,       expr->condition,   expr->true_expr,
+      expr->false_expr,   expr->base,      expr->index,       expr->index_end,
+      expr->repeat_count, expr->with_expr, expr->stream_range};
   for (const Expr* child : kScalarChildren) {
     if (WalkExprAny(child, v)) return true;
   }

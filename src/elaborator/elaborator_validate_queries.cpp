@@ -596,6 +596,7 @@ void CheckArrayQueryOnVarDimExpr(const Expr* e, const VarDimMap& vars,
   CheckArrayQueryOnVarDimExpr(e->index_end, vars, scope, diag);
   CheckArrayQueryOnVarDimExpr(e->repeat_count, vars, scope, diag);
   CheckArrayQueryOnVarDimExpr(e->with_expr, vars, scope, diag);
+  CheckArrayQueryOnVarDimExpr(e->stream_range, vars, scope, diag);
   for (auto* a : e->args) CheckArrayQueryOnVarDimExpr(a, vars, scope, diag);
   for (auto* el : e->elements)
     CheckArrayQueryOnVarDimExpr(el, vars, scope, diag);
