@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <initializer_list>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
@@ -762,6 +765,137 @@ TEST(ProceduralBlockSyntaxParsing, InitialConstruct_EmptyBlock) {
   ASSERT_NE(item->body, nullptr);
   EXPECT_EQ(item->body->kind, StmtKind::kBlock);
   EXPECT_TRUE(item->body->stmts.empty());
+}
+
+// A.6.2 (printed page 1197) gives each of the four always keywords a statement,
+// which A.6.4 (printed page 1198) never writes as the null statement, with
+// attribute instances before it or not. A timing control after the keyword
+// opens a statement of its own, whose body may be null.
+TEST(ProceduralBlockSyntaxParsing, AlwaysConstruct_NullBodyIsError) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic a;\n"
+      "  always ;\n"
+      "  always_comb ;\n"
+      "  always_latch (* keep *) ;\n"
+      "  always_ff ;\n"
+      "  always @(a) ;\n"
+      "  always #5 ;\n"
+      "endmodule\n");
+  for (uint32_t line : {3u, 4u, 5u, 6u}) {
+    EXPECT_TRUE(ReportedError(
+        r.diags,
+        "an always procedure's body is a statement, which cannot be null", line,
+        "A.6.2"));
+  }
+  for (uint32_t line : {7u, 8u}) {
+    EXPECT_FALSE(ReportedError(
+        r.diags,
+        "an always procedure's body is a statement, which cannot be null", line,
+        "A.6.2"));
+  }
+}
+
+// A.6.2 (printed page 1197) gives a final procedure a function_statement, which
+// A.6.4 (printed page 1198) makes a statement and so never null; the initial
+// procedure, whose body is a statement_or_null, may be.
+TEST(ProceduralBlockSyntaxParsing, FinalConstruct_NullBodyIsError) {
+  auto r = Parse(
+      "module m;\n"
+      "  final ;\n"
+      "  final (* keep *) ;\n"
+      "  initial ;\n"
+      "  final $display(\"done\");\n"
+      "endmodule\n");
+  for (uint32_t line : {2u, 3u}) {
+    EXPECT_TRUE(ReportedError(
+        r.diags,
+        "a final procedure's body is a statement, which cannot be null", line,
+        "A.6.2"));
+  }
+  EXPECT_EQ(r.diags.size(), 2u);
+}
+
+// A.6.2 (printed page 1198) writes an assignment's right-hand side as an
+// expression, and A.8.3 (printed page 1210) gives the min:typ:max triple to
+// mintypmax_expression alone, which an expression reaches only as the
+// parenthesized primary.
+TEST(ProceduralBlockSyntaxParsing,
+     AssignmentRhs_UnparenthesizedMinTypMaxIsError) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [3:0] a, b;\n"
+      "  initial begin\n"
+      "    a = 1:2:3;\n"
+      "    b <= #1 4:5:6;\n"
+      "    a += 1:2:3;\n"
+      "    a = (1:2:3);\n"
+      "  end\n"
+      "endmodule\n");
+  for (uint32_t line : {4u, 5u, 6u}) {
+    EXPECT_TRUE(ReportedError(r.diags,
+                              "an assignment's right-hand side is an "
+                              "expression, which holds a min:typ:max triple "
+                              "only within parentheses",
+                              line, "A.6.2"));
+  }
+  EXPECT_EQ(r.diags.size(), 3u);
+}
+
+// A.6.2 (printed page 1198) assigns a dynamic_array_new or a class_new to a
+// variable named with its selects alone, never to a concatenation, a streaming
+// concatenation or an assignment pattern, the other forms of variable_lvalue.
+TEST(ProceduralBlockSyntaxParsing,
+     BlockingAssignment_NewToAggregateTargetIsError) {
+  auto r = Parse(
+      "module m;\n"
+      "  class C; endclass\n"
+      "  C h1, h2;\n"
+      "  int d1[], d2[];\n"
+      "  initial begin\n"
+      "    {h1, h2} = new;\n"
+      "    {d1, d2} = new[4];\n"
+      "    {>>{d1}} = new[4];\n"
+      "    '{h1, h2} = new;\n"
+      "    h1 = new;\n"
+      "    d1 = new[4];\n"
+      "  end\n"
+      "endmodule\n");
+  for (uint32_t line : {6u, 7u, 8u, 9u}) {
+    EXPECT_TRUE(ReportedError(r.diags,
+                              "a 'new' is assigned to a variable, never to a "
+                              "concatenation, a streaming concatenation or an "
+                              "assignment pattern",
+                              line, "A.6.2"));
+  }
+  EXPECT_EQ(r.diags.size(), 4u);
+}
+
+// A.6.2 (printed page 1198) writes a dynamic_array_new's target as a
+// nonrange_variable_lvalue, whose selects hold no part-select or indexed
+// part-select, while a class_new's target takes any select.
+TEST(ProceduralBlockSyntaxParsing,
+     BlockingAssignment_DynamicArrayNewToRangeIsError) {
+  auto r = Parse(
+      "module m;\n"
+      "  class C; endclass\n"
+      "  C ha[];\n"
+      "  int d2[][];\n"
+      "  initial begin\n"
+      "    d2 = new[4];\n"
+      "    d2[1:0] = new[4];\n"
+      "    d2[0+:2] = new[4];\n"
+      "    d2[1] = new[4];\n"
+      "    ha[1:0] = new;\n"
+      "  end\n"
+      "endmodule\n");
+  for (uint32_t line : {7u, 8u}) {
+    EXPECT_TRUE(ReportedError(r.diags,
+                              "a dynamic array's 'new' is assigned to a target "
+                              "with no part-select",
+                              line, "A.6.2"));
+  }
+  EXPECT_EQ(r.diags.size(), 2u);
 }
 
 }  // namespace

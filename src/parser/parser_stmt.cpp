@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -200,6 +201,96 @@ struct ParserStmtHelpers {
                     Subclause("A.6.8"));
     }
     return step;
+  }
+
+  // A.6.2 (printed page 1198) writes an assignment's right-hand side as an
+  // expression, and A.8.3 (printed page 1210) gives the min:typ:max triple to
+  // mintypmax_expression alone, which an expression reaches only as A.8.4's
+  // parenthesized primary. The triple is read whole, so the statement's `;` is
+  // where the parse goes on.
+  static Expr* ParseAssignedExpr(Parser& p) {
+    Expr* rhs = p.ParseMinTypMaxExpr();
+    if (rhs->kind == ExprKind::kMinTypMax && !rhs->is_parenthesized) {
+      p.diag_.Error(rhs->range.start,
+                    "an assignment's right-hand side is an expression, which "
+                    "holds a min:typ:max triple only within parentheses",
+                    Subclause("A.6.2"));
+    }
+    return rhs;
+  }
+
+  // A.8.5's (printed page 1212) name form of an lvalue: a name, scoped or
+  // reached through member selects, under any selects.
+  static bool IsNamedLvalue(const Expr* e) {
+    static constexpr ExprKind kNamed[] = {
+        ExprKind::kIdentifier, ExprKind::kSelect, ExprKind::kMemberAccess};
+    return std::ranges::any_of(kNamed,
+                               [e](ExprKind kind) { return kind == e->kind; });
+  }
+
+  // Whether `e` has a form A.8.5 (printed page 1212) gives variable_lvalue,
+  // which covers every form it gives net_lvalue: a name under selects, a
+  // concatenation of such targets, an assignment pattern of them, typed or not,
+  // or a streaming concatenation. None is written in parentheses. A
+  // replication is left to §11.4.12.1's report on a target holding one.
+  static bool HasLvalueForm(const Expr* e) {
+    if (e->is_parenthesized) return false;
+    if (e->kind == ExprKind::kCast) {
+      return e->lhs->kind == ExprKind::kAssignmentPattern &&
+             HasLvalueForm(e->lhs);
+    }
+    if (e->kind == ExprKind::kConcatenation ||
+        e->kind == ExprKind::kAssignmentPattern) {
+      return std::ranges::all_of(e->elements, HasLvalueForm);
+    }
+    return IsNamedLvalue(e) || e->kind == ExprKind::kStreamingConcat ||
+           e->kind == ExprKind::kReplicate;
+  }
+
+  // A.6.2 (printed page 1198) writes the target of every procedural
+  // assignment as a variable_lvalue, and a force's or a release's as that or a
+  // net_lvalue.
+  static void CheckLvalueForm(Parser& p, const Expr* target) {
+    if (HasLvalueForm(target)) return;
+    p.diag_.Error(target->range.start,
+                  "this target is neither a variable_lvalue nor a net_lvalue",
+                  Subclause("A.8.5"));
+  }
+
+  // Whether the parse stands at `new [`, the dynamic_array_new of A.2.4.
+  static bool AtDynamicArrayNew(Parser& p) {
+    if (!p.Check(TokenKind::kKwNew)) return false;
+    auto saved = p.lexer_.SavePos();
+    p.Consume();
+    bool sized = p.Check(TokenKind::kLBracket);
+    p.lexer_.RestorePos(saved);
+    return sized;
+  }
+
+  // A.6.2 (printed page 1198) admits a `new` as the whole right-hand side of a
+  // blocking assignment in two forms: a dynamic_array_new assigned to a
+  // nonrange_variable_lvalue, a name whose selects hold no part-select, and a
+  // class_new assigned to a name under any select. Neither is a concatenation,
+  // a streaming concatenation or an assignment pattern.
+  static void CheckNewTarget(Parser& p, const Stmt* stmt, bool dynamic_new) {
+    if (!IsNewExpr(stmt->rhs)) return;
+    if (!IsNamedLvalue(stmt->lhs)) {
+      p.diag_.Error(stmt->lhs->range.start,
+                    "a 'new' is assigned to a variable, never to a "
+                    "concatenation, a streaming concatenation or an "
+                    "assignment pattern",
+                    Subclause("A.6.2"));
+      return;
+    }
+    if (!dynamic_new) return;
+    for (const Expr* e = stmt->lhs; e->kind == ExprKind::kSelect; e = e->base) {
+      if (e->index_end == nullptr) continue;
+      p.diag_.Error(stmt->lhs->range.start,
+                    "a dynamic array's 'new' is assigned to a target with no "
+                    "part-select",
+                    Subclause("A.6.2"));
+      return;
+    }
   }
 };
 
@@ -608,7 +699,7 @@ void Parser::ParseIntraAssignTiming(Stmt* stmt) {
     stmt->events = ParseEventList();
     Expect(TokenKind::kRParen, Subclause("9.4.5"));
   }
-  stmt->rhs = ParseMinTypMaxExpr();
+  stmt->rhs = ParserStmtHelpers::ParseAssignedExpr(*this);
 }
 
 Stmt* Parser::ParseAssignmentOrExprNoSemi() {
@@ -620,7 +711,9 @@ Stmt* Parser::ParseAssignmentOrExprNoSemi() {
   if (Match(TokenKind::kEq)) {
     stmt->kind = StmtKind::kBlockingAssign;
     stmt->lhs = lhs_expr;
+    bool dynamic_new = ParserStmtHelpers::AtDynamicArrayNew(*this);
     ParseIntraAssignTiming(stmt);
+    ParserStmtHelpers::CheckNewTarget(*this, stmt, dynamic_new);
   } else if (Match(TokenKind::kLtEq)) {
     stmt->kind = StmtKind::kNonblockingAssign;
     stmt->lhs = lhs_expr;
@@ -629,7 +722,7 @@ Stmt* Parser::ParseAssignmentOrExprNoSemi() {
     stmt->kind = StmtKind::kBlockingAssign;
     stmt->lhs = lhs_expr;
     auto op_tok = Consume();
-    stmt->rhs = ParseExpr();
+    stmt->rhs = ParserStmtHelpers::ParseAssignedExpr(*this);
     stmt->delay = nullptr;
 
     auto* bin = arena_.Create<Expr>();
@@ -651,6 +744,9 @@ Stmt* Parser::ParseAssignmentOrExprNoSemi() {
                   "the right-hand side of an assignment",
                   Subclause("A.6.9"));
     }
+  }
+  if (stmt->kind != StmtKind::kExprStmt) {
+    ParserStmtHelpers::CheckLvalueForm(*this, lhs_expr);
   }
   return stmt;
 }
@@ -716,99 +812,13 @@ Stmt* Parser::ParseAssignmentOrExprStmt() {
   return stmt;
 }
 
-Stmt* Parser::ParseCycleDelayStmt() {
-  auto* stmt = arena_.Create<Stmt>();
-  stmt->kind = StmtKind::kCycleDelay;
-  stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kHashHash, Subclause("14.11"));
-  if (Check(TokenKind::kLParen)) {
-    Consume();
-    stmt->cycle_delay = ParseExpr();
-    Expect(TokenKind::kRParen, Subclause("14.11"));
-  } else {
-    stmt->cycle_delay = ParsePrimaryExpr();
-  }
-  stmt->body = ParseStmt();
-  return stmt;
-}
-
-Stmt* Parser::ParseDelayStmt() {
-  auto* stmt = arena_.Create<Stmt>();
-  stmt->kind = StmtKind::kDelay;
-  stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kHash, Subclause("9.4.1"));
-
-  if (Check(TokenKind::kLParen)) {
-    Consume();
-    stmt->delay = ParseMinTypMaxExpr();
-    Expect(TokenKind::kRParen, Subclause("9.4.1"));
-  } else {
-    stmt->delay = ParseDelayValue();
-  }
-  stmt->body = ParseStmt();
-  return stmt;
-}
-
-// §9.4 Syntax 9-4: a clocking_event written without parentheses is `@` and a
-// ps_identifier or hierarchical_identifier -- a name whose parts are joined by
-// periods, with a bit-select allowed ahead of each period -- and not an
-// expression. Read as an expression, it took in what the controlled statement
-// opens with: `@e -> f;` became a wait on §11.4.7's implication `e -> f`
-// guarding an empty statement, and `@e ++n;` a postfix increment of `e`.
-EventExpr Parser::ParseNamedClockingEvent() {
-  EventExpr ev;
-  Token first = CurrentToken();
-  // §14.14 has the $global_clock system function refer to the event of the
-  // effective global clocking declaration, and §16.5.2 writes it after `@`
-  // with no parentheses around it.
-  if (first.Is(TokenKind::kSystemIdentifier) && first.text == "$global_clock") {
-    ev.signal = ParseSystemCall();
-    return ev;
-  }
-  if (first.Is(TokenKind::kSystemIdentifier) && first.text == "$root") {
-    Consume();
-  } else {
-    first = ExpectIdentifier(Subclause("9.4.2"));
-  }
-  Expr* name = ParseMemberAccessChain(first);
-  while (AtSelectBracket()) {
-    name = ParseSelectExpr(name);
-    while (Check(TokenKind::kDot) || Check(TokenKind::kColonColon)) {
-      name = MakeMemberAccess(name);
-    }
-  }
-  ev.signal = name;
-  return ev;
-}
-
-Stmt* Parser::ParseEventControlStmt() {
-  auto* stmt = arena_.Create<Stmt>();
-  stmt->kind = StmtKind::kEventControl;
-  stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kAt, Subclause("9.4.2"));
-  if (Match(TokenKind::kStar)) {
-    stmt->is_star_event = true;
-  } else if (Check(TokenKind::kLParen)) {
-    Consume();
-    if (Match(TokenKind::kStar)) {
-      stmt->is_star_event = true;
-    } else {
-      stmt->events = ParseEventList();
-    }
-    Expect(TokenKind::kRParen, Subclause("9.4.2"));
-  } else {
-    stmt->events.push_back(ParseNamedClockingEvent());
-  }
-  stmt->body = ParseStmt();
-  return stmt;
-}
-
 Stmt* Parser::ParseProceduralAssignStmt() {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = StmtKind::kAssign;
   stmt->range.start = CurrentLoc();
   Expect(TokenKind::kKwAssign, Subclause("10.6.1"));
   stmt->lhs = ParseExpr();
+  ParserStmtHelpers::CheckLvalueForm(*this, stmt->lhs);
   Expect(TokenKind::kEq, Subclause("10.6.1"));
   stmt->rhs = ParseExpr();
   Expect(TokenKind::kSemicolon, Subclause("10.6.1"));
@@ -821,6 +831,7 @@ Stmt* Parser::ParseProceduralDeassignStmt() {
   stmt->range.start = CurrentLoc();
   Expect(TokenKind::kKwDeassign, Subclause("10.6.1"));
   stmt->lhs = ParseExpr();
+  ParserStmtHelpers::CheckLvalueForm(*this, stmt->lhs);
   Expect(TokenKind::kSemicolon, Subclause("10.6.1"));
   return stmt;
 }
@@ -831,6 +842,7 @@ Stmt* Parser::ParseForceStmt() {
   stmt->range.start = CurrentLoc();
   Expect(TokenKind::kKwForce, Subclause("10.6.2"));
   stmt->lhs = ParseExpr();
+  ParserStmtHelpers::CheckLvalueForm(*this, stmt->lhs);
   Expect(TokenKind::kEq, Subclause("10.6.2"));
   stmt->rhs = ParseExpr();
   Expect(TokenKind::kSemicolon, Subclause("10.6.2"));
@@ -843,6 +855,7 @@ Stmt* Parser::ParseReleaseStmt() {
   stmt->range.start = CurrentLoc();
   Expect(TokenKind::kKwRelease, Subclause("10.6.2"));
   stmt->lhs = ParseExpr();
+  ParserStmtHelpers::CheckLvalueForm(*this, stmt->lhs);
   Expect(TokenKind::kSemicolon, Subclause("10.6.2"));
   return stmt;
 }

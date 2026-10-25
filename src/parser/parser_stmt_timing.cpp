@@ -1,0 +1,103 @@
+// The procedural timing control statements of IEEE 1800-2023 §9.4 and the
+// cycle delay statement of §14.11: a delay, an event control and a cycle delay,
+// each followed by the statement it governs. They need nothing of
+// ParserStmtHelpers, which is file-local to parser_stmt.cpp, so they stand here
+// and keep that file inside the line limit assert-no-oversized-source-files
+// enforces.
+
+#include "common/diagnostic.h"
+#include "lexer/token.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_stmt.h"
+#include "parser/parser.h"
+
+namespace delta {
+
+Stmt* Parser::ParseCycleDelayStmt() {
+  auto* stmt = arena_.Create<Stmt>();
+  stmt->kind = StmtKind::kCycleDelay;
+  stmt->range.start = CurrentLoc();
+  Expect(TokenKind::kHashHash, Subclause("14.11"));
+  if (Check(TokenKind::kLParen)) {
+    Consume();
+    stmt->cycle_delay = ParseExpr();
+    Expect(TokenKind::kRParen, Subclause("14.11"));
+  } else {
+    stmt->cycle_delay = ParsePrimaryExpr();
+  }
+  stmt->body = ParseStmt();
+  return stmt;
+}
+
+Stmt* Parser::ParseDelayStmt() {
+  auto* stmt = arena_.Create<Stmt>();
+  stmt->kind = StmtKind::kDelay;
+  stmt->range.start = CurrentLoc();
+  Expect(TokenKind::kHash, Subclause("9.4.1"));
+
+  if (Check(TokenKind::kLParen)) {
+    Consume();
+    stmt->delay = ParseMinTypMaxExpr();
+    Expect(TokenKind::kRParen, Subclause("9.4.1"));
+  } else {
+    stmt->delay = ParseDelayValue();
+  }
+  stmt->body = ParseStmt();
+  return stmt;
+}
+
+// §9.4 Syntax 9-4: a clocking_event written without parentheses is `@` and a
+// ps_identifier or hierarchical_identifier -- a name whose parts are joined by
+// periods, with a bit-select allowed ahead of each period -- and not an
+// expression. Read as an expression, it took in what the controlled statement
+// opens with: `@e -> f;` became a wait on §11.4.7's implication `e -> f`
+// guarding an empty statement, and `@e ++n;` a postfix increment of `e`.
+EventExpr Parser::ParseNamedClockingEvent() {
+  EventExpr ev;
+  Token first = CurrentToken();
+  // §14.14 has the $global_clock system function refer to the event of the
+  // effective global clocking declaration, and §16.5.2 writes it after `@`
+  // with no parentheses around it.
+  if (first.Is(TokenKind::kSystemIdentifier) && first.text == "$global_clock") {
+    ev.signal = ParseSystemCall();
+    return ev;
+  }
+  if (first.Is(TokenKind::kSystemIdentifier) && first.text == "$root") {
+    Consume();
+  } else {
+    first = ExpectIdentifier(Subclause("9.4.2"));
+  }
+  Expr* name = ParseMemberAccessChain(first);
+  while (AtSelectBracket()) {
+    name = ParseSelectExpr(name);
+    while (Check(TokenKind::kDot) || Check(TokenKind::kColonColon)) {
+      name = MakeMemberAccess(name);
+    }
+  }
+  ev.signal = name;
+  return ev;
+}
+
+Stmt* Parser::ParseEventControlStmt() {
+  auto* stmt = arena_.Create<Stmt>();
+  stmt->kind = StmtKind::kEventControl;
+  stmt->range.start = CurrentLoc();
+  Expect(TokenKind::kAt, Subclause("9.4.2"));
+  if (Match(TokenKind::kStar)) {
+    stmt->is_star_event = true;
+  } else if (Check(TokenKind::kLParen)) {
+    Consume();
+    if (Match(TokenKind::kStar)) {
+      stmt->is_star_event = true;
+    } else {
+      stmt->events = ParseEventList();
+    }
+    Expect(TokenKind::kRParen, Subclause("9.4.2"));
+  } else {
+    stmt->events.push_back(ParseNamedClockingEvent());
+  }
+  stmt->body = ParseStmt();
+  return stmt;
+}
+
+}  // namespace delta

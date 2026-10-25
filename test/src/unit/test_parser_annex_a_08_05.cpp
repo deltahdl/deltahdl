@@ -1,7 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <initializer_list>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -482,6 +486,69 @@ TEST(LvalueParsing, VarLvalueWithPackageScope) {
   ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->lhs, nullptr);
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kMemberAccess);
+}
+
+// A.6.2 (printed page 1198) writes the target of a blocking, a nonblocking and
+// an operator assignment as a variable_lvalue, which A.8.5 (printed page 1212)
+// gives four forms: a name under selects, a concatenation or an assignment
+// pattern of variable_lvalues (typed or not), and a streaming concatenation.
+// None is written in parentheses, whole or as an element, and a literal or a
+// cast of a name is none of them.
+TEST(LvalueParsing, ProceduralTargetOfNoVariableLvalueFormIsError) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef struct packed { logic a; logic b; } pair_t;\n"
+      "  logic a, b;\n"
+      "  initial begin\n"
+      "    (a) = b;\n"
+      "    (a) <= b;\n"
+      "    (a) += b;\n"
+      "    1'b0 = b;\n"
+      "    {a, (b)} = 2'b00;\n"
+      "    pair_t'{a, (b)} = 2'b00;\n"
+      "    a = b;\n"
+      "    {a, b} = 2'b00;\n"
+      "    pair_t'{a, b} = 2'b00;\n"
+      "    '{a, b} = 2'b00;\n"
+      "    {>>{a, b}} = 2'b00;\n"
+      "  end\n"
+      "  initial int'(a) = b;\n"
+      "endmodule\n");
+  for (uint32_t line : {5u, 6u, 7u, 8u, 9u, 10u, 17u}) {
+    EXPECT_TRUE(ReportedError(
+        r.diags, "this target is neither a variable_lvalue nor a net_lvalue",
+        line, "A.8.5"));
+  }
+  EXPECT_EQ(r.diags.size(), 7u);
+}
+
+// A.6.2 (printed page 1198) writes the target of a procedural assign and a
+// deassign as a variable_lvalue, and that of a force and a release as a
+// variable_lvalue or a net_lvalue; A.8.5 (printed page 1212) writes neither in
+// parentheses or as an operation.
+TEST(LvalueParsing, ProceduralContinuousTargetOfNoLvalueFormIsError) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic a, b;\n"
+      "  wire w;\n"
+      "  initial begin\n"
+      "    assign (a) = b;\n"
+      "    deassign (a);\n"
+      "    force (w) = b;\n"
+      "    release (w);\n"
+      "    force a + b = 1'b0;\n"
+      "    assign a = b;\n"
+      "    force w = b;\n"
+      "    release {a, w};\n"
+      "    deassign a;\n"
+      "  end\n"
+      "endmodule\n");
+  for (uint32_t line : {5u, 6u, 7u, 8u, 9u}) {
+    EXPECT_TRUE(ReportedError(
+        r.diags, "this target is neither a variable_lvalue nor a net_lvalue",
+        line, "A.8.5"));
+  }
+  EXPECT_EQ(r.diags.size(), 5u);
 }
 
 }  // namespace

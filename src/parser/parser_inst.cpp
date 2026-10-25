@@ -10,6 +10,7 @@
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -486,6 +487,22 @@ static ModuleItemKind AlwaysKindToItemKind(AlwaysKind kind) {
   return ModuleItemKind::kAlwaysBlock;
 }
 
+// A.6.2 (printed page 1197) gives an always procedure and a final procedure a
+// statement, where an initial procedure takes a statement_or_null, and A.6.4
+// (printed page 1198) writes the null statement as an alternative of
+// statement_or_null alone. `loc` is where the body opens, since a null
+// statement records no position of its own.
+static void ReportNullProcedureBody(const Stmt* body, SourceLoc loc,
+                                    std::string_view procedure,
+                                    DiagEngine& diag) {
+  if (body->kind != StmtKind::kNull) return;
+  diag.Error(loc,
+             std::format("{} procedure's body is a statement, which cannot be "
+                         "null",
+                         procedure),
+             Subclause("A.6.2"));
+}
+
 // §16.14.5: `always assert property (ps) action_block ;` and `always cover
 // property (ps) statement_or_null` are the forms the concurrent assertion
 // statements outside procedural code are equivalent to, an evaluation
@@ -511,7 +528,8 @@ ModuleItem* Parser::ParseAlwaysBlock(AlwaysKind kind) {
     if (statement != nullptr) return statement;
   }
 
-  if (Check(TokenKind::kAt)) {
+  bool has_event_control = Check(TokenKind::kAt);
+  if (has_event_control) {
     auto saved = lexer_.SavePos();
     Consume();
     // §9.4 Syntax 9-4 also writes the clocking event as `@` and a bare name,
@@ -538,7 +556,13 @@ ModuleItem* Parser::ParseAlwaysBlock(AlwaysKind kind) {
     }
   }
 
+  // An event control read above opens the procedure's statement, whose own
+  // body may be null.
+  SourceLoc body_loc = CurrentLoc();
   item->body = ParseStmt();
+  if (!has_event_control) {
+    ReportNullProcedureBody(item->body, body_loc, "an always", diag_);
+  }
   return item;
 }
 
@@ -561,7 +585,9 @@ ModuleItem* Parser::ParseFinalBlock() {
   item->kind = ModuleItemKind::kFinalBlock;
   item->loc = CurrentLoc();
   Consume();
+  SourceLoc body_loc = CurrentLoc();
   item->body = ParseStmt();
+  ReportNullProcedureBody(item->body, body_loc, "a final", diag_);
   return item;
 }
 
