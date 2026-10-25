@@ -1,4 +1,4 @@
-#include <utility>
+#include <cstdint>
 #include <vector>
 
 #include "common/arena.h"
@@ -94,14 +94,23 @@ void Parser::ParseSysClockingEventArg(Expr* call) {
 
 // Parses the comma-separated argument list, appending each argument (or
 // nullptr for an empty slot) to call->args; an "@event" terminates the list.
+// A.8.2 lets the first argument be a data_type, which $bits, $typename and the
+// array queries take (§20.6, §20.7), and writes the clocking event only after
+// a first expression.
 void Parser::ParseSysCallArgs(Expr* call) {
   if (Check(TokenKind::kComma)) {
     call->args.push_back(nullptr);
   } else {
-    call->args.push_back(ParseExpr());
+    call->args.push_back(ParseTypeOr(&Parser::ParseExpr));
   }
   while (Match(TokenKind::kComma)) {
     if (Check(TokenKind::kAt)) {
+      if (call->args.front() == nullptr) {
+        diag_.Error(CurrentLoc(),
+                    "a clocking event follows a system call's arguments only "
+                    "after a first expression",
+                    Subclause("A.8.2"));
+      }
       ParseSysClockingEventArg(call);
       break;
     }
@@ -126,8 +135,9 @@ Expr* Parser::ParseSystemCall() {
   // 1211) gives that identifier the select and method-call chain any
   // hierarchical identifier takes, so `$unit::q.size()`, `$unit::s.len()`
   // and `$unit::arr[0]` read through the same tail a `$root.` name reads
-  // and the same postfix loop a bare name takes (ParseIdentifierPostfixChain,
-  // expr_parser.cpp). Returned as the prefixed identifier alone, each was
+  // and the same name tail a bare name takes (ParseNameTail), whose with
+  // clause A.8.2 gives an array method on the name, `$unit::q.find with
+  // (item > 0)`. Returned as the prefixed identifier alone, each was
   // reported as a statement missing its ';' at the `.` or `[`. The head
   // identifier keeps the prefix in Expr::scope_prefix, which the simulator
   // resolves the unit's storage by (IdentifierLookupKey in
@@ -142,7 +152,7 @@ Expr* Parser::ParseSystemCall() {
     Expr* cast = TryParseIdentifierCast(UnitScopedTypeName(arena_, tok, name),
                                         &cast_handled);
     if (cast_handled) return cast;
-    return ParseIdentifierPostfixChain(ParseSysRootTail(name));
+    return ParseNameTail(ParseSysRootTail(name));
   }
   // §23.6 lets `$root` head a hierarchical name, and the name takes the tail
   // any name primary takes: `$root.top.arr[1][0]` and `$root.m.u.d.f()` were
@@ -181,19 +191,21 @@ Expr* Parser::ParseConcatenation() {
   auto loc = CurrentLoc();
   Expect(TokenKind::kLBrace, Subclause("11.4.12"));
 
+  // A.8.2 makes any primary a method call's root, and A.8.4 counts the empty
+  // unpacked array concatenation and a streaming concatenation among them.
   if (Check(TokenKind::kRBrace)) {
     Consume();
     auto* cat = arena_.Create<Expr>();
     cat->kind = ExprKind::kConcatenation;
     cat->range.start = loc;
-    return cat;
+    return ParseParenMethodTail(cat);
   }
 
   if (Check(TokenKind::kLtLt) || Check(TokenKind::kGtGt)) {
     auto dir = CurrentToken().kind;
     auto* sc = ParseStreamingConcat(dir);
     Expect(TokenKind::kRBrace, Subclause("11.4.14"));
-    return sc;
+    return ParseParenMethodTail(sc);
   }
 
   auto* first = ParseExpr();
@@ -235,20 +247,25 @@ Expr* Parser::ParseConcatenation() {
   return ParseParenMethodTail(AtSelectBracket() ? ParseSelectExpr(cat) : cat);
 }
 
-// A.8.4 lists a cast among the primaries and A.8.6 makes a primary the root
-// of a method call, `method_call_root . method_identifier`, so a member
-// select and a call may follow a cast: `Cols'(2).name()` is name() on the
-// value cast to Cols (§6.19.5.6), `string'(v).len()` len() on the string
+// A.8.2 makes any primary the root of a method call, `method_call_root .
+// method_call_body`, so a member select and a call may follow a cast, a
+// literal or an assignment pattern: `Cols'(2).name()` is name() on the value
+// cast to Cols (§6.19.5.6), `string'(v).len()` len() on the string
 // (§6.16.1), and `Cols'(1).next` the call with no argument list (§6.19.5.7).
 // Read as ending at the cast's ')', the '.' was reported as an unexpected
-// token. A select follows no cast: A.8.4 has a bit-select or part-select
-// apply to a hierarchical identifier and not to a primary.
-Expr* Parser::ParseCastMethodTail(Expr* cast) {
+// token. Each method_call_body is read whole: the method's name, the
+// attribute instances written after it, its argument list where one is
+// written, and an array method's or a randomize call's with clause. A select
+// follows no cast: A.8.4 has a bit-select or part-select apply to a
+// hierarchical identifier and not to a primary.
+Expr* Parser::ParseMethodTail(Expr* root) {
   while (Check(TokenKind::kDot)) {
-    cast = MakeMemberAccess(cast);
-    if (Check(TokenKind::kLParen)) cast = ParseCallExpr(cast);
+    root = MakeMemberAccess(root);
+    ParseAttributes();
+    if (Check(TokenKind::kLParen)) root = ParseCallExpr(root);
+    root = ParseWithClause(root);
   }
-  return cast;
+  return root;
 }
 
 Expr* Parser::ParseCastExpr() {
@@ -273,7 +290,7 @@ Expr* Parser::ParseCastExpr() {
   cast->range.start = type_tok.loc;
   cast->lhs = ParseExpr();
   Expect(TokenKind::kRParen, Subclause("6.24.1"));
-  return ParseCastMethodTail(cast);
+  return ParseMethodTail(cast);
 }
 
 bool WithOpensRange(Lexer& lexer) {
@@ -339,55 +356,183 @@ Expr* Parser::ParseWithClauseRange(bool in_stream_expression) {
   return range;
 }
 
-// A.8.2: a randomize_call's with-clause allows an identifier_list inside the
-// parentheses, while an array_manipulation_call's carries a single expression.
-// Either is tolerated: the first entry becomes the with-expression, and every
-// entry that is a bare identifier is collected as a name.
-std::vector<std::string_view> Parser::ParseWithClauseIdentifiers(Expr* expr) {
-  std::vector<std::string_view> ids;
-  if (Check(TokenKind::kRParen)) return ids;
-  expr->with_expr = ParseExpr();
-  if (expr->with_expr != nullptr &&
-      expr->with_expr->kind == ExprKind::kIdentifier)
-    ids.push_back(expr->with_expr->text);
-  while (Match(TokenKind::kComma)) {
-    Expr* next_id = ParseExpr();
-    if (next_id != nullptr && next_id->kind == ExprKind::kIdentifier)
-      ids.push_back(next_id->text);
+// A.8.2's randomize_call with clause after its `with`: an optional
+// parenthesized identifier_list, the names a restricted inline constraint
+// block resolves in the object (§18.7), which the simulator reads from
+// Expr::with_restrict_ids, and then the constraint block, which is required.
+// An entry that is no identifier is reported and read past.
+void Parser::ParseRandomizeWith(Expr* call) {
+  if (Match(TokenKind::kLParen)) {
+    call->with_has_parens = true;
+    if (!Check(TokenKind::kRParen)) {
+      do {
+        const Expr* entry = ParseExpr();
+        if (entry->kind == ExprKind::kIdentifier) {
+          call->with_restrict_ids.push_back(entry->text);
+        } else {
+          diag_.Error(entry->range.start,
+                      "a randomize call's with clause lists identifiers alone "
+                      "in its parentheses",
+                      Subclause("A.8.2"));
+        }
+      } while (Match(TokenKind::kComma));
+    }
+    Expect(TokenKind::kRParen, Subclause("18.7"));
   }
-  return ids;
+  if (!Check(TokenKind::kLBrace)) {
+    diag_.Error(CurrentLoc(),
+                "a randomize call's with clause ends in a constraint block",
+                Subclause("A.8.2"));
+    return;
+  }
+  Consume();
+  call->inline_constraint = CaptureInlineConstraintBlock();
 }
 
-// A.8.2's with clause of an array manipulation call, a parenthesized
-// expression, or of a randomize call, a constraint block. A `with` that opens
-// a bracketed range is left standing: A.8.1 writes that range after the whole
-// operand of a stream_expression, where Parser::ParseStreamingConcat reads it.
+namespace {
+
+// Which of A.8.2's with clauses the call before a `with` takes.
+enum class WithHost : std::uint8_t { kNone, kArrayMethod, kRandomize };
+
+// A randomize_call's for randomize written bare, under std:: or after a `.`;
+// an array_manipulation_call's for any other method named after a `.`; none
+// for anything else -- a name alone, a subroutine call, a select, or a name
+// under a scope other than std's.
+WithHost WithHostOf(const Expr* e) {
+  const Expr* name = e->kind == ExprKind::kCall ? e->lhs : e;
+  if (name->kind == ExprKind::kIdentifier) {
+    return name->text == "randomize" ? WithHost::kRandomize : WithHost::kNone;
+  }
+  if (name->kind != ExprKind::kMemberAccess) return WithHost::kNone;
+  const bool kRandomize = name->rhs->text == "randomize";
+  if (!name->is_scope_resolution) {
+    return kRandomize ? WithHost::kRandomize : WithHost::kArrayMethod;
+  }
+  return kRandomize && name->lhs->text == "std" ? WithHost::kRandomize
+                                                : WithHost::kNone;
+}
+
+constexpr const char* kOneWithExpression =
+    "an array method's with clause holds one expression in its parentheses";
+
+}  // namespace
+
+// A.8.2's with clause: after a randomize call, the form
+// Parser::ParseRandomizeWith reads; after an array method, one expression in
+// parentheses and no constraint block. A with clause after anything else is
+// reported and read as an array method's. A `with` that opens a bracketed
+// range is left standing: A.8.1 writes that range after the whole operand of
+// a stream_expression, where Parser::ParseStreamingConcat reads it.
 Expr* Parser::ParseWithClause(Expr* expr) {
   if (!Check(TokenKind::kKwWith) || WithOpensRange(lexer_)) return expr;
-  Consume();
-
-  if (Check(TokenKind::kLBrace)) {
-    Consume();
-    expr->inline_constraint = CaptureInlineConstraintBlock();
+  const WithHost kHost = WithHostOf(expr);
+  const Token kWith = Consume();
+  if (kHost == WithHost::kRandomize) {
+    ParseRandomizeWith(expr);
     return expr;
   }
-
-  Expect(TokenKind::kLParen, Subclause("7.12"));
-  expr->with_has_parens = true;
-  std::vector<std::string_view> ids = ParseWithClauseIdentifiers(expr);
-  Expect(TokenKind::kRParen, Subclause("7.12"));
-
+  if (kHost == WithHost::kNone) {
+    diag_.Error(
+        kWith.loc,
+        "a with clause follows only an array method call or a randomize call",
+        Subclause("A.8.2"));
+  }
+  if (!Check(TokenKind::kLBrace)) {
+    Expect(TokenKind::kLParen, Subclause("7.12"));
+    expr->with_has_parens = true;
+    if (Check(TokenKind::kRParen)) {
+      diag_.Error(CurrentLoc(), kOneWithExpression, Subclause("A.8.2"));
+    } else {
+      expr->with_expr = ParseExpr();
+    }
+    while (Check(TokenKind::kComma)) {
+      diag_.Error(CurrentLoc(), kOneWithExpression, Subclause("A.8.2"));
+      Consume();
+      ParseExpr();
+    }
+    Expect(TokenKind::kRParen, Subclause("7.12"));
+  }
   if (Check(TokenKind::kLBrace)) {
+    diag_.Error(CurrentLoc(),
+                "an array method's with clause takes no constraint block",
+                Subclause("A.8.2"));
     Consume();
-    expr->inline_constraint = CaptureInlineConstraintBlock();
-    // 18.7: the parenthesized names are the identifier_list of a restricted
-    // constraint block; keep them so the simulator limits which names resolve
-    // as the object's random variables. Recorded only when a constraint block
-    // actually follows, leaving the shared array-method `with (expr)` form (no
-    // trailing block) untouched.
-    expr->with_restrict_ids = std::move(ids);
+    CaptureInlineConstraintBlock();
   }
   return expr;
+}
+
+namespace {
+
+// §18.11 with A.8.2: an argument of a randomize() written bare that names a
+// variable through another, a member access or a select, which the
+// elaborator's scope randomize check reports under A.8.2.
+bool IsSelectedName(const Expr* arg) {
+  return arg->kind == ExprKind::kMemberAccess || arg->kind == ExprKind::kSelect;
+}
+
+// One position of a randomize call's argument list (see
+// Parser::CheckRandomizeArgList). `bare` is a randomize() written alone and
+// `std_form` one written std::randomize.
+void ReportRandomizeArg(const Expr* call, const Expr* arg, bool bare,
+                        bool std_form, DiagEngine& diag) {
+  if (arg == nullptr) {
+    diag.Error(call->range.start,
+               "a randomize call's argument list leaves no position empty",
+               Subclause("A.8.2"));
+    return;
+  }
+  // §18.11.1: null names no random variable, standing alone; it is lexed as
+  // an identifier.
+  if (arg->kind == ExprKind::kIdentifier) {
+    if (arg->text == "null" && call->args.size() > 1) {
+      diag.Error(arg->range.start,
+                 "'null' stands alone in a randomize call's argument list",
+                 Subclause("A.8.2"));
+    }
+    return;
+  }
+  if (std_form) {
+    diag.Error(arg->range.start,
+               "argument to std::randomize shall be a variable identifier",
+               Subclause("G.5"));
+    return;
+  }
+  if (bare && IsSelectedName(arg)) return;
+  diag.Error(arg->range.start,
+             "randomize() arguments shall be object property names, not "
+             "expressions",
+             Subclause("18.11"));
+}
+
+}  // namespace
+
+void Parser::CheckRandomizeArgList(const Expr* call) {
+  // A.8.2's randomize_call takes `( [ variable_identifier_list | null ] )`:
+  // names separated by commas, or null alone, and §18.11 limits the class
+  // method's arguments to the names of the object's properties. The call is
+  // recognized as a bare randomize(...) or as a call whose member name is
+  // randomize, and its list, read as any call's, is held to that form: no
+  // named argument, no empty position, no null beside a name, and no argument
+  // that is not a name -- under G.5 for std::randomize, which gives it the
+  // same variable_identifier_list, and under §18.11 otherwise. A member access
+  // or a select passed to a bare randomize() is left to the elaborator.
+  const Expr* callee = call->lhs;
+  const bool kBare = call->callee == "randomize";
+  if (!kBare && (callee->kind != ExprKind::kMemberAccess ||
+                 callee->rhs->text != "randomize")) {
+    return;
+  }
+  const bool kStd =
+      !kBare && callee->is_scope_resolution && callee->lhs->text == "std";
+  if (!call->arg_names.empty()) {
+    diag_.Error(call->range.start,
+                "a randomize call passes no argument by name",
+                Subclause("A.8.2"));
+  }
+  for (const Expr* arg : call->args) {
+    ReportRandomizeArg(call, arg, kBare, kStd, diag_);
+  }
 }
 
 }  // namespace delta

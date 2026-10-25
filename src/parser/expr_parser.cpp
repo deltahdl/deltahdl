@@ -447,36 +447,41 @@ Expr* MakeErrorExpr(Arena& arena, SourceLoc loc) {
 
 // type_reference primary ('type(...)' or the 'type' keyword), optionally used
 // as the casting_type of an assignment-pattern cast or, §6.23 listing casts
-// among the uses of a type reference, of a `'(expression)` cast.
+// among the uses of a type reference, of a `'(expression)` cast. A.8.2 makes
+// either cast, a primary, the root a method call may follow.
 Expr* Parser::ParseTypeRefPrimary() {
   auto* ref = ParseTypeRefExpr();
   if (Check(TokenKind::kApostropheLBrace)) {
     auto* pat = ParseAssignmentPattern();
-    return MakeNodeCast(arena_, ref, pat);
+    return ParseMethodTail(MakeNodeCast(arena_, ref, pat));
   }
   if (Match(TokenKind::kApostrophe)) {
     Expect(TokenKind::kLParen, Subclause("6.24.1"));
     auto* cast = MakeNodeCast(arena_, ref, ParseExpr());
     Expect(TokenKind::kRParen, Subclause("6.24.1"));
-    return cast;
+    return ParseMethodTail(cast);
   }
   return ref;
 }
 
+// A.8.2 makes any primary a method call's root (method_call_root), so a
+// literal, a size cast, an assignment pattern, null and $ each take the method
+// tail the other primaries take: `"abc".len()`, `T'{1, 2}.sum()`.
 Expr* Parser::ParsePrimaryExpr() {
   auto tok = CurrentToken();
 
   switch (tok.kind) {
     case TokenKind::kIntLiteral:
-      return ParseIntLiteralPrimary(tok);
+      return ParseMethodTail(ParseIntLiteralPrimary(tok));
     case TokenKind::kUnbasedUnsizedLiteral:
-      return MakeLiteral(ExprKind::kUnbasedUnsizedLiteral, tok);
+      return ParseMethodTail(
+          MakeLiteral(ExprKind::kUnbasedUnsizedLiteral, tok));
     case TokenKind::kRealLiteral:
-      return MakeLiteral(ExprKind::kRealLiteral, tok);
+      return ParseMethodTail(MakeLiteral(ExprKind::kRealLiteral, tok));
     case TokenKind::kTimeLiteral:
-      return MakeLiteral(ExprKind::kTimeLiteral, tok);
+      return ParseMethodTail(MakeLiteral(ExprKind::kTimeLiteral, tok));
     case TokenKind::kStringLiteral:
-      return MakeLiteral(ExprKind::kStringLiteral, tok);
+      return ParseMethodTail(MakeLiteral(ExprKind::kStringLiteral, tok));
     case TokenKind::kSystemIdentifier:
       return ParseSystemCall();
     case TokenKind::kIdentifier:
@@ -487,12 +492,12 @@ Expr* Parser::ParsePrimaryExpr() {
     case TokenKind::kLBrace:
       return ParseConcatenation();
     case TokenKind::kApostropheLBrace:
-      return ParseAssignmentPattern();
+      return ParseMethodTail(ParseAssignmentPattern());
     case TokenKind::kKwType:
       return ParseTypeRefPrimary();
     case TokenKind::kDollar:
     case TokenKind::kKwNull:
-      return MakeLiteral(ExprKind::kIdentifier, tok);
+      return ParseMethodTail(MakeLiteral(ExprKind::kIdentifier, tok));
     case TokenKind::kKwThis:
     case TokenKind::kKwSuper:
       return ParseThisOrSuperExpr();
@@ -529,7 +534,8 @@ Expr* Parser::ParseCastOrTypedPattern() {
                   Subclause("10.9"));
     }
     auto* pat = ParseAssignmentPattern();
-    return MakeTextCast(arena_, type_tok.text, type_tok.loc, pat);
+    return ParseMethodTail(
+        MakeTextCast(arena_, type_tok.text, type_tok.loc, pat));
   }
 
   if (Check(TokenKind::kApostrophe)) {
@@ -633,7 +639,7 @@ Expr* Parser::TryParseUserTypeCast(const Token& tok) {
 
   if (Check(TokenKind::kApostropheLBrace)) {
     auto* pat = ParseAssignmentPattern();
-    return MakeTextCast(arena_, tok.text, tok.loc, pat);
+    return ParseMethodTail(MakeTextCast(arena_, tok.text, tok.loc, pat));
   }
   if (!Check(TokenKind::kApostrophe)) return nullptr;
   auto saved = lexer_.SavePos();
@@ -646,7 +652,7 @@ Expr* Parser::TryParseUserTypeCast(const Token& tok) {
   auto* value = ParseExpr();
   auto* cast = MakeTextCast(arena_, tok.text, tok.loc, value);
   Expect(TokenKind::kRParen, Subclause("6.24.1"));
-  return ParseCastMethodTail(cast);
+  return ParseMethodTail(cast);
 }
 
 // An identifier or scoped name may be the casting_type of a cast: "id'{...}"
@@ -657,7 +663,7 @@ Expr* Parser::TryParseIdentifierCast(Expr* base, bool* handled) {
   *handled = true;
   if (Check(TokenKind::kApostropheLBrace)) {
     auto* pat = ParseAssignmentPattern();
-    return MakeNodeCast(arena_, base, pat);
+    return ParseMethodTail(MakeNodeCast(arena_, base, pat));
   }
   if (Check(TokenKind::kApostrophe)) {
     auto saved = lexer_.SavePos();
@@ -667,7 +673,7 @@ Expr* Parser::TryParseIdentifierCast(Expr* base, bool* handled) {
       auto* value = ParseExpr();
       auto* cast = MakeNodeCast(arena_, base, value);
       Expect(TokenKind::kRParen, Subclause("6.24.1"));
-      return ParseCastMethodTail(cast);
+      return ParseMethodTail(cast);
     }
     lexer_.RestorePos(saved);
   }
@@ -702,15 +708,13 @@ Expr* Parser::ParseIdentifierPostfixChain(Expr* result) {
   return result;
 }
 
-// Parse the member/select tail that may follow a 'with' clause expression.
+// Parse the member/select tail that may follow a 'with' clause expression or
+// a system call: its selects, and the methods Parser::ParseMethodTail reads
+// after each '.'.
 Expr* Parser::ParseWithClauseTail(Expr* result) {
   while (Check(TokenKind::kDot) || AtSelectBracket()) {
-    if (!Check(TokenKind::kDot)) {
-      result = ParseSelectExpr(result);
-      continue;
-    }
-    result = MakeMemberAccess(result);
-    if (Check(TokenKind::kLParen)) result = ParseCallExpr(result);
+    result = Check(TokenKind::kDot) ? ParseMethodTail(result)
+                                    : ParseSelectExpr(result);
   }
   return result;
 }
@@ -763,16 +767,28 @@ Expr* Parser::ParseIdentifierExpr() {
   return ParseNameTail(result);
 }
 
-void Parser::ParseTrailingNamedArgs(Expr* call) {
-  ParseNamedArg(call);
-  while (Match(TokenKind::kComma)) {
-    ParseNamedArg(call);
-  }
+namespace {
+
+// Whether `callee` is `super.new`, the one call A.1.9 lets write `default` in
+// place of its arguments (§8.17).
+bool IsSuperNewCallee(const Expr* callee) {
+  return callee != nullptr && callee->kind == ExprKind::kMemberAccess &&
+         callee->lhs->text == "super" && callee->rhs->text == "new";
 }
+
+}  // namespace
 
 void Parser::ParseCallArgs(Expr* call) {
   if (Check(TokenKind::kKwDefault)) {
     auto tok = Consume();
+    // A.8.2's list_of_arguments holds no `default`, which stands for a
+    // constructor's arguments in its super.new call alone.
+    if (!IsSuperNewCallee(call->lhs)) {
+      diag_.Error(tok.loc,
+                  "'default' stands in place of an argument list only in a "
+                  "constructor's super.new call",
+                  Subclause("A.8.2"));
+    }
     auto* expr = arena_.Create<Expr>();
     expr->kind = ExprKind::kIdentifier;
     expr->text = tok.text;
@@ -799,6 +815,14 @@ void Parser::ParseCallArgs(Expr* call) {
 }
 
 Expr* Parser::ParseCallExpr(Expr* callee) {
+  // A.8.2 writes an argument list after the name of a subroutine or a method
+  // alone, so none follows a call, `f(1)(2)`, or a select, `a[0](1)`.
+  if (callee->kind == ExprKind::kCall || callee->kind == ExprKind::kSelect) {
+    diag_.Error(CurrentLoc(),
+                "an argument list follows the name of a subroutine or a "
+                "method, not a call or a select",
+                Subclause("A.8.2"));
+  }
   auto* call = arena_.Create<Expr>();
   call->kind = ExprKind::kCall;
   call->callee = callee->text;
@@ -807,70 +831,6 @@ Expr* Parser::ParseCallExpr(Expr* callee) {
   ParseListOfArguments(call);
   CheckRandomizeArgList(call);
   return call;
-}
-
-namespace {
-
-// 18.11: a randomize() argument is one of the calling object's property names,
-// possibly indexed or reached through a member access. It is a variable
-// reference, never a computed expression.
-bool IsPropertyNameArg(const Expr* arg) {
-  switch (arg->kind) {
-    case ExprKind::kIdentifier:
-    case ExprKind::kMemberAccess:
-    case ExprKind::kSelect:
-      return true;
-    default:
-      return false;
-  }
-}
-
-}  // namespace
-
-namespace {
-
-// G.5: a call written as std::randomize, the scope randomize of 18.12 named
-// through the std package, whose form the subclause summarizes as randomize
-// [ ( [ variable_identifier_list ] ) ] [ with constraint_block ].
-bool IsStdRandomizeCall(const Expr* call) {
-  return call->lhs != nullptr && call->lhs->kind == ExprKind::kMemberAccess &&
-         call->lhs->is_scope_resolution && call->lhs->lhs != nullptr &&
-         call->lhs->lhs->text == "std";
-}
-
-}  // namespace
-
-void Parser::CheckRandomizeArgList(const Expr* call) {
-  // 18.11: randomize()'s inline random variable control list accepts only names
-  // of the calling object's properties; expressions are not allowed. Recognize
-  // the call either as a bare randomize(...) or as a method call whose member
-  // name is randomize, then reject any argument that is not a plain property
-  // reference. (A null argument, 18.11.1, is lexed as an identifier and so is
-  // accepted here.) G.5 gives std::randomize the narrower list of A.8.2's
-  // randomize_call, a variable_identifier_list, so for that form an argument
-  // that is not a variable identifier -- a member access, a select or any
-  // expression -- is rejected under G.5.
-  bool is_randomize =
-      call->callee == "randomize" ||
-      (call->lhs != nullptr && call->lhs->kind == ExprKind::kMemberAccess &&
-       call->lhs->rhs != nullptr && call->lhs->rhs->text == "randomize");
-  if (!is_randomize) return;
-  const bool kStd = IsStdRandomizeCall(call);
-  for (const Expr* arg : call->args) {
-    if (arg == nullptr) continue;
-    if (kStd) {
-      if (arg->kind == ExprKind::kIdentifier) continue;
-      diag_.Error(arg->range.start,
-                  "argument to std::randomize shall be a variable identifier",
-                  Subclause("G.5"));
-      continue;
-    }
-    if (IsPropertyNameArg(arg)) continue;
-    diag_.Error(arg->range.start,
-                "randomize() arguments shall be object property names, not "
-                "expressions",
-                Subclause("18.11"));
-  }
 }
 
 // 18.7: capture a randomize() with { constraint_block } body, positioned just

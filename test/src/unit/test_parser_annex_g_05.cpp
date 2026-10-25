@@ -71,17 +71,22 @@ TEST(RandomizeStdPackageParser, AnArgumentShallBeAVariableIdentifier) {
   }
 }
 
-// 18.11 against G.5: the class method randomize() admits a member access and
-// a select as property names, so the same arguments to obj.randomize parse,
-// and it is std::randomize alone that G.5 narrows.
-TEST(RandomizeStdPackageParser, TheClassMethodKeepsItsWiderList) {
+// 18.11 with A.8.2: the class method randomize() takes the names of the
+// object's properties, which A.8.2 writes as the variable_identifier_list
+// G.5 gives std::randomize, so a member access and a select are rejected at
+// the argument there too (#8060).
+TEST(RandomizeStdPackageParser, TheClassMethodTakesVariableIdentifiersToo) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
-      "    ok = obj.randomize(c.d, arr[0]);\n"
+      "    ok = obj.randomize(c.d);\n"
+      "    ok = obj.randomize(arr[0]);\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
+  constexpr const char* kMessage =
+      "randomize() arguments shall be object property names, not expressions";
+  EXPECT_TRUE(ReportedError(r.diags, kMessage, 3, "18.11"));
+  EXPECT_TRUE(ReportedError(r.diags, kMessage, 4, "18.11"));
 }
 
 }  // namespace

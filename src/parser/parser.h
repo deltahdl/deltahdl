@@ -740,7 +740,7 @@ class Parser {
   void CheckRandomizeArgList(const Expr* call);
   void ParseListOfArguments(Expr* call);
   void ParseCallArgs(Expr* call);
-  void ParseNamedArg(Expr* call);
+  Expr* ParseTypeOr(Expr* (Parser::*read)());
   void ParseTrailingNamedArgs(Expr* call);
   Expr* ParseMemberAccessChain(Token tok);
   bool StartsShallowCopySource();
@@ -751,7 +751,7 @@ class Parser {
   Expr* ParseIdentifierExpr();
   Expr* ParseLocalScopeExpr();
   Expr* TryParseIdentifierCast(Expr* base, bool* handled);
-  Expr* ParseCastMethodTail(Expr* cast);
+  Expr* ParseMethodTail(Expr* root);
   Expr* ParseParenMethodTail(Expr* paren);
   Expr* ParseIdentifierPostfixChain(Expr* result);
   Expr* ParseNameTail(Expr* result);
@@ -772,7 +772,7 @@ class Parser {
   Expr* ParseTypeRefExpr();
   Expr* ParseWithClause(Expr* expr);
   Expr* ParseWithClauseRange(bool in_stream_expression);
-  std::vector<std::string_view> ParseWithClauseIdentifiers(Expr* expr);
+  void ParseRandomizeWith(Expr* call);
   Expr* ParseParenExpr();
   Expr* ParseCompoundAssignExpr(Expr* lhs);
   Expr* ParseInsideExpr(Expr* lhs);

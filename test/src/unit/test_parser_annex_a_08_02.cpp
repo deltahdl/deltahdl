@@ -1,11 +1,16 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <string>
+#include <utility>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
 #include "helpers_subroutine_call_verify.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 
 using namespace delta;
 
@@ -631,6 +636,275 @@ TEST(SubroutineCallExprParsing, AnAssignmentInASecondPairOfParensTakesAMethod) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
+}
+
+// A.8.2's list_of_arguments holds no `default`: A.1.9 writes the keyword in
+// place of an argument list only in a constructor's super.new call (§8.17),
+// so it is reported in any other call and in a class new (#8055).
+TEST(SubroutineCallExprParsing, ADefaultArgumentListIsReportedOutsideSuperNew) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    x = f(default);\n"
+      "    obj.m(default);\n"
+      "    h = new(default);\n"
+      "    super.f(default);\n"
+      "  end\n"
+      "endmodule\n");
+  constexpr const char* kMessage =
+      "'default' stands in place of an argument list only in a constructor's "
+      "super.new call";
+  for (uint32_t line = 3; line <= 6; ++line) {
+    EXPECT_TRUE(ReportedError(r.diags, kMessage, line, "A.8.2"));
+  }
+}
+
+TEST(SubroutineCallExprParsing, SuperNewTakesADefaultArgumentList) {
+  EXPECT_TRUE(
+      ParseOk("class B;\n"
+              "  function new(int a); endfunction\n"
+              "endclass\n"
+              "class D extends B;\n"
+              "  function new(default);\n"
+              "    super.new(default);\n"
+              "  endfunction\n"
+              "endclass\n"));
+}
+
+// A.8.2 writes an argument list after the name of a subroutine or a method,
+// so none follows a call or a select (#8056).
+TEST(SubroutineCallExprParsing, AnArgumentListAfterACallOrASelectIsReported) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    x = f(1)(2);\n"
+      "    x = a[0](1);\n"
+      "  end\n"
+      "endmodule\n");
+  constexpr const char* kMessage =
+      "an argument list follows the name of a subroutine or a method, not a "
+      "call or a select";
+  EXPECT_TRUE(ReportedError(r.diags, kMessage, 3, "A.8.2"));
+  EXPECT_TRUE(ReportedError(r.diags, kMessage, 4, "A.8.2"));
+}
+
+// A.8.4 lets a select follow a call, and a member or a method follow either.
+TEST(SubroutineCallExprParsing, ASelectOrAMethodFollowsACall) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    x = f(1)[0];\n"
+              "    x = a[0].f(1);\n"
+              "    x = f(1).g();\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+// A.8.2 writes a with clause in an array_manipulation_call, after a method
+// named through `.`, and in a randomize_call, written bare, under std:: or as
+// a method; after anything else it is reported (#8057).
+TEST(SubroutineCallExprParsing, AWithClauseAfterNoArrayMethodOrRandomize) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    x = y with (z);\n"
+      "    x = f(1) with (z);\n"
+      "    x = a[0] with (z);\n"
+      "    x = pkg::randomize(v) with { v > 0; };\n"
+      "    x = pkg::q with (z);\n"
+      "  end\n"
+      "endmodule\n");
+  constexpr const char* kMessage =
+      "a with clause follows only an array method call or a randomize call";
+  for (uint32_t line = 3; line <= 7; ++line) {
+    EXPECT_TRUE(ReportedError(r.diags, kMessage, line, "A.8.2"));
+  }
+}
+
+TEST(SubroutineCallExprParsing, AnArrayMethodOrARandomizeCallTakesAWithClause) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    x = q.find with (item > 0);\n"
+              "    x = q.sum() with (item);\n"
+              "    x = randomize(v) with { v > 0; };\n"
+              "    x = std::randomize(v) with { v > 0; };\n"
+              "    x = obj.randomize with { v > 0; };\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+// A.8.2's randomize_call writes after `with` an optional parenthesized list
+// of identifiers and then a constraint block, which is required (#8058).
+TEST(SubroutineCallExprParsing, ARandomizeWithClauseNamesAndEndsInABlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    x = obj.randomize() with (a);\n"
+      "    x = obj.randomize() with (a + 1, b) { a > 0; };\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a randomize call's with clause ends in a constraint block", 3,
+      "A.8.2"));
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "a randomize call's with clause lists identifiers "
+                            "alone in its parentheses",
+                            4, "A.8.2"));
+}
+
+// A.8.2's array_manipulation_call writes after `with` one expression in
+// parentheses and no constraint block (#8059).
+TEST(SubroutineCallExprParsing, AnArrayMethodsWithClauseHoldsOneExpression) {
+  auto r = Parse(
+      "module m;\n"
+      "  int q[$];\n"
+      "  initial begin\n"
+      "    x = q.sum with { item > 0; };\n"
+      "    x = q.sum with (item) { item > 0; };\n"
+      "    x = q.sum with ();\n"
+      "    x = q.sum with (item, item + 1);\n"
+      "  end\n"
+      "endmodule\n");
+  constexpr const char* kBlock =
+      "an array method's with clause takes no constraint block";
+  constexpr const char* kOne =
+      "an array method's with clause holds one expression in its parentheses";
+  EXPECT_TRUE(ReportedError(r.diags, kBlock, 4, "A.8.2"));
+  EXPECT_TRUE(ReportedError(r.diags, kBlock, 5, "A.8.2"));
+  EXPECT_TRUE(ReportedError(r.diags, kOne, 6, "A.8.2"));
+  EXPECT_TRUE(ReportedError(r.diags, kOne, 7, "A.8.2"));
+}
+
+// A.8.2's randomize_call takes variable identifiers or `null` alone, so no
+// `null` beside a name, no empty position and no named argument (#8060).
+TEST(SubroutineCallExprParsing, ARandomizeArgumentListIsNamesOrNullAlone) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    x = obj.randomize(a, null);\n"
+      "    x = obj.randomize(a, , b);\n"
+      "    x = obj.randomize(.a(b));\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "'null' stands alone in a randomize call's argument list", 3,
+      "A.8.2"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a randomize call's argument list leaves no position empty", 4,
+      "A.8.2"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a randomize call passes no argument by name", 5, "A.8.2"));
+}
+
+// A.8.2's system_tf_call takes a data_type as its first argument, and A.2.2.1
+// gives a data_type a signing, the struct, union and enum types, a virtual
+// interface, chandle and event, none of which an expression spells: each is
+// read whole into a kTypeRef node carrying the type (#8061).
+TEST(SubroutineCallExprParsing, ASystemCallTakesATypeNoExpressionSpells) {
+  const std::pair<const char*, DataTypeKind> kTypes[] = {
+      {"int unsigned", DataTypeKind::kInt},
+      {"bit signed [3:0]", DataTypeKind::kBit},
+      {"struct packed { bit a; byte b; }", DataTypeKind::kStruct},
+      {"union packed { byte a; byte b; }", DataTypeKind::kUnion},
+      {"enum {A, B}", DataTypeKind::kEnum},
+      {"virtual ifc", DataTypeKind::kVirtualInterface},
+      {"chandle", DataTypeKind::kChandle},
+      {"event", DataTypeKind::kEvent},
+  };
+  for (const auto& [type, kind] : kTypes) {
+    auto r = Parse(std::string("module m;\n  initial s = $typename(") + type +
+                   ");\nendmodule\n");
+    EXPECT_FALSE(r.has_errors) << type;
+    const Expr* call = FirstInitialRHS(r);
+    ASSERT_NE(call, nullptr) << type;
+    ASSERT_EQ(call->args.size(), 1u) << type;
+    ASSERT_EQ(call->args[0]->kind, ExprKind::kTypeRef) << type;
+    ASSERT_NE(call->args[0]->type_value, nullptr) << type;
+    EXPECT_EQ(call->args[0]->type_value->kind, kind) << type;
+  }
+}
+
+// A.8.2 writes a system call's clocking event after a first expression, so
+// none follows an empty first position (#8062).
+TEST(SubroutineCallExprParsing, AClockingEventAfterAnEmptyFirstArgument) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic clk;\n"
+      "  initial x = $rose(, @(posedge clk));\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "a clocking event follows a system call's "
+                            "arguments only after a first expression",
+                            3, "A.8.2"));
+}
+
+TEST(SubroutineCallExprParsing, AClockingEventAfterAFirstExpression) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  logic clk, a;\n"
+              "  initial begin\n"
+              "    x = $rose(a, @(posedge clk));\n"
+              "    x = $past(a, 1, , @(posedge clk));\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+// A.8.2 makes any primary a method call's root, and A.8.4 counts among the
+// primaries a literal, an assignment pattern expression with or without its
+// type, the empty unpacked array concatenation, a streaming concatenation,
+// null, $, and a cast whose type is a size or a type reference (#8063).
+TEST(SubroutineCallExprParsing, EveryPrimaryTakesAMethodCall) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  typedef int arr_t [3];\n"
+              "  initial begin\n"
+              "    n = arr_t'{1, 2, 3}.sum();\n"
+              "    n = u_t'{1, 2}.sum();\n"
+              "    n = int'{1, 2}.sum();\n"
+              "    n = '{1, 2}.sum();\n"
+              "    n = type(arr_t)'{1, 2, 3}.sum();\n"
+              "    n = type(arr_t)'(q).sum();\n"
+              "    n = 8'(x).f();\n"
+              "    n = \"abc\".len();\n"
+              "    n = null.f();\n"
+              "    n = $.f();\n"
+              "    n = {}.size();\n"
+              "    n = {>>{a}}.size();\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+// A.8.2's method_call_body writes attribute instances between a method's name
+// and its arguments, whatever primary the method is called on (#8064).
+TEST(SubroutineCallExprParsing, AMethodOnAnyPrimaryTakesAttributeInstances) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int q[$];\n"
+              "  initial begin\n"
+              "    n = string'(s).len (* a *) ();\n"
+              "    n = (h).f (* a *) (1);\n"
+              "    n = $sformatf(\"%d\", n).len (* a *) ();\n"
+              "    n = q.find with (item > 0).size (* a *) ();\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+// A.8.2 lets an array method end in a with clause whatever primary it is
+// called on: the queue another with clause's call returns, a cast, or a
+// $unit:: name (#8065).
+TEST(SubroutineCallExprParsing, AnArrayMethodOnAnyPrimaryTakesAWithClause) {
+  EXPECT_TRUE(
+      ParseOk("typedef int q_t [$];\n"
+              "q_t q;\n"
+              "module m;\n"
+              "  q_t r;\n"
+              "  initial begin\n"
+              "    r = q.find with (item > 0).find with (item < 9);\n"
+              "    r = q_t'(r).find with (item > 0);\n"
+              "    r = $unit::q.find with (item > 0);\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 }  // namespace

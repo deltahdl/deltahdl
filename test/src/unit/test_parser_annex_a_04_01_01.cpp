@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <utility>
 #include <vector>
 
 #include "fixture_parser.h"
@@ -7,6 +8,7 @@
 #include "helpers_reported_error.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
+#include "parser/ast_type.h"
 
 using namespace delta;
 
@@ -373,6 +375,43 @@ TEST(ModuleInstantiationParsing, ParamExpressionMinTypMax) {
   EXPECT_EQ(insts[1]->inst_params[0].first, "W");
   ASSERT_NE(insts[1]->inst_params[0].second, nullptr);
   EXPECT_EQ(insts[1]->inst_params[0].second->kind, ExprKind::kMinTypMax);
+}
+
+// The data_type A.8.3 lets a param_expression be holds a signing and the
+// struct and enum types, which no expression spells: each is read whole into
+// a kTypeRef node, in a module instance's list as in a class
+// specialization's (#8066).
+TEST(ModuleInstantiationParsing, ParamExpressionDataTypeNoExpressionSpells) {
+  auto r = Parse(
+      "module m;\n"
+      "  sub #(int unsigned) u1();\n"
+      "  sub #(.T(struct packed { bit a; byte b; })) u2();\n"
+      "  initial x = C#(enum {A, B})::x;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  std::vector<ModuleItem*> insts;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kModuleInst) insts.push_back(item);
+  }
+  ASSERT_EQ(insts.size(), 2u);
+  const std::pair<const ModuleItem*, DataTypeKind> kWanted[] = {
+      {insts[0], DataTypeKind::kInt}, {insts[1], DataTypeKind::kStruct}};
+  for (const auto& [inst, kind] : kWanted) {
+    ASSERT_EQ(inst->inst_params.size(), 1u);
+    const Expr* value = inst->inst_params[0].second;
+    ASSERT_NE(value, nullptr);
+    ASSERT_EQ(value->kind, ExprKind::kTypeRef);
+    ASSERT_NE(value->type_value, nullptr);
+    EXPECT_EQ(value->type_value->kind, kind);
+  }
+  const Expr* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  ASSERT_EQ(rhs->kind, ExprKind::kMemberAccess);
+  ASSERT_EQ(rhs->lhs->elements.size(), 1u);
+  ASSERT_EQ(rhs->lhs->elements[0]->kind, ExprKind::kTypeRef);
+  ASSERT_NE(rhs->lhs->elements[0]->type_value, nullptr);
+  EXPECT_EQ(rhs->lhs->elements[0]->type_value->kind, DataTypeKind::kEnum);
 }
 
 }  // namespace

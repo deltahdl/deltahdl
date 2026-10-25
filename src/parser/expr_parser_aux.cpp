@@ -1,4 +1,5 @@
 #include "common/diagnostic.h"
+#include "lexer/lexer.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_type.h"
@@ -119,17 +120,21 @@ void Parser::ParseListOfArguments(Expr* call) {
   }
 }
 
-void Parser::ParseNamedArg(Expr* call) {
-  Expect(TokenKind::kDot, Subclause("13.5.4"));
-  auto name_tok = Expect(TokenKind::kIdentifier, Subclause("13.5.4"));
-  Expect(TokenKind::kLParen, Subclause("13.5.4"));
-  Expr* value = nullptr;
-  if (!Check(TokenKind::kRParen)) {
-    value = ParseExpr();
-  }
-  Expect(TokenKind::kRParen, Subclause("13.5.4"));
-  call->arg_names.push_back(name_tok.text);
-  call->args.push_back(value);
+// A.8.2's named arguments, `. identifier ( [ expression ] )` each, separated
+// by commas, which follow a call's positional ones.
+void Parser::ParseTrailingNamedArgs(Expr* call) {
+  do {
+    Expect(TokenKind::kDot, Subclause("13.5.4"));
+    auto name_tok = Expect(TokenKind::kIdentifier, Subclause("13.5.4"));
+    Expect(TokenKind::kLParen, Subclause("13.5.4"));
+    Expr* value = nullptr;
+    if (!Check(TokenKind::kRParen)) {
+      value = ParseExpr();
+    }
+    Expect(TokenKind::kRParen, Subclause("13.5.4"));
+    call->arg_names.push_back(name_tok.text);
+    call->args.push_back(value);
+  } while (Match(TokenKind::kComma));
 }
 
 Expr* Parser::ParseCompoundAssignExpr(Expr* lhs) {
@@ -219,60 +224,81 @@ Expr* Parser::ParseParenExpr() {
 // A.8.2 makes a method_call's root a primary and A.8.4 counts a parenthesized
 // mintypmax_expression among the primaries, so a method is called on the handle
 // a parenthesized expression yields (§8.4), `(sel ? x : y).f()`. The call
-// takes the tail a cast's does, and a randomize_call or array_manipulation_call
-// the with clause a name's call takes. Parser::ParseConcatenation reads the
-// same tail after a concatenation or a multiple concatenation, the other
-// primaries A.8.4 lists that end in a bracket.
+// takes the tail a cast's does, with the with clause a randomize_call or an
+// array_manipulation_call ends in. Parser::ParseConcatenation reads the same
+// tail after a concatenation, a multiple concatenation, the empty unpacked
+// array concatenation and a streaming concatenation, the other primaries A.8.4
+// lists that end in a bracket.
 Expr* Parser::ParseParenMethodTail(Expr* paren) {
   if (!Check(TokenKind::kDot)) return paren;
-  Expr* result = ParseWithClause(ParseCastMethodTail(paren));
+  Expr* result = ParseMethodTail(paren);
   if (result->with_expr == nullptr) return result;
   return ParseWithClauseTail(result);
+}
+
+namespace {
+
+// Whether the lexer stands at a data_type of A.2.2.1 that ParseExpr cannot
+// spell as a name with its packed dimensions as selects: one opening with
+// struct, union, enum, virtual, chandle or event, or a type keyword that
+// `signed` or `unsigned` follows.
+bool OpensTypeAnExpressionCannotSpell(Lexer& lexer) {
+  switch (lexer.Peek().kind) {
+    case TokenKind::kKwStruct:
+    case TokenKind::kKwUnion:
+    case TokenKind::kKwEnum:
+    case TokenKind::kKwVirtual:
+    case TokenKind::kKwChandle:
+    case TokenKind::kKwEvent:
+      return true;
+    default:
+      break;
+  }
+  if (!IsDataTypeKeyword(lexer.Peek().kind)) return false;
+  Lexer::SavedPos saved = lexer.SavePos();
+  lexer.Next();
+  const TokenKind kNext = lexer.Peek().kind;
+  lexer.RestorePos(saved);
+  return kNext == TokenKind::kKwSigned || kNext == TokenKind::kKwUnsigned;
+}
+
+}  // namespace
+
+// A data_type where one is admitted beside an expression -- A.8.3's
+// param_expression, a system call's first argument (A.8.2) -- that ParseExpr
+// cannot spell, read by ParseDataType into a kTypeRef node carrying it in
+// Expr::type_value, the node `type(data_type)` makes; anything else is read by
+// `read`. ParseExpr spells a keyword type as a name with its packed
+// dimensions as selects, which the readers of such an argument take, so `int
+// unsigned` stopped at `unsigned` and `struct packed { ... }` at `struct`.
+Expr* Parser::ParseTypeOr(Expr* (Parser::*read)()) {
+  if (!OpensTypeAnExpressionCannotSpell(lexer_)) return (this->*read)();
+  auto* ref = arena_.Create<Expr>();
+  ref->kind = ExprKind::kTypeRef;
+  ref->range.start = CurrentLoc();
+  ref->type_value = arena_.Create<DataType>(ParseDataType());
+  return ref;
 }
 
 // §6.20 / Syntax 8-2: a parameter_value_assignment may be ordered (a bare
 // expression) or named (".name(value)"). Captures one element of either form,
 // recording the name in arg_names (empty for the ordered form) and the value in
-// elements.
-//
-// A.4.1.1 makes each element a param_expression (printed page 1194 of
-// IEEE 1800-2023), which A.8.3 lets be a data_type. ParseExpr spells a
-// keyword type as a name with its packed dimensions as selects, which the
-// elaborator's override readers take, but it cannot spell A.2.2.1's signing
-// after an integer type nor a virtual interface type (printed page 1182): `int
-// unsigned` stopped at `unsigned` and `virtual ifc` at `virtual`, each
-// reported as a missing `)`. An element that opens with `virtual`, or with a
-// type keyword that `signed` or `unsigned` follows, is read by ParseDataType
-// into a kTypeRef node carrying the type.
+// elements. A.4.1.1 makes each element a param_expression (printed page 1194
+// of IEEE 1800-2023), which A.8.3 lets be a data_type, read by ParseTypeOr.
 void Parser::ParseParamValueAssignment(Expr* base) {
-  auto parse_value = [this]() -> Expr* {
-    bool opens_a_type = Check(TokenKind::kKwVirtual);
-    if (!opens_a_type && IsDataTypeKeyword(CurrentToken().kind)) {
-      auto saved = lexer_.SavePos();
-      Consume();
-      opens_a_type =
-          Check(TokenKind::kKwSigned) || Check(TokenKind::kKwUnsigned);
-      lexer_.RestorePos(saved);
-    }
-    if (!opens_a_type) return ParseExpr();
-    auto* ref = arena_.Create<Expr>();
-    ref->kind = ExprKind::kTypeRef;
-    ref->range.start = CurrentLoc();
-    ref->type_value = arena_.Create<DataType>(ParseDataType());
-    return ref;
-  };
   if (Check(TokenKind::kDot)) {
     Consume();
     auto name_tok = Expect(TokenKind::kIdentifier, Subclause("23.10.2.2"));
     Expect(TokenKind::kLParen, Subclause("23.10.2.2"));
-    Expr* value = Check(TokenKind::kRParen) ? nullptr : parse_value();
+    Expr* value =
+        Check(TokenKind::kRParen) ? nullptr : ParseTypeOr(&Parser::ParseExpr);
     Expect(TokenKind::kRParen, Subclause("23.10.2.2"));
     base->arg_names.push_back(name_tok.text);
     base->elements.push_back(value);
     return;
   }
   base->arg_names.push_back({});
-  base->elements.push_back(parse_value());
+  base->elements.push_back(ParseTypeOr(&Parser::ParseExpr));
 }
 
 Expr* Parser::ParseParameterizedScope(Expr* base) {

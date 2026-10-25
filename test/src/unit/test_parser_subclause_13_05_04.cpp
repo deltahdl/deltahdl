@@ -122,8 +122,8 @@ TEST(TaskAndFunctionParsing, PositionalArgsNoNamedArgs) {
 //
 // The token asked for is what tells this report apart from the one the call
 // itself writes: Parser::ParseCallExpr has already found its own '(' by the
-// time Parser::ParseNamedArg looks for this one, so only the named argument can
-// report a '(' missing here.
+// time Parser::ParseTrailingNamedArgs looks for this one, so only the named
+// argument can report a '(' missing here.
 TEST(NamedArgument, MissingActualParenthesesName13_5_4) {
   auto r = Parse(
       "module m;\n"
@@ -138,13 +138,14 @@ TEST(NamedArgument, MissingActualParenthesesName13_5_4) {
 //
 // The token this stops at is inside the actual's own parentheses, which the
 // call's own ')' cannot be, so the subclause says which of the two ended the
-// argument list: Parser::ParseNamedArg's or Parser::ParseCallExpr's.
+// argument list: Parser::ParseTrailingNamedArgs's or Parser::ParseCallExpr's.
 //
 // A source whose named argument is whole reports §13.5 instead, and correctly:
 // in `foo(.a(1);` the ')' present closes the actual, so the argument is
 // complete and the ')' missing is the call's own. Reading that report as the
 // named argument's is the mistake this case and the one above exist to make
-// impossible, because both stop at a token only Parser::ParseNamedArg reaches.
+// impossible, because both stop at a token only Parser::ParseTrailingNamedArgs
+// reaches.
 TEST(NamedArgument, UnclosedActualNames13_5_4) {
   auto r = Parse(
       "module m;\n"

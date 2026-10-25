@@ -22,15 +22,29 @@ TEST(SubroutineCallExprParsing, VariableIdentifierList) {
 }
 
 // 18.11: randomize() accepts as arguments only names of the calling object's
-// properties; a general expression is not allowed. A property selected by index
-// is still a property name and remains acceptable.
-TEST(SubroutineCallExprParsing, PropertySelectArgIsAccepted) {
+// properties, which A.8.2 writes as a variable_identifier_list, so an element
+// a select picks out of a property is no argument (#8060).
+TEST(SubroutineCallExprParsing, PropertySelectArgIsRejected) {
   auto r = Parse(
       "module m;\n"
       "  initial begin obj.randomize(a, b[0]); end\n"
       "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "randomize() arguments shall be object property "
+                            "names, not expressions",
+                            2, "18.11"));
+}
+
+// 18.11: an expression is no argument of randomize() written bare either.
+TEST(SubroutineCallExprParsing, ExpressionArgToTheBareFormIsRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin randomize(a + 1); end\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "randomize() arguments shall be object property "
+                            "names, not expressions",
+                            2, "18.11"));
 }
 
 // 18.11: expressions are not allowed as randomize() arguments. An arithmetic

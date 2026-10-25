@@ -12,6 +12,7 @@
 
 #include <gtest/gtest.h>
 
+#include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
 using namespace delta;
@@ -117,6 +118,21 @@ TEST(SubroutineCallSim, ArrayReductionWithClause) {
                       "endmodule\n",
                       "r"),
             20u);  // 2*(1+2+3+4) == 20
+}
+
+// system_tf_call's data_type argument: a signed keyword type and a struct
+// type, which only the data_type reader spells, are sized by $bits from the
+// type itself and named by $typename with their signing (#8061).
+TEST(SubroutineCallSim, ASystemCallSizesAndNamesADataType) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  initial $display(\"%0d %0d %s\", $bits(int unsigned),\n"
+                 "      $bits(struct packed { bit a; byte b; }),\n"
+                 "      $typename(int unsigned));\n"
+                 "endmodule\n",
+                 f),
+      "32 9 int unsigned\n");
 }
 
 }  // namespace

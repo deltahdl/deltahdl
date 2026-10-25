@@ -189,8 +189,8 @@ void Parser::ParseParenList(std::vector<Expr*>& out) {
 // named_parameter_assignment, `. parameter_identifier ( [ param_expression ]
 // )`, or an ordered_parameter_assignment, a param_expression alone. A.8.3
 // spells param_expression `mintypmax_expression | data_type | $`, so the value
-// is read as a mintypmax_expression, which is an expression where no ':'
-// follows it.
+// is a data_type where it opens one no expression spells, and otherwise a
+// mintypmax_expression, which is an expression where no ':' follows it.
 bool Parser::ParseParamValueEntry(
     std::vector<std::pair<std::string_view, Expr*>>& out) {
   if (Match(TokenKind::kDot)) {
@@ -198,13 +198,13 @@ bool Parser::ParseParamValueEntry(
     Expect(TokenKind::kLParen, Subclause("23.10.2.2"));
     Expr* expr = nullptr;
     if (!Check(TokenKind::kRParen)) {
-      expr = ParseMinTypMaxExpr();
+      expr = ParseTypeOr(&Parser::ParseMinTypMaxExpr);
     }
     Expect(TokenKind::kRParen, Subclause("23.10.2.2"));
     out.push_back({name.text, expr});
     return true;
   }
-  out.push_back({{}, ParseMinTypMaxExpr()});
+  out.push_back({{}, ParseTypeOr(&Parser::ParseMinTypMaxExpr)});
   return false;
 }
 

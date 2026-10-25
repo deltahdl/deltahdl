@@ -129,6 +129,13 @@ Logic4Vec EvalBits(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
 
   auto* arg = expr->args[0];
+  // §20.6.2 with A.8.2: a data_type argument is as wide as the type, which the
+  // parser carries in Expr::type_value -- `$bits(int unsigned)` is 32, and a
+  // packed struct's width is its members'.
+  if (arg->type_value != nullptr) {
+    return MakeLogic4VecVal(arena, 32,
+                            DeclaredTypeWidth(*arg->type_value, ctx));
+  }
   // §20.6.2 (printed page 629): the bit count of the expression packed into a
   // bit stream, which for a fixed-size unpacked array is every element's bits
   // -- 16 for `logic [7:0] m [0:1]`, of a net array as of a variable one. Read
