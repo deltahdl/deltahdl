@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
@@ -76,8 +77,19 @@ Expr* Parser::ParseForeachArrayId() {
     lexer_.RestorePos(saved);
     return before_member;
   };
+  // Each select before a period is a constant_bit_select (A.8.4), so one with
+  // a range, `[1:0]` or `[0+:2]`, is reported.
   while (Check(TokenKind::kLBracket) && selects_before_a_member()) {
-    while (Check(TokenKind::kLBracket)) result = ParseSelectExpr(result);
+    while (Check(TokenKind::kLBracket)) {
+      SourceLoc loc = CurrentLoc();
+      result = ParseSelectExpr(result);
+      if (result->index_end != nullptr) {
+        diag_.Error(loc,
+                    "a foreach array is a hierarchical identifier, whose "
+                    "selects before a period are bit-selects",
+                    Subclause("A.6.8"));
+      }
+    }
     while (Check(TokenKind::kDot)) result = MakeMemberAccess(result);
   }
   return result;

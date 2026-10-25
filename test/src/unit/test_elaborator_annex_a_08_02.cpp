@@ -623,4 +623,29 @@ TEST(SubroutineCallElaborationSyntax, ACallNamingAUnitVariableIsReported) {
   }
 }
 
+// A.6.8's for_step_assignment takes a function_subroutine_call, whose
+// parentheses a call of a task, a void function or a method may leave off
+// (A.8.2). So a step naming a variable alone is a call naming data and is
+// reported, and a step naming a void function or a task is not.
+TEST(SubroutineCallElaborationSyntax, AForStepNamingDataIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int i;\n"
+      "  function void bump(); i++; endfunction\n"
+      "  task tick; endtask\n"
+      "  initial begin\n"
+      "    for (i = 0; i < 4; i) ;\n"
+      "    for (i = 0; i < 4; bump) ;\n"
+      "    for (i = 0; i < 4; tick) ;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'i' names a variable or a net, and a call names "
+                            "a task or a function",
+                            6, "A.8.2"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
+}
+
 }  // namespace

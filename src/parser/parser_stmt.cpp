@@ -177,18 +177,13 @@ struct ParserStmtHelpers {
   // of the three forms A.6.8 gives for_step_assignment: an
   // operator_assignment, which Parser::ParseAssignmentOrExprNoSemi records as
   // a StmtKind::kBlockingAssign for every assignment_operator; an
-  // inc_or_dec_expression; or a function_subroutine_call. A nonblocking
-  // assignment and a bare expression are neither.
+  // inc_or_dec_expression; or a function_subroutine_call, which A.8.2 writes
+  // as a statement's call is, a name or a member select alone among them. A
+  // nonblocking assignment and any other expression are neither.
   static bool IsForStepAssignment(const Stmt* step) {
     if (step->kind == StmtKind::kBlockingAssign) return true;
-    if (step->kind != StmtKind::kExprStmt || step->expr == nullptr) {
-      return false;
-    }
-    const Expr* e = step->expr;
-    if (e->kind == ExprKind::kCall || e->kind == ExprKind::kSystemCall) {
-      return true;
-    }
-    return IsIncOrDec(e);
+    return step->kind == StmtKind::kExprStmt && step->expr != nullptr &&
+           IsStatementExpr(step->expr);
   }
 
   static Stmt* ParseForStep(Parser& p) {

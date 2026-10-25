@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <initializer_list>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
@@ -807,19 +810,21 @@ TEST(LoopSyntaxParsing, ErrorForInitializationWithoutAssignmentRejected) {
 // for_step_assignment ::= operator_assignment | inc_or_dec_expression |
 //   function_subroutine_call
 // A bare expression and a nonblocking assignment are neither; each was
-// accepted silently.
+// accepted silently. A name or a member select alone is a call whose
+// parentheses are left off, as one of a task, a void function or a method may
+// be (A.8.2), so whether it names a subroutine is the elaborator's question.
 TEST(LoopSyntaxParsing, ErrorForStepOutsideItsThreeFormsRejected) {
   auto r = Parse(
       "module m;\n"
       "  int i;\n"
       "  initial begin\n"
-      "    for (i = 0; i < 4; i) ;\n"
+      "    for (i = 0; i < 4; bump, obj.advance) ;\n"
       "    for (i = 0; i < 4; i + 1) ;\n"
       "    for (i = 0; i < 4; i <= i + 1) ;\n"
       "    for (i = 0; i < 4; i++, i += 2, next(i), $urandom()) ;\n"
       "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(ReportedError(
+  EXPECT_FALSE(ReportedError(
       r.diags, "a for loop's step is an operator assignment", 4, "A.6.8"));
   EXPECT_TRUE(ReportedError(
       r.diags, "a for loop's step is an operator assignment", 5, "A.6.8"));
@@ -910,6 +915,30 @@ TEST(LoopSyntaxParsing, ForVariableOfATypeReferenceWithoutVarIsReported) {
                             "type_reference in a variable declaration must be "
                             "preceded by the 'var' keyword",
                             3, "6.23"));
+}
+
+// A.6.8's foreach array is an A.9.3 hierarchical_identifier, whose segments
+// before a period carry bit-selects alone, A.8.4's constant_bit_select. A
+// part-select and an indexed part-select there are reported; one bit-select
+// or several are not.
+TEST(LoopSyntaxParsing, AForeachArraySelectsBitsBeforeAPeriod) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    foreach (s[1:0].m[i]) begin end\n"
+      "    foreach (s[0+:2].m[i]) begin end\n"
+      "    foreach (s[1].m[i]) begin end\n"
+      "    foreach (s[1][2].m[i]) begin end\n"
+      "  end\n"
+      "endmodule\n");
+  for (uint32_t line : {3u, 4u}) {
+    EXPECT_TRUE(ReportedError(r.diags,
+                              "a foreach array is a hierarchical identifier, "
+                              "whose selects before a period are bit-selects",
+                              line, "A.6.8"))
+        << "line " << line;
+  }
+  EXPECT_EQ(r.diags.size(), 2u);
 }
 
 }  // namespace
