@@ -68,11 +68,23 @@ EventExpr Parser::ParseNamedClockingEvent() {
     first = ExpectIdentifier(Subclause("9.4.2"));
   }
   Expr* name = ParseMemberAccessChain(first);
+  // A.6.5: the name's bit-selects stand before a period, so one ending in a
+  // select is no hierarchical_identifier and is written in parentheses. It is
+  // read whole all the same, so the statement it governs still parses.
+  bool ends_in_select = false;
   while (AtSelectBracket()) {
     name = ParseSelectExpr(name);
+    ends_in_select = true;
     while (Check(TokenKind::kDot) || Check(TokenKind::kColonColon)) {
       name = MakeMemberAccess(name);
+      ends_in_select = false;
     }
+  }
+  if (ends_in_select) {
+    diag_.Error(name->range.start,
+                "an unparenthesized clocking event is '@' and a name; an "
+                "expression is parenthesized",
+                Subclause("A.6.5"));
   }
   ev.signal = name;
   return ev;

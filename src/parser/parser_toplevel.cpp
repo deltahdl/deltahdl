@@ -423,7 +423,7 @@ static bool IsStrength1Token(TokenKind k) {
 // parenthesis, has one of delay_value's forms: an unsigned_number, decimal
 // digits alone; a real_number or a time_literal; or a ps_identifier, a name
 // alone or behind one package scope, `p::` or `$unit::` (A.9.3). The fifth
-// form, 1step, is read by the sites that take it before they come here.
+// form, 1step, is read by Parser::ParseDelayValue before it comes here.
 static bool IsDelayValueForm(const Expr* delay) {
   switch (delay->kind) {
     case ExprKind::kIntegerLiteral:
@@ -451,8 +451,27 @@ static bool IsDelayValueForm(const Expr* delay) {
 // member names so that the construct after it still parses. A name stops at
 // a parenthesis, which after `#d` opens what the delay governs, the terminals
 // of a gate instance written with no name (A.3.1).
+//
+// The fifth form, 1step, reaches here as the number 1 and the name step, which
+// stand for it only when nothing separates them: `#1 step` is a delay of 1 and
+// whatever opens with step, a statement or a gate instance's name.
 Expr* Parser::ParseDelayValue() {
   SourceLoc loc = CurrentLoc();
+  if (Check(TokenKind::kIntLiteral) && CurrentToken().text == "1") {
+    auto saved = lexer_.SavePos();
+    Consume();
+    const Token kNext = CurrentToken();
+    if (kNext.Is(TokenKind::kIdentifier) && kNext.text == "step" &&
+        kNext.loc.line == loc.line && kNext.loc.column == loc.column + 1) {
+      Consume();
+      auto* one_step = arena_.Create<Expr>();
+      one_step->kind = ExprKind::kIntegerLiteral;
+      one_step->text = "1step";
+      one_step->range.start = loc;
+      return one_step;
+    }
+    lexer_.RestorePos(saved);
+  }
   Expr* delay = nullptr;
   if (CheckIdentifier()) {
     delay = ParseMemberAccessChain(Consume());
@@ -480,21 +499,6 @@ void Parser::ParseGateDelay(Expr*& d1, Expr*& d2, Expr*& d3) {
       if (Match(TokenKind::kComma)) d3 = ParseMinTypMaxExpr();
     }
     Expect(TokenKind::kRParen, Subclause("28.16"));
-  } else if (Check(TokenKind::kIntLiteral) && CurrentToken().text == "1") {
-    auto saved = lexer_.SavePos();
-    auto one_tok = CurrentToken();
-    Consume();
-    if (Check(TokenKind::kIdentifier) && CurrentToken().text == "step") {
-      Consume();
-      d1 = arena_.Create<Expr>();
-      d1->kind = ExprKind::kIntegerLiteral;
-      d1->text = "1step";
-      d1->int_val = 0;
-      d1->range.start = one_tok.loc;
-    } else {
-      lexer_.RestorePos(saved);
-      d1 = ParseDelayValue();
-    }
   } else {
     d1 = ParseDelayValue();
   }

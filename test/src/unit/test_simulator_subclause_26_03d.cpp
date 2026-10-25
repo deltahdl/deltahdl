@@ -531,7 +531,10 @@ TEST(PackageImportSim, PackageFixedSizeArrayInitializerReadingReExportedNames) {
 // §15.5.2 (printed page 378) with §26.3 (printed 808): the event control's
 // operand is a hierarchical_event_identifier, and a package's event is named
 // through the package scope resolution operator, so `@(p1::e)` blocks the
-// process until `-> p1::e` at time 3 triggers it: y reads 3. The control
+// process until the module triggers the event, which it imports, at time 3: y
+// reads 3. A.6.5 names a trigger's event by a hierarchical identifier alone, so
+// the trigger names the imported event rather than the qualified one. The
+// control
 // took an identifier alone for a named event (NamedEventKey in
 // stmt_exec_wait.cpp), so the scoped operand went to the value-change
 // awaiter, which resolved no variable for it and never resumed the process,
@@ -543,8 +546,9 @@ TEST(PackageImportSim, PackageEventAwaitedThroughTheQualifier) {
                       "  event e;\n"
                       "endpackage\n"
                       "module top;\n"
+                      "  import p1::*;\n"
                       "  int y = 0;\n"
-                      "  initial #3 -> p1::e;\n"
+                      "  initial #3 -> e;\n"
                       "  initial begin\n"
                       "    @(p1::e);\n"
                       "    y = $time;\n"
@@ -556,18 +560,19 @@ TEST(PackageImportSim, PackageEventAwaitedThroughTheQualifier) {
 
 // §15.5.3 (printed page 378) with §26.3 (printed 808): the wait construct
 // reads the triggered state of a hierarchical_event_identifier, a package's
-// through its qualifier, so `wait (p1::e.triggered)` unblocks when `-> p1::e`
-// fires at time 3: z reads 3. The wait armed on the names `p1` and `e` the
-// read collection took the scoped operand apart into, neither the event's
-// storage (CollectPackageScopedReads in stmt_exec_wait.cpp), so the process
-// waited for ever and z stayed 0.
+// through its qualifier, so `wait (p1::e.triggered)` unblocks when the module
+// triggers the event, which it imports, at time 3: z reads 3. The wait armed on
+// the names `p1` and `e` the read collection took the scoped operand apart
+// into, neither the event's storage (CollectPackageScopedReads in
+// stmt_exec_wait.cpp), so the process waited for ever and z stayed 0.
 TEST(PackageImportSim, PackageEventTriggeredStateWaitedOnThroughTheQualifier) {
   EXPECT_EQ(RunAndGet("package p1;\n"
                       "  event e;\n"
                       "endpackage\n"
                       "module top;\n"
+                      "  import p1::*;\n"
                       "  int z = 0;\n"
-                      "  initial #3 -> p1::e;\n"
+                      "  initial #3 -> e;\n"
                       "  initial begin\n"
                       "    wait (p1::e.triggered);\n"
                       "    z = $time;\n"
@@ -579,7 +584,8 @@ TEST(PackageImportSim, PackageEventTriggeredStateWaitedOnThroughTheQualifier) {
 
 // §15.5.3 (printed page 378) with §26.3 (printed 808): the triggered state
 // persists through the time step, read as the bare member and as the
-// method call alike, so both read 1 after `-> p1::e` in the same step:
+// method call alike, so both read 1 after the module triggers the event, which
+// it imports, in the same step:
 // 1 * 10 + 1. With Variable::is_event clear on the package's storage
 // (ShapePackageVariable in lowerer_package_data.cpp), the member read fell
 // to a structure-member lookup and the call to the user-method lookup, and
@@ -589,9 +595,10 @@ TEST(PackageImportSim, PackageEventTriggeredStateReadThroughTheQualifier) {
                       "  event e;\n"
                       "endpackage\n"
                       "module top;\n"
+                      "  import p1::*;\n"
                       "  int y;\n"
                       "  initial begin\n"
-                      "    -> p1::e;\n"
+                      "    -> e;\n"
                       "    y = p1::e.triggered * 10 + p1::e.triggered();\n"
                       "  end\n"
                       "endmodule\n",

@@ -6,6 +6,7 @@
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
+#include "parser/expr_parser_internal.h"
 #include "parser/parser.h"
 
 namespace delta {
@@ -60,21 +61,6 @@ void Parser::ParseClockingSkew(Edge& edge, Expr*& delay) {
     // the second is read as the parenthesized primary it is.
     if (Check(TokenKind::kLParen)) {
       delay = ParsePrimaryExpr();
-    } else if (Check(TokenKind::kIntLiteral) && CurrentToken().text == "1") {
-      auto saved = lexer_.SavePos();
-      auto one_tok = CurrentToken();
-      Consume();
-      if (Check(TokenKind::kIdentifier) && CurrentToken().text == "step") {
-        Consume();
-        delay = arena_.Create<Expr>();
-        delay->kind = ExprKind::kIntegerLiteral;
-        delay->text = "1step";
-        delay->int_val = 0;
-        delay->range.start = one_tok.loc;
-      } else {
-        lexer_.RestorePos(saved);
-        delay = ParseDelayValue();
-      }
     } else {
       delay = ParseDelayValue();
     }
@@ -343,28 +329,29 @@ void Parser::ParseClockingItem(ModuleItem* item) {
 
 // A.9.3: `hierarchical_identifier ::= [ $root . ] { identifier
 // constant_bit_select . } identifier`, so one is a chain of identifiers joined
-// by `.`, each of which may carry a bit select. `a`, `top.a` and `bus[1].a` are
-// hierarchical identifiers; `a + b` and `f(x)` are not.
+// by `.`, any but the last of which may carry bit-selects, and a bit-select is
+// never a range. `a`, `top.a` and `bus[1].a` are hierarchical identifiers;
+// `a + b`, `f(x)`, `bus[1]` and `bus[1:0].a` are not.
 //
 // The `::` form is not one. A.9.3 joins the components with `.` alone, and a
-// name reached through a class or package scope is a ps_identifier, which A.6.5
-// does not admit here.
-static bool IsHierarchicalIdentifier(const Expr* e) {
+// name reached through a class or package scope, `$unit::` among them, is a
+// ps_identifier, which A.6.5 does not admit where it writes this.
+bool IsHierarchicalName(const Expr* e, bool trailing_select) {
+  bool last = true;
   while (e != nullptr) {
-    if (e->kind == ExprKind::kIdentifier) return true;
+    if (e->kind == ExprKind::kIdentifier) return e->scope_prefix != "$unit";
     if (e->kind == ExprKind::kMemberAccess) {
       if (e->is_scope_resolution) return false;
       if (e->rhs == nullptr || e->rhs->kind != ExprKind::kIdentifier) {
         return false;
       }
       e = e->lhs;
+      last = false;
       continue;
     }
-    if (e->kind == ExprKind::kSelect) {
-      e = e->base;
-      continue;
-    }
-    return false;
+    if (e->kind != ExprKind::kSelect || e->index_end != nullptr) return false;
+    if (last && !trailing_select) return false;
+    e = e->base;
   }
   return false;
 }
@@ -382,7 +369,7 @@ static bool IsHierarchicalIdentifier(const Expr* e) {
 // covers a subroutine call there is that A.6.5 admits none.
 Expr* Parser::ParseWaitOrderOperand() {
   Expr* e = ParseExpr();
-  if (e != nullptr && !IsHierarchicalIdentifier(e)) {
+  if (e != nullptr && !IsHierarchicalName(e, false)) {
     diag_.Error(e->range.start,
                 "wait_order operand shall be a hierarchical identifier",
                 Subclause("15.5.4"));

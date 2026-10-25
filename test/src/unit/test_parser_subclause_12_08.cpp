@@ -113,7 +113,7 @@ TEST(JumpStatementSyntaxParsing, ReturnVoid) {
 // expression to yield. The optional `[ expression ]` of
 // the jump_statement production itself is covered by
 // JumpStatementSyntaxParsing.ReturnWithExpressionBnf in
-// test_parser_annex_a_06_05.cpp.
+// test_parser_annex_a_06_05a.cpp.
 TEST(JumpStatementSyntaxParsing, ReturnValueFromNonVoidFunction) {
   auto r = Parse(
       "module t;\n"

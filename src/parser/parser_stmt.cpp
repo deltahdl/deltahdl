@@ -292,6 +292,50 @@ struct ParserStmtHelpers {
       return;
     }
   }
+
+  // A.6.5's event_control after its `@`: `*`, `( * )`, a parenthesized
+  // event_expression, or the name Parser::ParseNamedClockingEvent reads, kept
+  // on `stmt` as an event control statement keeps it. A delay_or_event_control
+  // holds one after an assignment operator and after `->>`, directly or after
+  // a repeat count, and every form is read in each place. `subclause` is the
+  // rule the closing parenthesis is expected under.
+  static void ParseEventControlAfterAt(Parser& p, Stmt* stmt,
+                                       Subclause subclause) {
+    if (p.Match(TokenKind::kStar)) {
+      stmt->is_star_event = true;
+    } else if (p.Match(TokenKind::kLParen)) {
+      if (p.Match(TokenKind::kStar)) {
+        stmt->is_star_event = true;
+      } else {
+        stmt->events = p.ParseEventList();
+      }
+      p.Expect(TokenKind::kRParen, subclause);
+    } else {
+      stmt->events.push_back(p.ParseNamedClockingEvent());
+    }
+  }
+
+  // A.6.5 writes an event trigger's operand, after `->` or `->>`, as a
+  // hierarchical_event_identifier and a nonrange_select, the bit-selects and
+  // member selects A.8.4 writes after it. Reads the operand into `s`.
+  static void ParseEventTriggerOperand(Parser& p, Stmt* s) {
+    s->expr = p.ParseExpr();
+    if (IsHierarchicalName(s->expr, true)) return;
+    p.diag_.Error(s->expr->range.start,
+                  "an event trigger names an event: a hierarchical identifier "
+                  "and its bit-selects",
+                  Subclause("A.6.5"));
+  }
+
+  // A.6.5's `repeat ( expression ) event_control`, its `repeat` already read.
+  static void ParseRepeatEventControl(Parser& p, Stmt* stmt,
+                                      Subclause subclause) {
+    p.Expect(TokenKind::kLParen, subclause);
+    stmt->repeat_event_count = p.ParseExpr();
+    p.Expect(TokenKind::kRParen, subclause);
+    p.Expect(TokenKind::kAt, subclause);
+    ParseEventControlAfterAt(p, stmt, subclause);
+  }
 };
 
 static CaseQualifier TokenToCaseQualifier(TokenKind tk) {
@@ -432,7 +476,7 @@ Stmt* Parser::ParseEventTriggerStmt() {
   s->kind = StmtKind::kEventTrigger;
   s->range.start = CurrentLoc();
   Consume();
-  s->expr = ParseExpr();
+  ParserStmtHelpers::ParseEventTriggerOperand(*this, s);
   Expect(TokenKind::kSemicolon, Subclause("15.5.1"));
   return s;
 }
@@ -454,34 +498,12 @@ Stmt* Parser::ParseNbEventTriggerStmt() {
     } else {
       s->delay = ParseDelayValue();
     }
-  } else if (Check(TokenKind::kKwRepeat)) {
-    Consume();
-    Expect(TokenKind::kLParen, Subclause("15.5.1"));
-    s->repeat_event_count = ParseExpr();
-    Expect(TokenKind::kRParen, Subclause("15.5.1"));
-    Expect(TokenKind::kAt, Subclause("15.5.1"));
-    Expect(TokenKind::kLParen, Subclause("15.5.1"));
-    s->events = ParseEventList();
-    Expect(TokenKind::kRParen, Subclause("15.5.1"));
-  } else if (Check(TokenKind::kAt)) {
-    Consume();
-    if (Match(TokenKind::kStar)) {
-      s->is_star_event = true;
-    } else if (Check(TokenKind::kLParen)) {
-      Consume();
-      if (Match(TokenKind::kStar)) {
-        s->is_star_event = true;
-      } else {
-        s->events = ParseEventList();
-      }
-      Expect(TokenKind::kRParen, Subclause("15.5.1"));
-    } else {
-      EventExpr ev;
-      ev.signal = ParseExpr();
-      s->events.push_back(ev);
-    }
+  } else if (Match(TokenKind::kKwRepeat)) {
+    ParserStmtHelpers::ParseRepeatEventControl(*this, s, Subclause("15.5.1"));
+  } else if (Match(TokenKind::kAt)) {
+    ParserStmtHelpers::ParseEventControlAfterAt(*this, s, Subclause("15.5.1"));
   }
-  s->expr = ParseExpr();
+  ParserStmtHelpers::ParseEventTriggerOperand(*this, s);
   Expect(TokenKind::kSemicolon, Subclause("15.5.1"));
   return s;
 }
@@ -670,6 +692,14 @@ Stmt* Parser::ParseDisableStmt() {
 
   stmt->kind = StmtKind::kDisable;
   stmt->expr = ParseExpr();
+  // A.6.5: the target is a hierarchical_task_identifier or a
+  // hierarchical_block_identifier, each an A.9.3 hierarchical_identifier.
+  if (!IsHierarchicalName(stmt->expr, false)) {
+    diag_.Error(stmt->expr->range.start,
+                "a disable statement names a task or a block, which is a "
+                "hierarchical identifier",
+                Subclause("A.6.5"));
+  }
   Expect(TokenKind::kSemicolon, Subclause("9.6.2"));
   return stmt;
 }
@@ -693,20 +723,11 @@ void Parser::ParseIntraAssignTiming(Stmt* stmt) {
     } else {
       stmt->delay = ParseDelayValue();
     }
-  } else if (Check(TokenKind::kAt)) {
-    Consume();
-    Expect(TokenKind::kLParen, Subclause("9.4.5"));
-    stmt->events = ParseEventList();
-    Expect(TokenKind::kRParen, Subclause("9.4.5"));
-  } else if (Check(TokenKind::kKwRepeat)) {
-    Consume();
-    Expect(TokenKind::kLParen, Subclause("9.4.5"));
-    stmt->repeat_event_count = ParseExpr();
-    Expect(TokenKind::kRParen, Subclause("9.4.5"));
-    Expect(TokenKind::kAt, Subclause("9.4.5"));
-    Expect(TokenKind::kLParen, Subclause("9.4.5"));
-    stmt->events = ParseEventList();
-    Expect(TokenKind::kRParen, Subclause("9.4.5"));
+  } else if (Match(TokenKind::kAt)) {
+    ParserStmtHelpers::ParseEventControlAfterAt(*this, stmt,
+                                                Subclause("9.4.5"));
+  } else if (Match(TokenKind::kKwRepeat)) {
+    ParserStmtHelpers::ParseRepeatEventControl(*this, stmt, Subclause("9.4.5"));
   }
   stmt->rhs = ParserStmtHelpers::ParseAssignedExpr(*this);
 }

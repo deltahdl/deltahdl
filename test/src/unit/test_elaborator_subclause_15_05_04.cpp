@@ -49,16 +49,17 @@ TEST(WaitOrderElaborator, WaitOrderOnAnIntOperandIsReported) {
                             "15.5.4"));
 }
 
-// §15.5.4: an event, an element of an array of events and an event of a
-// typedef of event are each a wait_order operand.
-TEST(WaitOrderElaborator, WaitOrderOnEventsArrayElementsAndTypedefsElaborates) {
+// §15.5.4: an event and an event of a typedef of event are each a wait_order
+// operand. An element of an array of events is none: Syntax 15-2 writes the
+// operand as a hierarchical_identifier, whose last identifier takes no select.
+TEST(WaitOrderElaborator, WaitOrderOnEventsAndTypedefsElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  typedef event ev_t;\n"
-      "  event a, arr[2];\n"
+      "  event a;\n"
       "  ev_t te;\n"
-      "  initial wait_order (a, arr[0], te) else $display(\"out of order\");\n"
+      "  initial wait_order (a, te) else $display(\"out of order\");\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);

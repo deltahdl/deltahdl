@@ -400,7 +400,7 @@ uint64_t DelayValueToTicksIn(const Logic4Vec& val, const TimeScale& scale,
 }
 
 // A.2.2.3's fifth delay_value, which the parser writes as a literal spelled
-// `1step` (Parser::ParseGateDelay).
+// `1step` (Parser::ParseDelayValue).
 static bool IsOneStepDelay(const Expr* delay) {
   return delay->kind == ExprKind::kIntegerLiteral && delay->text == "1step";
 }

@@ -415,16 +415,19 @@ TEST(Simulator, EventPropertiesOfTwoObjectsAreDistinctEvents) {
 }
 
 // §6.17 with §8.9: a static event property is one event for the class and
-// every object of it, so a wait by the scope form `@Sync::e` returns at
-// `-> Sync::e`, a static task's wait on the bare `e` returns at the same
-// trigger, and a wait through an object's handle, `@x.e`, returns at a
-// trigger through the handle -- #3924's shapes, which woke nothing.
+// every object of it, so a wait by the scope form `@Sync::e` and a static
+// task's wait on the bare `e` both return at the trigger a static task of the
+// class makes, and a wait through an object's handle, `@x.e`, returns at a
+// trigger through the handle -- #3924's shapes, which woke nothing. A.6.5
+// names a trigger's event by a hierarchical identifier, so the class triggers
+// its event from within rather than through the scope form.
 TEST(Simulator, StaticEventPropertyIsTheClassesOneEvent) {
   SimFixture f;
   auto out = RunCapture(
       "class Sync;\n"
       "  static event e;\n"
       "  static task waiter(); @e; $display(\"task %0t\", $time); endtask\n"
+      "  static task fire(); -> e; endtask\n"
       "endclass\n"
       "module t;\n"
       "  Sync x = new;\n"
@@ -432,7 +435,7 @@ TEST(Simulator, StaticEventPropertyIsTheClassesOneEvent) {
       "    fork\n"
       "      begin @Sync::e; $display(\"scope %0t\", $time); end\n"
       "      Sync::waiter();\n"
-      "      #2 -> Sync::e;\n"
+      "      #2 Sync::fire();\n"
       "    join\n"
       "    fork\n"
       "      begin @x.e; $display(\"handle %0t\", $time); end\n"

@@ -45,6 +45,14 @@ Expr* MakeTextCast(Arena& arena, std::string_view type_text, SourceLoc start,
 // parser in parser_stmt.cpp, which takes no such `new` as a statement.
 bool IsNewExpr(const Expr* arg);
 
+// Whether `e` is an A.9.3 hierarchical_identifier: identifiers joined by `.`,
+// any but the last carrying bit-selects, with no class or package scope.
+// `trailing_select` admits bit-selects after the last identifier too, the
+// nonrange_select A.6.5 writes after an event trigger's name. Defined in
+// parser_clocking.cpp beside the wait_order operand it was written for, and
+// shared with the disable statement and the event triggers in parser_stmt.cpp.
+bool IsHierarchicalName(const Expr* e, bool trailing_select);
+
 // Builds a postfix increment/decrement node wrapping an already-parsed operand,
 // using the already-consumed operator's kind. Pure node construction; defined
 // in expr_parser.cpp after the primaries that use it, ParseThisOrSuperExpr and

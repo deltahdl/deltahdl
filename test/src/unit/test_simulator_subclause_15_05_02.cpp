@@ -304,7 +304,7 @@ TEST(NamedEventSim, EventPushedIntoAQueueIsTheSameEvent) {
       "  initial begin\n"
       "    q.push_back(e);\n"
       "    fork\n"
-      "      begin @q[0]; at = $time; end\n"
+      "      begin @(q[0]); at = $time; end\n"
       "      #2 -> e;\n"
       "    join\n"
       "  end\n"
