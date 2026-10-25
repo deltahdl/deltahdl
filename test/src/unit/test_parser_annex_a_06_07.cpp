@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <initializer_list>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
@@ -470,6 +473,68 @@ TEST(RandcaseItemParsing, RejectsDefaultLabel) {
   // A randcase_item begins with a weight expression, so `default` reaches
   // ParsePrimaryExpr, whose report is filed under §11.2.
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 4, "11.2"));
+}
+
+// A.6.7 writes `randcase randcase_item { randcase_item } endcase`, so a
+// randcase holds at least one item before its endcase.
+TEST(CaseStatementParsing, ARandcaseWithNoItemIsReported) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial randcase endcase\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a randcase statement holds at least one item", 2, "A.6.7"));
+  EXPECT_EQ(r.diags.size(), 1u);
+}
+
+// A.6.7 writes a pattern-matching case item as a pattern and at most one `&&&`
+// filter, an expression, which holds neither another `&&&` nor a `matches`
+// (A.8.6). Each is reported; one filter alone is not. A `matches` in
+// parentheses is reported once, as one outside a predicate.
+TEST(CaseStatementParsing, ACaseItemFilterIsOneExpression) {
+  auto r = Parse(
+      "module m;\n"
+      "  int x, n;\n"
+      "  initial case (x) matches\n"
+      "    .n &&& n > 0 &&& n < 9: x = 1;\n"
+      "    .n &&& n matches 3: x = 2;\n"
+      "    .n &&& n > 0: x = 3;\n"
+      "    .n &&& (n matches 3): x = 4;\n"
+      "  endcase\n"
+      "endmodule\n");
+  for (uint32_t line : {4u, 5u}) {
+    EXPECT_TRUE(ReportedError(r.diags,
+                              "a pattern-matching case item takes one '&&&' "
+                              "filter, which is an expression",
+                              line, "A.6.7"))
+        << "line " << line;
+  }
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "'matches' and '&&&' stand only in the predicate "
+                            "of an if statement or a conditional operator",
+                            7, "A.6.6"));
+  EXPECT_EQ(r.diags.size(), 3u);
+}
+
+// Nor does `matches` follow a case item's pattern, before its filter or not:
+// A.6.7.1 ends no pattern with it, and A.8.6 makes it no binary operator.
+TEST(CaseStatementParsing, ACaseItemPatternIsNotFollowedByMatches) {
+  auto r = Parse(
+      "module m;\n"
+      "  int x;\n"
+      "  initial case (x) matches\n"
+      "    .n matches 3: x = 1;\n"
+      "    .n matches 3 &&& x > 0: x = 2;\n"
+      "  endcase\n"
+      "endmodule\n");
+  for (uint32_t line : {4u, 5u}) {
+    EXPECT_TRUE(ReportedError(r.diags,
+                              "a pattern-matching case item's pattern takes a "
+                              "'&&&' filter, not 'matches'",
+                              line, "A.6.7"))
+        << "line " << line;
+  }
+  EXPECT_EQ(r.diags.size(), 2u);
 }
 
 }  // namespace

@@ -572,4 +572,31 @@ TEST(PatternParsing, APatternFormInsideAPatternIsAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// A replication, `'{ n { ... } }`, is an assignment pattern's form, and its
+// members are expressions (A.6.7.1). So a `.name` or a `.*` in a replication
+// within a pattern stands outside any pattern and is reported.
+TEST(PatternParsing, APatternFormInAReplicationIsReported) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef struct { int a, b; } s_t;\n"
+      "  s_t s;\n"
+      "  int x;\n"
+      "  initial begin\n"
+      "    if (s matches '{2{.p}}) x = 1;\n"
+      "    case (s) matches\n"
+      "      '{2{.*}}: x = 2;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  for (uint32_t line : {6u, 8u}) {
+    EXPECT_TRUE(ReportedError(r.diags,
+                              "'.name' and '.*' are patterns, which stand only "
+                              "after 'matches' or in a pattern-matching case "
+                              "item",
+                              line, "A.6.7.1"))
+        << "line " << line;
+  }
+  EXPECT_EQ(r.diags.size(), 2u);
+}
+
 }  // namespace

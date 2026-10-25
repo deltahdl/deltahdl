@@ -338,7 +338,38 @@ struct ParserStmtHelpers {
     ++p.pattern_depth_;
     Expr* head = p.ParseExprBp(0);
     --p.pattern_depth_;
+    CheckCasePatternHead(p, head);
     return head;
+  }
+
+  // Whether `e` is the operator `op` written bare. One in parentheses was
+  // reported where it stands, by Parser::ParseExpr.
+  static bool IsBarePredicate(const Expr* e, TokenKind op) {
+    return e->kind == ExprKind::kBinary && e->op == op && !e->is_parenthesized;
+  }
+
+  // A.6.7 writes a case_pattern_item as a pattern and at most one `&&&`
+  // filter, which is an expression, and neither `&&&` nor `matches` is a
+  // binary operator (A.8.6). So no `matches` follows the pattern, and the
+  // filter holds neither a second `&&&` nor a `matches`.
+  static void CheckCasePatternHead(Parser& p, const Expr* head) {
+    const Expr* pattern = head;
+    while (IsBarePredicate(pattern, TokenKind::kAmpAmpAmp))
+      pattern = pattern->lhs;
+    if (IsBarePredicate(pattern, TokenKind::kKwMatches)) {
+      p.diag_.Error(head->range.start,
+                    "a pattern-matching case item's pattern takes a '&&&' "
+                    "filter, not 'matches'",
+                    Subclause("A.6.7"));
+    }
+    if (IsBarePredicate(head, TokenKind::kAmpAmpAmp) &&
+        (IsBarePredicate(head->lhs, TokenKind::kAmpAmpAmp) ||
+         IsBarePredicate(head->rhs, TokenKind::kKwMatches))) {
+      p.diag_.Error(head->range.start,
+                    "a pattern-matching case item takes one '&&&' filter, "
+                    "which is an expression",
+                    Subclause("A.6.7"));
+    }
   }
 
   // A.6.5's `repeat ( expression ) event_control`, its `repeat` already read.

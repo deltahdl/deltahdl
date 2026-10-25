@@ -57,6 +57,12 @@ Stmt* Parser::ParseRandcaseStmt() {
     auto* body = ParseStmt();
     stmt->randcase_items.push_back({weight, body});
   }
+  // A.6.7 writes `randcase randcase_item { randcase_item } endcase`, so one
+  // item at least stands before endcase.
+  if (stmt->randcase_items.empty()) {
+    diag_.Error(CurrentLoc(), "a randcase statement holds at least one item",
+                Subclause("A.6.7"));
+  }
   Expect(TokenKind::kKwEndcase, Subclause("18.16"));
   stmt->range.end = CurrentLoc();
   return stmt;

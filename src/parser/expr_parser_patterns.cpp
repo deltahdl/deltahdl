@@ -1,4 +1,5 @@
 #include <cstddef>
+#include <utility>
 #include <vector>
 
 #include "common/diagnostic.h"
@@ -130,10 +131,14 @@ Expr* Parser::ParsePatternReplication(Expr* count, SourceLoc loc) {
   rep->repeat_count = count;
   rep->is_pattern_replication = true;
   rep->range.start = loc;
+  // A replication is an assignment pattern's form alone, and its members are
+  // expressions (A.6.7.1), so none of them is a pattern, even within one.
+  int depth = std::exchange(pattern_depth_, 0);
   rep->elements.push_back(ParseExpr());
   while (Match(TokenKind::kComma)) {
     rep->elements.push_back(ParseExpr());
   }
+  pattern_depth_ = depth;
   Expect(TokenKind::kRBrace, Subclause("10.9.1"));
   return rep;
 }
