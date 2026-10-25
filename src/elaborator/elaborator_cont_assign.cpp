@@ -351,13 +351,18 @@ static bool NamesParameter(std::string_view name, const RtlirModule* mod,
 
 // A driven terminal is read as a continuous assignment's target is, since
 // A.8.5's net_lvalue gives the two their elements; a form the parser already
-// reported as no net_lvalue yields no element, or fewer.
+// reported as no net_lvalue yields no element, or fewer. A terminal left empty
+// on a UDP instance written before its primitive's declaration is a null, and
+// yields none: Elaborator::ReclassifyForwardUdpInstances
+// (src/elaborator/elaborator_udp_inst.cpp) has already reported it.
 void ValidatePrimitiveDrivenTerminals(
     const ModuleItem* item, const RtlirModule* mod, const ScopeMap& scope,
     const std::vector<std::string_view>& gen_scopes, DiagEngine& diag) {
   std::vector<ContTargetLeaf> leaves;
-  for (size_t i : PrimitiveDrivenTerminalIndices(item))
+  for (size_t i : PrimitiveDrivenTerminalIndices(item)) {
+    if (item->gate_terminals[i] == nullptr) continue;
     CollectContTargetLeaves(item->gate_terminals[i], leaves);
+  }
   for (const ContTargetLeaf& leaf : leaves) {
     if (NamesParameter(leaf.root, mod, gen_scopes)) {
       diag.Error(item->loc,
