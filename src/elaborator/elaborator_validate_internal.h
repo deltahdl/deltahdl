@@ -535,6 +535,15 @@ struct ArrayPatternCheck {
 // key are no index keys. Defined in array_pattern_keys.cpp.
 void CheckArrayPatternIndexKeys(const ArrayPatternCheck& check,
                                 const Expr* pattern, SourceLoc loc);
+// What two array pattern keys are the same key by. §10.9's array keys are
+// constant expressions, so what a key names is its value: `3` and `N-1` with N
+// of 4 name the element between them once, not twice. A key that does not fold
+// here is answered for by how it was written, which still tells apart the two
+// halves of a key written the same way twice. Nothing for a key that neither
+// folds nor was written as a single name or literal -- there is no ground to
+// call two of those the same, and calling them so would report every pair of
+// them as a duplicate. Defined in array_pattern_keys.cpp.
+std::optional<std::string> ArrayPatternKeyIdentity(const Expr* key);
 std::string_view LhsBaseName(const Expr* e);
 // §5.10 and §5.11: the replication an assignment pattern consists of,
 // `'{n{...}}`, or null, and the items a positional pattern supplies, its
