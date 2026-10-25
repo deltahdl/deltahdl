@@ -129,6 +129,19 @@ std::optional<bool> ConstFuncTruth(const Expr* cond, const ScopeMap& scope);
 // §13.4.3: the constant function the call `call` names among those registered
 // (ConstFuncRegistryGuard), null for none. Defined in const_eval_func.cpp.
 const ModuleItem* RegisteredConstFunc(const Expr* call);
+// §11.12 with A.10 footnote 50: whether the call `call` of a let the
+// registered module declares is a constant_let_expression -- every argument
+// written is constant, and so is the let's body with its formals counted as
+// constants -- or none where `call` names no such let. Defined in
+// const_eval_let.cpp.
+std::optional<bool> LetCallIsConstant(const Expr* call, const ScopeMap& scope);
+// §11.12 with A.8.4: the value of the call `call` of a let the registered
+// module declares, the let's body folded with each formal bound to its
+// argument's value; none where `call` names no such let or a value does not
+// fold. Defined in const_eval_let.cpp.
+std::optional<ConstVal> ConstEvalLetCall(const Expr* call,
+                                         const ScopeMap& scope,
+                                         FoldContext ctx);
 // The value the constant function call `call` returns, as a real: the real a
 // function returning one returns, and an integral result converted. Defined in
 // const_eval_func.cpp.

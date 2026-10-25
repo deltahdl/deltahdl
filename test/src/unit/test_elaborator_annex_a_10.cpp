@@ -1,5 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <initializer_list>
+#include <string_view>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -400,6 +404,101 @@ TEST(BnfClarificationElaboration, TypeRefEqualityComparisonOk) {
              "  logic r;\n"
              "  assign r = type(a) == type(a);\n"
              "endmodule\n"));
+}
+
+// A.10 footnote 47 makes the `$` primary legal only in a select of a queue
+// variable, where it stands for the last element (§7.10.1). One in the select
+// of a fixed array, a vector or a dynamic array, or in a slice of one, is
+// reported; one in a queue's select, in the select of a variable declared with
+// a queue typedef, and in a value range is not (#8078).
+TEST(BnfClarificationElaboration, DollarInTheSelectOfANonQueueError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef int q_t [$];\n"
+      "  int a [0:3];\n"
+      "  logic [7:0] v;\n"
+      "  int d [];\n"
+      "  int q [$];\n"
+      "  q_t t;\n"
+      "  int x;\n"
+      "  int s [0:2];\n"
+      "  initial begin\n"
+      "    x = a[$];\n"
+      "    x = v[$];\n"
+      "    s = a[1:$];\n"
+      "    x = d[$-1];\n"
+      "    x = q[$];\n"
+      "    x = t[$];\n"
+      "    x = int'(x inside {[0:$]});\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  constexpr std::string_view kMessage =
+      "'$' may stand only in a queue's dimension or select";
+  for (uint32_t line : {11U, 12U, 13U, 14U}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, line, "6.20.7"))
+        << line;
+  }
+  for (uint32_t line : {15U, 16U, 17U}) {
+    EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kMessage, line, "6.20.7"))
+        << line;
+  }
+}
+
+// A.10 footnote 45 admits a type reference to no operator but the four
+// equality operators, and `inside` is §11.4.13's set membership operator, so a
+// type reference as its left operand or as an item of its range list is
+// reported, once for each `inside` (#8082).
+TEST(BnfClarificationElaboration, TypeRefAsAnInsideOperandError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int a;\n"
+      "  bit b;\n"
+      "  initial begin\n"
+      "    b = type(a) inside {1, 2};\n"
+      "    b = a inside {type(int)};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {5U, 6U}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "a type reference may only be used with the "
+                              "equality, inequality, and case "
+                              "equality/inequality operators",
+                              line, "6.23"))
+        << line;
+  }
+}
+
+// A.10 footnote 45 holds wherever a type reference stands, so one under any
+// other operator is reported in a localparam's value, a declaration's
+// initializer, a function's body and a block variable's initializer as in a
+// procedural assignment (#8083).
+TEST(BnfClarificationElaboration, TypeRefOperatorAnywhereError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int a;\n"
+      "  localparam bit P = type(a) & 1;\n"
+      "  bit d = !type(a);\n"
+      "  function bit f();\n"
+      "    return type(a) + 1;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    automatic bit x = type(a) | 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {3U, 4U, 6U, 9U}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "a type reference may only be used with the "
+                              "equality, inequality, and case "
+                              "equality/inequality operators",
+                              line, "6.23"))
+        << line;
+  }
 }
 
 }  // namespace

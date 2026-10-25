@@ -784,6 +784,8 @@ static std::optional<ConstVal> ConstEvalNode(const Expr* expr,
       // user function and would never be found in the §13.4.3 registry below.
       if (auto builtin = ConstEvalBuiltinMethodFull(expr, scope))
         return builtin;
+      // §11.12 with A.8.4: a call of a let is a constant_let_expression.
+      if (auto let = ConstEvalLetCall(expr, scope, ctx)) return let;
       // §13.4.3: a call to a user-defined constant function folds at
       // elaboration time.
       return ConstEvalUserCall(expr, scope);

@@ -180,6 +180,7 @@ bool IsConstantExpr(const Expr* expr, const ScopeMap& scope) {
     case ExprKind::kCall:
       if (auto builtin = BuiltinMethodCallIsConstant(expr, scope))
         return *builtin;
+      if (auto let = LetCallIsConstant(expr, scope)) return *let;
       return AllElementsConstant(expr->args, scope);
     case ExprKind::kMemberAccess:
       return IsConstantMemberAccessExpr(expr, scope);

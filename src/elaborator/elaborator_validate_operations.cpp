@@ -1,5 +1,6 @@
 #include "elaborator/elaborator_validate_operations.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <format>
 #include <optional>
@@ -330,10 +331,15 @@ std::optional<int64_t> ElaboratorOperationRules::EvalConstTypeRefCompare(
   return (matched != is_negated) ? 1 : 0;
 }
 
+static bool IsTypeRef(const Expr* e) {
+  return e != nullptr && e->kind == ExprKind::kTypeRef;
+}
+
 // A.10 footnote 45 with §11.11 Syntax 11-7: a type_reference primary takes
-// none of the unary operators and no part of a conditional, whose predicate
-// and branches are operands as a binary operator's are. A unary operator's and
-// a conditional's operands are always written, so none is null here.
+// none of the unary operators, no part of a conditional, whose predicate and
+// branches are operands as a binary operator's are, and no part of §11.4.13's
+// set membership operator. Those operands are always written, so none is null
+// here.
 void ElaboratorOperationRules::ReportTypeRefOperand(const Expr* operand,
                                                     const Expr* op) {
   if (operand->kind != ExprKind::kTypeRef) return;
@@ -351,14 +357,20 @@ void ElaboratorOperationRules::WalkExprForTypeRefCompare(const Expr* expr) {
     ReportTypeRefOperand(expr->true_expr, expr);
     ReportTypeRefOperand(expr->false_expr, expr);
   }
+  // `inside` is reported once, at the first type reference among the items of
+  // its range list, or else at its left operand where that is one.
+  if (expr->kind == ExprKind::kInside) {
+    const auto kItem = std::ranges::find_if(expr->elements, IsTypeRef);
+    ReportTypeRefOperand(kItem == expr->elements.end() ? expr->lhs : *kItem,
+                         expr);
+  }
   if (expr->kind == ExprKind::kBinary) {
     bool is_equality =
         expr->op == TokenKind::kEqEq || expr->op == TokenKind::kBangEq ||
         expr->op == TokenKind::kEqEqEq || expr->op == TokenKind::kBangEqEq;
     if (is_equality) {
       CheckTypeRefCompareOp(expr);
-    } else if ((expr->lhs && expr->lhs->kind == ExprKind::kTypeRef) ||
-               (expr->rhs && expr->rhs->kind == ExprKind::kTypeRef)) {
+    } else if (IsTypeRef(expr->lhs) || IsTypeRef(expr->rhs)) {
       // §A.10: a type_reference primary is restricted to the equality,
       // inequality, case-equality, and case-inequality operators (and to use
       // as the casting type of a static cast, which is not a binary operator).
@@ -380,31 +392,32 @@ void ElaboratorOperationRules::WalkExprForTypeRefCompare(const Expr* expr) {
 
 void ElaboratorOperationRules::WalkStmtsForTypeRefCompare(const Stmt* s) {
   if (!s) return;
-  WalkExprForTypeRefCompare(s->rhs);
-  WalkExprForTypeRefCompare(s->lhs);
-  WalkExprForTypeRefCompare(s->expr);
-  WalkExprForTypeRefCompare(s->condition);
-  WalkExprForTypeRefCompare(s->assert_expr);
   // §6.23 admits a type reference in a comparison only against another type
   // reference, and A.10 restricts it to the four equality operators, neither
-  // conditioned on the statement the comparison stands in, so this descends
-  // every link ForEachChildStmt in elaborator_validate_internal.h names. It
-  // wrote out six of the thirteen, so `type(T) == 5` written as a fork arm or
-  // as an immediate assertion's else action was never compared at all.
+  // conditioned on the statement the comparison stands in, so this reads
+  // every expression of a statement ForEachChildExpr names and descends every
+  // link ForEachChildStmt names, both in elaborator_validate_internal.h. It
+  // wrote out six of the thirteen links, so `type(T) == 5` written as a fork
+  // arm or as an immediate assertion's else action was never compared at all,
+  // and five of the expressions, so a block variable's initializer was not.
+  ForEachChildExpr(s, [this](const Expr* e) { WalkExprForTypeRefCompare(e); });
   ForEachChildStmt(
       s, [this](Stmt* const& sub) { WalkStmtsForTypeRefCompare(sub); });
 }
 
 void ElaboratorOperationRules::ValidateTypeRefComparisons(
     const ModuleDecl* decl) {
+  // The rules hold wherever a type reference stands: in a procedural block or
+  // a subroutine body, a continuous assignment, and a declaration's or a
+  // parameter's initializer.
   for (const auto* item : decl->items) {
     bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
       WalkStmtsForTypeRefCompare(item->body);
     }
-    if (item->kind == ModuleItemKind::kContAssign && item->assign_rhs) {
-      WalkExprForTypeRefCompare(item->assign_rhs);
-    }
+    for (const Stmt* s : item->func_body_stmts) WalkStmtsForTypeRefCompare(s);
+    WalkExprForTypeRefCompare(item->init_expr);
+    WalkExprForTypeRefCompare(item->assign_rhs);
   }
 }
 

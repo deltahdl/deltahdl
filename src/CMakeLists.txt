@@ -289,6 +289,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/const_eval_wide.cpp
     elaborator/const_eval_wide_arith.cpp
     elaborator/const_eval_typename.cpp
+    elaborator/const_eval_let.cpp
     elaborator/typename_writer.cpp
     elaborator/operator_classes.cpp
     elaborator/sensitivity.cpp
