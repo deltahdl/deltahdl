@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include "common/diagnostic.h"
 #include "lexer/lexer.h"
 #include "lexer/token.h"
@@ -8,6 +10,49 @@
 #include "parser/parser_token_skips.h"
 
 namespace delta {
+
+bool IsNamedLvalue(const Expr* e) {
+  static constexpr ExprKind kNamed[] = {
+      ExprKind::kIdentifier, ExprKind::kSelect, ExprKind::kMemberAccess};
+  return std::ranges::any_of(kNamed,
+                             [e](ExprKind kind) { return kind == e->kind; });
+}
+
+bool HasLvalueForm(const Expr* e) {
+  if (e->is_parenthesized) return false;
+  if (e->kind == ExprKind::kCast) {
+    return e->lhs->kind == ExprKind::kAssignmentPattern &&
+           HasLvalueForm(e->lhs);
+  }
+  if (e->kind == ExprKind::kConcatenation ||
+      e->kind == ExprKind::kAssignmentPattern) {
+    return std::ranges::all_of(e->elements, HasLvalueForm);
+  }
+  return IsNamedLvalue(e) || e->kind == ExprKind::kStreamingConcat ||
+         e->kind == ExprKind::kReplicate;
+}
+
+void CheckIncDecOperand(const Expr* operand, DiagEngine& diag) {
+  if (HasLvalueForm(operand)) return;
+  diag.Error(operand->range.start,
+             "an increment or decrement's operand is a variable_lvalue; this "
+             "one is not",
+             Subclause("A.8.3"));
+}
+
+namespace {
+
+// A.8.3 makes an operator_assignment an expression within its own
+// parentheses, and A.6.2 writes that assignment's target as a variable_lvalue.
+void CheckParenAssignTarget(const Expr* target, DiagEngine& diag) {
+  if (HasLvalueForm(target)) return;
+  diag.Error(target->range.start,
+             "an assignment within an expression assigns a variable_lvalue; "
+             "this target is none",
+             Subclause("A.6.2"));
+}
+
+}  // namespace
 
 // Answers whether the token standing after `new` opens a shallow-copy source.
 // A.2.4 gives class_new the two alternatives
@@ -183,6 +228,7 @@ Expr* Parser::ParseParenExpr() {
                    k == TokenKind::kGtGtEq || k == TokenKind::kLtLtLtEq ||
                    k == TokenKind::kGtGtGtEq;
   if (is_assign) {
+    CheckParenAssignTarget(lhs, diag_);
     auto op_tok = Consume();
     auto* rhs = ParseExpr();
     auto* bin = arena_.Create<Expr>();
@@ -287,21 +333,23 @@ Expr* Parser::ParseTypeOr(Expr* (Parser::*read)()) {
 // expression) or named (".name(value)"). Captures one element of either form,
 // recording the name in arg_names (empty for the ordered form) and the value in
 // elements. A.4.1.1 makes each element a param_expression (printed page 1194
-// of IEEE 1800-2023), which A.8.3 lets be a data_type, read by ParseTypeOr.
+// of IEEE 1800-2023), which A.8.3 lets be a data_type, read by ParseTypeOr,
+// or a mintypmax_expression, a min:typ:max triple among them.
 void Parser::ParseParamValueAssignment(Expr* base) {
   if (Check(TokenKind::kDot)) {
     Consume();
     auto name_tok = Expect(TokenKind::kIdentifier, Subclause("23.10.2.2"));
     Expect(TokenKind::kLParen, Subclause("23.10.2.2"));
-    Expr* value =
-        Check(TokenKind::kRParen) ? nullptr : ParseTypeOr(&Parser::ParseExpr);
+    Expr* value = Check(TokenKind::kRParen)
+                      ? nullptr
+                      : ParseTypeOr(&Parser::ParseMinTypMaxExpr);
     Expect(TokenKind::kRParen, Subclause("23.10.2.2"));
     base->arg_names.push_back(name_tok.text);
     base->elements.push_back(value);
     return;
   }
   base->arg_names.push_back({});
-  base->elements.push_back(ParseTypeOr(&Parser::ParseExpr));
+  base->elements.push_back(ParseTypeOr(&Parser::ParseMinTypMaxExpr));
 }
 
 Expr* Parser::ParseParameterizedScope(Expr* base) {

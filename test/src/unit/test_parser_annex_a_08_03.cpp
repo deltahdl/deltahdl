@@ -1,11 +1,15 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
+#include <initializer_list>
 #include <set>
+#include <string_view>
 #include <vector>
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
+#include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
 
@@ -688,6 +692,141 @@ TEST(ExpressionParsing, EveryParsedExpressionCarriesAPosition) {
         << "no construct in the source reached ExprKind value "
         << static_cast<int>(kind);
   }
+}
+
+// A.8.3 writes an inc_or_dec_expression's operand as a variable_lvalue, which
+// A.8.5 makes a name under selects and no other expression: not a literal, an
+// operation, a name in parentheses or a call, before the operator or after it
+// (#8071).
+TEST(ExpressionParsing, ErrorIncrementOperandIsNoVariableLvalue) {
+  auto r = Parse(
+      "module m;\n"
+      "  int a, b;\n"
+      "  function int f(int x); return x; endfunction\n"
+      "  initial begin\n"
+      "    ++3;\n"
+      "    ++(a + b);\n"
+      "    --(a);\n"
+      "    f(1)++;\n"
+      "    ++a[0];\n"
+      "  end\n"
+      "endmodule\n");
+  constexpr std::string_view kMessage =
+      "an increment or decrement's operand is a variable_lvalue; this one is "
+      "not";
+  EXPECT_TRUE(ReportedError(r.diags, kMessage, 5, "A.8.3"));
+  EXPECT_TRUE(ReportedError(r.diags, kMessage, 6, "A.8.3"));
+  EXPECT_TRUE(ReportedError(r.diags, kMessage, 7, "A.8.3"));
+  EXPECT_TRUE(ReportedError(r.diags, kMessage, 8, "A.8.3"));
+  EXPECT_FALSE(ReportedError(r.diags, kMessage, 9, "A.8.3"));
+}
+
+// A.8.3 admits an operator_assignment within its own parentheses, and A.6.2
+// writes that assignment's target as a variable_lvalue, so a literal, an
+// operation or a name in parentheses is no target there (#8072).
+TEST(ExpressionParsing, ErrorParenthesizedAssignmentTargetIsNoVariableLvalue) {
+  auto r = Parse(
+      "module m;\n"
+      "  int x, y, a, b;\n"
+      "  initial begin\n"
+      "    x = (3 = y);\n"
+      "    x = ((a + b) += 1);\n"
+      "    x = ((a) = y);\n"
+      "    x = (a = y);\n"
+      "  end\n"
+      "endmodule\n");
+  constexpr std::string_view kMessage =
+      "an assignment within an expression assigns a variable_lvalue; this "
+      "target is none";
+  EXPECT_TRUE(ReportedError(r.diags, kMessage, 4, "A.6.2"));
+  EXPECT_TRUE(ReportedError(r.diags, kMessage, 5, "A.6.2"));
+  EXPECT_TRUE(ReportedError(r.diags, kMessage, 6, "A.6.2"));
+  EXPECT_FALSE(ReportedError(r.diags, kMessage, 7, "A.6.2"));
+}
+
+// A.8.3 gives a tagged union expression's member a primary, so an operator
+// after the value applies to the whole tagged expression, and one straight
+// after the member name, a `-` included, leaves the member without a value
+// (#8073).
+TEST(ExpressionParsing, TaggedMemberValueIsAPrimary) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    x = tagged Valid 3 + 4;\n"
+      "    x = tagged Invalid - 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  for (size_t n : {0u, 1u}) {
+    Stmt* s = NthInitialStmt(r, n);
+    ASSERT_NE(s, nullptr);
+    ASSERT_NE(s->rhs, nullptr);
+    ASSERT_EQ(s->rhs->kind, ExprKind::kBinary) << n;
+    ASSERT_NE(s->rhs->lhs, nullptr);
+    EXPECT_EQ(s->rhs->lhs->kind, ExprKind::kTagged) << n;
+  }
+  EXPECT_EQ(NthInitialStmt(r, 0)->rhs->op, TokenKind::kPlus);
+  EXPECT_NE(NthInitialStmt(r, 0)->rhs->lhs->lhs, nullptr);
+  EXPECT_EQ(NthInitialStmt(r, 1)->rhs->op, TokenKind::kMinus);
+  EXPECT_EQ(NthInitialStmt(r, 1)->rhs->lhs->lhs, nullptr);
+}
+
+// A.6.7.1 gives a tagged pattern's member a pattern, which may be a constant
+// expression, so in a `matches` pattern the member takes `1 + 2` whole.
+TEST(ExpressionParsing, TaggedPatternMemberTakesAConstantExpression) {
+  auto r = Parse(
+      "module m; initial if (x matches tagged M 1 + 2) y = 1; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  Stmt* s = FirstInitialStmt(r);
+  ASSERT_NE(s, nullptr);
+  ASSERT_NE(s->condition, nullptr);
+  const Expr* tagged = s->condition->rhs;
+  ASSERT_NE(tagged, nullptr);
+  ASSERT_EQ(tagged->kind, ExprKind::kTagged);
+  ASSERT_NE(tagged->lhs, nullptr);
+  EXPECT_EQ(tagged->lhs->kind, ExprKind::kBinary);
+}
+
+// A.8.3 writes a parameter value as a param_expression, a mintypmax_expression
+// among its forms, and a class's parameter_value_assignment takes the values a
+// module instance's does: a min:typ:max triple specializes a class in a
+// declaration and in a class scope, ordered or named, and a named value may
+// still be left empty (#8074).
+TEST(ExpressionParsing, ClassParameterValueTakesAMinTypMax) {
+  auto r = Parse(
+      "class C #(int P = 0);\n"
+      "  static int v = P;\n"
+      "endclass\n"
+      "module m;\n"
+      "  C #(1:2:3) h;\n"
+      "  C #(.P(1:2:3)) g;\n"
+      "  C #(.P()) e;\n"
+      "  int x, y, z;\n"
+      "  initial x = C#(4:5:6)::v;\n"
+      "  initial y = C#(.P(4:5:6))::v;\n"
+      "  initial z = C#(.P())::v;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// A.8.3's param_expression may be a data_type, and a structure, a union and
+// an enumeration are data types, so each specializes a class type in a
+// declaration, ordered or named (#8075).
+TEST(ExpressionParsing, ClassTypeParameterValueTakesAnAggregate) {
+  auto r = Parse(
+      "class C #(type T = int);\n"
+      "  T v;\n"
+      "endclass\n"
+      "module m;\n"
+      "  C #(struct packed { bit a; byte b; }) h;\n"
+      "  C #(enum bit { A, B }) g;\n"
+      "  C #(.T(union packed { bit a; bit b; })) k;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
 }
 
 }  // namespace

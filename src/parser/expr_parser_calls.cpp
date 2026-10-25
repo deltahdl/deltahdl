@@ -63,6 +63,7 @@ Expr* Parser::ParseNameTail(Expr* result) {
   result = ParseIdentifierPostfixChain(result);
   if (Check(TokenKind::kPlusPlus) || Check(TokenKind::kMinusMinus)) {
     auto op_tok = Consume();
+    CheckIncDecOperand(result, diag_);
     return MakePostfixUnary(arena_, op_tok.kind, result);
   }
   result = ParseWithClause(result);

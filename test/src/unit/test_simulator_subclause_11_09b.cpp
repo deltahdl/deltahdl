@@ -35,7 +35,7 @@ void ExpectMemberTagKeptAndOtherWriteReported(RtlirDesign* design,
 
 // §7.3.2 (printed page 151): a tagged union value carries its tag beside the
 // member's bits, and §13.4.1 (printed 342) gives the implicit variable of a
-// call the return type, so `u = g()` with g returning `tagged Valid -7`
+// call the return type, so `u = g()` with g returning `tagged Valid (-7)`
 // assigns u a value tagged Valid, which §11.9 (printed 304) has `u.Valid`
 // read consistently with. The store copied the bits alone, reading a tag off
 // a `tagged` right-hand side and a call being none, so u was read against no
@@ -48,7 +48,7 @@ TEST(TaggedUnionEval, AssignedCallResultCarriesTheReturnedTag) {
       "  u_t u;\n"
       "  int y;\n"
       "  function u_t g();\n"
-      "    return tagged Valid -7;\n"
+      "    return tagged Valid (-7);\n"
       "  endfunction\n"
       "  initial begin\n"
       "    u = g();\n"
@@ -68,7 +68,7 @@ TEST(TaggedUnionEval, AssignedCallResultCarriesTheReturnedTag) {
 
 // §11.9 (printed page 304): reading a member inconsistent with the current
 // tag is a run-time error, and the tag `u = g()` gives u is the one g's
-// `return tagged Valid -7` gave its result. With the bits copied and no tag,
+// `return tagged Valid (-7)` gave its result. With the bits copied and no tag,
 // `u.Other` raised nothing.
 TEST(TaggedUnionEval, AssignedCallResultTagIsCheckedAgainstAnotherMember) {
   SimFixture f;
@@ -78,7 +78,7 @@ TEST(TaggedUnionEval, AssignedCallResultTagIsCheckedAgainstAnotherMember) {
       "  u_t u;\n"
       "  int y;\n"
       "  function u_t g();\n"
-      "    return tagged Valid -7;\n"
+      "    return tagged Valid (-7);\n"
       "  endfunction\n"
       "  initial begin\n"
       "    u = g();\n"
@@ -148,7 +148,7 @@ TEST(TaggedUnionEval, ReturnedVariableCarriesItsTag) {
       "  u_t u, v;\n"
       "  int y;\n"
       "  function u_t g();\n"
-      "    v = tagged Valid -7;\n"
+      "    v = tagged Valid (-7);\n"
       "    return v;\n"
       "  endfunction\n"
       "  initial begin\n"
@@ -180,7 +180,7 @@ TEST(TaggedUnionEval, ReturnedVariableTagIsCheckedAgainstAnotherMember) {
       "  u_t u, v;\n"
       "  int y;\n"
       "  function u_t g();\n"
-      "    v = tagged Valid -7;\n"
+      "    v = tagged Valid (-7);\n"
       "    return v;\n"
       "  endfunction\n"
       "  initial begin\n"
@@ -340,7 +340,7 @@ TEST(TaggedUnionEval, LocalDeclarationInitializerTagIsReturnedWithTheLocal) {
       "  u_t u;\n"
       "  int y, z;\n"
       "  function u_t g();\n"
-      "    static u_t v = tagged Valid -7;\n"
+      "    static u_t v = tagged Valid (-7);\n"
       "    return v;\n"
       "  endfunction\n"
       "  initial begin\n"
@@ -378,7 +378,7 @@ TEST(TaggedUnionEval, LocalTaggedUnionIsReadInTheBodyAgainstItsTag) {
       "  typedef union tagged { void Invalid; int Valid; int Other; } u_t;\n"
       "  int y, z;\n"
       "  function int g();\n"
-      "    static u_t v = tagged Valid -7;\n"
+      "    static u_t v = tagged Valid (-7);\n"
       "    z = v.Other;\n"
       "    return v.Valid;\n"
       "  endfunction\n"

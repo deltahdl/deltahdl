@@ -399,7 +399,7 @@ TEST(TernaryMatchesSim, BindingConditionalResultTypeIsBothOperands) {
   auto* v = RunAndFindVar(
       "module t;\n"
       "  typedef union tagged { void Invalid; int Valid; } VInt;\n"
-      "  VInt v = tagged Valid -1;\n"
+      "  VInt v = tagged Valid (-1);\n"
       "  VInt w = tagged Invalid;\n"
       "  logic [63:0] r, s;\n"
       "  int ok = 0;\n"

@@ -1,4 +1,3 @@
-#include <algorithm>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -219,34 +218,6 @@ struct ParserStmtHelpers {
                     Subclause("A.6.2"));
     }
     return rhs;
-  }
-
-  // A.8.5's (printed page 1212) name form of an lvalue: a name, scoped or
-  // reached through member selects, under any selects.
-  static bool IsNamedLvalue(const Expr* e) {
-    static constexpr ExprKind kNamed[] = {
-        ExprKind::kIdentifier, ExprKind::kSelect, ExprKind::kMemberAccess};
-    return std::ranges::any_of(kNamed,
-                               [e](ExprKind kind) { return kind == e->kind; });
-  }
-
-  // Whether `e` has a form A.8.5 (printed page 1212) gives variable_lvalue,
-  // which covers every form it gives net_lvalue: a name under selects, a
-  // concatenation of such targets, an assignment pattern of them, typed or not,
-  // or a streaming concatenation. None is written in parentheses. A
-  // replication is left to §11.4.12.1's report on a target holding one.
-  static bool HasLvalueForm(const Expr* e) {
-    if (e->is_parenthesized) return false;
-    if (e->kind == ExprKind::kCast) {
-      return e->lhs->kind == ExprKind::kAssignmentPattern &&
-             HasLvalueForm(e->lhs);
-    }
-    if (e->kind == ExprKind::kConcatenation ||
-        e->kind == ExprKind::kAssignmentPattern) {
-      return std::ranges::all_of(e->elements, HasLvalueForm);
-    }
-    return IsNamedLvalue(e) || e->kind == ExprKind::kStreamingConcat ||
-           e->kind == ExprKind::kReplicate;
   }
 
   // A.6.2 (printed page 1198) writes the target of every procedural

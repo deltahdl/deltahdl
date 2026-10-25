@@ -265,6 +265,7 @@ Expr* Parser::ParsePrefixExpr() {
     // prefix ++/-- operator and its variable_lvalue.
     std::vector<Attribute> attrs = ParseAttributes();
     auto* operand = ParsePrimaryExpr();
+    CheckIncDecOperand(operand, diag_);
     auto* unary = arena_.Create<Expr>();
     unary->kind = ExprKind::kUnary;
     unary->attrs = std::move(attrs);
@@ -327,6 +328,18 @@ Expr* Parser::ParseNewExpr() {
   return expr;
 }
 
+// Whether `kind` ends a tagged expression or pattern whose member is written
+// without a value: what follows a whole expression or pattern, the `&&&` and
+// `?` of §12.6 after a pattern among them, so a `?` straight after a void
+// member's name ends it.
+static bool EndsTaggedMember(TokenKind kind) {
+  static constexpr std::array kEnds = {
+      TokenKind::kSemicolon, TokenKind::kComma,   TokenKind::kRParen,
+      TokenKind::kRBrace,    TokenKind::kColon,   TokenKind::kEof,
+      TokenKind::kAmpAmpAmp, TokenKind::kQuestion};
+  return std::ranges::find(kEnds, kind) != kEnds.end();
+}
+
 Expr* Parser::ParseTaggedExpr() {
   auto* expr = arena_.Create<Expr>();
   expr->kind = ExprKind::kTagged;
@@ -344,16 +357,20 @@ Expr* Parser::ParseTaggedExpr() {
     expr->lhs = ParseAssignmentPattern();
   } else if (Check(TokenKind::kDot)) {
     expr->lhs = ParsePrimaryExpr();
-  } else if (!Check(TokenKind::kSemicolon) && !Check(TokenKind::kComma) &&
-             !Check(TokenKind::kRParen) && !Check(TokenKind::kRBrace) &&
-             !Check(TokenKind::kColon) && !Check(TokenKind::kEof) &&
-             !Check(TokenKind::kAmpAmpAmp) && !Check(TokenKind::kQuestion)) {
-    // Syntax 12-4: the member pattern of `tagged M p` ends where the pattern
-    // does, so it is read at the binding power a `matches` pattern is read at
-    // (TryParseSpecialInfix), short of the `&&&` filter of §12.6.1 and §12.6.2
-    // and the `?` of §12.6.3 that follow the whole pattern. A void member's
-    // pattern is omitted, so a `?` straight after the member name ends it.
-    expr->lhs = ParseExprBp(2);
+  } else if (!EndsTaggedMember(CurrentToken().kind)) {
+    if (pattern_depth_ > 0) {
+      // Syntax 12-4: the member pattern of `tagged M p` ends where the pattern
+      // does, so it is read at the binding power a `matches` pattern is read
+      // at (TryParseSpecialInfix), short of the `&&&` filter of §12.6.1 and
+      // §12.6.2 and the `?` of §12.6.3 that follow the whole pattern.
+      expr->lhs = ParseExprBp(2);
+    } else if (InfixBindingPower(CurrentToken().kind).first < 0) {
+      // A.8.3: in an expression the member's value is a primary, so an
+      // operator after the value takes the whole tagged expression as its
+      // operand, and one straight after the member name, a `-` included,
+      // leaves the member without a value.
+      expr->lhs = ParsePrimaryExpr();
+    }
   }
   return expr;
 }

@@ -375,7 +375,7 @@ TEST(TaggedUnionEval, ChildInstanceDeclarationInitializerTagChecksMemberRead) {
   auto* design = ElaborateSrc(
       "module M;\n"
       "  typedef union tagged { void Invalid; int Valid; } u_t;\n"
-      "  u_t u = tagged Valid -7;\n"
+      "  u_t u = tagged Valid (-7);\n"
       "  u_t w = tagged Invalid;\n"
       "  int x;\n"
       "  int y;\n"
@@ -442,7 +442,7 @@ TEST(TaggedUnionEval, ChildInstanceDeclarationInitializerPrintsTagAndValue) {
   auto out = RunCapture(
       "module M;\n"
       "  typedef union tagged { void Invalid; int Valid; } u_t;\n"
-      "  u_t u = tagged Valid -7;\n"
+      "  u_t u = tagged Valid (-7);\n"
       "  initial $display(\"%p\", u);\n"
       "endmodule\n"
       "module top;\n"
@@ -466,7 +466,7 @@ TEST(TaggedUnionEval, ByValueFormalCarriesTheActualsTag) {
   auto* design = ElaborateSrc(
       "module t;\n"
       "  typedef union tagged { void Invalid; int Valid; } u_t;\n"
-      "  u_t u = tagged Valid -7;\n"
+      "  u_t u = tagged Valid (-7);\n"
       "  u_t w = tagged Invalid;\n"
       "  int x;\n"
       "  int y;\n"
@@ -538,7 +538,7 @@ TEST(TaggedUnionEval, ByValueFormalPrintsTheActualsTagAndValue) {
   auto out = RunCapture(
       "module t;\n"
       "  typedef union tagged { void Invalid; int Valid; } u_t;\n"
-      "  u_t u = tagged Valid -7;\n"
+      "  u_t u = tagged Valid (-7);\n"
       "  function void show(u_t a);\n"
       "    $display(\"%p\", a);\n"
       "  endfunction\n"
@@ -567,7 +567,7 @@ TEST(TaggedUnionEval, TaggedExprActualBindsTheFormalsLayoutAndTag) {
       "  function int f(u_t a);\n"
       "    return a.Valid;\n"
       "  endfunction\n"
-      "  initial x = f(tagged Valid -7);\n"
+      "  initial x = f(tagged Valid (-7));\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
@@ -786,7 +786,7 @@ TEST(TaggedUnionEval,
 
 // §7.3.2 (printed page 151): a tagged union value carries its tag beside the
 // member's bits, and §13.4.1 (printed 342) gives a function's implicit
-// variable the return type, so `return tagged Valid -7` hands the caller a
+// variable the return type, so `return tagged Valid (-7)` hands the caller a
 // tagged value; §13.5.1 (printed 348) copies it, tag included, into the
 // formal, and §11.9 (printed 304) checks the body's member read against that
 // tag. The result reached the formal as bits alone, the tag read from an
@@ -800,7 +800,7 @@ TEST(TaggedUnionEval, CallResultActualCarriesTheReturnedTag) {
       "  typedef union tagged { void Invalid; int Valid; } u_t;\n"
       "  int x;\n"
       "  function u_t g();\n"
-      "    return tagged Valid -7;\n"
+      "    return tagged Valid (-7);\n"
       "  endfunction\n"
       "  function int f(u_t a);\n"
       "    return a.Valid;\n"

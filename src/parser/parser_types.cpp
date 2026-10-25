@@ -245,24 +245,29 @@ void Parser::ParsePackedDims(DataType& dtype) {
 }
 
 // Parses one element of a parameter_value_assignment list. An ordered element
-// is a bare data type or expression; a named element is ".name(value)", whose
-// formal name is recorded on the value's DataType (§6.20 / Syntax 8-2).
+// is a bare value; a named element is ".name(value)", whose formal name is
+// recorded on the value's DataType (§6.20 / Syntax 8-2). A.8.3 writes the
+// value as a param_expression: a data_type, a structure, a union or an
+// enumeration among them, which TryParseInlineAggregateType reads and
+// ParseDataType does not, or else a mintypmax_expression.
 DataType Parser::ParseOneTypeParam() {
-  if (Match(TokenKind::kDot)) {
-    std::string_view arg_name =
-        Expect(TokenKind::kIdentifier, Subclause("23.10.2.2")).text;
+  bool named = Match(TokenKind::kDot);
+  std::string_view arg_name;
+  if (named) {
+    arg_name = Expect(TokenKind::kIdentifier, Subclause("23.10.2.2")).text;
     Expect(TokenKind::kLParen, Subclause("23.10.2.2"));
-    DataType dt;
-    if (!Check(TokenKind::kRParen)) {
-      dt = ParseDataType();
-      if (dt.kind == DataTypeKind::kImplicit) dt.type_ref_expr = ParseExpr();
+  }
+  DataType dt;
+  if (!named || !Check(TokenKind::kRParen)) {
+    if (!TryParseInlineAggregateType(dt)) dt = ParseDataType();
+    if (dt.kind == DataTypeKind::kImplicit) {
+      dt.type_ref_expr = ParseMinTypMaxExpr();
     }
+  }
+  if (named) {
     Expect(TokenKind::kRParen, Subclause("23.10.2.2"));
     dt.param_arg_name = arg_name;
-    return dt;
   }
-  DataType dt = ParseDataType();
-  if (dt.kind == DataTypeKind::kImplicit) dt.type_ref_expr = ParseExpr();
   return dt;
 }
 
