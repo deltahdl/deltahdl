@@ -86,10 +86,6 @@ SeqLocalDecl LocalFormalDecl(const ModuleItem& decl, size_t index) {
   SeqLocalDecl local;
   local.name = decl.prop_formals[index];
   local.type_kw = decl.prop_formal_type_kw[index];
-  if (type.signing_written) {
-    local.signing =
-        type.is_signed ? TokenKind::kKwSigned : TokenKind::kKwUnsigned;
-  }
   if (type.packed_dim_left != nullptr) {
     local.packed_dims.emplace_back(type.packed_dim_left, type.packed_dim_right);
     local.packed_dims.insert(local.packed_dims.end(),
@@ -101,11 +97,17 @@ SeqLocalDecl LocalFormalDecl(const ModuleItem& decl, size_t index) {
     local.named_type.packed_dim_left = nullptr;
     local.named_type.packed_dim_right = nullptr;
     local.named_type.extra_packed_dims.clear();
-  } else if (local.type_kw == TokenKind::kEof) {
+  } else {
+    // §6.11.3: a keyword type is signed as its keyword is by default, or as
+    // the signing written after it says, which the parsed type holds.
+    local.signing =
+        type.is_signed ? TokenKind::kKwSigned : TokenKind::kKwUnsigned;
     // §6.11: the vector types are the keyword types packed dimensions follow,
     // of which bit alone is 2-state.
-    local.type_kw = type.kind == DataTypeKind::kBit ? TokenKind::kKwBit
-                                                    : TokenKind::kKwLogic;
+    if (local.type_kw == TokenKind::kEof) {
+      local.type_kw = type.kind == DataTypeKind::kBit ? TokenKind::kKwBit
+                                                      : TokenKind::kKwLogic;
+    }
   }
   return local;
 }

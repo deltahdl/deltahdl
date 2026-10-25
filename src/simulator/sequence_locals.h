@@ -46,9 +46,10 @@ bool LocalIsSigned(const SeqLocalDecl& decl, const SimContext& ctx);
 
 // §16.8.2 with §16.10: the declaration of the local variable the local
 // variable formal argument `index` of `decl` is, under the formal's name and
-// of the type the formal is declared with: its type keyword or the type name
-// written in its place, with the signing (§6.11) and the packed dimensions
-// (§7.4.1) written after either.
+// of the type the formal is declared with: its type keyword, with its
+// signing, the keyword's own or the one written after it (§6.11.3), or the
+// type name written in its place, and the packed dimensions (§7.4.1) written
+// after either.
 SeqLocalDecl LocalFormalDecl(const ModuleItem& decl, size_t index);
 
 // §16.10: the local `decl` stood up as a variable of the innermost scope

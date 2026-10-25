@@ -440,11 +440,12 @@ TEST(PropertyLocals, ASelectOfALocalResolvesAgainstItsDeclaredDimensions) {
 
 // §16.10 with §6.8 and §6.11.2: a property's local of a 2-state type holds 0
 // before any assignment, and an initialization assigning it a 4-state value
-// turns the x and z bits to 0, so an int left unassigned and a `bit [3:0]`
-// initialized with 'x both read 0 at all nine attempts, where a copy holding
-// x left `x == 0` unknown and failed them all (#8096).
+// turns the x and z bits to 0. A `bit [3:0]` whose match item assigns bit 0
+// alone reads 4'b0001, and one initialized with 'x reads 0, at all nine
+// attempts, where a copy holding x in the bits left unknown failed them all
+// (#8096).
 TEST(PropertyLocals, ATwoStateLocalHoldsNoUnknownBits) {
-  ExpectPropertyCounts("1 |-> ##1 (x == 0)", 9, 0, "int x");
+  ExpectPropertyCounts("(1, x[0] = 1) |-> ##1 (x == 1)", 9, 0, "bit [3:0] x");
   ExpectPropertyCounts("1 |-> ##1 (x == 0)", 9, 0, "bit [3:0] x = 'x");
 }
 

@@ -750,26 +750,36 @@ static Variable* FindReferencedVariable(const Expr* expr,
 // §16.8.1 (c): a reference to a sequence's formal bound to a variable_lvalue
 // has the formal's type, and stands as a cast of the actual to it
 // (CastActualToFormal), so a member of it, `p.lo` or `p.lo.b`, is the member
-// of the cast's value the casting type's structure layout places there.
+// of the cast's value the casting type's structure layout places there. A
+// cast to a type of no structure is left to the reads after, a method of an
+// enum's cast, `Cols'(1).next`, among them.
 static bool TryCastMemberRead(const Expr* expr, SimContext& ctx, Arena& arena,
                               Logic4Vec& out) {
   const Expr* base = expr->lhs;
   while (base->kind == ExprKind::kMemberAccess) base = base->lhs;
   if (base->kind != ExprKind::kCast) return false;
+  const StructTypeInfo* layout = ctx.FindStructType(CastTypeKey(base, ctx));
+  if (layout == nullptr) return false;
   std::string path(expr->rhs->text);
   for (const Expr* e = expr->lhs; e != base; e = e->lhs) {
     path.insert(0, std::string(e->rhs->text) + ".");
   }
-  out = ExtractStructField(EvalExpr(base, ctx, arena),
-                           ctx.FindStructType(CastTypeKey(base, ctx)), path,
-                           arena);
+  out = ExtractStructField(EvalExpr(base, ctx, arena), layout, path, arena);
   return true;
+}
+
+// A member of a structure value that no name holds: one of a cast
+// (TryCastMemberRead) or of a container's element, `d[1].a`
+// (TryContainerElementMember).
+static bool TryMemberOfAValue(const Expr* expr, SimContext& ctx, Arena& arena,
+                              Logic4Vec& out) {
+  return TryCastMemberRead(expr, ctx, arena, out) ||
+         TryContainerElementMember(expr, ctx, arena, out);
 }
 
 Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
   Logic4Vec out;
-  if (TryCastMemberRead(expr, ctx, arena, out)) return out;
-  if (TryContainerElementMember(expr, ctx, arena, out)) return out;
+  if (TryMemberOfAValue(expr, ctx, arena, out)) return out;
   if (TryEvalStringMethodWithoutParens(expr, ctx, arena, out)) return out;
   if (TryMemberSelectThatIsNoRead(expr, ctx, arena, out)) return out;
 
