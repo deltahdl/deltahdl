@@ -120,9 +120,10 @@ void BindProductionFormals(const RsProduction* production,
   for (size_t i = 0; i < production->ports.size(); ++i) {
     const auto& port = production->ports[i];
     uint32_t w = DeclaredTypeWidth(port.data_type, ctx);
+    const std::optional<Logic4Vec>& actual = actuals[i];
     Logic4Vec val;
-    if (actuals[i].has_value()) {
-      val = *actuals[i];
+    if (actual.has_value()) {
+      val = *actual;
     } else if (port.default_value != nullptr) {
       val = EvalExpr(port.default_value, ctx, arena, w);
     } else {

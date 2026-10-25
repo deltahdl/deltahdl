@@ -406,7 +406,7 @@ TEST(RandsequenceSyntaxParsing, ProductionItemEmptyArgs) {
       "  initial begin\n"
       "    randsequence(main)\n"
       "      main : gen();\n"
-      "      void gen() : { ; };\n"
+      "      void gen : { ; };\n"
       "    endsequence\n"
       "  end\n"
       "endmodule\n");
@@ -414,6 +414,8 @@ TEST(RandsequenceSyntaxParsing, ProductionItemEmptyArgs) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// A.6.12 writes at least one production, so a body with none is reported; the
+// statement is still built, with no production in it.
 TEST(RandsequenceSyntaxParsing, EmptyRandsequenceBody) {
   auto r = Parse(
       "module m;\n"
@@ -423,6 +425,9 @@ TEST(RandsequenceSyntaxParsing, EmptyRandsequenceBody) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a randsequence statement holds at least one production", 4,
+      "A.6.12"));
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kRandsequence);
