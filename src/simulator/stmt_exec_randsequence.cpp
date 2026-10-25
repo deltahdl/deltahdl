@@ -17,6 +17,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <format>
+#include <optional>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -125,11 +126,11 @@ void StoreRuleProductionValue(const RuleProductionSlot& slot,
                               const RsProduction* child,
                               const Logic4Vec& ret_value, SimContext& ctx,
                               Arena& arena);
-std::vector<Logic4Vec> EvalProductionActuals(const RsProduction* production,
-                                             const RsProductionItem& call,
-                                             SimContext& ctx, Arena& arena);
+std::vector<std::optional<Logic4Vec>> EvalProductionActuals(
+    const RsProduction* production, const RsProductionItem& call,
+    SimContext& ctx, Arena& arena);
 void BindProductionFormals(const RsProduction* production,
-                           const std::vector<Logic4Vec>& actuals,
+                           const std::vector<std::optional<Logic4Vec>>& actuals,
                            SimContext& ctx, Arena& arena);
 
 // §18.17.7: which production of the randsequence statement a name reaches,
@@ -589,7 +590,7 @@ static ExecTask BuildOneRandJoinSeq(const RandseqEngine& eng,
   // syntax, and ExecRsProduction evaluates a call's actuals in the
   // caller's scope before entering the production's own. Nothing evaluated them
   // here at all, so `rand join D(5) D(20)` ran D with its formal unbound.
-  std::vector<Logic4Vec> actuals =
+  std::vector<std::optional<Logic4Vec>> actuals =
       EvalProductionActuals(production, item, eng.ctx, eng.arena);
 
   // The rest is ExecRsProduction's order: enter the production's scope, bind
@@ -847,7 +848,7 @@ static ExecTask ExecRsProduction(const Stmt* stmt, const RsProductionItem& call,
   const auto* production = FindProduction(stmt, call.name);
   if (!production) co_return StmtResult::kDone;
 
-  std::vector<Logic4Vec> actuals =
+  std::vector<std::optional<Logic4Vec>> actuals =
       EvalProductionActuals(production, call, ctx, arena);
 
   ctx.PushScope();

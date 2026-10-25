@@ -177,6 +177,10 @@ struct RsProductionItem {
   // carries no name either, and CheckProductionItem in
   // elaborator_validate_randsequence.cpp returns on that before reading this.
   SourceLoc loc;
+  // §18.17.7: the names of the arguments written `.name ( [ expression ] )`,
+  // which are the last arg_names.size() of args, as Expr::arg_names are a
+  // call's. A null argument is one the call left out.
+  std::vector<std::string_view> arg_names;
 };
 
 struct RsCaseItem {

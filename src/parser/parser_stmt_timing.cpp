@@ -31,13 +31,25 @@ Stmt* Parser::ParseCycleDelayStmt() {
   return stmt;
 }
 
-void CheckUnparenthesizedCycleDelay(const Expr* e, DiagEngine& diag) {
-  if (e->kind == ExprKind::kIntegerLiteral) return;
-  // ParsePrimaryExpr builds `$` and `null` as identifiers too, and neither is
-  // one.
-  if (e->kind == ExprKind::kIdentifier && e->text != "$" && e->text != "null") {
-    return;
+// Whether `e`, a primary ParsePrimaryExpr read, is an identifier alone.
+// ParsePrimaryExpr builds `$` and `null` as identifiers too, and a name after
+// `$root.` or `$unit::` with that prefix in Expr::scope_prefix, and none of
+// them is one.
+static bool IsLoneIdentifier(const Expr* e) {
+  return e->kind == ExprKind::kIdentifier && e->scope_prefix.empty() &&
+         e->text != "$" && e->text != "null";
+}
+
+bool IsPsIdentifier(const Expr* e) {
+  if (e->kind == ExprKind::kMemberAccess && e->is_scope_resolution) {
+    return IsLoneIdentifier(e->lhs);
   }
+  return IsLoneIdentifier(e) ||
+         (e->kind == ExprKind::kIdentifier && e->scope_prefix == "$unit");
+}
+
+void CheckUnparenthesizedCycleDelay(const Expr* e, DiagEngine& diag) {
+  if (e->kind == ExprKind::kIntegerLiteral || IsLoneIdentifier(e)) return;
   diag.Error(e->range.start,
              "a cycle delay written without parentheses is an integral number "
              "or an identifier; any other expression is parenthesized",

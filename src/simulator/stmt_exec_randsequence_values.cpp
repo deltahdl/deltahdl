@@ -1,10 +1,10 @@
 // The values a randsequence production is called with and the values it
 // returns, which §18.17.7 states as one rule apiece: data is passed to a
-// production in a task call's syntax, and a rule implicitly declares a
-// variable for each value-returning production it names. EvalProductionActuals
-// and BindProductionFormals answer the first, evaluating a call's actual
-// arguments in the caller's scope and binding each formal by position once the
-// production's own scope has been entered. BuildRuleValueCapture and
+// production in a task call's syntax, and a rule implicitly declares a variable
+// for each value-returning production it names. EvalProductionActuals and
+// BindProductionFormals answer the first, evaluating a call's actual arguments
+// in the caller's scope and binding each formal, by position or by name, once
+// the production's own scope has been entered. BuildRuleValueCapture and
 // BuildStepValueCapture answer the second, counting how many times a rule names
 // each value-returning production so that one named more than once is
 // registered as the 1..N array §18.17.7 declares before any of its appearances
@@ -20,6 +20,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -29,6 +30,7 @@
 #include "common/arena.h"
 #include "common/types.h"
 #include "elaborator/type_eval.h"
+#include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -50,9 +52,27 @@ const RsProduction* FindProduction(const Stmt* stmt, std::string_view name);
 bool ProductionReturnsValue(const RsProduction* p);
 bool ProductionReturnsString(const RsProduction* p);
 
-// §18.17.7: passing data to a production uses the same syntax as a task call.
+// §18.17.7: passing data to a production uses the same syntax as a task call,
+// so `call` reaches the formal at `index` of `production` as §13.5.4 has a
+// call reach a task's: by position before its first named argument and by
+// name after it. Null where the call leaves the formal out, by an empty
+// position, by `.name()` or by not reaching it.
+static const Expr* ProductionActual(const RsProduction* production,
+                                    const RsProductionItem& call,
+                                    size_t index) {
+  const size_t kPositional = call.args.size() - call.arg_names.size();
+  if (index < kPositional) return call.args[index];
+  for (size_t j = 0; j < call.arg_names.size(); ++j) {
+    if (call.arg_names[j] == production->ports[index].name) {
+      return call.args[kPositional + j];
+    }
+  }
+  return nullptr;
+}
+
 // Evaluate the actual arguments in the caller's scope, before the production's
-// own scope is entered, sizing each to its formal's declared width.
+// own scope is entered, one per formal and each sized to its formal's declared
+// width; a formal the call leaves out has none, and takes its default.
 //
 // DeclaredTypeWidth rather than the one-argument EvalTypeWidth, because
 // §18.17.7 declares a production's arguments as a task prototype declares them
@@ -61,25 +81,24 @@ bool ProductionReturnsString(const RsProduction* p);
 // DataTypeKind::kNamed no width at all, so a typedef'd formal contributed
 // nothing to the context its actual is evaluated in. A width of 0 still means
 // self-determined, which is what a formal nothing here can size still gets.
-std::vector<Logic4Vec> EvalProductionActuals(const RsProduction* production,
-                                             const RsProductionItem& call,
-                                             SimContext& ctx, Arena& arena) {
-  std::vector<Logic4Vec> actuals;
-  actuals.reserve(call.args.size());
-  for (size_t i = 0; i < call.args.size(); ++i) {
-    uint32_t w = i < production->ports.size()
-                     ? DeclaredTypeWidth(production->ports[i].data_type, ctx)
-                     : 0;
-    actuals.push_back(EvalExpr(call.args[i], ctx, arena, w));
+std::vector<std::optional<Logic4Vec>> EvalProductionActuals(
+    const RsProduction* production, const RsProductionItem& call,
+    SimContext& ctx, Arena& arena) {
+  std::vector<std::optional<Logic4Vec>> actuals(production->ports.size());
+  for (size_t i = 0; i < production->ports.size(); ++i) {
+    const Expr* actual = ProductionActual(production, call, i);
+    if (actual == nullptr) continue;
+    uint32_t w = DeclaredTypeWidth(production->ports[i].data_type, ctx);
+    actuals[i] = EvalExpr(actual, ctx, arena, w);
   }
   return actuals;
 }
 
 // §18.17.7: a production creates a scope that encompasses all its rules and
 // code blocks; formal arguments bound here are therefore available throughout
-// the production. Bind each formal by position, falling back to its default
-// value, then to zero, when no actual is supplied. The caller must have entered
-// the production's scope.
+// the production. Bind each formal to the actual EvalProductionActuals gave it,
+// falling back to its default value, then to zero, when the call left it out.
+// The caller must have entered the production's scope.
 //
 // The formal is an object of its declared type, so it is created at that type's
 // width and the value is assigned into it rather than put in its place. Both
@@ -96,14 +115,14 @@ std::vector<Logic4Vec> EvalProductionActuals(const RsProduction* production,
 // them, which has no declared width to resize to -- and ResizeToWidth leaves
 // such a value alone, so the 32-bit carrier below still catches it.
 void BindProductionFormals(const RsProduction* production,
-                           const std::vector<Logic4Vec>& actuals,
+                           const std::vector<std::optional<Logic4Vec>>& actuals,
                            SimContext& ctx, Arena& arena) {
   for (size_t i = 0; i < production->ports.size(); ++i) {
     const auto& port = production->ports[i];
     uint32_t w = DeclaredTypeWidth(port.data_type, ctx);
     Logic4Vec val;
-    if (i < actuals.size()) {
-      val = actuals[i];
+    if (actuals[i].has_value()) {
+      val = *actuals[i];
     } else if (port.default_value != nullptr) {
       val = EvalExpr(port.default_value, ctx, arena, w);
     } else {

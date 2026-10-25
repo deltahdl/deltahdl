@@ -35,8 +35,9 @@ TEST(CycleDelaySyntaxParsing, NumberIdentifierAndParenthesizedFormsAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// Any other primary after a bare `##` is reported where it starts, and the
-// statement behind it is still read.
+// Any other primary after a bare `##` is reported where it starts, a name
+// under `$root.` or `$unit::` among them, and the statement behind it is still
+// read.
 TEST(CycleDelaySyntaxParsing, OtherFormsWithoutParenthesesRejected) {
   auto r = Parse(
       "module m;\n"
@@ -50,9 +51,11 @@ TEST(CycleDelaySyntaxParsing, OtherFormsWithoutParenthesesRejected) {
       "    ##null n = 1;\n"
       "    cb.x <= ##a[0] 1;\n"
       "    cb.x <= ##top.n 1;\n"
+      "    ##$root.n n = 1;\n"
+      "    ##$unit::n n = 1;\n"
       "  end\n"
       "endmodule\n");
-  for (uint32_t line = 4; line <= 11; ++line) {
+  for (uint32_t line = 4; line <= 13; ++line) {
     EXPECT_TRUE(ReportedError(r.diags, kCycleDelayForm, line, "A.6.11"))
         << "line " << line;
   }

@@ -115,4 +115,30 @@ TEST(RandsequenceSim, NestedRandsequenceExecutes) {
   EXPECT_EQ(var->value.ToUint64(), 33u);
 }
 
+// §18.17.7 passes data to a production in a task call's syntax, so A.6.12's
+// rs_production_item takes A.8.4's list_of_arguments: a positional argument
+// left empty and a named one written `.b()` take the formal's default, and a
+// named argument binds the formal of its name wherever it stands. Each call
+// appends its two digits, a then b, so a formal bound by position where its
+// name should have bound it shows as a swapped pair.
+TEST(RandsequenceSim, ProductionArgumentsBindByNameAndOmittedTakeDefaults) {
+  SimFixture f;
+  auto* var = RunRandseqAndFindVar(f,
+                                   "module t;\n"
+                                   "  int x;\n"
+                                   "  initial begin\n"
+                                   "    x = 0;\n"
+                                   "    randsequence(main)\n"
+                                   "      main : p(1, ) p(.a(2)) "
+                                   "p(.b(), .a(3)) p(.b(5), .a(4));\n"
+                                   "      void p(int a, int b = 7) : "
+                                   "{ x = x * 100 + a * 10 + b; };\n"
+                                   "    endsequence\n"
+                                   "  end\n"
+                                   "endmodule\n",
+                                   "x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 17273745u);
+}
+
 }  // namespace

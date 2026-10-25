@@ -68,4 +68,11 @@ Expr* MakePostfixUnary(Arena& arena, TokenKind op, Expr* operand);
 // synchronous drive's cycle delay in parser_stmt.cpp.
 void CheckUnparenthesizedCycleDelay(const Expr* e, DiagEngine& diag);
 
+// Whether `e`, a primary Parser::ParsePrimaryExpr read, is an A.9.3
+// ps_identifier: an identifier alone, or under one package scope or `$unit`'s.
+// A class scope reads the same and is admitted with it. Defined in
+// parser_stmt_timing.cpp beside the cycle delay's identifier test it widens,
+// and shared with a randsequence rule's weight in parser_randsequence.cpp.
+bool IsPsIdentifier(const Expr* e);
+
 }  // namespace delta

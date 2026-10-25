@@ -12,13 +12,16 @@
 // built on.
 
 #include <cstddef>
+#include <utility>
 #include <vector>
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "lexer/token.h"
+#include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
+#include "parser/expr_parser_internal.h"
 #include "parser/parser.h"
 
 namespace delta {
@@ -75,11 +78,20 @@ RsProductionItem Parser::ParseRsProductionItem() {
   item.loc = name.loc;
   if (Check(TokenKind::kLParen)) {
     Consume();
-    if (!Check(TokenKind::kRParen)) {
-      item.args.push_back(ParseExpr());
-      while (Match(TokenKind::kComma)) {
-        item.args.push_back(ParseExpr());
+    // §18.17.7 passes data to a production in a task call's syntax, so the
+    // list is A.8.4's list_of_arguments, read as a subroutine call's: an empty
+    // position is a null argument, and named arguments follow the positional
+    // ones with their names kept. `default` stands only in a constructor's
+    // list (§8.17), so it is left for the parenthesis below to report.
+    if (!Check(TokenKind::kRParen) && !Check(TokenKind::kKwDefault)) {
+      auto* call = arena_.Create<Expr>();
+      if (Check(TokenKind::kDot)) {
+        ParseTrailingNamedArgs(call);
+      } else {
+        ParseCallArgs(call);
       }
+      item.args = std::move(call->args);
+      item.arg_names = std::move(call->arg_names);
     }
     Expect(TokenKind::kRParen, Subclause("18.17.7"));
   }
@@ -182,6 +194,11 @@ void Parser::ParseRsProdCase(RsProd& prod) {
     }
     if (is_default_here) seen_default = true;
   }
+  // A.6.12 writes at least one rs_case_item before `endcase`.
+  if (prod.case_items.empty()) {
+    diag_.Error(CurrentLoc(), "a case production holds at least one item",
+                Subclause("A.6.12"));
+  }
   Expect(TokenKind::kKwEndcase, Subclause("18.17.3"));
 }
 
@@ -279,7 +296,17 @@ void Parser::ParseRsRuleWeight(RsRule& rule) {
     rule.weight = ParseExpr();
     Expect(TokenKind::kRParen, Subclause("18.17.1"));
   } else {
+    // A.6.12's rs_weight_specification: written without parentheses, an
+    // integral number or a ps_identifier.
     rule.weight = ParsePrimaryExpr();
+    if (rule.weight->kind != ExprKind::kIntegerLiteral &&
+        !IsPsIdentifier(rule.weight)) {
+      diag_.Error(rule.weight->range.start,
+                  "a rule's weight written without parentheses is an integral "
+                  "number or an identifier, which a package scope may qualify; "
+                  "any other expression is parenthesized",
+                  Subclause("A.6.12"));
+    }
   }
   if (Check(TokenKind::kLBrace)) {
     Consume();
@@ -368,9 +395,21 @@ RsProduction Parser::ParseRsProduction() {
   // §18.17.7: productions that accept data declare a tf_port_list of formal
   // arguments, using the same syntax as a task prototype. Parse and retain the
   // formals so the value-passing engine can bind actual arguments to them.
+  //
+  // A.6.12's parentheses enclose a tf_port_list, which unlike a task's or a
+  // function's is not optional inside them; read empty, it is one tf_port_item
+  // with no port identifier, which A.2.7's footnote allows a prototype alone.
+  // So a production with no formal is written without the parentheses.
   if (Check(TokenKind::kLParen)) {
     prod.has_ports = true;
+    const SourceLoc kOpen = CurrentLoc();
     prod.ports = ParseFunctionArgs(true);
+    if (prod.ports.empty()) {
+      diag_.Error(kOpen,
+                  "a production's parentheses enclose at least one formal "
+                  "argument; a production with none is written without them",
+                  Subclause("A.6.12"));
+    }
   }
 
   Expect(TokenKind::kColon, Subclause("18.17"));
@@ -403,6 +442,12 @@ Stmt* Parser::ParseRandsequenceStmt() {
     // enclosing end/endmodule) reaches here and ParseRsProduction consumes
     // nothing. Stop and let the Expect below report the missing endsequence.
     if (lexer_.SavePos().pos == before) break;
+  }
+  // A.6.12 writes at least one rs_production before `endsequence`.
+  if (stmt->rs_productions.empty()) {
+    diag_.Error(CurrentLoc(),
+                "a randsequence statement holds at least one production",
+                Subclause("A.6.12"));
   }
 
   Expect(TokenKind::kKwEndsequence, Subclause("18.17"));
