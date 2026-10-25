@@ -233,6 +233,19 @@ TEST(TypenameSim, AnEnumerationWritesItsConstantsAndScopedName) {
             "enum{RED=32'sd0,GREEN=32'sd5}top.col_t\n");
 }
 
+// §20.6.1, step e: an enumeration declared with a base type writes each
+// constant sized and signed as that type holds it, two unsigned bits here.
+TEST(TypenameSim, AnEnumerationConstantIsSizedByItsBaseType) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  typedef enum bit [1:0] {X, Y = 3} e_t;\n"
+                       "  e_t v;\n"
+                       "  initial $display(\"%s\", $typename(v));\n"
+                       "endmodule\n",
+                       f),
+            "enum{X=2'd0,Y=2'd3}top.e_t\n");
+}
+
 // §20.6.1: a string variable's type is string.
 TEST(TypenameSim, AStringVariableIsAString) {
   SimFixture f;
