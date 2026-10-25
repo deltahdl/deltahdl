@@ -1,6 +1,5 @@
 #include <gtest/gtest.h>
 
-#include <cstdint>
 #include <initializer_list>
 #include <string>
 #include <string_view>
@@ -205,17 +204,10 @@ TEST(SubroutineCallElaborationSyntax,
   EXPECT_FALSE(f.has_errors);
 }
 
+// The message a call of a nonvoid function leaving its parentheses off is
+// reported with, up to the function's name.
 constexpr std::string_view kNonvoidOmitted =
     "cannot omit parentheses in call to nonvoid function '";
-
-// Whether the call of the nonvoid function `name` at `line` was reported for
-// leaving its parentheses off.
-bool ReportedOmitted(const ElabFixture& f, std::string_view name,
-                     uint32_t line) {
-  return ReportedError(f.diag.Diagnostics(),
-                       std::string(kNonvoidOmitted) + std::string(name) + "'",
-                       line, "13.5.5");
-}
 
 // §27.1: a generate block's items are the module's like any other, so a call
 // in any block of a conditional, case or loop generate construct, of a
@@ -244,7 +236,10 @@ TEST(OptionalArgumentListElaboration, ACallInAGenerateBlockIsJudged) {
   for (auto [name, line] :
        {std::pair{"f", 6u}, std::pair{"h", 6u}, std::pair{"f", 8u},
         std::pair{"f", 11u}, std::pair{"f", 14u}}) {
-    EXPECT_TRUE(ReportedOmitted(f, name, line)) << name << " at " << line;
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              std::string(kNonvoidOmitted) + name + "'", line,
+                              "13.5.5"))
+        << name << " at " << line;
   }
   EXPECT_EQ(f.diag.ErrorCount(), 5u);
 }
@@ -267,8 +262,10 @@ TEST(OptionalArgumentListElaboration, ACallInAMethodOfAModulesClassIsJudged) {
       "  endclass\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedOmitted(f, "f", 5));
-  EXPECT_TRUE(ReportedOmitted(f, "f", 7));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            std::string(kNonvoidOmitted) + "f'", 5, "13.5.5"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            std::string(kNonvoidOmitted) + "f'", 7, "13.5.5"));
   EXPECT_EQ(f.diag.ErrorCount(), 2u);
 }
 
@@ -289,7 +286,8 @@ TEST(OptionalArgumentListElaboration, ACallInAClassOfAnUnknownBaseIsLeft) {
       "  endclass\n"
       "endmodule\n",
       f);
-  EXPECT_FALSE(ReportedOmitted(f, "f", 7));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             std::string(kNonvoidOmitted) + "f'", 7, "13.5.5"));
 }
 
 // A class a package or the compilation unit declares calls the package's or
@@ -310,8 +308,10 @@ TEST(OptionalArgumentListElaboration, ACallInAMethodOfAUnitOrPackageClass) {
       "endpackage\n"
       "module m; endmodule\n",
       f);
-  EXPECT_TRUE(ReportedOmitted(f, "u", 3));
-  EXPECT_TRUE(ReportedOmitted(f, "f", 8));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            std::string(kNonvoidOmitted) + "u'", 3, "13.5.5"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            std::string(kNonvoidOmitted) + "f'", 8, "13.5.5"));
   EXPECT_EQ(f.diag.ErrorCount(), 2u);
 }
 
