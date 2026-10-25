@@ -202,6 +202,30 @@ TEST_F(DecompileByHand, PartsARunSeldomWrites) {
   EXPECT_EQ(VpiExprDecompile(with_call), "find() with x");
 }
 
+// §37.59 detail 2 with A.8.1: a stream operand's `with [
+// array_range_expression ]` is part of the text, written after the operand as
+// the range of a select with nothing before it; left out, `{>> {a}}` would
+// name the whole array where §11.4.14.4 streams only the items in the range.
+// A range that cannot be written leaves no text at all.
+TEST_F(DecompileByHand, StreamOperandWritesItsRange) {
+  Expr* first = Name("a");
+  first->stream_range = Select(nullptr, Name("lo"), Name("hi"));
+  Expr* second = Name("q");
+  second->stream_range = Select(nullptr, Name("i"), Name("n"));
+  second->stream_range->is_part_select_plus = true;
+  Expr* stream =
+      WithElements(ExprKind::kStreamingConcat, {first, Name("b"), second});
+  stream->op = TokenKind::kGtGt;
+  EXPECT_EQ(VpiExprDecompile(stream),
+            "{>> {a with [lo:hi], b, q with [i+:n]}}");
+
+  Expr* unwritable = Name("a");
+  unwritable->stream_range = Select(nullptr, Unrenderable(), nullptr);
+  Expr* blank = WithElements(ExprKind::kStreamingConcat, {unwritable});
+  blank->op = TokenKind::kGtGt;
+  EXPECT_EQ(VpiExprDecompile(blank), "");
+}
+
 // An operator kind whose name is no quoted spelling, as a token's kind that is
 // no operator is, writes as nothing in the streaming operator's place.
 TEST_F(DecompileByHand, AKindWithNoSpellingWritesNothing) {

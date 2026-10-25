@@ -421,7 +421,10 @@ std::optional<Piece> RenderInside(const Expr& expr) {
 }
 
 // §11.4.14: a streaming concatenation, its operator and any slice size one
-// space apart before the braced expressions it streams.
+// space apart before the braced expressions it streams. A.8.1 lets each
+// stream expression carry `with [ array_range_expression ]` after its operand
+// (§11.4.14.4), held in Expr::stream_range as a select with nothing before
+// it, which RenderSelect writes as its bracketed range alone.
 std::optional<Piece> RenderStream(const Expr& expr) {
   std::string head = Spelling(expr.op);
   if (expr.lhs != nullptr) {
@@ -429,9 +432,19 @@ std::optional<Piece> RenderStream(const Expr& expr) {
     if (!kSlice) return std::nullopt;
     head = VpiDecompileJoin({head, kSlice->text});
   }
-  const std::optional<std::string> kElements = RenderList(expr.elements, {});
-  if (!kElements) return std::nullopt;
-  return Piece{"{" + VpiDecompileJoin({head, "{" + *kElements + "}"}) + "}"};
+  std::string elements;
+  for (std::size_t i = 0; i < expr.elements.size(); ++i) {
+    const Expr* operand = expr.elements[i];
+    const std::optional<Piece> kOperand = Render(operand);
+    if (!kOperand) return std::nullopt;
+    if (i > 0) elements += ", ";
+    elements += kOperand->text;
+    if (operand->stream_range == nullptr) continue;
+    const std::optional<Piece> kRange = Render(operand->stream_range);
+    if (!kRange) return std::nullopt;
+    elements += " with " + kRange->text;
+  }
+  return Piece{"{" + VpiDecompileJoin({head, "{" + elements + "}"}) + "}"};
 }
 
 // §11.11: a min:typ:max expression, its three expressions one space from the
