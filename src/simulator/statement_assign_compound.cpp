@@ -2,6 +2,7 @@
 
 #include "common/arena.h"
 #include "common/types.h"
+#include "elaborator/operator_classes.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"

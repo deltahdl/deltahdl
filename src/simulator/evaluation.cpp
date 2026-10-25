@@ -9,6 +9,7 @@
 
 #include "common/arena.h"
 #include "common/types.h"
+#include "elaborator/operator_classes.h"
 #include "elaborator/type_eval.h"
 #include "lexer/token.h"
 #include "parser/ast_class.h"

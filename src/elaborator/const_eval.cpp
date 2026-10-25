@@ -543,25 +543,6 @@ static std::optional<std::string> ReplicatedStringChars(const Expr* expr) {
   return chars;
 }
 
-// §20.6.1: $typename may stand in a constant expression, and given a built-in
-// data type its answer is that type's keyword, the default signing being
-// dropped (step b). The other forms, which name a user-defined type or an
-// expression, are not folded here.
-static std::optional<std::string> ConstTypenameChars(const Expr* expr) {
-  static constexpr std::string_view kBuiltinTypes[] = {
-      "bit",  "logic", "byte",      "shortint", "int",    "longint", "integer",
-      "time", "real",  "shortreal", "realtime", "string", "chandle", "event"};
-  if (expr->callee != "$typename" || expr->args.size() != 1) {
-    return std::nullopt;
-  }
-  const Expr* arg = expr->args[0];
-  if (arg->kind != ExprKind::kIdentifier) return std::nullopt;
-  for (std::string_view type : kBuiltinTypes) {
-    if (arg->text == type) return std::string(type);
-  }
-  return std::nullopt;
-}
-
 std::optional<std::string> ConstEvalString(const Expr* expr) {
   if (expr == nullptr) return std::nullopt;
   switch (expr->kind) {

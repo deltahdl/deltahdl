@@ -9,6 +9,7 @@
 #include "common/diagnostic.h"
 #include "common/types.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/typename_writer.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
@@ -513,24 +514,6 @@ static void RecordClassSpecialization(std::string_view name,
                           var.class_data_type->type_params, ctx);
 }
 
-// §20.6.1, step d: the fixed unpacked dimensions `var` was declared with, as
-// $typename writes them after the "$" standing for the array's name, "$[0:9]"
-// for `AB_t AB[10]`; empty for a variable with none, or with one that did not
-// fold to fixed bounds.
-static std::string_view UnpackedDimsText(const RtlirVariable& var,
-                                         Arena& arena) {
-  if (var.num_unpacked_dims == 0 ||
-      var.unpacked_dims.size() != var.num_unpacked_dims) {
-    return {};
-  }
-  auto* text = arena.Create<std::string>("$");
-  for (const RtlirUnpackedDim& dim : var.unpacked_dims) {
-    *text +=
-        "[" + std::to_string(dim.left) + ":" + std::to_string(dim.right) + "]";
-  }
-  return *text;
-}
-
 // §21.7.5 (Table 21-11) with §6.19: the declared type keyword a dumped
 // variable's $var masquerades by, and whether the storage is an enumeration's
 // named constant, which no dump declares.
@@ -554,7 +537,9 @@ void Lowerer::LowerVar(std::string_view name, const RtlirVariable& var) {
   if (var.is_chandle) v->value = MakeLogic4VecVal(arena_, width, 0);
   v->is_4state = var.is_4state;
   v->declared_type = var.written_type != nullptr ? var.written_type : var.dtype;
-  v->declared_unpacked = UnpackedDimsText(var, arena_);
+  // §20.6.1, step d: the fixed unpacked dimensions the variable was declared
+  // with, as $typename writes them.
+  v->declared_unpacked = *arena_.Create<std::string>(UnpackedDimsText(var));
   if (var.is_event) v->is_event = true;
   if (var.is_signed) v->is_signed = true;
   if (var.is_string) ctx_.RegisterStringVariable(name);

@@ -141,6 +141,12 @@ std::optional<ConstVal> ConstEvalUnbasedUnsized(const Expr* expr,
                                                 FoldContext ctx);
 std::optional<ConstVal> ConstEvalStringLiteral(const Expr* expr);
 
+// §20.6.1: the characters a $typename call folds to in a constant expression,
+// written from the declarations of the module being elaborated; nothing for
+// another call, or where those declarations do not settle the answer.
+// Defined in const_eval_typename.cpp.
+std::optional<std::string> ConstTypenameChars(const Expr* expr);
+
 // §11.6.1's Table 11-21 (printed page 300): the value of the conditional
 // `expr`, the condition folded self-determined and the arm it selects folded
 // in `ctx`, which reaches the arm as it reaches an operand of an arithmetic

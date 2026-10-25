@@ -55,12 +55,9 @@ Logic4Vec EvalTernary(const Expr* expr, SimContext& ctx, Arena& arena,
 Logic4Vec EvalExprInContext(const Expr* expr, SimContext& ctx, Arena& arena,
                             uint32_t context_width, bool unsigned_context);
 
-// §11.6.1 Table 11-21's classes of operator and §11.8.1's self-determined
-// type of an expression as its form gives it. Defined in
+// §11.8.1's self-determined type of an expression as its form gives it, by
+// the classes of operator elaborator/operator_classes.h names. Defined in
 // evaluation_self_type.cpp.
-bool IsMaxWidthBinaryOp(TokenKind op);
-bool IsLeftWidthBinaryOp(TokenKind op);
-bool IsUnaryReductionOp(TokenKind op);
 uint32_t SimSelfWidth(const Expr* expr, SimContext& ctx);
 bool SimSelfSigned(const Expr* expr, SimContext& ctx);
 bool SimSelfReal(const Expr* expr, SimContext& ctx);

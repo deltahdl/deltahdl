@@ -1,11 +1,12 @@
 // §11.6.1 and §11.8.1: the self-determined length and signedness of an
 // expression as its form gives them, which the context-determined evaluators
 // in evaluation.cpp and eval_ternary.cpp size and sign their operands by
-// (§11.8.2), and the classes of operator the two rules name.
+// (§11.8.2), by the classes of operator elaborator/operator_classes.h names.
 
 #include <algorithm>
 #include <cstdint>
 
+#include "elaborator/operator_classes.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "simulator/evaluation.h"
@@ -14,56 +15,6 @@
 #include "simulator/variable.h"
 
 namespace delta {
-
-// §11.6.1 Table 11-21: arithmetic and bitwise operators whose result width is
-// the maximum width of the two operands; both operands are context-determined.
-bool IsMaxWidthBinaryOp(TokenKind op) {
-  switch (op) {
-    case TokenKind::kPlus:
-    case TokenKind::kMinus:
-    case TokenKind::kStar:
-    case TokenKind::kSlash:
-    case TokenKind::kPercent:
-    case TokenKind::kAmp:
-    case TokenKind::kPipe:
-    case TokenKind::kCaret:
-    case TokenKind::kTildeCaret:
-    case TokenKind::kCaretTilde:
-      return true;
-    default:
-      return false;
-  }
-}
-
-// §11.6.1: shift and power operators whose result width is the left operand's
-// width; the left operand is context-determined, the right self-determined.
-bool IsLeftWidthBinaryOp(TokenKind op) {
-  switch (op) {
-    case TokenKind::kPower:
-    case TokenKind::kLtLt:
-    case TokenKind::kGtGt:
-    case TokenKind::kLtLtLt:
-    case TokenKind::kGtGtGt:
-      return true;
-    default:
-      return false;
-  }
-}
-
-bool IsUnaryReductionOp(TokenKind op) {
-  switch (op) {
-    case TokenKind::kAmp:
-    case TokenKind::kPipe:
-    case TokenKind::kCaret:
-    case TokenKind::kTildeAmp:
-    case TokenKind::kTildePipe:
-    case TokenKind::kTildeCaret:
-    case TokenKind::kCaretTilde:
-      return true;
-    default:
-      return false;
-  }
-}
 
 // §11.6.1: the self-determined bit length of an expression, resolving variable
 // widths through the simulation context. Returns 0 ("indeterminate") for node
