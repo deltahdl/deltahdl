@@ -467,8 +467,15 @@ bool Parser::TryCaptureIfElseConstraint(ClassMember* member) {
 // matching '}', capturing each top-level relation on 'member' and applying the
 // body's structural and reference checks. Shared by an in-class constraint
 // block and an external constraint block (18.5.1), so an external block's
-// relations are captured the same way and its body receives the same checks.
-void Parser::ScanConstraintBodyRelations(ClassMember* member) {
+// relations are captured the same way and its body receives the same checks,
+// and by a randomize call's inline constraint block (§18.7), which
+// `inline_block` marks.
+void Parser::ScanConstraintBodyRelations(ClassMember* member,
+                                         bool inline_block) {
+  // A.10 footnote 48: `local::` stands only in an inline constraint block,
+  // and the reads of the block's expressions below suppress their reports.
+  if (!inline_block) ParserConstraintItemHelpers::ReportLocalQualifiers(*this);
+  ++constraint_block_depth_;
   // §18.5: the block's items in source order, read ahead of the scan.
   ParserConstraintItemHelpers::Capture(*this, member);
   int depth = 1;
@@ -498,6 +505,7 @@ void Parser::ScanConstraintBodyRelations(ClassMember* member) {
     // The next iteration starts a fresh relation only after a ';' was consumed.
     at_relation_start = starts_with_semicolon;
   }
+  --constraint_block_depth_;
 }
 
 static void ReportBlockQualifier(const ClassMember& m, const char* keyword,
@@ -541,7 +549,7 @@ ClassMember* Parser::ParseConstraintStub(ClassMember* member) {
   RejectConstraintQualifiers(member, diag_);
   if (kPrototype) return member;
 
-  ScanConstraintBodyRelations(member);
+  ScanConstraintBodyRelations(member, false);
   return member;
 }
 

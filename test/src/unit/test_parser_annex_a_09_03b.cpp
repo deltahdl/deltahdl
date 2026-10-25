@@ -10,6 +10,7 @@
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
 #include "parser/parser.h"
 
 using namespace delta;
@@ -364,23 +365,27 @@ TEST(IdentifierSyntaxParsing, InterfacePortIdentifierAsModulePort) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// The right-hand operand of the one relation the parsed class's one
-// constraint block holds.
+// The right-hand operand of the one relation held by the inline constraint
+// block of the randomize call that the parsed module's initial block tests,
+// `initial if (obj.randomize() with { x == local::y; }) ;`.
 //
 // A constraint block states its relations as expressions, so a test about the
-// syntax admitted on one side of a relation parses a class carrying a single
-// constraint and reads that side back. Returns nullptr when no constraint
-// member, no single relation, or no binary relation was produced.
-const Expr* SoleConstraintRelationRhs(const CompilationUnit* cu) {
-  if (cu == nullptr || cu->classes.empty()) return nullptr;
-  const ClassMember* con = nullptr;
-  for (auto* m : cu->classes[0]->members) {
-    if (m->kind == ClassMemberKind::kConstraint) con = m;
+// syntax admitted on one side of a relation parses a single relation and reads
+// that side back. A.10 footnote 48 confines `local::` to an inline constraint
+// block, so the relation stands in one. Returns nullptr when no initial block
+// testing such a call, no single relation, or no binary relation was produced.
+const Expr* SoleInlineRelationRhs(const CompilationUnit* cu) {
+  if (cu == nullptr || cu->modules.empty()) return nullptr;
+  for (const ModuleItem* item : cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+    const Stmt* s = item->body;
+    if (s == nullptr || s->condition == nullptr) return nullptr;
+    const ClassMember* con = s->condition->inline_constraint;
+    if (con == nullptr || con->constraint_exprs.size() != 1u) return nullptr;
+    const Expr* rel = con->constraint_exprs[0];
+    return rel->kind == ExprKind::kBinary ? rel->rhs : nullptr;
   }
-  if (con == nullptr || con->constraint_exprs.size() != 1u) return nullptr;
-  const Expr* rel = con->constraint_exprs[0];
-  if (rel->kind != ExprKind::kBinary) return nullptr;
-  return rel->rhs;
+  return nullptr;
 }
 
 // §A.9.3: ps_type_identifier admits a "local ::" scope prefix (footnote 48),
@@ -394,12 +399,16 @@ TEST(IdentifierSyntaxParsing, LocalScopePrefixInConstraintRelation) {
   auto* cu = ParseSrc(
       "class c;\n"
       "  rand int x;\n"
-      "  constraint lim { x == local::y; }\n"
-      "endclass\n",
+      "endclass\n"
+      "module m;\n"
+      "  int y;\n"
+      "  c obj;\n"
+      "  initial if (obj.randomize() with { x == local::y; }) ;\n"
+      "endmodule\n",
       f);
   ASSERT_NE(cu, nullptr);
   EXPECT_FALSE(f.diag.HasErrors());
-  const Expr* rhs = SoleConstraintRelationRhs(cu);
+  const Expr* rhs = SoleInlineRelationRhs(cu);
   ASSERT_NE(rhs, nullptr);
   ASSERT_EQ(rhs->kind, ExprKind::kMemberAccess);
   EXPECT_TRUE(rhs->is_scope_resolution);
@@ -417,12 +426,16 @@ TEST(IdentifierSyntaxParsing, LocalScopePrefixCastType) {
   auto* cu = ParseSrc(
       "class c;\n"
       "  rand int x;\n"
-      "  constraint lim { x == local::word_t'(y); }\n"
-      "endclass\n",
+      "endclass\n"
+      "module m;\n"
+      "  int y;\n"
+      "  c obj;\n"
+      "  initial if (obj.randomize() with { x == local::word_t'(y); }) ;\n"
+      "endmodule\n",
       f);
   ASSERT_NE(cu, nullptr);
   EXPECT_FALSE(f.diag.HasErrors());
-  const Expr* rhs = SoleConstraintRelationRhs(cu);
+  const Expr* rhs = SoleInlineRelationRhs(cu);
   ASSERT_NE(rhs, nullptr);
   ASSERT_EQ(rhs->kind, ExprKind::kCast);
   const Expr* casting_type = rhs->rhs;

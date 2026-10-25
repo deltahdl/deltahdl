@@ -227,14 +227,6 @@ DataType Parser::ParseStructOrUnionType() {
   return dtype;
 }
 
-DataType Parser::ParseStructOrUnionBody(TokenKind kw) {
-  DataType dtype;
-  dtype.kind = (kw == TokenKind::kKwStruct) ? DataTypeKind::kStruct
-                                            : DataTypeKind::kUnion;
-  ParseStructMembers(dtype);
-  return dtype;
-}
-
 // Parse the data_type that prefixes a struct/union member declaration,
 // including any nested struct/union/enum with its packed dimensions. A.2.2.1
 // lets the type be a type_identifier behind a package_scope or a class_scope,

@@ -8,6 +8,7 @@
 #include "lexer/token.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
+#include "parser/expr_parser_internal.h"
 #include "parser/operator_binding_power.h"
 #include "parser/parser.h"
 #include "parser/parser_constraint_items_internal.h"
@@ -31,6 +32,23 @@ bool IsPrimaryName(const Expr* e) {
 }
 
 }  // namespace
+
+// A.10 footnote 48 confines the `local::` qualifier to an inline constraint
+// block, and a class's own constraint block is none: reports each `local` in
+// the block whose items the lexer stands at, through its closing '}', and
+// leaves the lexer where it found it. The block's expressions are read with
+// their reports suppressed, so the qualifier is found among the tokens.
+void ParserConstraintItemHelpers::ReportLocalQualifiers(Parser& p) {
+  auto saved = p.lexer_.SavePos();
+  for (int depth = 1; depth > 0 && !p.AtEnd(); p.Consume()) {
+    if (p.Check(TokenKind::kLBrace)) ++depth;
+    if (p.Check(TokenKind::kRBrace)) --depth;
+    if (p.Check(TokenKind::kKwLocal)) {
+      ReportLocalQualifier(p.CurrentLoc(), p.diag_);
+    }
+  }
+  p.lexer_.RestorePos(saved);
+}
 
 // A block whose items do not parse, or parse only through a suppressed
 // report, is no constraint_block A.1.10 writes, and is reported where the

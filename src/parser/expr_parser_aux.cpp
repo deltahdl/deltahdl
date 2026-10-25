@@ -182,18 +182,6 @@ void Parser::ParseTrailingNamedArgs(Expr* call) {
   } while (Match(TokenKind::kComma));
 }
 
-Expr* Parser::ParseCompoundAssignExpr(Expr* lhs) {
-  auto op_tok = Consume();
-  auto* rhs = ParseExpr();
-  auto* bin = arena_.Create<Expr>();
-  bin->kind = ExprKind::kBinary;
-  bin->op = op_tok.kind;
-  bin->lhs = lhs;
-  bin->rhs = rhs;
-  bin->range.start = lhs->range.start;
-  return bin;
-}
-
 Expr* Parser::ParseParenExpr() {
   Consume();
   auto* lhs = ParseExpr();

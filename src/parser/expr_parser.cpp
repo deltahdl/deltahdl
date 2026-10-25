@@ -698,6 +698,24 @@ Expr* Parser::TryParseIdentifierCast(Expr* base, bool* handled) {
   return base;
 }
 
+// A.8.4 (printed page 1211) writes a select's part_select_range last and gives
+// a subroutine call's result one bracket, `function_subroutine_call
+// [ [ range_expression ] ]`: reports the bracket at `loc` when `base`, what it
+// would select, is a part-select or the select of a call's result.
+static void ReportBracketAfterLastSelect(const Expr* base, SourceLoc loc,
+                                         DiagEngine& diag) {
+  if (base->kind != ExprKind::kSelect) return;
+  if (base->index_end != nullptr) {
+    diag.Error(loc, "a part-select ends a select; no bracket follows it",
+               Subclause("A.8.4"));
+  } else if (base->base->kind == ExprKind::kCall ||
+             base->base->kind == ExprKind::kSystemCall) {
+    diag.Error(loc,
+               "a subroutine call's result takes one select; this is a second",
+               Subclause("A.8.4"));
+  }
+}
+
 // Parse the run of postfix call/select operators (with optional intervening
 // attribute lists and trailing member accesses) that follow a name primary.
 Expr* Parser::ParseIdentifierPostfixChain(Expr* result) {
@@ -710,6 +728,7 @@ Expr* Parser::ParseIdentifierPostfixChain(Expr* result) {
     if (Check(TokenKind::kLParen)) {
       result = ParseCallExpr(result);
     } else {
+      ReportBracketAfterLastSelect(result, CurrentLoc(), diag_);
       result = ParseSelectExpr(result);
     }
     // §23.6 Syntax 23-7 gives a hierarchical name as
@@ -730,8 +749,12 @@ Expr* Parser::ParseIdentifierPostfixChain(Expr* result) {
 // after each '.'.
 Expr* Parser::ParseWithClauseTail(Expr* result) {
   while (Check(TokenKind::kDot) || AtSelectBracket()) {
-    result = Check(TokenKind::kDot) ? ParseMethodTail(result)
-                                    : ParseSelectExpr(result);
+    if (Check(TokenKind::kDot)) {
+      result = ParseMethodTail(result);
+    } else {
+      ReportBracketAfterLastSelect(result, CurrentLoc(), diag_);
+      result = ParseSelectExpr(result);
+    }
   }
   return result;
 }
@@ -743,6 +766,13 @@ Expr* Parser::ParseWithClauseTail(Expr* result) {
 // chain so a trailing type identifier can still form a cast
 // ("local::T'(expr)"). A bare "local" without "::" is not an expression, so
 // this keeps that error path intact rather than treating "local" as a name.
+void ReportLocalQualifier(SourceLoc loc, DiagEngine& diag) {
+  diag.Error(loc,
+             "the 'local::' qualifier stands only in an inline constraint "
+             "block",
+             Subclause("A.8.4"));
+}
+
 Expr* Parser::ParseLocalScopeExpr() {
   auto tok = Consume();  // 'local'
   if (!Check(TokenKind::kColonColon)) {
@@ -750,6 +780,10 @@ Expr* Parser::ParseLocalScopeExpr() {
                 Subclause("18.7.1"));
     return MakeErrorExpr(arena_, tok.loc);
   }
+  // A.10 footnote 48: within a constraint block the qualifier is left to the
+  // block's own check, ParserConstraintItemHelpers::ReportLocalQualifiers for
+  // a class's own; an inline block is the one place it stands.
+  if (constraint_block_depth_ == 0) ReportLocalQualifier(tok.loc, diag_);
   Expr* result = ParseMemberAccessChain(tok);
   bool cast_handled = false;
   Expr* cast = TryParseIdentifierCast(result, &cast_handled);
@@ -859,7 +893,7 @@ Expr* Parser::ParseCallExpr(Expr* callee) {
 ClassMember* Parser::CaptureInlineConstraintBlock() {
   auto* block = arena_.Create<ClassMember>();
   block->kind = ClassMemberKind::kConstraint;
-  ScanConstraintBodyRelations(block);
+  ScanConstraintBodyRelations(block, true);
   return block;
 }
 

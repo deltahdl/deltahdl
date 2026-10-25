@@ -470,7 +470,7 @@ void Parser::ParseOutOfBlockConstraint(
   // block, into a member of its own that the block keeps whole.
   auto* body = arena_.Create<ClassMember>();
   body->kind = ClassMemberKind::kConstraint;
-  ScanConstraintBodyRelations(body);
+  ScanConstraintBodyRelations(body, false);
   if (unit) {
     ExternalConstraintBlock ext{
         class_name, constraint_name, loc,  is_initial, is_extends,

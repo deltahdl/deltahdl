@@ -113,6 +113,12 @@ bool IsNamedLvalue(const Expr* e);
 // of an assignment within an expression.
 bool HasLvalueForm(const Expr* e);
 
+// Reports the `local::` qualifier at `loc` as standing outside an inline
+// constraint block, the one place A.10 footnote 48 admits it. Defined in
+// expr_parser.cpp beside Parser::ParseLocalScopeExpr, and shared with the
+// token check of a class's own constraint block in parser_constraint_items.cpp.
+void ReportLocalQualifier(SourceLoc loc, DiagEngine& diag);
+
 // Reports `operand`, the operand of a prefix or a postfix `++` or `--`, unless
 // it has the form of A.8.3's variable_lvalue. Defined in expr_parser_aux.cpp,
 // and shared by Parser::ParsePrefixExpr in expr_parser.cpp with the postfix

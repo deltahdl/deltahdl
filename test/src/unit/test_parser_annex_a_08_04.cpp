@@ -1,5 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <initializer_list>
+#include <string_view>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
@@ -534,6 +538,92 @@ TEST(PrimaryParsing, ACastThroughUnitScopeIsACast) {
   EXPECT_EQ(rhs->rhs->rhs->text, "T");
   ASSERT_NE(rhs->lhs, nullptr);
   EXPECT_EQ(rhs->lhs->text, "x");
+}
+
+// A.8.4 writes a select's part_select_range last, so no bracket follows a
+// part-select: a range, an indexed `+:` or a slice of an unpacked array. A
+// bit-select followed by one part-select stays legal (#8076).
+TEST(PrimaryParsing, ErrorBracketAfterAPartSelect) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [7:0] a [0:3];\n"
+      "  logic [3:0][7:0] v;\n"
+      "  logic x;\n"
+      "  logic [1:0] y;\n"
+      "  initial begin\n"
+      "    x = v[3:2][1];\n"
+      "    y = a[1:2][0];\n"
+      "    y = v[0+:2][1];\n"
+      "    y = v[1][3:2];\n"
+      "  end\n"
+      "endmodule\n");
+  constexpr std::string_view kMessage =
+      "a part-select ends a select; no bracket follows it";
+  for (uint32_t line : {7u, 8u, 9u}) {
+    EXPECT_TRUE(ReportedError(r.diags, kMessage, line, "A.8.4")) << line;
+  }
+  EXPECT_FALSE(ReportedError(r.diags, kMessage, 10, "A.8.4"));
+}
+
+// A.8.4 gives a subroutine call's result one bracket,
+// `function_subroutine_call [ [ range_expression ] ]`, so a second bracket
+// after a call or a system call is reported, and one bit-select or part-select
+// stays legal (#8077).
+TEST(PrimaryParsing, ErrorSecondBracketAfterACall) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef logic [7:0] row_t [0:3];\n"
+      "  function row_t get(); return '{default: 8'hA5}; endfunction\n"
+      "  logic x;\n"
+      "  logic [7:0] b;\n"
+      "  initial begin\n"
+      "    x = get()[1][0];\n"
+      "    x = $past(get())[1][0];\n"
+      "    b = get()[1];\n"
+      "    x = get()[3:0];\n"
+      "  end\n"
+      "endmodule\n");
+  constexpr std::string_view kMessage =
+      "a subroutine call's result takes one select; this is a second";
+  EXPECT_TRUE(ReportedError(r.diags, kMessage, 7, "A.8.4"));
+  EXPECT_TRUE(ReportedError(r.diags, kMessage, 8, "A.8.4"));
+  EXPECT_FALSE(ReportedError(r.diags, kMessage, 9, "A.8.4"));
+  EXPECT_FALSE(ReportedError(r.diags, kMessage, 10, "A.8.4"));
+}
+
+// A.10 footnote 48 confines the `local::` qualifier to an inline constraint
+// block, so one in a class's own constraint block and one in an ordinary
+// expression are each reported, and one in a randomize call's with block is
+// not (#8081).
+TEST(PrimaryParsing, ErrorLocalQualifierOutsideAnInlineConstraintBlock) {
+  auto r = Parse(
+      "class C;\n"
+      "  rand int x;\n"
+      "  int y;\n"
+      "  constraint lim { x < local::y; }\n"
+      "  function void f();\n"
+      "    int z = local::y;\n"
+      "    void'(randomize() with { x < local::y; });\n"
+      "  endfunction\n"
+      "endclass\n");
+  constexpr std::string_view kMessage =
+      "the 'local::' qualifier stands only in an inline constraint block";
+  EXPECT_TRUE(ReportedError(r.diags, kMessage, 4, "A.8.4"));
+  EXPECT_TRUE(ReportedError(r.diags, kMessage, 6, "A.8.4"));
+  EXPECT_FALSE(ReportedError(r.diags, kMessage, 7, "A.8.4"));
+}
+
+// A class's own constraint block left open at the end of the file still has
+// its `local::` qualifier reported (#8081).
+TEST(PrimaryParsing, ErrorLocalQualifierInAnUnclosedConstraintBlock) {
+  auto r = Parse(
+      "class C;\n"
+      "  rand int x;\n"
+      "  constraint lim { x < local::y;\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "the 'local::' qualifier stands only in an inline constraint block", 3,
+      "A.8.4"));
 }
 
 }  // namespace

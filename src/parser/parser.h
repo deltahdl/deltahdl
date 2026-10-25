@@ -269,7 +269,7 @@ class Parser {
                                const ClassMember* first, const DataType& dtype);
   ClassMember* ParseConstraintStub(ClassMember* member);
   bool ParseConstraintHeader(ClassMember* member);
-  void ScanConstraintBodyRelations(ClassMember* member);
+  void ScanConstraintBodyRelations(ClassMember* member, bool inline_block);
   ClassMember* CaptureInlineConstraintBlock();
   bool ScanConstraintBodyToken(ClassMember* member, int& depth, bool& in_soft,
                                bool carried_qualifier);
@@ -521,7 +521,6 @@ class Parser {
   DataType ParseStructOrUnionType();
   void ParseUnionQualifiers(DataType& dtype);
   void ParseStructPackedSigning(DataType& dtype);
-  DataType ParseStructOrUnionBody(TokenKind kw);
   void ParseStructMembers(DataType& dtype);
   DataType ParseStructMemberType();
   void ParseStructMemberList(DataType& dtype, const DataType& member_type,
@@ -774,7 +773,6 @@ class Parser {
   Expr* ParseWithClauseRange(bool in_stream_expression);
   void ParseRandomizeWith(Expr* call);
   Expr* ParseParenExpr();
-  Expr* ParseCompoundAssignExpr(Expr* lhs);
   Expr* ParseInsideExpr(Expr* lhs);
   void ParseInsideRangeList(std::vector<Expr*>& out);
   Expr* ParseInsideValueRange();
@@ -929,6 +927,8 @@ class Parser {
   // `matches` and a pattern-matching case item. A `.name` or `.*` is reported
   // where none is open, and the `&&&` filter after a pattern opens none.
   int pattern_depth_ = 0;
+  // Open constraint blocks, within which local:: is left to their own check.
+  int constraint_block_depth_ = 0;
 
   // §H.2: true while the formal argument list of a DPI import declaration is
   // being parsed. Leaving a packed range unspecified is a relaxation granted to

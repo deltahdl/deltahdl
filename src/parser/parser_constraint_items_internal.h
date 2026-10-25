@@ -17,6 +17,7 @@ struct ParserConstraintItemHelpers {
   // The items from just past the block's '{' through its '}', into `member`,
   // or a report under A.1.10 where they do not parse.
   static void Capture(Parser& p, ClassMember* member);
+  static void ReportLocalQualifiers(Parser& p);
   static bool ParseItemsToBrace(Parser& p, std::vector<ConstraintItem*>& out,
                                 bool in_set);
   static ConstraintItem* ParseExpressionItem(Parser& p);
