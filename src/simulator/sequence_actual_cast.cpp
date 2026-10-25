@@ -38,18 +38,29 @@ Expr* NameOf(std::string_view name, const Expr* at, Arena& arena) {
 
 // §16.8.1 (c): an actual bound to a formal of a keyword data type is cast to
 // that type before it is substituted, so an 8-bit actual passed to a `bit`
-// formal is truncated and a `bit` passed to a `byte` formal extended.
-Expr* CastToKeywordType(Expr* actual, TokenKind type_kw, Arena& arena) {
+// formal is truncated and a `bit` passed to a `byte` formal extended. The
+// keyword alone casts with its own signing, signed for an integer atom type
+// and unsigned for a vector one (§6.11.3), so a signing written after it,
+// `byte unsigned` or `logic signed`, is given to the result by a signing cast
+// around the keyword's (§6.24.1). A formal of a data type keyword holds its
+// `type`; one of the sequence, property or event type holds none and stands
+// as written.
+Expr* CastToKeywordType(Expr* actual, TokenKind type_kw, const DataType* type,
+                        Arena& arena) {
   std::string_view type_name;
+  bool signed_by_default = true;
   switch (type_kw) {
     case TokenKind::kKwBit:
       type_name = "bit";
+      signed_by_default = false;
       break;
     case TokenKind::kKwLogic:
       type_name = "logic";
+      signed_by_default = false;
       break;
     case TokenKind::kKwReg:
       type_name = "reg";
+      signed_by_default = false;
       break;
     case TokenKind::kKwByte:
       type_name = "byte";
@@ -71,7 +82,10 @@ Expr* CastToKeywordType(Expr* actual, TokenKind type_kw, Arena& arena) {
   }
   Expr* cast = CastOf(actual, arena);
   cast->text = type_name;
-  return cast;
+  if (type->is_signed == signed_by_default) return cast;
+  Expr* signing = CastOf(cast, arena);
+  signing->text = type->is_signed ? "signed" : "unsigned";
+  return signing;
 }
 
 // §16.8.1 (c) with §6.24.1: an actual bound to a formal of a type no keyword
@@ -116,7 +130,7 @@ Expr* CastActualToFormal(Expr* actual, TokenKind type_kw, DataType* type,
   }
   if (StandsAsWritten(actual)) return actual;
   if (type_kw != TokenKind::kEof) {
-    return CastToKeywordType(actual, type_kw, arena);
+    return CastToKeywordType(actual, type_kw, type, arena);
   }
   return CastToDataType(actual, type, arena);
 }

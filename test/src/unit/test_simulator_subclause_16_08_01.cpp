@@ -156,6 +156,28 @@ TEST(TypedSequenceFormals, AVariableLvalueActualReadsWithTheFormalsType) {
   EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 25u);
 }
 
+// §16.8.1 (c) with §6.11.3: a keyword type written with a signing casts its
+// actual to that signing. Where v is 1, at 25, b reads ~v as the unsigned
+// byte 254, i reads v - 2 as the unsigned int 32'hFFFFFFFF, above 0, and g
+// reads v as the signed one-bit -1, below 0; ~v is 253 at 15 and 255
+// elsewhere, and v is 0 there, so the sequence ends at 25 alone. Cast with
+// the keywords' default signings, b read -2, i -1 and g 1, so it never ended.
+TEST(TypedSequenceFormals, AKeywordTypeWrittenWithASigningCastsToIt) {
+  SimFixture f;
+  auto* hits = RunAndFindVar(
+      TypedSource("  sequence s_g(byte unsigned b, int unsigned i,\n"
+                  "               logic signed g);\n"
+                  "    b == 254 && i > 0 && g < 0;\n"
+                  "  endsequence\n"
+                  "  sequence rule;\n"
+                  "    @(posedge clk) s_g(~v, v - 2, v);\n"
+                  "  endsequence\n"),
+      f, "hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 1u);
+  EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 25u);
+}
+
 // §16.8.1 (b): a formal of type event takes an event_expression, so
 // event_arg_example(posedge clk) is `@(posedge clk) x ##1 y`: v reads 2 at 15
 // and 1 at 25, and the sequence ends at 25.
