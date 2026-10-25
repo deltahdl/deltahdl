@@ -113,10 +113,11 @@ static bool IsRootedAtName(const Expr* e) {
 // ps_or_hierarchical_net_identifier with its constant_select, `{ net_lvalue
 // { , net_lvalue } }`, or `[ assignment_pattern_expression_type ]
 // assignment_pattern_net_lvalue`, whose elements A.6.7.1 writes with no key.
-// Declared in parser_instance_internal.h for the UDP instance in
-// parser_udp_inst.cpp, whose output_terminal is the same net_lvalue a gate's
-// is.
+// None of them is written in parentheses. Declared in
+// parser_instance_internal.h for the UDP instance in parser_udp_inst.cpp, whose
+// output_terminal is the same net_lvalue a gate's is.
 bool IsNetLvalue(const Expr* e) {
+  if (e->is_parenthesized) return false;
   switch (e->kind) {
     case ExprKind::kIdentifier:
     case ExprKind::kSelect:

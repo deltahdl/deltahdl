@@ -481,6 +481,21 @@ TEST(UdpInstantiationParsing, OutputTerminalMustBeNetLvalue) {
                              "28.3"));
 }
 
+// A.5.4 (printed page 1197) gives a UDP instance the output_terminal A.3.3
+// makes a net_lvalue, whose forms A.8.5 (printed page 1212) writes in no
+// parentheses.
+TEST(UdpInstantiationParsing, ParenthesizedOutputTerminalIsError) {
+  auto r = Parse(
+      "primitive inv(output out, input in);\n"
+      "  table 0 : 1; 1 : 0; endtable\n"
+      "endprimitive\n"
+      "module m;\n"
+      "  inv u1((z), a);\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "output terminal must be a net lvalue", 5,
+                            "28.3"));
+}
+
 TEST(UdpInstantiationParsing, MultipleUnnamedInstances) {
   auto r = Parse(
       "primitive inv(output out, input in);\n"
