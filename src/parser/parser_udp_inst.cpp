@@ -22,8 +22,10 @@ namespace delta {
 // instance writes `#` only before the parentheses of a parameter value
 // assignment, and names its instance before any `(` (A.4.1.1), so a `(` after
 // the name, which opens a drive strength or an unnamed instance's terminals,
-// and a `#` with no `(` after it, which opens a delay, are a UDP's. `#(` is
-// left to the module instance it may be, and
+// and a `#` with no `(` after it, which opens a delay, are a UDP's. So is a
+// `(` straight after a balanced `#( )`: there a module instance would write its
+// instance identifier, and an unnamed UDP instance opens its terminals. A `#(`
+// followed by a name is left to the module instance it may be, and
 // Elaborator::ReclassifyForwardUdpInstances turns it into a UDP instance where
 // the name proves to be one.
 bool Parser::AtUdpOnlyInstanceForm() {
@@ -31,9 +33,13 @@ bool Parser::AtUdpOnlyInstanceForm() {
   if (!Check(TokenKind::kHash)) return false;
   auto saved = lexer_.SavePos();
   Consume();
-  bool delay = !Check(TokenKind::kLParen);
+  bool udp_only = !Check(TokenKind::kLParen);
+  if (!udp_only) {
+    SkipBalancedParens();
+    udp_only = Check(TokenKind::kLParen);
+  }
   lexer_.RestorePos(saved);
-  return delay;
+  return udp_only;
 }
 
 // A.5.4's udp_instance, `[ name_of_instance ] ( output_terminal ,

@@ -436,4 +436,38 @@ TEST(UdpPortGrammar, InitialValueOnRegOrInputDeclarationIsRejected) {
   EXPECT_EQ(r.cu->udps[1]->input_names.size(), 1u);
 }
 
+// udp_port_list ::= output_port_identifier , input_port_identifier
+// { , input_port_identifier }: names alone, which a non-ANSI header and its
+// extern form both write. An attribute instance before the first name had been
+// read as if it opened a udp_declaration_port_list entry, and dropped once the
+// list proved to be names.
+TEST(UdpPortGrammar, AttributeBeforeAPortListOfNamesIsRejected) {
+  auto r = Parse(
+      "primitive p((* keep *) y, a);\n"
+      "  output y;\n"
+      "  input a;\n"
+      "  table 0 : 1; 1 : 0; endtable\n"
+      "endprimitive\n"
+      "extern primitive q((* keep *) y, a);\n");
+  const char* const kMsg =
+      "a UDP's port list of names takes no attribute instance";
+  EXPECT_TRUE(ReportedError(r.diags, kMsg, 1, "A.5.2"));
+  EXPECT_TRUE(ReportedError(r.diags, kMsg, 6, "A.5.2"));
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->udps.size(), 2u);
+  EXPECT_EQ(r.cu->udps[1]->output_name, "y");
+  EXPECT_EQ(r.cu->udps[1]->input_names.size(), 1u);
+}
+
+// The declaration list keeps the attribute instances its entries open with, in
+// a definition and an extern declaration alike.
+TEST(UdpPortGrammar, AttributeBeforeADeclarationListIsKept) {
+  auto r = Parse(
+      "primitive p((* keep *) output y, input a);\n"
+      "  table 0 : 1; 1 : 0; endtable\n"
+      "endprimitive\n"
+      "extern primitive q((* keep *) output y, input a);\n");
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

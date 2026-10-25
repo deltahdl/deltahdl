@@ -4,6 +4,7 @@
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
 
@@ -804,6 +805,60 @@ TEST(SourceText, AnInterfaceClassHeaderWritesNoClassOnlyParts) {
                             "an interface class type in an extends clause "
                             "takes no arguments",
                             4, "A.1.2"));
+}
+
+// A.1.2 writes each extern form as `extern` and a header, and every header
+// opens with its own { attribute_instance }, so an extern declaration's
+// attribute instances follow `extern`. There they had sent the parser skipping
+// to the next ';', dropping the declaration unreported (#7993).
+TEST(SourceText, AttributesAfterExternOpenTheHeader) {
+  auto r = Parse(
+      "extern (* keep *) module m(input a);\n"
+      "extern (* keep *) interface i(input a);\n"
+      "extern (* keep *) program q(input a);\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_TRUE(r.cu->modules[0]->is_extern);
+  ASSERT_EQ(r.cu->modules[0]->attrs.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->attrs[0].name, "keep");
+  EXPECT_EQ(r.cu->interfaces[0]->attrs.size(), 1u);
+  EXPECT_EQ(r.cu->programs[0]->attrs.size(), 1u);
+}
+
+// No production puts an attribute instance before `extern`; an extern
+// declaration's stand after it, at the head of its header (#7995).
+TEST(SourceText, AttributesBeforeExternAreRejected) {
+  auto r = Parse(
+      "(* keep *) extern module m(input a);\n"
+      "(* keep *) extern primitive p(output y, input a);\n");
+  const char* const kMsg =
+      "an extern declaration's attribute instances are written after "
+      "'extern', not before it";
+  EXPECT_TRUE(ReportedError(r.diags, kMsg, 1, "A.1.2"));
+  EXPECT_TRUE(ReportedError(r.diags, kMsg, 2, "A.1.2"));
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_EQ(r.cu->udps.size(), 1u);
+}
+
+// At compilation-unit scope `description` reaches `extern` only through the
+// extern headers of a module, interface, program or primitive. Any other token
+// after it had been skipped to the next ';' unreported (#7994).
+TEST(SourceText, ExternOpeningNoHeaderIsRejected) {
+  auto r = Parse(
+      "extern logic x;\n"
+      "extern class C;\n"
+      "module m; endmodule\n");
+  const char* const kMsg =
+      "the token after 'extern' opens no module, interface, program or "
+      "primitive header";
+  EXPECT_TRUE(ReportedError(r.diags, kMsg, 1, "A.1.2"));
+  EXPECT_TRUE(ReportedError(r.diags, kMsg, 2, "A.1.2"));
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_EQ(r.cu->modules.size(), 1u);
 }
 
 }  // namespace

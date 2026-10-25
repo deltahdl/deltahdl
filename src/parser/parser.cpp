@@ -538,10 +538,6 @@ bool Parser::TryParseAnonymousProgram(CompilationUnit* unit) {
 }
 
 bool Parser::TryParsePrimaryTopLevel(CompilationUnit* unit) {
-  if (Check(TokenKind::kKwExtern)) {
-    ParseExternTopLevel(unit);
-    return true;
-  }
   if (Check(TokenKind::kKwModule) || Check(TokenKind::kKwMacromodule)) {
     unit->modules.push_back(ParseModuleDecl());
     return true;
@@ -607,6 +603,19 @@ void Parser::ParseTopLevel(CompilationUnit* unit) {
   current_compilation_unit_ = unit;
   if (NoteItemAndMatchNull(unit->has_read_cu_item)) return;
   auto top_attrs = ParseAttributes();
+  // A.1.2's description writes { attribute_instance } before a package item
+  // and a bind directive, and no production writes one before `extern`: an
+  // extern declaration's stand after it, where ParseExternTopLevel reads them.
+  if (Check(TokenKind::kKwExtern)) {
+    if (!top_attrs.empty()) {
+      diag_.Error(top_attrs.front().loc,
+                  "an extern declaration's attribute instances are written "
+                  "after 'extern', not before it",
+                  Subclause("A.1.2"));
+    }
+    ParseExternTopLevel(unit);
+    return;
+  }
   const TopLevelSizes kBefore = SizesOf(*unit);
   if (TryParsePrimaryTopLevel(unit)) {
     if (std::vector<Attribute>* attrs = AttributesOfNewest(*unit, kBefore)) {
@@ -721,23 +730,31 @@ bool Parser::TryParseCuScopeItem(CompilationUnit* unit) {
   return false;
 }
 
+// A.1.2 and A.5.1 write each extern form as `extern` and a header, and every
+// such header opens with its own { attribute_instance }, so the attribute
+// instances read after `extern` are the declaration's.
 void Parser::ParseExternTopLevel(CompilationUnit* unit) {
   SourceLoc extern_loc = CurrentLoc();
   Consume();
+  std::vector<Attribute> attrs = ParseAttributes();
   if (Check(TokenKind::kKwModule) || Check(TokenKind::kKwMacromodule)) {
     unit->modules.push_back(ParseExternModuleDecl());
+    unit->modules.back()->attrs = std::move(attrs);
     return;
   }
   if (Check(TokenKind::kKwInterface)) {
     unit->interfaces.push_back(ParseExternInterfaceOrProgramDecl());
+    unit->interfaces.back()->attrs = std::move(attrs);
     return;
   }
   if (Check(TokenKind::kKwProgram)) {
     unit->programs.push_back(ParseExternInterfaceOrProgramDecl());
+    unit->programs.back()->attrs = std::move(attrs);
     return;
   }
   if (Check(TokenKind::kKwPrimitive)) {
     auto* udp = ParseExternUdpDecl();
+    udp->attrs = std::move(attrs);
     unit->udps.push_back(udp);
     known_udps_.insert(udp->name);
     return;
@@ -752,6 +769,12 @@ void Parser::ParseExternTopLevel(CompilationUnit* unit) {
     ParseExternTfDeclaration(extern_loc);
     return;
   }
+  // Nothing else follows `extern` in a compilation unit's scope. The unit
+  // resumes after the next ';'.
+  diag_.Error(CurrentLoc(),
+              "the token after 'extern' opens no module, interface, program or "
+              "primitive header",
+              Subclause("A.1.2"));
   SkipToSemicolon(lexer_);
 }
 

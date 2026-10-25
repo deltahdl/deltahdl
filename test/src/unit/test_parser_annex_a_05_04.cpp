@@ -625,4 +625,42 @@ TEST(UdpInstantiationParsing, AllStrengthKeywords) {
   }
 }
 
+// udp_instantiation lets a parenthesised delay2 stand before an unnamed
+// udp_instance. A module instance always names its instance after `#( )`, so a
+// `(` straight after the parentheses is a UDP's terminal list, whether or not
+// the primitive has been declared yet.
+TEST(UdpInstantiationParsing, UnnamedInstanceWithParenthesisedDelayBeforeDecl) {
+  auto r = Parse(
+      "module m(output o, input i);\n"
+      "  p #(2, 3) (o, i);\n"
+      "endmodule\n"
+      "primitive p(output y, input a);\n"
+      "  table 0 : 1; 1 : 0; endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto insts = FindUdpInsts(r.cu->modules[0]->items);
+  ASSERT_EQ(insts.size(), 1u);
+  EXPECT_TRUE(insts[0]->udp_undeclared_at_parse);
+  EXPECT_TRUE(insts[0]->gate_inst_name.empty());
+  EXPECT_EQ(insts[0]->gate_terminals.size(), 2u);
+  ASSERT_NE(insts[0]->gate_delay, nullptr);
+  EXPECT_EQ(insts[0]->gate_delay->int_val, 2u);
+  ASSERT_NE(insts[0]->gate_delay_fall, nullptr);
+  EXPECT_EQ(insts[0]->gate_delay_fall->int_val, 3u);
+}
+
+// With an instance name after the parentheses the item is still read as the
+// module instance it may be, its `#( )` as a parameter value assignment.
+TEST(UdpInstantiationParsing, NamedInstanceAfterParenthesesStaysAModuleInst) {
+  auto r = Parse(
+      "module m(output o, input i);\n"
+      "  p #(2) u (o, i);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules[0]->items.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kModuleInst);
+}
+
 }  // namespace

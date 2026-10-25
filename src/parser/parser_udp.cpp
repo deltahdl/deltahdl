@@ -829,6 +829,18 @@ void Parser::ParseUdpInitialStatement(UdpDecl* udp) {
   Expect(TokenKind::kSemicolon, Subclause("29.3.3"));
 }
 
+// A.5.2's udp_port_list is port identifiers alone, with no attribute_instance
+// before any of them. Those read ahead of the header's first port, where they
+// would have opened a udp_declaration_port_list entry, are reported at the
+// first of them once the list proves to be names.
+static void RejectAttributesBeforeUdpPortList(
+    DiagEngine& diag, const std::vector<Attribute>& attrs) {
+  if (attrs.empty()) return;
+  diag.Error(attrs.front().loc,
+             "a UDP's port list of names takes no attribute instance",
+             Subclause("A.5.2"));
+}
+
 UdpDecl* Parser::ParseUdpDecl() {
   auto* udp = arena_.Create<UdpDecl>();
   udp->range.start = CurrentLoc();
@@ -842,10 +854,11 @@ UdpDecl* Parser::ParseUdpDecl() {
     Expect(TokenKind::kSemicolon, Subclause("29.3.1"));
     ParseUdpPortDecls(udp);
   } else {
-    ParseAttributes();
+    std::vector<Attribute> attrs = ParseAttributes();
     if (UdpPortListIsDeclarations()) {
       ParseUdpAnsiHeader(udp);
     } else {
+      RejectAttributesBeforeUdpPortList(diag_, attrs);
       ParseUdpNonAnsiHeader(udp);
     }
   }
@@ -882,10 +895,11 @@ UdpDecl* Parser::ParseExternUdpDecl() {
   udp->name = ExpectIdentifier(Subclause("29.3.1")).text;
 
   Expect(TokenKind::kLParen, Subclause("29.3.1"));
-  ParseAttributes();
+  std::vector<Attribute> attrs = ParseAttributes();
   if (UdpPortListIsDeclarations()) {
     ParseUdpAnsiHeader(udp);
   } else {
+    RejectAttributesBeforeUdpPortList(diag_, attrs);
     // A.5.1 gives `extern udp_nonansi_declaration` no `udp_port_declaration`
     // and no `udp_body`, so A.5.2's `udp_port_list` is the whole prototype: its
     // first name is the output port and the rest are inputs, and no separate

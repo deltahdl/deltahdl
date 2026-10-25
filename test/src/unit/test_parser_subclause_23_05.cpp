@@ -76,7 +76,7 @@ TEST(ExternModuleParsing, ExternAnsiEmptyPortList) {
 }
 
 TEST(ExternModuleParsing, ExternAnsiWithAttributes) {
-  auto r = Parse("(* keep *) extern module m(input logic a);\n");
+  auto r = Parse("extern (* keep *) module m(input logic a);\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_TRUE(r.cu->modules[0]->is_extern);

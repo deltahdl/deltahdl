@@ -7,6 +7,7 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_specify.h"
 #include "simulator/udp_eval.h"
@@ -360,14 +361,20 @@ TEST(UdpDeclGrammar, AttributeOnWildcardUdp) {
   EXPECT_EQ(r.cu->udps[0]->name, "inv");
 }
 
+// `extern udp_ansi_declaration` and its non-ANSI pair put the declaration's
+// attribute instances after `extern`, at the head of the header.
 TEST(UdpDeclGrammar, AttributeOnExternUdp) {
   auto r = Parse(
-      "(* custom_attr *)\n"
-      "extern primitive inv(output out, input in);\n");
+      "extern (* custom_attr *)\n"
+      "primitive inv(output out, input in);\n"
+      "extern (* keep *) primitive buf1(o, i);\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->udps.size(), 1u);
+  ASSERT_EQ(r.cu->udps.size(), 2u);
   EXPECT_EQ(r.cu->udps[0]->name, "inv");
+  ASSERT_EQ(r.cu->udps[0]->attrs.size(), 1u);
+  EXPECT_EQ(r.cu->udps[0]->attrs[0].name, "custom_attr");
+  EXPECT_EQ(r.cu->udps[1]->attrs.size(), 1u);
 }
 
 // Every udp_nonansi_declaration / udp_ansi_declaration header ends with a
