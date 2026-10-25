@@ -3,6 +3,7 @@
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "lexer/lexer.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
@@ -209,6 +210,7 @@ Expr* Parser::ParseConcatenation() {
     }
     Expect(TokenKind::kRBrace, Subclause("11.4.12.1"));
     Expect(TokenKind::kRBrace, Subclause("11.4.12.1"));
+    ReportEmptyConcatItems(rep, diag_);
 
     return ParseParenMethodTail(AtSelectBracket() ? ParseSelectExpr(rep) : rep);
   }
@@ -221,6 +223,9 @@ Expr* Parser::ParseConcatenation() {
     cat->elements.push_back(ParseExpr());
   }
   Expect(TokenKind::kRBrace, Subclause("11.4.12"));
+  // A.8.1's footnote 40: `{}` is the empty unpacked array concatenation of
+  // §10.10 alone and stands in no other concatenation as an item.
+  ReportEmptyConcatItems(cat, diag_);
 
   // A.8.2 makes a method call's root a primary, and A.8.4 lists a
   // concatenation and a multiple concatenation, each with an optional select,
@@ -271,14 +276,55 @@ Expr* Parser::ParseCastExpr() {
   return ParseCastMethodTail(cast);
 }
 
-// A.2.10: the `with [ ... ]` array range of a §7.12.1 array manipulation call
-// -- a single index, a ranged pair, or an indexed part-select.
-Expr* Parser::ParseWithClauseRange() {
+bool WithOpensRange(Lexer& lexer) {
+  if (lexer.Peek().kind != TokenKind::kKwWith) return false;
+  Lexer::SavedPos saved = lexer.SavePos();
+  lexer.Next();
+  bool opens_range = lexer.Peek().kind == TokenKind::kLBracket;
+  lexer.RestorePos(saved);
+  return opens_range;
+}
+
+void ReportPredicateOperator(const Expr* e, DiagEngine& diag) {
+  if (e->kind == ExprKind::kBinary &&
+      (e->op == TokenKind::kKwMatches || e->op == TokenKind::kAmpAmpAmp)) {
+    diag.Error(e->range.start,
+               "'matches' and '&&&' stand only in the predicate of an if "
+               "statement or a conditional operator",
+               Subclause("A.6.6"));
+  }
+}
+
+void ReportEmptyConcatItems(const Expr* concat, DiagEngine& diag) {
+  for (const Expr* item : concat->elements) {
+    if (item->kind == ExprKind::kConcatenation && item->elements.empty()) {
+      diag.Error(item->range.start,
+                 "an empty concatenation, {}, is the empty unpacked array "
+                 "concatenation and no item of another concatenation",
+                 Subclause("A.8.1"));
+    }
+  }
+}
+
+// A.8.1's `with [ array_range_expression ]`, read whole from the `with`: a
+// single index, a ranged pair, or an indexed part-select of what the operand
+// before it names (§11.4.14.4). A.8.1 writes it after the operand of a
+// stream_expression alone, so where `in_stream_expression` is false it is
+// reported, and read past all the same.
+Expr* Parser::ParseWithClauseRange(bool in_stream_expression) {
+  Token with_tok = Consume();
+  if (!in_stream_expression) {
+    diag_.Error(with_tok.loc,
+                "a with range follows only the operand of a stream expression "
+                "in a streaming concatenation",
+                Subclause("A.8.1"));
+  }
+  Consume();
   auto* range = arena_.Create<Expr>();
   range->kind = ExprKind::kSelect;
   range->index = ParseExpr();
-  // Parser::ParseWithClause consumed the `[`, so what remains of the §7.12.1
-  // array range is the bounds, and the range begins where the first one does.
+  // What follows the `[` is the bounds, and the range begins where the first
+  // one does.
   range->range.start = range->index->range.start;
   if (Match(TokenKind::kPlusColon)) {
     range->is_part_select_plus = true;
@@ -289,6 +335,7 @@ Expr* Parser::ParseWithClauseRange() {
   } else if (Match(TokenKind::kColon)) {
     range->index_end = ParseExpr();
   }
+  Expect(TokenKind::kRBracket, Subclause("11.4.14.4"));
   return range;
 }
 
@@ -311,8 +358,13 @@ std::vector<std::string_view> Parser::ParseWithClauseIdentifiers(Expr* expr) {
   return ids;
 }
 
+// A.8.2's with clause of an array manipulation call, a parenthesized
+// expression, or of a randomize call, a constraint block. A `with` that opens
+// a bracketed range is left standing: A.8.1 writes that range after the whole
+// operand of a stream_expression, where Parser::ParseStreamingConcat reads it.
 Expr* Parser::ParseWithClause(Expr* expr) {
-  if (!Match(TokenKind::kKwWith)) return expr;
+  if (!Check(TokenKind::kKwWith) || WithOpensRange(lexer_)) return expr;
+  Consume();
 
   if (Check(TokenKind::kLBrace)) {
     Consume();
@@ -320,12 +372,6 @@ Expr* Parser::ParseWithClause(Expr* expr) {
     return expr;
   }
 
-  if (Check(TokenKind::kLBracket)) {
-    Consume();
-    expr->with_expr = ParseWithClauseRange();
-    Expect(TokenKind::kRBracket, Subclause("7.12.1"));
-    return expr;
-  }
   Expect(TokenKind::kLParen, Subclause("7.12"));
   expr->with_has_parens = true;
   std::vector<std::string_view> ids = ParseWithClauseIdentifiers(expr);

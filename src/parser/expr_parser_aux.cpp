@@ -2,6 +2,7 @@
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_type.h"
+#include "parser/expr_parser_internal.h"
 #include "parser/parser.h"
 #include "parser/parser_token_skips.h"
 
@@ -43,7 +44,9 @@ Expr* Parser::ParseStreamingConcat(TokenKind dir) {
   // or type keyword before the stream's brace is kept as a name, for the later
   // stages to size as a type or read as a parameter. A lone number is the
   // literal ParsePrimaryExpr makes of it, so its base is read with its digits
-  // (§11.4.14.2): spelled as a name, 8'd8 was read as 88.
+  // (§11.4.14.2): spelled as a name, 8'd8 was read as 88. Anything else is an
+  // expression running up to the brace, which continues no operand: read as
+  // one primary, `W*2` stopped at the `*`.
   if (!Check(TokenKind::kLBrace)) {
     auto saved = lexer_.SavePos();
     auto tok = Consume();
@@ -57,15 +60,23 @@ Expr* Parser::ParseStreamingConcat(TokenKind dir) {
       sc->lhs = type_id;
     } else {
       lexer_.RestorePos(saved);
-      sc->lhs = ParsePrimaryExpr();
+      sc->lhs = ParseExpr();
     }
   }
 
+  // A.8.1's stream_expression is an expression and then, optionally, `with [
+  // array_range_expression ]`, the range applying to the whole operand. The
+  // operand is read short of Parser::ParseExpr, which reports a range after
+  // any other expression, and the range is read here. Footnote 40 keeps `{}`
+  // out of a stream.
   Expect(TokenKind::kLBrace, Subclause("11.4.14"));
-  sc->elements.push_back(ParseExpr());
-  while (Match(TokenKind::kComma)) {
-    sc->elements.push_back(ParseExpr());
-  }
+  do {
+    Expr* operand = ParseExprBp(0);
+    ReportPredicateOperator(operand, diag_);
+    if (WithOpensRange(lexer_)) operand->with_expr = ParseWithClauseRange(true);
+    sc->elements.push_back(operand);
+  } while (Match(TokenKind::kComma));
+  ReportEmptyConcatItems(sc, diag_);
   Expect(TokenKind::kRBrace, Subclause("11.4.14"));
   return sc;
 }

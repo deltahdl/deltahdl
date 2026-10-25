@@ -133,6 +133,22 @@ TEST(ConcatenationSim, StreamingConcatByteSliceSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 0xCDABu);
 }
 
+// slice_size's constant_expression alternative is any constant expression, an
+// operator over a parameter among them: W*2 is 8, so the left-stream operator
+// reverses the word's four bytes.
+TEST(ConcatenationSim, StreamingConcatOperatorSliceSimulates) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  localparam int W = 4;\n"
+      "  logic [31:0] x;\n"
+      "  initial x = {<< W*2 {32'h11223344}};\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0x44332211u);
+}
+
 // constant_multiple_concatenation's replication count is a constant_expression.
 // ConstantMultipleConcatenationSimulates covers a literal count; here the count
 // is a parameter, the other constant form, folded when the dependent parameter

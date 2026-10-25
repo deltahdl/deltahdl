@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
@@ -330,6 +332,112 @@ TEST(ConcatenationParsing, StreamConcatenationEmptyRejected) {
   // §11.2 owns the report Parser::ParsePrimaryExpr makes for the missing
   // stream_expression; §11.4.14 states the stream_concatenation itself.
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 2, "11.2"));
+}
+
+// slice_size ::= simple_type | constant_expression, and the expression runs up
+// to the brace opening the stream_concatenation: an operator, a conditional
+// and a parenthesized operand are read whole into the slice size.
+TEST(ConcatenationParsing, StreamingSliceSizeOfAnyConstantExpression) {
+  auto r = Parse(
+      "module m;\n"
+      "  localparam int W = 4;\n"
+      "  initial begin\n"
+      "    x = {<< W*2 {a}};\n"
+      "    x = {<< W > 2 ? 8 : 16 {a}};\n"
+      "    x = {<< (W) - 1 {a}};\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_FALSE(r.has_errors);
+  const Stmt* body = InitialBody(r);
+  ASSERT_NE(body, nullptr);
+  ASSERT_EQ(body->stmts.size(), 3u);
+  EXPECT_EQ(body->stmts[0]->rhs->lhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(body->stmts[1]->rhs->lhs->kind, ExprKind::kTernary);
+  EXPECT_EQ(body->stmts[2]->rhs->lhs->kind, ExprKind::kBinary);
+}
+
+// stream_expression ::= expression [ with [ array_range_expression ] ], so the
+// range follows the whole operand: a name, a parenthesized operand and a
+// member alike. Its select begins where its first bound does, the 1 at column
+// 28 of line 2.
+TEST(ConcatenationParsing, StreamExpressionRangeFollowsTheWholeOperand) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = {>> {q with [1:2]}};\n"
+      "  initial x = {>> {(q) with [0], p.q with [1 +: 2]}};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_FALSE(r.has_errors);
+  const auto& items = r.cu->modules[0]->items;
+  ASSERT_EQ(items.size(), 2u);
+  const Expr* range = items[0]->body->rhs->elements[0]->with_expr;
+  ASSERT_NE(range, nullptr);
+  EXPECT_EQ(range->kind, ExprKind::kSelect);
+  EXPECT_EQ(range->range.start.line, 2u);
+  EXPECT_EQ(range->range.start.column, 28u);
+  const auto& operands = items[1]->body->rhs->elements;
+  ASSERT_EQ(operands.size(), 2u);
+  EXPECT_NE(operands[0]->with_expr, nullptr);
+  EXPECT_EQ(operands[1]->kind, ExprKind::kMemberAccess);
+  ASSERT_NE(operands[1]->with_expr, nullptr);
+  EXPECT_TRUE(operands[1]->with_expr->is_part_select_plus);
+}
+
+// A.8.1 writes `with [ array_range_expression ]` in stream_expression alone.
+// After a name, an array method call, a parenthesized expression, an operand
+// of a plain concatenation, a call's argument or a statement's call it is
+// reported where the `with` stands, and what follows it is still read.
+TEST(ConcatenationParsing, WithRangeOutsideAStreamExpressionRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  int a[4], q[$], b;\n"
+      "  initial begin\n"
+      "    b = a with [0];\n"
+      "    b = q.sum with [0 +: 2];\n"
+      "    b = (a) with [1];\n"
+      "    b = {a with [0], 8'd1};\n"
+      "    b = f(a with [2:3]);\n"
+      "    q.reverse with [1:2];\n"
+      "    b = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  constexpr const char* kStrayRange =
+      "a with range follows only the operand of a stream expression in a "
+      "streaming concatenation";
+  for (uint32_t line = 4; line <= 9; ++line) {
+    EXPECT_TRUE(ReportedError(r.diags, kStrayRange, line, "A.8.1"))
+        << "line " << line;
+  }
+  EXPECT_EQ(r.diags.size(), 6u);
+}
+
+// A.8.1's footnote 40 makes `{ }` the empty unpacked array concatenation of
+// §10.10 alone, used in no other form of concatenation: as an item of a
+// concatenation, of a multiple concatenation or of a stream it is reported
+// where it stands. A nested concatenation that holds an item is left alone.
+TEST(ConcatenationParsing, EmptyConcatenationAsAnItemRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [7:0] v;\n"
+      "  int q[$];\n"
+      "  initial begin\n"
+      "    v = {8'd1, {}};\n"
+      "    v = {2{4'd1, {}}};\n"
+      "    v = {>> {v, {}}};\n"
+      "    q = {q, {}};\n"
+      "    q = {};\n"
+      "    v = {4'd1, {2'd1, 2'd2}};\n"
+      "  end\n"
+      "endmodule\n");
+  constexpr const char* kEmptyItem =
+      "an empty concatenation, {}, is the empty unpacked array concatenation "
+      "and no item of another concatenation";
+  for (uint32_t line = 5; line <= 8; ++line) {
+    EXPECT_TRUE(ReportedError(r.diags, kEmptyItem, line, "A.8.1"))
+        << "line " << line;
+  }
+  EXPECT_EQ(r.diags.size(), 4u);
 }
 
 }  // namespace

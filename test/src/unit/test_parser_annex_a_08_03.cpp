@@ -610,7 +610,7 @@ TEST(ExpressionParsing, ConstantRangeReversedBounds) {
 // Parser::TryParseSpecialInfix is the reason the whole of ExprKind::kTernary
 // was affected: §11.4.11 has one construction site in the parser and it was one
 // of the twelve, so a conditional expression rendered as "<unknown location>".
-// Parser::ParseWithClauseRange (§7.12.1), Parser::ParseInsideValueRange
+// Parser::ParseWithClauseRange (§11.4.14.4), Parser::ParseInsideValueRange
 // (§11.4.13), ParserPortHelpers::ParseNonAnsiPortSelect (§23.2.2.1),
 // Parser::ParseAssocIndexDim (§7.8), Parser::ParseUnpackedDims (§7.4.2, §7.8.1
 // and §7.10) and Parser::ParseForeachArrayId (§12.7.3) are the rest.
@@ -641,7 +641,7 @@ TEST(ExpressionParsing, EveryParsedExpressionCarriesAPosition) {
       "    x = a inside {1, 2};\n"
       "    x = {>> byte {v}};\n"
       "    x = tagged Valid 42;\n"
-      "    q.reverse with [1:2];\n"
+      "    x = {>> {q with [1:2]}};\n"
       "    j--;\n"
       "    if (a &&& b) x = 1;\n"
       "    if (a matches 3) x = 1;\n"

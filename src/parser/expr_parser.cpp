@@ -130,16 +130,14 @@ uint64_t ParseIntText(std::string_view text) {
 // condition, which never stands as an expression of its own. A.8.6 makes
 // neither operator a binary_operator, so one at the top of any other
 // expression is reported. That covers one in parentheses, whose
-// mintypmax_expression is an expression too.
+// mintypmax_expression is an expression too. A.8.1 writes `with [
+// array_range_expression ]` after the operand of a stream_expression alone,
+// which Parser::ParseStreamingConcat reads short of this, so a range after
+// any other expression is reported and read past.
 Expr* Parser::ParseExpr() {
   Expr* e = ParseExprBp(0);
-  if (e->kind == ExprKind::kBinary &&
-      (e->op == TokenKind::kKwMatches || e->op == TokenKind::kAmpAmpAmp)) {
-    diag_.Error(e->range.start,
-                "'matches' and '&&&' stand only in the predicate of an if "
-                "statement or a conditional operator",
-                Subclause("A.6.6"));
-  }
+  ReportPredicateOperator(e, diag_);
+  if (WithOpensRange(lexer_)) ParseWithClauseRange(false);
   return e;
 }
 

@@ -771,7 +771,7 @@ class Parser {
   Expr* ParseCastExpr();
   Expr* ParseTypeRefExpr();
   Expr* ParseWithClause(Expr* expr);
-  Expr* ParseWithClauseRange();
+  Expr* ParseWithClauseRange(bool in_stream_expression);
   std::vector<std::string_view> ParseWithClauseIdentifiers(Expr* expr);
   Expr* ParseParenExpr();
   Expr* ParseCompoundAssignExpr(Expr* lhs);

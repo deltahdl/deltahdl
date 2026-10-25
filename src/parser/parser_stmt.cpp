@@ -816,6 +816,8 @@ Stmt* Parser::ParseAssignmentOrExprNoSemi() {
   } else {
     stmt->kind = StmtKind::kExprStmt;
     stmt->expr = ParseInfixBp(lhs_expr, 0);
+    // A.8.1 writes a with range after the operand of a stream expression alone.
+    if (WithOpensRange(lexer_)) ParseWithClauseRange(false);
     // A.6.9: a subroutine call statement is a call, and a `new` is no call:
     // §8.7 calls a constructor from the right-hand side of an assignment or
     // as `super.new`.

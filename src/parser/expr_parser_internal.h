@@ -10,6 +10,7 @@ namespace delta {
 
 class Arena;
 class DiagEngine;
+class Lexer;
 struct Expr;
 
 // Parse the numeric value of an integer literal token's text, ignoring the
@@ -74,5 +75,26 @@ void CheckUnparenthesizedCycleDelay(const Expr* e, DiagEngine& diag);
 // parser_stmt_timing.cpp beside the cycle delay's identifier test it widens,
 // and shared with a randsequence rule's weight in parser_randsequence.cpp.
 bool IsPsIdentifier(const Expr* e);
+
+// Whether the lexer stands at a `with` that opens a bracketed range, A.8.1's
+// `with [ array_range_expression ]`, rather than A.8.2's parenthesized
+// expression or constraint block. Defined in expr_parser_calls.cpp beside the
+// with clause, and shared with the stream_expression in expr_parser_aux.cpp,
+// Parser::ParseExpr in expr_parser.cpp and the expression statement in
+// parser_stmt.cpp.
+bool WithOpensRange(Lexer& lexer);
+
+// Reports `e` when its top is a `matches` or `&&&`, which A.6.6 confines to
+// the predicate of an if statement or a conditional operator. Defined in
+// expr_parser_calls.cpp, and shared by Parser::ParseExpr with the
+// stream_expression, which reads its operand short of ParseExpr.
+void ReportPredicateOperator(const Expr* e, DiagEngine& diag);
+
+// Reports each item of `concat`, a concatenation, a multiple concatenation or
+// a streaming concatenation, that is `{}`: A.8.1's footnote 40 makes that the
+// empty unpacked array concatenation of §10.10 alone. Defined in
+// expr_parser_calls.cpp beside Parser::ParseConcatenation, and shared with
+// the stream in expr_parser_aux.cpp.
+void ReportEmptyConcatItems(const Expr* concat, DiagEngine& diag);
 
 }  // namespace delta
