@@ -652,11 +652,11 @@ TEST(SubroutineCallElaborationSyntax, AForStepNamingDataIsReported) {
 // lets it be left off a task, a void function or a class method alone. So a
 // call statement naming a nonvoid function of the module or of a package
 // without one is reported; the same call with its parentheses, a void
-// function of either and a task are not.
+// function of either and a task of either are not.
 TEST(SubroutineCallElaborationSyntax, ANonvoidFunctionCallKeepsItsParentheses) {
   ElabFixture f;
   ElaborateSrc(
-      "package q; endpackage\n"
+      "package q; task qt; endtask endpackage\n"
       "package p;\n"
       "  function int g(); return 2; endfunction\n"
       "  function void w(); endfunction\n"
@@ -672,17 +672,18 @@ TEST(SubroutineCallElaborationSyntax, ANonvoidFunctionCallKeepsItsParentheses) {
       "    v;\n"
       "    t;\n"
       "    p::w;\n"
+      "    q::qt;\n"
       "  end\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "a call of the nonvoid function 'f' keeps its "
-                            "parentheses",
-                            11, "A.8.2"));
+                            "cannot omit parentheses in call to nonvoid "
+                            "function 'f'",
+                            11, "13.5.5"));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "a call of the nonvoid function 'g' keeps its "
-                            "parentheses",
-                            12, "A.8.2"));
+                            "cannot omit parentheses in call to nonvoid "
+                            "function 'p::g'",
+                            12, "13.5.5"));
   EXPECT_EQ(f.diag.ErrorCount(), 2u);
 }
 
@@ -697,7 +698,7 @@ TEST(SubroutineCallElaborationSyntax, AVoidCastOfANameAloneIsJudgedAsACall) {
       "  class C;\n"
       "    rand int x;\n"
       "    function int get(); return x; endfunction\n"
-      "    function void use(); void'(get); endfunction\n"
+      "    function void touch(); void'(get); endfunction\n"
       "  endclass\n"
       "  int i;\n"
       "  function int f(); return 1; endfunction\n"
@@ -716,9 +717,9 @@ TEST(SubroutineCallElaborationSyntax, AVoidCastOfANameAloneIsJudgedAsACall) {
                             "a task or a function",
                             11, "A.8.2"));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "a call of the nonvoid function 'f' keeps its "
-                            "parentheses",
-                            12, "A.8.2"));
+                            "cannot omit parentheses in call to nonvoid "
+                            "function 'f'",
+                            12, "13.5.5"));
   EXPECT_EQ(f.diag.ErrorCount(), 2u);
 }
 

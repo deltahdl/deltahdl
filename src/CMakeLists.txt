@@ -646,6 +646,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_validate_ref_args.cpp
     elaborator/elaborator_validate_scope_randomize.cpp
     elaborator/elaborator_validate_subroutine_args.cpp
+    elaborator/elaborator_validate_mailbox_calls.cpp
     elaborator/elaborator_validate_std_prototypes.cpp
     elaborator/elaborator_validate_cast_operand.cpp
     elaborator/queue_dim.cpp
