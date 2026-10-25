@@ -390,31 +390,4 @@ Expr* Parser::ParseWaitOrderOperand() {
   return e;
 }
 
-Stmt* Parser::ParseWaitOrderStmt() {
-  auto* stmt = arena_.Create<Stmt>();
-  stmt->kind = StmtKind::kWaitOrder;
-  stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kKwWaitOrder, Subclause("15.5.4"));
-  Expect(TokenKind::kLParen, Subclause("15.5.4"));
-
-  stmt->wait_order_events.push_back(ParseWaitOrderOperand());
-  while (Match(TokenKind::kComma)) {
-    stmt->wait_order_events.push_back(ParseWaitOrderOperand());
-  }
-  Expect(TokenKind::kRParen, Subclause("15.5.4"));
-
-  if (Check(TokenKind::kKwElse)) {
-    Consume();
-    stmt->else_branch = ParseStmt();
-  } else if (Check(TokenKind::kSemicolon)) {
-    Consume();
-  } else {
-    stmt->then_branch = ParseStmt();
-    if (Match(TokenKind::kKwElse)) {
-      stmt->else_branch = ParseStmt();
-    }
-  }
-  return stmt;
-}
-
 }  // namespace delta

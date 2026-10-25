@@ -84,15 +84,26 @@ struct ParserAssertHelpers {
   }
 
   // §16.3 action_block: a pass statement, an else with a fail statement, or
-  // neither, in which case a semicolon closes the assertion.
-  static void ParseActionBlock(Parser& p, Stmt* stmt) {
+  // neither, in which case a semicolon closes the assertion. A.6.3 writes the
+  // pass statement before an else as a statement rather than a
+  // statement_or_null, so a null one there is reported. The two statements
+  // are read into `pass_stmt` and `fail_stmt`, which an assertion and a
+  // wait_order keep in different members of Stmt.
+  static void ParseActionBlock(Parser& p, Stmt*& pass_stmt, Stmt*& fail_stmt) {
+    SourceLoc pass_loc = p.CurrentLoc();
     if (!p.Check(TokenKind::kSemicolon) && !p.Check(TokenKind::kKwElse)) {
-      stmt->assert_pass_stmt = p.ParseStmt();
+      pass_stmt = p.ParseStmt();
     }
     if (p.Match(TokenKind::kKwElse)) {
-      stmt->assert_fail_stmt = p.ParseStmt();
+      if (pass_stmt != nullptr && pass_stmt->kind == StmtKind::kNull) {
+        p.diag_.Error(pass_loc,
+                      "an action block's statement before 'else' is a "
+                      "statement, which cannot be null",
+                      Subclause("A.6.3"));
+      }
+      fail_stmt = p.ParseStmt();
     }
-    if (!stmt->assert_pass_stmt && !stmt->assert_fail_stmt) {
+    if (!pass_stmt && !fail_stmt) {
       p.Expect(TokenKind::kSemicolon, Subclause("16.3"));
     }
   }
@@ -103,8 +114,11 @@ struct ParserAssertHelpers {
   // one, and reads the statement behind it so the enclosing body never sees the
   // arm and reports it a second time as a token it did not expect. `semicolon`
   // is the subclause the closing `;` is expected under, which differs between
-  // the two forms that read a cover tail.
-  static void ParseCoverTail(Parser& p, Stmt* stmt, Subclause semicolon) {
+  // the forms that read a cover tail, and `no_fail` the one the else is
+  // reported under: §16.3 for an immediate or a deferred cover, §16.14.3 for
+  // a cover property or a cover sequence statement.
+  static void ParseCoverTail(Parser& p, Stmt* stmt, Subclause semicolon,
+                             Subclause no_fail) {
     if (p.Check(TokenKind::kSemicolon)) {
       p.Expect(TokenKind::kSemicolon, semicolon);
     } else if (!p.Check(TokenKind::kKwElse)) {
@@ -114,8 +128,8 @@ struct ParserAssertHelpers {
     p.diag_.Error(p.CurrentLoc(),
                   "cover has no fail statement; the else arm belongs to assert "
                   "and assume",
-                  Subclause("16.3"));
-    p.Expect(TokenKind::kKwElse, Subclause("16.3"));
+                  no_fail);
+    p.Expect(TokenKind::kKwElse, no_fail);
     // Read the fail statement rather than leaving it, and discard it: §16.3
     // gives a cover nowhere to keep one, and Stmt::assert_fail_stmt stays null.
     p.ParseStmt();
@@ -173,7 +187,16 @@ Stmt* Parser::ParseProceduralConcurrentAssertLike(StmtKind kind) {
   Stmt* stmt =
       ParseProceduralPropertySpec(kind, loc, Subclause("16.14.6"), sequence);
   stmt->cover_sequence = sequence;
-  ParserAssertHelpers::ParseActionBlock(*this, stmt);
+  // A.2.10 ends a cover property and a cover sequence statement in a
+  // statement_or_null, and the assert and assume property statements in an
+  // action_block.
+  if (kind == StmtKind::kCoverImmediate) {
+    ParserAssertHelpers::ParseCoverTail(*this, stmt, Subclause("16.14.3"),
+                                        Subclause("16.14.3"));
+  } else {
+    ParserAssertHelpers::ParseActionBlock(*this, stmt->assert_pass_stmt,
+                                          stmt->assert_fail_stmt);
+  }
   return stmt;
 }
 
@@ -232,7 +255,8 @@ Stmt* Parser::ParseImmediateAssertLike(StmtKind kind, TokenKind keyword) {
 
   ParserAssertHelpers::ParseDeferral(*this, stmt);
   ParserAssertHelpers::ParseAssertedExpr(*this, stmt);
-  ParserAssertHelpers::ParseActionBlock(*this, stmt);
+  ParserAssertHelpers::ParseActionBlock(*this, stmt->assert_pass_stmt,
+                                        stmt->assert_fail_stmt);
   return Spanning(stmt, stmt->range.start, lexer_);
 }
 
@@ -260,7 +284,8 @@ Stmt* Parser::ParseImmediateCover() {
 
   ParserAssertHelpers::ParseDeferral(*this, stmt);
   ParserAssertHelpers::ParseAssertedExpr(*this, stmt);
-  ParserAssertHelpers::ParseCoverTail(*this, stmt, Subclause("16.3"));
+  ParserAssertHelpers::ParseCoverTail(*this, stmt, Subclause("16.3"),
+                                      Subclause("16.3"));
   return Spanning(stmt, stmt->range.start, lexer_);
 }
 
@@ -309,7 +334,7 @@ ModuleItem* ParserAssertHelpers::ParseDeferredCoverItem(Parser& p,
   p.Expect(TokenKind::kLParen, Subclause("16.4"));
   stmt->assert_expr = p.ParseExpr();
   p.Expect(TokenKind::kRParen, Subclause("16.4"));
-  ParseCoverTail(p, stmt, Subclause("16.4"));
+  ParseCoverTail(p, stmt, Subclause("16.4"), Subclause("16.3"));
   return WrapStmtAsItem(p.arena_, stmt, loc, p.lexer_);
 }
 
@@ -321,7 +346,8 @@ ModuleItem* Parser::ParseDeferredImmediateItem(SourceLoc loc, StmtKind kind) {
   stmt->is_deferred = true;
   ParserAssertHelpers::ParseDeferral(*this, stmt);
   ParserAssertHelpers::ParseAssertedExpr(*this, stmt);
-  ParserAssertHelpers::ParseActionBlock(*this, stmt);
+  ParserAssertHelpers::ParseActionBlock(*this, stmt->assert_pass_stmt,
+                                        stmt->assert_fail_stmt);
   return WrapStmtAsItem(arena_, stmt, loc, lexer_);
 }
 
@@ -765,8 +791,30 @@ Stmt* Parser::ParseExpectStmt() {
   Expect(TokenKind::kKwExpect, Subclause("16.17"));
   Stmt* stmt = ParseProceduralPropertySpec(StmtKind::kExpect, loc,
                                            Subclause("16.17"), false);
-  ParserAssertHelpers::ParseActionBlock(*this, stmt);
+  ParserAssertHelpers::ParseActionBlock(*this, stmt->assert_pass_stmt,
+                                        stmt->assert_fail_stmt);
   stmt->range.end = CurrentLoc();
+  return stmt;
+}
+
+// A.6.5: `wait_order ( hierarchical_identifier { , hierarchical_identifier } )
+// action_block`, the operands read by Parser::ParseWaitOrderOperand and the
+// action block by the reader every assertion ends with, its two statements
+// kept in Stmt::then_branch and Stmt::else_branch.
+Stmt* Parser::ParseWaitOrderStmt() {
+  auto* stmt = arena_.Create<Stmt>();
+  stmt->kind = StmtKind::kWaitOrder;
+  stmt->range.start = CurrentLoc();
+  Expect(TokenKind::kKwWaitOrder, Subclause("15.5.4"));
+  Expect(TokenKind::kLParen, Subclause("15.5.4"));
+
+  stmt->wait_order_events.push_back(ParseWaitOrderOperand());
+  while (Match(TokenKind::kComma)) {
+    stmt->wait_order_events.push_back(ParseWaitOrderOperand());
+  }
+  Expect(TokenKind::kRParen, Subclause("15.5.4"));
+  ParserAssertHelpers::ParseActionBlock(*this, stmt->then_branch,
+                                        stmt->else_branch);
   return stmt;
 }
 

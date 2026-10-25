@@ -204,7 +204,7 @@ TEST(StaticMethodExprPositions, BlockLocalInAnEventIffConditionIsAccepted) {
 
 // A.6.5 gives `wait_order ( hierarchical_identifier { , hierarchical_identifier
 // } ) action_block`, which Parser::ParseWaitOrderStmt pushes into
-// Stmt::wait_order_events (src/parser/parser_clocking.cpp:292). The operands
+// Stmt::wait_order_events (src/parser/parser_assert.cpp). The operands
 // are named events rather than arbitrary expressions, so the source declares
 // two, and both are non-static properties standing in the same position.
 //

@@ -310,4 +310,28 @@ TEST(DeclarationBodyGrammar, APropertyBodyIsHeldToPropertySpec) {
   }
 }
 
+// A cover property statement and a cover sequence statement end in a
+// statement_or_null where an assert property statement ends in an
+// action_block, so an else written after either in procedural code is
+// reported, with or without a pass statement before it, and the statement
+// after the else is read rather than left for the enclosing block to report.
+// An assert property statement's else arm draws no report.
+TEST(CoverStatementParsing, AnElseArmInProceduralCodeIsReported) {
+  auto r = Parse(
+      "module m(input logic clk, a);\n"
+      "  initial begin\n"
+      "    cover property (@(posedge clk) a) $display(\"hit\"); else $stop;\n"
+      "    cover sequence (@(posedge clk) a) else $stop;\n"
+      "    assert property (@(posedge clk) a) $display(\"hit\"); else $stop;\n"
+      "  end\n"
+      "endmodule\n");
+  for (uint32_t line : {3u, 4u}) {
+    EXPECT_TRUE(ReportedError(r.diags,
+                              "cover has no fail statement; the else arm "
+                              "belongs to assert and assume",
+                              line, "16.14.3"));
+  }
+  EXPECT_EQ(r.diags.size(), 2u);
+}
+
 }  // namespace
