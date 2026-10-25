@@ -321,6 +321,10 @@ constexpr const char* kSequenceOperators =
     "    int n;\n"
     "    @(posedge clk) (a, n = 1, n += 2) ##1 b;\n"
     "  endproperty\n"
+    "  property q2;\n"
+    "    logic [7:0] v;\n"
+    "    @(posedge clk) (a, v[3:2] = 2'b11) ##1 b;\n"
+    "  endproperty\n"
     "endmodule\n";
 
 class SequenceExprsOfARun : public VpiDesignRun {
@@ -533,6 +537,26 @@ TEST_F(SequenceExprsOfARun, AnOperandReachesItsMatchItems) {
   vpiHandle target = vpi_handle(vpiLhs, items[0]);
   ASSERT_NE(target, nullptr);
   EXPECT_STREQ(vpi_get_str(vpiName, target), "n");
+}
+
+// A match item writing a part select of its local (A.10 footnote 51) has
+// that part select as its left-hand side, reaching the local through
+// vpiParent (§37.59), rather than the whole local.
+TEST_F(SequenceExprsOfARun, AMatchItemWritingAPartSelectHasItAsItsLhs) {
+  vpiHandle decl = Named(vpiPropertyDecl, By("top"), "q2");
+  ASSERT_NE(decl, nullptr);
+  vpiHandle chain =
+      vpi_handle(vpiPropertyExpr, vpi_handle(vpiPropertySpec, decl));
+  const std::vector<vpiHandle> kParts = OperandsOf(chain);
+  ASSERT_FALSE(kParts.empty());
+  const std::vector<vpiHandle> kItems = ObjectsOf(vpiMatchItem, kParts[0]);
+  ASSERT_EQ(kItems.size(), 1u);
+  vpiHandle target = vpi_handle(vpiLhs, kItems[0]);
+  ASSERT_NE(target, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, target), vpiPartSelect);
+  vpiHandle local = vpi_handle(vpiParent, target);
+  ASSERT_NE(local, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, local), "top.q2.v");
 }
 
 }  // namespace

@@ -264,6 +264,14 @@ void VpiMakeMemberBits(VpiObject& member, const PackedDims& dims,
   }
 }
 
+void VpiMakeVarBits(VpiObject& var, const DataType& type, uint32_t width,
+                    SimContext& ctx, const VpiAttachBuild& build) {
+  if (!HasVarBits(var)) return;
+  if (auto dims = DeclaredPackedDims(&type, width, ctx)) {
+    MakeVectorBits({&var, vpiRegBit, std::move(*dims)}, build);
+  }
+}
+
 VpiObject* VpiBitAtOffset(const VpiObject& root, int64_t offset) {
   for (VpiObject* child : root.children) {
     if ((child->type == vpiNetBit || child->type == vpiRegBit) &&

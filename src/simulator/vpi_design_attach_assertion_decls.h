@@ -57,9 +57,10 @@ void VpiFillAssertionItemDeclBody(VpiObject* made, const ModuleItem& decl,
 // found there first, then among `made`'s variables (§16.10) and in the
 // scopes around it: a ref obj named after each formal, bound to no actual
 // since no instance binds one in the declaration (§37.15 detail 3), and a
-// variable of its type, resolved in `ctx`, for a local variable formal.
+// variable of its type, resolved in `ctx`, for a local variable formal, with
+// its var bits where its type is packed (§37.17 detail 12).
 VpiObject* VpiFormalNames(VpiObject* made, const ModuleItem& decl,
-                          const SimContext& ctx, const VpiAttachBuild& build);
+                          SimContext& ctx, const VpiAttachBuild& build);
 
 // §11.12 with §37.12 and §37.57: the let decl the let declaration `item`
 // stands as, hung from `scope`, named after it, with a seq formal decl per

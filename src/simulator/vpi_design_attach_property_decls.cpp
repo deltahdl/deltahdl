@@ -15,11 +15,15 @@
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
+#include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
+#include "simulator/sequence_locals.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_design_attach_assertion_decls.h"
 #include "simulator/vpi_design_attach_build.h"
+#include "simulator/vpi_design_attach_vars.h"
 #include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers2.h"
@@ -262,9 +266,11 @@ void MakeSeqFormal(const ModuleItem& decl, size_t index, VpiObject* sequence,
 // `declared` and named in it, of the kind its type is (§37.17), the kind the
 // type name it is declared with stands for where it names one (§6.18),
 // resolved in `ctx`. §37.52 detail 1 gives its value no access, so it holds
-// none.
+// none. A logic or bit one with packed dimensions is a vector with a var bit
+// per bit, and one of a structure or union type a struct or union var with a
+// member variable per field (§37.17 details 3, 12, 17 and 26).
 void MakeDeclaredVariable(const SeqLocalDecl& local, VpiObject* declared,
-                          const SimContext& ctx, const VpiAttachBuild& build) {
+                          SimContext& ctx, const VpiAttachBuild& build) {
   VpiObject* var = build.alloc();
   var->type =
       VpiDataTypeVariableKind(local.named_type.kind == DataTypeKind::kNamed
@@ -274,6 +280,14 @@ void MakeDeclaredVariable(const SeqLocalDecl& local, VpiObject* declared,
   var->name = build.keep(std::string(local.name));
   var->full_name = VpiScopedFullName(declared, local.name);
   declared->children.push_back(var);
+  VpiMakeVarBits(*var, LocalDataType(local),
+                 LocalWidth(local, ctx, ctx.GetArena()), ctx, build);
+  // §7.4.1: a type name with packed dimensions written after it stands for
+  // an array of its type, whose members are its elements', not the local's.
+  if (!local.packed_dims.empty()) return;
+  if (const StructTypeInfo* layout = NamedLayout(local.named_type, ctx)) {
+    VpiMakeLocalMembers(var, *layout, ctx, build);
+  }
 }
 
 // §16.8.2: the kind of variable a local variable formal declared with `type`
@@ -643,18 +657,23 @@ VpiObject* VpiMakeSequenceDecl(const RtlirAssertionItemDecl& declared,
 }
 
 VpiObject* VpiFormalNames(VpiObject* made, const ModuleItem& decl,
-                          const SimContext& ctx, const VpiAttachBuild& build) {
+                          SimContext& ctx, const VpiAttachBuild& build) {
   VpiObject* names = build.alloc();
   names->parent = made;
   for (size_t i = 0; i < decl.prop_formals.size(); ++i) {
     VpiObject* stand = build.alloc();
-    stand->type = decl.prop_formal_is_local[i]
-                      ? FormalVariableKind(*decl.prop_formal_types[i], ctx)
-                      : vpiRefObj;
+    stand->type = vpiRefObj;
     stand->parent = made;
     stand->name = build.keep(std::string(decl.prop_formals[i]));
     stand->full_name = VpiScopedFullName(made, decl.prop_formals[i]);
     names->children.push_back(stand);
+    if (!decl.prop_formal_is_local[i]) continue;
+    // §16.8.2: a local variable formal is a local variable of its type, a
+    // packed logic or bit one with a var bit per bit as MakeDeclaredVariable
+    // gives a local declared in the body.
+    const DataType& type = *decl.prop_formal_types[i];
+    stand->type = FormalVariableKind(type, ctx);
+    VpiMakeVarBits(*stand, type, DeclaredTypeWidth(type, ctx), ctx, build);
   }
   return names;
 }

@@ -112,12 +112,7 @@ SeqLocalDecl LocalFormalDecl(const ModuleItem& decl, size_t index) {
   return local;
 }
 
-Variable* StandUpLocal(const SeqLocalDecl& decl, const Logic4Vec& value,
-                       SimContext& ctx) {
-  Variable* var = ctx.CreateLocalVariable(decl.name, value.width);
-  var->is_4state = LocalIs4State(decl, ctx);
-  var->is_signed = LocalIsSigned(decl, ctx);
-  var->value = value;
+DataType LocalDataType(const SeqLocalDecl& decl) {
   DataType type = decl.named_type;
   if (!decl.packed_dims.empty()) {
     type.packed_dim_left = decl.packed_dims.front().first;
@@ -125,6 +120,16 @@ Variable* StandUpLocal(const SeqLocalDecl& decl, const Logic4Vec& value,
     type.extra_packed_dims.assign(decl.packed_dims.begin() + 1,
                                   decl.packed_dims.end());
   }
+  return type;
+}
+
+Variable* StandUpLocal(const SeqLocalDecl& decl, const Logic4Vec& value,
+                       SimContext& ctx) {
+  Variable* var = ctx.CreateLocalVariable(decl.name, value.width);
+  var->is_4state = LocalIs4State(decl, ctx);
+  var->is_signed = LocalIsSigned(decl, ctx);
+  var->value = value;
+  DataType type = LocalDataType(decl);
   RecordDeclaredRange(type, var, ctx, ctx.GetArena());
   // A type name written with dimensions after it stands for the element of
   // an array of it, which RecordDeclaredRange shaped, not the whole local.

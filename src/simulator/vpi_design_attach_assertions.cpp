@@ -95,20 +95,30 @@ void AppendBounds(std::vector<VpiObject*>& operands, uint32_t min, uint32_t max,
   if (max != min) operands.push_back(BoundConstant(max, build));
 }
 
+// §37.64: the left-hand side of the match item `item`, the assignment
+// `assignment`: what its target writes, a select within the local or a member
+// of it (A.10 footnote 51), built as a procedural assignment's left side is,
+// or, for an item writing the whole local, a ref obj named after the local.
+VpiObject* MatchItemLhs(const SeqMatchAssign& item, VpiObject* assignment,
+                        const VpiStmtBuild& with) {
+  if (item.target != nullptr) return with.expression(item.target);
+  VpiObject* local = with.build.alloc();
+  local->type = vpiRefObj;
+  local->parent = assignment;
+  local->name = with.build.keep(std::string(item.lvar));
+  return local;
+}
+
 // §16.10 and §16.11: the match item `item` written with an operand of a
 // sequence, hung from `holder`: a tf call as the call it is, and an assignment
-// to the local variable it names with its operator (§37.64).
+// to the local variable it writes with its operator (§37.64).
 VpiObject* MatchItemObject(const SeqMatchAssign& item, VpiObject* holder,
                            const VpiStmtBuild& with) {
   if (item.call != nullptr) return with.expression(item.call);
   VpiObject* assignment = with.build.alloc();
   assignment->type = vpiAssignment;
   assignment->parent = holder;
-  VpiObject* local = with.build.alloc();
-  local->type = vpiRefObj;
-  local->parent = assignment;
-  local->name = with.build.keep(std::string(item.lvar));
-  assignment->lhs = local;
+  assignment->lhs = MatchItemLhs(item, assignment, with);
   assignment->rhs = with.expression(item.rhs);
   std::string_view spelling = TokenKindName(item.op);
   if (spelling.size() >= 2 && spelling.front() == '\'' &&

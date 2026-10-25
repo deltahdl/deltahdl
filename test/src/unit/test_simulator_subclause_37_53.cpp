@@ -515,6 +515,77 @@ TEST_F(SequenceDeclsOfARun, ASequenceReachesItsVariablesAndItsBody) {
   EXPECT_EQ(kEdgeOf(kRuns[1]), vpiNegedgeOp);
 }
 
+// A local of a logic or bit type written with packed dimensions is a vector
+// with a var bit per bit, the leftmost first, each named by its index and
+// reaching the local through vpiParent (§37.17 details 12 and 26), and a
+// scalar one has none. A bit select of the vector in the body stands for the
+// bit it selects, as one of a local variable formal of such a type does
+// (§16.8.2).
+TEST_F(SequenceDeclsOfARun, APackedLocalHasAVarBitPerBit) {
+  Run("module top; logic a;\n"
+      "  sequence s;\n"
+      "    logic [3:0] v;\n"
+      "    bit [0:1] w;\n"
+      "    logic g;\n"
+      "    (a, v = 4'h5) ##1 v[1];\n"
+      "  endsequence\n"
+      "  sequence t(local input logic [1:0] n);\n"
+      "    a ##1 n[0];\n"
+      "  endsequence\n"
+      "endmodule\n");
+  vpiHandle s = Named(vpiSequenceDecl, By("top"), "s");
+  ASSERT_NE(s, nullptr);
+  const std::vector<vpiHandle> kLocals = ObjectsOf(vpiVariables, s);
+  ASSERT_EQ(kLocals.size(), 3U);
+  EXPECT_EQ(OrderedNamesOf(vpiBit, kLocals[0]),
+            (std::vector<std::string>{"v[3]", "v[2]", "v[1]", "v[0]"}));
+  EXPECT_EQ(KindsOf(vpiBit, kLocals[0]), (std::vector<int>(4, vpiRegBit)));
+  EXPECT_EQ(OrderedNamesOf(vpiBit, kLocals[1]),
+            (std::vector<std::string>{"w[0]", "w[1]"}));
+  EXPECT_TRUE(ObjectsOf(vpiBit, kLocals[2]).empty());
+  const std::vector<vpiHandle> kParts = OperandsOf(vpi_handle(vpiExpr, s));
+  ASSERT_GE(kParts.size(), 2U);
+  EXPECT_EQ(vpi_get(vpiType, kParts[1]), vpiRegBit);
+  EXPECT_STREQ(vpi_get_str(vpiName, kParts[1]), "v[1]");
+  EXPECT_NE(vpi_compare_objects(vpi_handle(vpiParent, kParts[1]), kLocals[0]),
+            0);
+  const std::vector<vpiHandle> kFormalParts =
+      OperandsOf(vpi_handle(vpiExpr, Named(vpiSequenceDecl, By("top"), "t")));
+  ASSERT_GE(kFormalParts.size(), 2U);
+  EXPECT_EQ(vpi_get(vpiType, kFormalParts[1]), vpiRegBit);
+  EXPECT_STREQ(vpi_get_str(vpiName, kFormalParts[1]), "n[0]");
+}
+
+// A local of a structure type is a struct var with a member variable per
+// field, each of the kind its field's type is, a type name's included, and
+// reaching the local through vpiParent (§37.17 details 3, 17 and 26). A
+// member of the local in the body stands for that member.
+TEST_F(SequenceDeclsOfARun, AStructureLocalHasAMemberPerField) {
+  Run("module top; logic a;\n"
+      "  typedef logic [3:0] nib_t;\n"
+      "  typedef struct { nib_t f; int g; } pair_t;\n"
+      "  sequence s;\n"
+      "    pair_t p;\n"
+      "    (a, p.g = 1) ##1 p.g;\n"
+      "  endsequence\n"
+      "endmodule\n");
+  vpiHandle s = Named(vpiSequenceDecl, By("top"), "s");
+  ASSERT_NE(s, nullptr);
+  const std::vector<vpiHandle> kLocals = ObjectsOf(vpiVariables, s);
+  ASSERT_EQ(kLocals.size(), 1U);
+  EXPECT_EQ(vpi_get(vpiType, kLocals[0]), vpiStructVar);
+  EXPECT_EQ(OrderedNamesOf(vpiMember, kLocals[0]),
+            (std::vector<std::string>{"f", "g"}));
+  EXPECT_EQ(KindsOf(vpiMember, kLocals[0]),
+            (std::vector<int>{vpiLogicVar, vpiIntVar}));
+  const std::vector<vpiHandle> kParts = OperandsOf(vpi_handle(vpiExpr, s));
+  ASSERT_GE(kParts.size(), 2U);
+  EXPECT_EQ(vpi_get(vpiType, kParts[1]), vpiIntVar);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, kParts[1]), "top.s.p.g");
+  EXPECT_NE(vpi_compare_objects(vpi_handle(vpiParent, kParts[1]), kLocals[0]),
+            0);
+}
+
 // A sequence a generate block declares is one of that block's instance, and
 // one a clocking block declares is one of that block (§37.12, §27.4, §14.3).
 TEST_F(SequenceDeclsOfARun, AGenerateAndAClockingBlockReachTheirSequences) {

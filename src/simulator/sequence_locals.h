@@ -9,6 +9,7 @@
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
+#include "parser/ast_type.h"
 #include "simulator/sim_context.h"
 #include "simulator/variable.h"
 
@@ -51,6 +52,11 @@ bool LocalIsSigned(const SeqLocalDecl& decl, const SimContext& ctx);
 // type name written in its place, and the packed dimensions (§7.4.1) written
 // after either.
 SeqLocalDecl LocalFormalDecl(const ModuleItem& decl, size_t index);
+
+// §16.10 with §6.18 and §7.4.1: the data type the local `decl` is declared
+// with: the type name written in its keyword's place, of kind kImplicit where
+// a keyword is written, with the packed dimensions written after either.
+DataType LocalDataType(const SeqLocalDecl& decl);
 
 // §16.10: the local `decl` stood up as a variable of the innermost scope
 // holding `value`, of its declared type's state and signedness, with the

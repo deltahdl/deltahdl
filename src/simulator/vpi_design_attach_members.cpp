@@ -135,6 +135,30 @@ int VpiPackageNamedTypeVariableKind(const RtlirDesign& design,
 
 namespace {
 
+// What the members of one instance are made from: its design and module, the
+// objects keyed under its name `prefix`, and what a run builds with. The
+// members of a sequence's or property's local stand in no instance's
+// storage, and their site has neither a design nor a module.
+struct MemberSite {
+  const RtlirDesign* design;
+  const RtlirModule* mod;
+  const std::string& prefix;
+  const VpiObjectMap& objects;
+  SimContext& ctx;
+  const VpiAttachBuild& build;
+};
+
+// §6.18: the kind of a variable of the type the name `name` stands for, as
+// the module at `site` sees it, a class among its names; at a site of no
+// module, a local's, the kind the run's type table records for it, as
+// DeclaredTypeKind gives the local its own.
+int NamedFieldKind(const MemberSite& site, std::string_view name) {
+  if (site.mod == nullptr) {
+    return VpiDataTypeVariableKind(site.ctx.FindTypeKind(name));
+  }
+  return VpiNamedTypeVariableKind(*site.design, *site.mod, name);
+}
+
 // §37.26: the member of `holder` the field `field` lays out: its vpiParent is
 // the struct or union var or net, it is named after the field, its kind is a
 // net for a net's member and otherwise the one a variable of the field's type
@@ -142,8 +166,8 @@ namespace {
 // copy that a read refreshes and a write is copied back from, read as a real
 // where the field is one.
 VpiObject* MakeMember(VpiObject* holder, const StructFieldInfo& field,
-                      const RtlirDesign& design, const RtlirModule& mod,
-                      const VpiAttachBuild& build) {
+                      const MemberSite& site) {
+  const VpiAttachBuild& build = site.build;
   VpiObject* member = build.alloc();
   // §37.16 detail 31: a member of a struct or union net is a net, a struct or
   // union net itself where its field is a structure or union.
@@ -155,7 +179,7 @@ VpiObject* MakeMember(VpiObject* holder, const StructFieldInfo& field,
   } else if (kOfNet) {
     member->type = kVpiNet;
   } else if (field.type_kind == DataTypeKind::kNamed) {
-    member->type = VpiNamedTypeVariableKind(design, mod, field.type_name);
+    member->type = NamedFieldKind(site, field.type_name);
   } else {
     member->type = VpiDataTypeVariableKind(field.type_kind);
   }
@@ -330,17 +354,6 @@ std::vector<PackedRange> MemberUnpackedDims(const StructFieldInfo& field,
   return dims;
 }
 
-// What the members of one instance are made from: its module, the objects
-// keyed under its name `prefix`, and what a run builds with.
-struct MemberSite {
-  const RtlirDesign& design;
-  const RtlirModule& mod;
-  const std::string& prefix;
-  const VpiObjectMap& objects;
-  SimContext& ctx;
-  const VpiAttachBuild& build;
-};
-
 // The member per field of the layout `info` gives `holder`. §37.17 detail 28's
 // example names `str1.inner1.j1`: a member of a structure or union type has a
 // member per field of its own, each read from and written back to the storage
@@ -349,8 +362,7 @@ struct MemberSite {
 void MakeMembers(VpiObject* holder, const StructTypeInfo& info,
                  const MemberSite& site) {
   for (const StructFieldInfo& field : info.fields) {
-    VpiObject* member =
-        MakeMember(holder, field, site.design, site.mod, site.build);
+    VpiObject* member = MakeMember(holder, field, site);
     if (holder->member_of != nullptr) {
       member->member_of = holder->member_of;
       member->member_offset += holder->member_offset;
@@ -392,7 +404,7 @@ void MakeElementMembers(VpiObject* array, const StructTypeInfo& info,
 // packed one was passed over after that, though §37.26 makes vpiPacked only a
 // property of the struct var.
 void AttachVariableMembers(const MemberSite& site) {
-  for (const RtlirVariable& var : site.mod.variables) {
+  for (const RtlirVariable& var : site.mod->variables) {
     const std::string kKey = VpiFlatName(site.prefix, var.name);
     VpiObject* holder = FindObjectForFlatName(site.objects, kKey);
     const StructTypeInfo* info = site.ctx.GetVariableStructType(kKey);
@@ -412,7 +424,7 @@ void AttachVariableMembers(const MemberSite& site) {
 // aggregate type under the same key (RegisterAggregateLayout); each reported
 // vpiNet and held no member.
 void AttachNetMembers(const MemberSite& site) {
-  for (const RtlirNet& net : site.mod.nets) {
+  for (const RtlirNet& net : site.mod->nets) {
     const std::string kKey = VpiFlatName(site.prefix, net.name);
     const StructTypeInfo* info = site.ctx.GetVariableStructType(kKey);
     // §37.16 detail 1: a packed array net of a structure written in place has
@@ -512,12 +524,20 @@ void MakePackedArrayMembers(VpiObject* top, const DataType* written,
 
 }  // namespace
 
+void VpiMakeLocalMembers(VpiObject* local, const StructTypeInfo& layout,
+                         SimContext& ctx, const VpiAttachBuild& build) {
+  const std::string kNoPrefix;
+  const VpiObjectMap kNoObjects;
+  MakeMembers(local, layout,
+              {nullptr, nullptr, kNoPrefix, kNoObjects, ctx, build});
+}
+
 void AttachPackedArrayMembers(const RtlirDesign* design,
                               const VpiObjectMap& objects, SimContext& ctx,
                               const VpiAttachBuild& build) {
   WalkInstancePaths(
       design, [&](const RtlirModule* mod, const std::string& prefix) {
-        const MemberSite kSite{*design, *mod, prefix, objects, ctx, build};
+        const MemberSite kSite{design, mod, prefix, objects, ctx, build};
         for (const RtlirNet& net : mod->nets) {
           MakePackedArrayMembers(
               FindObjectForFlatName(objects, VpiFlatName(prefix, net.name)),
@@ -594,7 +614,7 @@ void AttachStructMembers(const RtlirDesign* design, const VpiObjectMap& objects,
   if (design == nullptr) return;
   WalkInstancePaths(
       design, [&](const RtlirModule* mod, const std::string& prefix) {
-        const MemberSite kSite{*design, *mod, prefix, objects, ctx, build};
+        const MemberSite kSite{design, mod, prefix, objects, ctx, build};
         AttachVariableMembers(kSite);
         AttachNetMembers(kSite);
       });
