@@ -192,4 +192,23 @@ TEST(ConditionalStmtSim, PriorityIfExecutesFirstTrueBranch) {
   LowerRunAndCheck(f, design, {{"x", 20u}});
 }
 
+// A conditional operator's condition is the whole `&&&` predicate before its
+// `?` (A.8.3 with A.6.6). With y at 0 the second clause fails, so the false
+// arm is taken. Read with the `?` inside the last clause, the assignment took
+// the value of the `&&&`, 1, instead.
+TEST(ConditionalStmtSim, AConditionalOperatorAfterATripleAmpPredicate) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x, y, z;\n"
+      "  initial begin\n"
+      "    x = 8'd5;\n"
+      "    y = 8'd0;\n"
+      "    z = x matches 8'd5 &&& y > 0 ? 8'd1 : 8'd2;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"z", 2u}});
+}
+
 }  // namespace

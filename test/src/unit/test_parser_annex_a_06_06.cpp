@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <initializer_list>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
@@ -389,6 +392,102 @@ TEST(ConditionalStmtBnf, CondPredicateTripleAmpStartsAtItsLeftOperand) {
   EXPECT_EQ(stmt->condition->op, TokenKind::kAmpAmpAmp);
   EXPECT_EQ(stmt->condition->range.start.line, 2u);
   EXPECT_EQ(stmt->condition->range.start.column, 15u);
+}
+
+// A.8.3 writes a conditional expression as a cond_predicate, a `?` and two
+// expressions, and A.6.6 joins the predicate's clauses with `&&&`, so the `?`
+// after the last clause takes the whole predicate as its condition. The right
+// operand of `&&&` was read far enough to take the `?` in, which left the
+// assignment holding a `&&&` whose last clause was a conditional.
+TEST(ConditionalStmtBnf, AConditionalOperatorTakesTheWholeTripleAmpPredicate) {
+  auto r = Parse(
+      "module m;\n"
+      "  int x, y, z;\n"
+      "  initial z = x matches 5 &&& y > 0 ? 1 : 2;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  ASSERT_EQ(stmt->rhs->kind, ExprKind::kTernary);
+  ASSERT_NE(stmt->rhs->condition, nullptr);
+  EXPECT_EQ(stmt->rhs->condition->op, TokenKind::kAmpAmpAmp);
+  ASSERT_NE(stmt->rhs->condition->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->condition->rhs->op, TokenKind::kGt);
+}
+
+// A cond_pattern is an expression, `matches` and a pattern (A.6.6), and an
+// implication is an expression (A.8.3), so `b -> c matches 3` matches the
+// whole implication. `matches` was read inside the implication's right
+// operand, which matched `c` alone.
+TEST(ConditionalStmtBnf, AMatchesClauseTakesAnImplicationWhole) {
+  auto r = Parse(
+      "module m;\n"
+      "  int b, c;\n"
+      "  initial if (b -> c matches 3) b = 0;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->condition, nullptr);
+  EXPECT_EQ(stmt->condition->op, TokenKind::kKwMatches);
+  ASSERT_NE(stmt->condition->lhs, nullptr);
+  EXPECT_EQ(stmt->condition->lhs->op, TokenKind::kArrow);
+}
+
+// A.6.6 and A.8.3 give a cond_predicate two places, an if statement's
+// condition and a conditional operator's condition, and A.8.6 makes neither
+// `matches` nor `&&&` a binary operator. So each is reported where it stands
+// as a whole expression: an assignment's right-hand side, a loop's condition,
+// inside parentheses, even those of an if condition or before a `?`, and as
+// a conditional operator's arm.
+TEST(ConditionalStmtBnf, APredicateOutsideAConditionIsReported) {
+  auto r = Parse(
+      "module m;\n"
+      "  int x, y;\n"
+      "  logic b;\n"
+      "  initial begin\n"
+      "    b = x matches 5;\n"
+      "    b = x &&& y;\n"
+      "    while (x matches 5) x++;\n"
+      "    if ((x matches 5)) y = 1;\n"
+      "    y = (x matches 5) ? 1 : 0;\n"
+      "    y = b ? x matches 5 : 0;\n"
+      "  end\n"
+      "endmodule\n");
+  for (uint32_t line : {5u, 6u, 7u, 8u, 9u, 10u}) {
+    EXPECT_TRUE(ReportedError(r.diags,
+                              "'matches' and '&&&' stand only in the predicate "
+                              "of an if statement or a conditional operator",
+                              line, "A.6.6"))
+        << "line " << line;
+  }
+  EXPECT_EQ(r.diags.size(), 6u);
+}
+
+// The two places A.6.6 and A.8.3 give a cond_predicate take one with or
+// without `&&&`, after `if` and `else if` and before a `?`. A pattern-matching
+// case item's `&&&` filter is case_pattern_item's own form (A.6.7) and is
+// read there too.
+TEST(ConditionalStmtBnf, APredicateInAConditionIsAccepted) {
+  auto r = Parse(
+      "module m;\n"
+      "  int x, y;\n"
+      "  initial begin\n"
+      "    if (x matches 5) y = 1;\n"
+      "    if (x matches 5 &&& y > 0) y = 1;\n"
+      "    else if (y matches 2) y = 2;\n"
+      "    y = x matches 5 ? 1 : 0;\n"
+      "    y = x matches 5 &&& y > 0 ? 1 : 0;\n"
+      "    case (x) matches\n"
+      "      .n &&& n > 0: y = n;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
 }
 
 }  // namespace

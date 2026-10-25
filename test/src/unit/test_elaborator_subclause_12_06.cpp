@@ -51,7 +51,8 @@ TEST(PatternMatching, RealLiteralPatternRejected) {
       7, "12.6"));
 }
 
-// §12.6: same rule applied to the binary `matches` operator.
+// §12.6: same rule applied to a `matches` clause in a conditional operator's
+// predicate (§12.6.3).
 TEST(PatternMatching, RealLiteralPatternInMatchesOperatorRejected) {
   SimFixture f;
   ElaborateSrc(
@@ -60,7 +61,7 @@ TEST(PatternMatching, RealLiteralPatternInMatchesOperatorRejected) {
       "  logic y;\n"
       "  initial begin\n"
       "    r = 1.5;\n"
-      "    y = r matches 2.5;\n"
+      "    y = r matches 2.5 ? 1 : 0;\n"
       "  end\n"
       "endmodule\n",
       f);
@@ -82,7 +83,7 @@ TEST(PatternMatching, StringLiteralPatternAgainstAStringValueRejected) {
       "  logic y;\n"
       "  initial begin\n"
       "    s = \"hi\";\n"
-      "    y = s matches \"hi\";\n"
+      "    y = s matches \"hi\" ? 1 : 0;\n"
       "  end\n"
       "endmodule\n",
       f);
@@ -230,8 +231,8 @@ TEST(PatternMatching, DistinctPatternIdentifiersAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §12.6: the same uniqueness rule applies to a pattern used with the binary
-// `matches` operator, not just a case item.
+// §12.6: the same uniqueness rule applies to a pattern matched in a
+// conditional operator's predicate (§12.6.3), not just a case item.
 TEST(PatternMatching, DuplicatePatternIdentifierInMatchesOperatorRejected) {
   SimFixture f;
   ElaborateSrc(
@@ -239,7 +240,7 @@ TEST(PatternMatching, DuplicatePatternIdentifierInMatchesOperatorRejected) {
       "module t;\n"
       "  u_t u;\n"
       "  logic y;\n"
-      "  initial y = u matches (tagged Add '{.r1, .r1});\n"
+      "  initial y = u matches (tagged Add '{.r1, .r1}) ? 1 : 0;\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
@@ -279,10 +280,10 @@ TEST(PatternMatching, RealLiteralPatternNames12_6) {
 // src/elaborator/elaborator_validate_matches.cpp had written out eight of the
 // thirteen child-statement links Stmt declares, and now takes the list from
 // ForEachChildStmt in src/elaborator/elaborator_validate_internal.h. The cases
-// below cover one newly reached position each. Each writes the pattern under
-// the binary `matches` operator of §12.6, which stands in an ordinary
-// expression and so can be written in a for initializer and a for step as well
-// as in the four statement positions.
+// below cover one newly reached position each. Each writes the pattern in a
+// conditional operator's predicate, which §12.6.3 lets pattern matching stand
+// in. The conditional is an ordinary expression, so it can be written in a for
+// initializer and a for step as well as in the four statement positions.
 
 // §12.7.1's for loop holds its initialization statements in Stmt::for_inits,
 // apart from its body.
@@ -293,7 +294,7 @@ TEST(PatternMatching, ARealLiteralPatternInAForInitializerIsReported) {
       "  real r;\n"
       "  logic y;\n"
       "  integer i;\n"
-      "  initial for (y = r matches 2.5; i < 2; i = i + 1) begin end\n"
+      "  initial for (y = r matches 2.5 ? 1 : 0; i < 2; i = i + 1) begin end\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(
@@ -311,7 +312,7 @@ TEST(PatternMatching, ARealLiteralPatternInAForStepIsReported) {
       "  real r;\n"
       "  logic y;\n"
       "  integer i;\n"
-      "  initial for (i = 0; i < 2; y = r matches 2.5) begin end\n"
+      "  initial for (i = 0; i < 2; y = r matches 2.5 ? 1 : 0) begin end\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(
@@ -331,7 +332,7 @@ TEST(PatternMatching, ARealLiteralPatternInAnAssertionPassStatementIsReported) {
       "  real r;\n"
       "  logic y;\n"
       "  logic ok;\n"
-      "  initial assert (ok) y = r matches 2.5;\n"
+      "  initial assert (ok) y = r matches 2.5 ? 1 : 0;\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(
@@ -347,7 +348,7 @@ TEST(PatternMatching, ARealLiteralPatternInAnAssertionFailStatementIsReported) {
       "  real r;\n"
       "  logic y;\n"
       "  logic ok;\n"
-      "  initial assert (ok) else y = r matches 2.5;\n"
+      "  initial assert (ok) else y = r matches 2.5 ? 1 : 0;\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(
@@ -368,7 +369,7 @@ TEST(PatternMatching, ARealLiteralPatternInARandsequenceCodeBlockIsReported) {
       "  logic y;\n"
       "  initial begin\n"
       "    randsequence(main)\n"
-      "      main : { y = r matches 2.5; };\n"
+      "      main : { y = r matches 2.5 ? 1 : 0; };\n"
       "    endsequence\n"
       "  end\n"
       "endmodule\n",
@@ -393,7 +394,7 @@ TEST(PatternMatching,
       "  integer i;\n"
       "  initial begin\n"
       "    randsequence(main)\n"
-      "      main : alt := 1 { y = r matches 2.5; };\n"
+      "      main : alt := 1 { y = r matches 2.5 ? 1 : 0; };\n"
       "      alt : { i = 1; };\n"
       "    endsequence\n"
       "  end\n"
@@ -500,8 +501,8 @@ TEST(PatternVariableReads, TheWildcardPatternIsNoRead) {
       "  initial begin\n"
       "    if (v matches tagged Valid .* &&& flag) x = 1;\n"
       "    if (v matches tagged Valid .*) x = 2;\n"
-      "    x = (v matches tagged Valid .* &&& flag) ? 3 : 4;\n"
-      "    x = (v matches tagged Valid .*) ? 5 : 6;\n"
+      "    x = v matches tagged Valid .* &&& flag ? 3 : 4;\n"
+      "    x = v matches tagged Valid .* ? 5 : 6;\n"
       "  end\n"
       "endmodule\n",
       f);
@@ -516,7 +517,7 @@ TEST(PatternVariableReads, TheWildcardPatternInAClassMethodIsNoRead) {
       "  typedef union tagged { void Invalid; int Valid; } VInt;\n"
       "  function int f(VInt v, logic flag);\n"
       "    if (v matches tagged Valid .* &&& flag) return 1;\n"
-      "    return (v matches tagged Valid .*) ? 2 : 3;\n"
+      "    return v matches tagged Valid .* ? 2 : 3;\n"
       "  endfunction\n"
       "endclass\n"
       "module m; endmodule\n",

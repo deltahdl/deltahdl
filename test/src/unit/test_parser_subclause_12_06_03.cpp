@@ -13,7 +13,7 @@ TEST(TernaryMatchesParsing, MatchesInTernary) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
-      "    y = (x matches 5) ? 1 : 0;\n"
+      "    y = x matches 5 ? 1 : 0;\n"
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -31,7 +31,7 @@ TEST(TernaryMatchesParsing, MatchesWithGuardInTernary) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
-      "    y = (x matches 5 &&& en) ? 1 : 0;\n"
+      "    y = x matches 5 &&& en ? 1 : 0;\n"
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -53,7 +53,7 @@ TEST(TernaryMatchesParsing, MatchesChainInTernary) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
-      "    y = (a matches 8'd1 &&& b matches 8'd2 &&& c) ? 1 : 0;\n"
+      "    y = a matches 8'd1 &&& b matches 8'd2 &&& c ? 1 : 0;\n"
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);

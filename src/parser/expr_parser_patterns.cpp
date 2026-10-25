@@ -138,16 +138,24 @@ Expr* Parser::ParsePatternReplication(Expr* count, SourceLoc loc) {
   return rep;
 }
 
-// §12.6: `. variable_identifier` inside a `'{...}` structure pattern binds a
-// new pattern identifier; mark it for the elaborator's uniqueness check.
-Expr* Parser::ParsePatternBinding() {
+// A.6.7.1: the two patterns written with a leading period. The one followed
+// by a name, `. variable_identifier`, declares a pattern identifier, marked
+// for the elaborator's uniqueness check, and `.*` is the wildcard. Neither is
+// an expression, so one read where no pattern is open (pattern_depth_) is
+// reported, and built all the same so that the expression around it reads on.
+Expr* Parser::ParseDotPattern() {
   auto loc = CurrentLoc();
-  Consume();
+  if (pattern_depth_ == 0) {
+    diag_.Error(loc,
+                "'.name' and '.*' are patterns, which stand only after "
+                "'matches' or in a pattern-matching case item",
+                Subclause("A.6.7.1"));
+  }
+  if (Consume().Is(TokenKind::kDotStar)) {
+    return MakeIdentifierNode(arena_, ".*", loc);
+  }
   auto name = ExpectIdentifier(Subclause("12.6"));
-  auto* id = arena_.Create<Expr>();
-  id->kind = ExprKind::kIdentifier;
-  id->text = name.text;
-  id->range.start = loc;
+  auto* id = MakeIdentifierNode(arena_, name.text, loc);
   id->is_pattern_binding = true;
   return id;
 }
@@ -191,7 +199,7 @@ Expr* Parser::ParsePatternKeyword() {
 // literal's text.
 void Parser::ParsePatternElement(Expr* pat, bool& named) {
   if (Check(TokenKind::kDot)) {
-    pat->elements.push_back(ParsePatternBinding());
+    pat->elements.push_back(ParseDotPattern());
     return;
   }
   Expr* key = ParsePatternKeyword();
@@ -206,7 +214,7 @@ void Parser::ParsePatternElement(Expr* pat, bool& named) {
   Expect(TokenKind::kColon, Subclause("10.9"));
   named = true;
   pat->pattern_keys.push_back(key);
-  pat->elements.push_back(Check(TokenKind::kDot) ? ParsePatternBinding()
+  pat->elements.push_back(Check(TokenKind::kDot) ? ParseDotPattern()
                                                  : ParseExpr());
 }
 

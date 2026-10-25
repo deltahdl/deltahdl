@@ -19,7 +19,7 @@ TEST(TernaryMatchesSim, TernaryMatchesTrue) {
       "  logic [7:0] x, y;\n"
       "  initial begin\n"
       "    x = 8'd5;\n"
-      "    y = (x matches 8'd5) ? 8'd42 : 8'd0;\n"
+      "    y = x matches 8'd5 ? 8'd42 : 8'd0;\n"
       "  end\n"
       "endmodule\n",
       f, "y");
@@ -34,7 +34,7 @@ TEST(TernaryMatchesSim, TernaryMatchesFalse) {
       "  logic [7:0] x, y;\n"
       "  initial begin\n"
       "    x = 8'd5;\n"
-      "    y = (x matches 8'd99) ? 8'd42 : 8'd77;\n"
+      "    y = x matches 8'd99 ? 8'd42 : 8'd77;\n"
       "  end\n"
       "endmodule\n",
       f, "y");
@@ -53,7 +53,7 @@ TEST(TernaryMatchesSim, PatternZBitsAreNoWildcard) {
       "  logic [7:0] y;\n"
       "  initial begin\n"
       "    sel = 4'b1010;\n"
-      "    y = (sel matches 4'b1?1?) ? 8'd1 : 8'd0;\n"
+      "    y = sel matches 4'b1?1? ? 8'd1 : 8'd0;\n"
       "  end\n"
       "endmodule\n",
       f, "y");
@@ -70,7 +70,7 @@ TEST(TernaryMatchesSim, TernaryMatchesGuardTrue) {
       "  initial begin\n"
       "    x = 8'd5;\n"
       "    en = 1'b1;\n"
-      "    y = (x matches 8'd5 &&& en) ? 8'd10 : 8'd0;\n"
+      "    y = x matches 8'd5 &&& en ? 8'd10 : 8'd0;\n"
       "  end\n"
       "endmodule\n",
       f, "y");
@@ -87,7 +87,7 @@ TEST(TernaryMatchesSim, TernaryMatchesGuardFalse) {
       "  initial begin\n"
       "    x = 8'd5;\n"
       "    en = 1'b0;\n"
-      "    y = (x matches 8'd5 &&& en) ? 8'd10 : 8'd99;\n"
+      "    y = x matches 8'd5 &&& en ? 8'd10 : 8'd99;\n"
       "  end\n"
       "endmodule\n",
       f, "y");
@@ -107,7 +107,7 @@ TEST(TernaryMatchesSim, AllChainedClausesSucceedSelectsConsequent) {
       "  initial begin\n"
       "    a = 8'd1;\n"
       "    b = 8'd2;\n"
-      "    y = (a matches 8'd1 &&& b matches 8'd2) ? 8'd7 : 8'd9;\n"
+      "    y = a matches 8'd1 &&& b matches 8'd2 ? 8'd7 : 8'd9;\n"
       "  end\n"
       "endmodule\n",
       f, "y");
@@ -127,7 +127,7 @@ TEST(TernaryMatchesSim, ChainedLaterClauseFailureSelectsAlternative) {
       "  initial begin\n"
       "    a = 8'd1;\n"
       "    b = 8'd5;\n"
-      "    y = (a matches 8'd1 &&& b matches 8'd2) ? 8'd7 : 8'd9;\n"
+      "    y = a matches 8'd1 &&& b matches 8'd2 ? 8'd7 : 8'd9;\n"
       "  end\n"
       "endmodule\n",
       f, "y");
@@ -141,7 +141,7 @@ TEST(TernaryMatchesSim, ChainedLaterClauseFailureSelectsAlternative) {
 // filter after `&&&` must not run and the counter it would bump stays at zero.
 TEST(TernaryMatchesSim, FailedClauseSkipsLaterClauseEvaluation) {
   RunMatchesShortCircuitSkipsLaterClause(
-      "y = (x matches 8'd99 &&& cnt++) ? 8'd1 : 8'd2;");
+      "y = x matches 8'd99 &&& cnt++ ? 8'd1 : 8'd2;");
 }
 
 // §12.6.3: a `matches` clause in a conditional-expression predicate carries a
@@ -159,7 +159,7 @@ TEST(TernaryMatchesSim, TernaryMatchesParameterPattern) {
       "  logic [7:0] x, y;\n"
       "  initial begin\n"
       "    x = 8'd5;\n"
-      "    y = (x matches P) ? 8'd42 : 8'd0;\n"
+      "    y = x matches P ? 8'd42 : 8'd0;\n"
       "  end\n"
       "endmodule\n",
       f, "y");
@@ -179,7 +179,7 @@ TEST(TernaryMatchesSim, TernaryMatchesLocalparamPattern) {
       "  logic [7:0] x, y;\n"
       "  initial begin\n"
       "    x = 8'd7;\n"
-      "    y = (x matches LP) ? 8'd42 : 8'd0;\n"
+      "    y = x matches LP ? 8'd42 : 8'd0;\n"
       "  end\n"
       "endmodule\n",
       f, "y");
@@ -206,7 +206,7 @@ TEST(TernaryMatchesSim, TernaryMatchesGenvarPattern) {
                  "      logic [7:0] x;\n"
                  "      initial begin\n"
                  "        x = 8'd2;\n"
-                 "        out[i] = (x matches i) ? 8'd30 : 8'd99;\n"
+                 "        out[i] = x matches i ? 8'd30 : 8'd99;\n"
                  "      end\n"
                  "    end\n"
                  "  endgenerate\n"
@@ -228,7 +228,7 @@ TEST(TernaryMatchesSim, TernaryMatchesConstantFunctionCallPattern) {
       "  logic [7:0] x, y;\n"
       "  initial begin\n"
       "    x = 8'd5;\n"
-      "    y = (x matches five()) ? 8'd42 : 8'd0;\n"
+      "    y = x matches five() ? 8'd42 : 8'd0;\n"
       "  end\n"
       "endmodule\n",
       f, "y");
@@ -250,7 +250,7 @@ TEST(TernaryMatchesSim, TernaryLeadingBooleanFilterThenMatches) {
       "  initial begin\n"
       "    x = 8'd5;\n"
       "    en = 1'b1;\n"
-      "    y = (en &&& x matches 8'd5) ? 8'd42 : 8'd0;\n"
+      "    y = en &&& x matches 8'd5 ? 8'd42 : 8'd0;\n"
       "  end\n"
       "endmodule\n",
       f, "y");
@@ -270,7 +270,7 @@ TEST(TernaryMatchesSim, TernaryMatchesInContinuousAssign) {
       "module t;\n"
       "  logic [7:0] x, y;\n"
       "  initial x = 8'd5;\n"
-      "  assign y = (x matches 8'd5) ? 8'd42 : 8'd0;\n"
+      "  assign y = x matches 8'd5 ? 8'd42 : 8'd0;\n"
       "endmodule\n",
       f, "y");
   ASSERT_NE(var, nullptr);
@@ -287,7 +287,7 @@ TEST(TernaryMatchesSim, TernaryMatchesInDeclarationInitializer) {
   SimFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
-      "  logic [7:0] y = (8'd5 matches 8'd5) ? 8'd42 : 8'd0;\n"
+      "  logic [7:0] y = 8'd5 matches 8'd5 ? 8'd42 : 8'd0;\n"
       "endmodule\n",
       f, "y");
   ASSERT_NE(var, nullptr);
@@ -311,7 +311,7 @@ TEST(TernaryMatchesSim, TernaryMatchesUnknownFilterCombinesBothResults) {
       "  initial begin\n"
       "    x = 8'd5;\n"
       "    guard = 1'bx;\n"
-      "    y = (x matches 8'd5 &&& guard) ? 8'd10 : 8'd99;\n"
+      "    y = x matches 8'd5 &&& guard ? 8'd10 : 8'd99;\n"
       "    ok = y === 8'b0xx0_x01x;\n"
       "  end\n"
       "endmodule\n",
@@ -332,9 +332,9 @@ TEST(TernaryMatchesSim, TheConsequentReadsTheBoundIdentifier) {
       "  int some, none;\n"
       "  initial begin\n"
       "    o = tagged Some (42);\n"
-      "    some = (o matches (tagged Some .x)) ? x : -1;\n"
+      "    some = o matches (tagged Some .x) ? x : -1;\n"
       "    o = tagged None;\n"
-      "    none = (o matches (tagged Some .x)) ? x : -1;\n"
+      "    none = o matches (tagged Some .x) ? x : -1;\n"
       "  end\n"
       "endmodule\n",
       f);
@@ -356,9 +356,9 @@ TEST(TernaryMatchesSim, ConstantPatternComparesXAndZBits) {
       "  logic [3:0] v = 4'b1010, w = 'x;\n"
       "  int n = 0;\n"
       "  initial begin\n"
-      "    n += (v matches 4'b1x1x) ? 1 : 0;\n"
-      "    n += (w matches 4'b0000) ? 10 : 0;\n"
-      "    n += (w matches 4'bxxxx) ? 100 : 0;\n"
+      "    n += v matches 4'b1x1x ? 1 : 0;\n"
+      "    n += w matches 4'b0000 ? 10 : 0;\n"
+      "    n += w matches 4'bxxxx ? 100 : 0;\n"
       "  end\n"
       "endmodule\n",
       f, "n");
@@ -380,8 +380,8 @@ TEST(TernaryMatchesSim, AmbiguousClauseSequenceCombinesBothResults) {
       "  logic [7:0] r, s;\n"
       "  int ok = 0;\n"
       "  initial begin\n"
-      "    r = (v matches tagged Valid .* &&& f) ? 8'h0F : 8'hF0;\n"
-      "    s = (v matches tagged Valid .n &&& f) ? n : 8'hF0;\n"
+      "    r = v matches tagged Valid .* &&& f ? 8'h0F : 8'hF0;\n"
+      "    s = v matches tagged Valid .n &&& f ? n : 8'hF0;\n"
       "    ok = (r === 8'bxxxx_xxxx) + 10 * (s === 8'bxxxx_xxxx);\n"
       "  end\n"
       "endmodule\n",
@@ -404,8 +404,8 @@ TEST(TernaryMatchesSim, BindingConditionalResultTypeIsBothOperands) {
       "  logic [63:0] r, s;\n"
       "  int ok = 0;\n"
       "  initial begin\n"
-      "    r = (v matches tagged Valid .n) ? n : 8'd0;\n"
-      "    s = (w matches tagged Valid .k) ? k : -8'sd1;\n"
+      "    r = v matches tagged Valid .n ? n : 8'd0;\n"
+      "    s = w matches tagged Valid .k ? k : -8'sd1;\n"
       "    ok = (r == 64'h0000_0000_ffff_ffff) + 10 * (s == '1);\n"
       "  end\n"
       "endmodule\n",

@@ -175,7 +175,7 @@ TEST(IfMatchesSim, MatchesResultIsBool) {
       "  logic [7:0] x, y;\n"
       "  initial begin\n"
       "    x = 8'd5;\n"
-      "    y = (x matches 8'd5) ? 8'd42 : 8'd0;\n"
+      "    y = x matches 8'd5 ? 8'd42 : 8'd0;\n"
       "  end\n"
       "endmodule\n",
       f, "y");

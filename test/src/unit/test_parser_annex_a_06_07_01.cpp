@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <initializer_list>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
@@ -506,10 +509,67 @@ TEST(PatternParsing, PatternDotMissingIdentifier) {
       "    if (v matches .) x = 1;\n"
       "  end\n"
       "endmodule\n");
-  // The `.identifier` primary is shared with the §23.3.2.3 named port
-  // connection, and the emission site in ParsePrimaryExpr files it there.
+  // Parser::ParseDotPattern reads the pattern and files the missing name under
+  // §12.6, whose Syntax 12-4 writes it.
   EXPECT_TRUE(
-      ReportedError(r.diags, "expected identifier, got ')'", 3, "23.3.2.3"));
+      ReportedError(r.diags, "expected identifier, got ')'", 3, "12.6"));
+}
+
+// A.6.7.1 writes `. variable_identifier` and `.*` as two of a pattern's forms,
+// and a pattern stands after `matches`, as a pattern-matching case item, or
+// inside another pattern. A.8.4's primary has neither form, so each is
+// reported where no pattern is open: as an expression, as an operand, as an
+// assignment pattern's members and as a tagged union expression's member.
+TEST(PatternParsing, APatternFormOutsideAPatternIsReported) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef union tagged { int A; } u_t;\n"
+      "  typedef struct { int a, b; } s_t;\n"
+      "  int x, y;\n"
+      "  s_t s;\n"
+      "  u_t u;\n"
+      "  initial begin\n"
+      "    x = .n;\n"
+      "    y = .* + 1;\n"
+      "    s = '{.p, .q};\n"
+      "    u = tagged A .k;\n"
+      "  end\n"
+      "endmodule\n");
+  for (uint32_t line : {8u, 9u, 10u, 11u}) {
+    EXPECT_TRUE(ReportedError(r.diags,
+                              "'.name' and '.*' are patterns, which stand only "
+                              "after 'matches' or in a pattern-matching case "
+                              "item",
+                              line, "A.6.7.1"))
+        << "line " << line;
+  }
+  EXPECT_EQ(r.diags.size(), 5u);
+}
+
+// After `matches`, and in a pattern-matching case item ahead of its `&&&`
+// filter, a pattern takes both forms at its top, as a tagged union pattern's
+// member, inside parentheses and as a structure pattern's members, keyed or
+// not.
+TEST(PatternParsing, APatternFormInsideAPatternIsAccepted) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef union tagged { int A; } u_t;\n"
+      "  typedef struct { int a, b; } s_t;\n"
+      "  int x;\n"
+      "  s_t s;\n"
+      "  u_t u;\n"
+      "  initial begin\n"
+      "    if (x matches .n) x = n;\n"
+      "    if (u matches tagged A .k) x = k;\n"
+      "    if (s matches '{.p, .*}) x = p;\n"
+      "    x = u matches tagged A (.k) ? k : 0;\n"
+      "    case (s) matches\n"
+      "      '{a: .p, b: .*} &&& p > 0: x = p;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
 }
 
 }  // namespace

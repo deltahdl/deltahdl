@@ -576,7 +576,7 @@ TEST(Precedence, ChainedTernaryRightAssoc) {
 TEST(OperatorAndExpressionParsing, CondPredicateTripleAndInTernary) {
   auto r = Parse(
       "module t;\n"
-      "  initial x = (a &&& b) ? y : z;\n"
+      "  initial x = a &&& b ? y : z;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -591,7 +591,7 @@ TEST(OperatorAndExpressionParsing, CondPredicateTripleAndInTernary) {
 TEST(OperatorAndExpressionParsing, ChainedCondPredicateTripleAndInTernary) {
   auto r = Parse(
       "module t;\n"
-      "  initial x = (a &&& b &&& c) ? y : z;\n"
+      "  initial x = a &&& b &&& c ? y : z;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -609,7 +609,7 @@ TEST(OperatorAndExpressionParsing, ChainedCondPredicateTripleAndInTernary) {
 TEST(CondPredicateParsing, MatchesPatternInTernaryCondition) {
   auto r = Parse(
       "module m;\n"
-      "  initial x = (a matches 3) ? y : z;\n"
+      "  initial x = a matches 3 ? y : z;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

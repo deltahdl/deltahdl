@@ -290,7 +290,7 @@ TEST(IfMatchesElaboration, MethodCallThroughPatternIdentifier) {
       "  initial begin\n"
       "    if (u matches tagged En .ev) $display(\"%s\", ev.name());\n"
       "    if (u matches tagged En .e2 &&& e2.name() == \"B\") s = \"y\";\n"
-      "    s = (u matches tagged En .e3) ? e3.name() : \"\";\n"
+      "    s = u matches tagged En .e3 ? e3.name() : \"\";\n"
       "  end\n"
       "endmodule\n",
       f);

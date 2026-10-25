@@ -8,6 +8,7 @@
 #include <utility>
 #include <vector>
 
+#include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/types.h"
 #include "lexer/token.h"
@@ -123,11 +124,40 @@ uint64_t ParseIntText(std::string_view text) {
   return FoldDigitsModulo64(std::string_view(buf).substr(i), base);
 }
 
-Expr* Parser::ParseExpr() { return ParseExprBp(0); }
+// A.6.6 and A.8.3 give a cond_predicate, the clauses `&&&` joins with their
+// `matches` patterns, two places: an if statement's condition, which
+// Parser::ParseIfStmt reads through ParseExprBp, and a conditional operator's
+// condition, which never stands as an expression of its own. A.8.6 makes
+// neither operator a binary_operator, so one at the top of any other
+// expression is reported. That covers one in parentheses, whose
+// mintypmax_expression is an expression too.
+Expr* Parser::ParseExpr() {
+  Expr* e = ParseExprBp(0);
+  if (e->kind == ExprKind::kBinary &&
+      (e->op == TokenKind::kKwMatches || e->op == TokenKind::kAmpAmpAmp)) {
+    diag_.Error(e->range.start,
+                "'matches' and '&&&' stand only in the predicate of an if "
+                "statement or a conditional operator",
+                Subclause("A.6.6"));
+  }
+  return e;
+}
 
 Expr* Parser::ParseExprBp(int min_bp) {
   auto* lhs = ParsePrefixExpr();
   return ParseInfixBp(lhs, min_bp);
+}
+
+// A cond_predicate's `&&&` or `matches` node over `lhs`, its right operand
+// still to read. §12.4 and §12.6 write each as a left operand followed by the
+// operator, which is where Parser::ParseInfixBp starts every other one.
+static Expr* MakePredicateNode(Arena& arena, TokenKind op, Expr* lhs) {
+  auto* bin = arena.Create<Expr>();
+  bin->kind = ExprKind::kBinary;
+  bin->op = op;
+  bin->range.start = lhs->range.start;
+  bin->lhs = lhs;
+  return bin;
 }
 
 Expr* Parser::TryParseSpecialInfix(Expr*& lhs, const Token& tok, int min_bp) {
@@ -141,7 +171,7 @@ Expr* Parser::TryParseSpecialInfix(Expr*& lhs, const Token& tok, int min_bp) {
     // the operator, so it begins where the condition begins.
     tern->range.start = lhs->range.start;
     tern->condition = lhs;
-    tern->true_expr = ParseExprBp(0);
+    tern->true_expr = ParseExpr();
     Expect(TokenKind::kColon, Subclause("11.4.11"));
     // §11.3.2's Table 11-2 (printed page 272) ranks the conditional operator
     // above -> and <-> and makes it right associative. The false expression is
@@ -160,14 +190,18 @@ Expr* Parser::TryParseSpecialInfix(Expr*& lhs, const Token& tok, int min_bp) {
 
   if (tok.kind == TokenKind::kAmpAmpAmp && min_bp <= 0) {
     Consume();
-    auto* bin = arena_.Create<Expr>();
-    bin->kind = ExprKind::kBinary;
-    bin->op = TokenKind::kAmpAmpAmp;
-    // §12.4 writes the `&&&` cond_predicate as a left operand followed by the
-    // operator, which is where Parser::ParseInfixBp starts every other one.
-    bin->range.start = lhs->range.start;
-    bin->lhs = lhs;
-    bin->rhs = ParseExprBp(1);
+    auto* bin = MakePredicateNode(arena_, TokenKind::kAmpAmpAmp, lhs);
+    // The clause after the operator is an expression, or a cond_pattern of
+    // one, and the `?` of A.8.3 after the last clause takes the whole
+    // predicate as its condition, so the clause is read short of a `?` and
+    // then given its `matches` pattern. It is no pattern itself, not even after
+    // a pattern-matching case item's pattern (A.6.7).
+    int depth = std::exchange(pattern_depth_, 0);
+    bin->rhs = ParseExprBp(2);
+    if (Check(TokenKind::kKwMatches)) {
+      bin->rhs = TryParseSpecialInfix(bin->rhs, CurrentToken(), 0);
+    }
+    pattern_depth_ = depth;
     return bin;
   }
 
@@ -175,16 +209,15 @@ Expr* Parser::TryParseSpecialInfix(Expr*& lhs, const Token& tok, int min_bp) {
     return ParseInsideExpr(lhs);
   }
 
-  if (tok.kind == TokenKind::kKwMatches && min_bp <= 1) {
+  // A cond_pattern's expression is any expression, an implication included
+  // (A.8.3), so `matches` is read only at the lowest binding power and never
+  // inside an implication's right operand.
+  if (tok.kind == TokenKind::kKwMatches && min_bp <= 0) {
     Consume();
-    auto* bin = arena_.Create<Expr>();
-    bin->kind = ExprKind::kBinary;
-    bin->op = TokenKind::kKwMatches;
-    // §12.6 writes the `matches` cond_pattern as a left operand followed by the
-    // operator.
-    bin->range.start = lhs->range.start;
-    bin->lhs = lhs;
+    auto* bin = MakePredicateNode(arena_, TokenKind::kKwMatches, lhs);
+    ++pattern_depth_;
     bin->rhs = ParseExprBp(2);
+    --pattern_depth_;
     return bin;
   }
   return nullptr;
@@ -472,21 +505,9 @@ Expr* Parser::ParsePrimaryExpr() {
     case TokenKind::kKwNew:
       return ParseNewExpr();
 
-    case TokenKind::kDotStar: {
-      auto loc = Consume().loc;
-      return MakeIdentifierNode(arena_, ".*", loc);
-    }
-
-    case TokenKind::kDot: {
-      auto loc = Consume().loc;
-      auto name = ExpectIdentifier(Subclause("23.3.2.3"));
-      auto* id = MakeIdentifierNode(arena_, name.text, loc);
-      // §12.6: `. variable_identifier` is a pattern that binds a new
-      // identifier; record that so the elaborator can enforce binding-name
-      // uniqueness.
-      id->is_pattern_binding = true;
-      return id;
-    }
+    case TokenKind::kDotStar:
+    case TokenKind::kDot:
+      return ParseDotPattern();
     default:
       break;
   }

@@ -767,7 +767,7 @@ class Parser {
   Expr* ParsePatternReplication(Expr* count, SourceLoc loc);
   void ParsePatternElement(Expr* pat, bool& named);
   Expr* ParsePatternKeyword();
-  Expr* ParsePatternBinding();
+  Expr* ParseDotPattern();
   Expr* ParseCastExpr();
   Expr* ParseTypeRefExpr();
   Expr* ParseWithClause(Expr* expr);
@@ -895,10 +895,7 @@ class Parser {
   // inside the package, whose body is that element's, and not an anonymous
   // program in it, which FilterAnonymousProgramItems in parser.cpp holds to
   // A.1.11's anonymous_program_item.
-  bool InPackageBody() const {
-    return current_package_ != nullptr && current_module_ == nullptr &&
-           !in_anonymous_program_;
-  }
+  bool InPackageBody() const;
 
   int generate_block_depth_ = 0;
   bool InGenerateBlock() const { return generate_block_depth_ > 0; }
@@ -928,6 +925,10 @@ class Parser {
   // cover statement's pass statement, which the elaborator reports, so the
   // §16.14 report stays out of one; ParseCoverProperty counts them.
   int cover_pass_statement_depth_ = 0;
+  // A.6.7.1: how many patterns the expression being read stands in, opened by
+  // `matches` and a pattern-matching case item. A `.name` or `.*` is reported
+  // where none is open, and the `&&&` filter after a pattern opens none.
+  int pattern_depth_ = 0;
 
   // §H.2: true while the formal argument list of a DPI import declaration is
   // being parsed. Leaving a packed range unspecified is a relaxation granted to

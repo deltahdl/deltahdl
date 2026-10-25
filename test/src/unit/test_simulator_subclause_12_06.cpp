@@ -18,9 +18,16 @@ using namespace delta;
 
 namespace {
 
+// The predicate of `x = <predicate> ? 1 : 0;`. A cond_predicate stands only in
+// an if statement's condition or a conditional operator's (A.6.6, A.8.3), so
+// it is read in the second and handed back to be evaluated on its own.
+Expr* ParsePredicateFrom(const std::string& predicate, SimFixture& f) {
+  return ParseExprFrom(predicate + " ? 1 : 0", f)->condition;
+}
+
 TEST(Matches, ExactMatchTrue) {
   SimFixture f;
-  auto* expr = ParseExprFrom("42 matches 42", f);
+  auto* expr = ParsePredicateFrom("42 matches 42", f);
   ASSERT_NE(expr, nullptr);
   EXPECT_EQ(expr->kind, ExprKind::kBinary);
   auto result = EvalExpr(expr, f.ctx, f.arena);
@@ -29,7 +36,7 @@ TEST(Matches, ExactMatchTrue) {
 
 TEST(Matches, ExactMatchFalse) {
   SimFixture f;
-  auto* expr = ParseExprFrom("42 matches 99", f);
+  auto* expr = ParsePredicateFrom("42 matches 99", f);
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
 }
@@ -38,7 +45,7 @@ TEST(Matches, VariableMatch) {
   SimFixture f;
   auto* var = f.ctx.CreateVariable("sig", 8);
   var->value = MakeLogic4VecVal(f.arena, 8, 0xAB);
-  auto* expr = ParseExprFrom("sig matches 8'hAB", f);
+  auto* expr = ParsePredicateFrom("sig matches 8'hAB", f);
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
 }
@@ -55,7 +62,7 @@ TEST(Matches, ConstantLocalparamPatternMatchesRuntime) {
                          "  logic y;\n"
                          "  initial begin\n"
                          "    x = 8'd5;\n"
-                         "    y = x matches P;\n"
+                         "    y = x matches P ? 1 : 0;\n"
                          "  end\n"
                          "endmodule\n",
                          "y");
@@ -73,7 +80,7 @@ TEST(Matches, ConstantParameterPatternNoMatchRuntime) {
                          "  logic y;\n"
                          "  initial begin\n"
                          "    x = 8'd3;\n"
-                         "    y = x matches Q;\n"
+                         "    y = x matches Q ? 1 : 0;\n"
                          "  end\n"
                          "endmodule\n",
                          "y");
@@ -96,9 +103,9 @@ TEST(Matches, ConstantPatternWiderThanOneWordComparesEveryWord) {
       "  int eq, ne, r;\n"
       "  initial begin\n"
       "    x = 96'h0123_4567_89AB_CDEF_0011_2233;\n"
-      "    eq = x matches P;\n"
+      "    eq = x matches P ? 1 : 0;\n"
       "    x = 96'h0122_4567_89AB_CDEF_0011_2233;\n"
-      "    ne = x matches P;\n"
+      "    ne = x matches P ? 1 : 0;\n"
       "    r = eq * 10 + ne;\n"
       "  end\n"
       "endmodule\n",
@@ -121,9 +128,9 @@ TEST(Matches, ConstantPatternNarrowerThanTheValueExtendsToItsWidth) {
                          "  int high_set, high_clear, r;\n"
                          "  initial begin\n"
                          "    x = 96'h1_0000_0000_0011_2233;\n"
-                         "    high_set = x matches P;\n"
+                         "    high_set = x matches P ? 1 : 0;\n"
                          "    x = 96'h0011_2233;\n"
-                         "    high_clear = x matches P;\n"
+                         "    high_clear = x matches P ? 1 : 0;\n"
                          "    r = high_set * 10 + high_clear;\n"
                          "  end\n"
                          "endmodule\n",
@@ -139,7 +146,7 @@ TEST(Matches, XInPatternIsNoWildcard) {
   SimFixture f;
   auto* var = f.ctx.CreateVariable("wv", 4);
   var->value = MakeLogic4VecVal(f.arena, 4, 0b1010);
-  auto* expr = ParseExprFrom("wv matches 4'b1x1x", f);
+  auto* expr = ParsePredicateFrom("wv matches 4'b1x1x", f);
   auto result = EvalExpr(expr, f.ctx, f.arena);
 
   EXPECT_EQ(result.ToUint64(), 0u);
@@ -149,7 +156,7 @@ TEST(Matches, ZInPatternIsNoWildcard) {
   SimFixture f;
   auto* var = f.ctx.CreateVariable("zv", 4);
   var->value = MakeLogic4VecVal(f.arena, 4, 0b1100);
-  auto* expr = ParseExprFrom("zv matches 4'b1?0?", f);
+  auto* expr = ParsePredicateFrom("zv matches 4'b1?0?", f);
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
 }
@@ -159,7 +166,7 @@ TEST(Matches, WildcardPatternMismatch) {
   auto* var = f.ctx.CreateVariable("mm", 4);
   var->value = MakeLogic4VecVal(f.arena, 4, 0b0010);
 
-  auto* expr = ParseExprFrom("mm matches 4'b1x1x", f);
+  auto* expr = ParsePredicateFrom("mm matches 4'b1x1x", f);
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
 }
@@ -167,7 +174,7 @@ TEST(Matches, WildcardPatternMismatch) {
 TEST(Matches, ResultAlwaysDetermined) {
   SimFixture f;
   MakeVar4(f, "xv", 4, 0b0000, 0b1111);
-  auto* expr = ParseExprFrom("xv matches 4'b0000", f);
+  auto* expr = ParsePredicateFrom("xv matches 4'b0000", f);
   auto result = EvalExpr(expr, f.ctx, f.arena);
 
   EXPECT_TRUE(result.IsKnown());
@@ -180,7 +187,7 @@ TEST(Matches, ResultDeterminedWhenPatternHasXZ) {
   SimFixture f;
   auto* var = f.ctx.CreateVariable("pv", 4);
   var->value = MakeLogic4VecVal(f.arena, 4, 0b1010);
-  auto* expr = ParseExprFrom("pv matches 4'b1x1z", f);
+  auto* expr = ParsePredicateFrom("pv matches 4'b1x1z", f);
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_TRUE(result.IsKnown());
   EXPECT_EQ(result.width, 1u);
@@ -190,7 +197,7 @@ TEST(Matches, ResultDeterminedWhenPatternHasXZ) {
 TEST(Matches, ResultDeterminedWhenValueAndPatternHaveXZ) {
   SimFixture f;
   MakeVar4(f, "vp", 4, 0b1010, 0b0101);
-  auto* expr = ParseExprFrom("vp matches 4'b1x1z", f);
+  auto* expr = ParsePredicateFrom("vp matches 4'b1x1z", f);
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_TRUE(result.IsKnown());
   EXPECT_EQ(result.width, 1u);
@@ -202,7 +209,7 @@ TEST(Matches, ResultDeterminedFalseWithValueXZ) {
   SimFixture f;
   // aval 0b1010 with bval 0b0101 makes two of the value's bits x/z.
   MakeVar4(f, "fv", 4, 0b1010, 0b0101);
-  auto* expr = ParseExprFrom("fv matches 4'b0101", f);
+  auto* expr = ParsePredicateFrom("fv matches 4'b0101", f);
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_TRUE(result.IsKnown());
   EXPECT_EQ(result.width, 1u);
@@ -211,7 +218,7 @@ TEST(Matches, ResultDeterminedFalseWithValueXZ) {
 
 TEST(Matches, TripleAmpTrue) {
   SimFixture f;
-  auto* expr = ParseExprFrom("1 &&& 1", f);
+  auto* expr = ParsePredicateFrom("1 &&& 1", f);
   ASSERT_NE(expr, nullptr);
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
@@ -219,7 +226,7 @@ TEST(Matches, TripleAmpTrue) {
 
 TEST(Matches, TripleAmpFalseShortCircuit) {
   SimFixture f;
-  auto* expr = ParseExprFrom("0 &&& 1", f);
+  auto* expr = ParsePredicateFrom("0 &&& 1", f);
   ASSERT_NE(expr, nullptr);
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
@@ -227,7 +234,7 @@ TEST(Matches, TripleAmpFalseShortCircuit) {
 
 TEST(Matches, TripleAmpSecondFalse) {
   SimFixture f;
-  auto* expr = ParseExprFrom("1 &&& 0", f);
+  auto* expr = ParsePredicateFrom("1 &&& 0", f);
   ASSERT_NE(expr, nullptr);
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);

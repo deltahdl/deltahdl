@@ -327,6 +327,20 @@ struct ParserStmtHelpers {
                   Subclause("A.6.5"));
   }
 
+  // The first of a case item's expressions: under `inside` a range_list's
+  // value_range, and under `matches` a case_pattern_item's pattern with its
+  // optional `&&&` filter (A.6.7). Those two are read through ParseExprBp,
+  // which leaves the `&&&` unreported where Parser::ParseExpr would report
+  // it, with a pattern open around the pattern.
+  static Expr* ParseCaseItemHead(Parser& p, bool inside, bool matches) {
+    if (inside) return p.ParseInsideValueRange();
+    if (!matches) return p.ParseExpr();
+    ++p.pattern_depth_;
+    Expr* head = p.ParseExprBp(0);
+    --p.pattern_depth_;
+    return head;
+  }
+
   // A.6.5's `repeat ( expression ) event_control`, its `repeat` already read.
   static void ParseRepeatEventControl(Parser& p, Stmt* stmt,
                                       Subclause subclause) {
@@ -514,7 +528,9 @@ Stmt* Parser::ParseIfStmt() {
   stmt->range.start = CurrentLoc();
   Expect(TokenKind::kKwIf, Subclause("12.4"));
   Expect(TokenKind::kLParen, Subclause("12.4"));
-  stmt->condition = ParseExpr();
+  // A.6.6: the condition is a cond_predicate, which Parser::ParseExpr reports
+  // wherever else its `matches` or `&&&` stands.
+  stmt->condition = ParseExprBp(0);
   SkipUnparenthesizedAssignInExpr();
   Expect(TokenKind::kRParen, Subclause("12.4"));
   stmt->then_branch = ParseStmt();
@@ -590,7 +606,8 @@ CaseItem Parser::ParseCaseItem(bool inside, bool matches) {
     item.is_default = true;
     Match(TokenKind::kColon);
   } else {
-    item.patterns.push_back(inside ? ParseInsideValueRange() : ParseExpr());
+    item.patterns.push_back(
+        ParserStmtHelpers::ParseCaseItemHead(*this, inside, matches));
     if (matches && Check(TokenKind::kComma)) {
       diag_.Error(CurrentLoc(),
                   "a pattern-matching case item holds one pattern, not a list",

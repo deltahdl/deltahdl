@@ -14,7 +14,7 @@ TEST(TernaryMatchesElaboration, TernaryMatchesElaborates) {
       "  logic [7:0] x, y;\n"
       "  initial begin\n"
       "    x = 8'd5;\n"
-      "    y = (x matches 8'd5) ? 8'd42 : 8'd0;\n"
+      "    y = x matches 8'd5 ? 8'd42 : 8'd0;\n"
       "  end\n"
       "endmodule\n",
       f);
@@ -32,7 +32,7 @@ TEST(TernaryMatchesElaboration,
       "module m;\n"
       "  typedef union tagged { void Invalid; int Valid; } VInt;\n"
       "  VInt v; int y;\n"
-      "  initial y = (v matches tagged Valid .k) ? k : k;\n"
+      "  initial y = v matches tagged Valid .k ? k : k;\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),

@@ -123,6 +123,11 @@ bool Parser::InInterfaceBody() const {
          current_module_->decl_kind == ModuleDeclKind::kInterface;
 }
 
+bool Parser::InPackageBody() const {
+  return current_package_ != nullptr && current_module_ == nullptr &&
+         !in_anonymous_program_;
+}
+
 // True inside a checker body, a generate block of it included: A.1.8's
 // footnote 6 forbids a checker_generate_item every item a checker_declaration
 // forbids outside one, so the block admits what the body admits.

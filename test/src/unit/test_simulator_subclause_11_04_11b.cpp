@@ -271,7 +271,7 @@ TEST(TernaryOperatorSim, CondPredicateTripleAndBothTrue) {
       "  initial begin\n"
       "    a = 1;\n"
       "    b = 1;\n"
-      "    result = (a &&& b) ? 42 : 99;\n"
+      "    result = a &&& b ? 42 : 99;\n"
       "  end\n"
       "endmodule\n",
       f, "result");
@@ -287,7 +287,7 @@ TEST(TernaryOperatorSim, CondPredicateTripleAndFirstFalse) {
       "  initial begin\n"
       "    a = 0;\n"
       "    b = 1;\n"
-      "    result = (a &&& b) ? 42 : 99;\n"
+      "    result = a &&& b ? 42 : 99;\n"
       "  end\n"
       "endmodule\n",
       f, "result");
@@ -303,7 +303,7 @@ TEST(TernaryOperatorSim, CondPredicateTripleAndSecondFalse) {
       "  initial begin\n"
       "    a = 1;\n"
       "    b = 0;\n"
-      "    result = (a &&& b) ? 42 : 99;\n"
+      "    result = a &&& b ? 42 : 99;\n"
       "  end\n"
       "endmodule\n",
       f, "result");
