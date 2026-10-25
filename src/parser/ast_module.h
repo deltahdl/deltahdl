@@ -763,6 +763,11 @@ struct ModuleItem {
   // kCovergroupDecl: the declaration as A.2.11 gives it -- formals, coverage
   // event, coverpoints, crosses and options (ast_covergroup.h).
   CovergroupDecl* covergroup = nullptr;
+
+  // kModuleInst: whether the instantiation wrote A.4.1.1's
+  // parameter_value_assignment, `#( ... )`, which inst_params cannot say of
+  // an empty `#( )`.
+  bool inst_param_assignment_written = false;
 };
 
 enum class ModuleDeclKind : uint8_t {

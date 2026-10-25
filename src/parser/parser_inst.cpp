@@ -116,9 +116,8 @@ ModuleItem* Parser::ParseModuleInst(const Token& module_tok) {
 ModuleItem* Parser::ParseModuleInstList(const Token& module_tok,
                                         std::vector<ModuleItem*>* extra_items) {
   std::vector<std::pair<std::string_view, Expr*>> params;
-  if (Match(TokenKind::kHash)) {
-    ParseParamValueAssignment(params);
-  }
+  const bool kParamsWritten = Match(TokenKind::kHash);
+  if (kParamsWritten) ParseParamValueAssignment(params);
 
   // Parse the instance dimensions `( [ expr ( : expr )? ] )*` into `item`.
   auto parse_inst_dims = [&](ModuleItem* item) {
@@ -153,6 +152,7 @@ ModuleItem* Parser::ParseModuleInstList(const Token& module_tok,
 
   auto parse_one_instance = [&]() -> ModuleItem* {
     auto* item = MakeInstanceItem(arena_, module_tok, params);
+    item->inst_param_assignment_written = kParamsWritten;
     // A.4.1.1's name_of_instance opens with an instance_identifier, which
     // A.9.3 spells `simple_identifier | escaped_identifier`.
     item->inst_name = ExpectIdentifier(Subclause("23.3.2")).text;

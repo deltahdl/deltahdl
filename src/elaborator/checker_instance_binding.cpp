@@ -187,11 +187,13 @@ void SetCheckerFreeVariables(const ModuleDecl* decl, RtlirModule* mod) {
 // four forms share, an override was read as the parameter value assignment of
 // the other three and carried to a declaration that has no parameters for it
 // to override, and `chk c1(a), c2(b);` was read as the other three's list and
-// elaborated as two instances, both silently.
+// elaborated as two instances, both silently. An empty `#( )` is the same
+// parameter value assignment holding no entry, so what is asked is whether one
+// was written.
 void CheckCheckerInstForm(const ModuleItem* item, const ModuleDecl* child,
                           DiagEngine& diag) {
   if (child->decl_kind != ModuleDeclKind::kChecker) return;
-  if (!item->inst_params.empty()) {
+  if (item->inst_param_assignment_written) {
     diag.Error(item->loc,
                std::format("checker '{}' cannot be instantiated with a "
                            "parameter value assignment",

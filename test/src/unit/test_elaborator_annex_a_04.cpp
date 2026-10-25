@@ -73,6 +73,28 @@ TEST(InstantiationFormElaboration, AnOrderedAssignmentOnACheckerIsRefusedToo) {
       5, "A.4.1.4"));
 }
 
+// An empty `#( )` is still a parameter_value_assignment, holding no entry, and
+// A.4.1.4 leaves the production out whole, in a module and in procedural code
+// alike.
+TEST(InstantiationFormElaboration, AnEmptyAssignmentOnACheckerIsRefusedToo) {
+  ElabFixture f;
+  ElaborateSrc(
+      "checker chk(input logic a);\n"
+      "endchecker\n"
+      "module m;\n"
+      "  logic s;\n"
+      "  chk #() c1(s);\n"
+      "  initial begin\n"
+      "    chk #() c2(s);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const char* const kMsg =
+      "checker 'chk' cannot be instantiated with a parameter value assignment";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMsg, 5, "A.4.1.4"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMsg, 7, "A.4.1.4"));
+}
+
 // And the checker instantiation that stays inside its own form elaborates: the
 // refusal is of the parameter value assignment and not of the instantiation.
 TEST(InstantiationFormElaboration, ACheckerWithoutOneElaborates) {
@@ -106,6 +128,9 @@ TEST(InstantiationFormElaboration, TheOtherThreeFormsTakeTheAssignment) {
       "  ifc #(.W(4)) i1();\n"
       "  prg #(.W(4)) p1();\n"
       "  sub #(.W(4)) s1();\n"
+      "  ifc #() i2();\n"
+      "  prg #() p2();\n"
+      "  sub #() s2();\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
