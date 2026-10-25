@@ -44,6 +44,18 @@ uint64_t DelayValueToTicks(const Logic4Vec& val, const SimContext& ctx);
 uint64_t DelayValueToTicksIn(const Logic4Vec& val, const TimeScale& scale,
                              TimeUnit precision);
 
+// Defined in stmt_exec_wait.cpp. The ticks the delay expression `delay` waits:
+// §3.14.3 makes a step one unit of the global time precision, which is one tick
+// whatever time unit the issuing element counts in, so a delay written 1step
+// waits one tick, neither scaled nor rounded; any other delay is evaluated and
+// turned into ticks by DelayValueToTicks. Every delay outside a clocking block
+// comes through here, so the 1step form waits alike wherever it is written.
+uint64_t DelayExprToTicks(const Expr* delay, SimContext& ctx, Arena& arena);
+
+// The same in the time unit `scale` gives, through DelayValueToTicksIn.
+uint64_t DelayExprToTicksIn(const Expr* delay, const TimeScale& scale,
+                            SimContext& ctx, Arena& arena);
+
 // Statement executors split out of stmt_exec.cpp into sibling translation
 // units. The dispatcher in stmt_exec.cpp calls these by name, so they have
 // external linkage and are declared here rather than as file-local statics.

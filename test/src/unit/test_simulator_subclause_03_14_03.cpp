@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <initializer_list>
+#include <string>
+
 #include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_preprocess_and_get.h"
@@ -57,6 +60,30 @@ TEST(DesignBuildingBlockSimulation,
                                  "endmodule\n",
                                  f),
             "1.500\n");
+}
+
+// The step time unit is the global time precision, here the 1 ps of the
+// module's own `timescale, so a 1step delay on a continuous assignment, on a
+// net and on a gate waits 1 ps where the module counts in 1 ns: the target
+// rises at 1.001. Evaluated as the literal's stored value, the delay was none
+// and the target rose with its source at 1.000.
+TEST(DesignBuildingBlockSimulation, AOneStepDelayWaitsOneGlobalPrecisionUnit) {
+  for (const char* driver : {"  wire w;\n  assign #1step w = a;\n",
+                             "  wire #1step w;\n  assign w = a;\n",
+                             "  wire w;\n  buf #1step g (w, a);\n"}) {
+    SimFixture f;
+    EXPECT_EQ(PreprocessAndCapture(
+                  std::string("`timescale 1ns / 1ps\n"
+                              "module t;\n"
+                              "  logic a = 0;\n") +
+                      driver +
+                      "  always @(posedge w) $display(\"%0.3f\", $realtime);\n"
+                      "  initial #1 a = 1;\n"
+                      "endmodule\n",
+                  f),
+              "1.001\n")
+        << driver;
+  }
 }
 
 }  // namespace

@@ -125,12 +125,9 @@ static ContAssignDelays BuildContAssignDelays(const ContAssignDelayExprs& exprs,
   ContAssignDelays d;
   // §22.7: each delay, the charge decay time among them, counts the time unit
   // of the module declaring it, and the ticks it waits are the design's.
-  d.rise = DelayValueToTicks(EvalExpr(exprs.rise, ctx, arena), ctx);
-  d.fall =
-      exprs.fall ? DelayValueToTicks(EvalExpr(exprs.fall, ctx, arena), ctx) : 0;
-  d.decay = exprs.decay
-                ? DelayValueToTicks(EvalExpr(exprs.decay, ctx, arena), ctx)
-                : 0;
+  d.rise = DelayExprToTicks(exprs.rise, ctx, arena);
+  d.fall = exprs.fall ? DelayExprToTicks(exprs.fall, ctx, arena) : 0;
+  d.decay = exprs.decay ? DelayExprToTicks(exprs.decay, ctx, arena) : 0;
   d.has_fall = exprs.fall != nullptr;
   d.has_decay = exprs.decay != nullptr;
   return d;

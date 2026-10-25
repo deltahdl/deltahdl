@@ -192,7 +192,7 @@ static StmtResult ExecNbEventTriggerImpl(const Stmt* stmt, SimContext& ctx,
   // Delay form, or none: the update event is created when the delay expires.
   uint64_t delay = 0;
   if (stmt->delay) {
-    delay = DelayValueToTicks(EvalExpr(stmt->delay, ctx, arena), ctx);
+    delay = DelayExprToTicks(stmt->delay, ctx, arena);
   }
   auto time = ctx.CurrentTime();
   time.ticks += delay;
@@ -647,11 +647,10 @@ static ExecTask ExecInlineTaskCall(const Stmt* stmt, SimContext& ctx,
 static ExecTask ExecBlockingAssignTimed(const Stmt* stmt, SimContext& ctx,
                                         Arena& arena) {
   auto [rhs_val, pin] = PinValue(ctx, EvalExpr(stmt->rhs, ctx, arena));
-  auto delay_val = EvalExpr(stmt->delay, ctx, arena);
   // §10.4.1's intra-assignment delay is a §9.4.1 delay control: the value is
   // normalized by the shared rules (unknown or high-Z to zero, negative to the
   // time variable's unsigned width) and rounded to §3.14.1's precision.
-  co_await DelayAwaiter{ctx, DelayValueToTicks(delay_val, ctx)};
+  co_await DelayAwaiter{ctx, DelayExprToTicks(stmt->delay, ctx, arena)};
   PerformBlockingAssign(stmt->lhs, rhs_val, ctx, arena);
   co_return StmtResult::kDone;
 }

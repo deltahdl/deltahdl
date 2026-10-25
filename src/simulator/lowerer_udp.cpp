@@ -268,9 +268,9 @@ static uint64_t SelectUdpDelay(const RtlirUdpInst& inst,
     fall = put->delays[1];
   } else {
     if (inst.delay == nullptr) return 0;
-    rise = DelayValueToTicks(EvalExpr(inst.delay, ctx, arena), ctx);
+    rise = DelayExprToTicks(inst.delay, ctx, arena);
     if (inst.delay_fall == nullptr) return rise;
-    fall = DelayValueToTicks(EvalExpr(inst.delay_fall, ctx, arena), ctx);
+    fall = DelayExprToTicks(inst.delay_fall, ctx, arena);
   }
   if (out == '0') return fall;
   if (out == '1') return rise;

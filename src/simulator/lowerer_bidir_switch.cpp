@@ -122,13 +122,11 @@ static uint64_t TransitionDelay(const BidirSwitchRun& run, uint8_t target,
   BidirSwitchDelaySpec spec;
   if (run.turn_on_delay != nullptr) {
     spec.has_turn_on = true;
-    spec.turn_on =
-        DelayValueToTicks(EvalExpr(run.turn_on_delay, ctx, arena), ctx);
+    spec.turn_on = DelayExprToTicks(run.turn_on_delay, ctx, arena);
   }
   if (run.turn_off_delay != nullptr) {
     spec.has_turn_off = true;
-    spec.turn_off =
-        DelayValueToTicks(EvalExpr(run.turn_off_delay, ctx, arena), ctx);
+    spec.turn_off = DelayExprToTicks(run.turn_off_delay, ctx, arena);
   }
   if (target == BidirSwitchState::kOn) return BidirSwitchTurnOnDelay(spec);
   if (target == BidirSwitchState::kOff || run.sw->user_defined_nets) {

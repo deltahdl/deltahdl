@@ -399,10 +399,28 @@ uint64_t DelayValueToTicksIn(const Logic4Vec& val, const TimeScale& scale,
   return DelayToTicks(DelayTicksFromValue(val), scale, precision);
 }
 
+// A.2.2.3's fifth delay_value, which the parser writes as a literal spelled
+// `1step` (Parser::ParseGateDelay).
+static bool IsOneStepDelay(const Expr* delay) {
+  return delay->kind == ExprKind::kIntegerLiteral && delay->text == "1step";
+}
+
+uint64_t DelayExprToTicks(const Expr* delay, SimContext& ctx, Arena& arena) {
+  if (IsOneStepDelay(delay)) return 1;
+  return DelayValueToTicks(EvalExpr(delay, ctx, arena), ctx);
+}
+
+uint64_t DelayExprToTicksIn(const Expr* delay, const TimeScale& scale,
+                            SimContext& ctx, Arena& arena) {
+  if (IsOneStepDelay(delay)) return 1;
+  return DelayValueToTicksIn(EvalExpr(delay, ctx, arena), scale,
+                             ctx.GlobalPrecision());
+}
+
 ExecTask ExecDelay(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   uint64_t ticks = 0;
   if (stmt->delay) {
-    ticks = DelayValueToTicks(EvalExpr(stmt->delay, ctx, arena), ctx);
+    ticks = DelayExprToTicks(stmt->delay, ctx, arena);
   }
   co_await DelayAwaiter{ctx, ticks};
   if (stmt->body) {

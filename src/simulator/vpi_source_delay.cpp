@@ -62,8 +62,7 @@ namespace {
 double TicksUnder(const Expr* delay, DelayMode mode, SimContext& ctx) {
   const DelayMode kSaved = ctx.GetDelayMode();
   ctx.SetDelayMode(mode);
-  const uint64_t kTicks =
-      DelayValueToTicks(EvalExpr(delay, ctx, ctx.GetArena()), ctx);
+  const uint64_t kTicks = DelayExprToTicks(delay, ctx, ctx.GetArena());
   ctx.SetDelayMode(kSaved);
   return static_cast<double>(kTicks);
 }

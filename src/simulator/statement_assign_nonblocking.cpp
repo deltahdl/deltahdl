@@ -175,7 +175,7 @@ static bool UpdateTimeReachable(uint64_t delay_ticks, const SimContext& ctx) {
 static uint64_t IntraAssignDelayTicks(const Stmt* stmt, SimContext& ctx,
                                       Arena& arena) {
   if (!stmt->delay) return 0;
-  return DelayValueToTicks(EvalExpr(stmt->delay, ctx, arena), ctx);
+  return DelayExprToTicks(stmt->delay, ctx, arena);
 }
 
 // §10.4.2 evaluates the right-hand side of a nonblocking assignment when the

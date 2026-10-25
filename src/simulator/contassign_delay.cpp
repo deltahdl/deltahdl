@@ -128,8 +128,7 @@ std::optional<ContAssignDelays> NetDelayTicks(const RtlirNet& net,
                                               SimContext& ctx, Arena& arena) {
   if (net.delay_rise == nullptr) return std::nullopt;
   auto ticks = [&](const Expr* e) {
-    return DelayValueToTicksIn(EvalExpr(e, ctx, arena), scale,
-                               ctx.GlobalPrecision());
+    return DelayExprToTicksIn(e, scale, ctx, arena);
   };
   ContAssignDelays d;
   d.rise = ticks(net.delay_rise);
