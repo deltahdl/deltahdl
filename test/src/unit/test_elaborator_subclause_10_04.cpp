@@ -51,6 +51,32 @@ TEST(ProceduralAssignmentElaboration, ProceduralAssignToNetIsError) {
                             4, "10.4"));
 }
 
+// §10.4 (printed page 251) with §11.4.14.3 (printed page 292): a streaming
+// concatenation written as a procedural assignment's target unpacks the stream
+// into variables, so a net among its stream expressions, or among a nested
+// one's, is reported as a net written directly is, and the variable beside it
+// is not.
+TEST(ProceduralAssignmentElaboration, NetInStreamingTargetIsError) {
+  SimFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  wire [3:0] w, n;\n"
+      "  logic [3:0] v, x;\n"
+      "  initial begin\n"
+      "    {>>{w, v}} = {x, x};\n"
+      "    {>>{v, {<<{n}}}} = {x, x};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "net 'w' cannot be the target of a procedural assignment", 5, "10.4"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "net 'n' cannot be the target of a procedural assignment", 6, "10.4"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "'v'", 5, "10.4"));
+}
+
 TEST(ProceduralAssignmentElaboration, NonblockingAssignToNetIsError) {
   SimFixture f;
   ElaborateSrc(

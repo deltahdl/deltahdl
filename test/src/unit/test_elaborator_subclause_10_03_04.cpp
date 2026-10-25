@@ -249,4 +249,34 @@ TEST(DriveStrengthElaboration, DriveStrengthOnSupplyNetIsError) {
                              6, "10.3.4"));
 }
 
+// §10.3.4 (printed page 251): a member of a net whose data type is a packed
+// structure is part of a vector net, as a part-select is, so a drive strength
+// on an assignment to it is reported as one on a select of a vector net. A net
+// of an interface instance, reached through the instance's name, is the
+// interface's, and this module's assignment to it leaves it unjudged.
+TEST(DriveStrengthElaboration, DriveStrengthOnMemberOfStructureNetIsError) {
+  ElabFixture f;
+  Elaborate(
+      "interface bus;\n"
+      "  wire y;\n"
+      "endinterface\n"
+      "module m;\n"
+      "  typedef struct packed { logic a; logic b; } s_t;\n"
+      "  wire s_t n;\n"
+      "  logic x;\n"
+      "  bus b();\n"
+      "  assign (weak0, weak1) n.a = x;\n"
+      "  assign (weak0, weak1) b.y = x;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "drive strength on continuous assignment applies only to scalar nets", 9,
+      "10.3.4"));
+  EXPECT_FALSE(ReportedError(
+      f.diag.Diagnostics(),
+      "drive strength on continuous assignment applies only to scalar nets", 10,
+      "10.3.4"));
+}
+
 }  // namespace

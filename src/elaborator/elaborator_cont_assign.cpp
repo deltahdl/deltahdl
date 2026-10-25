@@ -5,6 +5,7 @@
 #include <format>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "common/arena.h"
@@ -64,8 +65,8 @@ void Elaborator::ValidateContAssignIdentLhs(std::string_view name,
 // §10.3.4 (printed page 251): a drive strength applies only to an assignment
 // to a scalar net other than one of type supply0 or supply1, so a target that
 // is a supply net or a select of one is excepted as the net is, and a select of
-// a vector net or a concatenation is no more a scalar net than a whole vector
-// net is.
+// a vector net, a member of a net of a packed structure type or a concatenation
+// is no more a scalar net than a whole vector net is.
 void Elaborator::ValidateContAssignDriveStrength(ModuleItem* item,
                                                  RtlirModule* mod) {
   const Expr* lhs = item->assign_lhs;
@@ -549,6 +550,18 @@ void Elaborator::RecordGateOutputDrivers(const ModuleItem* item) {
   }
 }
 
+// Whether an element of a target reaches a net through a member access taken
+// of a name that is no net of this module -- an instance's or an interface
+// port's -- whose declaration this module does not hold. A member of this
+// module's own net is part of that net.
+static bool ReachesAnotherScope(
+    const std::vector<ContTargetLeaf>& leaves,
+    const std::unordered_set<std::string_view>& net_names) {
+  return std::ranges::any_of(leaves, [&](const ContTargetLeaf& leaf) {
+    return leaf.has_member && net_names.count(leaf.root) == 0;
+  });
+}
+
 void Elaborator::ElaborateContAssign(ModuleItem* item, RtlirModule* mod) {
   std::vector<ContTargetLeaf> leaves;
   if (!CollectContTargetLeaves(item->assign_lhs, leaves)) {
@@ -558,12 +571,13 @@ void Elaborator::ElaborateContAssign(ModuleItem* item, RtlirModule* mod) {
                 Subclause("10.3"));
     return;
   }
-  // A net reached through a member access is another scope's, whose
-  // declaration this module does not hold, so its strength goes unjudged.
+  // A net reached through a member access of another scope's name is that
+  // scope's, whose declaration this module does not hold, so its strength goes
+  // unjudged.
   if (ValidateContAssignLeaves(item, mod, leaves)) {
     ValidateContAssignVarTarget(item, diag_);
   } else if ((item->drive_strength0 != 0 || item->drive_strength1 != 0) &&
-             std::ranges::none_of(leaves, &ContTargetLeaf::has_member)) {
+             !ReachesAnotherScope(leaves, net_names_)) {
     ValidateContAssignDriveStrength(item, mod);
   }
   if (item->assign_lhs->kind == ExprKind::kIdentifier &&

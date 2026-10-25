@@ -383,46 +383,16 @@ std::string_view LhsBaseName(const Expr* e) {
   return {};
 }
 
-// §6.21 (printed page 134), first sentence: no continuous or procedural
-// continuous assignment may write an element of a dynamically sized array
-// variable, and `b[2].x` falls under it, because the name is a member while
-// the object the write lands in is the element `b[2]`, and writing part of an
-// element is writing it. The nonblocking half of the sentence, which §10.4.2
-// states for itself, is CheckNbaDynamicElements in nba_dynamic_element.cpp.
-static void ReportDynamicLvalueAssign(
-    const Stmt* s, const std::unordered_set<std::string_view>& dyn_names,
-    DiagEngine& diag) {
-  if (s->kind != StmtKind::kForce && s->kind != StmtKind::kAssign) return;
-  // The kind gate rather than the walk is what confines this to a part of a
-  // dynamic array: a bare identifier lvalue is a write to the whole object,
-  // which the clause permits, and LhsBaseName answers the same name for it as
-  // for a select of it.
-  if (s->lhs->kind != ExprKind::kSelect &&
-      s->lhs->kind != ExprKind::kMemberAccess)
-    return;
-  if (dyn_names.count(LhsBaseName(s->lhs)) != 0) {
-    diag.Error(s->range.start,
-               "procedural continuous assignment to element of "
-               "dynamic array",
-               Subclause("6.21"));
-  }
-}
-
-void CheckPcontDynamicArrayTarget(
-    const Stmt* s, const std::unordered_set<std::string_view>& dyn_names,
-    DiagEngine& diag) {
-  if (!s) return;
-  ReportDynamicLvalueAssign(s, dyn_names, diag);
-  ForEachChildStmt(s, [&](const Stmt* sub) {
-    CheckPcontDynamicArrayTarget(sub, dyn_names, diag);
-  });
-}
-
+// The names a target writes: a concatenation's elements' and, since
+// §11.4.14.3 (printed page 292) has a streaming concatenation written as a
+// target unpack the stream into its stream expressions, a streaming
+// concatenation's elements' too.
 static void CollectLhsBaseNames(
     const Expr* e, SourceLoc loc,
     std::unordered_map<std::string_view, SourceLoc>& out) {
   if (!e) return;
-  if (e->kind == ExprKind::kConcatenation) {
+  if (e->kind == ExprKind::kConcatenation ||
+      e->kind == ExprKind::kStreamingConcat) {
     for (const auto* elem : e->elements) CollectLhsBaseNames(elem, loc, out);
     return;
   }
