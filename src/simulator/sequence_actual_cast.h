@@ -14,8 +14,9 @@ struct Expr;
 // the data type `type`, as it stands for the formal: cast to the keyword's
 // type for a keyword data type, to its own self-determined type for an
 // untyped formal (SelfDeterminedActual), to `type` for a type no keyword
-// alone names, and otherwise as written: a `$`, an event actual, or one
-// bound to a formal written with no type.
+// alone names, which a formal whose `type_kw` is kEof always holds, and
+// otherwise as written: a `$`, an event actual, or one bound to a formal of
+// the sequence, property or event type.
 Expr* CastActualToFormal(Expr* actual, TokenKind type_kw, DataType* type,
                          Arena& arena);
 

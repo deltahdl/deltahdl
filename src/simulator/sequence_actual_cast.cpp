@@ -118,7 +118,6 @@ Expr* CastActualToFormal(Expr* actual, TokenKind type_kw, DataType* type,
   if (type_kw != TokenKind::kEof) {
     return CastToKeywordType(actual, type_kw, arena);
   }
-  if (type == nullptr) return actual;
   return CastToDataType(actual, type, arena);
 }
 
