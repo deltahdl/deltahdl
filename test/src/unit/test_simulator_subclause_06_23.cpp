@@ -205,6 +205,27 @@ TEST(TypeOfExprCastSim, CastToATypeReferenceTakesTheReferencedType) {
   EXPECT_EQ(RunAndGet(kSrc, "g"), 0xBCFu);
 }
 
+// §6.23 with §6.24.1 and §6.11.3: a type reference to an integer atom type
+// written unsigned casts to that unsigned type, so -1 cast to `int unsigned`
+// compares above 0 and -1 cast to `byte unsigned` widens with zeros to 255,
+// while `shortint` written alone keeps its signed default and 16'hFFFF cast
+// to it compares below 0.
+TEST(TypeOfExprCastSim, CastToATypeReferenceTakesTheWrittenSigning) {
+  const std::string kSrc =
+      "module t;\n"
+      "  bit r, n;\n"
+      "  int w;\n"
+      "  initial begin\n"
+      "    r = type(int unsigned)'(-1) > 0;\n"
+      "    w = type(byte unsigned)'(-1);\n"
+      "    n = type(shortint)'(16'hFFFF) < 0;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(kSrc, "r"), 1u);
+  EXPECT_EQ(RunAndGet(kSrc, "w"), 255u);
+  EXPECT_EQ(RunAndGet(kSrc, "n"), 1u);
+}
+
 // §6.23 with §8.11: `var static type(this) m_inst;` in a static method is a
 // handle of the method's class, so the singleton get() stores the object new()
 // makes and hands the same one back on the next call, with its val of 9.

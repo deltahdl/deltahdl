@@ -291,18 +291,13 @@ static CastTarget ResolveCastTarget(std::string_view key, SimContext& ctx) {
   return t;
 }
 
-// §6.11.3: the integer types signed unless declared unsigned.
-static bool IsSignedByDefault(DataTypeKind kind) {
-  return kind == DataTypeKind::kByte || kind == DataTypeKind::kShortint ||
-         kind == DataTypeKind::kInt || kind == DataTypeKind::kLongint ||
-         kind == DataTypeKind::kInteger;
-}
-
 // §6.23 with §6.24.1: the casting type a type reference stands for,
 // `type(bit [11:0])'(v)` the data type written, `type(n)'(v)` the type n was
-// declared with, and a typedef's name the type it names. False where `ref` is
-// no type reference or names nothing this resolves, the cast then read as
-// before.
+// declared with, and a typedef's name the type it names. A data type written
+// holds its signing, the keyword's default (§6.11.3) or the `signed` or
+// `unsigned` written after it, so `type(int unsigned)` casts unsigned. False
+// where `ref` is no type reference or names nothing this resolves, the cast
+// then read as before.
 static bool TypeRefCastTarget(const Expr* ref, SimContext& ctx,
                               CastTarget& out) {
   if (ref == nullptr || ref->kind != ExprKind::kTypeRef) return false;
@@ -310,7 +305,7 @@ static bool TypeRefCastTarget(const Expr* ref, SimContext& ctx,
   if (written != nullptr && written->kind != DataTypeKind::kNamed) {
     out.width = DeclaredTypeWidth(*written, ctx);
     out.is_4state = !IsTwoStateKind(written->kind);
-    out.is_signed = written->is_signed || IsSignedByDefault(written->kind);
+    out.is_signed = written->is_signed;
     return out.width > 0;
   }
   // §7.4.4: a type name with packed dimensions written after it stands for a
