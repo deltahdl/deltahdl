@@ -648,4 +648,78 @@ TEST(SubroutineCallElaborationSyntax, AForStepNamingDataIsReported) {
   EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
+// A.8.2 writes a tf_call's argument list as optional, and footnote 42 of A.10
+// lets it be left off a task, a void function or a class method alone. So a
+// call statement naming a nonvoid function of the module or of a package
+// without one is reported; the same call with its parentheses, a void
+// function of either and a task are not.
+TEST(SubroutineCallElaborationSyntax, ANonvoidFunctionCallKeepsItsParentheses) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package q; endpackage\n"
+      "package p;\n"
+      "  function int g(); return 2; endfunction\n"
+      "  function void w(); endfunction\n"
+      "endpackage\n"
+      "module m;\n"
+      "  function int f(); return 1; endfunction\n"
+      "  function void v(); endfunction\n"
+      "  task t; endtask\n"
+      "  initial begin\n"
+      "    f;\n"
+      "    p::g;\n"
+      "    f();\n"
+      "    v;\n"
+      "    t;\n"
+      "    p::w;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a call of the nonvoid function 'f' keeps its "
+                            "parentheses",
+                            11, "A.8.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a call of the nonvoid function 'g' keeps its "
+                            "parentheses",
+                            12, "A.8.2"));
+  EXPECT_EQ(f.diag.ErrorCount(), 2u);
+}
+
+// A void cast wraps a call as a call statement does (A.6.9), so a name alone
+// in one is judged alike: a variable is reported, and so is a nonvoid function
+// of the module. A method called through a handle or, in a method, by its
+// name alone, and a randomize call, may leave the argument list off.
+TEST(SubroutineCallElaborationSyntax, AVoidCastOfANameAloneIsJudgedAsACall) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  class C;\n"
+      "    rand int x;\n"
+      "    function int get(); return x; endfunction\n"
+      "    function void use(); void'(get); endfunction\n"
+      "  endclass\n"
+      "  int i;\n"
+      "  function int f(); return 1; endfunction\n"
+      "  C obj = new;\n"
+      "  initial begin\n"
+      "    void'(i);\n"
+      "    void'(f);\n"
+      "    void'(obj.get);\n"
+      "    void'(obj.randomize);\n"
+      "    void'(f());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'i' names a variable or a net, and a call names "
+                            "a task or a function",
+                            11, "A.8.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a call of the nonvoid function 'f' keeps its "
+                            "parentheses",
+                            12, "A.8.2"));
+  EXPECT_EQ(f.diag.ErrorCount(), 2u);
+}
+
 }  // namespace

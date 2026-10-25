@@ -1,5 +1,6 @@
 #include "elaborator/elaborator_call_targets.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <deque>
 #include <format>
@@ -63,17 +64,72 @@ const Expr* NamedCallee(const Expr& expr) {
   return kNamed ? expr.lhs : nullptr;
 }
 
+// A.6.9: the expression whose call the call statement whose expression is `e`
+// makes: within a void cast, the one cast a statement holds (A.6.4), a name or
+// a member select alone, judged as the same written as a statement is; `e`
+// otherwise, a call with its argument list in a cast being the expression
+// walk's.
+const Expr& StatementCallExpr(const Expr& e) {
+  if (e.kind == ExprKind::kCast && (e.lhs->kind == ExprKind::kIdentifier ||
+                                    e.lhs->kind == ExprKind::kMemberAccess)) {
+    return *e.lhs;
+  }
+  return e;
+}
+
+// A.8.2's footnote 42: whether `name`, called with no argument list, names a
+// function the items `items` declare with a return value, which only a task,
+// a void function or a class method may be called without.
+bool NamesNonvoidFunction(std::string_view name,
+                          const std::vector<ModuleItem*>& items) {
+  return std::ranges::any_of(items, [name](const ModuleItem* item) {
+    return item->kind == ModuleItemKind::kFunctionDecl && item->name == name &&
+           item->return_type.kind != DataTypeKind::kVoid;
+  });
+}
+
+void ReportNonvoidCallWithoutParentheses(std::string_view name, SourceLoc loc,
+                                         DiagEngine& diag) {
+  diag.Error(
+      loc,
+      std::format("a call of the nonvoid function '{}' keeps its parentheses",
+                  name),
+      Subclause("A.8.2"));
+}
+
+// The same of a call scoped by a package, `p::g;`, written at `loc`: a
+// function the package `p` of `unit` declares with a return value. A class
+// scope's names a static method, which may leave its parentheses off.
+void ReportScopedCallWithoutParentheses(const Expr& scoped, SourceLoc loc,
+                                        const CompilationUnit& unit,
+                                        DiagEngine& diag) {
+  for (const PackageDecl* package : unit.packages) {
+    if (package->name == scoped.lhs->text &&
+        NamesNonvoidFunction(scoped.rhs->text, package->items)) {
+      ReportNonvoidCallWithoutParentheses(scoped.rhs->text, loc, diag);
+    }
+  }
+}
+
 // A.6.9: a call statement, `x;` or `x(...);`, whose name the scope declares
 // as no task or function: a variable or a net (A.8.2), or anything else the
 // module declares or imports as data, such as a parameter, a let or a
 // sequence. A call with an argument list naming nothing the scope, the
 // compilation unit or a module enclosing an instance of the module sees
 // (§23.8) is an undeclared identifier (§23.9); a bare one is the scope rules'
-// report.
+// report. A bare one naming a nonvoid function of the scope's items, or of a
+// package it is scoped by, leaves off the parentheses footnote 42 of A.10
+// keeps. In a method a name alone calls the class's method first (§8.13),
+// which may leave them off, so the question is not asked there.
 void ReportStatementCall(const Stmt& stmt, const DataScope& scope,
                          DiagEngine& diag) {
-  const bool kBare = stmt.expr->kind == ExprKind::kIdentifier;
-  const Expr* callee = kBare ? stmt.expr : NamedCallee(*stmt.expr);
+  const Expr& e = StatementCallExpr(*stmt.expr);
+  if (e.kind == ExprKind::kMemberAccess && e.is_scope_resolution) {
+    ReportScopedCallWithoutParentheses(e, stmt.range.start, scope.unit, diag);
+    return;
+  }
+  const bool kBare = e.kind == ExprKind::kIdentifier;
+  const Expr* callee = kBare ? &e : NamedCallee(e);
   if (callee == nullptr) return;
   const std::string_view kName = callee->text;
   if (scope.Names(kName)) {
@@ -89,9 +145,13 @@ void ReportStatementCall(const Stmt& stmt, const DataScope& scope,
                Subclause("A.6.9"));
     return;
   }
-  if (kBare || scope.subroutines.contains(kName) || scope.visible(kName)) {
+  if (kBare) {
+    if (scope.cls == nullptr && NamesNonvoidFunction(kName, scope.items)) {
+      ReportNonvoidCallWithoutParentheses(kName, stmt.range.start, diag);
+    }
     return;
   }
+  if (scope.subroutines.contains(kName) || scope.visible(kName)) return;
   diag.Error(stmt.range.start, std::format("undeclared identifier '{}'", kName),
              Subclause("23.9"));
 }

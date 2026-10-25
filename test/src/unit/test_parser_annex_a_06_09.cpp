@@ -219,4 +219,27 @@ TEST(SubroutineCallStatementParsing, SuperNewIsAStatement) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// A.8.2 writes the argument list of a method call and of a randomize call as
+// optional, and footnote 42 of A.10 lets a call of a class method leave it
+// off. So a void cast takes a member select or a name alone, a method called
+// through a handle or the implicit `this`; whether it names a subroutine is
+// the elaborator's question.
+TEST(SubroutineCallStatementParsing, VoidCastOfACallWithoutItsArguments) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    void'(obj.get);\n"
+      "    void'(obj.randomize);\n"
+      "    void'(get);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* block = InitialBody(r);
+  ASSERT_NE(block, nullptr);
+  ASSERT_EQ(block->stmts.size(), 3u);
+  EXPECT_EQ(block->stmts[0]->expr->lhs->kind, ExprKind::kMemberAccess);
+  EXPECT_EQ(block->stmts[2]->expr->lhs->kind, ExprKind::kIdentifier);
+}
+
 }  // namespace

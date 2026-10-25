@@ -72,15 +72,22 @@ struct ParserStmtHelpers {
            (e->op == TokenKind::kPlusPlus || e->op == TokenKind::kMinusMinus);
   }
 
-  // A.6.4 with A.6.9: whether `e`, the expression of an expression statement,
-  // is a form a statement_item takes: a subroutine call, written with its
-  // argument list or as a task or method enable by a name, a scoped or
-  // hierarchical name or a member select, any of them with the `with` clause
-  // or inline constraint it carries; or an inc_or_dec_expression.
-  static bool IsStatementExpr(const Expr* e) {
+  // A.8.2: whether `e` is written as a subroutine_call: with its argument
+  // list, or as a task or method enable by a name, a scoped or hierarchical
+  // name or a member select, any of them with the `with` clause or inline
+  // constraint it carries, as the call of a task, a void function or a method
+  // may be written (footnote 42 of A.10).
+  static bool IsCallForm(const Expr* e) {
     return e->kind == ExprKind::kCall || e->kind == ExprKind::kSystemCall ||
            e->kind == ExprKind::kIdentifier ||
-           e->kind == ExprKind::kMemberAccess || IsIncOrDec(e);
+           e->kind == ExprKind::kMemberAccess;
+  }
+
+  // A.6.4 with A.6.9: whether `e`, the expression of an expression statement,
+  // is a form a statement_item takes: a subroutine call or an
+  // inc_or_dec_expression.
+  static bool IsStatementExpr(const Expr* e) {
+    return IsCallForm(e) || IsIncOrDec(e);
   }
 
   // One item of A.6.8's for_initialization, which is a list_of_variable_
@@ -839,11 +846,9 @@ Stmt* Parser::ParseVoidCastCallStmt() {
   Expect(TokenKind::kApostrophe, Subclause("A.6.9"));
   Expect(TokenKind::kLParen, Subclause("A.6.9"));
   Expr* call = ParseExpr();
-  // A.8.2: an array manipulation call or a randomize call may be written with
-  // its `with` clause and no argument list, which the expression keeps on the
-  // name it is written on rather than as a call.
-  if (call->kind != ExprKind::kCall && call->kind != ExprKind::kSystemCall &&
-      call->with_expr == nullptr && call->inline_constraint == nullptr) {
+  // Whether a name or a member select alone names a function is the
+  // elaborator's question.
+  if (!ParserStmtHelpers::IsCallForm(call)) {
     diag_.Error(call->range.start,
                 "a void cast discards a function call's return value; "
                 "void'(...) wraps a function_subroutine_call and no other "
