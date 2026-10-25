@@ -562,6 +562,28 @@ static bool ReachesAnotherScope(
   });
 }
 
+// §11.4.14.3 (printed page 292): a streaming concatenation written as a target
+// unpacks the stream into variables, as A.8.5 writes the form among
+// variable_lvalue's alone, so a net among its stream expressions, a nested
+// streaming concatenation's or a concatenation's among them, is reported.
+static void ReportStreamTargetNets(
+    const Expr* e, const std::unordered_set<std::string_view>& net_names,
+    SourceLoc loc, DiagEngine& diag) {
+  if (e->kind == ExprKind::kStreamingConcat ||
+      e->kind == ExprKind::kConcatenation) {
+    for (const Expr* el : e->elements)
+      ReportStreamTargetNets(el, net_names, loc, diag);
+    return;
+  }
+  std::string_view name = LhsBaseName(e);
+  if (net_names.count(name) == 0) return;
+  diag.Error(loc,
+             std::format("a streaming concatenation written as a target "
+                         "unpacks into variables, and '{}' is a net",
+                         name),
+             Subclause("11.4.14.3"));
+}
+
 void Elaborator::ElaborateContAssign(ModuleItem* item, RtlirModule* mod) {
   std::vector<ContTargetLeaf> leaves;
   if (!CollectContTargetLeaves(item->assign_lhs, leaves)) {
@@ -571,6 +593,8 @@ void Elaborator::ElaborateContAssign(ModuleItem* item, RtlirModule* mod) {
                 Subclause("10.3"));
     return;
   }
+  if (item->assign_lhs->kind == ExprKind::kStreamingConcat)
+    ReportStreamTargetNets(item->assign_lhs, net_names_, item->loc, diag_);
   // A net reached through a member access of another scope's name is that
   // scope's, whose declaration this module does not hold, so its strength goes
   // unjudged.

@@ -166,4 +166,39 @@ TEST(StreamingUnpackElaboration, NonblockingUnpackFromRealSourceRejected) {
                             4, "11.4.14.3"));
 }
 
+// §11.4.14.3 (printed page 292): a streaming concatenation written as a target
+// unpacks the stream into variables, so in a continuous assignment as anywhere
+// else a net among its stream expressions, or among those of a streaming
+// concatenation or a concatenation nested in it, is reported, and a variable
+// beside it, or a target of variables alone, is not.
+TEST(StreamingUnpackElaboration, NetInContinuousStreamingTargetRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  wire [3:0] w, n;\n"
+      "  logic [3:0] v, u, t, x;\n"
+      "  assign {>>{w}} = x;\n"
+      "  assign {>>{v, {<<{n}}}} = {x, x};\n"
+      "  assign {>>{u}} = x;\n"
+      "  assign {<<{{t, w}}} = {x, x};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a streaming concatenation written as a target "
+                            "unpacks into variables, and 'w' is a net",
+                            4, "11.4.14.3"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a streaming concatenation written as a target "
+                            "unpacks into variables, and 'n' is a net",
+                            5, "11.4.14.3"));
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), "'v' is a net", 5, "11.4.14.3"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "unpacks into variables", 6,
+                             "11.4.14.3"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a streaming concatenation written as a target "
+                            "unpacks into variables, and 'w' is a net",
+                            7, "11.4.14.3"));
+}
+
 }  // namespace
