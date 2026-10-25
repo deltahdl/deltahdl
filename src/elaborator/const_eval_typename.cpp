@@ -96,10 +96,12 @@ std::string TypenameOfDeclaredName(std::string_view name,
   return writer.OfType(reference, "", name);
 }
 
-// A select of one element of an unpacked array the registered module
+// A select of one element of a fixed unpacked array the registered module
 // declares, `AB[0]` of `AB_t AB[10]`, as $typename writes it: the element
 // type, which is the declared type without the dimension the select takes
-// away; empty where `arg` is no such select.
+// away; empty where `arg` is no such select. An array with a dimension whose
+// bounds do not fold, a dynamic or an associative one, has no dimensions to
+// write and is no such array.
 std::string TypenameOfElement(const Expr* arg, TypenameWriter& writer) {
   if (arg->kind != ExprKind::kSelect || arg->index_end != nullptr ||
       arg->base->kind != ExprKind::kIdentifier) {
@@ -107,12 +109,11 @@ std::string TypenameOfElement(const Expr* arg, TypenameWriter& writer) {
   }
   std::string_view name = arg->base->text;
   const RtlirVariable* var = RegisteredVariable(name);
-  if (var == nullptr || var->written_type == nullptr ||
-      var->num_unpacked_dims == 0) {
-    return {};
-  }
+  if (var == nullptr || var->written_type == nullptr) return {};
+  std::string unpacked = UnpackedDimsText(*var);
+  if (unpacked.empty()) return {};
   return writer.OfType(*var->written_type, "", name) +
-         ElementDimsText(UnpackedDimsText(*var));
+         ElementDimsText(unpacked);
 }
 
 // The argument of a $typename call as the fold writes it, by the form it
