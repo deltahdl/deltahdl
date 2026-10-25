@@ -306,6 +306,25 @@ TEST(TypenameSim, ATypeParameterNamesTheTypeItIsBoundTo) {
             "int\nbit[7:0]\n");
 }
 
+// §20.6.1, step b: only the default signing is removed, so an integer atom
+// type declared unsigned, and `time` or a vector declared signed, keep the
+// keyword, while `int signed` drops it.
+TEST(TypenameSim, ASigningOtherThanTheDefaultIsWritten) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  int unsigned a;\n"
+                       "  byte unsigned b;\n"
+                       "  time signed c;\n"
+                       "  int signed d;\n"
+                       "  bit signed [3:0] e;\n"
+                       "  initial $display(\"%s|%s|%s|%s|%s\", $typename(a),\n"
+                       "      $typename(b), $typename(c), $typename(d),\n"
+                       "      $typename(e));\n"
+                       "endmodule\n",
+                       f),
+            "int unsigned|byte unsigned|time signed|int|bit signed[3:0]\n");
+}
+
 // §20.6.1, step f: a class handle is of its class, named behind the scope
 // declaring it, the compilation unit here.
 TEST(TypenameSim, AClassHandleIsOfItsScopedClass) {

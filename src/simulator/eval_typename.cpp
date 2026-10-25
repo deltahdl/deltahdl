@@ -9,6 +9,7 @@
 // and keywords (h).
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <map>
@@ -63,10 +64,24 @@ bool IsAggregateKind(DataTypeKind kind) {
          kind == DataTypeKind::kUnion;
 }
 
-// Step b: a vector type is unsigned by default, so only `signed` is written.
-bool IsVectorKind(DataTypeKind kind) {
-  return kind == DataTypeKind::kLogic || kind == DataTypeKind::kReg ||
-         kind == DataTypeKind::kBit;
+// Step b: the default signing is removed, so a type's signing is written only
+// where it differs from its kind's. The integer atom types other than `time`
+// are signed by default, the integer vector types and `time` unsigned.
+std::string_view SigningText(DataTypeKind kind, bool is_signed) {
+  static constexpr std::array kSignedByDefault = {
+      DataTypeKind::kByte, DataTypeKind::kShortint, DataTypeKind::kInt,
+      DataTypeKind::kLongint, DataTypeKind::kInteger};
+  static constexpr std::array kUnsignedByDefault = {
+      DataTypeKind::kLogic, DataTypeKind::kReg, DataTypeKind::kBit,
+      DataTypeKind::kTime};
+  if (is_signed) {
+    bool written =
+        std::ranges::find(kUnsignedByDefault, kind) != kUnsignedByDefault.end();
+    return written ? " signed" : "";
+  }
+  bool written =
+      std::ranges::find(kSignedByDefault, kind) != kSignedByDefault.end();
+  return written ? " unsigned" : "";
 }
 
 // What is written of a type: the parts a DataType and a StructMember share.
@@ -147,7 +162,7 @@ class TypenameWriter {
     }
     std::string text(BuiltinKeyword(parts.kind));
     if (text.empty()) text = "logic";
-    if (IsVectorKind(parts.kind) && parts.is_signed) text += " signed";
+    text += SigningText(parts.kind, parts.is_signed);
     return text + PackedText(parts);
   }
 
