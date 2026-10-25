@@ -69,6 +69,8 @@ void Elaborator::ValidateSubroutineBodyTargets(const ModuleItem* item,
   std::unordered_map<std::string_view, SourceLoc> targets;
   CollectProcTargets(item->func_args, item->func_body_stmts, targets);
   ReportProceduralNetTargets(targets);
+  ReportProcContAssignNets(item->func_args, item->func_body_stmts, net_names_,
+                           diag_);
   for (const auto& [name, loc] : targets)
     if (net_names_.count(name) == 0) proc_assign_targets_.emplace(name, loc);
   const ForceLhsNames kForceNames{net_names_, nettype_net_names_, mod,
@@ -90,6 +92,7 @@ void Elaborator::ValidateItemConstraints(const ModuleItem* item,
     CheckInterconnectProcContAssign(item->body, interconnect_names_, diag_);
     CheckInterconnectProceduralRead(item->body, interconnect_names_, diag_);
     CheckProceduralAssignLhs(item->body, diag_);
+    ReportProcContAssignNets({}, {item->body}, net_names_, diag_);
 
     CheckForceLhs(item->body,
                   {net_names_, nettype_net_names_, mod, typedefs_, scope},

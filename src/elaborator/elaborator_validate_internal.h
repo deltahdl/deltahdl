@@ -592,6 +592,11 @@ void CheckPcontDynamicArrayTarget(
 void CollectProcTargets(const std::vector<FunctionArg>& formals,
                         const std::vector<Stmt*>& body,
                         std::unordered_map<std::string_view, SourceLoc>& out);
+// §10.6.1: reports each net of `net_names` a procedural assign or deassign in
+// `body` names as its target, passing by a name `body` itself declares.
+void ReportProcContAssignNets(
+    const std::vector<FunctionArg>& formals, const std::vector<Stmt*>& body,
+    const std::unordered_set<std::string_view>& net_names, DiagEngine& diag);
 
 void CollectForceReleaseTargets(
     const Stmt* s, std::unordered_map<std::string_view, SourceLoc>& out);

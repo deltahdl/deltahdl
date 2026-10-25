@@ -3,6 +3,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <format>
+#include <functional>
+#include <initializer_list>
 #include <optional>
 #include <span>
 #include <string>
@@ -400,6 +402,30 @@ static void CollectLhsBaseNames(
   if (!name.empty()) out.emplace(name, loc);
 }
 
+// Calls `visit` with each name the target of a statement of `body` whose kind
+// is among `kinds` writes, and the statement's location. The statement
+// position an assignment stands in decides none of the rules this serves, so
+// every statement of `body` is visited. §23.9 decides what a name reaches, so a
+// name the body itself declares -- a formal of `formals`, a block's variable,
+// a loop's -- is the body's own and none of the module's, and is passed by.
+static void ForEachBodyTarget(
+    const std::vector<FunctionArg>& formals, const std::vector<Stmt*>& body,
+    std::initializer_list<StmtKind> kinds,
+    const std::function<void(std::string_view, SourceLoc)>& visit) {
+  BodyDeclScopes scopes(false);
+  for (const auto& arg : formals) scopes.DeclareFormal(arg);
+  std::unordered_map<std::string_view, SourceLoc> written;
+  for (const Stmt* s : body) {
+    scopes.Walk(s, [&](const Stmt* st) {
+      if (std::ranges::find(kinds, st->kind) == kinds.end()) return;
+      written.clear();
+      CollectLhsBaseNames(st->lhs, st->range.start, written);
+      for (const auto& [name, loc] : written)
+        if (scopes.Find(name) == nullptr) visit(name, loc);
+    });
+  }
+}
+
 // Records the variable each blocking or nonblocking assignment writes, for
 // §6.5's rule making it an error for several continuous assignments, or a
 // mixture of procedural and continuous ones, to write any term of a variable's
@@ -408,28 +434,31 @@ static void CollectLhsBaseNames(
 // complete only after every item has been walked, so this only collects;
 // Elaborator::ValidateMixedAssignments and
 // Elaborator::ValidateProceduralNetAssign report.
-//
-// The statement position an assignment stands in decides neither rule, so
-// every statement of `body` is visited. §23.9 decides what a name reaches, so a
-// name the body itself declares -- a formal of `formals`, a block's variable,
-// a loop's -- is the body's own and none of the module's, and is not recorded.
 void CollectProcTargets(const std::vector<FunctionArg>& formals,
                         const std::vector<Stmt*>& body,
                         std::unordered_map<std::string_view, SourceLoc>& out) {
-  BodyDeclScopes scopes(false);
-  for (const auto& arg : formals) scopes.DeclareFormal(arg);
-  std::unordered_map<std::string_view, SourceLoc> written;
-  for (const Stmt* s : body) {
-    scopes.Walk(s, [&](const Stmt* st) {
-      if (st->kind != StmtKind::kBlockingAssign &&
-          st->kind != StmtKind::kNonblockingAssign)
-        return;
-      written.clear();
-      CollectLhsBaseNames(st->lhs, st->range.start, written);
-      for (const auto& [name, loc] : written)
-        if (scopes.Find(name) == nullptr) out.emplace(name, loc);
-    });
-  }
+  ForEachBodyTarget(
+      formals, body, {StmtKind::kBlockingAssign, StmtKind::kNonblockingAssign},
+      [&out](std::string_view name, SourceLoc loc) { out.emplace(name, loc); });
+}
+
+// §10.6.1 (printed page 257) bounds an `assign` statement's target to a
+// variable or a concatenation of variables, and A.6.2 (printed page 1198)
+// writes a `deassign`'s target as a variable_lvalue; only force and release
+// take a net as well (§10.6.2).
+void ReportProcContAssignNets(
+    const std::vector<FunctionArg>& formals, const std::vector<Stmt*>& body,
+    const std::unordered_set<std::string_view>& net_names, DiagEngine& diag) {
+  ForEachBodyTarget(formals, body, {StmtKind::kAssign, StmtKind::kDeassign},
+                    [&](std::string_view name, SourceLoc loc) {
+                      if (net_names.count(name) == 0) return;
+                      diag.Error(loc,
+                                 std::format("net '{}' cannot be the target "
+                                             "of a procedural assign or "
+                                             "deassign",
+                                             name),
+                                 Subclause("10.6.1"));
+                    });
 }
 
 // Records the variable each force or release statement names, for §10.6.2's

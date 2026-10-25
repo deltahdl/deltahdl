@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <format>
+#include <initializer_list>
 #include <utility>
 
 #include "fixture_elaborator.h"
@@ -336,6 +337,47 @@ TEST(ProceduralAssignDeassignElaboration, AssignOfAConstantIsReported) {
   }
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
                              "procedural assign of constant", 11, "10.6.1"));
+}
+
+// §10.6.1 (printed page 257) bounds an `assign` statement's target to a
+// variable or a concatenation of variables, and A.6.2 (printed page 1198)
+// writes a `deassign`'s target as a variable_lvalue; only `force` and `release`
+// (§10.6.2) take a net as well. A net named alone or within a concatenation is
+// reported, in a process and in a task alike, while a block's own variable of
+// the net's name is the block's and not the net.
+TEST(ProceduralAssignDeassignElaboration, NetTargetOfAssignOrDeassignIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  wire w;\n"
+      "  logic v;\n"
+      "  initial begin\n"
+      "    assign w = 1'b0;\n"
+      "    deassign w;\n"
+      "    assign {v, w} = 2'b00;\n"
+      "    force w = 1'b0;\n"
+      "    release w;\n"
+      "    assign v = 1'b0;\n"
+      "  end\n"
+      "  task t; assign w = 1'b1; endtask\n"
+      "  initial begin : b\n"
+      "    logic w;\n"
+      "    assign w = 1'b0;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {5u, 6u, 7u, 12u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "net 'w' cannot be the target of a procedural "
+                              "assign or deassign",
+                              line, "10.6.1"));
+  }
+  for (uint32_t line : {8u, 9u, 10u, 15u}) {
+    EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                               "net 'w' cannot be the target of a procedural "
+                               "assign or deassign",
+                               line, "10.6.1"));
+  }
 }
 
 }  // namespace
