@@ -278,10 +278,19 @@ void Parser::FilterPackageItems(std::vector<ModuleItem*>& items,
   items.resize(kept);
 }
 
+// The rule a port declaration, a specify block or a specparam declaration
+// breaks inside generate code: §27.2 names the three as items a generate block
+// may not contain, and a generate region, which §27.2 does not mention, holds
+// A.4.2's generate_items, none of which reaches any of the three.
+static Subclause GenerateItemRule(bool in_block) {
+  return in_block ? Subclause("27.2") : Subclause("A.4.2");
+}
+
 // A port declaration standing where an item was due. §27.2: a generate block
-// may not contain port declarations. Top-level non-ANSI port declarations are
-// consumed directly in ParseModuleBody, so a leading port direction reaching
-// a generate-block item is always an illegal non-ANSI port declaration. A
+// may not contain port declarations, nor may a generate region (A.4.2).
+// Top-level non-ANSI port declarations are consumed directly in
+// ParseModuleBody, so a leading port direction reaching a generate item is
+// always an illegal non-ANSI port declaration. A
 // checker body admits none either: A.1.8's checker_or_generate_item has no
 // port_declaration, where A.1.4's module_item opens with `port_declaration
 // ;`, and a checker's formals are the checker_port_list alone. Either is
@@ -289,10 +298,11 @@ void Parser::FilterPackageItems(std::vector<ModuleItem*>& items,
 // it; returns whether one was found.
 bool Parser::TryRejectBodyPortDecl() {
   if (!IsPortDirection(CurrentToken().kind)) return false;
-  if (InGenerateBlock()) {
+  if (InGenerateBlock() || in_generate_region_) {
     diag_.Error(CurrentLoc(),
-                "port declaration not allowed inside a generate block",
-                Subclause("27.2"));
+                "port declaration not allowed inside a generate block or "
+                "region",
+                GenerateItemRule(InGenerateBlock()));
   } else if (InCheckerBody()) {
     diag_.Error(CurrentLoc(),
                 "a port declaration is not an item of a checker; its formal "
@@ -324,13 +334,14 @@ bool Parser::TryRejectBodyPortDecl() {
 // left to FilterAnonymousProgramItems in parser.cpp, which reports under
 // A.1.11, so the bodies reported here are the three design elements and a
 // package's `specparam`. A generate block is reported under §27.2 instead,
-// whichever body holds it, since that is the rule the block breaks first.
+// whichever body holds it, since that is the rule the block breaks first, and
+// a generate region under A.4.2.
 bool Parser::TryParseSpecifyItem(std::vector<ModuleItem*>& items) {
   if (Check(TokenKind::kKwSpecify)) {
-    if (InGenerateBlock()) {
+    if (InGenerateBlock() || in_generate_region_) {
       diag_.Error(CurrentLoc(),
-                  "specify block not allowed inside a generate block",
-                  Subclause("27.2"));
+                  "specify block not allowed inside a generate block or region",
+                  GenerateItemRule(InGenerateBlock()));
     } else if (!InModuleBody() && !in_anonymous_program_) {
       diag_.Error(CurrentLoc(),
                   "specify block must appear inside a module declaration",
@@ -340,10 +351,11 @@ bool Parser::TryParseSpecifyItem(std::vector<ModuleItem*>& items) {
     return true;
   }
   if (Check(TokenKind::kKwSpecparam)) {
-    if (InGenerateBlock()) {
+    if (InGenerateBlock() || in_generate_region_) {
       diag_.Error(CurrentLoc(),
-                  "specparam declaration not allowed inside a generate block",
-                  Subclause("27.2"));
+                  "specparam declaration not allowed inside a generate block "
+                  "or region",
+                  GenerateItemRule(InGenerateBlock()));
     } else if (!InModuleBody() && !in_anonymous_program_) {
       diag_.Error(CurrentLoc(),
                   "specparam declaration must appear inside a module or a "

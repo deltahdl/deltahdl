@@ -62,13 +62,20 @@ TEST(GenerateBlockContent, SpecifyBlockAllowedAtModuleScope) {
               "endmodule\n"));
 }
 
-TEST(GenerateBlockContent, SpecifyBlockAllowedInBareGenerateRegion) {
-  EXPECT_TRUE(
-      ParseOk("module m(input a, output b);\n"
-              "  generate\n"
-              "    specify endspecify\n"
-              "  endgenerate\n"
-              "endmodule\n"));
+// §27.2 speaks of generate blocks, and a bare generate region is none, but
+// A.4.2 fills the region with generate_items, which reach no specify_block;
+// §27.3's region makes no semantic difference to the module, which grants no
+// item the grammar leaves out.
+TEST(GenerateBlockContent, SpecifyBlockRejectedInBareGenerateRegion) {
+  auto r = Parse(
+      "module m(input a, output b);\n"
+      "  generate\n"
+      "    specify endspecify\n"
+      "  endgenerate\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "specify block not allowed inside a generate block or region", 3,
+      "A.4.2"));
 }
 
 TEST(GenerateBlockContent, SpecparamRejectedInGenerateIf) {

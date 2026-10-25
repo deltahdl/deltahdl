@@ -176,11 +176,19 @@ void Parser::ParseGenerateRegion(std::vector<ModuleItem*>& items) {
   RejectInPackageBody("a generate region is not an item of a package");
   Expect(TokenKind::kKwGenerate, Subclause("27.3"));
 
+  // §27.3 lets a region stand only directly in a module, so a generate block,
+  // whose generate_items A.4.2 writes with no generate_region among them,
+  // holds none either, whether or not a region encloses the block.
   if (in_generate_region_) {
     diag_.Error(
         loc,
         "this generate region opens inside another one, which is not allowed",
         Subclause("27.3"));
+  } else if (InGenerateBlock()) {
+    diag_.Error(loc,
+                "this generate region opens inside a generate block; a "
+                "generate region stands only directly in a module",
+                Subclause("27.3"));
   }
   bool saved = in_generate_region_;
   in_generate_region_ = true;

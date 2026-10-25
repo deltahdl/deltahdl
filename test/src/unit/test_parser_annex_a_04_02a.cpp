@@ -582,4 +582,53 @@ TEST(GenerateInstantiationGrammar, GenerateBlockEndLabelMatchesPrefixLabel) {
               "endmodule\n"));
 }
 
+// §27.3 lets a generate region stand only directly in a module, and A.4.2's
+// generate_item reaches no generate_region, so a region inside a generate
+// block is reported where no region encloses the block as well.
+TEST(GenerateInstantiationGrammar, GenerateRegionInsideAGenerateBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  if (1) begin : g\n"
+      "    generate\n"
+      "      wire a;\n"
+      "    endgenerate\n"
+      "  end\n"
+      "  for (genvar i = 0; i < 2; i++) begin : h\n"
+      "    generate\n"
+      "    endgenerate\n"
+      "  end\n"
+      "  generate\n"
+      "  endgenerate\n"
+      "endmodule\n");
+  const char* const kMsg = "this generate region opens inside a generate block";
+  EXPECT_TRUE(ReportedError(r.diags, kMsg, 3, "27.3"));
+  EXPECT_TRUE(ReportedError(r.diags, kMsg, 8, "27.3"));
+  EXPECT_FALSE(ReportedError(r.diags, kMsg, 11, "27.3"));
+}
+
+// A.4.2 fills a generate region with generate_items, as it fills a generate
+// block, and no generate_item is a port declaration, a specparam declaration
+// or a specify block.
+TEST(GenerateInstantiationGrammar, PortSpecparamAndSpecifyInARegion) {
+  auto r = Parse(
+      "module m(a, y);\n"
+      "  output y;\n"
+      "  generate\n"
+      "    input a;\n"
+      "    specparam d = 1;\n"
+      "    specify (a => y) = 1; endspecify\n"
+      "  endgenerate\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "port declaration not allowed inside a generate block or region",
+      4, "A.4.2"));
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "specparam declaration not allowed inside a "
+                            "generate block or region",
+                            5, "A.4.2"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "specify block not allowed inside a generate block or region", 6,
+      "A.4.2"));
+}
+
 }  // namespace
