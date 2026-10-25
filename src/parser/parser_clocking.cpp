@@ -336,24 +336,22 @@ void Parser::ParseClockingItem(ModuleItem* item) {
 // The `::` form is not one. A.9.3 joins the components with `.` alone, and a
 // name reached through a class or package scope, `$unit::` among them, is a
 // ps_identifier, which A.6.5 does not admit where it writes this.
+//
+// The walk runs from the last identifier to the first: past the trailing
+// bit-selects where they are admitted, then past each `.` and the bit-selects
+// before it. A member access is built with its member name as an identifier
+// (Parser::MakeMemberAccess), so only its scope needs asking about.
+static bool IsBitSelect(const Expr* e) {
+  return e->kind == ExprKind::kSelect && e->index_end == nullptr;
+}
+
 bool IsHierarchicalName(const Expr* e, bool trailing_select) {
-  bool last = true;
-  while (e != nullptr) {
-    if (e->kind == ExprKind::kIdentifier) return e->scope_prefix != "$unit";
-    if (e->kind == ExprKind::kMemberAccess) {
-      if (e->is_scope_resolution) return false;
-      if (e->rhs == nullptr || e->rhs->kind != ExprKind::kIdentifier) {
-        return false;
-      }
-      e = e->lhs;
-      last = false;
-      continue;
-    }
-    if (e->kind != ExprKind::kSelect || e->index_end != nullptr) return false;
-    if (last && !trailing_select) return false;
-    e = e->base;
+  while (trailing_select && IsBitSelect(e)) e = e->base;
+  while (e->kind == ExprKind::kMemberAccess && !e->is_scope_resolution) {
+    e = e->lhs;
+    while (IsBitSelect(e)) e = e->base;
   }
-  return false;
+  return e->kind == ExprKind::kIdentifier && e->scope_prefix != "$unit";
 }
 
 // A.6.5 writes `wait_order ( hierarchical_identifier { ,
