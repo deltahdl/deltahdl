@@ -109,38 +109,6 @@ static void AppendElementPackedDims(const ArrayPatternCheck& check,
   }
 }
 
-// What two array pattern keys are the same key by. §10.9's array keys are
-// constant expressions, so what a key names is its value: `3` and `N-1` with N
-// of 4 name the element between them once, not twice. A key that does not fold
-// here is answered for by how it was written, which still tells apart the two
-// halves of a key written the same way twice. Nothing for a key that neither
-// folds nor was written as a single name or literal -- there is no ground to
-// call two of those the same, and calling them so would report every pair of
-// them as a duplicate.
-static std::optional<std::string> ArrayPatternKeyIdentity(const Expr* key) {
-  auto value = ConstEvalInt(key);
-  if (value) return std::to_string(*value);
-  if (key->text.empty()) return std::nullopt;
-  return std::string(key->text);
-}
-
-static void CheckArrayPatternDuplicateIndices(const Expr* init, SourceLoc loc,
-                                              const TypedefMap& typedefs,
-                                              DiagEngine& diag) {
-  std::unordered_set<std::string> seen;
-  for (const auto* key : init->pattern_keys) {
-    if (key->text == "default" || IsTypeKey(key->text, typedefs)) continue;
-    auto identity = ArrayPatternKeyIdentity(key);
-    if (!identity) continue;
-    if (!seen.insert(*identity).second) {
-      diag.Error(
-          loc,
-          std::format("duplicate index key '{}' in array pattern", *identity),
-          Subclause("10.9.1"));
-    }
-  }
-}
-
 // §10.9.1 (printed page 262): a type key that matches no element of an array
 // of structures descends into each element and applies to the members of its
 // type, so it covers an element whose every member it matches.
@@ -274,7 +242,7 @@ static void CheckPatternDims(const ArrayPatternCheck& check,
                              std::span<const PatternDim> dims, SourceLoc loc) {
   if (pattern->kind != ExprKind::kAssignmentPattern || dims.empty()) return;
   if (!pattern->pattern_keys.empty()) {
-    CheckArrayPatternDuplicateIndices(pattern, loc, check.typedefs, check.diag);
+    CheckArrayPatternIndexKeys(check, pattern, loc);
     CheckArrayPatternCoverage(check, pattern, elem_type, dims[0], loc);
     return;
   }

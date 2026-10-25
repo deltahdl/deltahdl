@@ -272,15 +272,6 @@ ConstantKind KindOfConstant(const Expr* e, const PatternNames& names,
 // How many parameters deep a parameter's value is followed for its kind.
 constexpr int kParamDepth = 8;
 
-// Whether `e` names a variable in scope, which no constant expression does
-// (§11.2.1). A system function call is left alone: `$bits(v)` is constant.
-bool NamesAVariable(const Expr* e, const PatternNames& names) {
-  if (e == nullptr || e->kind == ExprKind::kSystemCall) return false;
-  if (e->kind == ExprKind::kIdentifier) return names.vars.count(e->text) != 0;
-  return AnyExprChild(
-      e, [&](const Expr* child) { return NamesAVariable(child, names); });
-}
-
 // Hands `visit` each constant expression of pattern `p` (Syntax 12-4): what is
 // neither a pattern identifier, the wildcard, a tagged pattern nor a
 // structure pattern, all of which are descended.
@@ -354,7 +345,7 @@ void CheckPattern(const Expr* pat, const Expr* value, const PatternNames& names,
                      "only an integral expression can serve as a constant "
                      "expression pattern",
                      Subclause("12.6"));
-    } else if (NamesAVariable(leaf, names)) {
+    } else if (NamesAVariable(leaf, names.vars)) {
       ctx.diag.Error(leaf->range.start,
                      "constant expression pattern is not a constant "
                      "expression",

@@ -418,6 +418,17 @@ bool AnyExprChild(const Expr* e, Fn&& fn) {
   return false;
 }
 
+// Whether `e` names one of `vars`, the variables in scope where it stands,
+// which no constant expression does (§11.2.1). A system function call is left
+// alone: `$bits(v)` is constant.
+template <typename Vars>
+bool NamesAVariable(const Expr* e, const Vars& vars) {
+  if (e == nullptr || e->kind == ExprKind::kSystemCall) return false;
+  if (e->kind == ExprKind::kIdentifier) return vars.count(e->text) != 0;
+  return AnyExprChild(
+      e, [&](const Expr* child) { return NamesAVariable(child, vars); });
+}
+
 // Runs `fn` over every child expression of `e`, for what it does rather than
 // for an answer. It enumerates nothing itself: it asks AnyExprChild a question
 // no child answers, so a walk written to report on a subtree reads the same
@@ -499,7 +510,7 @@ std::unordered_set<std::string_view> UnpackedStructVars(
 // structure named as the element type and the packed dimensions a typedef
 // carries, `aggregate_typedefs` names the typedefs that stand for an unpacked
 // aggregate, and `var_types` the declared kind of a name written as an
-// element. Defined in elaborator_validate.cpp.
+// element or in an index key. Defined in elaborator_validate.cpp.
 struct ArrayPatternCheck {
   const TypedefMap& typedefs;
   const std::unordered_set<std::string_view>& aggregate_typedefs;
@@ -518,6 +529,12 @@ struct ArrayPatternCheck {
                   std::span<const uint32_t> unpacked_sizes,
                   SourceLoc loc) const;
 };
+// A.6.7.1 and §10.9.1: each index key of the array pattern `pattern` is a
+// constant expression, which names none of `check.var_types`, and names its
+// element once, a second key naming it reported at `loc`. `default` and a type
+// key are no index keys. Defined in array_pattern_keys.cpp.
+void CheckArrayPatternIndexKeys(const ArrayPatternCheck& check,
+                                const Expr* pattern, SourceLoc loc);
 std::string_view LhsBaseName(const Expr* e);
 // §5.10 and §5.11: the replication an assignment pattern consists of,
 // `'{n{...}}`, or null, and the items a positional pattern supplies, its

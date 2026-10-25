@@ -160,6 +160,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/library_cell_writes.cpp
     elaborator/type_key_match.cpp
     elaborator/struct_pattern_checks.cpp
+    elaborator/array_pattern_keys.cpp
     elaborator/unit_scope_order.cpp
     elaborator/compilation_unit_set.cpp
     elaborator/unit_scope_switch.cpp
