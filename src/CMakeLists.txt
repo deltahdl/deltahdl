@@ -115,6 +115,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     parser/parser_randsequence.cpp
     parser/parser_let.cpp
     parser/parser_specify.cpp
+    parser/parser_timing_check.cpp
     parser/parser_config.cpp
     parser/parser_inst.cpp
     parser/parser_items.cpp

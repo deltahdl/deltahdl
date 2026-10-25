@@ -490,16 +490,17 @@ TEST(NegativeTimingCheckOptionFromSource, NegativeHoldOnlyGatedByOption) {
   EXPECT_EQ(copies.data_delay, 0);
 }
 
-// §31.9.4 C1: a timing check limit may be written as a min:typ:max constant, so
-// the negative value reaching the gate can come from the selected member of a
-// triple rather than from a plain constant.
+// A timing check limit may be a min:typ:max triple, parenthesized because
+// A.7.5.2 writes a timing_check_limit as an expression, so the negative value
+// §31.9.4's option gates can come from the selected member of a triple rather
+// than from a plain constant.
 TEST(NegativeTimingCheckOptionFromSource, NegativeMinTypMaxLimitGatedByOption) {
   SimFixture f;
   SpecifyManager on, off;
   RegisterCheckUnderBothOptions(
       "  reg ntf;\n",
       "    specparam lo = -12, mid = -10, hi = -8;\n"
-      "    $setuphold(posedge clk, data, lo:mid:hi, 20, ntf);",
+      "    $setuphold(posedge clk, data, (lo:mid:hi), 20, ntf);",
       f, on, off);
 
   EXPECT_TRUE(on.GetTimingChecks().front().negative_timing_check_enabled);

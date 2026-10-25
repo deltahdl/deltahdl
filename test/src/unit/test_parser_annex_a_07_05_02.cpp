@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <initializer_list>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
@@ -339,6 +342,46 @@ TEST(TimingCheckArgumentParsing, ErrorDelayedRefMissingCloseBracket) {
   // §31.9 owns the bit-select on a delayed_reference; Parser::Expect reports
   // the missing ']' from Parser::ParseOptionalDelayedRef.
   EXPECT_TRUE(ReportedError(r.diags, "expected ']', got ','", 3, "31.9"));
+}
+
+// A.7.5.2 writes a timing_check_limit as an expression and $width's threshold
+// as a constant_expression, so a min:typ:max triple there is parenthesized;
+// $nochange's start_edge_offset and end_edge_offset are mintypmax_expressions
+// and take one bare.
+TEST(TimingCheckArgumentParsing, ParenthesizedLimitAndBareOffsetTriplesTaken) {
+  auto r = Parse(
+      "module m(input clk, data);\n"
+      "  reg ntf;\n"
+      "  specify\n"
+      "    $setup(data, posedge clk, (1:2:3));\n"
+      "    $setuphold(posedge clk, data, (1:2:3), (4:5:6), ntf);\n"
+      "    $width(posedge clk, 10, (0:1:2), ntf);\n"
+      "    $nochange(posedge clk, data, 1:2:3, 4:5:6);\n"
+      "  endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+}
+
+// A bare triple standing as a limit, first or second, or as $width's
+// threshold, is reported where it starts.
+TEST(TimingCheckArgumentParsing, BareLimitAndThresholdTriplesRejected) {
+  auto r = Parse(
+      "module m(input clk, data);\n"
+      "  reg ntf;\n"
+      "  specify\n"
+      "    $setup(data, posedge clk, 1:2:3);\n"
+      "    $setuphold(posedge clk, data, 10, 4:5:6, ntf);\n"
+      "    $width(posedge clk, 10, 0:1:2, ntf);\n"
+      "  endspecify\n"
+      "endmodule\n");
+  for (uint32_t line : {4u, 5u, 6u}) {
+    EXPECT_TRUE(ReportedError(r.diags,
+                              "a timing check's limit or threshold is an "
+                              "expression, so a min:typ:max triple there is "
+                              "parenthesized",
+                              line, "A.7.5.2"))
+        << "line " << line;
+  }
 }
 
 }  // namespace
