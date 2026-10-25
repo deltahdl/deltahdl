@@ -296,4 +296,76 @@ TEST(ThisElaboration, ThisInAPackageOrUnitSubroutineIsAnError) {
   }
 }
 
+// §8.11 gives `this` no object outside a class, and a continuous assignment
+// and a declaration's initializer belong to no method, so `this` or `super` in
+// either side of the one or in the other is reported at the module item, as in
+// a procedural block (#8079).
+TEST(ThisElaboration, ThisInAModuleItemsOwnExpressionIsAnError) {
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  int y;\n"
+      "  logic q;\n"
+      "  wire [31:0] w = this.y;\n"
+      "  int z = this.y;\n"
+      "  assign y = super.y;\n"
+      "  assign this.q = 1'b1;\n"
+      "endmodule\n",
+      f);
+  for (const int kLine : {4, 5, 6, 7}) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "'this' has no object to refer to outside a non-static class method",
+        kLine, "8.11"))
+        << kLine;
+  }
+}
+
+// §8.11 reaches every expression a statement holds, not only an assignment's
+// two sides and a condition: a block variable's initializer, a loop's
+// condition and a delay each name `this` here, in a procedural block apiece,
+// and each block is reported at its keyword (#8080).
+TEST(ThisElaboration, ThisInAnyExpressionOfAStatementIsAnError) {
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  int y;\n"
+      "  initial begin\n"
+      "    automatic int x = this.y;\n"
+      "  end\n"
+      "  initial for (int i = 0; i < this.y; i++) ;\n"
+      "  initial #(this.y) ;\n"
+      "endmodule\n",
+      f);
+  for (const int kLine : {3, 6, 7}) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "'this' has no object to refer to outside a non-static class method",
+        kLine, "8.11"))
+        << kLine;
+  }
+}
+
+// §8.11 reaches `this` wherever it stands within an expression, a
+// part-select's second bound and a replication's count among the rest (#8086).
+TEST(ThisElaboration, ThisInAnyOperandOfAnExpressionIsAnError) {
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  logic [7:0] v;\n"
+      "  logic [3:0] x;\n"
+      "  logic [7:0] r;\n"
+      "  initial x = v[3:this.y];\n"
+      "  initial r = {this.y{1'b1}};\n"
+      "endmodule\n",
+      f);
+  for (const int kLine : {5, 6}) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "'this' has no object to refer to outside a non-static class method",
+        kLine, "8.11"))
+        << kLine;
+  }
+}
+
 }  // namespace

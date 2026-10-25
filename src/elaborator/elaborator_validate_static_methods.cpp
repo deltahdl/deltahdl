@@ -44,18 +44,7 @@ static bool ExprRefsThisOrSuper(const Expr* e) {
   if (e->kind == ExprKind::kIdentifier &&
       (e->text == "this" || e->text == "super"))
     return true;
-  for (const Expr* child :
-       {e->lhs, e->rhs, e->base, e->index, e->condition, e->true_expr,
-        e->false_expr, e->with_expr, e->stream_range}) {
-    if (ExprRefsThisOrSuper(child)) return true;
-  }
-  for (const auto* elem : e->elements) {
-    if (ExprRefsThisOrSuper(elem)) return true;
-  }
-  for (const auto* arg : e->args) {
-    if (ExprRefsThisOrSuper(arg)) return true;
-  }
-  return false;
+  return AnyExprChild(e, ExprRefsThisOrSuper);
 }
 
 // §8.10 makes an access to the special this handle inside a static method's
@@ -70,15 +59,20 @@ static bool ExprRefsThisOrSuper(const Expr* e) {
 // halves of §8.10's one sentence -- the non-static member and the `this` handle
 // -- now hold over the same body rather than over two different subsets of it.
 //
-// ForEachChildStmt gives the visitor no way to stop, so the first hit is kept
-// in `found` and the recursion runs only while `found` is false.
+// The rule names no expression of a statement where the handle is permitted
+// either, so each statement's own expressions are the positions
+// ForEachChildExpr names: a declaration's initializer, a loop's condition and
+// a delay as well as an assignment's two sides and a condition.
+//
+// Neither ForEachChildExpr nor ForEachChildStmt gives the visitor a way to
+// stop, so the first hit is kept in `found` and each visit runs only while
+// `found` is false.
 static bool StmtRefsThisOrSuper(const Stmt* s) {
   if (!s) return false;
-  if (ExprRefsThisOrSuper(s->lhs)) return true;
-  if (ExprRefsThisOrSuper(s->rhs)) return true;
-  if (ExprRefsThisOrSuper(s->expr)) return true;
-  if (ExprRefsThisOrSuper(s->condition)) return true;
   bool found = false;
+  ForEachChildExpr(s, [&found](const Expr* e) {
+    if (!found) found = ExprRefsThisOrSuper(e);
+  });
   ForEachChildStmt(s, [&](Stmt* const& sub) {
     if (found) return;
     found = StmtRefsThisOrSuper(sub);
@@ -425,9 +419,19 @@ void ElaboratorClassRules::ValidateStaticMethodBodies(const ModuleDecl* decl) {
   }
 }
 
+// The expressions a module item writes outside any statement: a continuous
+// assignment's two sides and a declaration's initializer, which no method
+// holds any more than a procedural block does.
+static bool ItemExprRefsThisOrSuper(const ModuleItem* item) {
+  return ExprRefsThisOrSuper(item->init_expr) ||
+         ExprRefsThisOrSuper(item->assign_lhs) ||
+         ExprRefsThisOrSuper(item->assign_rhs);
+}
+
 void ElaboratorClassRules::ValidateThisInItem(const ModuleItem* item) {
   bool is_proc = IsProceduralItemKind(item->kind);
-  if (is_proc && item->body && StmtRefsThisOrSuper(item->body)) {
+  bool in_body = is_proc && item->body && StmtRefsThisOrSuper(item->body);
+  if (in_body || ItemExprRefsThisOrSuper(item)) {
     diag_.Error(item->loc,
                 "'this' has no object to refer to outside a non-static class "
                 "method",

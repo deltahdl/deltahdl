@@ -788,4 +788,26 @@ TEST(StaticMethodClassScopeAccess, TheOwnNonStaticMethodCalledBareIsReported) {
                             10, "8.10"));
 }
 
+// §8.10 reaches every expression a static method's body holds, so `this` in a
+// local variable's initializer is reported at the method, as `this` in a
+// return statement is (#8080).
+TEST(StaticMethodElaboration, StaticMethodThisInAnInitializerError) {
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  int k;\n"
+      "  static function int f();\n"
+      "    int x = this.k;\n"
+      "    return x;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  C c;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'this' and 'super' shall not be used in a static method", 3, "8.10"));
+}
+
 }  // namespace
