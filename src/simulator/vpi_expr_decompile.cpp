@@ -326,7 +326,9 @@ std::optional<Piece> RenderCall(const Expr& expr) {
     return Piece{VpiDecompileJoin({text, *kWith})};
   }
   // §7.12: an array manipulation method's with clause, its expression in the
-  // parentheses it is written in, or its array range in brackets (§7.12.1).
+  // parentheses it is written in. A call that is itself the operand of a
+  // stream expression carries the stream's bracketed range here instead
+  // (A.8.1, §11.4.14.4).
   if (expr.with_expr != nullptr) {
     const std::optional<Piece> kWith = Render(expr.with_expr);
     if (!kWith) return std::nullopt;
