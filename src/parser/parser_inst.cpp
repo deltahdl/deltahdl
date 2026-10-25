@@ -272,7 +272,8 @@ Expr* Parser::ParsePortActual() {
 }
 
 bool Parser::ParsePortConnection(ModuleItem* item) {
-  ParseAttributes();
+  auto attrs = ParseAttributes();
+  if (!attrs.empty()) item->inst_port_attr_loc = attrs.front().loc;
   if (Check(TokenKind::kDotStar)) {
     auto loc = CurrentLoc();
     Consume();

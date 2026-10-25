@@ -573,6 +573,20 @@ TEST(UdpInstanceElaboration, ForwardDeclaredUdpTakesAParenthesisedDelay) {
   ASSERT_NE(inst->delay, nullptr);
   EXPECT_EQ(inst->delay->int_val, 5U);
   EXPECT_EQ(inst->delay_fall, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// A.5.4 gives a UDP instance an optional delay2, whose parenthesised form holds
+// one or two values. Read before p_fwd's declaration, an empty `#( )` is an
+// empty parameter value assignment, which left inst_params empty, so the
+// conversion took it for no delay written at all.
+TEST(UdpInstanceElaboration, ForwardDeclaredUdpWithAnEmptyDelayIsReported) {
+  ElabFixture f;
+  ElaborateSrc(ForwardUdpSrc("p_fwd #() u(f_out, f_a, f_b);"), f, "fwd_top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a UDP instance's #( ) holds one or two delays, "
+                            "not none",
+                            3, "A.5.4"));
 }
 
 // The second of a delay2's two values is the fall delay, so `#(5, 3)` gives
@@ -723,6 +737,60 @@ TEST(UdpInstanceElaboration, ForwardDeclaredUdpArrayWithOneRange) {
   ElaborateSrc(ForwardUdpSrc("p_fwd u[1:0](f_out, f_a, f_b);"), f, "fwd_top");
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "an array of instances", 3,
                              "28.3.5"));
+}
+
+// A.3.3 makes a UDP instance's output terminal a net_lvalue, which A.5.4
+// writes first and does not let go unwritten. Read before p_fwd's declaration,
+// the empty connection is a module instance's omitted ordered connection, and
+// the conversion handed it on as a null output terminal.
+TEST(UdpInstanceElaboration, ForwardDeclaredUdpWithAnEmptyOutputTerminal) {
+  ElabFixture f;
+  ElaborateSrc(ForwardUdpSrc("p_fwd u(, f_a, f_b);"), f, "fwd_top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a UDP instance's output terminal is left empty", 3,
+                            "A.5.4"));
+}
+
+// An input terminal is an expression under A.3.3, which is no more optional
+// than the output terminal ahead of it.
+TEST(UdpInstanceElaboration, ForwardDeclaredUdpWithAnEmptyInputTerminal) {
+  ElabFixture f;
+  ElaborateSrc(ForwardUdpSrc("p_fwd u(f_out, , f_b);"), f, "fwd_top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a UDP instance's input terminal is left empty", 3,
+                            "A.5.4"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "a UDP instance's output terminal is left empty",
+                             3, "A.5.4"));
+}
+
+// A.5.4 writes a UDP instance's terminals with no attribute instance ahead of
+// any of them. Read before p_fwd's declaration, the attribute instance went
+// with a module instance's ordered connection, and the parser kept no trace of
+// it for the conversion to find.
+TEST(UdpInstanceElaboration, ForwardDeclaredUdpWithAnAttributedTerminal) {
+  ElabFixture f;
+  ElaborateSrc(ForwardUdpSrc("p_fwd u(f_out, (* keep *) f_a, f_b);"), f,
+               "fwd_top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a UDP instance's terminal takes no attribute "
+                            "instance",
+                            3, "A.5.4"));
+}
+
+// A.4.1.1 lets a module instance's ordered connection take an attribute
+// instance, so the same connection on a module's instance stays accepted.
+TEST(UdpInstanceElaboration, ModuleInstanceTakesAnAttributedConnection) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m_child(output o, input i);\n"
+      "endmodule\n"
+      "module fwd_top;\n"
+      "  wire f_out, f_a;\n"
+      "  m_child u(f_out, (* keep *) f_a);\n"
+      "endmodule\n",
+      f, "fwd_top");
+  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 }  // namespace

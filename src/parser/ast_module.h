@@ -768,6 +768,11 @@ struct ModuleItem {
   // parameter_value_assignment, `#( ... )`, which inst_params cannot say of
   // an empty `#( )`.
   bool inst_param_assignment_written = false;
+
+  // kModuleInst: where an attribute instance stood ahead of a port connection,
+  // which A.4.1.1's ordered_port_connection takes and A.5.4's UDP terminal
+  // does not; invalid where none was written.
+  SourceLoc inst_port_attr_loc;
 };
 
 enum class ModuleDeclKind : uint8_t {

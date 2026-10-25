@@ -156,10 +156,19 @@ UdpDecl* Elaborator::FindUdpByName(std::string_view name) const {
 // written in order. Read before the primitive's declaration, `#( ... )` is the
 // parameter override of what the parser took for a module, so its ordered
 // values are the instance's rise and fall delays, a third is more than a UDP
-// takes, and a named assignment is no delay at all.
+// takes, and a named assignment is no delay at all. A.5.4's delay2 holds one
+// or two values in its parentheses, so an empty `#( )`, which leaves no
+// parameter behind, is no delay2 either.
 static void TakeForwardUdpDelays(ModuleItem* item, DiagEngine& diag) {
   const auto& params = item->inst_params;
-  if (params.empty()) return;
+  if (params.empty()) {
+    if (item->inst_param_assignment_written) {
+      diag.Error(item->loc,
+                 "a UDP instance's #( ) holds one or two delays, not none",
+                 Subclause("A.5.4"));
+    }
+    return;
+  }
   bool named = std::any_of(params.begin(), params.end(),
                            [](const auto& p) { return !p.first.empty(); });
   if (named) {
@@ -190,6 +199,29 @@ static void ReportNamedUdpConnections(const ModuleItem* item,
   diag.Error(item->loc,
              "a UDP instance connects its terminals in order, not by name",
              Subclause("29.8"));
+}
+
+// A.5.4 writes a UDP instance's terminals bare: A.3.3 makes the output
+// terminal a net_lvalue and each input terminal an expression, so none is left
+// empty, and no attribute instance stands ahead of any. A module instance's
+// ordered connection may be either, and Parser::ParsePortConnection
+// (src/parser/parser_inst.cpp) read this instance as one, so the empty
+// connection reaches here as a null and the attribute instance only as where
+// it stood.
+static void ReportForwardUdpTerminalForms(const ModuleItem* item,
+                                          DiagEngine& diag) {
+  if (item->inst_port_attr_loc.IsValid()) {
+    diag.Error(item->inst_port_attr_loc,
+               "a UDP instance's terminal takes no attribute instance",
+               Subclause("A.5.4"));
+  }
+  for (size_t i = 0; i < item->inst_ports.size(); ++i) {
+    if (item->inst_ports[i].second != nullptr) continue;
+    diag.Error(item->loc,
+               i == 0 ? "a UDP instance's output terminal is left empty"
+                      : "a UDP instance's input terminal is left empty",
+               Subclause("A.5.4"));
+  }
 }
 
 // §29.8 gives an array of UDP instances the range §28.3.5 gives an array of
@@ -236,6 +268,7 @@ void Elaborator::ReclassifyForwardUdpInstances(const ModuleDecl* decl) {
     if (udp == nullptr) continue;
 
     ReportNamedUdpConnections(item, diag_);
+    ReportForwardUdpTerminalForms(item, diag_);
     ReportForwardUdpArrayRange(item, diag_);
     TakeForwardUdpDelays(item, diag_);
     item->kind = ModuleItemKind::kUdpInst;
