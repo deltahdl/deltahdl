@@ -15,7 +15,6 @@
 #include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
 #include "simulator/struct_string_member.h"
-#include "simulator/variable.h"
 
 namespace delta {
 
@@ -43,13 +42,12 @@ static bool IsRealKind(DataTypeKind kind) {
          kind == DataTypeKind::kRealtime;
 }
 
-Logic4Vec ExtractStructField(Variable* base_var, const StructTypeInfo* info,
+Logic4Vec ExtractStructField(const Logic4Vec& value, const StructTypeInfo* info,
                              std::string_view field, Arena& arena) {
   uint32_t bit_offset = 0;
   const StructFieldInfo* f = ResolveStructField(info, field, &bit_offset);
   if (f == nullptr) return MakeLogic4Vec(arena, 1);
-  Logic4Vec slice =
-      ExtractBitField(arena, base_var->value, bit_offset, f->width);
+  Logic4Vec slice = ExtractBitField(arena, value, bit_offset, f->width);
   // §7.2 with §6.16: a string member's bits are a handle to its text.
   if (f->type_kind == DataTypeKind::kString)
     return StringMemberText(slice, arena);

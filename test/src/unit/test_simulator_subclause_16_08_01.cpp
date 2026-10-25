@@ -69,8 +69,8 @@ TEST(TypedSequenceFormals, ActualIsCastToTheFormalsType) {
 // §16.8.1 (c): each keyword data type casts its actual so: byte'(v +
 // 9'h100) drops the ninth bit and reads 2 where v is 2, at 15 alone, where
 // uncast it would read 9'h102; longint and integer widen, logic keeps the
-// least significant bit, 0 at 15, and a packed type no keyword names alone
-// takes the actual as written.
+// least significant bit, 0 at 15, and logic [1:0] the two least significant
+// bits, 2 at 15.
 TEST(TypedSequenceFormals, EachKeywordTypeCastsItsActual) {
   SimFixture f;
   auto* hits = RunAndFindVar(
@@ -85,6 +85,75 @@ TEST(TypedSequenceFormals, EachKeywordTypeCastsItsActual) {
   ASSERT_NE(hits, nullptr);
   EXPECT_EQ(hits->value.ToUint64(), 1u);
   EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 15u);
+}
+
+// §16.8.1 (c): a formal typed with packed dimensions, or with a type name no
+// keyword spells, casts an actual that is no variable_lvalue to that type as
+// a keyword type does: n, t and p read v + 8'h10, v + 8'h20 and v + 8'h30 as
+// the two bits logic [1:0], two_t and pk::two_t hold, 2 where v is 2, and q
+// reads v + 8'h44 as the four bits of two_t [1:0], 6 there; so the sequence
+// ends at 15 alone. Uncast, they would read 8'h12, 8'h22, 8'h32 and 8'h46
+// there, and q cast to the two bits two_t alone holds would read 2.
+TEST(TypedSequenceFormals, APackedOrNamedTypeCastsItsActual) {
+  SimFixture f;
+  auto* hits = RunAndFindVar(
+      "package pk;\n"
+      "  typedef logic [1:0] two_t;\n"
+      "endpackage\n" +
+          TypedSource("  typedef logic [1:0] two_t;\n"
+                      "  sequence s_p(logic [1:0] n, two_t t, pk::two_t p,\n"
+                      "               two_t [1:0] q);\n"
+                      "    n == 2 && t == 2 && p == 2 && q == 6;\n"
+                      "  endsequence\n"
+                      "  sequence rule;\n"
+                      "    @(posedge clk)\n"
+                      "      s_p(v + 8'h10, v + 8'h20, v + 8'h30, v + 8'h44);\n"
+                      "  endsequence\n"),
+      f, "hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 1u);
+  EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 15u);
+}
+
+// §16.8.1 (c): an actual that is a variable_lvalue -- a name, a select or
+// member of one, or a concatenation of such -- is read through references to
+// the formal as having the formal's type. n reads u, 8'hF1 at 25, as the
+// four bits logic [3:0] holds, 1, and e reads it as four two_t elements, of
+// which e[3] is 2'b11; a select of w or m resolves against the [8:1] w is
+// declared with and pk::w_t names, so w[1] and m[1] are the rightmost bits of
+// v[7:0] and bx.f, 1 where v is 1, as k[0] is of byte'(v); and p reads the
+// concatenation as a pair_t, whose hi is 0 there, whose lo, a half_t, has b
+// 1, and whose rightmost bit p[0] is 1. So the sequence ends at 25 alone.
+// Read with the actuals' own types, n read 8'hF1, e[3] bit 3 of u, w[1] and
+// m[1] the second bit from the right, and p.hi and p.lo.b named no member of
+// the concatenation, so the sequence never ended.
+TEST(TypedSequenceFormals, AVariableLvalueActualReadsWithTheFormalsType) {
+  SimFixture f;
+  auto* hits = RunAndFindVar(
+      "package pk;\n"
+      "  typedef logic [8:1] w_t;\n"
+      "endpackage\n" +
+          TypedSource(
+              "  wire [7:0] u = v + 8'hF0;\n"
+              "  typedef logic [1:0] two_t;\n"
+              "  typedef struct packed { logic [7:0] f; } box_t;\n"
+              "  typedef struct packed { logic [1:0] a, b; } half_t;\n"
+              "  typedef struct packed { logic [3:0] hi; half_t lo; } pair_t;\n"
+              "  box_t bx;\n"
+              "  assign bx = v;\n"
+              "  sequence s_r(logic [3:0] n, two_t [3:0] e, logic [8:1] w,\n"
+              "               pk::w_t m, byte k, pair_t p);\n"
+              "    n == 1 && e[3] == 3 && w[1] && m[1] && k[0] &&\n"
+              "        p.hi == 0 && p.lo.b == 1 && p[0];\n"
+              "  endsequence\n"
+              "  sequence rule;\n"
+              "    @(posedge clk) s_r(u, u, v[7:0], bx.f, v, {v[7:4], "
+              "v[3:0]});\n"
+              "  endsequence\n"),
+      f, "hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 1u);
+  EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 25u);
 }
 
 // §16.8.1 (b): a formal of type event takes an event_expression, so

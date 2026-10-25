@@ -20,6 +20,7 @@
 #include "simulator/dyn_struct_member.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_expr_internal.h"
+#include "simulator/eval_function_internal.h"
 #include "simulator/eval_member_path.h"
 #include "simulator/eval_string.h"
 #include "simulator/evaluation.h"
@@ -217,7 +218,7 @@ static std::string ClassScopedTypeKey(const ClassTypeInfo* cls,
 // names the type of the scope containing the call, bypassing the class of
 // the object being randomized that runs while the block is evaluated. Empty
 // for a cast that names no type this way.
-static std::string CastTypeKey(const Expr* expr, SimContext& ctx) {
+std::string CastTypeKey(const Expr* expr, SimContext& ctx) {
   const Expr* rhs = expr->rhs;
   if (expr->text.empty()) {
     if (rhs == nullptr || rhs->kind != ExprKind::kMemberAccess ||
@@ -310,6 +311,15 @@ static bool TypeRefCastTarget(const Expr* ref, SimContext& ctx,
     out.width = DeclaredTypeWidth(*written, ctx);
     out.is_4state = !IsTwoStateKind(written->kind);
     out.is_signed = written->is_signed || IsSignedByDefault(written->kind);
+    return out.width > 0;
+  }
+  // §7.4.4: a type name with packed dimensions written after it stands for a
+  // packed array of what the name stands for, `type(nib_t [1:0])`, which the
+  // name alone does not spell.
+  if (written != nullptr && written->packed_dim_left != nullptr) {
+    out.width = DeclaredTypeWidth(*written, ctx);
+    out.is_4state = DeclaredTypeIs4State(*written, ctx);
+    out.is_signed = DeclaredTypeIsSigned(*written, ctx);
     return out.width > 0;
   }
   std::string_view name;

@@ -5,6 +5,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -19,6 +20,7 @@ namespace delta {
 
 class Arena;
 class SimContext;
+struct Variable;
 
 // Rewrites an expression an assumption reads into the terms of the checker
 // whose free variables it constrains: a child checker's formal into its
@@ -87,12 +89,14 @@ struct SeqTerm;
 enum class SeqTermKind : uint8_t;
 
 // §16.10: the values of the local variables `decls` declares for one
-// attempt, each with a literal of its value under its name, which the
-// expressions reading the locals read in their place.
+// attempt, each with an identifier under the local's name, which the
+// expressions reading the locals read in their place: it names a variable
+// of the local's declared type holding the value (SeqTerms::Locals), which
+// SeqTerms::BindLocalsOf binds where such an expression is evaluated.
 struct LocalValues {
   const std::vector<SeqLocalDecl>* decls = nullptr;
   std::vector<Logic4Vec> values;
-  ActualsByFormal literals;
+  ActualsByFormal references;
 };
 
 // §16.10: the match items of each of `items` performed in turn on
@@ -146,6 +150,10 @@ class SeqTerms {
   const LocalValues* Locals(std::vector<Logic4Vec> values,
                             const std::vector<SeqLocalDecl>* decls);
 
+  // §16.10: binds, in the innermost scope, the variable each identifier of
+  // `e` names that stands for a local's value (LocalValues::references).
+  void BindLocalsOf(const Expr* e);
+
  private:
   struct Builder;
 
@@ -177,6 +185,7 @@ class SeqTerms {
   void ExpandBind(const SeqTerm* term, uint32_t ticked, bool anchor,
                   std::vector<SeqWay>& out);
   Expr* UnderLocals(Expr* e, const LocalValues* locals);
+  Expr* LocalReference(SeqLocalDecl decl, const Logic4Vec& value);
 
   SimContext& ctx_;
   Arena& arena_;
@@ -186,6 +195,8 @@ class SeqTerms {
   std::vector<std::unique_ptr<LinearSequence>> sequences_;
   std::vector<std::unique_ptr<std::vector<SeqLocalDecl>>> local_decls_;
   const SeqTerm* match_ = nullptr;
+  // §16.10: the variables LocalReference stood up, by the names it gave them.
+  std::map<std::string_view, Variable*> local_vars_;
 };
 
 }  // namespace delta

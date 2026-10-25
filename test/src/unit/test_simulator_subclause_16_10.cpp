@@ -407,6 +407,57 @@ TEST(PropertyLocals, AMatchItemAssignsASelectOfTheLocal) {
                        "logic [7:0] x = 8'hFF");
 }
 
+// §16.10 with §7.2: a property's local of a packed structure type reads and
+// writes its members by name. x, a pair_t holding 8'h3C, has x.hi 3 and x.lo
+// 12, read by a sequence's operand and by an if-else's condition; `x.lo = 5`
+// leaves it 8'h35, and `x.hi += 1` 8'h4C. All nine attempts pass each, where
+// a member read off a literal standing for the copy took the else branch and
+// a target written through a variable of the copy's width alone was not
+// found (#8096).
+TEST(PropertyLocals, AStructureLocalReadsAndWritesItsMembers) {
+  const std::string kDecl = "pair_t x = 8'h3C";
+  const std::string kItems =
+      "  typedef struct packed { logic [3:0] hi, lo; } pair_t;\n";
+  ExpectPropertyCounts("1 |-> ##1 (x.hi == 3 && x.lo == 12)", 9, 0, kDecl,
+                       kItems);
+  ExpectPropertyCounts("if (x.hi == 3) ##1 1 else ##1 0", 9, 0, kDecl, kItems);
+  ExpectPropertyCounts("(1, x.lo = 5) |-> ##1 (x == 8'h35)", 9, 0, kDecl,
+                       kItems);
+  ExpectPropertyCounts("(1, x.hi += 1) |-> ##1 (x == 8'h4C)", 9, 0, kDecl,
+                       kItems);
+}
+
+// §16.10 with §7.4.1: a select of a property's local resolves against the
+// dimensions it was declared with. `logic [8:1] x` holding 1 has x[1] 1 and
+// x[2] 0, where [7:0] reads them the other way round, and `x[1] = 0` clears
+// the bit holding the 1. All nine attempts pass each (#8096).
+TEST(PropertyLocals, ASelectOfALocalResolvesAgainstItsDeclaredDimensions) {
+  ExpectPropertyCounts("1 |-> ##1 (x[1] == 1 && x[2] == 0)", 9, 0,
+                       "logic [8:1] x = 1");
+  ExpectPropertyCounts("(1, x[1] = 0) |-> ##1 (x == 0)", 9, 0,
+                       "logic [8:1] x = 1");
+}
+
+// §16.10 with §6.8 and §6.11.2: a property's local of a 2-state type holds 0
+// before any assignment, and an initialization assigning it a 4-state value
+// turns the x and z bits to 0, so an int left unassigned and a `bit [3:0]`
+// initialized with 'x both read 0 at all nine attempts, where a copy holding
+// x left `x == 0` unknown and failed them all (#8096).
+TEST(PropertyLocals, ATwoStateLocalHoldsNoUnknownBits) {
+  ExpectPropertyCounts("1 |-> ##1 (x == 0)", 9, 0, "int x");
+  ExpectPropertyCounts("1 |-> ##1 (x == 0)", 9, 0, "bit [3:0] x = 'x");
+}
+
+// §16.10 with §6.11.2 and §6.11.3: a match item assigning a property's
+// local whole leaves it holding what a variable of its type holds once
+// assigned the value: 'x assigned to a `bit [3:0]` reads 0, and 8'hFF
+// assigned to a byte reads -1, so both consequents hold at all nine
+// attempts. Resized alone, the bit local held x and the byte read 255.
+TEST(PropertyLocals, AMatchItemAssignsALocalAsItsTypeHoldsIt) {
+  ExpectPropertyCounts("(1, x = 'x) |-> ##1 (x == 0)", 9, 0, "bit [3:0] x");
+  ExpectPropertyCounts("(1, x = 8'hFF) |-> ##1 (x < 0)", 9, 0, "byte x");
+}
+
 // §16.10 with §7.4.1: the copy of a property's packed local an attempt reads
 // is four bits wide, as $bits finds it (#5745).
 TEST(PropertyLocals, APackedLocalsCopyIsItsDeclaredWidth) {

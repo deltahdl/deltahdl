@@ -52,6 +52,10 @@ class AssumeObligations {
   // An expression read at its value in the current time step, once.
   bool Holds(Expr* e);
 
+  // §16.10: binds, in the innermost scope, the variables of the locals'
+  // values `e` reads, a condition NoFailCondition answered among them.
+  void BindLocalsOf(const Expr* e) { terms_.BindLocalsOf(e); }
+
   // The condition, over the values the time step reads, under which `node`
   // does not fail in it, the clocks `ticked` having ticked; nullptr where
   // it holds under any values.

@@ -21,6 +21,7 @@
 #include "simulator/property_attempts.h"
 #include "simulator/sequence_flatten.h"
 #include "simulator/sequence_locals.h"
+#include "simulator/sim_context.h"
 
 namespace delta {
 
@@ -576,11 +577,14 @@ void AssumeObligations::NewTimeStep() {
 
 bool AssumeObligations::Holds(Expr* e) {
   for (auto frame = frames_.rbegin(); frame != frames_.rend(); ++frame) {
-    e = SubstituteFormals(e, frame->first->literals, arena_);
+    e = SubstituteFormals(e, frame->first->references, arena_);
   }
   auto found = values_.find(e);
   if (found != values_.end()) return found->second;
+  ctx_.PushScope();
+  terms_.BindLocalsOf(e);
   bool value = EvalExpr(e, ctx_, arena_).IsTruthy();
+  ctx_.PopScope();
   values_[e] = value;
   return value;
 }
@@ -688,7 +692,7 @@ const ObligationNode* AssumeObligations::StepLocals(
 // values stands as it is, so that it still puts no condition on the solve.
 Expr* AssumeObligations::UnderLocals(Expr* cond, const LocalValues* locals) {
   if (cond == conditions_.Always()) return cond;
-  return SubstituteFormals(cond, locals->literals, arena_);
+  return SubstituteFormals(cond, locals->references, arena_);
 }
 
 // §16.12.7: each match of the antecedent at this tick begins an attempt of

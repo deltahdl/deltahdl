@@ -1,5 +1,6 @@
 #include "simulator/sequence_locals.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <utility>
@@ -11,7 +12,6 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
-#include "parser/expr_substitute.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/scheduler.h"
@@ -81,6 +81,35 @@ bool LocalIsSigned(const SeqLocalDecl& decl, const SimContext& ctx) {
              : LocalIsSigned(decl.type_kw);
 }
 
+SeqLocalDecl LocalFormalDecl(const ModuleItem& decl, size_t index) {
+  const DataType& type = *decl.prop_formal_types[index];
+  SeqLocalDecl local;
+  local.name = decl.prop_formals[index];
+  local.type_kw = decl.prop_formal_type_kw[index];
+  if (type.signing_written) {
+    local.signing =
+        type.is_signed ? TokenKind::kKwSigned : TokenKind::kKwUnsigned;
+  }
+  if (type.packed_dim_left != nullptr) {
+    local.packed_dims.emplace_back(type.packed_dim_left, type.packed_dim_right);
+    local.packed_dims.insert(local.packed_dims.end(),
+                             type.extra_packed_dims.begin(),
+                             type.extra_packed_dims.end());
+  }
+  if (type.kind == DataTypeKind::kNamed) {
+    local.named_type = type;
+    local.named_type.packed_dim_left = nullptr;
+    local.named_type.packed_dim_right = nullptr;
+    local.named_type.extra_packed_dims.clear();
+  } else if (local.type_kw == TokenKind::kEof) {
+    // §6.11: the vector types are the keyword types packed dimensions follow,
+    // of which bit alone is 2-state.
+    local.type_kw = type.kind == DataTypeKind::kBit ? TokenKind::kKwBit
+                                                    : TokenKind::kKwLogic;
+  }
+  return local;
+}
+
 Variable* StandUpLocal(const SeqLocalDecl& decl, const Logic4Vec& value,
                        SimContext& ctx) {
   Variable* var = ctx.CreateLocalVariable(decl.name, value.width);
@@ -103,67 +132,51 @@ Variable* StandUpLocal(const SeqLocalDecl& decl, const Logic4Vec& value,
   return var;
 }
 
-void AssignMatchItemTarget(const SeqMatchAssign& item, Logic4Vec rhs,
-                           Variable& local, SimContext& ctx, Arena& arena) {
+Variable* StandUpUnassignedLocal(const SeqLocalDecl& decl, SimContext& ctx,
+                                 Arena& arena) {
+  Logic4Vec value = MakeLogic4Vec(arena, LocalWidth(decl, ctx, arena));
+  if (LocalIs4State(decl, ctx)) FillWithX(value);
+  return StandUpLocal(decl, value, ctx);
+}
+
+void AssignWholeLocal(Variable& var, const Logic4Vec& value, Arena& arena) {
+  Logic4Vec held =
+      ResizeToWidth(OwnRhsWords(value, arena), var.value.width, arena);
+  if (!var.is_4state) CoerceTo2State(held);
+  held.is_signed = var.is_signed;
+  var.value = held;
+}
+
+void AssignMatchItem(const SeqMatchAssign& item, Logic4Vec rhs, Variable& local,
+                     SimContext& ctx, Arena& arena) {
   local.value = OwnRhsWords(local.value, arena);
   if (item.op != TokenKind::kEq) {
-    rhs = EvalBinaryOp(CompoundAssignBaseOp(item.op),
-                       EvalExpr(item.target, ctx, arena), rhs, arena);
+    Logic4Vec held = item.target != nullptr ? EvalExpr(item.target, ctx, arena)
+                                            : local.value;
+    rhs = EvalBinaryOp(CompoundAssignBaseOp(item.op), held, rhs, arena);
   }
-  PerformBlockingAssign(item.target, rhs, ctx, arena);
-}
-
-Logic4Vec AssignedLocalValue(const SeqMatchAssign& item, const Logic4Vec& whole,
-                             Logic4Vec rhs, SimContext& ctx, Arena& arena) {
   if (item.target != nullptr) {
-    ctx.PushScope();
-    Variable* local = ctx.CreateLocalVariable(item.lvar, whole.width);
-    local->value = whole;
-    AssignMatchItemTarget(item, rhs, *local, ctx, arena);
-    Logic4Vec value = local->value;
-    ctx.PopScope();
-    return value;
+    PerformBlockingAssign(item.target, rhs, ctx, arena);
+  } else {
+    AssignWholeLocal(local, rhs, arena);
   }
-  if (item.op != TokenKind::kEq) {
-    rhs = EvalBinaryOp(CompoundAssignBaseOp(item.op), whole, rhs, arena);
-  }
-  return ResizeToWidth(OwnRhsWords(rhs, arena), whole.width, arena);
-}
-
-Expr* SubstituteTarget(const SeqMatchAssign& item, bool keeps_local,
-                       const ActualsByFormal& actuals, Arena& arena) {
-  if (item.target == nullptr) return nullptr;
-  if (!keeps_local) return SubstituteFormals(item.target, actuals, arena);
-  ActualsByFormal others = actuals;
-  others.erase(item.lvar);
-  return SubstituteFormals(item.target, others, arena);
 }
 
 // §16.10: the initialization assignments are performed in the order the
 // locals are declared, one's expression reading the locals declared before
 // it as assigned, so each is stood up in a scope of its own as its value is
-// found; a local without an initialization is unassigned, x for a 4-state
-// type.
+// found; a local without an initialization is unassigned.
 std::vector<Logic4Vec> InitialLocals(const std::vector<SeqLocalDecl>& decls,
                                      SimContext& ctx, Arena& arena) {
   std::vector<Logic4Vec> values;
   values.reserve(decls.size());
   ctx.PushScope();
   for (const SeqLocalDecl& decl : decls) {
-    const uint32_t kWidth = LocalWidth(decl, ctx, arena);
-    bool is_4state = LocalIs4State(decl, ctx);
-    Logic4Vec value = MakeLogic4Vec(arena, kWidth);
+    Variable* var = StandUpUnassignedLocal(decl, ctx, arena);
     if (decl.init != nullptr) {
-      value = ResizeToWidth(OwnRhsWords(EvalExpr(decl.init, ctx, arena), arena),
-                            kWidth, arena);
-      // §16.10 makes the initialization an assignment to the local, and
-      // §6.11.2 has one to a 2-state variable turn x and z bits to 0.
-      if (!is_4state) CoerceTo2State(value);
-    } else if (is_4state) {
-      FillWithX(value);
+      AssignWholeLocal(*var, EvalExpr(decl.init, ctx, arena), arena);
     }
-    StandUpLocal(decl, value, ctx);
-    values.push_back(value);
+    values.push_back(var->value);
   }
   ctx.PopScope();
   return values;

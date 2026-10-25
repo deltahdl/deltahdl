@@ -11,7 +11,6 @@
 
 #include "common/arena.h"
 #include "common/types.h"
-#include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
@@ -32,12 +31,12 @@ namespace {
 // cycle it is handed all the same ends the instance rather than the run.
 constexpr int kMaxInstanceDepth = 16;
 
-// §16.10 over the match items of one operand: the right-hand sides read the
-// actuals as the operands do, and an assigned local named after a formal --
-// a local variable formal argument, whose flattened name the actual is -- is
-// renamed with it. A local of a named property, or a local variable formal
-// argument of one, stands as the literal of the attempt's copy of it
-// (§16.13.7, §16.12.19), which the item then assigns.
+// §16.10 over the match items of one operand: the right-hand sides and the
+// targets read the actuals as the operands do, and an assigned local named
+// after a formal -- a local variable formal argument, whose flattened name
+// the actual is -- is renamed with it. So is a local of a named property, or
+// a local variable formal argument of one, which the name of the attempt's
+// variable for it stands for (§16.13.7, §16.12.19).
 std::vector<SeqMatchAssign> SubstituteMatchItems(
     const std::vector<SeqMatchAssign>& items, const ActualsByFormal& actuals,
     Arena& arena) {
@@ -48,13 +47,9 @@ std::vector<SeqMatchAssign> SubstituteMatchItems(
     if (it != actuals.end() && it->second != nullptr &&
         it->second->kind == ExprKind::kIdentifier) {
       copy.lvar = it->second->text;
-    } else if (it != actuals.end() && it->second != nullptr &&
-               it->second->kind == ExprKind::kIntegerLiteral) {
-      copy.local_copy = it->second;
     }
     copy.rhs = SubstituteFormals(item.rhs, actuals, arena);
-    copy.target =
-        SubstituteTarget(item, copy.local_copy != nullptr, actuals, arena);
+    copy.target = SubstituteFormals(item.target, actuals, arena);
     if (item.call != nullptr) {
       copy.call = SubstituteFormals(item.call, actuals, arena);
     }
@@ -167,8 +162,8 @@ ActualsByFormal BindInstanceActuals(const ModuleItem* decl,
        ++i) {
     auto it = actuals.find(decl->prop_formals[i]);
     if (it == actuals.end()) continue;
-    it->second =
-        CastActualToFormal(it->second, decl->prop_formal_type_kw[i], arena);
+    it->second = CastActualToFormal(it->second, decl->prop_formal_type_kw[i],
+                                    decl->prop_formal_types[i], arena);
   }
   return actuals;
 }
@@ -325,11 +320,8 @@ LocalBinding RenameLocalFormal(const ModuleItem* inner, const LocalFormal& lf,
   auto it = actuals.find(name);
   binding.actual = it == actuals.end() ? nullptr : it->second;
   binding.direction = lf.direction;
-  SeqLocalDecl decl;
+  SeqLocalDecl decl = LocalFormalDecl(*inner, lf.index);
   decl.name = binding.renamed;
-  decl.type_kw = lf.index < inner->prop_formal_type_kw.size()
-                     ? inner->prop_formal_type_kw[lf.index]
-                     : TokenKind::kKwInt;
   renaming.out.locals.push_back(decl);
   actuals[name] = LocalNameExpr(binding.renamed, renaming.arena);
   return binding;

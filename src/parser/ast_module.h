@@ -278,11 +278,6 @@ struct SeqMatchAssign {
   // each end point in the Reactive region with its by-value arguments as they
   // read at the match; `lvar` and `rhs` are unset where this is.
   Expr* call = nullptr;
-  // §16.10 and §16.13.7: where `lvar` names a local of a named property, the
-  // literal standing for the attempt's copy of it, which the property's other
-  // expressions read in the local's place; the item assigns the copy by
-  // rewriting the literal. Null for any other target.
-  Expr* local_copy = nullptr;
   // §16.10 with A.10 footnote 51: the variable_lvalue written where it
   // selects within the local `lvar` names or names a member of it, `v[1]` of
   // `v[1] = b` or `s.f` of `s.f++`, read as an assignment's target is; null

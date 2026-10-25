@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/types.h"
@@ -12,6 +13,7 @@
 #include "simulator/property_clocks.h"
 #include "simulator/sequence_flatten.h"
 #include "simulator/sequence_monitor.h"
+#include "simulator/variable.h"
 
 // The state of one attempt of a property tree and the algebra of the
 // verdicts over it, shared by the tick, in property_attempts.cpp, and the
@@ -84,21 +86,26 @@ struct NodeState {
   // tick, its parent having begun it at a tick of another.
   int clock = 0;
   bool awaiting = false;
+  // §16.10: the variables standing for the locals of the instance the
+  // expansion is of, its copies of the property's locals (§16.13.7) and its
+  // local variable formal arguments (§16.12.19), each under the name of its
+  // own the expressions reading it name, bound in a scope while the
+  // expansion steps.
+  std::vector<std::pair<std::string_view, Variable*>> locals;
 };
 
 // §16.13.7: one copy of a local variable of a named property for one
 // semantic leading clock of an instance's attempt: the node of the
-// expansion it is for, whose subtree reads `literal` in the local's place,
-// and the initialization assignment performed, into the literal, at the
-// first tick of that node's clock at or after the attempt begins, the value
-// cast to the local's width and signedness.
+// expansion it is for, whose subtree reads `reference` in the local's place,
+// the variable it names, and the initialization assignment performed to the
+// variable at the first tick of that node's clock at or after the attempt
+// begins.
 struct LocalCopy {
   const PropertyExprNode* node;
   std::string_view name;
-  Expr* literal;
+  Expr* reference;
   const Expr* init;
-  uint32_t width;
-  bool is_signed;
+  Variable* var;
 };
 
 struct PropertyTreeState {
@@ -112,6 +119,9 @@ struct PropertyTreeState {
   PropertyClocks clocks;
   SimTime advanced_at{PropertyClocks::kNever};
   bool every_match = false;
+  // §16.10: how many variables the expansions of the tree's attempts have
+  // stood up for their locals, which numbers each one's name.
+  uint32_t locals_made = 0;
 };
 
 // The verdict of an attempt decided, read off its root's state. Defined in

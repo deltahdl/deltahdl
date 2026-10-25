@@ -1,7 +1,9 @@
 // §11.5.1: the declared ranges a select of a value that carries no
 // declaration of its own is resolved against -- a class property's, read off
 // its member declaration, and a call's, read off the return type of the
-// function it calls -- for SelectBaseRange in eval_select.cpp.
+// function it calls -- for SelectBaseRange in eval_select.cpp; and the packed
+// dimension a select of a cast is resolved against, read off its casting
+// type, for SelectBaseLevel there.
 
 #include <cstdint>
 #include <optional>
@@ -14,9 +16,11 @@
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
+#include "simulator/eval_expr_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
+#include "simulator/variable.h"
 
 namespace delta {
 
@@ -68,6 +72,27 @@ std::optional<PackedRange> CalledFunctionRange(const Expr* base, uint32_t width,
   const ModuleItem* func = ctx.FindFunction(base->callee);
   if (func == nullptr) return std::nullopt;
   return DeclaredTypeRange(func->return_type, width, ctx, arena);
+}
+
+// §16.8.1 (c): a reference to a sequence's formal bound to a variable_lvalue
+// has the formal's type, and stands as a cast of the actual to that type
+// (CastActualToFormal), so a select of it is resolved against the outermost
+// packed dimension that type writes, each index of it an element as wide as
+// the dimensions inside it make one (§7.4.4): the data type a type reference
+// holds, or the declaration a typedef's name stands for.
+std::optional<PackedLevel> CastTypeLevel(const Expr* base, uint32_t width,
+                                         SimContext& ctx, Arena& arena) {
+  if (base->kind != ExprKind::kCast) return std::nullopt;
+  const Expr* ref = base->rhs;
+  const DataType* type = ref != nullptr && ref->kind == ExprKind::kTypeRef
+                             ? ref->type_value
+                             : ctx.FindTypeDeclaration(CastTypeKey(base, ctx));
+  if (type == nullptr || type->packed_dim_left == nullptr) return std::nullopt;
+  PackedRange range{
+      SelectBoundValue(EvalExpr(type->packed_dim_left, ctx, arena)),
+      SelectBoundValue(EvalExpr(type->packed_dim_right, ctx, arena))};
+  auto span = static_cast<uint32_t>(range.HighIndex() - range.LowIndex() + 1);
+  return PackedLevel{range, width / span};
 }
 
 }  // namespace delta

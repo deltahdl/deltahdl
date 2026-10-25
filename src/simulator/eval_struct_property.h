@@ -12,15 +12,14 @@ class Arena;
 class SimContext;
 struct StructFieldInfo;
 struct StructTypeInfo;
-struct Variable;
 
 // §7.2.1: the member `field` (a dotted path through nested members) of the
-// structure `base_var` holds, whose layout is `info`, read as its declared
+// structure value `value`, whose layout is `info`, read as its declared
 // type: a 2-state member of a packed union with its unknowns as zeros
 // (§7.3.1), a real member as a real (§6.12), a signed member as signed
 // (§6.11), and a string member as its text (§7.2 with §6.16). A one-bit zero
 // where the path names no member.
-Logic4Vec ExtractStructField(Variable* base_var, const StructTypeInfo* info,
+Logic4Vec ExtractStructField(const Logic4Vec& value, const StructTypeInfo* info,
                              std::string_view field, Arena& arena);
 
 // §7.2 with §8.7: the member `path` (a dotted path through nested members) of

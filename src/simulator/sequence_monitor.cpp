@@ -7,7 +7,6 @@
 #include <vector>
 
 #include "common/types.h"
-#include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
@@ -21,8 +20,6 @@
 #include "simulator/sequence_locals.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_name_tables.h"
-#include "simulator/statement_assign.h"
-#include "simulator/statement_assign_internal.h"
 #include "simulator/stmt_exec_assertion_internal.h"
 #include "simulator/sva_engine_sampling.h"
 #include "simulator/variable.h"
@@ -101,38 +98,12 @@ class AttemptLocalsScope {
       ScheduleMatchCall(item.call, ctx_, arena);
       return;
     }
-    if (item.local_copy != nullptr) {
-      AssignLocalCopy(item, arena);
-      return;
-    }
     Variable* var = ctx_.FindLocalVariable(item.lvar);
     if (var == nullptr) return;
-    Logic4Vec rhs = EvalExpr(item.rhs, ctx_, arena);
-    if (item.target != nullptr) {
-      AssignMatchItemTarget(item, rhs, *var, ctx_, arena);
-      return;
-    }
-    if (item.op != TokenKind::kEq) {
-      rhs = EvalBinaryOp(CompoundAssignBaseOp(item.op), var->value, rhs, arena);
-    }
-    var->value =
-        ResizeToWidth(OwnRhsWords(rhs, arena), var->value.width, arena);
+    AssignMatchItem(item, EvalExpr(item.rhs, ctx_, arena), *var, ctx_, arena);
   }
 
  private:
-  // §16.10 and §16.13.7: an item assigning a local of the named property the
-  // sequence stands in, whose other expressions read the attempt's copy
-  // through the same literal, so the literal is rewritten in place with the
-  // value at the local's width and signedness, as the copy's initialization
-  // writes it.
-  void AssignLocalCopy(const SeqMatchAssign& item, Arena& arena) {
-    Logic4Vec held = EvalExpr(item.local_copy, ctx_, arena);
-    Logic4Vec rhs = EvalExpr(item.rhs, ctx_, arena);
-    Logic4Vec value = AssignedLocalValue(item, held, rhs, ctx_, arena);
-    value.is_signed = held.is_signed;
-    *item.local_copy = *LiteralOfValue(value, arena);
-  }
-
   LinearAttempt& attempt_;
   SimContext& ctx_;
   std::vector<Variable*> vars_;

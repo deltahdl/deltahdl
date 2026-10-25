@@ -153,7 +153,15 @@ void AttemptSolution(AssumeSet& set, SimContext& ctx, Arena& arena) {
   set.obligations.NewTimeStep();
   ReadTicks(set, ctx.CurrentTime());
   Logic4Vec drawn;
-  TryEvalScopeRandomizeCall(SolveFor(set, arena), ctx, arena, drawn);
+  Expr* solve = SolveFor(set, arena);
+  // §16.10: the conditions read the attempts' locals through the variables
+  // their values stand in.
+  ctx.PushScope();
+  for (const Expr* cond : solve->inline_constraint->constraint_exprs) {
+    set.obligations.BindLocalsOf(cond);
+  }
+  TryEvalScopeRandomizeCall(solve, ctx, arena, drawn);
+  ctx.PopScope();
   StepMembers(set);
   ctx.AssertionSamples().SetEvaluatingProperty(false);
   ctx.SetCurrentProcess(saved);

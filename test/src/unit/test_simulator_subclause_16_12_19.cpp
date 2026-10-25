@@ -50,10 +50,11 @@ struct LocalCounts {
   uint64_t fail_time;
 };
 
-LocalCounts CountsOfLocal(const std::string& spec) {
+LocalCounts CountsOfLocal(const std::string& spec,
+                          const std::string& items = "") {
   SimFixture f;
   auto* passes =
-      RunAndFindVar(LocalFormalSource("  p: assert property (" + spec +
+      RunAndFindVar(LocalFormalSource(items + "  p: assert property (" + spec +
                                       ") passes++; else begin fails++; "
                                       "fail_time = $time; end\n"),
                     f, "passes");
@@ -92,6 +93,40 @@ TEST(LocalPropertyFormals, AFormalNotLocalReadsTheActualAtEachTick) {
   EXPECT_EQ(counts.passes, 7u);
   EXPECT_EQ(counts.fails, 1u);
   EXPECT_EQ(counts.fail_time, 25u);
+}
+
+// §16.12.19 with §16.10: a local variable formal argument of a property is a
+// local variable of the type it is declared with. A select of p_sel's lv
+// resolves against its [8:1], lv[1] the rightmost bit, 1 for data's 5 at 1
+// and its 9 at 4 alike, where bit 1 of a range [7:0] is 0 for both. p_member
+// reads lp's member lo by name, data's value at the attempt, which do1
+// matches at 3 alone. p_write's match item writes a select of lv, lv[8] = 1
+// leaving 8'h85 for the attempt from 1 alone. Held as a literal of the
+// actual, lv[1] would fail both attempts, lp.lo read nothing and lv[8] set
+// bit 8 of a 32-bit value (#8096).
+TEST(LocalPropertyFormals, ALocalFormalTakesItsDeclaredType) {
+  const std::string kItems =
+      "  typedef struct packed { logic [3:0] hi, lo; } pair_t;\n"
+      "  property p_sel(local input logic [8:1] lv);\n"
+      "    @(posedge clk) c |-> ##2 lv[1];\n"
+      "  endproperty\n"
+      "  property p_member(local input pair_t lp);\n"
+      "    @(posedge clk) c |-> ##2 (do1 == lp.lo);\n"
+      "  endproperty\n"
+      "  property p_write(local input logic [8:1] lv);\n"
+      "    @(posedge clk) (c, lv[8] = 1) |-> ##2 (lv == 8'h85);\n"
+      "  endproperty\n";
+  LocalCounts sel = CountsOfLocal("p_sel(data)", kItems);
+  EXPECT_EQ(sel.passes, 8u);
+  EXPECT_EQ(sel.fails, 0u);
+  LocalCounts member = CountsOfLocal("p_member(data)", kItems);
+  EXPECT_EQ(member.passes, 7u);
+  EXPECT_EQ(member.fails, 1u);
+  EXPECT_EQ(member.fail_time, 55u);
+  LocalCounts write = CountsOfLocal("p_write(data)", kItems);
+  EXPECT_EQ(write.passes, 7u);
+  EXPECT_EQ(write.fails, 1u);
+  EXPECT_EQ(write.fail_time, 55u);
 }
 
 }  // namespace

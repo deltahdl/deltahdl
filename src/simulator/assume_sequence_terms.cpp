@@ -16,8 +16,11 @@
 #include "parser/ast_stmt.h"
 #include "parser/expr_substitute.h"
 #include "simulator/evaluation.h"
+#include "simulator/expr_walk.h"
 #include "simulator/sequence_flatten.h"
 #include "simulator/sequence_locals.h"
+#include "simulator/sim_context.h"
+#include "simulator/variable.h"
 
 namespace delta {
 
@@ -221,7 +224,8 @@ const LocalValues* SeqTerms::Locals(std::vector<Logic4Vec> values,
   if (slot == nullptr) {
     slot = std::make_unique<LocalValues>();
     for (size_t i = 0; i < values.size(); ++i) {
-      slot->literals[(*decls)[i].name] = LiteralOfValue(values[i], arena_);
+      slot->references[(*decls)[i].name] =
+          LocalReference((*decls)[i], values[i]);
     }
     slot->values = std::move(values);
     slot->decls = decls;
@@ -248,8 +252,34 @@ int SeqTerms::FirstClock(const SeqTerm* term) {
   }
 }
 
+// §16.10: a variable of the local `decl`'s declared type holding `value`,
+// stood up under a name of its own in a scope it outlives, and the
+// identifier naming it, which BindLocalsOf binds where it is read.
+Expr* SeqTerms::LocalReference(SeqLocalDecl decl, const Logic4Vec& value) {
+  std::string name =
+      std::string(decl.name) + "@v" + std::to_string(local_vars_.size());
+  decl.name = {arena_.AllocString(name.data(), name.size()), name.size()};
+  ctx_.PushScope();
+  local_vars_[decl.name] = StandUpLocal(decl, value, ctx_);
+  ctx_.PopScope();
+  auto* reference = arena_.Create<Expr>();
+  reference->kind = ExprKind::kIdentifier;
+  reference->text = decl.name;
+  return reference;
+}
+
+void SeqTerms::BindLocalsOf(const Expr* e) {
+  ForEachSubExpr(e, [this](const Expr* sub) {
+    if (sub->kind != ExprKind::kIdentifier) return;
+    auto found = local_vars_.find(sub->text);
+    if (found != local_vars_.end()) {
+      ctx_.BindLocalVariable(found->first, found->second);
+    }
+  });
+}
+
 Expr* SeqTerms::UnderLocals(Expr* e, const LocalValues* locals) {
-  return SubstituteFormals(e, locals->literals, arena_);
+  return SubstituteFormals(e, locals->references, arena_);
 }
 
 const std::vector<SeqWay>& SeqTerms::Ways(const SeqTerm* term, uint32_t ticked,
@@ -513,19 +543,25 @@ void SeqTerms::ExpandBind(const SeqTerm* term, uint32_t ticked, bool anchor,
 
 namespace {
 
-// §16.10: the match item `item` performed on `locals`.
+// §16.10: the match item `item` performed on `locals`, each local stood up
+// under its own name in a scope of its own (StandUpLocal), so the item reads
+// them by name and assigns its own as an attempt of a sequence assigns it
+// (AssignMatchItem); the value it then holds is read back with the
+// signedness of its type.
 void PerformMatchItem(const SeqMatchAssign& item, LocalValues& locals,
                       SimContext& ctx, Arena& arena) {
   const std::vector<SeqLocalDecl>& decls = *locals.decls;
   for (size_t i = 0; i < decls.size(); ++i) {
     if (decls[i].name != item.lvar) continue;
-    Logic4Vec& value = locals.values[i];
-    Logic4Vec rhs = EvalExpr(
-        SubstituteFormals(item.rhs, locals.literals, arena), ctx, arena);
-    bool is_signed = value.is_signed;
-    value = AssignedLocalValue(item, value, rhs, ctx, arena);
-    value.is_signed = is_signed;
-    locals.literals[decls[i].name] = LiteralOfValue(value, arena);
+    ctx.PushScope();
+    for (size_t k = 0; k < decls.size(); ++k) {
+      StandUpLocal(decls[k], locals.values[k], ctx);
+    }
+    Variable& local = *ctx.FindLocalVariable(item.lvar);
+    AssignMatchItem(item, EvalExpr(item.rhs, ctx, arena), local, ctx, arena);
+    locals.values[i] = local.value;
+    locals.values[i].is_signed = local.is_signed;
+    ctx.PopScope();
   }
 }
 

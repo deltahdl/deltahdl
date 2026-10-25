@@ -25,8 +25,6 @@
 #include "simulator/sequence_locals.h"
 #include "simulator/sequence_monitor.h"
 #include "simulator/sim_context.h"
-#include "simulator/statement_assign.h"
-#include "simulator/statement_assign_internal.h"
 #include "simulator/variable.h"
 
 namespace delta {
@@ -116,7 +114,7 @@ struct Collection {
 // added to the copies in force above it.
 void AddLocalCopies(const PropertyExprNode* node, Collection& in) {
   for (const LocalCopy& copy : in.state.local_copies) {
-    if (copy.node == node) in.locals[copy.name] = copy.literal;
+    if (copy.node == node) in.locals[copy.name] = copy.reference;
   }
 }
 
@@ -272,14 +270,36 @@ bool Ticked(const StepContext& sc, int clock) {
 Tri Step(const PropertyExprNode* node, NodeState& state, StepContext& sc,
          bool begin);
 
+// §16.10: a variable standing for the local `decl` of the instance whose
+// expansion `state` holds, of the local's declared type and holding the
+// value it holds before any assignment, under a name of its own, which
+// `state` binds it to while the expansion steps (StepBoolean); the variable
+// and an identifier naming it, which the expansion reads in the local's
+// place.
+std::pair<Expr*, Variable*> NewExpansionLocal(SeqLocalDecl decl,
+                                              NodeState& state,
+                                              StepContext& sc) {
+  std::string name =
+      std::string(decl.name) + "@c" + std::to_string(sc.tree.locals_made++);
+  decl.name = {sc.arena.AllocString(name.data(), name.size()), name.size()};
+  sc.ctx.PushScope();
+  Variable* var = StandUpUnassignedLocal(decl, sc.ctx, sc.arena);
+  sc.ctx.PopScope();
+  state.locals.emplace_back(decl.name, var);
+  auto* reference = sc.arena.Create<Expr>();
+  reference->kind = ExprKind::kIdentifier;
+  reference->text = decl.name;
+  return {reference, var};
+}
+
 // §16.12.19 by way of §16.8.2: a local variable formal argument of a named
 // property, whose direction is input alone, is a local variable of the
-// instance, a new copy of it initialized from the actual when the attempt
-// begins, so the actual's value at that tick, sampled as the property reads
-// it and cast as §16.8.1 has it, stands in the formal's place for the
-// attempt where the actual is an expression.
+// instance of the type the formal is declared with, a new copy of it
+// initialized from the actual when the attempt begins, so the variable holds
+// the actual's value at that tick, sampled as the property reads it and cast
+// as §16.8.1 has it, for the attempt where the actual is an expression.
 void CaptureLocalFormals(const ModuleItem* decl, ActualsByFormal& actuals,
-                         StepContext& sc) {
+                         NodeState& state, StepContext& sc) {
   for (size_t i = 0;
        i < decl->prop_formals.size() && i < decl->prop_formal_is_local.size();
        ++i) {
@@ -289,8 +309,10 @@ void CaptureLocalFormals(const ModuleItem* decl, ActualsByFormal& actuals,
         it->second->property_actual != nullptr) {
       continue;
     }
-    it->second =
-        LiteralOfValue(EvalExpr(it->second, sc.ctx, sc.arena), sc.arena);
+    auto [reference, var] =
+        NewExpansionLocal(LocalFormalDecl(*decl, i), state, sc);
+    AssignWholeLocal(*var, EvalExpr(it->second, sc.ctx, sc.arena), sc.arena);
+    it->second = reference;
   }
 }
 
@@ -310,22 +332,17 @@ void SubstituteNodeLocals(PropertyExprNode* node, const ActualsByFormal& locals,
 
 // §16.13.7: a copy of each of the property's locals for `node`, one of the
 // expansion's nodes that names a clock or its root, the initialization of
-// each reading the copies of the locals declared before it; the copies by
-// the locals' names.
+// each reading the copies of the locals declared before it; the identifiers
+// naming the copies by the locals' names.
 ActualsByFormal NewLocalCopies(const PropertyExprNode* node,
                                const std::vector<SeqLocalDecl>& locals,
-                               StepContext& sc) {
+                               NodeState& state, StepContext& sc) {
   ActualsByFormal copies;
   for (const SeqLocalDecl& local : locals) {
-    const uint32_t kWidth = LocalWidth(local, sc.ctx, sc.arena);
-    Logic4Vec unassigned = MakeLogic4Vec(sc.arena, kWidth);
-    unassigned.is_signed = LocalIsSigned(local, sc.ctx);
-    FillWithX(unassigned);
-    Expr* literal = LiteralOfValue(unassigned, sc.arena);
+    auto [reference, var] = NewExpansionLocal(local, state, sc);
     const Expr* init = SubstituteFormals(local.init, copies, sc.arena);
-    sc.tree.local_copies.push_back(
-        {node, local.name, literal, init, kWidth, unassigned.is_signed});
-    copies[local.name] = literal;
+    sc.tree.local_copies.push_back({node, local.name, reference, init, var});
+    copies[local.name] = reference;
   }
   return copies;
 }
@@ -347,23 +364,24 @@ bool NamesAClock(const PropertyExprNode* node) {
 // its node begins.
 void PlaceLocalCopies(PropertyExprNode* node,
                       const std::vector<SeqLocalDecl>& locals,
-                      const ActualsByFormal* in_force, StepContext& sc) {
+                      const ActualsByFormal* in_force, NodeState& state,
+                      StepContext& sc) {
   ActualsByFormal own;
   if (in_force == nullptr || NamesAClock(node)) {
-    own = NewLocalCopies(node, locals, sc);
+    own = NewLocalCopies(node, locals, state, sc);
     in_force = &own;
   }
   SubstituteNodeLocals(node, *in_force, sc.arena);
   for (PropertyExprNode* operand : node->operands) {
-    PlaceLocalCopies(operand, locals, in_force, sc);
+    PlaceLocalCopies(operand, locals, in_force, state, sc);
   }
 }
 
 // §16.13.7: the initialization assignments of the copies made for `node`,
 // performed as the node begins, at the first tick of its clock at or after
-// the attempt began, each in the order the locals are declared, the value
-// cast to the local's type; a copy initialized lives on in its literal
-// alone.
+// the attempt began, each in the order the locals are declared and assigned
+// to the copy's variable as to the local (AssignWholeLocal); a copy
+// initialized lives on in its variable alone.
 void InitializeLocalCopies(const PropertyExprNode* node, StepContext& sc) {
   std::vector<LocalCopy>& copies = sc.tree.local_copies;
   std::vector<LocalCopy> waiting;
@@ -374,11 +392,8 @@ void InitializeLocalCopies(const PropertyExprNode* node, StepContext& sc) {
       continue;
     }
     if (copy.init == nullptr) continue;
-    Logic4Vec value = ResizeToWidth(
-        OwnRhsWords(EvalExpr(copy.init, sc.ctx, sc.arena), sc.arena),
-        copy.width, sc.arena);
-    value.is_signed = copy.is_signed;
-    *copy.literal = *LiteralOfValue(value, sc.arena);
+    AssignWholeLocal(*copy.var, EvalExpr(copy.init, sc.ctx, sc.arena),
+                     sc.arena);
   }
   copies = std::move(waiting);
 }
@@ -395,7 +410,7 @@ bool ExpandInstance(const PropertyExprNode* node, NodeState& state,
   const ModuleItem* decl = InstantiatedProperty(node->boolean, sc.ctx);
   if (decl == nullptr) return false;
   auto actuals = BindInstanceActuals(decl, node->boolean, sc.arena);
-  CaptureLocalFormals(decl, actuals, sc);
+  CaptureLocalFormals(decl, actuals, state, sc);
   PropertyExprNode* body =
       SubstituteTree(decl->prop_body_tree, actuals, sc.arena);
   // §16.13.2: a property declared with a clock is evaluated on it, from its
@@ -405,7 +420,7 @@ bool ExpandInstance(const PropertyExprNode* node, NodeState& state,
     body->clock = SubstituteClock(decl->prop_clock, actuals, sc.arena);
   }
   if (!decl->prop_locals.empty()) {
-    PlaceLocalCopies(body, decl->prop_locals, nullptr, sc);
+    PlaceLocalCopies(body, decl->prop_locals, nullptr, state, sc);
   }
   Collection collection{sc.tree, sc.ctx, sc.arena, actuals, {}};
   if (!CollectSequences(body, collection, state.clock)) return false;
@@ -426,7 +441,15 @@ Tri StepBoolean(const PropertyExprNode* node, NodeState& state, StepContext& sc,
                 bool begin) {
   if (begin) ExpandInstance(node, state, sc);
   if (state.expansion != nullptr) {
-    return Step(state.expansion, *state.operands[0], sc, begin);
+    // §16.10: the expansion reads and assigns the instance's locals by the
+    // names their variables stand under.
+    sc.ctx.PushScope();
+    for (const auto& [name, var] : state.locals) {
+      sc.ctx.BindLocalVariable(name, var);
+    }
+    Tri verdict = Step(state.expansion, *state.operands[0], sc, begin);
+    sc.ctx.PopScope();
+    return verdict;
   }
   const bool kHeld = EvalExpr(node->boolean, sc.ctx, sc.arena).IsTruthy();
   sc.ctx.AssertionSamples().NoteOperand(node->boolean, kHeld);

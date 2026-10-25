@@ -13,6 +13,7 @@ class Arena;
 class SimContext;
 struct ClassObject;
 struct ClassTypeInfo;
+struct Expr;
 struct StructTypeInfo;
 
 // Resolves a (possibly chained) field path against class object `obj`: a
@@ -30,6 +31,11 @@ Logic4Vec ResolveClassFieldChain(ClassObject* obj,
 // in eval_expr.cpp. Resolves a type name (built-in or user-defined) to its bit
 // width, defaulting to 32 for unknown names.
 uint32_t ResolveCastWidth(std::string_view type_name, SimContext& ctx);
+
+// §6.24.1: the key the type tables hold the named casting type of the cast
+// `expr` under, `T`, `p::T` or a class's typedef; empty for a cast that names
+// no type this way. Defined in eval_expr_cast.cpp.
+std::string CastTypeKey(const Expr* expr, SimContext& ctx);
 
 // The position of the dot that parts a member access path into the variable
 // on its left and the member path on its right: the first dot, unless the

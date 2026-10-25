@@ -104,6 +104,41 @@ TEST(LocalVariableFormals, InputLocalFormalIsInitializedFromTheActual) {
   EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 25u);
 }
 
+// §16.8.2 with §16.10: a local variable formal argument is a local variable
+// of the instance of the type it is declared with, so each formal here holds
+// data's 165 as that type does: lv, lb and lt all eight bits, a packed
+// vector's, a bit vector's and byte_t's; lr resolving a select against its
+// [8:1], lr[1] the rightmost bit; ls as the signed -91; and lu as an
+// unsigned byte, 165. The sequence ends at 25, where do1 reads 165. Sized by
+// the type keyword alone, the first four would hold one bit and lu a signed
+// byte, and it would never end.
+TEST(LocalVariableFormals, ALocalFormalTakesItsDeclaredType) {
+  SimFixture f;
+  auto* hits = RunAndFindVar(
+      LocalSource(
+          "  typedef logic [7:0] byte_t;\n"
+          "  sequence sub(local input logic [7:0] lv,\n"
+          "               local input bit [7:0] lb,\n"
+          "               local input byte_t lt,\n"
+          "               local input logic [8:1] lr,\n"
+          "               local input logic signed [7:0] ls,\n"
+          "               local input byte unsigned lu);\n"
+          "    c ##1 (do1 == lv && do1 == lb && do1 == lt && lr[1] &&\n"
+          "           ls < 0 && lu > 128);\n"
+          "  endsequence\n"
+          "  sequence rule;\n"
+          "    @(posedge clk) sub(data, data, data, data, data, data);\n"
+          "  endsequence\n",
+          "    #10 c = 1; data = 165;\n"
+          "    #10 c = 0; data = 6; do1 = 165;\n"
+          "    #10 do1 = 6;\n"
+          "    #10 do1 = 0;\n"),
+      f, "hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 1u);
+  EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 25u);
+}
+
 // §16.8.2's example, its repetition left out: sub_seq2's inout lv is
 // initialized from seq2's v1, incremented by data_in where !a holds, and
 // assigned back to v1 when the instance matches, so seq2's last operand reads

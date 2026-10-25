@@ -12,6 +12,7 @@
 #include "parser/ast_type.h"
 #include "simulator/scheduler.h"
 #include "simulator/stmt_result.h"
+#include "simulator/variable.h"
 
 namespace delta {
 
@@ -335,6 +336,15 @@ std::optional<PackedRange> PropertyDeclaredRange(const ClassTypeInfo* type,
 // any other expression. Defined in eval_select_declared_range.cpp.
 std::optional<PackedRange> CalledFunctionRange(const Expr* base, uint32_t width,
                                                SimContext& ctx, Arena& arena);
+
+// §16.8.1 (c) with §7.4.4: the outermost packed dimension the casting type
+// of the cast `base` writes, a type reference's data type or a typedef's, as
+// an index on the cast's value of `width` bits is resolved: its range, and
+// the width of the element one index of it selects. None for any other
+// expression, or a type writing no packed dimension. Defined in
+// eval_select_declared_range.cpp.
+std::optional<PackedLevel> CastTypeLevel(const Expr* base, uint32_t width,
+                                         SimContext& ctx, Arena& arena);
 
 // Resolve-then-write for a blocking assignment, which does both when the
 // statement executes. Returns false when the path names no storage.

@@ -586,13 +586,14 @@ static SelectBaseObject FindSelectBaseObject(const Expr* base, SimContext& ctx,
 
 // §7.4.4: the packed dimension the select base `base`, a window of `width`
 // bits, is indexed by, or none where the base stands on no declaration or
-// its selects have gone past the dimensions.
+// its selects have gone past the dimensions. A cast stands on its casting
+// type (CastTypeLevel).
 static std::optional<PackedLevel> SelectBaseLevel(const Expr* base,
                                                   uint32_t width,
                                                   SimContext& ctx,
                                                   Arena& arena) {
   SelectBaseObject obj = FindSelectBaseObject(base, ctx, arena);
-  if (obj.var == nullptr) return std::nullopt;
+  if (obj.var == nullptr) return CastTypeLevel(base, width, ctx, arena);
   return obj.var->PackedLevelWithin(obj.depth, width);
 }
 
@@ -601,7 +602,8 @@ static std::optional<PackedLevel> SelectBaseLevel(const Expr* base,
 // reaches depends in part on the declaration, and
 // when it names a subfield of a packed multidimensional array the range of
 // the dimension that subfield is indexed by (§7.4.4); a function result has
-// its return type's range (§13.4.1, CalledFunctionRange); for anything else --
+// its return type's range (§13.4.1, CalledFunctionRange) and a cast its
+// casting type's (§16.8.1, CastTypeLevel); for anything else --
 // a concatenation, a struct member -- the value carries no declaration of its
 // own and is addressed as [width-1:0]. A dimension whose
 // index selects elements rather than bits keeps the flat view too, as

@@ -459,10 +459,13 @@ TEST(CheckerVariableRandomization, AConstCastOrAutomaticActualIsExcluded) {
 // constrains, the declarations `decls` beside, the assertion a1 of the same
 // property counting its failures before the run ends, where attempts still
 // in flight are decided whatever the values, and `ones` the posedges at
-// which x is 1, over 40 posedges of clk.
+// which x is 1, over 40 posedges of clk; the compilation unit declares
+// `unit` before it.
 std::string AssumedPropertySource(const std::string& property,
-                                  const std::string& decls) {
-  return "checker chk(logic clk);\n"
+                                  const std::string& decls,
+                                  const std::string& unit) {
+  return unit +
+         "checker chk(logic clk);\n"
          "  rand bit x, y, z;\n" +
          decls +
          "  int fail = 0, ones = 0;\n"
@@ -483,17 +486,18 @@ std::string AssumedPropertySource(const std::string& property,
 }
 
 // §17.7.2: under each of `properties` assumed, the declarations `decls`
-// beside, no attempt of the property fails, while x is still 1 at some
-// posedges, so that the obligations the property sets are met rather than
-// never raised. Left out of the solution attempts, as a form they did not
-// solve, each property failed.
+// beside and `unit` before the checker, no attempt of the property fails,
+// while x is still 1 at some posedges, so that the obligations the property
+// sets are met rather than never raised. Left out of the solution attempts,
+// as a form they did not solve, each property failed.
 void ExpectAssumedPropertiesHold(const std::vector<std::string>& properties,
-                                 const std::string& decls = "") {
+                                 const std::string& decls = "",
+                                 const std::string& unit = "") {
   for (const std::string& property : properties) {
     SCOPED_TRACE(property);
     SimFixture f;
-    auto* fail =
-        RunAndFindVar(AssumedPropertySource(property, decls), f, "c.fail");
+    auto* fail = RunAndFindVar(AssumedPropertySource(property, decls, unit), f,
+                               "c.fail");
     ASSERT_NE(fail, nullptr);
     EXPECT_EQ(fail->value.ToUint64(), 0u);
     EXPECT_GT(f.ctx.FindVariable("c.ones")->value.ToUint64(), 0u);
@@ -666,6 +670,25 @@ TEST(CheckerVariableRandomization, ALocalsSelectCarriesItsValue) {
       "(y == v[1] && !v[0]); endsequence\n"
       "  sequence s2; bit [1:0] v; (1, v = 2'b01, v[1] += x) ##1 "
       "(y == v[1] && v[0]); endsequence\n");
+}
+
+// §17.7.2 with §16.10, §7.2 and §7.4.1: an assumption reads and writes a
+// member or a select of a sequence's local as the local's declared type has
+// it. s1 assigns x to p.lo of a pair_t and holds y to it a tick on, beside
+// the p.hi of 3 p was initialized with; s2 assigns x to v[2] of a `logic
+// [8:1]` and holds y to it beside v[1], its rightmost bit, which holds the 1
+// v was initialized with. Read off a literal of the local's value, p.hi read
+// no member and v[1] and v[2] the bits of a range [7:0], so no value of y
+// met the condition solved and the assertion failed (#8099).
+TEST(CheckerVariableRandomization,
+     ALocalsMemberOrSelectResolvesAgainstItsType) {
+  ExpectAssumedPropertiesHold(
+      {"s1", "s2"},
+      "  sequence s1; pair_t p = 8'h3C; (1, p.lo = x) ##1 "
+      "(y == p.lo && p.hi == 3); endsequence\n"
+      "  sequence s2; logic [8:1] v = 1; (1, v[2] = x) ##1 "
+      "(y == v[2] && v[1]); endsequence\n",
+      "typedef struct packed { logic [3:0] hi, lo; } pair_t;\n");
 }
 
 // §17.7.2 with §16.13: an assumption whose operands name a clock of their
