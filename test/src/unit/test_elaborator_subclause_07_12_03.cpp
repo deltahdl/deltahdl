@@ -166,7 +166,8 @@ TEST(BuiltinMethodElaboration, ReductionOverAnElementWithoutItsOperation) {
 // member, a real member under sum, a packed structure member, a union's int
 // member, an element of an element, a string's character, a member of an
 // element of an array of more dimensions, a member of a variable, a member of
-// a call's result and a member of what has no members are left alone.
+// a call's result, a member of what has no members and a stream's range,
+// which stands where the with expression goes (#8053), are left alone.
 TEST(BuiltinMethodElaboration, WithExpressionOfAnyFormNeedsTheReduction) {
   ElabFixture f;
   ElaborateSrc(
@@ -210,6 +211,7 @@ TEST(BuiltinMethodElaboration, WithExpressionOfAnyFormNeedsTheReduction) {
       "    n = ia.sum with (item.x);\n"
       "    n = sa.sum with (n.x);\n"
       "    n = sa.sum with (item.zz.a);\n"
+      "    n = {>> {ia.sum with [0:1]}};\n"
       "  end\n"
       "endmodule\n",
       f);
@@ -220,7 +222,7 @@ TEST(BuiltinMethodElaboration, WithExpressionOfAnyFormNeedsTheReduction) {
     EXPECT_TRUE(ReportedError(diags, kReport, line, "7.12.3"));
   }
   for (const auto& d : diags) {
-    EXPECT_FALSE(d.loc.line >= 28 && d.loc.line <= 40 &&
+    EXPECT_FALSE(d.loc.line >= 28 && d.loc.line <= 41 &&
                  d.message.find(kReport) != std::string::npos)
         << d.loc.line << ": " << d.message;
   }
