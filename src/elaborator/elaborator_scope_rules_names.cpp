@@ -322,8 +322,9 @@ void PopulatePackageProvidedNames(const CompilationUnit* unit,
 //     on into higher-level modules until it succeeds, so a callee is not held
 //     to the module boundary a variable read is held to.
 //   - the slice size or type of a §11.4.14.2 streaming concatenation, which
-//     Parser::ParseStreamingConcat writes into lhs. `{<< 8 {a}}` puts the 8
-//     there as an identifier node, and it names a width rather than a value.
+//     Parser::ParseStreamingConcat writes into lhs. `{<< byte {a}}` puts the
+//     byte there as an identifier node, and it names a width rather than a
+//     value.
 //   - the member name of a §7.3.2 tagged union expression, which
 //     Parser::ParseTaggedExpr writes into rhs. `tagged Valid x` names a member
 //     of the union type there, not a declaration of the enclosing scope.

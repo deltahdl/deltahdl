@@ -264,4 +264,26 @@ TEST(StreamSliceSizeSim, ParameterAndTypedefSliceSizesPackAndUnpack) {
       "slice_size for streaming operator must be positive", 12, "11.4.14.2"));
 }
 
+// §11.4.14.2 slices by a slice_size's value. A sized or based literal has the
+// value its digits give in its base, and an unbased unsized one the value of
+// its single bit, so 8'd8, 'h8 and 4'b1000 cut a word into bytes and '1 into
+// bits. Read by their decimal digits, the first and third are 88 and 41000,
+// wider than the word, which comes through unchanged.
+TEST(StreamSliceSizeSim, SizedBasedAndUnbasedLiteralSliceSizesSliceByValue) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  int x, a, b, c, d;\n"
+                       "  initial begin\n"
+                       "    x = 32'h11223344;\n"
+                       "    a = {<< 8'd8 {x}};\n"
+                       "    b = {<< 'h8 {x}};\n"
+                       "    c = {<< 4'b1000 {x}};\n"
+                       "    d = {<< '1 {x}};\n"
+                       "    $display(\"%h %h %h %h\", a, b, c, d);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "44332211 44332211 44332211 22cc4488\n");
+}
+
 }  // namespace

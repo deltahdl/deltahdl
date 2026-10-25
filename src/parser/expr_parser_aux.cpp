@@ -39,10 +39,17 @@ Expr* Parser::ParseStreamingConcat(TokenKind dir) {
   sc->range.start = loc;
   sc->op = dir;
 
+  // A.8.1's slice_size is a simple_type or a constant_expression. A lone name
+  // or type keyword before the stream's brace is kept as a name, for the later
+  // stages to size as a type or read as a parameter. A lone number is the
+  // literal ParsePrimaryExpr makes of it, so its base is read with its digits
+  // (§11.4.14.2): spelled as a name, 8'd8 was read as 88.
   if (!Check(TokenKind::kLBrace)) {
     auto saved = lexer_.SavePos();
     auto tok = Consume();
-    if (Check(TokenKind::kLBrace)) {
+    bool is_number = tok.kind == TokenKind::kIntLiteral ||
+                     tok.kind == TokenKind::kUnbasedUnsizedLiteral;
+    if (!is_number && Check(TokenKind::kLBrace)) {
       auto* type_id = arena_.Create<Expr>();
       type_id->kind = ExprKind::kIdentifier;
       type_id->text = tok.text;

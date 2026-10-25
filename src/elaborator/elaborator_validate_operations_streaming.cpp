@@ -1,10 +1,8 @@
-#include <charconv>
 #include <cstdint>
 #include <format>
 #include <optional>
 #include <string>
 #include <string_view>
-#include <system_error>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -137,28 +135,15 @@ void CheckStreamingConcatOperand(
 // positive; a zero or negative slice size is illegal. A slice_size given as
 // a simple type instead names a block width equal to that type's size,
 // which is inherently positive and therefore exempt from this check. The
-// parser records a bare numeric slice_size as an identifier carrying the
-// literal text, while a non-numeric identifier names a type or a parameter.
+// parser keeps a number as its literal and a lone name as an identifier,
+// which names a type or a parameter.
 void CheckStreamingSliceSize(const Expr* slice, DiagEngine& diag,
                              const ScopeMap& param_scope) {
   if (!slice) return;
-  std::optional<int64_t> value;
-  if (slice->kind == ExprKind::kIdentifier) {
-    int64_t parsed = 0;
-    const char* begin = slice->text.data();
-    const char* end = begin + slice->text.size();
-    auto [ptr, ec] = std::from_chars(begin, end, parsed);
-    // A name that is no digit text is a type or, where the module's
-    // parameter scope holds it, a parameter, folded for its value; a type
-    // folds to nothing and is exempt.
-    value = ec == std::errc() && ptr == end ? std::optional<int64_t>(parsed)
-                                            : ConstEvalInt(slice, param_scope);
-  } else {
-    // A constant-expression slice_size may name a parameter or localparam
-    // (§11.2.1), so fold it in the module's parameter scope; a bare literal
-    // folds identically whether or not the scope carries any names.
-    value = ConstEvalInt(slice, param_scope);
-  }
+  // A constant-expression slice_size may name a parameter or localparam
+  // (§11.2.1), so it is folded in the module's parameter scope; a type folds
+  // to nothing and is exempt.
+  std::optional<int64_t> value = ConstEvalInt(slice, param_scope);
   if (value && *value <= 0) {
     diag.Error(slice->range.start,
                "streaming slice_size shall be a positive constant",

@@ -23,15 +23,6 @@
 
 namespace delta {
 
-static uint32_t ParseDigitStr(std::string_view text) {
-  if (text.empty() || text[0] < '0' || text[0] > '9') return 0;
-  uint32_t n = 0;
-  for (char c : text) {
-    if (c >= '0' && c <= '9') n = n * 10 + (c - '0');
-  }
-  return n;
-}
-
 // §11.4.14.2: a slice_size is a simple type, whose bit count it is, or a
 // constant integral expression, which shall be positive. A name the run holds
 // a value for -- a parameter -- is the second, read for its value; any other
@@ -40,8 +31,6 @@ uint32_t StreamSliceSize(const Expr* size_expr, SimContext& ctx, Arena& arena) {
   if (!size_expr) return 1;
   if (size_expr->kind == ExprKind::kIdentifier &&
       ctx.FindVariable(size_expr->text) == nullptr) {
-    uint32_t num = ParseDigitStr(size_expr->text);
-    if (num > 0) return num;
     return ResolveCastWidth(size_expr->text, ctx);
   }
   auto val = EvalExpr(size_expr, ctx, arena).ToUint64();

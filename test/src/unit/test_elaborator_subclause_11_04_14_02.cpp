@@ -188,4 +188,27 @@ TEST(StreamSliceSizeElaboration, ParameterSliceSizeOfZeroReported) {
   EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
+// §11.4.14.2 holds a constant slice_size to a positive value, and a sized or
+// based literal's value is what its digits give in its base: 4'd0 and 'h0 are
+// zero and reported, 'h8 and 4'b1000 are eight and not.
+TEST(StreamSliceSizeElaboration, SizedAndBasedLiteralSliceSizesFoldedByValue) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  logic [15:0] r;\n"
+      "  initial r = {<< 4'd0 {16'hABCD}};\n"
+      "  initial r = {<< 'h0 {16'hABCD}};\n"
+      "  initial r = {<< 'h8 {16'hABCD}};\n"
+      "  initial r = {<< 4'b1000 {16'hABCD}};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "streaming slice_size shall be a positive constant",
+                            3, "11.4.14.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "streaming slice_size shall be a positive constant",
+                            4, "11.4.14.2"));
+  EXPECT_EQ(f.diag.ErrorCount(), 2u);
+}
+
 }  // namespace
