@@ -318,10 +318,11 @@ static ContTargetLeaf LeafOf(const Expr* e) {
 // §10.3 Syntax 10-1: a continuous assignment's target is a net_lvalue or a
 // variable_lvalue -- a name under constant selects and member accesses, a
 // concatenation of those, or an assignment pattern of them with or without a
-// type, whose keys §10.9's own rule reports. Collects its elements, answering
-// false for any other form.
+// type, whose keys §10.9's own rule reports. A.8.5 writes none of them in
+// parentheses. Collects its elements, answering false for any other form.
 static bool CollectContTargetLeaves(const Expr* e,
                                     std::vector<ContTargetLeaf>& out) {
+  if (e->is_parenthesized) return false;
   if (e->kind == ExprKind::kCast &&
       e->lhs->kind == ExprKind::kAssignmentPattern)
     e = e->lhs;
@@ -413,8 +414,9 @@ bool Elaborator::ValidateContAssignLeaf(ModuleItem* item, RtlirModule* mod,
     ValidateContAssignIdentLhs(leaf.root, item, mod);
   // A name reached through a member access may be an instance's or an
   // interface's, which names no variable of this module, so only a name the
-  // target writes directly or through selects is judged a variable.
-  bool is_var = net_names_.count(leaf.root) == 0 && !leaf.has_member;
+  // target writes directly or through selects is judged as a variable here.
+  bool is_net = net_names_.count(leaf.root) != 0;
+  bool is_var = !is_net && !leaf.has_member;
   if (is_var) ValidateContAssignVarLeaf(item, leaf.root);
   // §10.3.2: an assignment to a net of a user-defined nettype drives the whole
   // net, so it may select an element of an array of such nets and nothing
@@ -426,7 +428,9 @@ bool Elaborator::ValidateContAssignLeaf(ModuleItem* item, RtlirModule* mod,
                 "drives the whole net and cannot index or select into it",
                 Subclause("10.3.2"));
   }
-  return is_var;
+  // A.6.1: a member of a variable this module declares is a variable_lvalue as
+  // the variable is, so the assignment takes the variable form all the same.
+  return is_var || (!is_net && var_types_.count(leaf.root) != 0);
 }
 
 // §6.5 and §10.3.2 of a variable an element of a continuous assignment's
@@ -593,12 +597,15 @@ void Elaborator::ElaborateContAssign(ModuleItem* item, RtlirModule* mod) {
                 Subclause("10.3"));
     return;
   }
-  if (item->assign_lhs->kind == ExprKind::kStreamingConcat)
+  // A.8.5 writes a streaming concatenation among variable_lvalue's alone, so
+  // an assignment to one takes A.6.1's variable form.
+  bool streaming = item->assign_lhs->kind == ExprKind::kStreamingConcat;
+  if (streaming)
     ReportStreamTargetNets(item->assign_lhs, net_names_, item->loc, diag_);
   // A net reached through a member access of another scope's name is that
   // scope's, whose declaration this module does not hold, so its strength goes
   // unjudged.
-  if (ValidateContAssignLeaves(item, mod, leaves)) {
+  if (ValidateContAssignLeaves(item, mod, leaves) || streaming) {
     ValidateContAssignVarTarget(item, diag_);
   } else if ((item->drive_strength0 != 0 || item->drive_strength1 != 0) &&
              !ReachesAnotherScope(leaves, net_names_)) {

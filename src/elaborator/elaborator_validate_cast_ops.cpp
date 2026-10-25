@@ -196,9 +196,11 @@ bool IsAliasConstantSelect(const Expr* e, const ScopeMap& scope) {
 
 // §10.11 Syntax 10-6: an alias operand is a net_lvalue -- a net named with a
 // constant select, a concatenation of net_lvalues, or a positional assignment
-// pattern of them with or without a type. A member access stands here for the
-// hierarchical name CheckAliasOperandKinds reports.
+// pattern of them with or without a type, none of which A.8.5 writes in
+// parentheses. A member access stands here for the hierarchical name
+// CheckAliasOperandKinds reports.
 bool IsAliasNetLvalue(const Expr* e, const ScopeMap& scope) {
+  if (e->is_parenthesized) return false;
   switch (e->kind) {
     case ExprKind::kIdentifier:
     case ExprKind::kMemberAccess:
