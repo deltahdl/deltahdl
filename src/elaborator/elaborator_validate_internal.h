@@ -798,4 +798,10 @@ void ValidateGenerateValueParams(const ModuleItem* item, const RtlirModule* mod,
                                  const ScopeMap& scope,
                                  const CompilationUnit* unit, DiagEngine& diag);
 
+// §13.5.5 with §8.13: the subroutine call rules over each method body of each
+// class a package or the compilation unit declares, against that package's or
+// the unit's tasks and functions. The classes a module declares are walked
+// with the module's items. Defined in elaborator_validate_subroutine_args.cpp.
+void ValidateUnitClassCallArgs(const CompilationUnit& unit, DiagEngine& diag);
+
 }  // namespace delta

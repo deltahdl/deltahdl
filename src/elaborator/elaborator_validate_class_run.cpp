@@ -4,6 +4,7 @@
 #include "elaborator/elaborator_call_targets.h"
 #include "elaborator/elaborator_class_constraints.h"
 #include "elaborator/elaborator_validate_classes.h"
+#include "elaborator/elaborator_validate_internal.h"
 
 namespace delta {
 
@@ -93,6 +94,7 @@ void ElaboratorClassRules::RunPreElaborationClassValidations() {
 void ElaboratorClassRules::ValidateClassMethodReads() {
   ReportClassMethodUnresolved(unit_, diag_);
   ReportClassMethodCalls(*unit_, diag_);
+  ValidateUnitClassCallArgs(*unit_, diag_);
 }
 
 }  // namespace delta

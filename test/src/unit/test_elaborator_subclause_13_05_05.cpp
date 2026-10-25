@@ -1,5 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <initializer_list>
+#include <string>
+#include <string_view>
+#include <utility>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -197,6 +203,116 @@ TEST(SubroutineCallElaborationSyntax,
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+}
+
+constexpr std::string_view kNonvoidOmitted =
+    "cannot omit parentheses in call to nonvoid function '";
+
+// Whether the call of the nonvoid function `name` at `line` was reported for
+// leaving its parentheses off.
+bool ReportedOmitted(const ElabFixture& f, std::string_view name,
+                     uint32_t line) {
+  return ReportedError(f.diag.Diagnostics(),
+                       std::string(kNonvoidOmitted) + std::string(name) + "'",
+                       line, "13.5.5");
+}
+
+// §27.1: a generate block's items are the module's like any other, so a call
+// in any block of a conditional, case or loop generate construct, of a
+// function the module declares or one the block itself does, keeps its
+// parentheses as a call at the module's top level does.
+TEST(OptionalArgumentListElaboration, ACallInAGenerateBlockIsJudged) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  parameter P = 1;\n"
+      "  function int f(); return 1; endfunction\n"
+      "  if (P) begin : g\n"
+      "    function int h(); return 2; endfunction\n"
+      "    initial begin f; h; end\n"
+      "  end else begin : e\n"
+      "    initial f;\n"
+      "  end\n"
+      "  case (P)\n"
+      "    1: begin : c initial f; end\n"
+      "  endcase\n"
+      "  for (genvar i = 0; i < 1; i++) begin : l\n"
+      "    initial f;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  for (auto [name, line] :
+       {std::pair{"f", 6u}, std::pair{"h", 6u}, std::pair{"f", 8u},
+        std::pair{"f", 11u}, std::pair{"f", 14u}}) {
+    EXPECT_TRUE(ReportedOmitted(f, name, line)) << name << " at " << line;
+  }
+  EXPECT_EQ(f.diag.ErrorCount(), 5u);
+}
+
+// In a method a name alone calls a method of the class or of a class it
+// extends first (§8.13), which may leave its parentheses off; any other name
+// calls the module's subroutine, whose call keeps them. A class nested in
+// another sees the module's subroutines too (§8.23).
+TEST(OptionalArgumentListElaboration, ACallInAMethodOfAModulesClassIsJudged) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  function int f(); return 1; endfunction\n"
+      "  class C;\n"
+      "    function int g(); return 2; endfunction\n"
+      "    function void run(); f; g; endfunction\n"
+      "    class N;\n"
+      "      function void go(); f; endfunction\n"
+      "    endclass\n"
+      "  endclass\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedOmitted(f, "f", 5));
+  EXPECT_TRUE(ReportedOmitted(f, "f", 7));
+  EXPECT_EQ(f.diag.ErrorCount(), 2u);
+}
+
+// A class extending its type parameter declares names no one knows before the
+// class is specialized, any of which a name alone may call, so a method's call
+// by a name alone is not judged: here the default's method `f` is what it
+// calls.
+TEST(OptionalArgumentListElaboration, ACallInAClassOfAnUnknownBaseIsLeft) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  function int f(); return 1; endfunction\n"
+      "  class Base;\n"
+      "    function int f(); return 0; endfunction\n"
+      "  endclass\n"
+      "  class W #(type B = Base) extends B;\n"
+      "    function void run(); f; endfunction\n"
+      "  endclass\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(ReportedOmitted(f, "f", 7));
+}
+
+// A class a package or the compilation unit declares calls the package's or
+// the unit's subroutines by a name alone, and such a call keeps its
+// parentheses as one in a module does.
+TEST(OptionalArgumentListElaboration, ACallInAMethodOfAUnitOrPackageClass) {
+  ElabFixture f;
+  ElaborateSrc(
+      "function int u(); return 3; endfunction\n"
+      "class UC;\n"
+      "  function void run(); u; endfunction\n"
+      "endclass\n"
+      "package p;\n"
+      "  function int f(); return 1; endfunction\n"
+      "  class C;\n"
+      "    function void run(); f; endfunction\n"
+      "  endclass\n"
+      "endpackage\n"
+      "module m; endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedOmitted(f, "u", 3));
+  EXPECT_TRUE(ReportedOmitted(f, "f", 8));
+  EXPECT_EQ(f.diag.ErrorCount(), 2u);
 }
 
 }  // namespace

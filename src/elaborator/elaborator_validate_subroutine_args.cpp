@@ -4,13 +4,16 @@
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "common/system_functions.h"
+#include "elaborator/class_member_names.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -662,6 +665,8 @@ struct SubroutineCallContext {
   const std::unordered_set<std::string_view>& non_singular_vars;
   const std::unordered_set<std::string_view>& non_singular_funcs;
   DiagEngine& diag;
+  // The classes of the unit, whose members a method's name alone calls first.
+  const SoleClassIndex& classes;
 };
 
 // Validates one sensitivity-list event expression (the `signal` and
@@ -719,11 +724,94 @@ static void ValidateContAssignCallArgs(
                                "a continuous assignment");
 }
 
-// Validates the subroutine-call rules in one top-level item.
+static void ValidateCallArgsInItem(const ModuleItem* item,
+                                   const SubroutineCallContext& ctx);
+
+// The context `ctx` with the subroutines `decls` in place of its own.
+static SubroutineCallContext WithDecls(
+    const SubroutineCallContext& ctx,
+    const std::unordered_map<std::string_view, const ModuleItem*>& decls) {
+  return {
+      decls,    ctx.net_names, ctx.non_singular_vars, ctx.non_singular_funcs,
+      ctx.diag, ctx.classes};
+}
+
+// Keys each task and function the items `items` declare in `decls` by its
+// name.
+static void AddSubroutines(
+    const std::vector<ModuleItem*>& items,
+    std::unordered_map<std::string_view, const ModuleItem*>& decls) {
+  for (const ModuleItem* item : items) {
+    if (item->kind == ModuleItemKind::kFunctionDecl ||
+        item->kind == ModuleItemKind::kTaskDecl) {
+      decls[item->name] = item;
+    }
+  }
+}
+
+// §27.1 with §23.9: the items `items` of one generate block, walked as the
+// module's are, the tasks and functions the block declares callable within it.
+static void ValidateCallArgsInBlock(const std::vector<ModuleItem*>& items,
+                                    const SubroutineCallContext& ctx) {
+  std::unordered_map<std::string_view, const ModuleItem*> decls = ctx.all_decls;
+  AddSubroutines(items, decls);
+  const SubroutineCallContext kInner = WithDecls(ctx, decls);
+  for (const ModuleItem* item : items) ValidateCallArgsInItem(item, kInner);
+}
+
+// §27.4 and §27.5: each block of the generate construct `construct`: a loop's
+// one block, each block of a conditional construct and of the else chain after
+// it, and each case item's block.
+static void ValidateCallArgsInGenerate(const ModuleItem& construct,
+                                       const SubroutineCallContext& ctx) {
+  for (const ModuleItem* branch = &construct; branch != nullptr;
+       branch = branch->gen_else) {
+    ValidateCallArgsInBlock(branch->gen_body, ctx);
+    for (const GenerateCaseItem& item : branch->gen_case_items) {
+      ValidateCallArgsInBlock(item.body, ctx);
+    }
+  }
+}
+
+// §8.13: each method body the class `cls` writes, and those of the classes
+// nested in it (§8.23), walked with every name the class or a class it extends
+// declares taken out of the scope's subroutines. A name alone calls that
+// member first, and a method may leave its parentheses off (footnote 42 of
+// A.8.2). Where the names are not known in full, a class extending its type
+// parameter or a class no scope declares, any name may be a member's, so the
+// methods are left alone.
+static void ValidateCallArgsInClass(const ClassDecl& cls,
+                                    const SubroutineCallContext& ctx) {
+  std::unordered_set<std::string_view> members;
+  if (!ctx.classes.SelectableNames(cls, members)) return;
+  std::unordered_map<std::string_view, const ModuleItem*> decls = ctx.all_decls;
+  for (std::string_view name : members) decls.erase(name);
+  const SubroutineCallContext kInner = WithDecls(ctx, decls);
+  for (const ClassMember* member : cls.members) {
+    if (member->kind == ClassMemberKind::kMethod) {
+      ValidateSubroutineBodyCallArgs(member->method, decls, ctx.net_names,
+                                     ctx.diag);
+    }
+    if (member->nested_class != nullptr) {
+      ValidateCallArgsInClass(*member->nested_class, kInner);
+    }
+  }
+}
+
+// Validates the subroutine-call rules in one item, a generate construct's
+// blocks and a class's methods among them.
 static void ValidateCallArgsInItem(const ModuleItem* item,
                                    const SubroutineCallContext& ctx) {
   if (IsProceduralItemKind(item->kind)) {
     ValidateProcBlockEvents(item, ctx);
+  }
+  if (item->kind == ModuleItemKind::kGenerateIf ||
+      item->kind == ModuleItemKind::kGenerateCase ||
+      item->kind == ModuleItemKind::kGenerateFor) {
+    ValidateCallArgsInGenerate(*item, ctx);
+  }
+  if (item->kind == ModuleItemKind::kClassDecl) {
+    ValidateCallArgsInClass(*item->class_decl, ctx);
   }
 
   if (item->kind == ModuleItemKind::kFunctionDecl ||
@@ -766,11 +854,35 @@ void Elaborator::ValidateSubroutineCallArgs(const ModuleDecl* decl) {
   std::unordered_set<std::string_view> non_singular_funcs =
       CollectNonSingularFuncs(decl, func_decls_);
 
-  SubroutineCallContext ctx{all_decls, net_names_, non_singular_vars,
-                            non_singular_funcs, diag_};
+  const SoleClassIndex kClasses(*unit_);
+  SubroutineCallContext ctx{all_decls,          net_names_, non_singular_vars,
+                            non_singular_funcs, diag_,      kClasses};
   for (const auto* item : decl->items) {
     ValidateCallArgsInItem(item, ctx);
   }
+}
+
+void ValidateUnitClassCallArgs(const CompilationUnit& unit, DiagEngine& diag) {
+  const SoleClassIndex kClasses(unit);
+  const std::unordered_set<std::string_view> kNone;
+  // A package's classes see its subroutines, and the unit's classes the
+  // unit's; a package sees nothing the unit declares (§26.3).
+  auto walk_site = [&](const std::vector<ModuleItem*>& items,
+                       const std::vector<ClassDecl*>& classes) {
+    std::unordered_map<std::string_view, const ModuleItem*> decls;
+    AddSubroutines(items, decls);
+    const SubroutineCallContext kCtx{decls, kNone, kNone,
+                                     kNone, diag,  kClasses};
+    for (const ClassDecl* cls : classes) ValidateCallArgsInClass(*cls, kCtx);
+    for (const ModuleItem* item : items) {
+      if (item->kind == ModuleItemKind::kClassDecl) {
+        ValidateCallArgsInClass(*item->class_decl, kCtx);
+      }
+    }
+  };
+  walk_site(unit.cu_items, unit.classes);
+  for (const PackageDecl* package : unit.packages)
+    walk_site(package->items, {});
 }
 
 }  // namespace delta
