@@ -266,17 +266,20 @@ bool OpensTypeAnExpressionCannotSpell(Lexer& lexer) {
 
 // A data_type where one is admitted beside an expression -- A.8.3's
 // param_expression, a system call's first argument (A.8.2) -- that ParseExpr
-// cannot spell, read by ParseDataType into a kTypeRef node carrying it in
-// Expr::type_value, the node `type(data_type)` makes; anything else is read by
-// `read`. ParseExpr spells a keyword type as a name with its packed
-// dimensions as selects, which the readers of such an argument take, so `int
-// unsigned` stopped at `unsigned` and `struct packed { ... }` at `struct`.
+// cannot spell, read into a kTypeRef node carrying it in Expr::type_value, the
+// node `type(data_type)` makes; anything else is read by `read`. ParseExpr
+// spells a keyword type as a name with its packed dimensions as selects,
+// which the readers of such an argument take, so `int unsigned` stopped at
+// `unsigned` and `struct packed { ... }` at `struct`. ParseDataType reads no
+// struct, union or enum, which TryParseInlineAggregateType reads first.
 Expr* Parser::ParseTypeOr(Expr* (Parser::*read)()) {
   if (!OpensTypeAnExpressionCannotSpell(lexer_)) return (this->*read)();
   auto* ref = arena_.Create<Expr>();
   ref->kind = ExprKind::kTypeRef;
   ref->range.start = CurrentLoc();
-  ref->type_value = arena_.Create<DataType>(ParseDataType());
+  DataType dtype;
+  if (!TryParseInlineAggregateType(dtype)) dtype = ParseDataType();
+  ref->type_value = arena_.Create<DataType>(dtype);
   return ref;
 }
 

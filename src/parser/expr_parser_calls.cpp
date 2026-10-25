@@ -364,18 +364,18 @@ Expr* Parser::ParseWithClauseRange(bool in_stream_expression) {
 void Parser::ParseRandomizeWith(Expr* call) {
   if (Match(TokenKind::kLParen)) {
     call->with_has_parens = true;
-    if (!Check(TokenKind::kRParen)) {
-      do {
-        const Expr* entry = ParseExpr();
-        if (entry->kind == ExprKind::kIdentifier) {
-          call->with_restrict_ids.push_back(entry->text);
-        } else {
-          diag_.Error(entry->range.start,
-                      "a randomize call's with clause lists identifiers alone "
-                      "in its parentheses",
-                      Subclause("A.8.2"));
-        }
-      } while (Match(TokenKind::kComma));
+    bool more = !Check(TokenKind::kRParen);
+    while (more) {
+      const Expr* entry = ParseExpr();
+      if (entry->kind == ExprKind::kIdentifier) {
+        call->with_restrict_ids.push_back(entry->text);
+      } else {
+        diag_.Error(entry->range.start,
+                    "a randomize call's with clause lists identifiers alone "
+                    "in its parentheses",
+                    Subclause("A.8.2"));
+      }
+      more = Match(TokenKind::kComma);
     }
     Expect(TokenKind::kRParen, Subclause("18.7"));
   }
