@@ -21,6 +21,9 @@
 
 namespace delta {
 
+// §10.9 requires positional notation of every assignment pattern a left-hand
+// expression holds, and A.8.5 lets each element of a concatenation target or
+// of a pattern target be a pattern again, so the elements are read in turn.
 static void CheckLhsPatternNamedKeys(const Expr* lhs, DiagEngine& diag) {
   if (!lhs) return;
   const Expr* pat = lhs;
@@ -29,6 +32,10 @@ static void CheckLhsPatternNamedKeys(const Expr* lhs, DiagEngine& diag) {
     diag.Error(lhs->range.start,
                "LHS assignment pattern shall use positional notation only",
                Subclause("10.9"));
+  }
+  if (pat->kind == ExprKind::kAssignmentPattern ||
+      pat->kind == ExprKind::kConcatenation) {
+    for (const Expr* el : pat->elements) CheckLhsPatternNamedKeys(el, diag);
   }
 }
 

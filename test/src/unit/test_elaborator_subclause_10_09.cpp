@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <initializer_list>
+#include <string_view>
 
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
@@ -673,6 +674,37 @@ TEST(AssignmentPatternElaboration,
                               "outside an assignment-like context",
                               line, "10.9"));
   }
+}
+
+// §10.9 (printed page 261) requires positional notation of an assignment
+// pattern used in a left-hand expression, and A.8.5 lets a target's element be
+// a pattern again, so a keyed pattern nested in a concatenation target or in a
+// pattern target is reported, in a procedural and in a continuous assignment,
+// and a positional one nested so is not (#8093).
+TEST(AssignmentPatternElaboration, NestedKeyedPatternInATargetIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef struct packed { logic [3:0] a; logic [3:0] b; } pair_t;\n"
+      "  typedef struct packed { pair_t l; pair_t r; } quad_t;\n"
+      "  pair_t q, q2;\n"
+      "  quad_t w;\n"
+      "  logic [3:0] x, y, x2, y2;\n"
+      "  initial begin\n"
+      "    {pair_t'{a: x, b: y}, q} = w;\n"
+      "    quad_t'{pair_t'{a: x, b: y}, q} = w;\n"
+      "    {pair_t'{x, y}, q} = w;\n"
+      "  end\n"
+      "  assign {pair_t'{a: x2, b: y2}, q2} = w;\n"
+      "endmodule\n",
+      f);
+  constexpr std::string_view kMessage =
+      "LHS assignment pattern shall use positional notation only";
+  for (uint32_t line : {8u, 9u, 12u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, line, "10.9"))
+        << line;
+  }
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kMessage, 10, "10.9"));
 }
 
 }  // namespace
