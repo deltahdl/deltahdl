@@ -20,6 +20,7 @@
 #include "simulator/evaluation.h"
 #include "simulator/expr_walk.h"
 #include "simulator/sequence_actual_cast.h"
+#include "simulator/sequence_locals.h"
 #include "simulator/sim_context.h"
 
 namespace delta {
@@ -52,6 +53,8 @@ std::vector<SeqMatchAssign> SubstituteMatchItems(
       copy.local_copy = it->second;
     }
     copy.rhs = SubstituteFormals(item.rhs, actuals, arena);
+    copy.target =
+        SubstituteTarget(item, copy.local_copy != nullptr, actuals, arena);
     if (item.call != nullptr) {
       copy.call = SubstituteFormals(item.call, actuals, arena);
     }

@@ -18,8 +18,6 @@
 #include "simulator/evaluation.h"
 #include "simulator/sequence_flatten.h"
 #include "simulator/sequence_locals.h"
-#include "simulator/statement_assign.h"
-#include "simulator/statement_assign_internal.h"
 
 namespace delta {
 
@@ -524,11 +522,8 @@ void PerformMatchItem(const SeqMatchAssign& item, LocalValues& locals,
     Logic4Vec& value = locals.values[i];
     Logic4Vec rhs = EvalExpr(
         SubstituteFormals(item.rhs, locals.literals, arena), ctx, arena);
-    if (item.op != TokenKind::kEq) {
-      rhs = EvalBinaryOp(CompoundAssignBaseOp(item.op), value, rhs, arena);
-    }
     bool is_signed = value.is_signed;
-    value = ResizeToWidth(OwnRhsWords(rhs, arena), value.width, arena);
+    value = AssignedLocalValue(item, value, rhs, ctx, arena);
     value.is_signed = is_signed;
     locals.literals[decls[i].name] = LiteralOfValue(value, arena);
   }

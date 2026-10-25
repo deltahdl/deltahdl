@@ -22,6 +22,7 @@ struct Stmt;
 class SimContext;
 class Arena;
 struct Process;
+struct StructTypeInfo;
 struct Variable;
 
 // §6.11.2 names the 4-state types, logic, reg, integer and time, and gives
@@ -70,6 +71,12 @@ void ExecFuncVarDecl(const Stmt* stmt, StaticFrame frame, SimContext& ctx,
 // variable by BindReturnStructLayout in eval_function_body.cpp.
 bool BindNamedLayout(std::string_view var_name, const DataType& type,
                      SimContext& ctx);
+
+// §6.18 with §7.2.1: the layout of the structure or union the typedef name
+// `type` stands for, found as BindNamedLayout finds it, for a variable that
+// keeps its own (Variable::local_layout) rather than binding its name; null
+// where the name stands for none. Defined in eval_function_body_decl.cpp.
+const StructTypeInfo* NamedLayout(const DataType& type, SimContext& ctx);
 
 // §10.4's blocking assignment as a subroutine body performs it, over every
 // left-hand side that body admits: an identifier, a select, `this.f`,

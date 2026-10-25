@@ -28,12 +28,14 @@ void ForEachEventSlot(std::vector<EventExpr>& events, const Fn& fn) {
   }
 }
 
-// Each expression slot of the match items of one operand.
+// Each expression slot of the match items of one operand, a target's selects
+// among them.
 template <typename Fn>
 void ForEachItemSlot(std::vector<SeqMatchAssign>& items, const Fn& fn) {
   for (SeqMatchAssign& item : items) {
     fn(item.rhs);
     fn(item.call);
+    fn(item.target);
   }
 }
 

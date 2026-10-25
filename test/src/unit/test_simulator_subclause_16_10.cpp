@@ -37,20 +37,27 @@ TEST(SequenceLocals, InitializationAssignmentsRunInDeclarationOrder) {
   EXPECT_EQ(clear->value.ToUint64(), 0u);
 }
 
-// Expects the sequence `te2 ##1 last_operand`, its body declaring `locals`
-// and its module the items `prelude`, to end once, at 4, the tick at 35, with
-// te2 high at 3 alone.
+// Expects the sequence `body`, declaring `locals` and its module the items
+// `prelude`, to end once, at 4, the tick at 35, with te2 high at 3 alone.
+void ExpectOneEndAtFour(const std::string& body, const std::string& locals,
+                        const std::string& prelude = "") {
+  SimFixture f;
+  auto* hits =
+      RunAndFindVar(SequenceTickSource(body, DriveTicks({{}, {3}, {}, {}, {}}),
+                                       prelude, locals),
+                    f, "hits");
+  ASSERT_NE(hits, nullptr) << body;
+  EXPECT_EQ(hits->value.ToUint64(), 1u) << body;
+  EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 35u) << body;
+}
+
+// Expects the sequence `te2 ##1 last_operand`, declaring `locals` and its
+// module the items `prelude`, to end once, at 4, the tick at 35, with te2
+// high at 3 alone.
 void ExpectOneEndAfterTe2(const std::string& last_operand,
                           const std::string& locals,
                           const std::string& prelude = "") {
-  SimFixture f;
-  auto* hits = RunAndFindVar(
-      SequenceTickSource("te2 ##1 " + last_operand,
-                         DriveTicks({{}, {3}, {}, {}, {}}), prelude, locals),
-      f, "hits");
-  ASSERT_NE(hits, nullptr) << last_operand;
-  EXPECT_EQ(hits->value.ToUint64(), 1u) << last_operand;
-  EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 35u) << last_operand;
+  ExpectOneEndAtFour("te2 ##1 " + last_operand, locals, prelude);
 }
 
 // §16.10 with §7.4.1: a sequence's local declared of a packed type, `logic
@@ -96,6 +103,80 @@ TEST(SequenceLocals, ALocalOfATypeNameIsTheTypeTheNameStandsFor) {
   ExpectOneEndAfterTe2("(x < 0)", "    snib_t x = -1;\n", kNibbleTypes);
   ExpectOneEndAfterTe2("(x == 255)", "    nib_t [1:0] x = 9'h1FF;\n",
                        kNibbleTypes);
+}
+
+// §16.10 with A.10 footnote 51: a match item may assign a select of a
+// sequence's local, writing those bits and keeping the rest. From v 8'h1F,
+// `v[1] = 0` leaves 8'h1D, `v[7:6] = 2'b11` 8'hDF, `v[3:0] += 3` 8'h12, its
+// four bits wrapping where the whole local would reach 8'h22, `v[7:4]++`
+// 8'h2F where `v++` gives 8'h20, and `--v[4]` 8'h0F where `--v` gives 8'h1E.
+// Each, attached to te2 at 3, ends `##1 (v == want)` at 4; a target read as
+// a bare name alone left the group unparsed and the sequence ending nowhere
+// (#8091).
+TEST(SequenceLocals, AMatchItemAssignsASelectOfTheLocal) {
+  struct Case {
+    const char* item;
+    const char* want;
+  };
+  const Case kCases[] = {{"v[1] = 0", "8'h1D"},
+                         {"v[7:6] = 2'b11", "8'hDF"},
+                         {"v[3:0] += 3", "8'h12"},
+                         {"v[7:4]++", "8'h2F"},
+                         {"--v[4]", "8'h0F"}};
+  for (const Case& c : kCases) {
+    ExpectOneEndAtFour(
+        std::string("(te2, ") + c.item + ") ##1 (v == " + c.want + ")",
+        "    logic [7:0] v = 8'h1F;\n");
+  }
+}
+
+// §16.10 with A.10 footnote 51: the select a match item assigns reaches the
+// local it names through an instance, as the whole local is reached: sub's own
+// w, renamed for the instance, and the local v passed to sub's formal lv.
+// `w[1] = 0` and `lv[1] = 0` each take 8'h1F to 8'h1D, so with te2 at 3 both
+// sequences end at 4 (#8091).
+TEST(SequenceLocals, AMatchItemAssignsASelectOfALocalReachedThroughAnInstance) {
+  ExpectOneEndAtFour("sub", "",
+                     "  sequence sub; logic [7:0] w = 8'h1F;\n"
+                     "    (te2, w[1] = 0) ##1 (w == 8'h1D);\n"
+                     "  endsequence\n");
+  ExpectOneEndAtFour("sub(v) ##1 (v == 8'h1D)", "    logic [7:0] v = 8'h1F;\n",
+                     "  sequence sub(lv); (te2, lv[1] = 0); endsequence\n");
+}
+
+// The structure the cases of a local of a packed structure type use (§7.2).
+constexpr char kPairType[] =
+    "  typedef struct packed { logic [3:0] hi, lo; } pair_t;\n";
+
+// §16.10 with §7.2: a sequence's local of a packed structure type reads and
+// writes its members by name. p, a pair_t holding 8'h3C, has p.hi 3 and p.lo
+// 12, read by an operand and by a later local's initialization; `p.lo = 5`
+// leaves it 8'h35, and `p.hi += 1` 8'h4C (#8094, #8091).
+TEST(SequenceLocals, AStructureLocalReadsAndWritesItsMembers) {
+  const std::string kLocal = "    pair_t p = 8'h3C;\n";
+  ExpectOneEndAfterTe2("(p.hi == 3 && p.lo == 12)", kLocal, kPairType);
+  ExpectOneEndAfterTe2("(h == 3)", kLocal + "    logic [3:0] h = p.hi;\n",
+                       kPairType);
+  ExpectOneEndAtFour("(te2, p.lo = 5) ##1 (p == 8'h35)", kLocal, kPairType);
+  ExpectOneEndAtFour("(te2, p.hi += 1) ##1 (p == 8'h4C)", kLocal, kPairType);
+}
+
+// §16.10 with §7.4.1: a select of a sequence's local resolves against the
+// dimensions it was declared with. `logic [8:1] v` holding 1 has v[1] 1 and
+// v[2] 0, where [7:0] reads them the other way round, read by an operand and
+// by a later local's initialization, and `v[1] = 0` clears the bit holding
+// the 1. Holding 8'hA5, `nib_t [1:0] x` has x[1] the nibble 4'hA and x[0]
+// 4'h5, and `logic [1:0][3:0] y` y[1] 4'hA and y[0][0] 1, where one bit
+// apiece would read 0 and 1 (#8095).
+TEST(SequenceLocals, ASelectOfALocalResolvesAgainstItsDeclaredDimensions) {
+  const std::string kVector = "    logic [8:1] v = 1;\n";
+  ExpectOneEndAfterTe2("(v[1] == 1 && v[2] == 0)", kVector);
+  ExpectOneEndAfterTe2("b", kVector + "    bit b = v[1];\n");
+  ExpectOneEndAtFour("(te2, v[1] = 0) ##1 (v == 0)", kVector);
+  ExpectOneEndAfterTe2("(x[1] == 4'hA && x[0] == 4'h5)",
+                       "    nib_t [1:0] x = 8'hA5;\n", kNibbleTypes);
+  ExpectOneEndAfterTe2("(y[1] == 4'hA && y[0][0] == 1)",
+                       "    logic [1:0][3:0] y = 8'hA5;\n");
 }
 
 // §16.10 makes a local's initialization an assignment to it, and §6.11.2 has
@@ -308,6 +389,22 @@ TEST(PropertyLocals, ALocalOfATypeNameIsTheTypeTheNameStandsFor) {
 TEST(PropertyLocals, ATimeLocalIsSixtyFourUnsignedBits) {
   ExpectPropertyCounts("(1, x = -1) |-> ##1 (x > 64'hFFFF_FFFF)", 9, 0,
                        "time x");
+}
+
+// §16.10 with A.10 footnote 51: a match item may assign a select of a
+// property's local, writing those bits of the attempt's copy and keeping the
+// rest: from 8'hF0, `x[0] = 1` leaves 8'hF1 where `x = 1` gives 1, and from
+// 8'hFF, `x[3:0] += 2` leaves 8'hF1, its four bits wrapping, where `x += 2`
+// gives 8'h01, and `x[7:4]++` 8'h0F where `x++` gives 0. All nine attempts
+// pass each; a target read as a bare name alone left the body unevaluated
+// (#8091).
+TEST(PropertyLocals, AMatchItemAssignsASelectOfTheLocal) {
+  ExpectPropertyCounts("(1, x[0] = 1) |-> ##1 (x == 8'hF1)", 9, 0,
+                       "logic [7:0] x = 8'hF0");
+  ExpectPropertyCounts("(1, x[3:0] += 2) |-> ##1 (x == 8'hF1)", 9, 0,
+                       "logic [7:0] x = 8'hFF");
+  ExpectPropertyCounts("(1, x[7:4]++) |-> ##1 (x == 8'h0F)", 9, 0,
+                       "logic [7:0] x = 8'hFF");
 }
 
 // §16.10 with §7.4.1: the copy of a property's packed local an attempt reads

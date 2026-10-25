@@ -653,6 +653,21 @@ TEST(CheckerVariableRandomization, ALocalVariableCarriesItsValue) {
       "(y == (v == 2'd1)); endsequence\n");
 }
 
+// §17.7.2 with §16.10 and A.10 footnote 51: an assumption over a sequence
+// whose match item assigns a select of a local reads the bits it wrote and
+// keeps the rest: y is solved to the value x had the tick before through v[1]
+// alone, assigned x, or 0 then incremented by x, beside the v[0] the item
+// before it set. Solved as though the whole local were assigned, y would be
+// held where the assertion wants another value whenever x held (#8091).
+TEST(CheckerVariableRandomization, ALocalsSelectCarriesItsValue) {
+  ExpectAssumedPropertiesHold(
+      {"s1", "s2"},
+      "  sequence s1; bit [1:0] v; (1, v = 0, v[1] = x) ##1 "
+      "(y == v[1] && !v[0]); endsequence\n"
+      "  sequence s2; bit [1:0] v; (1, v = 2'b01, v[1] += x) ##1 "
+      "(y == v[1] && v[0]); endsequence\n");
+}
+
 // §17.7.2 with §16.13: an assumption whose operands name a clock of their
 // own holds each attempt to them at the ticks of that clock, which are
 // clock events of the assume set too: m2 holds y at 0 at each posedge, so

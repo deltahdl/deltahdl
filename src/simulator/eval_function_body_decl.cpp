@@ -90,6 +90,11 @@ bool BindNamedLayout(std::string_view var_name, const DataType& type,
   return true;
 }
 
+const StructTypeInfo* NamedLayout(const DataType& type, SimContext& ctx) {
+  std::string_view type_name = NamedLayoutKey(type, ctx);
+  return type_name.empty() ? nullptr : ctx.FindStructType(type_name);
+}
+
 // §13.3 (printed page 337) runs a subroutine body's statements as a
 // begin-end group's, declarations included, and §11.9 (printed 304) lets a
 // tagged union variable be initialized with a tagged union expression, whose

@@ -70,9 +70,9 @@ bool OperandClockTicked(const LinearSequence& body, size_t pos,
 }
 
 // §16.10: the attempt's locals stood up as variables of a scope of their own
-// for the length of one operand's evaluation, read back into the attempt when
-// the scope is popped, so an operand and its match items read and write the
-// attempt's own copies.
+// (StandUpLocal) for the length of one operand's evaluation, read back into
+// the attempt when the scope is popped, so an operand and its match items read
+// and write the attempt's own copies.
 class AttemptLocalsScope {
  public:
   AttemptLocalsScope(const std::vector<SeqLocalDecl>& decls,
@@ -80,12 +80,7 @@ class AttemptLocalsScope {
       : attempt_(attempt), ctx_(ctx) {
     ctx_.PushScope();
     for (size_t i = 0; i < decls.size() && i < attempt.locals.size(); ++i) {
-      Variable* var =
-          ctx_.CreateLocalVariable(decls[i].name, attempt.locals[i].width);
-      var->is_4state = LocalIs4State(decls[i], ctx_);
-      var->is_signed = LocalIsSigned(decls[i], ctx_);
-      var->value = attempt.locals[i];
-      vars_.push_back(var);
+      vars_.push_back(StandUpLocal(decls[i], attempt.locals[i], ctx_));
     }
   }
   ~AttemptLocalsScope() {
@@ -98,8 +93,9 @@ class AttemptLocalsScope {
   AttemptLocalsScope& operator=(const AttemptLocalsScope&) = delete;
 
   // §16.10: one match item, `lvar = rhs` or `lvar op= rhs`, assigning the
-  // attempt's copy of the local; the assigned value takes words of its own.
-  // §16.11: a subroutine call among the items is scheduled instead.
+  // attempt's copy of the local, or the select or member of it its target
+  // writes; the assigned value takes words of its own. §16.11: a subroutine
+  // call among the items is scheduled instead.
   void Assign(const SeqMatchAssign& item, Arena& arena) {
     if (item.call != nullptr) {
       ScheduleMatchCall(item.call, ctx_, arena);
@@ -112,6 +108,10 @@ class AttemptLocalsScope {
     Variable* var = ctx_.FindLocalVariable(item.lvar);
     if (var == nullptr) return;
     Logic4Vec rhs = EvalExpr(item.rhs, ctx_, arena);
+    if (item.target != nullptr) {
+      AssignMatchItemTarget(item, rhs, *var, ctx_, arena);
+      return;
+    }
     if (item.op != TokenKind::kEq) {
       rhs = EvalBinaryOp(CompoundAssignBaseOp(item.op), var->value, rhs, arena);
     }
@@ -128,10 +128,7 @@ class AttemptLocalsScope {
   void AssignLocalCopy(const SeqMatchAssign& item, Arena& arena) {
     Logic4Vec held = EvalExpr(item.local_copy, ctx_, arena);
     Logic4Vec rhs = EvalExpr(item.rhs, ctx_, arena);
-    if (item.op != TokenKind::kEq) {
-      rhs = EvalBinaryOp(CompoundAssignBaseOp(item.op), held, rhs, arena);
-    }
-    Logic4Vec value = ResizeToWidth(OwnRhsWords(rhs, arena), held.width, arena);
+    Logic4Vec value = AssignedLocalValue(item, held, rhs, ctx_, arena);
     value.is_signed = held.is_signed;
     *item.local_copy = *LiteralOfValue(value, arena);
   }

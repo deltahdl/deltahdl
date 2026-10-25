@@ -102,6 +102,7 @@ struct ParserPropertySpecHelpers {
   // subroutine call, and the literal 1 an inc_or_dec_expression adds or
   // subtracts. Defined in src/parser/parser_sequence_match_items.cpp.
   static Expr* OneLiteral(Parser& p);
+  static bool ParseMatchItemTarget(Parser& p, SeqMatchAssign& item);
   static bool ParseIncDecMatchItem(Parser& p, SeqMatchAssign& item,
                                    bool prefix);
   static bool AheadIsSubroutineCall(Parser& p);

@@ -31,6 +31,20 @@ Expr* ParserPropertySpecHelpers::OneLiteral(Parser& p) {
   return one;
 }
 
+// §16.10: the variable_lvalue a match item writes, the local's name and,
+// where A.10 footnote 51 lets it select within the local or name a member of
+// it, `v[1]` or `s.f`, the whole of what is written as `target`.
+bool ParserPropertySpecHelpers::ParseMatchItemTarget(Parser& p,
+                                                     SeqMatchAssign& item) {
+  if (!p.Check(TokenKind::kIdentifier)) return false;
+  Token name = p.Consume();
+  item.lvar = name.text;
+  if (p.Check(TokenKind::kDot) || p.AtSelectBracket()) {
+    item.target = p.ParseIdentifierPostfixChain(p.ParseMemberAccessChain(name));
+  }
+  return true;
+}
+
 // §16.10: an inc_or_dec_expression as a match item, `lvar++`, `lvar--`,
 // `++lvar` or `--lvar`, is the local updated by one, `lvar += 1` or `lvar
 // -= 1`; `prefix` says the operator stood before the name.
@@ -38,10 +52,7 @@ bool ParserPropertySpecHelpers::ParseIncDecMatchItem(Parser& p,
                                                      SeqMatchAssign& item,
                                                      bool prefix) {
   TokenKind op = p.Consume().kind;
-  if (prefix) {
-    if (!p.Check(TokenKind::kIdentifier)) return false;
-    item.lvar = p.Consume().text;
-  }
+  if (prefix && !ParseMatchItemTarget(p, item)) return false;
   item.op =
       op == TokenKind::kPlusPlus ? TokenKind::kPlusEq : TokenKind::kMinusEq;
   item.rhs = OneLiteral(p);
@@ -97,8 +108,7 @@ bool ParserPropertySpecHelpers::ParseSequenceMatchItem(Parser& p,
   if (p.Check(TokenKind::kPlusPlus) || p.Check(TokenKind::kMinusMinus)) {
     return ParseIncDecMatchItem(p, item, true);
   }
-  if (!p.Check(TokenKind::kIdentifier)) return false;
-  item.lvar = p.Consume().text;
+  if (!ParseMatchItemTarget(p, item)) return false;
   if (p.Check(TokenKind::kPlusPlus) || p.Check(TokenKind::kMinusMinus)) {
     return ParseIncDecMatchItem(p, item, false);
   }

@@ -1,8 +1,14 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
+#include <string_view>
+#include <vector>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
+#include "lexer/token.h"
+#include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
 
@@ -275,6 +281,52 @@ TEST(SequenceLocalVariableParsing,
     EXPECT_EQ(body.delays[2].max, 0u);
     EXPECT_EQ(body.repetitions[2].kind, SeqRepetition::Kind::kNone);
   }
+}
+
+// §16.10 with A.10 footnote 51: a match item's operator_assignment or
+// inc_or_dec_expression writes a variable_lvalue, which may select within the
+// local or name a member of it. Each form is captured with the group's
+// operand, `lvar` naming the local and `target` keeping the select or member
+// written; read as a bare name alone, the target left the group unparsed and
+// the body without an operand to evaluate.
+TEST(SequenceLocalVariableParsing, AMatchItemTargetMaySelectWithinTheLocal) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef struct packed { logic [3:0] hi, lo; } pair_t;\n"
+      "  logic clk, a, b;\n"
+      "  sequence s;\n"
+      "    logic [7:0] v;\n"
+      "    pair_t p;\n"
+      "    @(posedge clk) (a, v[1] = b, p.hi += 2, ++v[3:2], p.lo[0]--, v = 0)"
+      " ##1 b;\n"
+      "  endsequence\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindItemByKind(r, ModuleItemKind::kSequenceDecl);
+  ASSERT_NE(item, nullptr);
+  const SeqLinearBody& body = item->seq_linear;
+  ASSERT_EQ(body.operands.size(), 2u);
+  const std::vector<SeqMatchAssign>& items = body.match_items[0];
+  struct Case {
+    std::string_view lvar;
+    TokenKind op;
+    ExprKind target;
+  };
+  const Case kCases[] = {{"v", TokenKind::kEq, ExprKind::kSelect},
+                         {"p", TokenKind::kPlusEq, ExprKind::kMemberAccess},
+                         {"v", TokenKind::kPlusEq, ExprKind::kSelect},
+                         {"p", TokenKind::kMinusEq, ExprKind::kSelect}};
+  ASSERT_EQ(items.size(), 5u);
+  for (size_t i = 0; i < 4; ++i) {
+    SCOPED_TRACE(i);
+    EXPECT_EQ(items[i].lvar, kCases[i].lvar);
+    EXPECT_EQ(items[i].op, kCases[i].op);
+    ASSERT_NE(items[i].target, nullptr);
+    EXPECT_EQ(items[i].target->kind, kCases[i].target);
+  }
+  EXPECT_EQ(items[4].lvar, "v");
+  EXPECT_EQ(items[4].target, nullptr);
 }
 
 }  // namespace

@@ -11,6 +11,7 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
+#include "parser/expr_substitute.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/scheduler.h"
@@ -80,6 +81,64 @@ bool LocalIsSigned(const SeqLocalDecl& decl, const SimContext& ctx) {
              : LocalIsSigned(decl.type_kw);
 }
 
+Variable* StandUpLocal(const SeqLocalDecl& decl, const Logic4Vec& value,
+                       SimContext& ctx) {
+  Variable* var = ctx.CreateLocalVariable(decl.name, value.width);
+  var->is_4state = LocalIs4State(decl, ctx);
+  var->is_signed = LocalIsSigned(decl, ctx);
+  var->value = value;
+  DataType type = decl.named_type;
+  if (!decl.packed_dims.empty()) {
+    type.packed_dim_left = decl.packed_dims.front().first;
+    type.packed_dim_right = decl.packed_dims.front().second;
+    type.extra_packed_dims.assign(decl.packed_dims.begin() + 1,
+                                  decl.packed_dims.end());
+  }
+  RecordDeclaredRange(type, var, ctx, ctx.GetArena());
+  // A type name written with dimensions after it stands for the element of
+  // an array of it, which RecordDeclaredRange shaped, not the whole local.
+  if (type.kind == DataTypeKind::kNamed && decl.packed_dims.empty()) {
+    var->local_layout = NamedLayout(type, ctx);
+  }
+  return var;
+}
+
+void AssignMatchItemTarget(const SeqMatchAssign& item, Logic4Vec rhs,
+                           Variable& local, SimContext& ctx, Arena& arena) {
+  local.value = OwnRhsWords(local.value, arena);
+  if (item.op != TokenKind::kEq) {
+    rhs = EvalBinaryOp(CompoundAssignBaseOp(item.op),
+                       EvalExpr(item.target, ctx, arena), rhs, arena);
+  }
+  PerformBlockingAssign(item.target, rhs, ctx, arena);
+}
+
+Logic4Vec AssignedLocalValue(const SeqMatchAssign& item, const Logic4Vec& whole,
+                             Logic4Vec rhs, SimContext& ctx, Arena& arena) {
+  if (item.target != nullptr) {
+    ctx.PushScope();
+    Variable* local = ctx.CreateLocalVariable(item.lvar, whole.width);
+    local->value = whole;
+    AssignMatchItemTarget(item, rhs, *local, ctx, arena);
+    Logic4Vec value = local->value;
+    ctx.PopScope();
+    return value;
+  }
+  if (item.op != TokenKind::kEq) {
+    rhs = EvalBinaryOp(CompoundAssignBaseOp(item.op), whole, rhs, arena);
+  }
+  return ResizeToWidth(OwnRhsWords(rhs, arena), whole.width, arena);
+}
+
+Expr* SubstituteTarget(const SeqMatchAssign& item, bool keeps_local,
+                       const ActualsByFormal& actuals, Arena& arena) {
+  if (item.target == nullptr) return nullptr;
+  if (!keeps_local) return SubstituteFormals(item.target, actuals, arena);
+  ActualsByFormal others = actuals;
+  others.erase(item.lvar);
+  return SubstituteFormals(item.target, others, arena);
+}
+
 // §16.10: the initialization assignments are performed in the order the
 // locals are declared, one's expression reading the locals declared before
 // it as assigned, so each is stood up in a scope of its own as its value is
@@ -103,10 +162,7 @@ std::vector<Logic4Vec> InitialLocals(const std::vector<SeqLocalDecl>& decls,
     } else if (is_4state) {
       FillWithX(value);
     }
-    Variable* var = ctx.CreateLocalVariable(decl.name, value.width);
-    var->is_4state = is_4state;
-    var->is_signed = LocalIsSigned(decl, ctx);
-    var->value = value;
+    StandUpLocal(decl, value, ctx);
     values.push_back(value);
   }
   ctx.PopScope();

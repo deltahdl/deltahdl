@@ -283,6 +283,11 @@ struct SeqMatchAssign {
   // expressions read in the local's place; the item assigns the copy by
   // rewriting the literal. Null for any other target.
   Expr* local_copy = nullptr;
+  // §16.10 with A.10 footnote 51: the variable_lvalue written where it
+  // selects within the local `lvar` names or names a member of it, `v[1]` of
+  // `v[1] = b` or `s.f` of `s.f++`, read as an assignment's target is; null
+  // where the local is written whole.
+  Expr* target = nullptr;
 };
 
 // §16.10: a local variable of a sequence body, one an
