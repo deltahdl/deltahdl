@@ -207,12 +207,7 @@ TEST(PliPreObservedSim, VpiPutValueFromPreObservedRecordsWriteViolation) {
 
   Logic4Word storage{};
   Variable var{};
-  var.value.width = 32;
-  var.value.nwords = 1;
-  var.value.words = &storage;
-
-  VpiObject obj{};
-  obj.var = &var;
+  VpiObject obj = IntegerVarObject(var, storage);
 
   auto* pre_obs = sched.GetEventPool().Acquire();
   pre_obs->callback = [&]() {
@@ -236,12 +231,7 @@ TEST(PliPreObservedSim, MultipleIllegalWritesFromPreObservedAreEachCounted) {
 
   Logic4Word storage{};
   Variable var{};
-  var.value.width = 32;
-  var.value.nwords = 1;
-  var.value.words = &storage;
-
-  VpiObject obj{};
-  obj.var = &var;
+  VpiObject obj = IntegerVarObject(var, storage);
 
   auto* pre_obs = sched.GetEventPool().Acquire();
   pre_obs->callback = [&]() {
@@ -268,12 +258,7 @@ TEST(PliPreObservedSim, VpiPutValueFromPostNbaIsNotFlaggedAgainstPreObserved) {
 
   Logic4Word storage{};
   Variable var{};
-  var.value.width = 32;
-  var.value.nwords = 1;
-  var.value.words = &storage;
-
-  VpiObject obj{};
-  obj.var = &var;
+  VpiObject obj = IntegerVarObject(var, storage);
 
   auto* post_nba = sched.GetEventPool().Acquire();
   post_nba->callback = [&]() {
@@ -322,6 +307,7 @@ TEST(PliPreObservedSim, VpiPutValueOnNetFromPreObservedRecordsWriteViolation) {
 
   Net net{};
   VpiObject obj{};
+  obj.type = vpiNet;
   obj.net = &net;
 
   auto* pre_obs = sched.GetEventPool().Acquire();

@@ -230,12 +230,7 @@ TEST(PostponedRegionSim, VpiPutValueFromPostponedRecordsWriteViolation) {
 
   Logic4Word storage{};
   Variable var{};
-  var.value.width = 32;
-  var.value.nwords = 1;
-  var.value.words = &storage;
-
-  VpiObject obj{};
-  obj.var = &var;
+  VpiObject obj = IntegerVarObject(var, storage);
 
   auto* postponed = sched.GetEventPool().Acquire();
   postponed->callback = [&]() {
@@ -259,12 +254,7 @@ TEST(PostponedRegionSim, MultipleIllegalWritesAreEachCounted) {
 
   Logic4Word storage{};
   Variable var{};
-  var.value.width = 32;
-  var.value.nwords = 1;
-  var.value.words = &storage;
-
-  VpiObject obj{};
-  obj.var = &var;
+  VpiObject obj = IntegerVarObject(var, storage);
 
   auto* postponed = sched.GetEventPool().Acquire();
   postponed->callback = [&]() {

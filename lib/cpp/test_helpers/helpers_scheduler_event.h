@@ -237,6 +237,19 @@ inline void VerifyScheduleFromActiveIsNotFlagged(
   EXPECT_EQ(illegal_schedule_count(sched), 0u);
 }
 
+// The VPI object of kind vpiIntegerVar standing for `var`, which it makes a
+// 32-bit variable holding its one word in `storage`: a target a test's
+// vpi_put_value() can write, a variable being among those §38.34 lists.
+inline VpiObject IntegerVarObject(Variable& var, Logic4Word& storage) {
+  var.value.width = 32;
+  var.value.nwords = 1;
+  var.value.words = &storage;
+  VpiObject obj{};
+  obj.type = vpiIntegerVar;
+  obj.var = &var;
+  return obj;
+}
+
 // Verify that a VPI write performed from an Active callback writes the value
 // and is not flagged against the given region's illegal-write counter.
 // `illegal_write_count` reads the region-specific counter off the scheduler.
@@ -249,12 +262,7 @@ inline void VerifyVpiWriteFromActiveIsNotFlagged(
 
   Logic4Word storage{};
   Variable var{};
-  var.value.width = 32;
-  var.value.nwords = 1;
-  var.value.words = &storage;
-
-  VpiObject obj{};
-  obj.var = &var;
+  VpiObject obj = IntegerVarObject(var, storage);
 
   auto* active = sched.GetEventPool().Acquire();
   active->callback = [&]() {
