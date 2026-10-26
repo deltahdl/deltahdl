@@ -96,7 +96,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 - [Positive prompts](positive-prompts.md) — write a generated prompt as the action wanted, not the one forbidden.
 - [Composite actions](composite-actions.md) — a CI mechanism is `.github/actions/<name>/action.yml`, not a shell script.
 - [Naming an inserted step](naming-an-inserted-pipeline-step.md) — give it a real position or a descriptive name, never "Step 0".
-- [The unpinned CI toolchain](unpinned-ci-toolchain.md) — everything floats to latest; Actions tags stay at their major version.
+- [The unpinned CI toolchain](unpinned-ci-toolchain.md) — everything floats to latest, the runner image too, whose new headers move include-cleaner's verdicts; Actions tags stay at their major version.
 
 ## Issues
 
