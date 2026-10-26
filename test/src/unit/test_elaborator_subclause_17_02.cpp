@@ -328,6 +328,43 @@ TEST(CheckerDeclaration, ATypedefIndexAndAPackageClassAreDynamic) {
                             12, "17.2"));
 }
 
+// §17.2 with §6.21: a typedef carries its unpacked dimensions, and the class
+// its chain ends at, into the variable declared with it, as Annex P has a type
+// including a dynamic one dynamic. q, declared through a queue typedef, and h,
+// through a typedef of a class, are dynamic variables, while fx, through a
+// typedef of a fixed-size array, may still be indexed.
+TEST(CheckerDeclaration, AVariableDeclaredThroughATypedefIsDynamicAsItsType) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C; int v; endclass\n"
+      "module m;\n"
+      "  typedef int q_t[$];\n"
+      "  typedef C c_t;\n"
+      "  typedef int f_t[4];\n"
+      "  logic clk;\n"
+      "  q_t q;\n"
+      "  c_t h;\n"
+      "  f_t fx;\n"
+      "  checker c;\n"
+      "    a1: assert property (@(posedge clk) q[0] == 1);\n"
+      "    a2: assert property (@(posedge clk) h.v == 1);\n"
+      "    a3: assert property (@(posedge clk) fx[0] == 1);\n"
+      "  endchecker\n"
+      "  c u();\n"
+      "endmodule\n",
+      f, "m");
+  auto reported = [&](const char* name, int line) {
+    return ReportedError(f.diag.Diagnostics(),
+                         std::string("references a member or element of the "
+                                     "dynamic variable '") +
+                             name + "'",
+                         line, "17.2");
+  };
+  EXPECT_TRUE(reported("q", 11));
+  EXPECT_TRUE(reported("h", 12));
+  EXPECT_FALSE(reported("fx", 13));
+}
+
 // §17.2: a checker formal's type is one §16.12 gives a property formal, which
 // an interface is not. A name followed by the formal's identifier alone is
 // read before it is known to be an interface's, so the report is made once

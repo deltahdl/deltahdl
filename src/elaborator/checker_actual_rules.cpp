@@ -162,10 +162,18 @@ void CheckTaintedFormalUse(const ModuleItem* item, const ModuleDecl* checker,
 // §6.21: whether the variable `item` declares is dynamic, an array with a
 // dimension that is not fixed-size, a dynamic array's `[]`, a queue's `[$]`
 // or an associative array's index, or a handle of a class `tables` names.
+// Annex P has a type that includes a dynamic one dynamic, and a typedef
+// carries its dimensions and the type it names into the variable declared
+// with it, so the chain of typedef names the type is written with is followed:
+// a dimension any of them wrote counts, and so does a class the chain names.
 bool IsDynamicVariable(const ModuleItem* item, const TypeShapeTables& tables) {
-  bool handle = item->data_type.kind == DataTypeKind::kNamed &&
-                tables.class_names.count(item->data_type.type_name) != 0;
-  return handle || std::ranges::any_of(item->unpacked_dims, [&](const Expr* d) {
+  std::vector<std::string_view> names;
+  FollowTypedefs(item->data_type, tables.typedefs, names);
+  bool handle = std::ranges::any_of(names, [&](std::string_view name) {
+    return tables.class_names.contains(name);
+  });
+  return handle || !TypedefDimsAreFixedSize(item->data_type, tables) ||
+         std::ranges::any_of(item->unpacked_dims, [&](const Expr* d) {
            return !IsFixedSizeUnpackedDim(d, tables);
          });
 }

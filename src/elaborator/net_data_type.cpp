@@ -85,10 +85,8 @@ void ValidateNetDeclaratorDims(const std::vector<Expr*>& dims,
              Subclause("6.7"));
 }
 
-// Whether every typedef name the chain from `dtype` passes through wrote only
-// fixed-size unpacked dimensions.
-static bool TypedefDimsAreFixedSize(const DataType& dtype,
-                                    const TypeShapeTables& tables) {
+bool TypedefDimsAreFixedSize(const DataType& dtype,
+                             const TypeShapeTables& tables) {
   std::vector<std::string_view> names;
   FollowTypedefs(dtype, tables.typedefs, names);
   for (std::string_view name : names) {

@@ -62,6 +62,11 @@ void ValidateNetDataTypeIs4State(const DataType& dtype,
                                  const TypedefMap& typedefs, DiagEngine& diag,
                                  SourceLoc loc);
 
+// Whether every typedef name the chain from `dtype` passes through wrote only
+// fixed-size unpacked dimensions.
+bool TypedefDimsAreFixedSize(const DataType& dtype,
+                             const TypeShapeTables& tables);
+
 // §6.7.1 item b: a typedef carries its unpacked dimensions into the type it
 // names, so a net declared through one is an array of that shape, and the
 // array has to be fixed-size. Reports `dtype` at `loc` when a typedef name it
