@@ -6,6 +6,7 @@
 #include "elaborator/elaborator_validate_internal.h"
 #include "lexer/token.h"
 #include "parser/ast_class.h"
+#include "parser/ast_covergroup.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
@@ -59,6 +60,56 @@ void ReportMemberImplicationOperators(const ClassMember& member,
   ReportClassImplicationOperators(member.nested_class, diag);
 }
 
+// A generate construct's header (A.4.2): an if-generate's condition and the
+// else-if that follows it, a case-generate's selector and item values, and a
+// loop-generate's initialization, condition and iteration. Each is held in the
+// fields of its kind, and the others are empty.
+void ReportGenerateImplicationOperators(const ModuleItem& item,
+                                        DiagEngine& diag) {
+  ReportImplicationOperators(item.gen_cond, diag);
+  ReportStmtImplicationOperators(item.gen_init, diag);
+  ReportStmtImplicationOperators(item.gen_step, diag);
+  for (const GenerateCaseItem& case_item : item.gen_case_items) {
+    for (const Expr* pattern : case_item.patterns) {
+      ReportImplicationOperators(pattern, diag);
+    }
+  }
+  if (item.gen_else != nullptr) {
+    ReportItemImplicationOperators(*item.gen_else, diag);
+  }
+}
+
+// A bin's or a coverpoint option's expressions (A.2.11): an option's value, a
+// bin's array size, its values, its `with` filter, its set expression and its
+// guard.
+void ReportBinsImplicationOperators(const BinsOrOptions& bins,
+                                    DiagEngine& diag) {
+  ReportImplicationOperators(bins.option.value, diag);
+  ReportImplicationOperators(bins.array_size, diag);
+  for (const CovergroupValueRange& range : bins.ranges) {
+    ReportImplicationOperators(range.lo, diag);
+    ReportImplicationOperators(range.hi, diag);
+  }
+  ReportImplicationOperators(bins.with_expr, diag);
+  ReportImplicationOperators(bins.set_expr, diag);
+  ReportImplicationOperators(bins.iff, diag);
+}
+
+// A covergroup's options, and each coverpoint's expression, guard and bins
+// (A.2.11).
+void ReportCovergroupImplicationOperators(const CovergroupDecl& covergroup,
+                                          DiagEngine& diag) {
+  for (const CoverageSpecOrOption& spec : covergroup.items) {
+    ReportImplicationOperators(spec.option.value, diag);
+    if (spec.cover_point == nullptr) continue;
+    ReportImplicationOperators(spec.cover_point->expr, diag);
+    ReportImplicationOperators(spec.cover_point->iff, diag);
+    for (const BinsOrOptions& bins : spec.cover_point->bins) {
+      ReportBinsImplicationOperators(bins, diag);
+    }
+  }
+}
+
 }  // namespace
 
 void ReportImplicationOperators(const Expr* expr, DiagEngine& diag) {
@@ -107,6 +158,26 @@ void ReportItemImplicationOperators(const ModuleItem& item, DiagEngine& diag) {
       break;
     case ModuleItemKind::kClassDecl:
       ReportClassImplicationOperators(item.class_decl, diag);
+      break;
+    case ModuleItemKind::kModuleInst:
+      // A.4.1.1: the parameter values written in the instantiation. A checker
+      // instance takes none (A.4.1.4).
+      for (const auto& param : item.inst_params) {
+        ReportImplicationOperators(param.second, diag);
+      }
+      break;
+    case ModuleItemKind::kGateInst:
+      for (const Expr* terminal : item.gate_terminals) {
+        ReportImplicationOperators(terminal, diag);
+      }
+      break;
+    case ModuleItemKind::kGenerateIf:
+    case ModuleItemKind::kGenerateCase:
+    case ModuleItemKind::kGenerateFor:
+      ReportGenerateImplicationOperators(item, diag);
+      break;
+    case ModuleItemKind::kCovergroupDecl:
+      ReportCovergroupImplicationOperators(*item.covergroup, diag);
       break;
     default:
       break;

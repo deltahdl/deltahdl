@@ -24,6 +24,7 @@
 #include "elaborator/elaborator_items_params.h"
 #include "elaborator/elaborator_module_inst_internal.h"
 #include "elaborator/elaborator_port_binding_internal.h"
+#include "elaborator/implication_operator_rules.h"
 #include "elaborator/property_instance.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
@@ -703,6 +704,14 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
     current_inst_path_ = std::move(saved_inst_path);
     config_inst_path_ = std::move(saved_config_path);
     return;
+  }
+  // A.4.1.1: a module's, interface's or program's port connections are
+  // ordinary expressions; a checker's are property_actual_args (A.4.1.4),
+  // which may hold a property.
+  if (child_decl->decl_kind != ModuleDeclKind::kChecker) {
+    for (const auto& port : item->inst_ports) {
+      ReportImplicationOperators(port.second, diag_);
+    }
   }
 
   EnterGenBlockInstance(inst, child_decl,

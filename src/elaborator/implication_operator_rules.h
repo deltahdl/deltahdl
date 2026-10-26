@@ -15,9 +15,12 @@ void ReportImplicationOperators(const Expr* expr, DiagEngine& diag);
 
 // The same for the ordinary expressions `item` holds: a continuous
 // assignment's, a declaration's initializer or a let's body, a subroutine's or
-// a let's port defaults, those of a class it declares, and those of the
-// statements its body and its subroutine body hold, the lets declared among a
-// block's items included. A concurrent assertion's property and an expect
+// a let's port defaults, an instance's parameter values, a gate's terminals, a
+// generate construct's header, those of a class or a covergroup it declares,
+// and those of the statements its body and its subroutine body hold, the lets
+// declared among a block's items included. An instance's port connections are
+// left to the elaboration of the instance, which knows whether it instantiates
+// a checker. A concurrent assertion's property and an expect
 // statement's are property expressions and are left out; the statements of
 // their action blocks are not.
 void ReportItemImplicationOperators(const ModuleItem& item, DiagEngine& diag);

@@ -154,4 +154,125 @@ TEST(OperatorElaboration, ImplicationInPackageAndUnitScopeIsError) {
   ExpectImplicationReports(f, {2, 5, 10}, {3, 8, 13});
 }
 
+// A.4.1.1 writes a module instance's ordered and named port connections as
+// expressions. A checker instance's are property_actual_args (A.4.1.4), which
+// may hold a property.
+TEST(OperatorElaboration, ImplicationInInstancePortConnectionIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module c(input logic i);\n"
+      "endmodule\n"
+      "checker k(property p);\n"
+      "endchecker\n"
+      "module m;\n"
+      "  logic a, b;\n"
+      "  c u1(a |-> b);\n"
+      "  c u2(.i(a |=> b));\n"
+      "  k u3(a |-> b);\n"
+      "endmodule\n",
+      f);
+  ExpectImplicationReports(f, {7}, {8});
+}
+
+// A.4.1.1 writes an ordered and a named parameter value as a param_expression.
+TEST(OperatorElaboration, ImplicationInInstanceParameterValueIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module c #(parameter bit P = 0, parameter bit Q = 0);\n"
+      "endmodule\n"
+      "module m;\n"
+      "  c #(1'b1 |-> 1'b0) u1();\n"
+      "  c #(.Q(1'b0 |=> 1'b1)) u2();\n"
+      "endmodule\n",
+      f);
+  ExpectImplicationReports(f, {4}, {5});
+}
+
+// A.3.3 writes a gate's input and enable terminals as expressions.
+TEST(OperatorElaboration, ImplicationInGateTerminalIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  wire o1, o2;\n"
+      "  logic a, b, e;\n"
+      "  and g1(o1, a |-> b, e);\n"
+      "  bufif1 g2(o2, a, e |=> b);\n"
+      "endmodule\n",
+      f);
+  ExpectImplicationReports(f, {4}, {5});
+}
+
+// A.4.2 writes an if-generate construct's condition as a constant expression,
+// that of an else-if among them.
+TEST(OperatorElaboration, ImplicationInIfGenerateConditionIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  localparam bit A = 1, B = 0;\n"
+      "  if (A |-> B) begin : g1\n"
+      "  end else if (B |=> A) begin : g2\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ExpectImplicationReports(f, {3}, {4});
+}
+
+// A.4.2 writes a case-generate construct's selector and item values as
+// constant expressions.
+TEST(OperatorElaboration, ImplicationInCaseGenerateIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  localparam bit A = 1, B = 0;\n"
+      "  case (A |-> B)\n"
+      "    B |=> A: begin : g1 end\n"
+      "    default: begin : g2 end\n"
+      "  endcase\n"
+      "endmodule\n",
+      f);
+  ExpectImplicationReports(f, {3}, {4});
+}
+
+// A.4.2 writes a loop-generate construct's initialization, condition and
+// iteration as expressions.
+TEST(OperatorElaboration, ImplicationInLoopGenerateHeaderIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  localparam bit A = 1, B = 0;\n"
+      "  genvar i;\n"
+      "  for (i = A |-> B; i < 1; i = i + 1) begin : g1\n"
+      "  end\n"
+      "  for (i = 0; i < (A |=> B) + 1; i = i + 1) begin : g2\n"
+      "  end\n"
+      "  for (i = 0; i < 1; i = i + (B |-> A) + 1) begin : g3\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ExpectImplicationReports(f, {4, 8}, {6});
+}
+
+// A.2.11 writes a covergroup option's value, a coverpoint's expression and
+// guard, and a bin's option, values, array size, filter, set expression and
+// guard as expressions.
+TEST(OperatorElaboration, ImplicationInCovergroupIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk, a, b;\n"
+      "  covergroup cg @(posedge clk);\n"
+      "    option.weight = 1'b1 |-> 1'b0;\n"
+      "    cp: coverpoint a |=> b iff (a |-> b) {\n"
+      "      option.weight = 1'b0 |=> 1'b1;\n"
+      "      bins one = {1'b1 |-> 1'b0, [1'b0 : 1'b1 |=> 1'b0]};\n"
+      "      bins arr[1'b1 |-> 1'b1] = {0} iff (b |=> a);\n"
+      "      bins w = {[0:1]} with (item |-> 1'b1);\n"
+      "      bins s = a |=> b;\n"
+      "    }\n"
+      "  endgroup\n"
+      "endmodule\n",
+      f);
+  ExpectImplicationReports(f, {4, 5, 7, 8, 9}, {5, 6, 7, 8, 10});
+}
+
 }  // namespace
