@@ -183,4 +183,63 @@ TEST(DpiUnpackedAggregates, AnArrayMemberOfPackedElementsIsCanonical) {
   EXPECT_EQ(VariableValue(f, "t3"), 32559U);
 }
 
+// The C functions the design below calls, reading and writing a sized array of
+// pairs as the C array of the struct it is laid out as.
+int PairsSum(const Pair* p) {
+  int sum = 0;
+  for (int i = 0; i < 4; ++i) sum = (sum * 100) + (p[i].x * 10) + p[i].y;
+  return sum;
+}
+
+void PairsMake(Pair* q) {
+  q[0] = {5, 6};
+  q[1] = {7, 8};
+}
+
+// A design passing a sized array of unpacked structs to C and filling another
+// through an output, each declared over a descending range.
+void RunArrayOfStructsDesign(SimFixture& f) {
+  RunWithImportsBound(
+      "module t;\n"
+      "  typedef struct { int x; int y; } pair;\n"
+      "  import \"DPI-C\" function int pairs_sum(input pair p [3:0]);\n"
+      "  import \"DPI-C\" function void pairs_make(output pair q [1:0]);\n"
+      "  pair ps [3:0];\n"
+      "  pair qs [1:0];\n"
+      "  int s, q0, q1;\n"
+      "  initial begin\n"
+      "    foreach (ps[k]) begin\n"
+      "      ps[k].x = k + 1; ps[k].y = 9 - k;\n"
+      "    end\n"
+      "    s = pairs_sum(ps);\n"
+      "    pairs_make(qs);\n"
+      "    q0 = qs[0].x * 10 + qs[0].y;\n"
+      "    q1 = qs[1].x * 10 + qs[1].y;\n"
+      "  end\n"
+      "endmodule\n",
+      f,
+      {{"pairs_sum", reinterpret_cast<void*>(&PairsSum)},
+       {"pairs_make", reinterpret_cast<void*>(&PairsMake)}},
+      "annex_h_07_08_struct_arrays");
+}
+
+// §H.7.8 with §H.7.3: an unpacked array of structs is an aggregate built of
+// subaggregates, passed to a sized formal as the C array of the struct, the
+// element of the lowest index first: C reads pairs 0 to 3 in that order.
+TEST(DpiUnpackedAggregates, ASizedArrayOfStructsCrossesAsACArray) {
+  SimFixture f;
+  RunArrayOfStructsDesign(f);
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+  EXPECT_EQ(VariableValue(f, "s"), 19283746U);
+}
+
+// A sized output array of structs is copied back element by element, C index
+// 0 going to the lowest SystemVerilog index.
+TEST(DpiUnpackedAggregates, ASizedOutputArrayOfStructsIsCopiedBack) {
+  SimFixture f;
+  RunArrayOfStructsDesign(f);
+  EXPECT_EQ(VariableValue(f, "q0"), 56U);
+  EXPECT_EQ(VariableValue(f, "q1"), 78U);
+}
+
 }  // namespace

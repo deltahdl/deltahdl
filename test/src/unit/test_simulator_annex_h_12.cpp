@@ -29,6 +29,7 @@ SvOpenArrayDesc Desc(const SvOpenArrayDimRange* ranges, int n_dims,
   SvOpenArrayDesc desc;
   desc.data = nullptr;
   desc.n_dims = n_dims;
+  desc.has_packed_part = 1;
   desc.ranges = ranges;
   desc.elem_size = elem_size;
   return desc;

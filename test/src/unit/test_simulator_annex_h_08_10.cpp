@@ -1,11 +1,14 @@
+#include <dlfcn.h>
 #include <gtest/gtest.h>
 
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <string>
+#include <string_view>
 #include <vector>
 
+#include "fixture_simulator.h"
 #include "helpers_dpi_c_binding.h"
 #include "parser/ast_type.h"
 #include "simulator/dpi_arg_value.h"
@@ -337,6 +340,72 @@ TEST(DpiStringArguments, EachDirectionAndTheResultCrossAsCStrings) {
   EXPECT_EQ(inout[0].AsString(), "HELLO");
   std::vector<DpiArgValue> none;
   EXPECT_EQ(b.Call("return_text", none).AsString(), "returned");
+}
+
+// The C function the design below imports. It calls two exports by their
+// linkage names, one returning a string and one writing a string output, and
+// allocates and calls again before it copies the characters each handed it,
+// as C code may that copies a string only once it is done with the call.
+template <typename Function>
+Function ExportNamed(const char* name) {
+  return reinterpret_cast<Function>(dlsym(RTLD_DEFAULT, name));
+}
+
+void Relay(const char** greeting, const char** named) {
+  static std::string kept_greeting;
+  static std::string kept_named;
+  auto greet = ExportNamed<const char* (*)(const char*)>("greet");
+  auto name_it = ExportNamed<void (*)(const char**)>("name_it");
+  if (greet == nullptr || name_it == nullptr) {
+    *greeting = "";
+    *named = "";
+    return;
+  }
+  const char* from_greet = greet("you");
+  const char* from_name_it = nullptr;
+  name_it(&from_name_it);
+  const std::vector<std::string> kChurn(64, std::string(48, 'x'));
+  kept_greeting = from_greet;
+  kept_named = from_name_it == nullptr ? "" : from_name_it;
+  *greeting = kept_greeting.c_str();
+  *named = kept_named.c_str();
+}
+
+uint64_t VariableValue(SimFixture& f, std::string_view name) {
+  auto* var = f.ctx.FindVariable(name);
+  return var == nullptr ? ~uint64_t{0} : var->value.ToUint64();
+}
+
+// §H.8.10 with §H.8.9: an export's string result, and its string output,
+// reach C as the address of characters that are still there when C reads
+// them after making further calls -- SystemVerilog writes a valid address.
+TEST(DpiStringArguments, AnExportsStringResultAndOutputStayValidInC) {
+  SimFixture f;
+  RunWithImportsBound(
+      "module top;\n"
+      "  export \"DPI-C\" function greet;\n"
+      "  export \"DPI-C\" function name_it;\n"
+      "  import \"DPI-C\" context function void relay(output string g,\n"
+      "      output string n);\n"
+      "  function string greet(input string who);\n"
+      "    return {\"hi \", who};\n"
+      "  endfunction\n"
+      "  function void name_it(output string s);\n"
+      "    s = \"a string longer than any small-string buffer\";\n"
+      "  endfunction\n"
+      "  string g, n;\n"
+      "  int ok_g, ok_n;\n"
+      "  initial begin\n"
+      "    relay(g, n);\n"
+      "    ok_g = g == \"hi you\";\n"
+      "    ok_n = n == \"a string longer than any small-string buffer\";\n"
+      "  end\n"
+      "endmodule\n",
+      f, {{"relay", reinterpret_cast<void*>(&Relay)}},
+      "annex_h_08_10_export_strings");
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+  EXPECT_EQ(VariableValue(f, "ok_g"), 1U);
+  EXPECT_EQ(VariableValue(f, "ok_n"), 1U);
 }
 
 }  // namespace

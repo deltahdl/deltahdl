@@ -91,6 +91,7 @@ TEST(DpiPackedArrayAccessExample, F2CopiesEachElementOfTheOpenArrayByItsIndex) {
   SvOpenArrayDesc desc;
   desc.data = data;
   desc.n_dims = 2;
+  desc.has_packed_part = 1;
   desc.ranges = kRanges;
   desc.elem_size = sizeof(data[0]);
   F2(&desc);

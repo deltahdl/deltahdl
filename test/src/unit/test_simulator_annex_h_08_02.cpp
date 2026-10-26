@@ -1,8 +1,12 @@
+#include <dlfcn.h>
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string_view>
 #include <vector>
 
+#include "fixture_simulator.h"
+#include "helpers_dpi_c_binding.h"
 #include "parser/ast_type.h"
 #include "simulator/dpi_arg_value.h"
 #include "simulator/dpi_c_type.h"
@@ -84,6 +88,70 @@ TEST(DpiCallsFromC, TheCallerAllocatesAnActualPassedByReference) {
   EXPECT_EQ(DpiRepresentationOfFormal(
                 Formal("b", DataTypeKind::kBit, Direction::kOutput, 8)),
             DpiRepresentation::kCanonical);
+}
+
+// The C struct the exports below take, laid out as the C compiler lays out
+// the SystemVerilog pair.
+struct Pair {
+  int x;
+  int y;
+};
+
+// The C functions the design below imports, each calling an export by its
+// linkage name, found among the process's global symbols where the
+// forwarders of a design's exports stand.
+template <typename Function>
+Function ExportNamed(const char* name) {
+  return reinterpret_cast<Function>(dlsym(RTLD_DEFAULT, name));
+}
+
+int TakeAPair() {
+  auto take = ExportNamed<int (*)(const Pair*)>("take");
+  if (take == nullptr) return -1;
+  const Pair kPair = {4, 7};
+  return take(&kPair);
+}
+
+int MakeAPair() {
+  auto make = ExportNamed<void (*)(Pair*)>("make");
+  if (make == nullptr) return -1;
+  Pair pair = {0, 0};
+  make(&pair);
+  return (pair.x * 10) + pair.y;
+}
+
+uint64_t VariableValue(SimFixture& f, std::string_view name) {
+  auto* var = f.ctx.FindVariable(name);
+  return var == nullptr ? ~uint64_t{0} : var->value.ToUint64();
+}
+
+// §H.8.2 with §H.7.8: an export takes the unpacked struct an import may, by
+// reference to the C compiler's layout of it, an input read from C's object
+// and an output written back into it.
+TEST(DpiCallsFromC, AnExportTakesAnUnpackedStructFormal) {
+  SimFixture f;
+  RunWithImportsBound(
+      "module top;\n"
+      "  typedef struct { int x; int y; } pair;\n"
+      "  export \"DPI-C\" function take;\n"
+      "  export \"DPI-C\" function make;\n"
+      "  import \"DPI-C\" context function int take_a_pair();\n"
+      "  import \"DPI-C\" context function int make_a_pair();\n"
+      "  function int take(input pair p); return p.x * 10 + p.y; endfunction\n"
+      "  function void make(output pair q); q.x = 3; q.y = 8; endfunction\n"
+      "  int r1, r2;\n"
+      "  initial begin\n"
+      "    r1 = take_a_pair();\n"
+      "    r2 = make_a_pair();\n"
+      "  end\n"
+      "endmodule\n",
+      f,
+      {{"take_a_pair", reinterpret_cast<void*>(&TakeAPair)},
+       {"make_a_pair", reinterpret_cast<void*>(&MakeAPair)}},
+      "annex_h_08_02_export_struct");
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+  EXPECT_EQ(VariableValue(f, "r1"), 47U);
+  EXPECT_EQ(VariableValue(f, "r2"), 38U);
 }
 
 }  // namespace

@@ -60,6 +60,7 @@ TEST(DpiAccessFunctions, TheCopyAndTheAddressReachTheSameElement) {
   SvOpenArrayDesc desc;
   desc.data = data;
   desc.n_dims = 2;
+  desc.has_packed_part = 1;
   desc.ranges = kRanges;
   desc.elem_size = sizeof(svBitVecVal);
   svOpenArrayHandle h = &desc;

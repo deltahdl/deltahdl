@@ -39,6 +39,7 @@ svOpenArrayHandle MakeHandle(void* data, const SvOpenArrayDimRange* ranges,
                              SvOpenArrayDesc* desc) {
   desc->data = data;
   desc->n_dims = n_dims;
+  desc->has_packed_part = 1;
   desc->ranges = ranges;
   desc->elem_size = elem_size;
   return desc;

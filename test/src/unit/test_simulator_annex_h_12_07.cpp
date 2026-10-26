@@ -51,6 +51,7 @@ TEST(DpiOtherElementTypes, AnIntElementIsReachedThroughItsComputedAddress) {
   SvOpenArrayDesc desc;
   desc.data = data;
   desc.n_dims = 3;
+  desc.has_packed_part = 1;
   desc.ranges = kRanges;
   desc.elem_size = sizeof(int);
   svOpenArrayHandle h = &desc;

@@ -58,6 +58,7 @@ struct TenOfMyType {
   TenOfMyType() {
     desc.data = data.data();
     desc.n_dims = 2;
+    desc.has_packed_part = 0;
     desc.ranges = ranges;
     desc.elem_size = sizeof(MyType);
   }

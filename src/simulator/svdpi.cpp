@@ -155,11 +155,15 @@ void svPutPartselLogic(svLogicVecVal* d, svLogicVecVal s, int i, int w) {
 // the packed part of the array (which is one-dimensional) and dimensions
 // greater than 0 name the unpacked part. Each function resolves the requested
 // dimension's declared bounds from the handle's descriptor and then derives the
-// queried quantity exactly as 20.7 prescribes.
+// queried quantity exactly as 20.7 prescribes. An array whose element has no
+// packed part has no dimension 0, its unpacked dimensions still starting at 1.
 static const SvOpenArrayDimRange* ResolveDim(svOpenArrayHandle h, int d) {
   if (h == nullptr) return nullptr;
   const auto* desc = static_cast<const SvOpenArrayDesc*>(h);
-  if (desc->ranges == nullptr || d < 0 || d >= desc->n_dims) return nullptr;
+  const int kFirst = desc->has_packed_part != 0 ? 0 : 1;
+  if (desc->ranges == nullptr || d < kFirst || d >= desc->n_dims) {
+    return nullptr;
+  }
   return &desc->ranges[d];
 }
 
@@ -195,9 +199,20 @@ int svSize(svOpenArrayHandle h, int d) {
   int high = r->left > r->right ? r->left : r->right;
   return high - low + 1;
 }
+// 20.7: $dimensions counts the packed dimension only where the element has
+// one, so an open array of unpacked structs or reals counts its unpacked
+// dimensions alone.
 int svDimensions(svOpenArrayHandle h) {
   if (h == nullptr) return 0;
-  return static_cast<const SvOpenArrayDesc*>(h)->n_dims;
+  const auto* desc = static_cast<const SvOpenArrayDesc*>(h);
+  return desc->has_packed_part != 0 ? desc->n_dims : desc->n_dims - 1;
+}
+
+// The number of unpacked dimensions of the open array `h`, an element access
+// taking one index for each; none for a null handle.
+static int UnpackedDimensions(svOpenArrayHandle h) {
+  if (h == nullptr) return 0;
+  return static_cast<const SvOpenArrayDesc*>(h)->n_dims - 1;
 }
 // §H.12.4: svGetArrayPtr/svSizeOfArray expose the actual address and byte size
 // of an open array as a whole, but only when the SystemVerilog layout matches
@@ -430,11 +445,11 @@ void* svGetArrElemPtr3(svOpenArrayHandle h, int indx1, int indx2, int indx3) {
 }
 
 // General element-address function for an arbitrary number of unpacked indices.
-// One index is supplied per unpacked dimension, so the count is svDimensions
-// minus the single packed dimension; the indices are gathered and handed to the
-// same resolver the specialized versions use.
+// One index is supplied per unpacked dimension, UnpackedDimensions of them;
+// the indices are gathered and handed to the same resolver the specialized
+// versions use.
 void* svGetArrElemPtr(svOpenArrayHandle h, int indx1, ...) {
-  int n = svDimensions(h) - 1;
+  int n = UnpackedDimensions(h);
   if (n < 1) return nullptr;
   std::vector<int> idx;
   idx.reserve(n);
@@ -452,7 +467,7 @@ void* svGetArrElemPtr(svOpenArrayHandle h, int indx1, ...) {
 static std::vector<int> IndicesOfVariadicCall(svOpenArrayHandle h, int indx1,
                                               va_list ap) {
   std::vector<int> idx;
-  int n = svDimensions(h) - 1;
+  int n = UnpackedDimensions(h);
   if (n < 1) return idx;
   idx.reserve(n);
   idx.push_back(indx1);
@@ -559,8 +574,8 @@ void svGetLogicArrElem3VecVal(svLogicVecVal* d, svOpenArrayHandle s, int indx1,
 // Annex H.12.6: read or write a single scalar (bit or logic) element of an open
 // array, selected by one unpacked index per unpacked dimension. The specialized
 // 1-, 2-, and 3-index entry points forward to the shared scalar helpers; the
-// variadic forms gather svDimensions-1 indices (one per unpacked dimension, the
-// packed dimension 0 excepted) before forwarding, mirroring svGetArrElemPtr.
+// variadic forms gather one index per unpacked dimension before forwarding,
+// mirroring svGetArrElemPtr.
 svBit svGetBitArrElem1(svOpenArrayHandle s, int indx1) {
   int idx[1] = {indx1};
   return GetBitScalarElem(s, idx, 1);
@@ -574,7 +589,7 @@ svBit svGetBitArrElem3(svOpenArrayHandle s, int indx1, int indx2, int indx3) {
   return GetBitScalarElem(s, idx, 3);
 }
 svBit svGetBitArrElem(svOpenArrayHandle s, int indx1, ...) {
-  int n = svDimensions(s) - 1;
+  int n = UnpackedDimensions(s);
   if (n < 1) return 0;
   std::vector<int> idx;
   idx.reserve(n);
@@ -599,7 +614,7 @@ svLogic svGetLogicArrElem3(svOpenArrayHandle s, int indx1, int indx2,
   return GetLogicScalarElem(s, idx, 3);
 }
 svLogic svGetLogicArrElem(svOpenArrayHandle s, int indx1, ...) {
-  int n = svDimensions(s) - 1;
+  int n = UnpackedDimensions(s);
   if (n < 1) return 0;
   std::vector<int> idx;
   idx.reserve(n);
@@ -625,7 +640,7 @@ void svPutLogicArrElem3(svOpenArrayHandle d, svLogic value, int indx1,
   PutLogicScalarElem(d, value, idx, 3);
 }
 void svPutLogicArrElem(svOpenArrayHandle d, svLogic value, int indx1, ...) {
-  int n = svDimensions(d) - 1;
+  int n = UnpackedDimensions(d);
   if (n < 1) return;
   std::vector<int> idx;
   idx.reserve(n);
@@ -650,7 +665,7 @@ void svPutBitArrElem3(svOpenArrayHandle d, svBit value, int indx1, int indx2,
   PutBitScalarElem(d, value, idx, 3);
 }
 void svPutBitArrElem(svOpenArrayHandle d, svBit value, int indx1, ...) {
-  int n = svDimensions(d) - 1;
+  int n = UnpackedDimensions(d);
   if (n < 1) return;
   std::vector<int> idx;
   idx.reserve(n);

@@ -7,6 +7,7 @@
 #include <cstring>
 #include <optional>
 #include <string>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -115,10 +116,10 @@ std::optional<DpiCObject> ObjectOfFormal(const DpiArg& formal) {
   }
   // §H.7.3: a stand-alone array passed to a sized formal has the C layout of
   // an array of its elements, so it is built where every dimension is sized
-  // and the element is an object built here. An open array (§35.5.6.1), and
-  // an array of structs or unions, are not built yet.
-  if (formal.unpacked_dims.empty() || !formal.members.empty() ||
-      !ObjectOfElement(formal).has_value()) {
+  // and the element is an object built here -- an unpacked struct or union
+  // among them, each element then laid out as the C compiler lays the struct
+  // (§H.7.8).
+  if (formal.unpacked_dims.empty() || !ObjectOfElement(formal).has_value()) {
     return std::nullopt;
   }
   return DpiCObject::kArray;
@@ -216,25 +217,27 @@ uint32_t PackedWidthOf(const DpiArg& formal) {
 
 // §H.12.2: dimension 0 of an open array's descriptor, the packed part of its
 // element normalized to [n-1:0] (§H.7.5) -- a scalar's [0:0], and none for
-// an element with no packed part.
-SvOpenArrayDimRange PackedRangeOf(const DpiArg& formal) {
+// an element with no packed part, such as an unpacked struct or a real, for
+// which §20.7 counts no packed dimension.
+std::optional<SvOpenArrayDimRange> PackedRangeOf(const DpiArg& formal) {
   switch (formal.type) {
     case DataTypeKind::kBit:
     case DataTypeKind::kLogic:
     case DataTypeKind::kReg:
-      return {static_cast<int>(std::max<uint32_t>(formal.width, 1)) - 1, 0};
+      return SvOpenArrayDimRange{
+          static_cast<int>(std::max<uint32_t>(formal.width, 1)) - 1, 0};
     case DataTypeKind::kByte:
-      return {7, 0};
+      return SvOpenArrayDimRange{7, 0};
     case DataTypeKind::kShortint:
-      return {15, 0};
+      return SvOpenArrayDimRange{15, 0};
     case DataTypeKind::kInt:
     case DataTypeKind::kInteger:
-      return {31, 0};
+      return SvOpenArrayDimRange{31, 0};
     case DataTypeKind::kLongint:
     case DataTypeKind::kTime:
-      return {63, 0};
+      return SvOpenArrayDimRange{63, 0};
     default:
-      return {0, 0};
+      return std::nullopt;
   }
 }
 
@@ -322,7 +325,9 @@ void Prepare(DpiCStorage& storage, const DpiArg& formal) {
     Prepare(storage.parts.back(), kElement);
     storage.sizes.push_back(ElementBytes(kElement));
     storage.kinds.push_back(formal.type);
-    storage.ranges.push_back(PackedRangeOf(formal));
+    const std::optional<SvOpenArrayDimRange> kPacked = PackedRangeOf(formal);
+    storage.ranges.push_back(kPacked.value_or(SvOpenArrayDimRange{0, 0}));
+    storage.desc.has_packed_part = kPacked.has_value() ? 1 : 0;
     // §H.12.4: a scalar bit or logic element is held as a canonical chunk,
     // not as the svBit or svLogic an individual value is.
     storage.element_stride =
@@ -700,6 +705,28 @@ std::string ForwarderOf(const DpiRtExport& exp, std::size_t index) {
          ") {\n" + body + "}\n";
 }
 
+// §H.8.10: the copy of `text` an export hands its C caller, kept for the rest
+// of the run, one per distinct string, so the address C holds stays valid
+// however long its code runs.
+const char* KeptForC(const std::string& text) {
+  static std::unordered_set<std::string> kept;
+  return kept.insert(text).first->c_str();
+}
+
+// Points every string `storage` holds, its own or a member's or an element's,
+// at the copy KeptForC keeps, laying each part out again where its parent
+// holds it; the characters StoreValue copied go with `storage`.
+void KeepStringsForC(DpiCStorage& storage) {
+  if (storage.object == DpiCObject::kString) {
+    storage.scalar.str = KeptForC(storage.text);
+  }
+  for (std::size_t k = 0; k < storage.parts.size(); ++k) {
+    KeepStringsForC(storage.parts[k]);
+    std::memcpy(storage.bytes.data() + storage.offsets[k],
+                storage.parts[k].Address(), storage.sizes[k]);
+  }
+}
+
 }  // namespace
 
 std::string DpiCTrampolineName(std::size_t index) {
@@ -765,9 +792,10 @@ DpiArgValue CallDpiCFunction(const DpiCFunction& function,
 }
 
 std::string DpiExportNotCallableFromC(const DpiRtExport& exp) {
+  // §H.8.2: an export takes every formal type an import takes but an open
+  // array, an unpacked struct or union among them (§H.7.8).
   for (const DpiArg& formal : exp.args) {
-    if (formal.is_open_array || !formal.members.empty() ||
-        !ObjectOfFormal(formal).has_value()) {
+    if (formal.is_open_array || !ObjectOfFormal(formal).has_value()) {
       return "deltahdl does not yet pass to an exported subroutine the type "
              "of its formal '" +
              std::string(formal.name) + "'";
@@ -812,6 +840,7 @@ void DpiStoreInCObject(const DpiArg& formal, const DpiArgValue& value,
   DpiCStorage storage;
   Prepare(storage, formal);
   StoreValue(storage, formal.type, value);
+  KeepStringsForC(storage);
   std::memcpy(object, storage.Address(), ObjectBytes(storage));
 }
 
@@ -821,6 +850,7 @@ void DpiStoreResultInCObject(DataTypeKind kind, const DpiArgValue& value,
   DpiCStorage storage;
   storage.object = ObjectOfSmallKind(kind);
   StoreValue(storage, kind, value);
+  KeepStringsForC(storage);
   std::memcpy(result, storage.Address(), ScalarBytes(storage.object));
 }
 }  // namespace delta

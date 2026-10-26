@@ -1,5 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <string_view>
+
+#include "fixture_simulator.h"
+#include "helpers_dpi_c_binding.h"
 #include "simulator/svdpi.h"
 #include "simulator/svdpi_open_array.h"
 
@@ -18,7 +23,8 @@
 //
 // These tests build an svOpenArrayHandle backed by an SvOpenArrayDesc carrying
 // distinct packed and unpacked ranges and observe the svdpi.cpp query functions
-// applying those two rules.
+// applying those two rules; the last runs a design whose imports query the
+// handles the run builds for open arrays of several element types.
 
 namespace {
 
@@ -26,6 +32,7 @@ svOpenArrayHandle MakeHandle(const SvOpenArrayDimRange* ranges, int n_dims,
                              SvOpenArrayDesc* desc) {
   desc->data = nullptr;
   desc->n_dims = n_dims;
+  desc->has_packed_part = 1;
   desc->ranges = ranges;
   return desc;
 }
@@ -144,6 +151,74 @@ TEST(ArrayQueryingFunctions, OutOfRangeDimensionAndNullHandle) {
   EXPECT_EQ(svLeft(nullptr, 0), 0);
   EXPECT_EQ(svSize(nullptr, 0), 0);
   EXPECT_EQ(svIncrement(nullptr, 0), 0);
+  // Nor has it an unpacked dimension for an element access to index.
+  EXPECT_EQ(svGetArrElemPtr(nullptr, 0), nullptr);
+}
+
+struct Pair {
+  int i;
+  int j;
+};
+
+// The C side of the design below, counting the dimensions of each open array
+// it is handed. The pairs are read through the variable argument
+// svGetArrElemPtr, which takes one index per unpacked dimension.
+int DimensionsOfPairs(svOpenArrayHandle h) {
+  int sum = 0;
+  for (int a = svLow(h, 1); a <= svHigh(h, 1); ++a) {
+    for (int b = svLow(h, 2); b <= svHigh(h, 2); ++b) {
+      sum += static_cast<Pair*>(svGetArrElemPtr(h, a, b))->i;
+    }
+  }
+  return (svDimensions(h) * 1000) + sum;
+}
+
+int DimensionsOfReals(svOpenArrayHandle h) {
+  return (svDimensions(h) * 10) + svSize(h, 1);
+}
+
+int DimensionsOfInts(svOpenArrayHandle h) {
+  return (svDimensions(h) * 100) + svLeft(h, 0);
+}
+
+uint64_t VariableValue(SimFixture& f, std::string_view name) {
+  auto* var = f.ctx.FindVariable(name);
+  return var == nullptr ? ~uint64_t{0} : var->value.ToUint64();
+}
+
+// Q1 with 20.7: $dimensions counts an array's packed and unpacked dimensions,
+// an integer type of predefined width being a packed [n-1:0]. An unpacked
+// struct and a real have no packed dimension, so an open array of either
+// counts its unpacked dimensions alone -- two for the pairs, one for the reals
+// -- while an open array of ints counts its [31:0] beside its one.
+TEST(ArrayQueryingFunctions, AnElementWithNoPackedPartAddsNoDimension) {
+  SimFixture f;
+  RunWithImportsBound(
+      "module t;\n"
+      "  typedef struct { int i; int j; } pair;\n"
+      "  import \"DPI-C\" function int dims_of_pairs(input pair a [][]);\n"
+      "  import \"DPI-C\" function int dims_of_reals(input real a []);\n"
+      "  import \"DPI-C\" function int dims_of_ints(input int a []);\n"
+      "  pair pa [11:12][6:8];\n"
+      "  real ra [1:3];\n"
+      "  int ia [2:5];\n"
+      "  int s1, s2, s3;\n"
+      "  initial begin\n"
+      "    foreach (pa[x, y]) pa[x][y].i = x + y;\n"
+      "    s1 = dims_of_pairs(pa);\n"
+      "    s2 = dims_of_reals(ra);\n"
+      "    s3 = dims_of_ints(ia);\n"
+      "  end\n"
+      "endmodule\n",
+      f,
+      {{"dims_of_pairs", reinterpret_cast<void*>(&DimensionsOfPairs)},
+       {"dims_of_reals", reinterpret_cast<void*>(&DimensionsOfReals)},
+       {"dims_of_ints", reinterpret_cast<void*>(&DimensionsOfInts)}},
+      "annex_h_12_02_dimensions");
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+  EXPECT_EQ(VariableValue(f, "s1"), 2111U);
+  EXPECT_EQ(VariableValue(f, "s2"), 13U);
+  EXPECT_EQ(VariableValue(f, "s3"), 231U);
 }
 
 }  // namespace

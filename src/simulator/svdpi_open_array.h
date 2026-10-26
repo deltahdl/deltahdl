@@ -31,11 +31,19 @@ typedef struct SvOpenArrayDimRange {
 // use it to step between consecutive elements. A value of 0 marks an element
 // representation that differs from that of an individual value of the same
 // type, for which H.12.4 requires those functions to return a null pointer.
+//
+// ranges holds n_dims entries, the packed part at index 0 and the unpacked
+// dimensions after it. has_packed_part is nonzero where the element has a
+// packed dimension -- a bit or logic vector, an integer type of predefined
+// width, or a packed struct, union or enumeration -- and zero for one with
+// none, such as an unpacked struct or a real. 20.7 counts no packed dimension
+// for the latter, so the entry at index 0 then stands for nothing.
 typedef struct SvOpenArrayDesc {
   void* data;
   int n_dims;
   const SvOpenArrayDimRange* ranges;
   size_t elem_size;
+  int has_packed_part;
 } SvOpenArrayDesc;
 
 #ifdef __cplusplus

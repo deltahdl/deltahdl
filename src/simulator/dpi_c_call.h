@@ -53,9 +53,9 @@ struct DpiCFunction {
 };
 
 // §35.7 with §H.8.2: why foreign code cannot call the export `exp` through a
-// function this simulator generates, or empty where it can. An open array, a
-// struct or union, or a type whose C object is not built here is not passed
-// to an exported function yet.
+// function this simulator generates, or empty where it can. An open array,
+// which §H.8.2 bars from an export, or a type whose C object is not built
+// here is not passed to an exported function.
 std::string DpiExportNotCallableFromC(const DpiRtExport& exp);
 
 // The function generated beside the forwarders that is handed the one entry

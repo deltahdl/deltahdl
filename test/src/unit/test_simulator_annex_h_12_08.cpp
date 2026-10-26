@@ -74,6 +74,7 @@ struct OpenArrayOfMyType {
         ranges{{0, 0}, {left1, right1}, {left2, right2}} {
     desc.data = data.data();
     desc.n_dims = 3;
+    desc.has_packed_part = 0;
     desc.ranges = ranges;
     desc.elem_size = sizeof(MyType);
   }

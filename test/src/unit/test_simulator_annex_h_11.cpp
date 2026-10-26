@@ -75,6 +75,7 @@ TEST(DpiArrayAccess, AnOpenArrayKeepsTheActualsOwnRanges) {
   SvOpenArrayDesc desc;
   desc.data = nullptr;
   desc.n_dims = 3;
+  desc.has_packed_part = 1;
   desc.ranges = kRanges;
   desc.elem_size = 0;
   svOpenArrayHandle h = &desc;
