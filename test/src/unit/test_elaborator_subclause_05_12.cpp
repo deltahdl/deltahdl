@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <optional>
 #include <string_view>
@@ -474,6 +475,85 @@ TEST(LexicalConventionElaboration, ClassMemberAttrValueNamesClassParameter) {
                             "expression",
                             8, "5.12"));
   EXPECT_EQ(f.diag.ErrorCount(), 1u);
+}
+
+// The values of the attributes named `name` that `mod` keeps beside its items,
+// in ascending order with the ones that fold to nothing first.
+std::vector<std::optional<int64_t>> NodeAttrValues(const RtlirModule& mod,
+                                                   std::string_view name) {
+  std::vector<std::optional<int64_t>> values;
+  for (const auto& [node, attrs] : mod.node_attrs) {
+    for (const ResolvedAttribute& attr : attrs) {
+      if (attr.name == name) values.push_back(attr.resolved_value);
+    }
+  }
+  std::sort(values.begin(), values.end());
+  return values;
+}
+
+// A local parameter of a function, a sequential block or a parallel block is a
+// constant of it, so a statement's attribute there may name it and folds to its
+// value, the block's shadowing the module's parameter of the same name until
+// the block ends. A function's local parameter named outside the function is
+// no constant there.
+TEST(LexicalConventionElaboration, AttrValueNamesSubroutineAndBlockLocalParam) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  parameter int K = 9;\n"
+      "  logic x;\n"
+      "  function automatic int f();\n"
+      "    localparam int L = 2;\n"
+      "    (* weight = L *) return L;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    begin : inner\n"
+      "      localparam int K = 3;\n"
+      "      (* weight = K *) x = 1;\n"
+      "    end\n"
+      "    (* weight = K *) x = 0;\n"
+      "    (* weight = L *) x = 1;\n"
+      "    fork\n"
+      "      localparam int J = 4;\n"
+      "      (* weight = J *) x = 0;\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "value of attribute 'weight' is not a constant "
+                            "expression",
+                            14, "5.12"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
+  ASSERT_EQ(design->top_modules.size(), 1u);
+  const std::vector<std::optional<int64_t>> kExpected = {std::nullopt, 2, 3, 4,
+                                                         9};
+  EXPECT_EQ(NodeAttrValues(*design->top_modules[0], "weight"), kExpected);
+}
+
+// A class's value parameter is a constant within it though its value is a
+// real or is given by no default, and so is a real local parameter. Such a
+// name shadows the module's parameter of the same name, so an attribute naming
+// it folds to nothing rather than to the module parameter's value.
+TEST(LexicalConventionElaboration, AttrValueNamesUnfoldedClassParam) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  parameter int P = 7;\n"
+      "  class C #(parameter real R = 1.5, int P);\n"
+      "    localparam real Q = 2.5;\n"
+      "    (* scale = R *) int a;\n"
+      "    (* width = P *) int b;\n"
+      "    (* ratio = Q *) int c;\n"
+      "  endclass\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  ASSERT_EQ(design->top_modules.size(), 1u);
+  const std::vector<std::optional<int64_t>> kNothing = {std::nullopt};
+  EXPECT_EQ(NodeAttrValues(*design->top_modules[0], "width"), kNothing);
 }
 
 }  // namespace

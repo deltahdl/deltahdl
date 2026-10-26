@@ -54,12 +54,18 @@ static ResolvedAttribute EvalAttribute(const Attribute& attr,
 std::vector<ResolvedAttribute> ResolveAttributes(
     const std::vector<Attribute>& attrs, DiagEngine& diag,
     const ScopeMap& scope) {
+  return ResolveAttributes(attrs, diag, scope, scope);
+}
+
+std::vector<ResolvedAttribute> ResolveAttributes(
+    const std::vector<Attribute>& attrs, DiagEngine& diag,
+    const ScopeMap& scope, const ScopeMap& constants) {
   std::vector<ResolvedAttribute> result;
   for (const auto& attr : attrs) {
     // §5.12: an attribute's value is a constant expression. One that does not
     // fold to an integer may still be a constant, a real or a string, so the
     // report asks constancy rather than whether EvalAttribute folded a number.
-    if (attr.value && !IsConstantExpr(attr.value, scope)) {
+    if (attr.value && !IsConstantExpr(attr.value, constants)) {
       diag.Error(attr.loc,
                  std::format("value of attribute '{}' is not a constant "
                              "expression",
