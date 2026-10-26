@@ -1,6 +1,7 @@
 #include "elaborator/implication_operator_rules.h"
 
 #include <format>
+#include <vector>
 
 #include "common/diagnostic.h"
 #include "elaborator/elaborator_validate_internal.h"
@@ -42,24 +43,6 @@ void ReportStmtImplicationOperators(const Stmt* stmt, DiagEngine& diag) {
   });
 }
 
-// A class member's initializer and constraints, and its method's or nested
-// class's expressions. A constraint is built from expressions (A.1.10); the
-// implication it does hold is `->`.
-void ReportMemberImplicationOperators(const ClassMember& member,
-                                      DiagEngine& diag) {
-  ReportImplicationOperators(member.init_expr, diag);
-  for (const Expr* expr : member.constraint_exprs) {
-    ReportImplicationOperators(expr, diag);
-  }
-  for (const Expr* expr : member.constraint_soft_exprs) {
-    ReportImplicationOperators(expr, diag);
-  }
-  if (member.method != nullptr) {
-    ReportItemImplicationOperators(*member.method, diag);
-  }
-  ReportClassImplicationOperators(member.nested_class, diag);
-}
-
 // A generate construct's header (A.4.2): an if-generate's condition and the
 // else-if that follows it, a case-generate's selector and item values, and a
 // loop-generate's initialization, condition and iteration. Each is held in the
@@ -79,34 +62,95 @@ void ReportGenerateImplicationOperators(const ModuleItem& item,
   }
 }
 
+// The values of a covergroup_range_list (A.2.11).
+void ReportRangesImplicationOperators(
+    const std::vector<CovergroupValueRange>& ranges, DiagEngine& diag) {
+  for (const CovergroupValueRange& range : ranges) {
+    ReportImplicationOperators(range.lo, diag);
+    ReportImplicationOperators(range.hi, diag);
+  }
+}
+
 // A bin's or a coverpoint option's expressions (A.2.11): an option's value, a
-// bin's array size, its values, its `with` filter, its set expression and its
-// guard.
+// bin's array size, its values, its `with` filter, its set expression, each
+// transition step's values and repeat range, and its guard.
 void ReportBinsImplicationOperators(const BinsOrOptions& bins,
                                     DiagEngine& diag) {
   ReportImplicationOperators(bins.option.value, diag);
   ReportImplicationOperators(bins.array_size, diag);
-  for (const CovergroupValueRange& range : bins.ranges) {
-    ReportImplicationOperators(range.lo, diag);
-    ReportImplicationOperators(range.hi, diag);
-  }
+  ReportRangesImplicationOperators(bins.ranges, diag);
   ReportImplicationOperators(bins.with_expr, diag);
   ReportImplicationOperators(bins.set_expr, diag);
+  for (const TransSet& set : bins.transitions) {
+    for (const TransRangeList& step : set.steps) {
+      ReportRangesImplicationOperators(step.items, diag);
+      ReportImplicationOperators(step.repeat_lo, diag);
+      ReportImplicationOperators(step.repeat_hi, diag);
+    }
+  }
   ReportImplicationOperators(bins.iff, diag);
 }
 
-// A covergroup's options, and each coverpoint's expression, guard and bins
-// (A.2.11).
+// A select expression's intersect values, `with` filter or cross set
+// expression, and matches count, and those of its operands (A.2.11).
+void ReportSelectImplicationOperators(const SelectExpression* select,
+                                      DiagEngine& diag) {
+  if (select == nullptr) return;
+  ReportRangesImplicationOperators(select->intersect, diag);
+  ReportImplicationOperators(select->expr, diag);
+  ReportImplicationOperators(select->matches, diag);
+  ReportSelectImplicationOperators(select->lhs, diag);
+  ReportSelectImplicationOperators(select->rhs, diag);
+}
+
+// A cross's guard, and each of its options' values and bins selections'
+// guards and select expressions (A.2.11).
+void ReportCrossImplicationOperators(const CoverCrossDecl& cross,
+                                     DiagEngine& diag) {
+  ReportImplicationOperators(cross.iff, diag);
+  for (const CrossBodyItem& item : cross.body) {
+    ReportImplicationOperators(item.option.value, diag);
+    ReportImplicationOperators(item.bins.iff, diag);
+    ReportSelectImplicationOperators(item.bins.select, diag);
+  }
+}
+
+// A covergroup's options, each coverpoint's expression, guard and bins, and
+// each cross (A.2.11).
 void ReportCovergroupImplicationOperators(const CovergroupDecl& covergroup,
                                           DiagEngine& diag) {
   for (const CoverageSpecOrOption& spec : covergroup.items) {
     ReportImplicationOperators(spec.option.value, diag);
+    if (spec.cover_cross != nullptr) {
+      ReportCrossImplicationOperators(*spec.cover_cross, diag);
+    }
     if (spec.cover_point == nullptr) continue;
     ReportImplicationOperators(spec.cover_point->expr, diag);
     ReportImplicationOperators(spec.cover_point->iff, diag);
     for (const BinsOrOptions& bins : spec.cover_point->bins) {
       ReportBinsImplicationOperators(bins, diag);
     }
+  }
+}
+
+// A class member's initializer and constraints, and its method's, nested
+// class's or embedded covergroup's expressions. A constraint is built from
+// expressions (A.1.10); the implication it does hold is `->`.
+void ReportMemberImplicationOperators(const ClassMember& member,
+                                      DiagEngine& diag) {
+  ReportImplicationOperators(member.init_expr, diag);
+  for (const Expr* expr : member.constraint_exprs) {
+    ReportImplicationOperators(expr, diag);
+  }
+  for (const Expr* expr : member.constraint_soft_exprs) {
+    ReportImplicationOperators(expr, diag);
+  }
+  if (member.method != nullptr) {
+    ReportItemImplicationOperators(*member.method, diag);
+  }
+  ReportClassImplicationOperators(member.nested_class, diag);
+  if (member.covergroup != nullptr) {
+    ReportCovergroupImplicationOperators(*member.covergroup, diag);
   }
 }
 
@@ -167,6 +211,8 @@ void ReportItemImplicationOperators(const ModuleItem& item, DiagEngine& diag) {
       }
       break;
     case ModuleItemKind::kGateInst:
+    case ModuleItemKind::kUdpInst:
+      // A.3.3 and A.5.4: a gate's or a primitive's terminals.
       for (const Expr* terminal : item.gate_terminals) {
         ReportImplicationOperators(terminal, diag);
       }

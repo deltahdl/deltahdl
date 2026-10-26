@@ -282,4 +282,84 @@ TEST(OperatorElaboration, ImplicationInCovergroupIsError) {
   ExpectImplicationReports(f, {4, 5, 7, 8, 9}, {5, 6, 7, 8, 10});
 }
 
+// A.5.4 gives a user-defined primitive instance input terminals, which A.3.3
+// writes as expressions.
+TEST(OperatorElaboration, ImplicationInUdpInstanceTerminalIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "primitive u(output o, input i, input j);\n"
+      "  table\n"
+      "    0 0 : 0;\n"
+      "    1 1 : 1;\n"
+      "  endtable\n"
+      "endprimitive\n"
+      "module m;\n"
+      "  wire o1;\n"
+      "  logic a, b;\n"
+      "  u p1(o1, a |-> b, a |=> b);\n"
+      "endmodule\n",
+      f);
+  ExpectImplicationReports(f, {10}, {10});
+}
+
+// A.2.11 writes a cross's guard, its options' values and a bins selection's
+// guard as expressions, and a select expression's intersect values, with
+// filter and matches count as covergroup expressions.
+TEST(OperatorElaboration, ImplicationInCovergroupCrossIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk;\n"
+      "  bit [1:0] a, b;\n"
+      "  covergroup cg @(posedge clk);\n"
+      "    ca: coverpoint a;\n"
+      "    cb: coverpoint b;\n"
+      "    x: cross ca, cb iff (a[0] |-> b[0]) {\n"
+      "      option.weight = 1'b1 |=> 1'b0;\n"
+      "      bins s = binsof(ca) intersect {1'b1 |-> 1'b0} iff (a[1] |=> "
+      "b[1]);\n"
+      "      bins w = binsof(cb) with (cb |-> 1'b1) matches (1'b1 |=> 1'b1);\n"
+      "    }\n"
+      "  endgroup\n"
+      "endmodule\n",
+      f);
+  ExpectImplicationReports(f, {7, 9, 10}, {8, 9, 10});
+}
+
+// A.2.11 writes a transition bin's values and repeat range as covergroup
+// expressions.
+TEST(OperatorElaboration, ImplicationInTransitionBinIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk;\n"
+      "  bit a;\n"
+      "  covergroup cg @(posedge clk);\n"
+      "    cp: coverpoint a {\n"
+      "      bins t = ((1'b0 |-> 1'b1) => 1'b1 [* (1'b1 |=> 1'b1)]);\n"
+      "    }\n"
+      "  endgroup\n"
+      "endmodule\n",
+      f);
+  ExpectImplicationReports(f, {6}, {6});
+}
+
+// A covergroup embedded in a class (§19.4) is the covergroup_declaration a
+// module holds, its expressions alike.
+TEST(OperatorElaboration, ImplicationInClassCovergroupIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class c;\n"
+      "  bit a, b;\n"
+      "  covergroup cg;\n"
+      "    option.weight = 1'b1 |-> 1'b0;\n"
+      "    cp: coverpoint a |=> b;\n"
+      "  endgroup\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  ExpectImplicationReports(f, {4}, {5});
+}
+
 }  // namespace
