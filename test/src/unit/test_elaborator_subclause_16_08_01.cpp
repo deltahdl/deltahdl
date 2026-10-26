@@ -1,9 +1,13 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <string>
+#include <string_view>
 #include <vector>
 
+#include "common/diagnostic.h"
 #include "elaborator/property_instance.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/typed_sequence_formal.h"
@@ -227,6 +231,17 @@ TEST(TypedSequenceFormal, AListBoundToTheBooleanFormalTakesTheTree) {
   }
 }
 
+// How many §16.8.1 errors the run reported on `line` whose message holds
+// `message`, which is one for each breach the cases below name.
+std::ptrdiff_t ReportsOnLine(const std::vector<Diagnostic>& diags,
+                             uint32_t line, std::string_view message) {
+  return std::ranges::count_if(diags, [&](const Diagnostic& d) {
+    return d.severity == DiagSeverity::kError && d.loc.line == line &&
+           d.subclause == "16.8.1" &&
+           d.message.find(message) != std::string::npos;
+  });
+}
+
 // §16.8.1: a typed formal argument stands as the variable_lvalue of a match
 // item's assignment or increment only where it is a local variable formal
 // argument. x of s1 and y of s2 are typed and not local, so both are
@@ -270,13 +285,18 @@ TEST(TypedSequenceFormal, ATypedFormalAssignedInAMatchItemIsReported) {
                             "the typed formal argument 'x' of 'p' is "
                             "assigned in a sequence match item",
                             16, "16.8.1"));
+  EXPECT_EQ(ReportsOnLine(f.diag.Diagnostics(), 4, "'x' of 's1'"), 1);
+  EXPECT_EQ(ReportsOnLine(f.diag.Diagnostics(), 7, "'y' of 's2'"), 1);
+  EXPECT_EQ(ReportsOnLine(f.diag.Diagnostics(), 16, "'x' of 'p'"), 1);
 }
 
 // §16.8.1: a typed formal argument referenced in a cycle delay range or a
 // repetition's bound is of type shortint, int or longint. d of s1, n of s2
 // and g of s3 are not, so each is reported; the three of s4 are, and d of
 // s5 is untyped, so neither line is. v of s6 is of another type but bounds
-// nothing, the int k bounding its one delay, so its line is not either.
+// nothing, the int k bounding its one delay, so its line is not either. A
+// bound written alone, `##d` or `[*n]`, is the least and the greatest count
+// at once, and is one breach.
 TEST(TypedSequenceFormal, ABoundOfAnotherTypeIsReported) {
   const char* const kReport =
       "bounds a cycle delay or a repetition but is of a type other than "
@@ -301,7 +321,7 @@ TEST(TypedSequenceFormal, ABoundOfAnotherTypeIsReported) {
       "    a ##d b;\n"
       "  endsequence\n"
       "  sequence s6(bit [3:0] v, int k);\n"
-      "    a ##k (v == 4'd1);\n"
+      "    v[0] ##k b;\n"
       "  endsequence\n"
       "endmodule\n",
       f);
@@ -317,6 +337,9 @@ TEST(TypedSequenceFormal, ABoundOfAnotherTypeIsReported) {
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 13, "16.8.1"));
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 16, "16.8.1"));
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 19, "16.8.1"));
+  EXPECT_EQ(ReportsOnLine(f.diag.Diagnostics(), 4, "'d' of 's1'"), 1);
+  EXPECT_EQ(ReportsOnLine(f.diag.Diagnostics(), 7, "'n' of 's2'"), 1);
+  EXPECT_EQ(ReportsOnLine(f.diag.Diagnostics(), 10, "'g' of 's3'"), 1);
 }
 
 // §16.8.1: a formal argument of type sequence is not the operand of a goto
@@ -345,6 +368,44 @@ TEST(TypedSequenceFormal, ASequenceFormalAsAGotoOperandIsReported) {
       std::string("the formal argument 'q' of 's1' ") + kReport, 4, "16.8.1"));
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 7, "16.8.1"));
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 10, "16.8.1"));
+  EXPECT_EQ(ReportsOnLine(f.diag.Diagnostics(), 4, "'q' of 's1'"), 1);
+}
+
+// §16.8.1: the three rules hold inside a group that `or` makes a sequence of
+// its own, standing as one operand of the chain around it: d of s1 bounds a
+// delay of one alternative, x of s2 is assigned in a match item of one, and
+// q of s3 is repeated by goto in one.
+TEST(TypedSequenceFormal, AFormalInsideANestedGroupIsHeldToTheRules) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit clk, a, b;\n"
+      "  sequence s1(bit [3:0] d);\n"
+      "    a ##1 (a ##d b or b) ##1 b;\n"
+      "  endsequence\n"
+      "  sequence s2(int x);\n"
+      "    a ##1 ((a, x = 1) or b);\n"
+      "  endsequence\n"
+      "  sequence s3(sequence q);\n"
+      "    a ##1 (b or q[->1]);\n"
+      "  endsequence\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the formal argument 'd' of 's1' bounds a cycle "
+                            "delay or a repetition",
+                            4, "16.8.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the typed formal argument 'x' of 's2' is "
+                            "assigned in a sequence match item",
+                            7, "16.8.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the formal argument 'q' of 's3' is of type "
+                            "sequence and is the operand of a goto repetition",
+                            10, "16.8.1"));
+  EXPECT_EQ(ReportsOnLine(f.diag.Diagnostics(), 4, "'d' of 's1'"), 1);
+  EXPECT_EQ(ReportsOnLine(f.diag.Diagnostics(), 7, "'x' of 's2'"), 1);
+  EXPECT_EQ(ReportsOnLine(f.diag.Diagnostics(), 10, "'q' of 's3'"), 1);
 }
 
 }  // namespace

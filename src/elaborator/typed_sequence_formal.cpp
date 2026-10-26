@@ -188,6 +188,13 @@ void CheckBound(const Expr* bound, const TypedFormalScope& in) {
   }
 }
 
+// The bounds of a cycle delay range or a repetition. A count written alone,
+// `##d` or `[*n]`, is held as the one expression standing as both bounds.
+void CheckBounds(const SeqCycleDelay& range, const TypedFormalScope& in) {
+  CheckBound(range.min_expr, in);
+  if (range.max_expr != range.min_expr) CheckBound(range.max_expr, in);
+}
+
 // The operand `operand` of a goto repetition.
 void CheckGotoOperand(const Expr* operand, const TypedFormalScope& in) {
   for (const TypedFormal& formal : in.typed) {
@@ -203,31 +210,43 @@ void CheckGotoOperand(const Expr* operand, const TypedFormalScope& in) {
   }
 }
 
+void CheckTypedFormalsInTree(const PropertyExprNode* tree,
+                             const TypedFormalScope& in);
+
+// One chain of a sequence, the chains nested in it aside, and each group
+// standing as one of its operands, which holds a sequence of its own.
+void CheckTypedFormalsInChain(const SeqLinearBody& chain,
+                              const TypedFormalScope& in) {
+  for (size_t i = 0; i < chain.operands.size(); ++i) {
+    const Expr* operand = chain.operands[i];
+    CheckMatchItemTargets(chain.match_items[i], operand->range.start, in);
+    CheckTypedFormalsInTree(operand->property_actual, in);
+  }
+  CheckMatchItemTargets(chain.first_match_items, in.decl->loc, in);
+  for (const SeqCycleDelay& delay : chain.delays) CheckBounds(delay, in);
+  for (size_t i = 0; i < chain.repetitions.size(); ++i) {
+    CheckBounds(chain.repetitions[i], in);
+    if (chain.repetitions[i].kind == SeqRepetition::Kind::kGoto) {
+      CheckGotoOperand(chain.operands[i], in);
+    }
+  }
+}
+
 void CheckTypedFormalsIn(const SeqLinearBody& body,
                          const TypedFormalScope& in) {
-  for (size_t i = 0; i < body.operands.size(); ++i) {
-    CheckMatchItemTargets(body.match_items[i], body.operands[i]->range.start,
-                          in);
-  }
-  CheckMatchItemTargets(body.first_match_items, in.decl->loc, in);
-  for (const SeqCycleDelay& delay : body.delays) {
-    CheckBound(delay.min_expr, in);
-    CheckBound(delay.max_expr, in);
-  }
-  for (size_t i = 0; i < body.repetitions.size(); ++i) {
-    const SeqRepetition& repetition = body.repetitions[i];
-    CheckBound(repetition.min_expr, in);
-    CheckBound(repetition.max_expr, in);
-    if (repetition.kind == SeqRepetition::Kind::kGoto) {
-      CheckGotoOperand(body.operands[i], in);
+  ForEachBody(body, [&in](const SeqLinearBody& chain) {
+    CheckTypedFormalsInChain(chain, in);
+  });
+}
+
+// The sequences of the property tree under `tree`, null for none.
+void CheckTypedFormalsInTree(const PropertyExprNode* tree,
+                             const TypedFormalScope& in) {
+  ForEachTreeNode(tree, [&in](const PropertyExprNode& node) {
+    if (node.sequence != nullptr) {
+      CheckTypedFormalsIn(node.sequence->seq_linear, in);
     }
-  }
-  for (const auto* inner :
-       {&body.intersects, &body.conjuncts, &body.alternatives}) {
-    for (const SeqLinearBody& operand : *inner) {
-      CheckTypedFormalsIn(operand, in);
-    }
-  }
+  });
 }
 
 }  // namespace
@@ -236,11 +255,7 @@ void CheckTypedFormalReferences(const ModuleItem* decl, DiagEngine& diag) {
   const TypedFormalScope kScope{decl, TypedFormalsOf(decl), diag};
   if (kScope.typed.empty()) return;
   CheckTypedFormalsIn(decl->seq_linear, kScope);
-  ForEachTreeNode(decl->prop_body_tree, [&](const PropertyExprNode& node) {
-    if (node.sequence != nullptr) {
-      CheckTypedFormalsIn(node.sequence->seq_linear, kScope);
-    }
-  });
+  CheckTypedFormalsInTree(decl->prop_body_tree, kScope);
 }
 
 }  // namespace delta
