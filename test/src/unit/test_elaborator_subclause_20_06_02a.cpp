@@ -474,7 +474,8 @@ TEST(BitsOfDeclaration, OperatorExpressionIsSizedBySelfDeterminedBitLength) {
 
 // A binary operator Table 11-21 does not size -- the sequence implication,
 // which makes no expression at all -- leaves $bits unfolded rather than sized
-// as something it is not.
+// as something it is not. A.8.6's binary_operator holds no implication, so the
+// operand is reported as well.
 TEST(BitsOfDeclaration, OperatorWithNoSelfDeterminedBitLengthIsLeftUnsized) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -483,6 +484,10 @@ TEST(BitsOfDeclaration, OperatorWithNoSelfDeterminedBitLengthIsLeftUnsized) {
       "  localparam int W = $bits(B |-> B);\n"
       "endmodule\n",
       f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the property operator '|->' joins the operands "
+                            "of an ordinary expression",
+                            3, "A.8.6"));
   EXPECT_TRUE(design == nullptr || ParamUnresolved(design, "W"));
 }
 
