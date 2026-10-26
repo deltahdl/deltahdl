@@ -103,8 +103,8 @@ void ReportSelectImplicationOperators(const SelectExpression* select,
   ReportSelectImplicationOperators(select->rhs, diag);
 }
 
-// A cross's guard, and each of its options' values and bins selections'
-// guards and select expressions (A.2.11).
+// A cross's guard, each of its options' values and bins selections' guards and
+// select expressions, and each function its body declares (A.2.11).
 void ReportCrossImplicationOperators(const CoverCrossDecl& cross,
                                      DiagEngine& diag) {
   ReportImplicationOperators(cross.iff, diag);
@@ -112,13 +112,31 @@ void ReportCrossImplicationOperators(const CoverCrossDecl& cross,
     ReportImplicationOperators(item.option.value, diag);
     ReportImplicationOperators(item.bins.iff, diag);
     ReportSelectImplicationOperators(item.bins.select, diag);
+    if (item.function != nullptr) {
+      ReportItemImplicationOperators(*item.function, diag);
+    }
   }
 }
 
-// A covergroup's options, each coverpoint's expression, guard and bins, and
-// each cross (A.2.11).
+// A tf_port_list's defaults (A.2.7).
+void ReportPortDefaultImplicationOperators(const std::vector<FunctionArg>& args,
+                                           DiagEngine& diag) {
+  for (const FunctionArg& arg : args) {
+    ReportImplicationOperators(arg.default_value, diag);
+  }
+}
+
+// A covergroup's and its sample function's port defaults, its clocking event's
+// events and guards (A.6.5), its options, each coverpoint's expression, guard
+// and bins, and each cross (A.2.11).
 void ReportCovergroupImplicationOperators(const CovergroupDecl& covergroup,
                                           DiagEngine& diag) {
+  ReportPortDefaultImplicationOperators(covergroup.formals, diag);
+  ReportPortDefaultImplicationOperators(covergroup.event.sample_formals, diag);
+  for (const EventExpr& event : covergroup.event.clocking) {
+    ReportImplicationOperators(event.signal, diag);
+    ReportImplicationOperators(event.iff_condition, diag);
+  }
   for (const CoverageSpecOrOption& spec : covergroup.items) {
     ReportImplicationOperators(spec.option.value, diag);
     if (spec.cover_cross != nullptr) {
@@ -229,9 +247,7 @@ void ReportItemImplicationOperators(const ModuleItem& item, DiagEngine& diag) {
       break;
   }
   // A subroutine's or a let's port defaults (A.2.7, A.2.12).
-  for (const FunctionArg& arg : item.func_args) {
-    ReportImplicationOperators(arg.default_value, diag);
-  }
+  ReportPortDefaultImplicationOperators(item.func_args, diag);
   ReportStmtImplicationOperators(item.body, diag);
   for (const Stmt* stmt : item.func_body_stmts) {
     ReportStmtImplicationOperators(stmt, diag);

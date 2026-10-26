@@ -326,6 +326,47 @@ TEST(OperatorElaboration, ImplicationInCovergroupCrossIsError) {
   ExpectImplicationReports(f, {7, 9, 10}, {8, 9, 10});
 }
 
+// A.2.11 lets a cross body hold a function_declaration, whose port defaults
+// and statements are ordinary expressions like any subroutine's.
+TEST(OperatorElaboration, ImplicationInCrossBodyFunctionIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk;\n"
+      "  bit [1:0] a, b;\n"
+      "  covergroup cg @(posedge clk);\n"
+      "    ca: coverpoint a;\n"
+      "    cb: coverpoint b;\n"
+      "    x: cross ca, cb {\n"
+      "      function bit f(bit p = 1'b1 |=> 1'b0);\n"
+      "        return a[0] |-> b[0];\n"
+      "      endfunction\n"
+      "    }\n"
+      "  endgroup\n"
+      "endmodule\n",
+      f);
+  ExpectImplicationReports(f, {9}, {8});
+}
+
+// A.2.11 gives a covergroup and its sample function a tf_port_list, whose
+// defaults are expressions (A.2.7), and a clocking event, whose events and
+// guards are expressions (A.6.5).
+TEST(OperatorElaboration, ImplicationInCovergroupEventOrFormalIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk, a, b;\n"
+      "  covergroup cf (int w = 1'b1 |-> 1'b0) @(posedge clk);\n"
+      "  endgroup\n"
+      "  covergroup cs with function sample (bit v = 1'b1 |=> 1'b0);\n"
+      "  endgroup\n"
+      "  covergroup ce @(posedge (a |-> b) iff (a |=> b));\n"
+      "  endgroup\n"
+      "endmodule\n",
+      f);
+  ExpectImplicationReports(f, {3, 7}, {5, 7});
+}
+
 // A.2.11 writes a transition bin's values and repeat range as covergroup
 // expressions.
 TEST(OperatorElaboration, ImplicationInTransitionBinIsError) {
