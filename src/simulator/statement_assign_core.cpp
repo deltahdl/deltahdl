@@ -879,6 +879,13 @@ void PerformBlockingAssign(const Expr* lhs, const Logic4Vec& rhs_val,
   auto* var = ResolveLhsVariable(lhs, ctx);
   if (var) {
     if (var->is_forced) return;
+    // §6.16, as in AssignToScalarLhs: a string takes the whole text, which
+    // sized to the variable's old text kept only its last characters.
+    if (IsStringTarget(lhs, ctx)) {
+      var->value = StripStringZeros(owned, arena);
+      var->NotifyWatchers();
+      return;
+    }
     auto converted = ConvertRealOnAssign(owned, lhs, *var, ctx, arena);
     var->value = converted;
     if (!var->is_4state) CoerceTo2State(var->value);

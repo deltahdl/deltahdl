@@ -200,4 +200,28 @@ TEST(PassByValueSim, UnwrittenOutputFormalCopiesOutItsTypesDefault) {
             "xxxx 0 0000 xx xx\n");
 }
 
+// §13.5.1 copies an output formal into its actual when the subroutine returns,
+// and §6.16 gives a string variable the length of whatever it is assigned. So
+// a string actual holding shorter text than the output takes all of it, and
+// one holding longer text keeps none of what it held. The copy was resized to
+// the length of the actual's old text, so `a` kept "ef", the last two
+// characters of "abcdef".
+TEST(PassByValueSim, StringOutputReplacesTheActualsTextWhateverItsLength) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  function automatic void f(output string s,\n"
+                 "                            input string v);\n"
+                 "    s = v;\n"
+                 "  endfunction\n"
+                 "  string a = \"ab\", b = \"abcdefgh\";\n"
+                 "  initial begin\n"
+                 "    f(a, \"abcdef\"); f(b, \"xy\");\n"
+                 "    $display(\"%0d %s %0d %s\", a.len(), a, b.len(), b);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "6 abcdef 2 xy\n");
+}
+
 }  // namespace
