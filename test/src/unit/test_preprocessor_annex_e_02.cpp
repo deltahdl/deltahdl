@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <optional>
+#include <string>
+
 #include "fixture_preprocessor.h"
 #include "helpers_reported_error.h"
 #include "preprocessor/preprocessor.h"
@@ -13,6 +16,27 @@ using namespace delta;
 // parses the directive and records the decay-time state queried below.
 
 namespace {
+
+// The decay time a source holding only `default_decay_time with the argument
+// `arg` sets, as the value the argument gives, or nothing where the source
+// reported an error or left the charge never decaying. The report stays in `f`
+// for a case to read.
+std::optional<double> DecayTimeSetBy(PreprocFixture& f,
+                                     const std::string& arg) {
+  Preprocessor pp(f.mgr, f.diag, {});
+  auto fid = f.mgr.AddFile("<test>", "`default_decay_time " + arg + "\n");
+  pp.Preprocess(fid);
+  if (f.diag.HasErrors() || pp.DefaultDecayTimeInfinite()) return std::nullopt;
+  return pp.DefaultDecayTimeReal();
+}
+
+// Whether `f` reported `arg` as no decay time.
+::testing::AssertionResult ReportedInvalid(const PreprocFixture& f,
+                                           const std::string& arg) {
+  return ReportedError(f.diag.Diagnostics(),
+                       "invalid `default_decay_time argument: '" + arg + "'", 1,
+                       "E.2");
+}
 
 // E2-C1 (syntax, integer_constant; Example 1): an integer argument sets the
 // default decay time and clears the infinite (no-decay) state.
@@ -145,6 +169,51 @@ TEST(Preprocessor, DefaultDecayTime_InsideAModuleIsAccepted) {
   EXPECT_TRUE(f.diag.Diagnostics().empty());
   EXPECT_FALSE(pp.DefaultDecayTimeInfinite());
   EXPECT_EQ(pp.DefaultDecayTime(), 5u);
+}
+
+// §5.7.1 makes an integer constant of a decimal number broken by underscores
+// and of a based number with or without a size, and each sets the decay time
+// its value gives.
+TEST(Preprocessor, DefaultDecayTime_UnderscoredOrBasedIntegerArgument) {
+  PreprocFixture underscored;
+  EXPECT_EQ(DecayTimeSetBy(underscored, "1_000"), 1000.0);
+  PreprocFixture based;
+  EXPECT_EQ(DecayTimeSetBy(based, "'d100"), 100.0);
+  PreprocFixture sized;
+  EXPECT_EQ(DecayTimeSetBy(sized, "16'h1_F4"), 500.0);
+}
+
+// A signed constant whose top bit is set is negative, 4'shf being -1, and
+// §28.16.2 gives a charge decay time no negative value, so the argument sets
+// no decay time.
+TEST(Preprocessor, DefaultDecayTime_NegativeSignedArgumentIsError) {
+  PreprocFixture f;
+  EXPECT_EQ(DecayTimeSetBy(f, "4'shf"), std::nullopt);
+  EXPECT_TRUE(ReportedInvalid(f, "4'shf"));
+}
+
+// §5.7.2 writes a real constant in scientific notation as well, its exponent
+// marked by e or E and signed or not, and ignores the underscores in it.
+TEST(Preprocessor, DefaultDecayTime_ScientificOrUnderscoredRealArgument) {
+  PreprocFixture lower;
+  EXPECT_EQ(DecayTimeSetBy(lower, "2.5e1"), 25.0);
+  PreprocFixture upper;
+  EXPECT_EQ(DecayTimeSetBy(upper, "25E0"), 25.0);
+  PreprocFixture negative_exponent;
+  EXPECT_EQ(DecayTimeSetBy(negative_exponent, "2.5e-1"), 0.25);
+  PreprocFixture underscored;
+  EXPECT_EQ(DecayTimeSetBy(underscored, "1_2.5"), 12.5);
+}
+
+// §5.7.2 requires a digit on each side of a decimal point, listing .12, 9. and
+// 4.E3 among the invalid forms, and an exponent has digits. None of these is a
+// real constant, nor is a number followed by other text.
+TEST(Preprocessor, DefaultDecayTime_MalformedRealArgumentIsError) {
+  for (const char* arg : {"9.", ".5", "4.E3", "2.5e", "2.5x"}) {
+    PreprocFixture f;
+    EXPECT_EQ(DecayTimeSetBy(f, arg), std::nullopt) << arg;
+    EXPECT_TRUE(ReportedInvalid(f, arg)) << arg;
+  }
 }
 
 }  // namespace

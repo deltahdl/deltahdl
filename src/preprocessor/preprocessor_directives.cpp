@@ -1,8 +1,12 @@
+#include <algorithm>
 #include <cctype>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <fstream>
+#include <optional>
+#include <string>
 #include <string_view>
 
 #include "common/diagnostic.h"
@@ -356,38 +360,119 @@ void Preprocessor::BeginCompilationUnit() {
   has_line_override_ = false;
 }
 
-// Digits, with at most one decimal point among them.
-static bool ValidateDecayTimeChars(std::string_view arg) {
-  bool saw_dot = false;
+// The value the digit `c` stands for in base `radix`, or -1 where it is none
+// of that base's digits, as §5.7.1's x, z and ? digits are none.
+static int DigitValue(char c, unsigned radix) {
+  static constexpr std::string_view kDigits = "0123456789abcdef";
+  size_t value = kDigits.find(
+      static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
+  return value < radix ? static_cast<int>(value) : -1;
+}
+
+// §5.7.1's digits of base `radix`, with an underscore anywhere but first, as
+// the value they spell, or nothing where `text` is not such a run.
+static std::optional<uint64_t> ReadDigits(std::string_view text,
+                                          unsigned radix) {
+  if (text.empty() || DigitValue(text.front(), radix) < 0) return std::nullopt;
+  uint64_t value = 0;
+  for (char c : text) {
+    if (c == '_') continue;
+    int digit = DigitValue(c, radix);
+    if (digit < 0) return std::nullopt;
+    value = value * radix + static_cast<uint64_t>(digit);
+  }
+  return value;
+}
+
+// The radix §5.7.1's base format letter `c` names, or 0 for a letter naming
+// none.
+static unsigned RadixOf(char c) {
+  static constexpr std::string_view kLetters = "bodh";
+  static constexpr unsigned kRadixes[] = {2, 8, 10, 16};
+  size_t at = kLetters.find(
+      static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
+  return at == std::string_view::npos ? 0 : kRadixes[at];
+}
+
+// §5.7.1's based number, `size_text` the size written before its apostrophe,
+// empty where none was, and `format` the text after it: an optional s, the base
+// letter and the digits, white space allowed before the digits. The value is
+// held in the constant's width, its size where it has one and 64 bits where
+// not, so a narrower size truncates the digits from the left and a signed
+// constant whose top bit is set is negative.
+static std::optional<int64_t> ReadBasedConstant(std::string_view size_text,
+                                                std::string_view format) {
+  bool is_signed = format.find_first_of("sS") == 0;
+  format.remove_prefix(is_signed ? 1 : 0);
+  unsigned radix = format.empty() ? 0 : RadixOf(format.front());
+  if (radix == 0) return std::nullopt;
+  auto digits = ReadDigits(TrimDirective(format.substr(1)), radix);
+  uint64_t width = 64;
+  if (!size_text.empty()) {
+    auto size = ReadDigits(size_text, 10);
+    if (!size || *size == 0) return std::nullopt;
+    width = std::min<uint64_t>(*size, 64);
+  }
+  if (!digits) return std::nullopt;
+  uint64_t mask = width == 64 ? ~uint64_t{0} : (uint64_t{1} << width) - 1;
+  uint64_t value = *digits & mask;
+  bool negative = is_signed && (value >> (width - 1)) != 0;
+  return static_cast<int64_t>(negative ? value | ~mask : value);
+}
+
+// An integer constant as §5.7.1 writes one, an unsized decimal number or a
+// based number, as the value it stands for, or nothing where `arg` is none.
+static std::optional<int64_t> ReadIntegerConstant(std::string_view arg) {
+  size_t quote = arg.find('\'');
+  if (quote != std::string_view::npos) {
+    return ReadBasedConstant(TrimDirective(arg.substr(0, quote)),
+                             arg.substr(quote + 1));
+  }
+  auto value = ReadDigits(arg, 10);
+  if (!value) return std::nullopt;
+  return static_cast<int64_t>(*value);
+}
+
+// The length of §5.7.1's unsigned number at the start of `text`, decimal digits
+// with underscores after the first, or 0 where none starts there.
+static size_t UnsignedNumberLength(std::string_view text) {
+  if (text.empty() || !std::isdigit(static_cast<unsigned char>(text.front()))) {
+    return 0;
+  }
+  size_t length = 1;
+  while (length < text.size() &&
+         (std::isdigit(static_cast<unsigned char>(text[length])) ||
+          text[length] == '_')) {
+    ++length;
+  }
+  return length;
+}
+
+// A real constant as §5.7.2 writes one, in decimal notation with a digit on
+// each side of the point or in scientific notation with an optionally signed
+// exponent, underscores ignored, as the value it stands for, or nothing where
+// `arg` is none. A run of digits alone reads as a real too.
+static std::optional<double> ReadRealConstant(std::string_view arg) {
+  size_t end = UnsignedNumberLength(arg);
+  if (end == 0) return std::nullopt;
+  if (arg.substr(end).starts_with('.')) {
+    size_t digits = UnsignedNumberLength(arg.substr(end + 1));
+    if (digits == 0) return std::nullopt;
+    end += 1 + digits;
+  }
+  std::string_view rest = arg.substr(end);
+  if (rest.find_first_of("eE") == 0) {
+    size_t sign = rest.find_first_of("+-", 1) == 1 ? 1 : 0;
+    size_t digits = UnsignedNumberLength(rest.substr(1 + sign));
+    if (digits == 0) return std::nullopt;
+    end += 1 + sign + digits;
+  }
+  if (end != arg.size()) return std::nullopt;
+  std::string text;
   for (char c : arg) {
-    if (c == '.' && !saw_dot) {
-      saw_dot = true;
-    } else if (!std::isdigit(static_cast<unsigned char>(c))) {
-      return false;
-    }
+    if (c != '_') text.push_back(c);
   }
-  return true;
-}
-
-static double ParseDecayTimeReal(std::string_view arg) {
-  auto dot_pos = arg.find('.');
-  auto int_part = arg.substr(0, dot_pos);
-  auto frac_part = arg.substr(dot_pos + 1);
-  double val = 0.0;
-  for (char c : int_part) val = val * 10.0 + (c - '0');
-  double frac = 0.0;
-  double divisor = 10.0;
-  for (char c : frac_part) {
-    frac += (c - '0') / divisor;
-    divisor *= 10.0;
-  }
-  return val + frac;
-}
-
-static uint64_t ParseDecayTimeInt(std::string_view arg) {
-  uint64_t val = 0;
-  for (char c : arg) val = val * 10 + (c - '0');
-  return val;
+  return std::strtod(text.c_str(), nullptr);
 }
 
 void Preprocessor::HandleDefaultDecayTime(std::string_view rest,
@@ -404,28 +489,29 @@ void Preprocessor::HandleDefaultDecayTime(std::string_view rest,
     default_decay_time_real_ = 0.0;
     return;
   }
-  bool has_dot = arg.find('.') != std::string_view::npos;
-  if (!ValidateDecayTimeChars(arg)) {
+  // E.2 takes an integer constant or a real constant. A charge decay time has
+  // no negative value (§28.16.2), so a signed integer constant whose value is
+  // negative is no decay time.
+  std::optional<double> value;
+  if (auto integer = ReadIntegerConstant(arg)) {
+    if (*integer >= 0) value = static_cast<double>(*integer);
+  } else {
+    value = ReadRealConstant(arg);
+  }
+  if (!value) {
     diag_.Error(
         loc, "invalid `default_decay_time argument: '" + std::string(arg) + "'",
         Subclause("E.2"));
     return;
   }
-  if (has_dot) {
-    // §3.14.1: the time precision governs how a delay value is rounded before
-    // simulation uses it, and a precision equal to the time unit rounds each
-    // delay value to an integer.
-    // E.2 admits a real_constant here and gives no conversion of its own, so
-    // the rounding is that clause's, not a truncation: 3.5 is a decay time of
-    // 4. The exact value stays in default_decay_time_real_.
-    double val = ParseDecayTimeReal(arg);
-    default_decay_time_real_ = val;
-    default_decay_time_ = static_cast<uint64_t>(std::llround(val));
-  } else {
-    uint64_t val = ParseDecayTimeInt(arg);
-    default_decay_time_ = val;
-    default_decay_time_real_ = static_cast<double>(val);
-  }
+  // §3.14.1: the time precision governs how a delay value is rounded before
+  // simulation uses it, and a precision equal to the time unit rounds each
+  // delay value to an integer.
+  // E.2 admits a real_constant here and gives no conversion of its own, so
+  // the rounding is that clause's, not a truncation: 3.5 is a decay time of
+  // 4. The exact value stays in default_decay_time_real_.
+  default_decay_time_real_ = *value;
+  default_decay_time_ = static_cast<uint64_t>(std::llround(*value));
   default_decay_time_infinite_ = false;
 }
 
@@ -437,24 +523,20 @@ void Preprocessor::HandleDefaultTriregStrength(std::string_view rest,
                 Subclause("E.3"));
     return;
   }
-  for (char c : arg) {
-    if (!std::isdigit(static_cast<unsigned char>(c))) {
-      diag_.Error(loc,
-                  "invalid `default_trireg_strength argument: '" +
-                      std::string(arg) + "'",
-                  Subclause("E.3"));
-      return;
-    }
+  auto value = ReadIntegerConstant(arg);
+  if (!value) {
+    diag_.Error(
+        loc,
+        "invalid `default_trireg_strength argument: '" + std::string(arg) + "'",
+        Subclause("E.3"));
+    return;
   }
-  uint32_t val = 0;
-  for (char c : arg) val = val * 10 + (c - '0');
-
-  if (val > 250) {
+  if (*value < 0 || *value > 250) {
     diag_.Error(loc, "`default_trireg_strength value must be between 0 and 250",
                 Subclause("E.3"));
     return;
   }
-  default_trireg_strength_ = val;
+  default_trireg_strength_ = static_cast<uint32_t>(*value);
   has_default_trireg_strength_ = true;
 }
 
