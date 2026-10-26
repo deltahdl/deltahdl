@@ -19,6 +19,21 @@ void RecordVpiError(s_vpi_error_info& error, const char* message) {
   error.message = VpiText(message);
 }
 
+// §38.34: whether vpi_put_value() can be applied to an object of kind `type`:
+// a net, a variable (a memory word being a reg, §37.20 detail 1), a select of
+// either, a named event, a system function call, a primitive, of which a
+// sequential UDP is the one a value is put to (§37.35 detail 2), or a
+// scheduled event. A system task call is not among them: a task returns no
+// value (§36.5), so its call has none for a put to write.
+bool IsPutValueTargetType(int type) {
+  if (VpiIsNetsType(type) || VpiIsVariablesType(type) ||
+      VpiIsVariableSelectType(type) || VpiObjectIsPrimitive(type)) {
+    return true;
+  }
+  return type == vpiVarSelect || type == vpiNamedEvent ||
+         type == vpiSysFuncCall || type == vpiSchedEvent;
+}
+
 }  // namespace
 
 // Applies the §37.31/§37.26/§37.36 read-side restrictions. Returns true (with
@@ -74,7 +89,8 @@ bool VpiGetValueIsRefused(VpiHandle obj, const s_vpi_value& value,
   return false;
 }
 
-// Applies the §37.31/§37.26/§37.35/§37.3.5 target-kind restrictions that hold
+// Applies the §37.31/§37.26/§37.35/§37.3.5 target-kind restrictions, and
+// §38.34's list of the kinds of object the routine applies to, that hold
 // regardless of the requested delay mode. Returns true (with error recorded)
 // when the put must be refused and the target left unchanged.
 bool VpiPutValueTargetIsRejected(VpiHandle obj, s_vpi_error_info& error) {
@@ -113,20 +129,6 @@ bool VpiPutValueTargetIsRejected(VpiHandle obj, s_vpi_error_info& error) {
     return true;
   }
 
-  // §36.5: a user-defined system function yields a value and a user-defined
-  // system task yields none, so a write through the call handle
-  // §37.42 gives the application -- which is how a system function's result is
-  // delivered -- has nowhere to land on a task call. §38.34 lists the objects
-  // this routine applies to and names system function calls among
-  // them, with no system task call beside it. The put is rejected, an error is
-  // recorded, and the run reads no value out of the task.
-  if (obj->type == vpiSysTaskCall) {
-    RecordVpiError(error,
-                   "vpi_put_value(): a user-defined system task call has no "
-                   "return value to write");
-    return true;
-  }
-
   // §37.35 detail 2: among primitives, vpi_put_value() may be applied only to a
   // sequential UDP. Putting a value to any other primitive kind - a gate,
   // switch, combinational UDP, or a generic primitive - is not allowed, so the
@@ -161,6 +163,18 @@ bool VpiPutValueTargetIsRejected(VpiHandle obj, s_vpi_error_info& error) {
           "not allowed");
       return true;
     }
+  }
+
+  // §38.34: nor can it be applied to an object of any kind the clause does not
+  // list, a parameter, a specparam and a UDP table entry among those that hold
+  // a value. The put is rejected, an error is recorded, and the object is left
+  // unchanged.
+  if (!IsPutValueTargetType(obj->type)) {
+    RecordVpiError(error,
+                   "vpi_put_value(): a value can be put only to a net, a "
+                   "variable, a select of either, a named event, a system "
+                   "function call, a sequential UDP or a scheduled event");
+    return true;
   }
   return false;
 }

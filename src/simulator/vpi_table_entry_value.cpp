@@ -13,13 +13,16 @@ namespace {
 
 // The symbols of `row`, each one or two characters: a field written in
 // parentheses is an edge, the two levels it names; any other character but a
-// space or a field separator is a symbol of its own.
+// space or a field separator is a symbol of its own. The row is a table
+// entry's text as DecompiledUdpRow writes it, which no put can change
+// (§38.34): every edge field in it is `(`, two levels and `)`, and it ends in
+// an output symbol.
 std::vector<std::string_view> RowSymbols(std::string_view row) {
   std::vector<std::string_view> symbols;
   for (std::size_t i = 0; i < row.size(); ++i) {
     const char kChar = row[i];
     if (kChar == ' ' || kChar == ':') continue;
-    if (kChar == '(' && i + 3 < row.size() && row[i + 3] == ')') {
+    if (kChar == '(') {
       symbols.push_back(row.substr(i + 1, 2));
       i += 3;
       continue;
@@ -33,8 +36,8 @@ std::vector<std::string_view> RowSymbols(std::string_view row) {
 
 std::vector<s_vpi_vecval> VpiTableEntryVector(std::string_view row) {
   const std::vector<std::string_view> kSymbols = RowSymbols(row);
-  std::vector<s_vpi_vecval> vector(
-      kSymbols.empty() ? 1 : (kSymbols.size() - 1) / 4 + 1, s_vpi_vecval{0, 0});
+  std::vector<s_vpi_vecval> vector((kSymbols.size() - 1) / 4 + 1,
+                                   s_vpi_vecval{0, 0});
   for (std::size_t k = 0; k < kSymbols.size(); ++k) {
     const std::string_view kSymbol = kSymbols[k];
     uint32_t pair =

@@ -146,7 +146,8 @@ TEST_F(ClassDefinition, ValueRestrictionScopedToClassDefnParent) {
 // D2 scope: the restriction names variable and event handles specifically. A
 // non-value member reached from a class defn handle - here a constraint - is
 // not a variable or event, so the guard's type-membership arm must let it
-// through and neither value routine refuses it on §37.31's account. This
+// through and neither value routine refuses it on §37.31's account; a put is
+// refused only as §38.34 refuses one to any object it does not list. This
 // exercises the arm complementary to the denial test, which the module-parent
 // test does not.
 TEST_F(ClassDefinition, ValueRestrictionAppliesOnlyToVariableAndEventMembers) {
@@ -166,7 +167,11 @@ TEST_F(ClassDefinition, ValueRestrictionAppliesOnlyToVariableAndEventMembers) {
 
   vpi_put_value(VpiHandleOf(&member_constraint), &value, nullptr, vpiNoDelay);
   s_vpi_error_info put_info = {};
-  EXPECT_EQ(vpi_chk_error(&put_info), 0);
+  ASSERT_EQ(vpi_chk_error(&put_info), vpiError);
+  EXPECT_STREQ(put_info.message,
+               "vpi_put_value(): a value can be put only to a net, a "
+               "variable, a select of either, a named event, a system "
+               "function call, a sequential UDP or a scheduled event");
 }
 
 // D3: a class defn's vpiConstraint iteration returns only normal constraints,

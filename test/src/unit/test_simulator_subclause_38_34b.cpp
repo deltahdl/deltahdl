@@ -405,5 +405,55 @@ TEST_F(RealFunctionOfARun, ItReturnsTheRealPutAndRefusesAString) {
   EXPECT_NE(string_put_error, 0);
 }
 
+// The string value of `obj`.
+std::string StringOf(vpiHandle obj) {
+  s_vpi_value value = {};
+  value.format = vpiStringVal;
+  vpi_get_value(obj, &value);
+  return value.value.str == nullptr ? "" : value.value.str;
+}
+
+// The integer value of `obj`.
+int IntValueOf(vpiHandle obj) {
+  s_vpi_value value = {};
+  value.format = vpiIntVal;
+  vpi_get_value(obj, &value);
+  return value.value.integer;
+}
+
+// §38.34: vpi_put_value applies to nets, variables and selects of either,
+// named events, system function calls, sequential UDPs and scheduled events
+// alone, so a put to a parameter, a specparam or a UDP table entry is refused
+// with an error and leaves the object as it was (#8172).
+TEST_F(PutsOfARun, APutToAParameterSpecparamOrTableEntryIsRefused) {
+  Run("primitive inv(output o, input i);\n"
+      "  table 0 : 1; 1 : 0; endtable\n"
+      "endprimitive\n"
+      "module top; parameter P = 5; specparam S = 7; wire o; reg i;\n"
+      "  inv g(o, i);\n"
+      "endmodule\n");
+  const std::vector<vpiHandle> kRows =
+      ObjectsOf(vpiTableEntry, Named(vpiUdpDefn, nullptr, "inv"));
+  ASSERT_EQ(kRows.size(), 2u);
+  const vpiHandle kTargets[] = {Named(vpiParameter, By("top"), "P"),
+                                Named(vpiSpecParam, By("top"), "S"), kRows[0]};
+  for (vpiHandle target : kTargets) {
+    ASSERT_NE(target, nullptr);
+    s_vpi_value put = {};
+    put.format = vpiStringVal;
+    put.value.str = VpiText("(");
+    EXPECT_EQ(vpi_put_value(target, &put, nullptr, vpiNoDelay), nullptr);
+    s_vpi_error_info info = {};
+    EXPECT_EQ(vpi_chk_error(&info), vpiError);
+    EXPECT_STREQ(info.message,
+                 "vpi_put_value(): a value can be put only to a net, a "
+                 "variable, a select of either, a named event, a system "
+                 "function call, a sequential UDP or a scheduled event");
+  }
+  EXPECT_EQ(IntValueOf(kTargets[0]), 5);
+  EXPECT_EQ(IntValueOf(kTargets[1]), 7);
+  EXPECT_EQ(StringOf(kRows[0]), "0 : 1");
+}
+
 }  // namespace
 }  // namespace delta
