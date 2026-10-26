@@ -695,22 +695,34 @@ std::string ExportTempName(std::string_view key, size_t index) {
 
 // Makes the temporary `name` for `formal` the first time it is needed: a
 // variable of the formal's width, or for an unpacked formal an array of such
-// variables over the formal's dimensions. The run's tables keep the names they
-// are given as views, so each one is held by the arena for the run.
+// variables over the formal's dimensions. A struct or union formal's carries
+// its layout, members deposited and read as an actual's are (§H.7.8), and a
+// string formal's holds a whole string (§H.8.10). The run's tables keep the
+// names they are given as views, so each one is held by the arena for the run.
 void EnsureExportTemp(const std::string& name, const DpiArg& formal,
                       SimContext& ctx) {
   Arena& arena = ctx.GetArena();
   auto kept = [&arena](const std::string& text) -> std::string_view {
     return *arena.Create<std::string>(text);
   };
-  const uint32_t kWidth = DpiValueWidth(formal.type, formal.width);
-  if (formal.unpacked_dims.empty()) {
-    if (ctx.FindVariable(name) == nullptr) {
-      ctx.CreateVariable(kept(name), kWidth);
-    }
+  if (formal.unpacked_dims.empty() ? ctx.FindVariable(name) != nullptr
+                                   : ctx.FindArrayInfo(name) != nullptr) {
     return;
   }
-  if (ctx.FindArrayInfo(name) != nullptr) return;
+  const StructTypeInfo* layout =
+      formal.members.empty()
+          ? nullptr
+          : ctx.FindStructType(FormalLayoutKey(*formal.declaration, ctx));
+  const uint32_t kWidth = layout != nullptr
+                              ? layout->total_width
+                              : DpiValueWidth(formal.type, formal.width);
+  const std::string_view kName = kept(name);
+  if (layout != nullptr) ctx.SetVariableStructType(kName, layout->type_name);
+  if (formal.unpacked_dims.empty()) {
+    ctx.CreateVariable(kName, kWidth)->is_string =
+        formal.type == DataTypeKind::kString;
+    return;
+  }
   ArrayInfo info;
   info.lo = static_cast<uint32_t>(formal.unpacked_dims.front().low);
   info.size = static_cast<uint32_t>(formal.unpacked_dims.front().high -
@@ -724,7 +736,7 @@ void EnsureExportTemp(const std::string& name, const DpiArg& formal,
       info.dim_descending.push_back(false);
     }
   }
-  ctx.RegisterArray(kept(name), info);
+  ctx.RegisterArray(kName, info);
   for (const std::string& element : UnpackedActualOf(name, false, ctx).names) {
     ctx.CreateVariable(kept(element), kWidth);
   }
@@ -756,6 +768,10 @@ void SendExportArguments(std::string_view key,
       WritebackDpiArray(formal, actual, args[i], b);
       continue;
     }
+    if (!formal.members.empty()) {
+      WritebackDpiAggregate(formal, actual, args[i], b);
+      continue;
+    }
     PerformBlockingAssign(actual,
                           DpiValueOfType(b.arena, formal.type, formal.width,
                                          args[i], !formal.is_unsigned),
@@ -772,10 +788,11 @@ void ReceiveExportArguments(const std::vector<DpiArg>& formals,
     const DpiArg& formal = formals[i];
     if (formal.direction == Direction::kInput) continue;
     const Expr* actual = b.call->args[i];
-    args[i] = formal.unpacked_dims.empty()
-                  ? DpiArgValueOfType(formal.type, formal.width,
-                                      EvalExpr(actual, b.ctx, b.arena))
-                  : DpiArrayActual(formal, actual, b);
+    args[i] = !formal.unpacked_dims.empty() ? DpiArrayActual(formal, actual, b)
+              : !formal.members.empty()
+                  ? DpiAggregateActual(formal, actual, b)
+                  : DpiArgValueOfType(formal.type, formal.width,
+                                      EvalExpr(actual, b.ctx, b.arena));
   }
 }
 

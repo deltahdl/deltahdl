@@ -171,6 +171,13 @@ bool TryBindTaggedActual(const FunctionArg& param, const Expr* actual,
                          SimContext& ctx);
 bool TryBindInlineAggregateFormal(const FunctionArg& param, SimContext& ctx);
 bool TryBindNamedAggregateFormal(const FunctionArg& param, SimContext& ctx);
+// The key the layout of the structure or union formal `param` is declared with
+// stands under in SimContext: the typedef's name, or the key the layout of an
+// aggregate written inline in the declaration is registered by; empty where
+// the formal's type is neither. Defined in eval_function_args_tagged.cpp;
+// shared with the temporaries an exported function's formals cross in
+// (eval_function_dpi.cpp).
+std::string_view FormalLayoutKey(const FunctionArg& param, SimContext& ctx);
 // §13.3 with §10.7: the declared width of a by-value formal of type `dt`, the
 // one BindValueArg resizes the actual's value into, or zero for a type no
 // width applies to -- a class handle. Defined in eval_function_args_tagged.cpp.

@@ -62,8 +62,7 @@ static std::string_view InlineFormalLayoutKey(const FunctionArg& param,
 // latter `a.Valid` of an inline-typed formal was read through no member and
 // `f(tagged Invalid)` raised nothing. Empty where the formal's type is
 // neither.
-static std::string_view FormalLayoutKey(const FunctionArg& param,
-                                        SimContext& ctx) {
+std::string_view FormalLayoutKey(const FunctionArg& param, SimContext& ctx) {
   const DataType& dt = param.data_type;
   if (!dt.type_name.empty() && ctx.FindStructType(dt.type_name) != nullptr)
     return dt.type_name;
