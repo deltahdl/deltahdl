@@ -30,6 +30,7 @@
 #include "elaborator/sequence_degeneracy.h"
 #include "elaborator/sequence_match_attach.h"
 #include "elaborator/sequence_match_class.h"
+#include "elaborator/typed_sequence_formal.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -682,6 +683,7 @@ void CheckOutputsAssigned(const ModuleItem* seq, const RuleEnv& env) {
 
 void CheckDeclaration(const ModuleItem* decl, const RuleEnv& env) {
   CheckOutputsAssigned(decl, env);
+  CheckTypedFormalReferences(decl, env.diag);
   const NameSet kLocals = DeclLocals(decl);
   Site site{Place::kOperand, &kLocals, nullptr};
   CheckSequence(decl, site, env);

@@ -4,6 +4,9 @@
 
 namespace delta {
 
+class DiagEngine;
+struct ModuleItem;
+
 // §16.8.1: a formal argument's data type may be `untyped` (a keyword), or it
 // may be one of the types allowed in §16.6, or `sequence`, or `event`. This
 // enum captures the type categories that affect the §16.8.1 rules.
@@ -86,5 +89,13 @@ bool IsUntypedKeywordRequired(bool prev_formal_in_list_was_typed,
 // shall not be typed `event`. Returns true when the declaration is legal.
 bool IsEventTypedFormalCompatibleWithEdgeIdentifierUse(
     bool formal_typed_event, bool actual_combined_with_edge_identifier);
+
+// §16.8.1 (printed page 406): the rules on where the typed formal arguments
+// of the sequence or property declaration `decl` are referenced in its
+// sequences, each breach reported. A typed formal that is not a local
+// variable formal argument is not assigned in a match item. A typed formal
+// bounding a cycle delay or a repetition is of type shortint, int or longint.
+// A formal of type sequence is not the operand of a goto repetition.
+void CheckTypedFormalReferences(const ModuleItem* decl, DiagEngine& diag);
 
 }  // namespace delta

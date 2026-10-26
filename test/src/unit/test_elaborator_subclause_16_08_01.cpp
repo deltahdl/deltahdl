@@ -9,6 +9,7 @@
 #include "elaborator/typed_sequence_formal.h"
 #include "fixture_elaborator.h"
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
@@ -224,6 +225,121 @@ TEST(TypedSequenceFormal, AListBoundToTheBooleanFormalTakesTheTree) {
               kSubstituted[i])
         << "instance " << i;
   }
+}
+
+// §16.8.1: a typed formal argument stands as the variable_lvalue of a match
+// item's assignment or increment only where it is a local variable formal
+// argument. x of s1 and y of s2 are typed and not local, so both are
+// reported; z of s3 is local and w of s4 untyped, and neither is. p shows a
+// property's sequences held to the same rule.
+TEST(TypedSequenceFormal, ATypedFormalAssignedInAMatchItemIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit clk, a, b;\n"
+      "  sequence s1(int x);\n"
+      "    (a, x = 1) ##1 b;\n"
+      "  endsequence\n"
+      "  sequence s2(bit [3:0] y);\n"
+      "    (a, y++) ##1 b;\n"
+      "  endsequence\n"
+      "  sequence s3(local inout int z);\n"
+      "    (a, z += 1);\n"
+      "  endsequence\n"
+      "  sequence s4(w);\n"
+      "    (a, w = 1);\n"
+      "  endsequence\n"
+      "  property p(int x);\n"
+      "    @(posedge clk) (a, x = 1) |-> b;\n"
+      "  endproperty\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the typed formal argument 'x' of 's1' is "
+                            "assigned in a sequence match item",
+                            4, "16.8.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the typed formal argument 'y' of 's2' is "
+                            "assigned in a sequence match item",
+                            7, "16.8.1"));
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), "'z' of 's3'", 10, "16.8.1"));
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), "'w' of 's4'", 13, "16.8.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the typed formal argument 'x' of 'p' is "
+                            "assigned in a sequence match item",
+                            16, "16.8.1"));
+}
+
+// §16.8.1: a typed formal argument referenced in a cycle delay range or a
+// repetition's bound is of type shortint, int or longint. d of s1, n of s2
+// and g of s3 are not, so each is reported; the three of s4 are, and d of
+// s5 is untyped, so neither line is.
+TEST(TypedSequenceFormal, ABoundOfAnotherTypeIsReported) {
+  const char* const kReport =
+      "bounds a cycle delay or a repetition but is of a type other than "
+      "shortint, int or longint";
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit clk, a, b;\n"
+      "  sequence s1(bit [3:0] d);\n"
+      "    a ##d b;\n"
+      "  endsequence\n"
+      "  sequence s2(byte n);\n"
+      "    a ##1 b[*n];\n"
+      "  endsequence\n"
+      "  sequence s3(logic [7:0] g);\n"
+      "    a ##1 b[->g];\n"
+      "  endsequence\n"
+      "  sequence s4(shortint d1, int d2, longint d3);\n"
+      "    a ##d1 b ##[d2:d3] a[=d1];\n"
+      "  endsequence\n"
+      "  sequence s5(d);\n"
+      "    a ##d b;\n"
+      "  endsequence\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      std::string("the formal argument 'd' of 's1' ") + kReport, 4, "16.8.1"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      std::string("the formal argument 'n' of 's2' ") + kReport, 7, "16.8.1"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      std::string("the formal argument 'g' of 's3' ") + kReport, 10, "16.8.1"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 13, "16.8.1"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 16, "16.8.1"));
+}
+
+// §16.8.1: a formal argument of type sequence is not the operand of a goto
+// repetition. q of s1 is; s2 repeats b, and q of s3 is untyped.
+TEST(TypedSequenceFormal, ASequenceFormalAsAGotoOperandIsReported) {
+  const char* const kReport =
+      "is of type sequence and is the operand of a "
+      "goto repetition";
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit clk, a, b;\n"
+      "  sequence s1(sequence q);\n"
+      "    q[->1] ##1 b;\n"
+      "  endsequence\n"
+      "  sequence s2(sequence q);\n"
+      "    q ##1 b[->1];\n"
+      "  endsequence\n"
+      "  sequence s3(q);\n"
+      "    q[->1] ##1 b;\n"
+      "  endsequence\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      std::string("the formal argument 'q' of 's1' ") + kReport, 4, "16.8.1"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 7, "16.8.1"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 10, "16.8.1"));
 }
 
 }  // namespace
