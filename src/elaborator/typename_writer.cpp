@@ -49,7 +49,9 @@ std::string_view BuiltinKeyword(DataTypeKind kind) {
   return it == BuiltinKeywords().end() ? std::string_view{} : it->second;
 }
 
-bool IsAggregateKind(DataTypeKind kind) {
+// Step c's struct, union and enum: the kinds $typename writes out with their
+// bodies, packed or not, rather than by a keyword.
+bool IsStructUnionOrEnumKind(DataTypeKind kind) {
   return kind == DataTypeKind::kEnum || kind == DataTypeKind::kStruct ||
          kind == DataTypeKind::kUnion;
 }
@@ -164,8 +166,9 @@ std::string TypenameWriter::OfParts(const TypenameParts& parts,
                                     std::string_view scope,
                                     std::string_view hint) {
   if (parts.kind == DataTypeKind::kNamed) return OfName(parts, scope);
-  if (parts.whole != nullptr && IsAggregateKind(parts.kind)) {
-    return OfAggregate(*parts.whole, Anonymous(*parts.whole, scope, hint));
+  if (parts.whole != nullptr && IsStructUnionOrEnumKind(parts.kind)) {
+    return OfStructUnionOrEnum(*parts.whole,
+                               Anonymous(*parts.whole, scope, hint));
   }
   std::string text(BuiltinKeyword(parts.kind));
   if (text.empty()) text = "logic";
@@ -174,8 +177,8 @@ std::string TypenameWriter::OfParts(const TypenameParts& parts,
 }
 
 // Step a: a typedef name is resolved back to the type it names, the
-// declaration's own packed ranges written after it; step f: an aggregate
-// it names, and a class, keep the name, behind the scope declaring it.
+// declaration's own packed ranges written after it; step f: a struct, union
+// or enum it names, and a class, keep the name, behind the scope declaring it.
 std::string TypenameWriter::OfName(const TypenameParts& parts,
                                    std::string_view scope) {
   std::string prefix = parts.scope_name.empty()
@@ -184,9 +187,9 @@ std::string TypenameWriter::OfName(const TypenameParts& parts,
   const DataType* named =
       env_.resolve_name(parts.scope_name, parts.type_name, prefix);
   if (named == nullptr) return OfUnresolvedName(parts, prefix);
-  if (IsAggregateKind(named->kind)) {
-    return OfAggregate(*named,
-                       TypeOwnerPrefix(prefix) + std::string(parts.type_name));
+  if (IsStructUnionOrEnumKind(named->kind)) {
+    return OfStructUnionOrEnum(
+        *named, TypeOwnerPrefix(prefix) + std::string(parts.type_name));
   }
   return OfType(*named, prefix, parts.type_name) + PackedText(parts);
 }
@@ -209,8 +212,8 @@ std::string TypenameWriter::TypeOwnerPrefix(std::string_view prefix) {
   return std::string(env_.scope_name()) + ".";
 }
 
-// Step c: an anonymous aggregate is named by the system. The clause leaves
-// the form to the implementation; this one writes "e$", "s$" or "u$"
+// Step c: an anonymous struct, union or enum is named by the system. The clause
+// leaves the form to the implementation; this one writes "e$", "s$" or "u$"
 // followed by the name of what declares the type, which no other
 // declaration of the scope shares.
 std::string TypenameWriter::Anonymous(const DataType& type,
@@ -222,8 +225,8 @@ std::string TypenameWriter::Anonymous(const DataType& type,
   return TypeOwnerPrefix(scope) + letter + "$" + std::string(hint);
 }
 
-std::string TypenameWriter::OfAggregate(const DataType& type,
-                                        const std::string& name) {
+std::string TypenameWriter::OfStructUnionOrEnum(const DataType& type,
+                                                const std::string& name) {
   if (type.kind == DataTypeKind::kEnum) return OfEnum(type) + name;
   std::string text = type.kind == DataTypeKind::kStruct ? "struct" : "union";
   if (type.is_packed) text += " packed";

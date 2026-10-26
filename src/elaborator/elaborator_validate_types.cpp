@@ -469,8 +469,8 @@ void Elaborator::ValidatePackedDimOnDisallowedType(const DataType& dtype,
                      class_names_.count(dtype.type_name) != 0;
   if (!names_class && !IsDisallowedPackedElement(dtype, typedefs_)) return;
   diag_.Error(loc,
-              "packed array element type must be a single-bit type, "
-              "enum, or packed aggregate",
+              "packed array element type must be a single-bit type, an "
+              "enumerated type, a packed array, or a packed structure or union",
               Subclause("7.4.1"));
 }
 

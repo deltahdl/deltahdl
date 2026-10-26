@@ -74,8 +74,8 @@ class TypenameWriter {
 
   // `scope` is the scope the declaration of the type was named behind, empty
   // where it is the one the type is written in, and `hint` names what declares
-  // the type -- a variable, a member -- which is what an anonymous aggregate
-  // is named after (step c).
+  // the type -- a variable, a member -- which is what an anonymous struct,
+  // union or enum is named after (step c).
   std::string OfType(const DataType& type, std::string_view scope,
                      std::string_view hint);
 
@@ -92,7 +92,8 @@ class TypenameWriter {
   std::string TypeOwnerPrefix(std::string_view prefix);
   std::string Anonymous(const DataType& type, std::string_view scope,
                         std::string_view hint);
-  std::string OfAggregate(const DataType& type, const std::string& name);
+  std::string OfStructUnionOrEnum(const DataType& type,
+                                  const std::string& name);
   std::string OfEnum(const DataType& type);
 
   const TypenameEnvironment& env_;

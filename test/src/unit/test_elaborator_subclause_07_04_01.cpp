@@ -212,6 +212,9 @@ TEST(PackedArrayValidation, AnEnumArrayWithNoBaseTypeTakesAnElementSelect) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// The report names the element types §7.4.1 lets a packed array be made of,
+// in the standard's own terms: Annex P keeps "aggregate" for unpacked
+// structures, unions and arrays, so a packed one is never called that.
 TEST(PackedArrayValidation, PackedDimOnReal_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -219,9 +222,11 @@ TEST(PackedArrayValidation, PackedDimOnReal_Rejected) {
       "  real [3:0] x;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "packed array element type must be a single-bit type", 2, "7.4.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "packed array element type must be a single-bit "
+                            "type, an enumerated type, a packed array, or a "
+                            "packed structure or union",
+                            2, "7.4.1"));
 }
 
 TEST(PackedArrayValidation, PackedDimOnShortreal_Rejected) {

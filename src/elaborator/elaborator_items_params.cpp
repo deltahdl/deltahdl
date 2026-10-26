@@ -123,7 +123,7 @@ void CheckTypeParamNotSetToValue(const ModuleItem* item, DiagEngine& diag) {
 // may resolve to a conforming type declared elsewhere.
 //
 // On a type-parameter item the restriction keyword is carried in
-// forward_type_kind as: kEnum/kStruct/kUnion for those aggregate keywords,
+// forward_type_kind as: kEnum/kStruct/kUnion for those three keywords,
 // kNamed for a `class` restriction, and kVoid for `interface class` (see
 // Parser::ParseTypeParamDecl).
 // Follow a chain of typedef names to the concrete type behind it, stopping at
@@ -210,8 +210,9 @@ void CheckTypeParamIsClass(const ModuleItem* item, DataTypeKind fwd,
 
 // §6.20.3: a type parameter restricted to enum, struct, or union conforms
 // only if the type it is assigned resolves to that same kind.
-void CheckTypeParamIsAggregateKind(const ModuleItem* item, DataTypeKind fwd,
-                                   const DataType& resolved, DiagEngine& diag) {
+void CheckTypeParamIsEnumStructOrUnion(const ModuleItem* item, DataTypeKind fwd,
+                                       const DataType& resolved,
+                                       DiagEngine& diag) {
   if (resolved.kind == DataTypeKind::kNamed || resolved.kind == fwd) return;
   static const auto kBasicName = [](DataTypeKind k) -> std::string_view {
     switch (k) {
@@ -241,19 +242,19 @@ void CheckTypeParamConformsToForwardKind(const ModuleItem* item,
                                          const ClassTypeLookup& lookup,
                                          DiagEngine& diag) {
   DataTypeKind fwd = item->forward_type_kind;
-  bool aggregate_restriction = fwd == DataTypeKind::kEnum ||
-                               fwd == DataTypeKind::kStruct ||
-                               fwd == DataTypeKind::kUnion;
+  bool enum_struct_or_union_restriction = fwd == DataTypeKind::kEnum ||
+                                          fwd == DataTypeKind::kStruct ||
+                                          fwd == DataTypeKind::kUnion;
   bool class_restriction =
       fwd == DataTypeKind::kNamed || fwd == DataTypeKind::kVoid;
-  if (!aggregate_restriction && !class_restriction) return;
+  if (!enum_struct_or_union_restriction && !class_restriction) return;
 
   const DataType* resolved = ResolveNamedTypeChain(&assigned, typedefs);
   if (class_restriction) {
     CheckTypeParamIsClass(item, fwd, *resolved, lookup, diag);
     return;
   }
-  CheckTypeParamIsAggregateKind(item, fwd, *resolved, diag);
+  CheckTypeParamIsEnumStructOrUnion(item, fwd, *resolved, diag);
 }
 
 // Fills the value-parameter type information on `pd` and records a real-typed
