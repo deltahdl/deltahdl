@@ -7,20 +7,10 @@ using namespace delta;
 
 namespace {
 
-TEST(WhiteSpaceSynthesis, VerticalTabDelimiterSynthesizes) {
-  SynthFixture f;
-  auto* mod =
-      ElaborateSrc(f, "module\vm\v;\vlogic\va\v;\vassign\va=1'b0;\vendmodule");
-  ASSERT_NE(mod, nullptr);
-  SynthLower synth(f.arena, f.diag);
-  auto* aig = synth.Lower(mod);
-  ASSERT_NE(aig, nullptr);
-}
-
 TEST(WhiteSpaceSynthesis, MixedWhitespaceSynthesizes) {
   SynthFixture f;
   auto* mod = ElaborateSrc(
-      f, "module \t\n m \f ; \v logic \t a ; assign a = 1'b0 ; endmodule");
+      f, "module \t\n m \f ; logic \t a ; assign a = 1'b0 ; endmodule");
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   auto* aig = synth.Lower(mod);

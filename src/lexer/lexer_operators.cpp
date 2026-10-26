@@ -9,11 +9,11 @@
 namespace delta {
 
 // Report the first position at or after `p` holding something other than white
-// space. §5.3 gives white space as blanks, tabs, newlines and formfeeds, which
-// is the set std::isspace answers for. Nothing is consumed, so a caller can ask
-// what stands after the white space and still decline to step over it.
+// space, as Lexer::IsWhiteSpace holds it to §5.3's set. Nothing is consumed, so
+// a caller can ask what stands after the white space and still decline to step
+// over it.
 uint32_t Lexer::SkipWhitespaceFrom(uint32_t p) const {
-  while (std::isspace(static_cast<unsigned char>(CharAt(p)))) {
+  while (IsWhiteSpace(CharAt(p))) {
     ++p;
   }
   return p;

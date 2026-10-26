@@ -4,22 +4,18 @@
 
 namespace {
 
-TEST(WhiteSpaceElaboration, VerticalTabDelimiterElaborates) {
-  EXPECT_TRUE(ElabOk("module\vt\v;\vlogic\va\v;\vassign\va=1'b0;\vendmodule"));
-}
-
 TEST(WhiteSpaceElaboration, CrlfDelimiterElaborates) {
   EXPECT_TRUE(
       ElabOk("module t;\r\n  logic a;\r\n  assign a = 1'b0;\r\nendmodule\r\n"));
 }
 
 TEST(WhiteSpaceElaboration, MixedWhitespaceElaborates) {
-  EXPECT_TRUE(ElabOk("module \t\n\f\v t \t\n ; \f\v logic \t a ; endmodule"));
+  EXPECT_TRUE(ElabOk("module \t\n\f t \t\n ; \f logic \t a ; endmodule"));
 }
 
 TEST(WhiteSpaceElaboration, WhitespaceOnlyInputElaboratesEmpty) {
   ElabFixture f;
-  auto* design = ElaborateSrc("   \t\n\f\v   ", f);
+  auto* design = ElaborateSrc("   \t\n\f   ", f);
   EXPECT_EQ(design, nullptr);
 }
 

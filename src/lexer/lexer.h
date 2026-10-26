@@ -137,6 +137,10 @@ class Lexer {
   bool AtEnd() const;
   SourceLoc MakeLoc() const;
 
+  // Whether `c` is white space, which §5.3 and A.9.4 make the space, the tab,
+  // the newline and the formfeed, a carriage return counting as part of a line
+  // ending. A vertical tab is none of them, though std::isspace answers for it.
+  static bool IsWhiteSpace(char c);
   void SkipWhitespaceAndComments();
   bool SkipSpacesAndTabs();
   uint32_t SkipWhitespaceFrom(uint32_t p) const;

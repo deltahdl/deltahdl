@@ -442,9 +442,13 @@ void Lexer::TryRecognizeFsmConcatPragma(
   fsm_concat_pragmas_.push_back(pragma);
 }
 
+bool Lexer::IsWhiteSpace(char c) {
+  return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f';
+}
+
 void Lexer::SkipWhitespaceAndComments() {
   while (!AtEnd()) {
-    if (std::isspace(static_cast<unsigned char>(Current()))) {
+    if (IsWhiteSpace(Current())) {
       Advance();
       continue;
     }
@@ -591,7 +595,7 @@ Token Lexer::NextFilePathSpec() {
   uint32_t start = pos_;
   while (!AtEnd()) {
     char c = Current();
-    if (std::isspace(static_cast<unsigned char>(c)) || c == ',' || c == ';') {
+    if (IsWhiteSpace(c) || c == ',' || c == ';') {
       break;
     }
     Advance();
@@ -752,10 +756,8 @@ Token Lexer::LexEscapedIdentifier() {
   Advance();
   uint32_t start = pos_;
   while (!AtEnd()) {
+    if (IsWhiteSpace(Current())) break;
     auto c = static_cast<unsigned char>(Current());
-    if (std::isspace(c)) {
-      break;
-    }
 
     if (c < 33 || c > 126) {
       diag_.Error(MakeLoc(),

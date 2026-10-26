@@ -161,7 +161,7 @@ Token Lexer::LexBasedNumber(SourceLoc loc, uint32_t start) {
   // space between them allowed, and §5.3 counts newlines and formfeeds as white
   // space as much as blanks and tabs. This white space is legal, so stepping
   // over it draws no report.
-  while (std::isspace(static_cast<unsigned char>(Current())) != 0) Advance();
+  while (IsWhiteSpace(Current())) Advance();
   uint32_t before_digits = pos_;
   // §5.7.1 makes the third token, the unsigned number, out of digits legal for
   // its base format. A letter or digit that is illegal for the base is still

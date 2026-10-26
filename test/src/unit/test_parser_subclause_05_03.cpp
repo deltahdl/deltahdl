@@ -2,6 +2,7 @@
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -116,8 +117,12 @@ TEST(LexicalConventionParsing, StatementSpanningManyLines) {
   EXPECT_EQ(assign_item->kind, ModuleItemKind::kContAssign);
 }
 
-TEST(LexicalConventionParsing, VerticalTabDelimiter) {
-  EXPECT_TRUE(ParseOk("module\vt\v;\vlogic\va\v;\vendmodule"));
+// §5.3 makes white space the space, tab, newline, formfeed and end of file
+// alone, so a vertical tab between two tokens is a character outside every
+// token (§5.2), not a delimiter.
+TEST(LexicalConventionParsing, VerticalTabIsNoDelimiter) {
+  auto r = Parse("module\vt;\nendmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "unexpected character '\v'", 1, "5.2"));
 }
 
 TEST(LexicalConventionParsing, TabInsideStringPreservedInParse) {
@@ -136,7 +141,7 @@ TEST(LexicalConventionParsing, TabInsideStringPreservedInParse) {
 }
 
 TEST(LexicalConventionParsing, AllWhitespaceTypesInputParsesEmpty) {
-  auto r = Parse(" \t\n\f\v\r\n ");
+  auto r = Parse(" \t\n\f\r\n ");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_TRUE(r.cu->modules.empty());
 }

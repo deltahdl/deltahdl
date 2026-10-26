@@ -120,16 +120,6 @@ TEST(WhiteSpaceSim, WhitespaceAroundTernary) {
   EXPECT_EQ(result, 100u);
 }
 
-TEST(WhiteSpaceSim, WhitespaceVerticalTabInSource) {
-  auto result = RunAndGet(
-      "module t;\v"
-      "logic [7:0] result;\v"
-      "initial result = 8'd11;\v"
-      "endmodule\n",
-      "result");
-  EXPECT_EQ(result, 11u);
-}
-
 TEST(WhiteSpaceSim, WhitespaceCrlfLineEndings) {
   auto result = RunAndGet(
       "module t;\r\n"

@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_lexer.h"
+#include "helpers_reported_error.h"
 #include "lexer/token.h"
 
 using namespace delta;
@@ -35,11 +36,29 @@ TEST(LexicalConventionLexing, FormfeedIsWhitespace) {
   EXPECT_EQ(tokens[1].text, "b");
 }
 
-TEST(LexicalConventionLexing, VerticalTabIsWhitespace) {
-  auto tokens = Lex("a\vb");
-  ASSERT_EQ(tokens.size(), 3u);
-  EXPECT_EQ(tokens[0].text, "a");
-  EXPECT_EQ(tokens[1].text, "b");
+// §5.3 and A.9.4 make white space the space, tab, newline, formfeed and end
+// of file alone, so a vertical tab separates nothing. No token begins with
+// one, and §5.2 has it reported as a character outside every token.
+TEST(LexicalConventionLexing, VerticalTabIsNoWhitespace) {
+  auto diags = LexDiagnostics("a\vb");
+  EXPECT_TRUE(ReportedError(diags, "unexpected character '\v'", 1, "5.2"));
+}
+
+// An escaped identifier runs to white space (§5.6.1), so a vertical tab, being
+// none, stands inside it as the non-printable character it is.
+TEST(LexicalConventionLexing, VerticalTabDoesNotEndAnEscapedIdentifier) {
+  auto diags = LexDiagnostics("\\ab\vc ");
+  EXPECT_TRUE(ReportedError(
+      diags, "escaped identifier contains non-printable character", 1,
+      "5.6.1"));
+}
+
+// §5.7.1 lets white space stand between a based literal's base and its value,
+// and a vertical tab is none, so the value is missing where it stands.
+TEST(LexicalConventionLexing, VerticalTabDoesNotSeparateABaseFromItsValue) {
+  auto diags = LexDiagnostics("4'h\v5 ");
+  EXPECT_TRUE(ReportedError(diags, "missing value digits after base specifier",
+                            1, "5.7.1"));
 }
 
 TEST(LexicalConventionLexing, CarriageReturnIsWhitespace) {
@@ -57,7 +76,7 @@ TEST(LexicalConventionLexing, CrlfIsWhitespace) {
 }
 
 TEST(LexicalConventionLexing, WhitespaceNotEmittedAsToken) {
-  auto tokens = Lex("  \t\n\f\v  a  \t\n\f\v  ");
+  auto tokens = Lex("  \t\n\f  a  \t\n\f  ");
   ASSERT_EQ(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
   EXPECT_EQ(tokens[1].kind, TokenKind::kEof);
@@ -76,7 +95,7 @@ TEST(LexicalConventionLexing, WhitespaceOnlySeparatesTokens) {
 }
 
 TEST(LexicalConventionLexing, MixedWhitespaceCollapsesToSeparator) {
-  auto tokens = Lex("a  \t  \n  \f  \v  b");
+  auto tokens = Lex("a  \t  \n  \f  b");
   ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
@@ -131,7 +150,7 @@ TEST(LexicalConventionLexing, SourceLocationsAcrossTabsAndSpaces) {
 }
 
 TEST(LexicalConventionLexing, WhitespaceOnlyInputProducesEof) {
-  auto tokens = Lex("   \t\n\f\v\r\n   ");
+  auto tokens = Lex("   \t\n\f\r\n   ");
   ASSERT_EQ(tokens.size(), 1u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kEof);
 }
