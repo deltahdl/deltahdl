@@ -3,15 +3,18 @@
 #include <cstdint>
 #include <format>
 #include <functional>
+#include <optional>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "elaborator/class_method_reads.h"
 #include "elaborator/const_eval.h"
+#include "elaborator/constant_scope.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/elaborator_scope_rules_names.h"
@@ -50,24 +53,12 @@ void CollectMemberAccess(const Expr* e, std::vector<const Expr*>& out) {
   for (const auto* el : e->elements) CollectMemberAccess(el, out);
 }
 
-// Collects every member access written anywhere in `s` and its nested
-// statements. §23.6 says a hierarchical name may be written wherever the object
-// it names is referenced, and §26.3 bars a hierarchical reference into an
-// importing scope with no condition on where that reference stands, so every
-// position a statement holds a statement in is a position both rules reach.
-//
-// ForEachChildStmt in elaborator_validate_internal.h states those positions
-// once for the whole elaborator, which is why the list is not written out again
-// here. The visitor takes `Stmt* const&` because `s` is a `const Stmt*`, which
-// is how ForEachChildStmt lets a walk that only reads the tree share its list
-// with the walks that rewrite it.
-//
-// The two loops above the call read expressions rather than statements: a case
-// item's patterns and a randcase item's weight are the only expressions Stmt
-// holds outside its own scalar fields, and ForEachChildStmt reaches neither
-// because neither is a statement.
-void CollectMemberAccessInStmt(const Stmt* s, std::vector<const Expr*>& out) {
-  if (!s) return;
+// Collects every member access the statement `s` writes in its own
+// expressions, leaving out the statements it holds. The two loops read
+// expressions rather than statements: a case item's patterns and a randcase
+// item's weight are the only expressions Stmt holds outside its own scalar
+// fields, and ForEachChildStmt reaches neither because neither is a statement.
+void CollectOwnMemberAccess(const Stmt* s, std::vector<const Expr*>& out) {
   CollectMemberAccess(s->condition, out);
   CollectMemberAccess(s->lhs, out);
   CollectMemberAccess(s->rhs, out);
@@ -80,6 +71,22 @@ void CollectMemberAccessInStmt(const Stmt* s, std::vector<const Expr*>& out) {
     for (const auto* p : ci.patterns) CollectMemberAccess(p, out);
   }
   for (const auto& rc : s->randcase_items) CollectMemberAccess(rc.first, out);
+}
+
+// Collects every member access written anywhere in `s` and its nested
+// statements. §23.6 says a hierarchical name may be written wherever the object
+// it names is referenced, and §26.3 bars a hierarchical reference into an
+// importing scope with no condition on where that reference stands, so every
+// position a statement holds a statement in is a position both rules reach.
+//
+// ForEachChildStmt in elaborator_validate_internal.h states those positions
+// once for the whole elaborator, which is why the list is not written out again
+// here. The visitor takes `Stmt* const&` because `s` is a `const Stmt*`, which
+// is how ForEachChildStmt lets a walk that only reads the tree share its list
+// with the walks that rewrite it.
+void CollectMemberAccessInStmt(const Stmt* s, std::vector<const Expr*>& out) {
+  if (!s) return;
+  CollectOwnMemberAccess(s, out);
   ForEachChildStmt(
       s, [&](Stmt* const& sub) { CollectMemberAccessInStmt(sub, out); });
 }
@@ -299,7 +306,7 @@ CollectInstanceArrayBounds(const ModuleDecl* decl) {
 // when either is. The parser holds the second bound or the width of each of
 // `[a:b]`, `[a+:w]` and `[a-:w]` in index_end.
 bool ReportInstanceSelectForm(DiagEngine& diag, std::string_view name,
-                              const Expr* select, const ScopeMap& scope) {
+                              const Expr* select, const ConstantScope& scope) {
   if (select->index_end != nullptr) {
     diag.Error(select->index->range.start,
                std::format("instance select of '{}' is a range; an instance "
@@ -308,7 +315,7 @@ bool ReportInstanceSelectForm(DiagEngine& diag, std::string_view name,
                Subclause("23.6"));
     return true;
   }
-  if (IsConstantExpr(select->index, scope)) return false;
+  if (IsConstantExpr(select->index, scope.constants)) return false;
   diag.Error(
       select->index->range.start,
       std::format("instance select of '{}' is not a constant expression", name),
@@ -336,7 +343,7 @@ std::unordered_set<std::string_view> NamedLoopGenerateBlocks(
 // instance array's is.
 void CheckHierRefLoopBlockSelect(
     DiagEngine& diag, const std::unordered_set<std::string_view>& loops,
-    const Expr* ma, const ScopeMap& scope) {
+    const Expr* ma, const ConstantScope& scope) {
   std::string_view name;
   const Expr* select_index = nullptr;
   if (!DecodeInstanceArrayBase(ma, name, select_index)) return;
@@ -347,7 +354,7 @@ void CheckHierRefLoopBlockSelect(
 void CheckHierRefInstanceArrayAccess(
     DiagEngine& diag,
     const std::unordered_map<std::string_view, InstanceArrayBounds>& arrayed,
-    const Expr* ma, const ScopeMap& scope) {
+    const Expr* ma, const ConstantScope& scope) {
   std::string_view name;
   const Expr* select_index = nullptr;
   if (!DecodeInstanceArrayBase(ma, name, select_index)) return;
@@ -368,7 +375,7 @@ void CheckHierRefInstanceArrayAccess(
   // or a select that is no constant has been reported, and has no one index
   // to check.
   if (ReportInstanceSelectForm(diag, name, ma->lhs, scope)) return;
-  auto idx = ConstEvalInt(select_index, scope);
+  auto idx = ConstEvalInt(select_index, scope.fold);
   if (!idx) return;
   if (*idx < it->second.low || *idx > it->second.high) {
     diag.Error(select_index->range.start,
@@ -378,6 +385,35 @@ void CheckHierRefInstanceArrayAccess(
                Subclause("23.6"));
   }
 }
+
+// §23.6: the instance selects of the hierarchical names a module's procedures
+// hold, each judged against the constants in force where it is written. A
+// parameter a block declares is a constant of the statements after it in the
+// block (§6.20), so it is entered as the walk passes its declaration and
+// leaves when the walk leaves the block.
+struct InstanceSelectWalk {
+  DiagEngine& diag;
+  const std::unordered_map<std::string_view, InstanceArrayBounds>& arrayed;
+  const std::unordered_set<std::string_view>& loops;
+  ConstantScope scope;
+
+  void Check(const Expr* ma) {
+    CheckHierRefInstanceArrayAccess(diag, arrayed, ma, scope);
+    CheckHierRefLoopBlockSelect(diag, loops, ma, scope);
+  }
+
+  void Walk(const Stmt* stmt) {
+    if (stmt == nullptr) return;
+    std::vector<const Expr*> accesses;
+    CollectOwnMemberAccess(stmt, accesses);
+    for (const Expr* ma : accesses) Check(ma);
+    if (DeclaresParam(stmt)) scope.Declare(stmt->var_name, stmt->var_init);
+    std::optional<ConstantScope> outer;
+    if (BlockDeclaresParam(*stmt)) outer = scope;
+    ForEachChildStmt(stmt, [this](Stmt* const& sub) { Walk(sub); });
+    if (outer.has_value()) scope = std::move(*outer);
+  }
+};
 
 }  // namespace
 
@@ -870,12 +906,18 @@ void Elaborator::ValidateHierRefInstanceArray(const ModuleDecl* decl,
   std::unordered_set<std::string_view> loops = NamedLoopGenerateBlocks(decl);
   if (arrayed.empty() && loops.empty()) return;
 
-  ScopeMap scope = mod ? BuildParamScope(mod) : ScopeMap{};
-  std::vector<const Expr*> accesses;
-  CollectModuleMemberAccesses(decl, accesses);
-  for (const auto* ma : accesses) {
-    CheckHierRefInstanceArrayAccess(diag_, arrayed, ma, scope);
-    CheckHierRefLoopBlockSelect(diag_, loops, ma, scope);
+  ScopeMap module_params = mod ? BuildParamScope(mod) : ScopeMap{};
+  InstanceSelectWalk walk{
+      diag_, arrayed, loops,
+      ConstantScope{module_params, std::move(module_params)}};
+  for (const ModuleItem* item : decl->items) {
+    if (item->kind == ModuleItemKind::kContAssign) {
+      std::vector<const Expr*> accesses;
+      CollectMemberAccess(item->assign_lhs, accesses);
+      CollectMemberAccess(item->assign_rhs, accesses);
+      for (const Expr* ma : accesses) walk.Check(ma);
+    }
+    if (IsProceduralItemKind(item->kind)) walk.Walk(item->body);
   }
 }
 

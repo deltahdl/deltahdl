@@ -743,4 +743,42 @@ TEST(HierarchicalNameElaboration, InstanceSelectRangeIsError) {
   EXPECT_EQ(f.diag.ErrorCount(), 3u);
 }
 
+// A local parameter a block declares is a constant of the statements after it
+// in the block, so it may stand as an instance select there, and the select is
+// range-checked by its value. After the block the name is the module's
+// variable again, which is no constant.
+TEST(HierarchicalNameElaboration, InstanceSelectNamesBlockLocalParam) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module leaf; logic v; endmodule\n"
+      "module top;\n"
+      "  leaf u [0:3] ();\n"
+      "  for (genvar g = 0; g < 4; g++) begin : blk\n"
+      "    logic w;\n"
+      "  end\n"
+      "  int K;\n"
+      "  logic x;\n"
+      "  initial begin\n"
+      "    begin\n"
+      "      localparam int K = 1;\n"
+      "      localparam int L = 7;\n"
+      "      x = u[K].v;\n"
+      "      x = blk[K].w;\n"
+      "      x = u[L].v;\n"
+      "    end\n"
+      "    x = u[K].v;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "instance select [7] is out of range for instance array 'u' [3:0]", 15,
+      "23.6"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "instance select of 'u' is not a constant "
+                            "expression",
+                            17, "23.6"));
+  EXPECT_EQ(f.diag.ErrorCount(), 2u);
+}
+
 }  // namespace

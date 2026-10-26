@@ -1,15 +1,13 @@
 #include "elaborator/elaborator_node_attributes.h"
 
-#include <algorithm>
-#include <cstdint>
 #include <functional>
 #include <optional>
-#include <string_view>
 #include <utility>
 #include <vector>
 
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
+#include "elaborator/constant_scope.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
@@ -47,34 +45,10 @@ bool KeepsNodeAttributes(ModuleItemKind kind) {
   }
 }
 
-// The constants visible where an attribute is written. `fold` holds those
-// whose values fold to an integer, which is what an attribute's value folds
-// against. `constants` holds every one of them, by name: one whose value folds
-// to no integer, a real or a parameter given no default, is a constant all the
-// same (§6.20), and is left out of `fold` so that nothing folds against a value
-// the source never gave it. The constancy question reads names alone, so the
-// value `constants` holds for such a name is never read.
-struct AttributeScope {
-  ScopeMap fold;
-  ScopeMap constants;
-
-  // Enters the constant `name`, declared with the value `value`, over the ones
-  // entered before it, shadowing any of the same name.
-  void Declare(std::string_view name, const Expr* value) {
-    std::optional<int64_t> folded = ConstEvalInt(value, fold);
-    if (folded) {
-      fold[name] = *folded;
-    } else {
-      fold.erase(name);
-    }
-    constants[name] = folded.value_or(0);
-  }
-};
-
 // §8.25 with §6.20: a class's value parameters and its local parameters are
 // constants within the class, entered over the scope around it. A type
 // parameter names a type and no value.
-void LayerClassParams(const ClassDecl& decl, AttributeScope& scope) {
+void LayerClassParams(const ClassDecl& decl, ConstantScope& scope) {
   for (const auto& [name, value] : decl.params) {
     if (decl.type_param_names.count(name) == 0) scope.Declare(name, value);
   }
@@ -85,23 +59,6 @@ void LayerClassParams(const ClassDecl& decl, AttributeScope& scope) {
   }
 }
 
-// Whether the statement `stmt` declares a parameter: A.2.8's
-// block_item_declaration holds a parameter_declaration and a
-// local_parameter_declaration, which the parser reads as a kVarDecl.
-bool DeclaresParam(const Stmt* stmt) {
-  return stmt->kind == StmtKind::kVarDecl && stmt->var_is_param;
-}
-
-// Whether `stmt` is a sequential or a parallel block declaring a parameter,
-// whose scope (§6.20) the block bounds. A parallel block keeps its
-// declarations among fork_stmts.
-bool BlockDeclaresParam(const Stmt& stmt) {
-  for (const std::vector<Stmt*>* items : {&stmt.stmts, &stmt.fork_stmts}) {
-    if (std::any_of(items->begin(), items->end(), DeclaresParam)) return true;
-  }
-  return false;
-}
-
 // What resolving attributes works with: where they are kept, where a
 // duplicate is reported, and the constants in force, built from the module's
 // parameters the first time an attribute, a class or a declaration asks for
@@ -110,19 +67,19 @@ struct NodeAttributeRecord {
   RtlirNodeAttributes& table;
   DiagEngine& diag;
   const std::function<ScopeMap()>& params;
-  std::optional<AttributeScope> scope;
+  std::optional<ConstantScope> scope;
 
-  AttributeScope& Scope() {
+  ConstantScope& Scope() {
     if (!scope.has_value()) {
       ScopeMap module_params = params();
-      scope = AttributeScope{module_params, std::move(module_params)};
+      scope = ConstantScope{module_params, std::move(module_params)};
     }
     return *scope;
   }
 
   void Record(const void* node, const std::vector<Attribute>& attrs) {
     if (attrs.empty()) return;
-    const AttributeScope& in_force = Scope();
+    const ConstantScope& in_force = Scope();
     table[node] =
         ResolveAttributes(attrs, diag, in_force.fold, in_force.constants);
   }
@@ -144,7 +101,7 @@ struct NodeAttributeRecord {
     Record(stmt, stmt->attrs);
     ForEachChildExpr(stmt, [this](const Expr* expr) { RecordExpr(expr); });
     if (DeclaresParam(stmt)) Scope().Declare(stmt->var_name, stmt->var_init);
-    std::optional<AttributeScope> outer;
+    std::optional<ConstantScope> outer;
     if (BlockDeclaresParam(*stmt)) outer = Scope();
     ForEachChildStmt(stmt, [this](const Stmt* sub) { RecordStmt(sub); });
     if (outer.has_value()) scope = std::move(outer);
@@ -174,8 +131,8 @@ struct NodeAttributeRecord {
   void RecordClass(const ClassDecl* decl) {
     if (decl == nullptr) return;
     Record(decl, decl->attrs);
-    AttributeScope& in_class = Scope();
-    AttributeScope outer = in_class;
+    ConstantScope& in_class = Scope();
+    ConstantScope outer = in_class;
     LayerClassParams(*decl, in_class);
     for (const Expr* arg : decl->extends_args) RecordExpr(arg);
     for (const ClassMember* member : decl->members) {
