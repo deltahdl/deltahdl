@@ -53,10 +53,6 @@ std::vector<uint64_t> ObjectBits(const VpiObject& obj) {
 
 }  // namespace
 
-// §38.36.1 with §37.17 detail 14: watch the storage of `obj` and, as it is
-// written, call back the cbSizeChange registrations placed on it where its
-// size changed, then the cbValueChange ones where its value did, a write of
-// what it holds being no change, until none of either is left.
 // The strength the net `obj` reads, or none for an object without one.
 NetStrength StrengthOf(const VpiObject& obj) {
   return obj.net != nullptr ? obj.net->resolved_strength : NetStrength{};
@@ -84,6 +80,10 @@ void NoteValueChange(VpiContext& vpi, VpiObject* obj,
   }
 }
 
+// §38.36.1 with §37.17 detail 14: watch the storage of `obj` and, as it is
+// written, call back the cbSizeChange registrations placed on it where its
+// size changed, then the cbValueChange ones where its value did, a write of
+// what it holds being no change, until none of either is left.
 void WatchObjectChanges(VpiContext& vpi, VpiObject* obj) {
   // Its one caller, vpi_register_cb, passes a registration's object only.
   if (obj->var == nullptr || obj->value_change_watched) return;
