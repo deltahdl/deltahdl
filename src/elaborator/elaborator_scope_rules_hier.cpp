@@ -292,6 +292,58 @@ CollectInstanceArrayBounds(const ModuleDecl* decl) {
   return arrayed;
 }
 
+// §23.6 with Syntax 23-7: the instance select after `name`, the name of an
+// instance array or a loop generate block, in the select `select`, is one
+// constant expression naming one instance or one block. A range in its place,
+// or a select that is no constant expression in `scope`, is reported; true
+// when either is. The parser holds the second bound or the width of each of
+// `[a:b]`, `[a+:w]` and `[a-:w]` in index_end.
+bool ReportInstanceSelectForm(DiagEngine& diag, std::string_view name,
+                              const Expr* select, const ScopeMap& scope) {
+  if (select->index_end != nullptr) {
+    diag.Error(select->index->range.start,
+               std::format("instance select of '{}' is a range; an instance "
+                           "select names one instance",
+                           name),
+               Subclause("23.6"));
+    return true;
+  }
+  if (IsConstantExpr(select->index, scope)) return false;
+  diag.Error(
+      select->index->range.start,
+      std::format("instance select of '{}' is not a constant expression", name),
+      Subclause("23.6"));
+  return true;
+}
+
+// The names of the blocks of the module's loop generate constructs, one of
+// whose blocks a hierarchical name selects with an instance select (§23.6,
+// §27.4). A block §27.6 named takes no hierarchical name at all.
+std::unordered_set<std::string_view> NamedLoopGenerateBlocks(
+    const ModuleDecl* decl) {
+  std::unordered_set<std::string_view> names;
+  for (const ModuleItem* item : decl->items) {
+    if (item->kind == ModuleItemKind::kGenerateFor &&
+        !item->name_is_generated) {
+      names.insert(item->name);
+    }
+  }
+  return names;
+}
+
+// §23.6: the select standing on the name of a loop generate block in the
+// hierarchical name `ma`, as in `blk[i].w`, is an instance select as an
+// instance array's is.
+void CheckHierRefLoopBlockSelect(
+    DiagEngine& diag, const std::unordered_set<std::string_view>& loops,
+    const Expr* ma, const ScopeMap& scope) {
+  std::string_view name;
+  const Expr* select_index = nullptr;
+  if (!DecodeInstanceArrayBase(ma, name, select_index)) return;
+  if (select_index == nullptr || !loops.contains(name)) return;
+  ReportInstanceSelectForm(diag, name, ma->lhs, scope);
+}
+
 void CheckHierRefInstanceArrayAccess(
     DiagEngine& diag,
     const std::unordered_map<std::string_view, InstanceArrayBounds>& arrayed,
@@ -312,7 +364,10 @@ void CheckHierRefInstanceArrayAccess(
   // §23.6: the instance select is a constant expression, so it may be any of
   // the constant forms of 11.2.1 -- a literal, but equally a parameter or
   // localparam. Evaluate it against the enclosing module's parameter scope so a
-  // parameter-valued select is range-checked, not just a bare literal.
+  // parameter-valued select is range-checked, not just a bare literal. A range
+  // or a select that is no constant has been reported, and has no one index
+  // to check.
+  if (ReportInstanceSelectForm(diag, name, ma->lhs, scope)) return;
   auto idx = ConstEvalInt(select_index, scope);
   if (!idx) return;
   if (*idx < it->second.low || *idx > it->second.high) {
@@ -812,13 +867,15 @@ void Elaborator::ValidateHierRefInstanceArray(const ModuleDecl* decl,
                                               const RtlirModule* mod) {
   std::unordered_map<std::string_view, InstanceArrayBounds> arrayed =
       CollectInstanceArrayBounds(decl);
-  if (arrayed.empty()) return;
+  std::unordered_set<std::string_view> loops = NamedLoopGenerateBlocks(decl);
+  if (arrayed.empty() && loops.empty()) return;
 
   ScopeMap scope = mod ? BuildParamScope(mod) : ScopeMap{};
   std::vector<const Expr*> accesses;
   CollectModuleMemberAccesses(decl, accesses);
   for (const auto* ma : accesses) {
     CheckHierRefInstanceArrayAccess(diag_, arrayed, ma, scope);
+    CheckHierRefLoopBlockSelect(diag_, loops, ma, scope);
   }
 }
 

@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <initializer_list>
 
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
@@ -667,6 +668,79 @@ TEST(HierarchicalNameElaboration, AssertionScopesTakeModuleLevelNames) {
         ReportedError(f.diag.Diagnostics(), "redeclaration", line, "23.9"))
         << line;
   }
+}
+
+// §23.6 makes the instance select after the name of an instance array or a
+// loop generate block a constant expression, which a variable is not. A
+// parameter expression and a literal are constants, and a single instance
+// takes no select.
+TEST(HierarchicalNameElaboration, InstanceSelectNotConstantIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module leaf; logic v; endmodule\n"
+      "module top;\n"
+      "  parameter int P = 1;\n"
+      "  leaf u [0:3] ();\n"
+      "  leaf s ();\n"
+      "  for (genvar g = 0; g < 4; g++) begin : blk\n"
+      "    logic w;\n"
+      "  end\n"
+      "  int i;\n"
+      "  logic x;\n"
+      "  initial begin\n"
+      "    x = u[i].v;\n"
+      "    x = blk[i].w;\n"
+      "    x = u[P + 1].v;\n"
+      "    x = blk[3].w;\n"
+      "    x = s.v;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "instance select of 'u' is not a constant "
+                            "expression",
+                            12, "23.6"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "instance select of 'blk' is not a constant "
+                            "expression",
+                            13, "23.6"));
+  EXPECT_EQ(f.diag.ErrorCount(), 2u);
+}
+
+// An instance select is one expression naming one instance or one block
+// (§23.6), so a part-select or an indexed part-select stands in its place
+// illegally, and is reported as such rather than range-checked by its first
+// bound: `u[5:4]` draws no out-of-range report.
+TEST(HierarchicalNameElaboration, InstanceSelectRangeIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module leaf; logic v; endmodule\n"
+      "module top;\n"
+      "  leaf u [0:3] ();\n"
+      "  for (genvar g = 0; g < 4; g++) begin : blk\n"
+      "    logic w;\n"
+      "  end\n"
+      "  logic x;\n"
+      "  initial begin\n"
+      "    x = u[5:4].v;\n"
+      "    x = u[0+:2].v;\n"
+      "    x = blk[3-:2].w;\n"
+      "    x = u[1].v;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "top");
+  for (uint32_t line : {9u, 10u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "instance select of 'u' is a range; an instance "
+                              "select names one instance",
+                              line, "23.6"))
+        << line;
+  }
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "instance select of 'blk' is a range; an instance "
+                            "select names one instance",
+                            11, "23.6"));
+  EXPECT_EQ(f.diag.ErrorCount(), 3u);
 }
 
 }  // namespace
