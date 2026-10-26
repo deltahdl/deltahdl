@@ -25,11 +25,13 @@ bool IsObjectName(std::string_view name) {
   return name == "this" || name == "super";
 }
 
-// §18.6.1 with A.8.2 (printed page 1209): randomize is a method of every
-// class, declared by none, and its call may be written without its argument
-// list, so a method's bare `randomize` reads that method.
-bool NamesBuiltInRandomize(std::string_view name) {
-  return name == "randomize";
+// Whether a name a class method reads resolves: one the unit declares, or
+// randomize, which §18.6.1 makes a method of every class that none declares
+// and whose call A.8.2 (printed page 1209) lets be written without its
+// argument list, so a method's bare `randomize` reads that method.
+bool ClassMethodReadResolves(const UnitDeclaredNames& declared,
+                             std::string_view name) {
+  return declared.Declares(name) || name == "randomize";
 }
 
 // The methods of `cls` and of the classes it nests, each given to `fn`.
@@ -149,10 +151,7 @@ void ReportClassMethodUnresolved(const CompilationUnit* unit,
         CollectProcRhsIdents(s, locals, reads);
       }
       for (const Expr* read : reads) {
-        if (declared.Declares(read->text) ||
-            NamesBuiltInRandomize(read->text)) {
-          continue;
-        }
+        if (ClassMethodReadResolves(declared, read->text)) continue;
         diag.Error(
             read->range.start,
             std::format("reference to unresolved identifier '{}'", read->text),
