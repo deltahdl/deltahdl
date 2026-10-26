@@ -144,6 +144,22 @@ struct CaseSelection {
   std::vector<PatternBinding> bindings;
 };
 CaseSelection SelectCaseItem(const Stmt* stmt, SimContext& ctx, Arena& arena);
+// §12.5 (printed page 321): the length every expression of a plain case,
+// casez or casex is evaluated at, the longest of the case expression's and
+// the items', and whether all of them are signed, which alone makes the
+// extension to that length a sign extension. §16.12.16 compares a case
+// property's expressions by the same rules. IncludeInCaseLength takes one
+// expression into the length, CaseOperandValue evaluates one at it, and
+// CaseExactMatch compares two so evaluated by case equality. Defined in
+// stmt_exec_case.cpp.
+struct CaseLength {
+  uint32_t width = 0;
+  bool all_signed = true;
+};
+void IncludeInCaseLength(const Expr* e, SimContext& ctx, CaseLength& length);
+Logic4Vec CaseOperandValue(const Expr* e, const CaseLength& length,
+                           SimContext& ctx, Arena& arena);
+bool CaseExactMatch(const Logic4Vec& sel, const Logic4Vec& pat);
 ExecTask ExecFor(const Stmt* stmt, SimContext& ctx, Arena& arena);
 ExecTask ExecForeach(const Stmt* stmt, SimContext& ctx, Arena& arena);
 ExecTask ExecWhile(const Stmt* stmt, SimContext& ctx, Arena& arena);

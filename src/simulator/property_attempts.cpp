@@ -15,7 +15,6 @@
 #include "parser/ast_stmt.h"
 #include "parser/expr_substitute.h"
 #include "simulator/evaluation.h"
-#include "simulator/evaluation_internal.h"
 #include "simulator/instance_bindings.h"
 #include "simulator/process.h"
 #include "simulator/property_attempts_internal.h"
@@ -25,6 +24,7 @@
 #include "simulator/sequence_locals.h"
 #include "simulator/sequence_monitor.h"
 #include "simulator/sim_context.h"
+#include "simulator/stmt_exec_internal.h"
 #include "simulator/variable.h"
 
 namespace delta {
@@ -243,6 +243,8 @@ NodeState* NewNodeState(const PropertyExprNode* node, PropertyTreeState& tree,
                         int inherited, Arena& arena) {
   auto* state = arena.Create<NodeState>();
   if (node->kind == PropertyExprNode::Kind::kAbort) state->abort_node = node;
+  state->strong =
+      node->strong || (!node->strength_written && tree.plain_sequences_strong);
   state->clock = ClockOfNode(node, tree, inherited);
   for (const PropertyExprNode* operand : node->operands) {
     state->operands.push_back(NewNodeState(operand, tree, state->clock, arena));
@@ -490,24 +492,22 @@ Tri StepIfElse(const PropertyExprNode* node, NodeState& state, StepContext& sc,
   return state.condition ? then_branch : else_branch;
 }
 
-// §12.5: the case expression and one item's expression are compared with
-// the case equality, the narrower extended to the wider's width, signed
-// where both are.
-bool CaseMatches(Logic4Vec sel, Logic4Vec item, Arena& arena) {
-  uint32_t width = sel.width > item.width ? sel.width : item.width;
-  bool sign_ext = sel.is_signed && item.is_signed;
-  if (sel.width < width) sel = ExtendVec(sel, width, sign_ext, arena);
-  if (item.width < width) item = ExtendVec(item, width, sign_ext, arena);
-  return EvalCaseEquality(sel, item);
-}
-
 // §16.12.16: the linear search over the items in order, the default item
 // ignored in it: the first item one of whose expressions matches the case
 // expression is selected and the search ends there; where every comparison
 // fails the default is selected, and the count of the items where there is
-// none.
+// none. The clause compares as §12.5 does, every expression evaluated at
+// the length of the longest and extended by sign only where all are signed,
+// which F.3.4.3.5 writes as the case equality of specify(b) and specify(bi).
 size_t SelectCaseItem(const PropertyExprNode* node, StepContext& sc) {
-  Logic4Vec sel = EvalExpr(node->boolean, sc.ctx, sc.arena);
+  CaseLength length;
+  IncludeInCaseLength(node->boolean, sc.ctx, length);
+  for (const std::vector<Expr*>& values : node->case_values) {
+    for (const Expr* value : values) {
+      IncludeInCaseLength(value, sc.ctx, length);
+    }
+  }
+  Logic4Vec sel = CaseOperandValue(node->boolean, length, sc.ctx, sc.arena);
   size_t selected = node->operands.size();
   for (size_t i = 0; i < node->case_values.size(); ++i) {
     if (node->case_values[i].empty()) {
@@ -515,7 +515,8 @@ size_t SelectCaseItem(const PropertyExprNode* node, StepContext& sc) {
       continue;
     }
     for (const Expr* value : node->case_values[i]) {
-      if (CaseMatches(sel, EvalExpr(value, sc.ctx, sc.arena), sc.arena)) {
+      if (CaseExactMatch(sel,
+                         CaseOperandValue(value, length, sc.ctx, sc.arena))) {
         return i;
       }
     }

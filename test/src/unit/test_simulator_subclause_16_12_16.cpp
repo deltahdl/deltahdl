@@ -114,13 +114,17 @@ TEST(PropertyCase, EmptyItemListWithDefaultExecutesDefault) {
 // The design of test/src/e2e/case_property.sv around one assertion: clk
 // rises at 5, 15, ..., 75 so that tick n is at 10n - 5; delay is 0 at ticks
 // 1 and 2, 1 at 3 and 4, 2 at 5 and 6 and 3 at 7 and 8; a is high
-// throughout, b at 2, 3, 4 and 8, and sel_x is 2'bxx.
+// throughout, b at 2, 3, 4 and 8, and sel_x is 2'bxx. Beyond that design,
+// minus_one is a signed 4-bit -1 and eight an unsigned 4-bit 8, for §12.5's
+// sizing.
 std::string CaseSource(const std::string& items) {
   return "module t;\n"
          "  logic clk = 0;\n"
          "  int tick = 1;\n"
          "  logic [1:0] delay;\n"
          "  logic [1:0] sel_x = 2'bxx;\n"
+         "  logic signed [3:0] minus_one = -1;\n"
+         "  logic [3:0] eight = 8;\n"
          "  logic a = 1;\n"
          "  logic b;\n"
          "  int passes = 0;\n"
@@ -195,6 +199,36 @@ TEST(PropertyCase, AnItemsPropertyMayBeACase) {
 TEST(PropertyCase, TheItemsAreComparedByCaseEquality) {
   auto counts =
       CountsOf("case (sel_x) 2'b00: 0; 2'bxx: 1; default: 0; endcase");
+  EXPECT_EQ(counts.first, 8u);
+  EXPECT_EQ(counts.second, 0u);
+}
+
+// §16.12.16, §12.5 and F.3.4.3.5: every expression of the case is evaluated
+// at the length of the longest, the item's 8 bits, so eight + eight is 16
+// there and matches 8'd16, where at its own 4 bits it would be 0 and fall to
+// the default.
+TEST(PropertyCase, TheExpressionsAreEvaluatedAtTheLongestLength) {
+  auto counts = CountsOf("case (eight + eight) 8'd16: 1; default: 0; endcase");
+  EXPECT_EQ(counts.first, 8u);
+  EXPECT_EQ(counts.second, 0u);
+}
+
+// §12.5: one unsigned expression makes the whole case unsigned, so
+// minus_one is zero-extended to 8'b0000_1111 against every item and matches
+// neither 8'sb1111_1111 nor 8'd5, though it and the first item are both
+// signed; the default is selected.
+TEST(PropertyCase, AnUnsignedItemMakesEveryComparisonUnsigned) {
+  auto counts = CountsOf(
+      "case (minus_one) 8'sb1111_1111: 0; 8'd5: 0; default: 1; endcase");
+  EXPECT_EQ(counts.first, 8u);
+  EXPECT_EQ(counts.second, 0u);
+}
+
+// §12.5: where every expression is signed the extension is by sign, so
+// minus_one extends to 8'sb1111_1111 and selects that item.
+TEST(PropertyCase, WhereEveryExpressionIsSignedTheExtensionIsBySign) {
+  auto counts =
+      CountsOf("case (minus_one) 8'sb1111_1111: 1; default: 0; endcase");
   EXPECT_EQ(counts.first, 8u);
   EXPECT_EQ(counts.second, 0u);
 }

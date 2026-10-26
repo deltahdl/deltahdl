@@ -579,6 +579,8 @@ static PropertyTreeState* PropertyTreeStateOf(const Stmt* stmt, Process& proc,
     state = CreatePropertyTreeState(stmt->assert_property, stmt->assert_clock,
                                     stmt->cover_sequence, ctx, arena);
     if (state == nullptr) return nullptr;
+    state->plain_sequences_strong = stmt->kind == StmtKind::kCoverImmediate ||
+                                    stmt->kind == StmtKind::kExpect;
     auto* p = CreateAssertionChildProcess(ctx, arena, Region::kActive);
     p->kind = ProcessKind::kFinal;
     p->coro = PropertyTreeFinalCoroutine(

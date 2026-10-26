@@ -104,7 +104,7 @@ static bool CaseInsidePatternMatch(const Logic4Vec& sel, const Expr* pat,
   return EvalInsideElement(sel, pat, ctx, arena) == 1;
 }
 
-static bool CaseExactMatch(const Logic4Vec& sel, const Logic4Vec& pat) {
+bool CaseExactMatch(const Logic4Vec& sel, const Logic4Vec& pat) {
   uint32_t width = (sel.width > pat.width) ? sel.width : pat.width;
   bool sign_ext = sel.is_signed && pat.is_signed;
   for (uint32_t i = 0; i < width; ++i) {
@@ -148,43 +148,43 @@ struct CaseSubject {
   Logic4Vec sel;
   PatternSubject pattern;
   std::optional<std::vector<PatternBinding>> bound;
-  // §12.5 (printed page 321): for a plain case, casez or casex, the length
-  // every expression of the statement is evaluated at, the longest of the case
-  // expression's and the items', and whether all of them are signed, which
-  // alone makes the extension to that length a sign extension.
-  uint32_t width = 0;
-  bool all_signed = false;
+  // For a plain case, casez or casex, the length §12.5 evaluates every
+  // expression of the statement at.
+  CaseLength length;
 };
+
+void IncludeInCaseLength(const Expr* e, SimContext& ctx, CaseLength& length) {
+  length.width = std::max(length.width, SimSelfWidth(e, ctx));
+  length.all_signed = length.all_signed && SimSelfSigned(e, ctx);
+}
 
 // Sizes the plain case, casez or casex `stmt` as §12.5 sizes it.
 static void SizeCaseStatement(const Stmt* stmt, SimContext& ctx,
                               CaseSubject& cs) {
-  cs.width = SimSelfWidth(stmt->condition, ctx);
-  cs.all_signed = SimSelfSigned(stmt->condition, ctx);
+  IncludeInCaseLength(stmt->condition, ctx, cs.length);
   for (const auto& item : stmt->case_items) {
     for (const Expr* pat : item.patterns) {
-      cs.width = std::max(cs.width, SimSelfWidth(pat, ctx));
-      cs.all_signed = cs.all_signed && SimSelfSigned(pat, ctx);
+      IncludeInCaseLength(pat, ctx, cs.length);
     }
   }
 }
 
-// An expression of a plain case, casez or casex statement evaluated at the
-// statement's length and extended to it, by sign only where every expression
-// is signed. An unbased unsized literal (§5.7.1) sets every bit of that
-// length. A real or string operand is compared as it stands.
-static Logic4Vec CaseOperandValue(const Expr* e, const CaseSubject& cs,
-                                  SimContext& ctx, Arena& arena) {
-  Logic4Vec v = EvalExpr(e, ctx, arena, cs.width);
+// An expression of a plain case, casez or casex evaluated at the case's
+// length and extended to it, by sign only where every expression is signed.
+// An unbased unsized literal (§5.7.1) sets every bit of that length. A real
+// or string operand is compared as it stands.
+Logic4Vec CaseOperandValue(const Expr* e, const CaseLength& length,
+                           SimContext& ctx, Arena& arena) {
+  Logic4Vec v = EvalExpr(e, ctx, arena, length.width);
   if (v.is_real || v.is_string) return v;
-  if (v.fills_width && v.width < cs.width)
-    return FillUnbasedUnsized(v, cs.width, arena);
+  if (v.fills_width && v.width < length.width)
+    return FillUnbasedUnsized(v, length.width, arena);
   // Where every expression's type is signed, as far as their forms show it,
   // each comparison extends its pair by sign, a form SimSelfSigned does not
   // read -- a select, a call -- answering by its value's own (CaseBitAt).
-  if (cs.all_signed) return v;
+  if (length.all_signed) return v;
   v.is_signed = false;
-  return v.width < cs.width ? ExtendVec(v, cs.width, false, arena) : v;
+  return v.width < length.width ? ExtendVec(v, length.width, false, arena) : v;
 }
 
 // §12.6.1: the `&&&` filters of the item pattern `e` after its pattern
@@ -238,7 +238,7 @@ static bool CasePatternMatch(CaseSubject& cs, const Expr* pat, const Stmt* stmt,
   if (stmt->case_inside) return CaseInsidePatternMatch(cs.sel, pat, ctx, arena);
   if (stmt->case_matches)
     return CaseMatchesPatternMatch(cs, pat, ctx, arena, stmt->case_kind);
-  return CaseItemMatches(cs.sel, CaseOperandValue(pat, cs, ctx, arena),
+  return CaseItemMatches(cs.sel, CaseOperandValue(pat, cs.length, ctx, arena),
                          stmt->case_kind);
 }
 
@@ -332,7 +332,7 @@ CaseSelection SelectCaseItem(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     cs.sel = EvalExpr(stmt->condition, ctx, arena);
   } else {
     SizeCaseStatement(stmt, ctx, cs);
-    cs.sel = CaseOperandValue(stmt->condition, cs, ctx, arena);
+    cs.sel = CaseOperandValue(stmt->condition, cs.length, ctx, arena);
   }
   CaseSelection chosen;
   if (qual == CaseQualifier::kUnique || qual == CaseQualifier::kUnique0) {

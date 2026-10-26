@@ -92,6 +92,9 @@ struct NodeState {
   // own the expressions reading it name, bound in a scope while the
   // expansion steps.
   std::vector<std::pair<std::string_view, Variable*>> locals;
+  // §16.12.2: for a sequence, whether it is read as strong, which decides
+  // an attempt of it still in flight when the run ends.
+  bool strong = false;
 };
 
 // §16.13.7: one copy of a local variable of a named property for one
@@ -122,6 +125,11 @@ struct PropertyTreeState {
   // §16.10: how many variables the expansions of the tree's attempts have
   // stood up for their locals, which numbers each one's name.
   uint32_t locals_made = 0;
+  // §16.12.2 and F.3.4.3.1: whether the statement the tree is the property
+  // of, a cover property or an expect, reads a sequence written with no
+  // sequence operator as strong; an assert property and an assume property
+  // read one as weak.
+  bool plain_sequences_strong = false;
 };
 
 // The verdict of an attempt decided, read off its root's state. Defined in

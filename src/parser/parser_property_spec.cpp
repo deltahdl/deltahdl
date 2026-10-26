@@ -98,16 +98,18 @@ Expr* ParserPropertySpecHelpers::PropertySpecPlaceholder(Arena& arena,
 
 // §16.12.2: the sequence_expr of a sequential property, bare or under
 // strong(...) or weak(...), read as a linear sequence body into a sequence
-// declaration of its own; `strong` says which operator was written, and
-// `term` that the sequence is one operand of a property's or or and, read
-// to the operator. Answers nullptr, the lexer where it was, where the
-// sequence is not one the monitor reads.
+// declaration of its own; `strong` says whether strong(...) was written and
+// `written` whether either operator was, and `term` that the sequence is one
+// operand of a property's or or and, read to the operator. Answers nullptr,
+// the lexer where it was, where the sequence is not one the monitor reads.
 ModuleItem* ParserPropertySpecHelpers::TryParseSequenceSpec(Parser& p,
                                                             bool& strong,
+                                                            bool& written,
                                                             bool term) {
   auto saved = p.lexer_.SavePos();
   bool wrapped = p.Check(TokenKind::kKwStrong) || p.Check(TokenKind::kKwWeak);
   strong = p.Check(TokenKind::kKwStrong);
+  written = wrapped;
   if (wrapped) {
     p.Consume();
     if (!p.Match(TokenKind::kLParen)) {
@@ -311,7 +313,8 @@ PropertyExprNode* ParserPropertySpecHelpers::ParseWholeSequenceActual(
   auto saved = p.lexer_.SavePos();
   auto* node = NewPropertyNode(p, PropertyExprNode::Kind::kSequence);
   p.diag_.PushSuppress();
-  node->sequence = TryParseSequenceSpec(p, node->strong, false);
+  node->sequence =
+      TryParseSequenceSpec(p, node->strong, node->strength_written, false);
   p.diag_.PopSuppress();
   if (node->sequence != nullptr &&
       (p.Check(TokenKind::kComma) || p.Check(TokenKind::kRParen))) {
@@ -618,7 +621,8 @@ PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyTerm(Parser& p) {
   if (wrapped || AheadHolds(p, TokenKind::kHashHash, true) ||
       AheadHoldsRepetition(p) || AheadHoldsSequenceOperator(p)) {
     auto* node = NewPropertyNode(p, PropertyExprNode::Kind::kSequence);
-    node->sequence = TryParseSequenceSpec(p, node->strong, true);
+    node->sequence =
+        TryParseSequenceSpec(p, node->strong, node->strength_written, true);
     return node->sequence != nullptr ? node : nullptr;
   }
   auto* node = NewPropertyNode(p, PropertyExprNode::Kind::kBoolean);
@@ -651,7 +655,8 @@ PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyImplication(
   auto saved = p.lexer_.SavePos();
   auto* node = NewPropertyNode(p, PropertyExprNode::Kind::kImplication);
   bool strong = false;
-  node->sequence = TryParseSequenceSpec(p, strong, true);
+  bool written = false;
+  node->sequence = TryParseSequenceSpec(p, strong, written, true);
   TokenKind op = p.CurrentToken().kind;
   bool implication = op == TokenKind::kPipeDashGt || op == TokenKind::kPipeEqGt;
   bool followed_by =
@@ -762,7 +767,8 @@ bool ParserPropertySpecHelpers::ParseSimpleSpecBody(Parser& p,
     body.prop = ParseExpressionOrDist(p);
     return body.prop != nullptr;
   }
-  body.sequence = TryParseSequenceSpec(p, body.strong, false);
+  body.sequence =
+      TryParseSequenceSpec(p, body.strong, body.strength_written, false);
   return body.sequence != nullptr;
 }
 
@@ -787,9 +793,13 @@ static bool SequenceNamesClocks(const SeqLinearBody& body) {
   return false;
 }
 
-// §16.12.2 and F.4.1: the statements whose bare sequence is read as
-// strong(...), a cover and an expect.
-static bool BareSequenceIsStrong(StmtKind body_kind) {
+// §16.12.2 and F.3.4.3.1: whether the sequence of `body` is read as strong
+// in a statement of `body_kind`: where strong(...) is written, and where no
+// sequence operator is and the statement is a cover or an expect, which read
+// a plain sequence as strong(...). A weak(...) stays weak in every statement.
+static bool SequenceReadsStrong(const SimpleSpecBody& body,
+                                StmtKind body_kind) {
+  if (body.strength_written) return body.strong;
   return body_kind == StmtKind::kCoverImmediate ||
          body_kind == StmtKind::kExpect;
 }
@@ -803,7 +813,7 @@ Stmt* ParserPropertySpecHelpers::MakeSimplePropertyStmt(
   SimpleSpecBody body = read;
   if (body.property == nullptr && body.sequence != nullptr &&
       SequenceNamesClocks(body.sequence->seq_linear)) {
-    body.strong = body.strong || BareSequenceIsStrong(body_kind);
+    body.strong = SequenceReadsStrong(body, body_kind);
     body.property = TreeOfSpecBody(p, body);
     body.sequence = nullptr;
     body.negated = false;
@@ -821,9 +831,9 @@ Stmt* ParserPropertySpecHelpers::MakeSimplePropertyStmt(
   stmt->assert_expr = prop;
   stmt->assert_sequence = body.sequence;
   // §16.12.2: a sequence_expr in an assert or assume is evaluated as weak
-  // unless written strong(...), and one in a cover as strong, F.4.1 having
-  // an expect statement's read as a cover's.
-  stmt->assert_strong = body.strong || BareSequenceIsStrong(body_kind);
+  // unless written strong(...), and one in a cover or an expect as strong
+  // unless written weak(...).
+  stmt->assert_strong = SequenceReadsStrong(body, body_kind);
   stmt->assert_negated = body.negated;
   PropertyExprNode* property = body.property;
   if (property != nullptr && body.negated) {
@@ -852,6 +862,7 @@ PropertyExprNode* ParserPropertySpecHelpers::TreeOfSpecBody(
     tree->boolean = body.prop;
     tree->sequence = body.sequence;
     tree->strong = body.strong;
+    tree->strength_written = body.strength_written;
   }
   if (!body.negated) return tree;
   auto* whole = NewPropertyNode(p, PropertyExprNode::Kind::kNot);

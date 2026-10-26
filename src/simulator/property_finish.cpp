@@ -194,7 +194,7 @@ Tri Finish(const PropertyExprNode* node, NodeState& state) {
       state.verdict = Finish(state.expansion, *state.operands[0]);
       break;
     case PropertyExprNode::Kind::kSequence:
-      state.verdict = node->strong ? Tri::kFalse : Tri::kTrue;
+      state.verdict = state.strong ? Tri::kFalse : Tri::kTrue;
       break;
     case PropertyExprNode::Kind::kNot:
       state.verdict = Not(Finish(node->operands[0], *state.operands[0]));

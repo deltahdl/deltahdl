@@ -139,6 +139,11 @@ struct PropertyExprNode {
   // clk1) sig1`, on which it is evaluated from its nearest tick; empty for
   // an operand on the clock flowing to it (§16.13.3).
   std::vector<EventExpr> clock;
+  // §16.12.2: for a sequence, whether strong(...) or weak(...) was written
+  // around it. One written plain takes the strength of the statement it is
+  // used in: strong in a cover property or an expect, weak in an assert
+  // property or an assume property.
+  bool strength_written = false;
 };
 
 struct CaseItem {

@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "fixture_simulator.h"
@@ -102,19 +103,20 @@ TEST(SequenceProperty, WeakEqualsWeakOfFirstMatch) {
 // 10n - 5, the tick counter counting through; b is high at ticks 2 to 4 and
 // c at 3, so b ##1 c matches from tick 2 alone, the attempt from 1 has no
 // match from its first tick, the one from 3 none from its second, and the
-// one from 4 is still in flight when the run ends; `items` declare the
-// assertions, counting in `passes` and `fails`.
+// one from 4 is still in flight when the run ends; go is high at tick 4
+// alone; `items` declare the assertions, counting in `passes` and `fails`.
 std::string SequencePropertySource(const std::string& items) {
   return "module t;\n"
          "  logic clk = 0;\n"
          "  int tick = 1;\n"
-         "  logic b, c;\n"
+         "  logic b, c, go;\n"
          "  int passes = 0;\n"
          "  int fails = 0;\n"
          "  always #5 clk = ~clk;\n"
          "  always #10 tick = tick + 1;\n"
          "  assign b = tick inside {2, 3, 4};\n"
-         "  assign c = tick inside {3};\n" +
+         "  assign c = tick inside {3};\n"
+         "  assign go = tick inside {4};\n" +
          items +
          "  initial #40 $finish;\n"
          "endmodule\n";
@@ -206,6 +208,93 @@ TEST(SequenceProperty, NamedSequenceInCoverPropertyIsStrong) {
 // per match: the attempt from 4, unfinished when the run ends, is no match.
 TEST(SequenceProperty, NamedSequenceInCoverSequenceIsStrong) {
   EXPECT_EQ(NamedSequenceCoverPasses("cover sequence"), 1u);
+}
+
+// The pass and fail counts of `items`, the final blocks the run ends with
+// included.
+std::pair<uint64_t, uint64_t> CountsAtTheEnd(const std::string& items) {
+  SimFixture f;
+  auto* passes = RunAndFindVar(SequencePropertySource(items), f, "passes");
+  if (passes == nullptr) return {~0ull, ~0ull};
+  f.ctx.RunFinalBlocks();
+  return {passes->value.ToUint64(),
+          f.ctx.FindVariable("fails")->value.ToUint64()};
+}
+
+// §16.12.2 and F.3.4.3.1: a sequence written with no sequence operator is
+// strong in a cover wherever it stands, an operand of a property's or as
+// much as the whole spec. The attempt from 2 passes at 3; the one from 3,
+// its first operand failed at 4 and its second in flight, and the one from
+// 4, both in flight, fail when the run ends, so the pass statement runs
+// once.
+TEST(SequenceProperty, PlainSequenceBeneathAnOperatorInCoverIsStrong) {
+  auto counts = CountsAtTheEnd(
+      "  cv: cover property (@(posedge clk) (b ##1 c) or (b ##2 c)) "
+      "passes++;\n");
+  EXPECT_EQ(counts.first, 1u);
+}
+
+// §16.12.2: the same property in an assert reads its sequences as weak, so
+// the attempts from 3 and 4 hold when the run ends beside the one from 2,
+// and the one from 1 fails at its tick.
+TEST(SequenceProperty, PlainSequenceBeneathAnOperatorInAssertIsWeak) {
+  auto counts = CountsAtTheEnd(
+      "  a: assert property (@(posedge clk) (b ##1 c) or (b ##2 c)) "
+      "passes++; else fails++;\n");
+  EXPECT_EQ(counts.first, 3u);
+  EXPECT_EQ(counts.second, 1u);
+}
+
+// §16.12.2's own example: p3, b ##1 c, is strong in the cover of go #-# p3,
+// which is not (go |-> not p3). At 4, go and b hold and no tick follows, so
+// p3 fails when the run ends, the implication holds and the cover does not:
+// the pass statement never runs.
+TEST(SequenceProperty, PlainSequenceOfAPropertyBodyIsStrongInACover) {
+  auto counts = CountsAtTheEnd(
+      "  property p3; b ##1 c; endproperty\n"
+      "  cv: cover property (@(posedge clk) go #-# p3) passes++;\n");
+  EXPECT_EQ(counts.first, 0u);
+}
+
+// §16.12.2: weak(...) is weak in a cover too, so the attempts from 3 and 4
+// hold when the run ends beside the one from 2.
+TEST(SequenceProperty, WeakSequenceBeneathAnOperatorInCoverIsWeak) {
+  auto counts = CountsAtTheEnd(
+      "  cv: cover property (@(posedge clk) weak(b ##1 c) or weak(b ##2 c)) "
+      "passes++;\n");
+  EXPECT_EQ(counts.first, 3u);
+}
+
+// §16.12.2: an expect reads a plain sequence as strong, so the attempt the
+// expect reached at 30 begins at 4, is in flight when the run ends and
+// fails then, running the else clause.
+TEST(SequenceProperty, PlainSequenceInExpectIsStrong) {
+  auto counts = CountsAtTheEnd(
+      "  initial begin #30; expect (@(posedge clk) b ##1 c) passes++; "
+      "else fails++; end\n");
+  EXPECT_EQ(counts.first, 0u);
+  EXPECT_EQ(counts.second, 1u);
+}
+
+// §16.12.2: the same in an expect whose property is a property's or: both
+// operands of the attempt from 4 are in flight when the run ends and fail
+// then, running the else clause.
+TEST(SequenceProperty, PlainSequenceBeneathAnOperatorInExpectIsStrong) {
+  auto counts = CountsAtTheEnd(
+      "  initial begin #30; expect (@(posedge clk) (b ##1 c) or (b ##2 c)) "
+      "passes++; else fails++; end\n");
+  EXPECT_EQ(counts.first, 0u);
+  EXPECT_EQ(counts.second, 1u);
+}
+
+// §16.12.2: weak(...) as an expect's whole property is weak, so the same
+// attempt neither passes nor fails when the run ends.
+TEST(SequenceProperty, WeakSequenceInExpectIsWeak) {
+  auto counts = CountsAtTheEnd(
+      "  initial begin #30; expect (@(posedge clk) weak(b ##1 c)) passes++; "
+      "else fails++; end\n");
+  EXPECT_EQ(counts.first, 0u);
+  EXPECT_EQ(counts.second, 0u);
 }
 
 }  // namespace

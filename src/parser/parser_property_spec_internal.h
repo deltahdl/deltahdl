@@ -26,6 +26,9 @@ struct SimpleSpecBody {
   bool strong = false;
   bool negated = false;
   PropertyExprNode* property = nullptr;
+  // §16.12.2: whether strong(...) or weak(...) was written around the
+  // sequence, which alone keeps the statement from choosing its strength.
+  bool strength_written = false;
 };
 
 // §16.12 to §16.12.6: the parse of the property_spec of a concurrent
@@ -38,7 +41,8 @@ struct SimpleSpecBody {
 // expression_or_dist in src/parser/parser_property_dist.cpp.
 struct ParserPropertySpecHelpers {
   static Expr* PropertySpecPlaceholder(Arena& arena, SourceLoc loc);
-  static ModuleItem* TryParseSequenceSpec(Parser& p, bool& strong, bool term);
+  static ModuleItem* TryParseSequenceSpec(Parser& p, bool& strong,
+                                          bool& written, bool term);
   static bool AheadHolds(Parser& p, TokenKind wanted, bool to_junction);
   static bool BodyHasPropertyJunction(Parser& p);
   static bool AheadOpensKeywordTerm(Parser& p);
