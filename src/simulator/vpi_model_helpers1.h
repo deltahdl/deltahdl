@@ -485,11 +485,6 @@ std::vector<VpiHandle> VpiLetExprArguments(
 // call, a method task/func call, and a system task/func call.
 bool VpiIsTfCallType(int type);
 
-// The expressions the expression `expr` is written over: a call's arguments,
-// which it holds apart from its children (§37.42), and any other expression's
-// children, an operation's operands or a var select's indices among them.
-const std::vector<VpiObject*>& VpiSubexpressions(const VpiObject& expr);
-
 // §37.42 details 1, 2, 11: the method-call kinds (method func call, method task
 // call). The vpiPrefix and vpiWith relations apply only to these, as does the
 // built-in-method NULL rule for vpiFunction/vpiTask.

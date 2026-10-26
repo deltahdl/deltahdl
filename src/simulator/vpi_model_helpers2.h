@@ -662,6 +662,11 @@ bool VpiAssignTargetWrites(const VpiObject* lhs, const VpiObject& target);
 // select or an argument of a call at any depth.
 bool VpiExpressionReads(const VpiObject* rhs, const VpiObject& target);
 
+// The expressions the expression `expr` is written over: a call's arguments,
+// which it holds apart from its children (§37.42), and any other expression's
+// children, an operation's operands or a var select's indices among them.
+const std::vector<VpiObject*>& VpiSubexpressions(const VpiObject& expr);
+
 // §37.21: whether `child`, an object hung among the variable `var`'s children,
 // is among the variable's drivers (`want_driver`) or its loads: a port always
 // a driver, and an assignment, a procedural assign or a force by whether its
