@@ -705,14 +705,6 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
     config_inst_path_ = std::move(saved_config_path);
     return;
   }
-  // A.4.1.1: a module's, interface's or program's port connections are
-  // ordinary expressions; a checker's are property_actual_args (A.4.1.4),
-  // which may hold a property.
-  if (child_decl->decl_kind != ModuleDeclKind::kChecker) {
-    for (const auto& port : item->inst_ports) {
-      ReportImplicationOperators(port.second, diag_);
-    }
-  }
 
   EnterGenBlockInstance(inst, child_decl,
                         {gen_block_path_, gen_loop_consts_, gen_prefix_scopes_},
@@ -809,6 +801,16 @@ void Elaborator::CheckInstancePorts(RtlirModuleInst& inst,
                                     const ModuleItem* item, RtlirModule* mod) {
   CheckPortCoercion(inst, item->loc);
   ReportActualsOnlyACheckerTakes(inst, item, diag_);
+  // A.4.1.1: a module's, interface's or program's port connection is an
+  // ordinary expression. One that is an implication as a whole is read as a
+  // property actual, which the check above rejects; one nested in a larger
+  // expression is read as an expression and is reported here. A checker's
+  // connections are property_actual_args (A.4.1.4), which may hold a property.
+  if (!inst.resolved->is_checker) {
+    for (const auto& port : item->inst_ports) {
+      ReportImplicationOperators(port.second, diag_);
+    }
+  }
   CheckUwirePortMerge(inst, item, mod);
   CheckInterconnectPortMerge(inst, item, mod);
 }

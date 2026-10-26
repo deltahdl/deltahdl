@@ -155,8 +155,10 @@ TEST(OperatorElaboration, ImplicationInPackageAndUnitScopeIsError) {
 }
 
 // A.4.1.1 writes a module instance's ordered and named port connections as
-// expressions. A checker instance's are property_actual_args (A.4.1.4), which
-// may hold a property.
+// expressions, so an implication nested in one is reported. One that is the
+// whole connection reads as a property, which §23.3.2 rejects for a module's
+// port, and a checker instance's connections are property_actual_args
+// (A.4.1.4), which may hold a property; neither is an A.8.6 report.
 TEST(OperatorElaboration, ImplicationInInstancePortConnectionIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -166,12 +168,17 @@ TEST(OperatorElaboration, ImplicationInInstancePortConnectionIsError) {
       "endchecker\n"
       "module m;\n"
       "  logic a, b;\n"
-      "  c u1(a |-> b);\n"
-      "  c u2(.i(a |=> b));\n"
-      "  k u3(a |-> b);\n"
+      "  c u1(a & (a |-> b));\n"
+      "  c u2(.i(b | (a |=> b)));\n"
+      "  c u3(a |-> b);\n"
+      "  k u4(a |-> b);\n"
       "endmodule\n",
       f);
   ExpectImplicationReports(f, {7}, {8});
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "is an event expression, a sequence or a "
+                            "property, which only a checker's port takes",
+                            9, "23.3.2"));
 }
 
 // A.4.1.1 writes an ordered and a named parameter value as a param_expression.
