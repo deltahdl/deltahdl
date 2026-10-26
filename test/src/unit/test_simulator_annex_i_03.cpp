@@ -125,4 +125,28 @@ TEST(SvdpiSourceCode, TheHandlesAndTheVersionRoutineAreTheListings) {
   EXPECT_STREQ(svDpiVersion(), "1800-2005");
 }
 
+// §I.3: the listing's comments on svGetTime, svGetTimeUnit and
+// svGetTimePrecision make calling any of them with an invalid svScope -- one
+// that names no instance scope -- an error, which each answers with -1,
+// leaving its output as it was. A NULL scope is no such handle: it asks for
+// the simulation time unit. All three answered 0 with the simulation's own
+// time and unit, the address of an object standing as a scope.
+TEST(SvdpiSourceCode, TheTimeFunctionsRefuseAHandleThatNamesNoScope) {
+  static int not_a_scope = 0;
+  auto invalid = reinterpret_cast<svScope>(&not_a_scope);
+  svTimeVal time = {};
+  time.type = sv_sim_time;
+  time.low = 12345;
+  int32_t unit = 99;
+  int32_t precision = 99;
+
+  EXPECT_EQ(svGetTime(invalid, &time), -1);
+  EXPECT_EQ(time.low, 12345u);
+  EXPECT_EQ(svGetTimeUnit(invalid, &unit), -1);
+  EXPECT_EQ(unit, 99);
+  EXPECT_EQ(svGetTimePrecision(invalid, &precision), -1);
+  EXPECT_EQ(precision, 99);
+  EXPECT_EQ(svGetTimeUnit(nullptr, &unit), 0);
+}
+
 }  // namespace

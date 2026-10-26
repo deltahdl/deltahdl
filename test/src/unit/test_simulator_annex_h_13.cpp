@@ -131,17 +131,15 @@ TEST_F(SvGetTimeSim, TimePrecisionMatchesVpiGetForNullScope) {
 
 // §H.13: svGetTime is defined to scale to the time unit of the instance scope
 // associated with the supplied svScope; the null-scope case is the special form
-// that uses the simulation time unit. This simulator binds no per-scope
-// timescale to an svScope, so a non-null scope resolves to the same design-wide
-// simulation time. Driving the non-null-scope path confirms production accepts
-// the scope argument and routes it to the shared time source rather than
-// rejecting it.
+// that uses the simulation time unit. A registered scope with no timescale
+// bound reads the same design-wide simulation time the null scope does, so the
+// non-null path is accepted and routed to the shared time source rather than
+// rejected.
 TEST_F(SvGetTimeSim, NonNullScopeRetrievesCurrentSimulationTime) {
   AdvanceTo(42);
 
-  int marker = 0;
-  const void* scope =
-      &marker;  // non-null svScope; no per-scope timescale bound
+  const DpiScope* scope = DpiRegisterScope("top.u_plain_time_h_13");
+  ASSERT_NE(scope, nullptr);
 
   s_vpi_time with_scope = {};
   with_scope.type = kSvSimTime;
@@ -158,16 +156,16 @@ TEST_F(SvGetTimeSim, NonNullScopeRetrievesCurrentSimulationTime) {
 
 // §H.13: svGetTimeUnit and svGetTimePrecision are likewise defined per the
 // instance scope associated with an svScope, with the null scope as the
-// simulation-time-unit special form. With no per-scope timescale binding a
-// non-null scope yields the same unit and precision the null scope does;
-// exercising the non-null path confirms both routines honor the scope argument.
+// simulation-time-unit special form. A registered scope with no timescale
+// bound yields the same unit and precision the null scope does; exercising the
+// non-null path confirms both routines honor the scope argument.
 TEST_F(SvGetTimeSim, NonNullScopeUnitAndPrecisionMatchNullScope) {
   VpiHandle top = vpi_ctx_.CreateModule("top", "top");
   ASSERT_NE(top, nullptr);
   top->time_precision = -9;
 
-  int marker = 0;
-  const void* scope = &marker;  // non-null svScope
+  const DpiScope* scope = DpiRegisterScope("top.u_plain_unit_h_13");
+  ASSERT_NE(scope, nullptr);
 
   int32_t unit_scoped = 0;
   int32_t unit_null = 0;

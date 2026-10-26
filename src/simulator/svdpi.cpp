@@ -757,17 +757,25 @@ int svIsDisabledState(void) { return delta::DpiCurrentDisabledState() ? 1 : 0; }
 // check can confirm it occurred.
 void svAckDisabledState(void) { delta::DpiAckCurrentDisable(); }
 
+// Annex I.3's comments on svGetTime, svGetTimeUnit and svGetTimePrecision make
+// calling them with an invalid svScope an error. A NULL scope is not one: it
+// asks for the simulation time unit. Any other handle is invalid unless it
+// names an instance scope (DpiScopeIsValid).
+static bool InvalidTimeScope(svScope scope) {
+  return scope != nullptr &&
+         !delta::DpiScopeIsValid(static_cast<const delta::DpiScope*>(scope));
+}
+
 // §H.13: retrieve the current simulation time. The caller sets time->type to
 // request the form it wants — sv_scaled_real_time for a real scaled to the time
 // unit, otherwise sv_sim_time for the 64-bit count — and this function honors
 // that selection, writing the result into the same svTimeVal. A NULL scope
-// means the time is scaled to the simulation time unit; this simulator binds no
-// per-scope timescale to an svScope, so a non-NULL scope reports the same
-// design-wide simulation time. The value comes from the shared time source the
-// VPI time routines read, so svGetTime and vpi_get_time() always agree. Returns
-// -1 when there is nowhere to write the result, 0 otherwise.
+// means the time is scaled to the simulation time unit. The value comes from
+// the shared time source the VPI time routines read, so svGetTime and
+// vpi_get_time() always agree. Returns -1 when there is nowhere to write the
+// result or the scope names no instance scope (InvalidTimeScope), 0 otherwise.
 int svGetTime(svScope scope, svTimeVal* time) {
-  if (time == nullptr) return -1;
+  if (time == nullptr || InvalidTimeScope(scope)) return -1;
   bool want_scaled_real = (time->type == sv_scaled_real_time);
   // §H.13: scaled to the time unit of the instance scope associated with the
   // svScope where one is bound to it; the simulation time unit otherwise, as
@@ -784,11 +792,11 @@ int svGetTime(svScope scope, svTimeVal* time) {
 }
 
 // §H.13: retrieve the time unit for the scope. A NULL scope retrieves the
-// simulation time unit; with no per-scope timescale binding a non-NULL scope
-// reports that same unit. The value matches vpi_get(vpiTimeUnit) for the
-// design. Returns -1 when there is nowhere to write the result, 0 otherwise.
+// simulation time unit, and so does a scope with no timescale bound. The value
+// matches vpi_get(vpiTimeUnit) for the design. Returns -1 when there is nowhere
+// to write the result or the scope names no instance scope, 0 otherwise.
 int svGetTimeUnit(svScope scope, int32_t* time_unit) {
-  if (time_unit == nullptr) return -1;
+  if (time_unit == nullptr || InvalidTimeScope(scope)) return -1;
   // §H.13: the instance scope's own unit where one is bound to the svScope.
   if (delta::DpiScopeTimescale(static_cast<const delta::DpiScope*>(scope),
                                time_unit, nullptr)) {
@@ -801,9 +809,9 @@ int svGetTimeUnit(svScope scope, int32_t* time_unit) {
 // §H.13: retrieve the time precision for the scope, mirroring svGetTimeUnit. A
 // NULL scope retrieves the simulation time unit; the value matches
 // vpi_get(vpiTimePrecision) for the design. Returns -1 when there is nowhere to
-// write the result, 0 otherwise.
+// write the result or the scope names no instance scope, 0 otherwise.
 int svGetTimePrecision(svScope scope, int32_t* time_precision) {
-  if (time_precision == nullptr) return -1;
+  if (time_precision == nullptr || InvalidTimeScope(scope)) return -1;
   // §H.13: the instance scope's own precision where one is bound to it.
   if (delta::DpiScopeTimescale(static_cast<const delta::DpiScope*>(scope),
                                nullptr, time_precision)) {
