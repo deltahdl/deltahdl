@@ -745,6 +745,10 @@ bool VpiIsTfCallType(int type) {
   }
 }
 
+const std::vector<VpiObject*>& VpiSubexpressions(const VpiObject& expr) {
+  return VpiIsTfCallType(expr.type) ? expr.arguments : expr.children;
+}
+
 bool VpiIsMethodCallType(int type) {
   // §37.42: the method-call kinds (method func call and method task call).
   return type == vpiMethodFuncCall || type == vpiMethodTaskCall;

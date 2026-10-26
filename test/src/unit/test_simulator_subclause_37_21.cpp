@@ -482,5 +482,57 @@ TEST_F(VariableDriversOfARun, AForceReadingASelectThroughASelectLoadsTheArray) {
   EXPECT_EQ(KindsOf(vpiLoad, By("top.m")), std::vector<int>{vpiForce});
 }
 
+// Detail 2: an array takes in the drivers and loads of its parts, and a
+// variable a select of it reads as its index is none of them, so the force
+// on i drives nothing of m, `assign o2 = i` is no load of m, and
+// `assign o = m[i]` is reached once (#8167).
+TEST_F(VariableDriversOfARun, AnArrayTakesInNothingOfItsSelectsIndices) {
+  Run("module top;\n"
+      "  logic m [0:1];\n"
+      "  logic i, o, o2;\n"
+      "  assign o = m[i];\n"
+      "  assign o2 = i;\n"
+      "  initial force i = 1'b0;\n"
+      "endmodule\n");
+  EXPECT_EQ(KindsOf(vpiLoad, By("top.m")), std::vector<int>{vpiContAssign});
+  EXPECT_EQ(KindsOf(vpiDriver, By("top.m")), std::vector<int>{});
+}
+
+// Figure: a call reads what its arguments read, so a continuous assignment
+// passing a variable to a function or a system function is a load of it
+// (#8168).
+TEST_F(VariableDriversOfARun, AnAssignmentLoadsWhatACallsArgumentsRead) {
+  Run("module top;\n"
+      "  function automatic logic f(logic a); return a; endfunction\n"
+      "  logic t, u, o, p;\n"
+      "  assign o = f(t);\n"
+      "  assign p = $unsigned(u);\n"
+      "endmodule\n");
+  EXPECT_EQ(KindsOf(vpiLoad, By("top.t")), std::vector<int>{vpiContAssign});
+  EXPECT_EQ(KindsOf(vpiLoad, By("top.u")), std::vector<int>{vpiContAssign});
+}
+
+// Figure: a force loads what the index of a select, the base of an indexed
+// part select, the indices of a select through another and a call's argument
+// read, each variable among them (#8166).
+TEST_F(VariableDriversOfARun, AForceLoadsWhatItsIndicesAndArgumentsRead) {
+  Run("module top;\n"
+      "  function automatic logic f(logic a); return a; endfunction\n"
+      "  logic [3:0] v;\n"
+      "  logic m [0:1][0:1];\n"
+      "  logic [1:0] o2;\n"
+      "  logic o1, o3, o4, i, b, k, l, t;\n"
+      "  initial begin\n"
+      "    force o1 = v[i];\n"
+      "    force o2 = v[b +: 2];\n"
+      "    force o3 = m[k][l];\n"
+      "    force o4 = f(t);\n"
+      "  end\n"
+      "endmodule\n");
+  for (const char* name : {"top.i", "top.b", "top.k", "top.l", "top.t"}) {
+    EXPECT_EQ(KindsOf(vpiLoad, By(name)), std::vector<int>{vpiForce}) << name;
+  }
+}
+
 }  // namespace
 }  // namespace delta

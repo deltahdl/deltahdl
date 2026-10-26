@@ -52,9 +52,10 @@ bool VpiExpressionReads(const VpiObject* rhs, const VpiObject& target) {
       (rhs->type == vpiOperation || rhs->type == vpiVarSelect ||
        VpiIsVariableSelectType(rhs->type) || VpiIsTfCallType(rhs->type));
   return kComposite &&
-         std::ranges::any_of(rhs->children, [&target](const VpiObject* sub) {
-           return VpiExpressionReads(sub, target);
-         });
+         std::ranges::any_of(VpiSubexpressions(*rhs),
+                             [&target](const VpiObject* sub) {
+                               return VpiExpressionReads(sub, target);
+                             });
 }
 
 bool VpiIsVariableDriverOrLoad(const VpiObject& child, const VpiObject& var,
@@ -70,10 +71,14 @@ bool VpiIsVariableDriverOrLoad(const VpiObject& child, const VpiObject& var,
 
 void VpiCollectVariableDriversOrLoads(VpiObject* node, bool want_driver,
                                       bool descend, VpiObject* iter) {
+  // A var select holds the indices it is written with among its children
+  // (§37.19), and a variable read as an index is no part of the array, so the
+  // walk goes no further down from one.
+  const bool kDescend = descend && node->type != vpiVarSelect;
   for (auto* child : node->children) {
     if (VpiIsVariableDriverOrLoad(*child, *node, want_driver)) {
       iter->children.push_back(child);
-    } else if (descend && VpiIsVariableSelectOrMemberType(child->type)) {
+    } else if (kDescend && VpiIsVariableSelectOrMemberType(child->type)) {
       VpiCollectVariableDriversOrLoads(child, want_driver, descend, iter);
     }
   }

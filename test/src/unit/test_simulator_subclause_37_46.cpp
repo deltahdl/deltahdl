@@ -486,5 +486,41 @@ TEST_F(NetDriversAndLoadsOfARun, ASwitchChannelTermDrivesAndLoadsItsNet) {
   EXPECT_FALSE(Holds(KindsOf(vpiDriver, By("top.c")), vpiPrimTerm));
 }
 
+// A call reads what its arguments read, so a continuous assignment passing a
+// net, or a bit of a vector net, to a function is a load of it (#8168).
+TEST_F(NetDriversAndLoadsOfARun, AContinuousAssignmentLoadsTheNetsACallReads) {
+  Run("module top;\n"
+      "  function automatic logic f(logic a); return a; endfunction\n"
+      "  wire w; wire [1:0] v; logic o, p;\n"
+      "  assign o = f(w);\n"
+      "  assign p = f(v[1]);\n"
+      "endmodule\n");
+  EXPECT_TRUE(Holds(KindsOf(vpiLoad, By("top.w")), vpiContAssign));
+  EXPECT_TRUE(Holds(KindsOf(vpiLoad, vpi_handle_by_index(By("top.v"), 1)),
+                    vpiContAssign));
+}
+
+// A force loads the nets the index of a select and a call's argument read
+// (#8166).
+TEST_F(NetDriversAndLoadsOfARun, AForceLoadsTheNetsItsIndexAndArgumentRead) {
+  Run("module top;\n"
+      "  function automatic logic f(logic a); return a; endfunction\n"
+      "  logic [3:0] v; logic o1, o2; wire n, w;\n"
+      "  initial begin force o1 = v[n]; force o2 = f(w); end\n"
+      "endmodule\n");
+  EXPECT_TRUE(Holds(KindsOf(vpiLoad, By("top.n")), vpiForce));
+  EXPECT_TRUE(Holds(KindsOf(vpiLoad, By("top.w")), vpiForce));
+}
+
+// §37.46 draws the assign stmt among the net loads, so a procedural assign is
+// a load of a net its expression reads (#8169).
+TEST_F(NetDriversAndLoadsOfARun, AProceduralAssignLoadsTheNetItReads) {
+  Run("module top; logic q; wire n;\n"
+      "  initial assign q = n;\n"
+      "endmodule\n");
+  EXPECT_TRUE(Holds(KindsOf(vpiLoad, By("top.n")), vpiAssignStmt));
+  EXPECT_FALSE(Holds(KindsOf(vpiDriver, By("top.n")), vpiAssignStmt));
+}
+
 }  // namespace
 }  // namespace delta

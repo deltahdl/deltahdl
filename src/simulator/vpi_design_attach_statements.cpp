@@ -157,6 +157,50 @@ void FillAssignment(VpiObject* obj, const Stmt& stmt,
   MakeIntraAssignmentControl(obj, stmt, with);
 }
 
+// §37.21 and §37.46: hangs `holder` among the children of each net and
+// variable the expression object `expr` reads: one it names, itself or a part
+// of it, as an operand or a call's argument at any depth, and one the index,
+// the bounds, or the base and width of a select in it read, a select through
+// another, m[i][j], reading the indices of both. A target is hung by what it
+// names alone, through the two walks a port and a terminal are hung by too,
+// since neither is a driver of what its connection's index reads.
+void HangOnObjectsRead(VpiObject* holder, VpiObject* expr) {
+  if (expr == nullptr) return;
+  if (expr->type == vpiOperation || VpiIsTfCallType(expr->type)) {
+    for (VpiObject* sub : VpiSubexpressions(*expr)) {
+      HangOnObjectsRead(holder, sub);
+    }
+    return;
+  }
+  for (const VpiObject* select = expr; select != nullptr;
+       select = VpiIsVariableSelectType(select->type) ||
+                        select->type == vpiVarSelect
+                    ? select->parent
+                    : nullptr) {
+    for (VpiObject* part :
+         {select->index_expr, select->base_expr, select->width_expr,
+          select->left_range, select->right_range}) {
+      HangOnObjectsRead(holder, part);
+    }
+  }
+  VpiHangOnNetsNamed(holder, expr);
+  VpiHangOnVariablesNamed(holder, expr);
+}
+
+// §37.79: the target an assign, deassign, force or release names, and the
+// expression an assign or force drives it with. An assign or a force drives
+// the variables its target names, a force the nets too (§37.21, §37.46), and
+// each loads the nets and variables its expression reads.
+void FillProceduralAssignment(VpiObject* obj, const Stmt& stmt,
+                              const VpiStmtBuild& with) {
+  obj->lhs = with.expression(stmt.lhs);
+  obj->rhs = with.expression(stmt.rhs);
+  if (stmt.kind != StmtKind::kAssign && stmt.kind != StmtKind::kForce) return;
+  if (stmt.kind == StmtKind::kForce) VpiHangOnNetsNamed(obj, obj->lhs);
+  VpiHangOnVariablesNamed(obj, obj->lhs);
+  HangOnObjectsRead(obj, obj->rhs);
+}
+
 // `child` among the children of `obj`, where one was made.
 void AddChild(VpiObject* obj, VpiObject* child) {
   if (child != nullptr) obj->children.push_back(child);
@@ -684,21 +728,7 @@ void VpiFillStmt(VpiObject* obj, const Stmt& stmt, const VpiStmtBuild& with) {
     case StmtKind::kDeassign:
     case StmtKind::kForce:
     case StmtKind::kRelease:
-      // §37.79: the target an assign, deassign, force or release names, and
-      // the expression an assign or force drives it with.
-      obj->lhs = with.expression(stmt.lhs);
-      obj->rhs = with.expression(stmt.rhs);
-      // §37.46: a force drives the nets it names and loads those it reads.
-      if (stmt.kind == StmtKind::kForce) {
-        VpiHangOnNetsNamed(obj, obj->lhs);
-        VpiHangOnNetsNamed(obj, obj->rhs);
-      }
-      // §37.21: an assign or a force drives the variables it names and loads
-      // those it reads.
-      if (stmt.kind == StmtKind::kAssign || stmt.kind == StmtKind::kForce) {
-        VpiHangOnVariablesNamed(obj, obj->lhs);
-        VpiHangOnVariablesNamed(obj, obj->rhs);
-      }
+      FillProceduralAssignment(obj, stmt, with);
       return;
     case StmtKind::kCase:
       FillCase(obj, stmt, with);

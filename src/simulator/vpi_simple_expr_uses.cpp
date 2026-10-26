@@ -112,9 +112,9 @@ bool VpiExpressionUses(const VpiObject* node, const VpiObject& expr) {
     if (VpiExpressionUses(part, expr)) return true;
   }
   if (!VpiIsExprType(node->type)) return false;
-  return std::ranges::any_of(node->children, [&](const VpiObject* child) {
-    return VpiExpressionUses(child, expr);
-  });
+  return std::ranges::any_of(
+      VpiSubexpressions(*node),
+      [&](const VpiObject* sub) { return VpiExpressionUses(sub, expr); });
 }
 
 namespace {
