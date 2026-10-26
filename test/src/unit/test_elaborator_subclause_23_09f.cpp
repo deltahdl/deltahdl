@@ -96,4 +96,25 @@ TEST(ClassMethodScopeRules, ReadsOfNamesItsScopesDeclareResolve) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
+// §23.9 with §18.6.1 and A.8.2: every class has the built-in method
+// randomize, which no class declares, and its call may be written without its
+// argument list, so a method's bare `randomize` reads that method and is no
+// unresolved name, where a name beside it that nothing declares still is.
+TEST(ClassMethodScopeRules, ABareRandomizeReadsTheBuiltInMethod) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  class k;\n"
+      "    rand int y;\n"
+      "    function int f; return randomize; endfunction\n"
+      "    function int g; return randomize + nosuch; endfunction\n"
+      "  endclass\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to unresolved identifier 'nosuch'", 5,
+                            "23.9"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
+}
+
 }  // namespace
