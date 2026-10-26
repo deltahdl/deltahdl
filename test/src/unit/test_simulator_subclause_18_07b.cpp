@@ -216,4 +216,25 @@ TEST(InlineConstraintsRun, ARestrictedBlocksUnlistedHeadResolvesInTheCaller) {
   EXPECT_EQ(out, "4\n");
 }
 
+// 18.7 with A.8.2: an object's randomize written with only its with clause
+// is the call randomize() with that clause: x is drawn under x == 7 and the
+// call returns 1 (#8151).
+TEST(InlineConstraintsRun, ACallWithNoArgumentListTakesItsClause) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  class C;\n"
+      "    rand bit [3:0] x;\n"
+      "  endclass\n"
+      "  C obj = new;\n"
+      "  int ok;\n"
+      "  initial begin\n"
+      "    ok = obj.randomize with { x == 4'd7; };\n"
+      "    $display(\"%0d %0d\", ok, obj.x);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 7\n");
+}
+
 }  // namespace

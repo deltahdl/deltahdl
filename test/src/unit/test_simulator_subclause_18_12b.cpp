@@ -89,4 +89,28 @@ TEST(ScopeRandomizeRun, AnUnsatisfiableBlockReturnsZeroAndHoldsTheValue) {
   EXPECT_EQ(out, "0 3\n");
 }
 
+// 18.12 with A.8.2: the scope randomize's argument list is optional, so
+// std::randomize written with only its with clause is the call with no
+// argument, the same check of its constraints on the current values, and
+// std::randomize alone checks none and returns 1 (#8151).
+TEST(ScopeRandomizeRun, NoArgumentListBeforeTheClauseIsTheSameCheck) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  bit [7:0] a, b;\n"
+      "  int holds, fails, alone;\n"
+      "  initial begin\n"
+      "    a = 1; b = 2;\n"
+      "    holds = std::randomize with { a < b; };\n"
+      "    a = 3;\n"
+      "    fails = std::randomize with { a < b; };\n"
+      "    alone = std::randomize;\n"
+      "    $display(\"%0d %0d %0d %0d\", holds, fails, alone,\n"
+      "             a == 3 && b == 2);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 0 1 1\n");
+}
+
 }  // namespace

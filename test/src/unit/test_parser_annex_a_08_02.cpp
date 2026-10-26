@@ -1,8 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -732,6 +734,37 @@ TEST(SubroutineCallExprParsing, AnArrayMethodOrARandomizeCallTakesAWithClause) {
               "    x = obj.randomize with { v > 0; };\n"
               "  end\n"
               "endmodule\n"));
+}
+
+// A.8.2 (printed page 1209): a randomize_call's argument list is optional,
+// so a randomize name followed by a with clause, under std::, after a `.` or
+// bare, and std::randomize alone, are each the call randomize() is, the
+// constraint block on that call. A member named randomize with neither,
+// which may be a struct's, stays the member it reads as (#8151).
+TEST(SubroutineCallExprParsing, ARandomizeCallWithoutItsListIsACall) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    x = std::randomize with { a > 0; };\n"
+      "    x = obj.randomize with { v > 0; };\n"
+      "    x = randomize with { v > 0; };\n"
+      "    x = std::randomize;\n"
+      "    x = s.randomize;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  const std::vector<Stmt*> kStmts = AllInitialStmts(r);
+  ASSERT_EQ(kStmts.size(), 5u);
+  for (size_t i = 0; i < 3; ++i) {
+    const Expr* rhs = kStmts[i]->rhs;
+    ASSERT_EQ(rhs->kind, ExprKind::kCall) << "statement " << i;
+    EXPECT_TRUE(rhs->args.empty()) << "statement " << i;
+    EXPECT_NE(rhs->inline_constraint, nullptr) << "statement " << i;
+  }
+  EXPECT_EQ(kStmts[3]->rhs->kind, ExprKind::kCall);
+  EXPECT_EQ(kStmts[3]->rhs->inline_constraint, nullptr);
+  EXPECT_EQ(kStmts[4]->rhs->kind, ExprKind::kMemberAccess);
 }
 
 // A.8.2's randomize_call writes after `with` an optional parenthesized list

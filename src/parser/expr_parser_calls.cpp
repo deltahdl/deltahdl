@@ -416,6 +416,25 @@ WithHost WithHostOf(const Expr* e) {
 constexpr const char* kOneWithExpression =
     "an array method's with clause holds one expression in its parentheses";
 
+// A.8.2 (printed page 1209): a randomize_call's argument list is optional,
+// and one written without it is the call randomize() is, built as
+// Parser::ParseCallExpr builds that call, with no argument.
+Expr* RandomizeCallOf(Expr* name, Arena& arena) {
+  auto* call = arena.Create<Expr>();
+  call->kind = ExprKind::kCall;
+  call->callee = name->text;
+  call->lhs = name;
+  call->range.start = name->range.start;
+  return call;
+}
+
+// Whether `e` is the name std::randomize, which names the scope randomize
+// function and nothing else, written with no argument list.
+bool IsStdRandomizeName(const Expr* e) {
+  return e->kind == ExprKind::kMemberAccess && e->is_scope_resolution &&
+         WithHostOf(e) == WithHost::kRandomize;
+}
+
 }  // namespace
 
 // A.8.2's with clause: after a randomize call, the form
@@ -425,12 +444,19 @@ constexpr const char* kOneWithExpression =
 // range is left standing: A.8.1 writes that range after the whole operand of
 // a stream_expression, where Parser::ParseStreamingConcat reads it.
 Expr* Parser::ParseWithClause(Expr* expr) {
-  if (!Check(TokenKind::kKwWith) || WithOpensRange(lexer_)) return expr;
+  if (!Check(TokenKind::kKwWith) || WithOpensRange(lexer_)) {
+    return IsStdRandomizeName(expr) ? RandomizeCallOf(expr, arena_) : expr;
+  }
   const WithHost kHost = WithHostOf(expr);
   const Token kWith = Consume();
   if (kHost == WithHost::kRandomize) {
-    ParseRandomizeWith(expr);
-    return expr;
+    // A randomize name a with clause follows is the randomize_call written
+    // without its argument list; `randomize` being no reserved word, a name
+    // with neither may be a member or a variable, and stays one.
+    Expr* call =
+        expr->kind == ExprKind::kCall ? expr : RandomizeCallOf(expr, arena_);
+    ParseRandomizeWith(call);
+    return call;
   }
   if (kHost == WithHost::kNone) {
     diag_.Error(
