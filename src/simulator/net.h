@@ -52,6 +52,7 @@ struct NetStrength {
   Strength s1_lo = Strength::kHighz;
 
   bool IsAmbiguous() const { return s0_hi != s0_lo || s1_hi != s1_lo; }
+  bool operator==(const NetStrength&) const = default;
 };
 
 struct Net {

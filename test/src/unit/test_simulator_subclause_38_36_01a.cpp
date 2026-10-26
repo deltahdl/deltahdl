@@ -490,6 +490,45 @@ TEST_F(EventCallbacksOfARun, ASizeChangeCallbackFiresOnEachResize) {
   EXPECT_EQ(kSizes[2].time, 2u);
 }
 
+// §38.36.1 with §37.17 detail 13: a cbValueChange routine placed on a bit of a
+// vector is called after each change of that bit, and not after a write that
+// changes only other bits of the vector (#7849).
+TEST_F(EventCallbacksOfARun,
+       AValueChangeCallbackOnABitFiresWhenThatBitChanges) {
+  Armer() = [] {
+    PlaceEventCallback(cbValueChange,
+                       vpi_handle_by_index(TopObject("top.v"), 2));
+  };
+  Run("module top; timeunit 1ns; timeprecision 1ns; logic [3:0] v = 0;\n"
+      "  initial begin $arm;\n"
+      "    #1 v[0] = 1; #1 v[2] = 1; #1 v = 4'b0100; #1 v = 4'b0000;\n"
+      "  end\n"
+      "endmodule\n");
+  const std::vector<EventDelivery> kChanges = DeliveriesOf(cbValueChange);
+  ASSERT_EQ(kChanges.size(), 2u);
+  EXPECT_EQ(kChanges[0].time, 2u);
+  EXPECT_EQ(kChanges[1].time, 4u);
+}
+
+// §38.36.1: a resize calls the cbSizeChange routines placed on the queue it
+// resizes and none placed elsewhere, a queue watched for value changes alone
+// among them (#7849).
+TEST_F(EventCallbacksOfARun, AResizeCallsOnlyTheSizeCallbacksOfItsQueue) {
+  Armer() = [] {
+    PlaceEventCallback(cbValueChange, TopObject("top.q"));
+    PlaceEventCallback(cbSizeChange, TopObject("top.r"));
+  };
+  Run("module top; timeunit 1ns; timeprecision 1ns; int q[$]; int r[$];\n"
+      "  initial begin $arm;\n"
+      "    #1 q.push_back(7); #1 r.push_back(8);\n"
+      "  end\n"
+      "endmodule\n");
+  const std::vector<EventDelivery> kSizes = DeliveriesOf(cbSizeChange);
+  ASSERT_EQ(kSizes.size(), 1u);
+  EXPECT_EQ(kSizes[0].obj, "r");
+  EXPECT_EQ(kSizes[0].time, 2u);
+}
+
 // §38.36.1: cbStartOfThread is called whenever a thread is created, each
 // branch of a fork among them (#5122).
 TEST_F(EventCallbacksOfARun, AStartOfThreadCallbackFiresForEachForkBranch) {

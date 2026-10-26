@@ -21,14 +21,16 @@ namespace {
 // among `callbacks`.
 bool IsPlacedOn(const std::vector<s_cb_data>& callbacks, int reason,
                 const VpiObject* obj) {
+  // `obj` is the object watched, never null, so a registration with no object
+  // matches none.
   return std::ranges::any_of(callbacks, [reason, obj](const s_cb_data& cb) {
-    return cb.reason == reason && cb.obj != nullptr &&
-           VpiObjectOf(cb.obj) == obj;
+    return cb.reason == reason && VpiObjectOf(cb.obj) == obj;
   });
 }
 
 // The aval and bval words of the bits `obj` stands for: its variable's, or,
-// for a bit or a select of one, those of its parent's it spans.
+// for a bit or a select of one, those of its parent's it spans, up to the
+// variable's last bit.
 std::vector<uint64_t> ObjectBits(const VpiObject& obj) {
   const Logic4Vec& whole = obj.var->value;
   std::vector<uint64_t> bits;
@@ -39,11 +41,12 @@ std::vector<uint64_t> ObjectBits(const VpiObject& obj) {
     }
     return bits;
   }
-  for (int k = 0; k < std::max(obj.size, 1); ++k) {
-    const auto kBit = static_cast<uint32_t>(obj.bit_offset + k);
-    if (kBit / 64 >= whole.nwords) break;
-    bits.push_back((whole.words[kBit / 64].aval >> (kBit % 64)) & 1);
-    bits.push_back((whole.words[kBit / 64].bval >> (kBit % 64)) & 1);
+  const auto kFirst = static_cast<uint32_t>(obj.bit_offset);
+  const uint32_t kEnd = std::min(
+      kFirst + static_cast<uint32_t>(std::max(obj.size, 1)), whole.width);
+  for (uint32_t bit = kFirst; bit < kEnd; ++bit) {
+    bits.push_back((whole.words[bit / 64].aval >> (bit % 64)) & 1);
+    bits.push_back((whole.words[bit / 64].bval >> (bit % 64)) & 1);
   }
   return bits;
 }
@@ -59,11 +62,6 @@ NetStrength StrengthOf(const VpiObject& obj) {
   return obj.net != nullptr ? obj.net->resolved_strength : NetStrength{};
 }
 
-bool SameStrength(const NetStrength& a, const NetStrength& b) {
-  return a.s0_hi == b.s0_hi && a.s0_lo == b.s0_lo && a.s1_hi == b.s1_hi &&
-         a.s1_lo == b.s1_lo;
-}
-
 // §38.36.1: what `obj` holds now against the bits `held` and the strength
 // `strength` last seen, both brought up to date, and, where `call_back`, its
 // cbValueChange callbacks called for a change of value or, a change of
@@ -74,20 +72,21 @@ void NoteValueChange(VpiContext& vpi, VpiObject* obj,
                      bool call_back) {
   std::vector<uint64_t> now = ObjectBits(*obj);
   const NetStrength kStrength = StrengthOf(*obj);
-  const bool kStrengthChanged = !SameStrength(kStrength, strength);
+  const bool kValueChanged = now != held;
+  const bool kStrengthChanged = kStrength != strength;
+  held = std::move(now);
   strength = kStrength;
-  if (now != held) {
-    held = std::move(now);
-    if (call_back) vpi.DispatchCallbacks(cbValueChange, obj);
-  } else if (kStrengthChanged && call_back) {
+  if (!call_back) return;
+  if (kValueChanged) {
+    vpi.DispatchCallbacks(cbValueChange, obj);
+  } else if (kStrengthChanged) {
     vpi.DispatchStrengthChange(obj);
   }
 }
 
 void WatchObjectChanges(VpiContext& vpi, VpiObject* obj) {
-  if (obj == nullptr || obj->var == nullptr || obj->value_change_watched) {
-    return;
-  }
+  // Its one caller, vpi_register_cb, passes a registration's object only.
+  if (obj->var == nullptr || obj->value_change_watched) return;
   obj->value_change_watched = true;
   obj->var->AddWatcher([&vpi, obj, held = ObjectBits(*obj),
                         strength = StrengthOf(*obj),
