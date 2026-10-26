@@ -4,6 +4,7 @@
 #include <cstring>
 #include <functional>
 #include <string>
+#include <vector>
 
 #include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
@@ -305,6 +306,61 @@ TEST_F(PutsOfARun, ARealMemberOfAStructureHoldsTheRealPut) {
   read.format = vpiRealVal;
   vpi_get_value(By("top.s.r"), &read);
   EXPECT_DOUBLE_EQ(read.value.real, 2.5);
+}
+
+// The real `top.r` holds once `put` is put to it.
+double RealAfterPut(s_vpi_value put) {
+  vpi_put_value(vpi_handle_by_name(VpiText("top.r"), nullptr), &put, nullptr,
+                vpiNoDelay);
+  s_vpi_value read = {};
+  read.format = vpiRealVal;
+  vpi_get_value(vpi_handle_by_name(VpiText("top.r"), nullptr), &read);
+  return read.value.real;
+}
+
+// §38.34 with §38.15: a real variable takes a value put in a string, scalar
+// or vector format as the integer the value gives, its x and z bits as 0, the
+// inverse of reading a real in such a format as its rounded integer, and a
+// value that decodes to nothing leaves it as it was (#8170).
+TEST_F(PutsOfARun, ARealVariableTakesAnIntegralFormatAsItsInteger) {
+  Run("module top; real r; initial $noop; endmodule\n");
+  s_vpi_value dec = {};
+  dec.format = vpiDecStrVal;
+  dec.value.str = VpiText("3");
+  EXPECT_DOUBLE_EQ(RealAfterPut(dec), 3.0);
+  s_vpi_value hex = {};
+  hex.format = vpiHexStrVal;
+  hex.value.str = VpiText("1x");
+  EXPECT_DOUBLE_EQ(RealAfterPut(hex), 16.0);
+  s_vpi_value scalar = {};
+  scalar.format = vpiScalarVal;
+  scalar.value.scalar = vpi1;
+  EXPECT_DOUBLE_EQ(RealAfterPut(scalar), 1.0);
+  s_vpi_value nothing = {};
+  nothing.format = vpiVectorVal;
+  EXPECT_DOUBLE_EQ(RealAfterPut(nothing), 1.0);
+}
+
+// §38.34 with §38.15: a negative real read as a vector, its rounded integer's
+// 64 bits, is put back from that vector as itself (#8170).
+TEST_F(PutsOfARun, ARealReadAsAVectorIsPutBackAsItself) {
+  Run("module top; real r; initial $noop; endmodule\n");
+  s_vpi_value minus = {};
+  minus.format = vpiRealVal;
+  minus.value.real = -4.0;
+  RealAfterPut(minus);
+  s_vpi_value read = {};
+  read.format = vpiVectorVal;
+  vpi_get_value(By("top.r"), &read);
+  ASSERT_NE(read.value.vector, nullptr);
+  std::vector<s_vpi_vecval> held(read.value.vector, read.value.vector + 2);
+  s_vpi_value zero = {};
+  zero.format = vpiIntVal;
+  EXPECT_DOUBLE_EQ(RealAfterPut(zero), 0.0);
+  s_vpi_value back = {};
+  back.format = vpiVectorVal;
+  back.value.vector = held.data();
+  EXPECT_DOUBLE_EQ(RealAfterPut(back), -4.0);
 }
 
 // What the vpiStringVal put to the `$half_of_five` call recorded.

@@ -534,6 +534,20 @@ static bool PutValueFormatIsRejected(VpiHandle obj, const s_vpi_value* value,
   return false;
 }
 
+// §38.34 with §6.12: the real number a value put to a real object stands for:
+// a real's own, and in any other format the integer the value gives, its x
+// and z bits read as 0 and the 64 bits it is decoded to read as a signed
+// integer. That is the inverse of §38.15's reading of a real in such a format
+// as its rounded integer, so a value read in one is put back as itself. None
+// for a value that decodes to nothing.
+static std::optional<double> RealPutValue(const s_vpi_value& value) {
+  if (value.format == kVpiRealVal) return value.value.real;
+  std::vector<Logic4Word> words;
+  if (!VpiPutValueBits(value, 64, words)) return std::nullopt;
+  return static_cast<double>(
+      static_cast<int64_t>(words.front().aval & ~words.front().bval));
+}
+
 // §38.34 with Table 38-3: the value `value` gives, decoded from whichever
 // format it is in, written to every bit of the target variable, or, for a net
 // bit or var bit, to its bit of the parent's storage, and for a select leaving
@@ -543,16 +557,13 @@ static bool PutValueFormatIsRejected(VpiHandle obj, const s_vpi_value* value,
 static void PutValueWriteBits(VpiHandle obj, const s_vpi_value* value) {
   const uint32_t kWidth = VpiPutWidth(*obj);
   std::vector<Logic4Word> bits;
-  // §38.34 with §6.12: a real object takes a real or an integer put to it as
-  // the real number it is, held in the object's own precision, rather than
-  // the integer the value rounds to.
-  if ((obj->var->is_real || obj->var->value.is_real) &&
-      (value->format == kVpiRealVal || value->format == kVpiIntVal)) {
-    const double kReal = value->format == kVpiRealVal
-                             ? value->value.real
-                             : static_cast<double>(value->value.integer);
+  // §38.34 with §6.12: a real object holds the real number the value stands
+  // for in its own precision, rather than the value's bits.
+  if (obj->var->is_real || obj->var->value.is_real) {
+    const std::optional<double> kReal = RealPutValue(*value);
+    if (!kReal) return;
     Arena scratch;
-    const Logic4Vec kBits = MakeRealVec(scratch, kReal, kWidth);
+    const Logic4Vec kBits = MakeRealVec(scratch, *kReal, kWidth);
     bits.assign(kBits.words, kBits.words + kBits.nwords);
     VpiWriteDecodedBits(*obj, bits, kWidth);
     obj->var->value.is_real = true;
