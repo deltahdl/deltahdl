@@ -381,6 +381,11 @@ std::unordered_set<std::string_view> DeclaredGenvars(
   return genvars;
 }
 
+// A.8.2 (printed page 1209) writes the scope randomize function of §18.12 as
+// `[ std:: ] randomize` with its argument list optional, so a bare randomize
+// read that no declaration of the scope names is that call.
+bool NamesScopeRandomize(std::string_view name) { return name == "randomize"; }
+
 // §23.9: reports every collected read that names no declaration the reference
 // can reach, and §27.4 every read of one of `genvars`, which are declared but
 // may not be read where these reads stand.
@@ -397,7 +402,7 @@ void ReportUnresolvedRefs(const std::vector<const Expr*>& refs, Pred declared,
                  Subclause("27.4"));
       continue;
     }
-    if (declared(e->text)) continue;
+    if (declared(e->text) || NamesScopeRandomize(e->text)) continue;
     diag.Error(e->range.start,
                std::format("reference to unresolved identifier '{}'", e->text),
                Subclause("23.9"));
