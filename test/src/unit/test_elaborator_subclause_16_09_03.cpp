@@ -343,7 +343,10 @@ TEST(SampledValueRules, APastInsideAnOrGroupIsHeldToTheTicksRule) {
 
 // §16.9.3 with §16.8.1: a $past written in an actual of a sequence instance
 // that is itself a sequence, `s(a ##1 $past(b, 0))`, is held to the rule as
-// one written in the assertion is, once; a2's $past(b, 1) keeps it.
+// one written in the assertion is, once; a2's $past(b, 1) keeps it. a3's
+// actual is an expression, and the instance standing as the whole property
+// is that property's sequence as well as the expression read, which is one
+// breach and one report.
 TEST(SampledValueRules, APastInsideASequenceActualIsHeldToTheTicksRule) {
   ElabFixture f;
   ElaborateSrc(
@@ -354,11 +357,14 @@ TEST(SampledValueRules, APastInsideASequenceActualIsHeldToTheTicksRule) {
       "  endsequence\n"
       "  a1: assert property (@(posedge clk) s(a ##1 $past(b, 0)));\n"
       "  a2: assert property (@(posedge clk) s(a ##1 $past(b, 1)));\n"
+      "  a3: assert property (@(posedge clk) s($past(b, 0)));\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kTicksReport, 6, "16.9.3"));
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kTicksReport, 7, "16.9.3"));
   EXPECT_EQ(TicksReportsOn(f.diag.Diagnostics(), 6), 1);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kTicksReport, 8, "16.9.3"));
+  EXPECT_EQ(TicksReportsOn(f.diag.Diagnostics(), 8), 1);
 }
 
 }  // namespace

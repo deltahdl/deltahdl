@@ -714,7 +714,13 @@ void CheckAssertionStmt(const Stmt* s, const NameSet* automatics,
     CollectBodyLocals(s->assert_sequence->seq_linear, locals);
   }
   Site site{Place::kOperand, &locals, automatics};
-  CheckRoot(s->assert_expr, site, env);
+  // Where a tree or a sequence stands for the property, the expression is a
+  // placeholder or is held there as well: an instance standing as the whole
+  // property is its tree's root or its sequence's one operand. It is read
+  // through them alone, each breach in it reported once.
+  if (s->assert_property == nullptr && s->assert_sequence == nullptr) {
+    CheckRoot(s->assert_expr, site, env);
+  }
   CheckTree(s->assert_property, site, env);
   CheckSequence(s->assert_sequence, site, env);
   CheckClock(s->assert_clock, site, env);
