@@ -270,19 +270,19 @@ TEST_F(VpiActionFeatureCallbacks,
   EXPECT_EQ(survivors, expected);
 }
 
-// §38.36.3: the reset callbacks occur whether the reset is invoked directly or
-// indirectly through vpi_control(vpiReset, ...). Driving the reset through the
-// C control entry point delivers the same start-then-end sequence.
-TEST_F(VpiActionFeatureCallbacks, ResetViaVpiControlDeliversCallbacks) {
+// §38.36.3: the reset callbacks occur around a reset, whether it is invoked
+// directly or through vpi_control(vpiReset, ...). This implementation is
+// without $reset, as Annex D.1 allows, so the vpi_control request fails
+// (§38.4) and neither reset callback is delivered.
+TEST_F(VpiActionFeatureCallbacks,
+       ResetViaVpiControlFailsAndDeliversNoCallback) {
   Register(cbStartOfReset);
   Register(cbEndOfReset);
 
-  int handled = vpi_control(vpiReset, 0);
+  int handled = vpi_control(vpiReset, 0, 0, 0);
 
-  EXPECT_EQ(handled, 1);
-  ASSERT_EQ(g_sequence.size(), 2u);
-  EXPECT_EQ(g_sequence[0], cbStartOfReset);
-  EXPECT_EQ(g_sequence[1], cbEndOfReset);
+  EXPECT_EQ(handled, 0);
+  EXPECT_TRUE(g_sequence.empty());
 }
 
 // §38.36.3 (edge case): dispatching a reason with no registered callback
