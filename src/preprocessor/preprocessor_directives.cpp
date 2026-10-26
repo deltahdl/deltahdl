@@ -487,16 +487,19 @@ void Preprocessor::HandleDefaultDecayTime(std::string_view rest,
     default_decay_time_infinite_ = true;
     default_decay_time_ = 0;
     default_decay_time_real_ = 0.0;
+    default_decay_time_is_real_ = false;
     return;
   }
   // E.2 takes an integer constant or a real constant. A charge decay time has
   // no negative value (§28.16.2), so a signed integer constant whose value is
   // negative is no decay time.
   std::optional<double> value;
+  bool is_real = false;
   if (auto integer = ReadIntegerConstant(arg)) {
     if (*integer >= 0) value = static_cast<double>(*integer);
   } else {
     value = ReadRealConstant(arg);
+    is_real = true;
   }
   if (!value) {
     diag_.Error(
@@ -505,13 +508,14 @@ void Preprocessor::HandleDefaultDecayTime(std::string_view rest,
     return;
   }
   // §3.14.1: the time precision governs how a delay value is rounded before
-  // simulation uses it, and a precision equal to the time unit rounds each
-  // delay value to an integer.
-  // E.2 admits a real_constant here and gives no conversion of its own, so
-  // the rounding is that clause's, not a truncation: 3.5 is a decay time of
-  // 4. The exact value stays in default_decay_time_real_.
+  // simulation uses it, and the precision is the governed module's, which is
+  // not known here. E.2 admits a real_constant and gives no conversion of its
+  // own, so the exact value stays in default_decay_time_real_, marked as a
+  // real for the elaborator to hand on, and default_decay_time_ holds it
+  // rounded to whole time units, which a precision equal to the unit gives.
   default_decay_time_real_ = *value;
   default_decay_time_ = static_cast<uint64_t>(std::llround(*value));
+  default_decay_time_is_real_ = is_real;
   default_decay_time_infinite_ = false;
 }
 

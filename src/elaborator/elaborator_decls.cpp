@@ -412,6 +412,8 @@ struct TriregDefaults {
   bool has_strength = false;
   uint64_t decay_ticks = 0;
   bool decay_infinite = true;
+  bool decay_is_real = false;
+  double decay_real = 0.0;
 };
 
 // §28.16.2.2: give the net the charge decay time its declaration writes as the
@@ -424,7 +426,11 @@ static void ApplyTriregDecayTime(const ModuleItem* item, RtlirNet& net,
                                  const ScopeMap& scope, DiagEngine& diag) {
   if (item->net_delay_decay == nullptr) {
     if (!defaults.decay_infinite) {
+      // E.2 with §3.14.1: a real default is rounded at the module's precision
+      // as a real third delay is, so its exact value goes on beside the count.
       net.decay_ticks = defaults.decay_ticks;
+      net.decay_is_real = defaults.decay_is_real;
+      net.decay_real = defaults.decay_real;
       net.decays = true;
     }
     return;
@@ -781,9 +787,10 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
 
   ApplyTriregNetDefaults(
       item, net,
-      TriregDefaults{mod->default_trireg_strength,
-                     mod->has_default_trireg_strength, mod->default_decay_time,
-                     mod->default_decay_time_infinite},
+      TriregDefaults{
+          mod->default_trireg_strength, mod->has_default_trireg_strength,
+          mod->default_decay_time, mod->default_decay_time_infinite,
+          mod->default_decay_time_is_real, mod->default_decay_time_real},
       BuildParamScope(mod), diag_);
 
   RecordNetDeclDelay(item, net);

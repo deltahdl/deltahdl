@@ -318,6 +318,11 @@ struct ModuleDirectives {
   // directive after the element does not change.
   NetType default_nettype = NetType::kWire;
   NetType unconnected_drive = NetType::kWire;
+  // E.2: whether the decay time was written as a real constant, and its exact
+  // value, which §3.14.1 has rounded at the time precision of the module it
+  // governs rather than to the whole count `decay_ticks` holds.
+  bool decay_is_real = false;
+  double decay_real = 0.0;
 };
 
 template <typename T, size_t N = 4>

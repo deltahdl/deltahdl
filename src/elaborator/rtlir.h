@@ -674,16 +674,16 @@ struct RtlirModule {
   bool is_automatic = false;
   std::vector<ResolvedAttribute> attrs;
   RtlirNodeAttributes node_attrs;  // §37.83: its items' and statements'.
-  // Annex E.4 to E.7: the delay mode the last directive before this module
-  // selected, in force where the module was declared or, for a module parsed
-  // without the preprocessor, the compilation unit's.
+  // Annex E: E.4 to E.7's delay mode, and E.2's decay time and E.3's charge
+  // strength for trireg nets declaring none, in force where this module was
+  // declared, or the compilation unit's where it was parsed without the
+  // preprocessor. A real decay time keeps its exact value for the lowerer to
+  // round at this module's time precision (§3.14.1).
   DelayModeDirective delay_mode = DelayModeDirective::kNone;
-
-  // Annex E.2 and E.3: the default decay time and charge strength of this
-  // module's trireg nets that declare none, the directives in force where it
-  // was declared or, parsed without the preprocessor, the compilation unit's.
   uint64_t default_decay_time = 0;
   bool default_decay_time_infinite = true;
+  bool default_decay_time_is_real = false;
+  double default_decay_time_real = 0.0;
   uint32_t default_trireg_strength = 0;
   bool has_default_trireg_strength = false;
 

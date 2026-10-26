@@ -189,13 +189,17 @@ TEST(Elaborator, DefaultDecayTime_AppliesToAllTriregNets) {
 struct DecayOf {
   uint64_t ticks = 0;
   bool decays = false;
+  bool is_real = false;
+  double real = 0.0;
 };
 DecayOf DecayOfNet(const RtlirDesign* design, std::string_view module,
                    std::string_view net_name) {
   for (const auto* mod : design->top_modules) {
     if (mod->name != module) continue;
     for (const auto& net : mod->nets) {
-      if (net.name == net_name) return {net.decay_ticks, net.decays};
+      if (net.name == net_name) {
+        return {net.decay_ticks, net.decays, net.decay_is_real, net.decay_real};
+      }
     }
   }
   return {};
@@ -249,6 +253,50 @@ TEST(Elaborator, DefaultDecayTime_AModuleBeforeTheDirectiveIsNotUnderIt) {
   EXPECT_EQ(DecayOfNet(design, "b", "cap").ticks, 50u);
   EXPECT_TRUE(DecayOfNet(design, "b", "cap").decays);
   EXPECT_FALSE(DecayOfNet(design, "c", "cap").decays);
+}
+
+// Annex E.2 with §3.14.1: a delay value is rounded at the time precision of the
+// module it is written for, and a real decay time is no exception, whichever of
+// E.2's directive and a trireg's third delay (§28.16.2.2) writes it. Under
+// 1ns/100ps, 2.5 is 2.5 ns, so the default reaches the net as the real 2.5 the
+// lowerer rounds at the precision, as the third delay does, rather than as the
+// 3 whole units of a rounding made before any precision is known.
+TEST(Elaborator, DefaultDecayTime_RealArgumentReachesTheNetUnrounded) {
+  ElabFixture f;
+  auto* design = ElaborateWithPreprocessor(
+      "`timescale 1ns/100ps\n"
+      "`default_decay_time 2.5\n"
+      "module t;\n"
+      "  trireg by_default;\n"
+      "  trireg #(0, 0, 2.5) declared;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const DecayOf kByDefault = DecayOfNet(design, "t", "by_default");
+  const DecayOf kDeclared = DecayOfNet(design, "t", "declared");
+  EXPECT_TRUE(kByDefault.decays);
+  EXPECT_TRUE(kByDefault.is_real);
+  EXPECT_EQ(kByDefault.real, 2.5);
+  EXPECT_EQ(kByDefault.is_real, kDeclared.is_real);
+  EXPECT_EQ(kByDefault.real, kDeclared.real);
+}
+
+// An integer argument stays the whole count it was written as, as an integer
+// third delay does, so nothing is rounded twice.
+TEST(Elaborator, DefaultDecayTime_IntegerArgumentReachesTheNetAsACount) {
+  ElabFixture f;
+  auto* design = ElaborateWithPreprocessor(
+      "`default_decay_time 1_000\n"
+      "module t;\n"
+      "  trireg cap;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const DecayOf kDecay = DecayOfNet(design, "t", "cap");
+  EXPECT_EQ(kDecay.ticks, 1000u);
+  EXPECT_FALSE(kDecay.is_real);
 }
 
 }  // namespace

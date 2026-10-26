@@ -40,6 +40,7 @@ struct PreprocResult {
   uint64_t default_decay_time = 0;
   double default_decay_time_real = 0.0;
   bool default_decay_time_infinite = true;
+  bool default_decay_time_is_real = false;
 
   uint32_t default_trireg_strength = 0;
   bool has_default_trireg_strength = false;

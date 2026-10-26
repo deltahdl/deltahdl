@@ -190,12 +190,16 @@ static void InitRtlirModuleHeader(RtlirModule* mod, const ModuleDecl* decl,
   if (decl->has_module_directives) {
     mod->default_decay_time = decl->default_decay_time;
     mod->default_decay_time_infinite = decl->default_decay_time_infinite;
+    mod->default_decay_time_is_real = decl->default_decay_time_is_real;
+    mod->default_decay_time_real = decl->default_decay_time_real;
     mod->default_trireg_strength = decl->default_trireg_strength;
     mod->has_default_trireg_strength = decl->has_default_trireg_strength;
     mod->delay_mode = decl->delay_mode;
   } else {
     mod->default_decay_time = unit->default_decay_time;
     mod->default_decay_time_infinite = unit->default_decay_time_infinite;
+    mod->default_decay_time_is_real = unit->default_decay_time_is_real;
+    mod->default_decay_time_real = unit->default_decay_time_real;
     mod->default_trireg_strength = unit->default_trireg_strength;
     mod->has_default_trireg_strength = unit->has_default_trireg_strength;
     mod->delay_mode = unit->delay_mode_directive;

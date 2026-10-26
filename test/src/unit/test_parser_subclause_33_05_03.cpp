@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <ios>
@@ -161,7 +162,7 @@ TEST(SeparateCompilationTool, LoadFailsOnTruncatedChunk) {
   ScratchDir tmp;
   auto path = tmp.dir / "truncated.dpl";
   std::ofstream os(path, std::ios::binary);
-  os.write("DPLIB005", 8);
+  os.write("DPLIB006", 8);
 
   unsigned char bad[4] = {0x10, 0x00, 0x00, 0x00};
   os.write(reinterpret_cast<const char*>(bad), 4);
@@ -260,6 +261,64 @@ TEST(SeparateCompilationTool, LoadAppliesTheRecordedDirectiveState) {
   EXPECT_EQ(mod->directive_timescale.prec_magnitude, 100);
   EXPECT_EQ(mod->default_nettype, NetType::kTri);
   EXPECT_TRUE(mod->is_cell);
+}
+
+// Annex E.2 with §3.14.1: a real `default_decay_time is rounded at the time
+// precision of the module it governs, which the binding run knows and the
+// compile's preprocessor does not, so a record carries the exact value and
+// that it was written as a real beside the rounded count.
+TEST(SeparateCompilationTool, LoadKeepsARealDefaultDecayTimeExact) {
+  ScratchDir tmp;
+  auto path = tmp.dir / "rtlLib.dpl";
+  ModuleDirectives leaf;
+  leaf.module = "leaf";
+  leaf.decay_ticks = 3;
+  leaf.decay_infinite = false;
+  leaf.decay_is_real = true;
+  leaf.decay_real = 2.5;
+  PrecompiledDirectives directives;
+  directives.modules.push_back(leaf);
+  ASSERT_TRUE(PrecompiledLibrary::Save("module leaf;\nendmodule\n", "rtlLib",
+                                       path, directives));
+
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine diag(mgr);
+  CompilationUnit target;
+  ASSERT_TRUE(PrecompiledLibrary::Load(path, target, mgr, arena, diag));
+  ASSERT_EQ(target.modules.size(), 1u);
+  const ModuleDecl* mod = target.modules[0];
+  EXPECT_EQ(mod->default_decay_time, 3u);
+  EXPECT_FALSE(mod->default_decay_time_infinite);
+  EXPECT_TRUE(mod->default_decay_time_is_real);
+  EXPECT_EQ(mod->default_decay_time_real, 2.5);
+}
+
+// A record cut short inside a module's directive state is no record, wherever
+// the cut falls, the two fields a record carries last for each module among
+// them: 17 bytes off cuts into the real decay time's exact value, and 25 off
+// leaves out whether it was written as a real. With one module and no cells,
+// licences, protected lines or viewports, four counts of four bytes follow
+// those fields.
+TEST(SeparateCompilationTool, LoadFailsOnARecordCutInsideTheDecayTime) {
+  for (std::uintmax_t cut : {17U, 25U}) {
+    ScratchDir tmp;
+    auto path = tmp.dir / "cut.dpl";
+    ModuleDirectives leaf;
+    leaf.module = "leaf";
+    PrecompiledDirectives directives;
+    directives.modules.push_back(leaf);
+    ASSERT_TRUE(PrecompiledLibrary::Save("module leaf;\nendmodule\n", "rtlLib",
+                                         path, directives));
+    std::filesystem::resize_file(path, std::filesystem::file_size(path) - cut);
+
+    SourceManager mgr;
+    Arena arena;
+    DiagEngine diag(mgr);
+    CompilationUnit target;
+    EXPECT_FALSE(PrecompiledLibrary::Load(path, target, mgr, arena, diag))
+        << cut;
+  }
 }
 
 }  // namespace

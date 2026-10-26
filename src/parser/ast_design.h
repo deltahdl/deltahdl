@@ -179,6 +179,10 @@ struct CompilationUnit {
   uint64_t default_decay_time = 0;
   double default_decay_time_real = 0.0;
   bool default_decay_time_infinite = true;
+  // E.2: whether the decay time was written as a real constant, whose exact
+  // value default_decay_time_real holds for the elaborator to round at the
+  // governed module's time precision (§3.14.1).
+  bool default_decay_time_is_real = false;
 
   uint32_t default_trireg_strength = 0;
   bool has_default_trireg_strength = false;
@@ -292,6 +296,8 @@ inline void ApplyModuleDirectives(
     mod->has_module_directives = true;
     mod->default_decay_time = d->decay_ticks;
     mod->default_decay_time_infinite = d->decay_infinite;
+    mod->default_decay_time_is_real = d->decay_is_real;
+    mod->default_decay_time_real = d->decay_real;
     mod->default_trireg_strength = d->strength;
     mod->has_default_trireg_strength = d->has_strength;
     mod->delay_mode = d->delay_mode;

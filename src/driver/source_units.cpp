@@ -51,6 +51,7 @@ void ReadPreprocessorState(const Preprocessor& preproc, PreprocResult& result) {
   result.default_decay_time = preproc.DefaultDecayTime();
   result.default_decay_time_real = preproc.DefaultDecayTimeReal();
   result.default_decay_time_infinite = preproc.DefaultDecayTimeInfinite();
+  result.default_decay_time_is_real = preproc.DefaultDecayTimeIsReal();
   result.default_trireg_strength = preproc.DefaultTriregStrength();
   result.has_default_trireg_strength = preproc.HasDefaultTriregStrength();
   result.delay_mode_directive = preproc.DelayModeDirective();
@@ -131,6 +132,7 @@ void ApplyPreprocMetadata(CompilationUnit* cu, const PreprocResult& pp) {
   cu->default_decay_time = pp.default_decay_time;
   cu->default_decay_time_real = pp.default_decay_time_real;
   cu->default_decay_time_infinite = pp.default_decay_time_infinite;
+  cu->default_decay_time_is_real = pp.default_decay_time_is_real;
   cu->default_trireg_strength = pp.default_trireg_strength;
   cu->has_default_trireg_strength = pp.has_default_trireg_strength;
   cu->delay_mode_directive = pp.delay_mode_directive;

@@ -748,6 +748,7 @@ class Preprocessor {
 
   uint64_t DefaultDecayTime() const { return default_decay_time_; }
   double DefaultDecayTimeReal() const { return default_decay_time_real_; }
+  bool DefaultDecayTimeIsReal() const { return default_decay_time_is_real_; }
   bool DefaultDecayTimeInfinite() const { return default_decay_time_infinite_; }
   uint32_t DefaultTriregStrength() const { return default_trireg_strength_; }
   bool HasDefaultTriregStrength() const { return has_default_trireg_strength_; }
@@ -929,6 +930,8 @@ class Preprocessor {
   uint64_t default_decay_time_ = 0;
   double default_decay_time_real_ = 0.0;
   bool default_decay_time_infinite_ = true;
+  // Whether the decay time in force was written as a real constant.
+  bool default_decay_time_is_real_ = false;
   uint32_t default_trireg_strength_ = 0;
   bool has_default_trireg_strength_ = false;
   enum DelayModeDirective delay_mode_directive_ = DelayModeDirective::kNone;

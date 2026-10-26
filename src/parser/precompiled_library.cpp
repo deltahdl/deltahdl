@@ -1,6 +1,7 @@
 #include "parser/precompiled_library.h"
 
 #include <algorithm>
+#include <bit>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -31,12 +32,13 @@ namespace delta {
 
 namespace {
 
-// DPLIB005 records carry the directive state, the runtime licences, the
-// protected lines and the envelopes' viewports beside the text; a DPLIB004
-// file, which held no viewports, a DPLIB003 file, which held no protected lines
-// either, a DPLIB002 file, which held no licences either, and a DPLIB001 file,
-// which held the text alone, are not read.
-constexpr char kMagic[] = "DPLIB005";
+// DPLIB006 records carry the directive state, the runtime licences, the
+// protected lines and the envelopes' viewports beside the text; a DPLIB005
+// file, whose directive state held a real default decay time rounded alone, a
+// DPLIB004 file, which held no viewports either, a DPLIB003 file, which held
+// no protected lines either, a DPLIB002 file, which held no licences either,
+// and a DPLIB001 file, which held the text alone, are not read.
+constexpr char kMagic[] = "DPLIB006";
 constexpr std::streamsize kMagicLen = 8;
 
 void WriteU32(std::ofstream& os, uint32_t v) {
@@ -113,6 +115,8 @@ void WriteModuleDirectives(std::ofstream& os, const ModuleDirectives& d) {
   WriteU8(os, d.is_package ? 1 : 0);
   WriteU8(os, static_cast<uint8_t>(d.default_nettype));
   WriteU8(os, static_cast<uint8_t>(d.unconnected_drive));
+  WriteU8(os, d.decay_is_real ? 1 : 0);
+  WriteU64(os, std::bit_cast<uint64_t>(d.decay_real));
 }
 
 // The values ReadModuleDirectives reads one field of a record into before it is
@@ -129,6 +133,8 @@ struct DirectiveBytes {
   uint8_t is_package = 0;
   uint8_t default_nettype = 0;
   uint8_t unconnected_drive = 0;
+  uint8_t decay_is_real = 0;
+  uint64_t decay_real = 0;
 };
 
 bool ReadModuleDirectives(std::ifstream& is, ModuleDirectives& d) {
@@ -139,7 +145,9 @@ bool ReadModuleDirectives(std::ifstream& is, ModuleDirectives& d) {
               ReadU8(is, b.has_timescale) && ReadU8(is, b.unit) &&
               ReadU32(is, b.magnitude) && ReadU8(is, b.precision) &&
               ReadU32(is, b.prec_magnitude) && ReadU8(is, b.is_package) &&
-              ReadU8(is, b.default_nettype) && ReadU8(is, b.unconnected_drive);
+              ReadU8(is, b.default_nettype) &&
+              ReadU8(is, b.unconnected_drive) && ReadU8(is, b.decay_is_real) &&
+              ReadU64(is, b.decay_real);
   if (!read) return false;
   d.decay_infinite = b.decay_infinite != 0;
   d.has_strength = b.has_strength != 0;
@@ -153,6 +161,8 @@ bool ReadModuleDirectives(std::ifstream& is, ModuleDirectives& d) {
   d.is_package = b.is_package != 0;
   d.default_nettype = static_cast<NetType>(b.default_nettype);
   d.unconnected_drive = static_cast<NetType>(b.unconnected_drive);
+  d.decay_is_real = b.decay_is_real != 0;
+  d.decay_real = std::bit_cast<double>(b.decay_real);
   return true;
 }
 

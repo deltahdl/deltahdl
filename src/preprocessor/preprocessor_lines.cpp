@@ -55,6 +55,7 @@ void Preprocessor::ResetDirectiveState() {
   default_decay_time_ = 0;
   default_decay_time_real_ = 0.0;
   default_decay_time_infinite_ = true;
+  default_decay_time_is_real_ = false;
   default_trireg_strength_ = 0;
   has_default_trireg_strength_ = false;
   delay_mode_directive_ = DelayModeDirective::kNone;

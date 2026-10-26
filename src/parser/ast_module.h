@@ -854,6 +854,11 @@ struct ModuleDecl {
   bool has_module_directives = false;
   uint64_t default_decay_time = 0;
   bool default_decay_time_infinite = true;
+  // E.2 with §3.14.1: whether the decay time was written as a real constant,
+  // and its exact value, for the elaborator to round at this module's time
+  // precision.
+  bool default_decay_time_is_real = false;
+  double default_decay_time_real = 0.0;
   uint32_t default_trireg_strength = 0;
   bool has_default_trireg_strength = false;
   DelayModeDirective delay_mode = DelayModeDirective::kNone;

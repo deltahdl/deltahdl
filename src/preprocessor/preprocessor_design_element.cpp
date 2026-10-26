@@ -203,7 +203,8 @@ void Preprocessor::TrackDesignElementHeader(std::string_view trimmed) {
            default_decay_time_infinite_, default_trireg_strength_,
            has_default_trireg_strength_, delay_mode_directive_, has_timescale_,
            current_timescale_, element.is_package, default_net_type_,
-           unconnected_drive_});
+           unconnected_drive_, default_decay_time_is_real_,
+           default_decay_time_real_});
     }
     ++design_element_depth_;
   }
