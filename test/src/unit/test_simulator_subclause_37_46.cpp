@@ -383,6 +383,29 @@ TEST(NetDriversAndLoads, ANetBitReachesItsNetDriversAndLoads) {
   EXPECT_TRUE(VpiIterationContains(loads, &assign_stmt));
 }
 
+// §37.45 details 1 and 2 tell the two terms of a delay device apart by the
+// device; a delay term held by anything else is told apart by nothing, so the
+// figure, which draws a delay term on both sides, makes it a driver and a load.
+TEST(NetDriversAndLoads, ADelayTermHeldByNoDelayDeviceDrivesAndLoads) {
+  VpiContext ctx;
+  VpiObject holder;
+  holder.type = vpiModule;
+  VpiObject term;
+  term.type = vpiDelayTerm;
+  term.parent = &holder;
+  VpiObject net;
+  net.type = vpiNet;
+  net.children = {&term};
+  std::vector<VpiHandle> drivers =
+      CollectVpiIteration(ctx, ctx.Iterate(vpiDriver, &net));
+  ASSERT_EQ(drivers.size(), 1u);
+  EXPECT_EQ(drivers[0], &term);
+  std::vector<VpiHandle> loads =
+      CollectVpiIteration(ctx, ctx.Iterate(vpiLoad, &net));
+  ASSERT_EQ(loads.size(), 1u);
+  EXPECT_EQ(loads[0], &term);
+}
+
 // The drivers and loads of the nets of a run: a primitive's terminals, a
 // force and a port connected to a complex expression, each hung on the nets it
 // connects, names or reads.
@@ -448,6 +471,19 @@ TEST_F(NetDriversAndLoadsOfARun, AForceReachesTheNetsThroughOperandsAndBits) {
   EXPECT_EQ(std::ranges::count(kLoadsOfM, vpiForce), 2);
   EXPECT_TRUE(Holds(KindsOf(vpiDriver, By("top.v")), vpiForce));
   EXPECT_FALSE(Holds(KindsOf(vpiLoad, By("top.v")), vpiForce));
+}
+
+// A bidirectional switch passes values both ways between the two ends of its
+// channel (§28.8), so the inout prim term on each end both drives and loads
+// the net it connects, while the control terminal only loads its net.
+TEST_F(NetDriversAndLoadsOfARun, ASwitchChannelTermDrivesAndLoadsItsNet) {
+  Run("module top; wire a, b, c;\n"
+      "  tranif1 g(a, b, c);\n"
+      "endmodule\n");
+  EXPECT_TRUE(Holds(KindsOf(vpiDriver, By("top.a")), vpiPrimTerm));
+  EXPECT_TRUE(Holds(KindsOf(vpiLoad, By("top.a")), vpiPrimTerm));
+  EXPECT_TRUE(Holds(KindsOf(vpiLoad, By("top.c")), vpiPrimTerm));
+  EXPECT_FALSE(Holds(KindsOf(vpiDriver, By("top.c")), vpiPrimTerm));
 }
 
 }  // namespace

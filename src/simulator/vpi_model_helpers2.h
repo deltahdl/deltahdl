@@ -704,8 +704,8 @@ bool VpiIsNetDriverType(int type);
 
 // §37.46 (figure, net loads): the object kinds that load a net - a delay
 // terminal, an assignment statement, a force, a continuous assignment (whole or
-// single bit), or a primitive terminal. A port loads a net only through the
-// complex-expression rule of detail 1, so it is not part of this set.
+// single bit), a primitive terminal, or a port, which loads one only through
+// the complex-expression rule of detail 1.
 bool VpiIsNetLoadType(int type);
 
 // §37.46 detail 1: whether `port`, which is a port, carries a complex
@@ -718,10 +718,11 @@ bool VpiIsNetLoadType(int type);
 bool VpiPortIsComplexExpressionLoad(VpiHandle port);
 
 // §37.46: whether `child`, an object hung among the net `net`'s children, is
-// among the net's drivers (`want_driver`) or its loads: a prim term by the
-// direction of its terminal (§37.35), a force (§37.79) or a continuous
-// assignment (§37.47) by whether its target writes the net or its expression
-// reads it, a port by detail 1, and any other object by its kind.
+// among the net's drivers (`want_driver`) or its loads: one of the kinds the
+// figure draws on that side, and then a prim term by the direction of its
+// terminal (§37.35), a force (§37.79) or a continuous assignment (§37.47) by
+// whether its target writes the net or its expression reads it, a delay term
+// by which term of its device it is (§37.45), and a port by detail 1.
 bool VpiIsNetDriverOrLoad(VpiHandle child, VpiHandle net, bool want_driver);
 
 // §37.16 detail 16: the ports driving the net `net` from something other than

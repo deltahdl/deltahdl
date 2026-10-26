@@ -329,6 +329,81 @@ TEST(VariableDriversAndLoads, AnAssignmentDrivesItsTargetAndLoadsWhatItReads) {
   EXPECT_EQ(CollectVpiIteration(ctx, ctx.Iterate(vpiLoad, &read)).size(), 1u);
 }
 
+// Figure: an assignment drives a variable through the target it writes, so
+// one hung on the variable with no target drives nothing.
+TEST(VariableDriversAndLoads, AnAssignmentWithNoTargetDrivesNothing) {
+  VpiContext ctx;
+  VpiObject assign_stmt;
+  assign_stmt.type = vpiAssignStmt;
+  VpiObject var;
+  var.type = vpiLogicVar;
+  var.children = {&assign_stmt};
+  EXPECT_TRUE(CollectVpiIteration(ctx, ctx.Iterate(vpiDriver, &var)).empty());
+}
+
+// §37.19 with §37.17 detail 5: a select through another, m[i][j], holds its
+// own index j as its index and reaches the outer index i only among its
+// children, and an assignment reading it is a load of both indices.
+TEST(VariableDriversAndLoads, ReadingASelectThroughASelectLoadsBothIndices) {
+  VpiContext ctx;
+  VpiObject i;
+  i.type = vpiLogicVar;
+  VpiObject j;
+  j.type = vpiLogicVar;
+  VpiObject array;
+  array.type = vpiArrayVar;
+  VpiObject inner;
+  inner.type = vpiVarSelect;
+  inner.parent = &array;
+  inner.index_expr = &i;
+  inner.children = {&i};
+  VpiObject outer;
+  outer.type = vpiVarSelect;
+  outer.parent = &inner;
+  outer.index_expr = &j;
+  outer.children = {&j, &i};
+  VpiObject cont_assign;
+  cont_assign.type = vpiContAssign;
+  cont_assign.rhs = &outer;
+  i.children = {&cont_assign};
+  j.children = {&cont_assign};
+  EXPECT_EQ(CollectVpiIteration(ctx, ctx.Iterate(vpiLoad, &i)).size(), 1u);
+  EXPECT_EQ(CollectVpiIteration(ctx, ctx.Iterate(vpiLoad, &j)).size(), 1u);
+}
+
+// Figure: the expression {v[k], f(k), u} is a load of u past a bit select and
+// a call reading other variables, of v through the select and of k through
+// the select's index.
+TEST(VariableDriversAndLoads, AnExpressionIsALoadPastASelectAndACall) {
+  VpiContext ctx;
+  VpiObject v;
+  v.type = vpiLogicVar;
+  VpiObject k;
+  k.type = vpiLogicVar;
+  VpiObject u;
+  u.type = vpiLogicVar;
+  VpiObject bit_select;
+  bit_select.type = vpiBitSelect;
+  bit_select.parent = &v;
+  bit_select.index_expr = &k;
+  VpiObject call;
+  call.type = vpiFuncCall;
+  call.arguments = {&k};
+  VpiObject concat;
+  concat.type = vpiOperation;
+  concat.op_type = vpiConcatOp;
+  concat.children = {&bit_select, &call, &u};
+  VpiObject cont_assign;
+  cont_assign.type = vpiContAssign;
+  cont_assign.rhs = &concat;
+  v.children = {&cont_assign};
+  k.children = {&cont_assign};
+  u.children = {&cont_assign};
+  EXPECT_EQ(CollectVpiIteration(ctx, ctx.Iterate(vpiLoad, &u)).size(), 1u);
+  EXPECT_EQ(CollectVpiIteration(ctx, ctx.Iterate(vpiLoad, &v)).size(), 1u);
+  EXPECT_EQ(CollectVpiIteration(ctx, ctx.Iterate(vpiLoad, &k)).size(), 1u);
+}
+
 // §37.21 against a design read and run whole.
 class VariableDriversOfARun : public VpiDesignRun {
  protected:
@@ -393,6 +468,18 @@ TEST_F(VariableDriversOfARun, APortDrivesTheVariableItConnects) {
 TEST_F(VariableDriversOfARun, AnAssignmentToAMemberDrivesTheStructure) {
   Run(kDesign);
   EXPECT_EQ(KindsOf(vpiDriver, By("top.s")), std::vector<int>{vpiContAssign});
+}
+
+// Detail 2: a force reading a select through another select, m[i][j], is a
+// load of the array both selects are taken from, reached from the outer select
+// through the inner one.
+TEST_F(VariableDriversOfARun, AForceReadingASelectThroughASelectLoadsTheArray) {
+  Run("module top;\n"
+      "  logic m [0:1][0:1];\n"
+      "  logic o, i, j;\n"
+      "  initial force o = m[i][j];\n"
+      "endmodule\n");
+  EXPECT_EQ(KindsOf(vpiLoad, By("top.m")), std::vector<int>{vpiForce});
 }
 
 }  // namespace

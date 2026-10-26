@@ -50,8 +50,9 @@ bool VpiIsNetDriverType(int type) {
 
 bool VpiIsNetLoadType(int type) {
   // §37.46 (figure, net loads): a delay terminal, an assignment statement, a
-  // force, a continuous assignment (whole or single bit), or a primitive
-  // terminal. A port is excluded here; detail 1 governs when a port is a load.
+  // force, a continuous assignment (whole or single bit), a primitive
+  // terminal, or a port; detail 1 governs when a port is a load.
+  if (VpiIsPortsType(type)) return true;
   switch (type) {
     case vpiDelayTerm:
     case vpiAssignStmt:
@@ -94,6 +95,12 @@ bool AssignmentDrivesOrLoads(const VpiObject& assign, const VpiObject& net,
 }  // namespace
 
 bool VpiIsNetDriverOrLoad(VpiHandle child, VpiHandle net, bool want_driver) {
+  // §37.46 (figure): only a kind drawn on a side stands there; the rules below
+  // say which objects of those kinds do.
+  if (!(want_driver ? VpiIsNetDriverType(child->type)
+                    : VpiIsNetLoadType(child->type))) {
+    return false;
+  }
   if (child->type == vpiPrimTerm) {
     return child->direction == kVpiInout ||
            child->direction == (want_driver ? kVpiOutput : kVpiInput);
@@ -112,8 +119,7 @@ bool VpiIsNetDriverOrLoad(VpiHandle child, VpiHandle net, bool want_driver) {
   if (VpiIsPortsType(child->type)) {
     return VpiPortIsComplexExpressionLoad(child) != want_driver;
   }
-  return want_driver ? VpiIsNetDriverType(child->type)
-                     : VpiIsNetLoadType(child->type);
+  return true;
 }
 
 namespace {
