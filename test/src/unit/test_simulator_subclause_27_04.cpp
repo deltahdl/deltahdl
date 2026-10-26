@@ -269,21 +269,20 @@ TEST(LoopGenerateHierarchicalNameSim, AnotherBlockSelectsByItsIndex) {
                  "out", {13u, 12u});
 }
 
-// §23.6: an instance select that is no constant, a variable of the module,
-// selects the instance its value names when the read runs.
-TEST(LoopGenerateHierarchicalNameSim, RunTimeIndexSelectsTheInstance) {
+// §23.6: an instance select is a constant expression, which need not be a
+// literal. One naming a localparam of the module selects the instance its
+// value names.
+TEST(LoopGenerateHierarchicalNameSim, LocalparamIndexSelectsTheInstance) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
+                       "  localparam int K = 1;\n"
                        "  for (genvar i = 0; i < 2; i++) begin : g\n"
                        "    int v;\n"
                        "    initial v = 36 + i;\n"
                        "  end\n"
-                       "  int k;\n"
                        "  initial begin\n"
-                       "    #1 k = 1;\n"
-                       "    $write(\"vidx %0d\", g[k].v);\n"
-                       "    k = 0;\n"
-                       "    $display(\" %0d\", g[k].v);\n"
+                       "    #1 $write(\"vidx %0d\", g[K].v);\n"
+                       "    $display(\" %0d\", g[K - 1].v);\n"
                        "  end\n"
                        "endmodule\n",
                        f),
