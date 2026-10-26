@@ -2,6 +2,7 @@
 
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -138,6 +139,45 @@ TEST(GeneralPurposeAlwaysElaboration, AlwaysWithWaitInBodyNoWarning) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+// §9.2.2.1 warns about an always procedure with no control for simulation time
+// to advance. Annex P's glossary makes a task enable a blocking statement, the
+// task possibly holding one, without the caller looking into its body, so an
+// always that enables a task has such a control and draws no warning.
+TEST(GeneralPurposeAlwaysElaboration, AlwaysEnablingATaskNoWarning) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic clk = 0;\n"
+      "  task automatic tick; #5 clk = ~clk; endtask\n"
+      "  always begin\n"
+      "    tick();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+// A function call is no blocking statement, §13.4 keeping every
+// time-controlling statement out of a function, so an always whose body only
+// calls one still has nothing to let time advance.
+TEST(GeneralPurposeAlwaysElaboration, AlwaysCallingOnlyAFunctionWarns) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic q;\n"
+      "  function void note; q = ~q; endfunction\n"
+      "  always begin\n"
+      "    note();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "always block has no timing control", 4,
+                              "9.2.2.1"));
 }
 
 }  // namespace

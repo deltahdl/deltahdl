@@ -1,6 +1,7 @@
 #include "elaborator/elaborator_process_validate.h"
 
 #include <format>
+#include <string>
 #include <string_view>
 #include <unordered_set>
 
@@ -314,6 +315,24 @@ bool StmtBlocks(const Stmt* stmt, bool include_nonblocking_intra) {
   return found;
 }
 
+// §9.2.2.1 warns about a general purpose always with no control for
+// simulation time to advance, and Annex P's glossary makes a task enable a
+// blocking statement: the task may hold one, and the caller is not required to
+// look into its body. So a statement anywhere in `stmt` enabling a task
+// `task_names` names is such a control. StmtBlocks leaves the enable out,
+// since §9.2.2.2.1 admits task calls in an always_comb.
+bool StmtEnablesTask(const Stmt* stmt,
+                     const std::unordered_set<std::string>& task_names) {
+  if (!stmt) return false;
+  if (task_names.contains(EnabledSubroutineName(stmt))) return true;
+  bool found = false;
+  ForEachChildStmt(stmt, [&](Stmt* const& sub) {
+    if (found) return;
+    found = StmtEnablesTask(sub, task_names);
+  });
+  return found;
+}
+
 void ValidateCombLatchProcess(ModuleItem* item, const RtlirProcess& proc,
                               RtlirProcessKind kind, DiagEngine& diag) {
   if (kind != RtlirProcessKind::kAlwaysComb &&
@@ -422,9 +441,11 @@ void ValidateFinalProcess(ModuleItem* item, const RtlirProcess& proc,
 }  // namespace
 
 void ValidateProcess(RtlirProcessKind kind, ModuleItem* item,
-                     const RtlirProcess& proc, DiagEngine& diag) {
+                     const RtlirProcess& proc, DiagEngine& diag,
+                     const std::unordered_set<std::string>& task_names) {
   if (kind == RtlirProcessKind::kAlways && item->sensitivity.empty() &&
-      !item->is_star_sensitivity && !StmtBlocks(proc.body)) {
+      !item->is_star_sensitivity && !StmtBlocks(proc.body) &&
+      !StmtEnablesTask(proc.body, task_names)) {
     diag.Warning(item->loc,
                  "always block has no timing control; may cause "
                  "a zero-delay loop",

@@ -734,9 +734,18 @@ void Elaborator::AddProcedure(ModuleItem* item, RtlirModule* mod,
   }
   bool infers = kind != RtlirProcessKind::kInitial;
   if (infers) AddInferenceCallees(item->body);
-  const ProcessBuildEnv kEnv{
-      arena_, diag_, infers ? &inference_funcs_ : nullptr,
-      infers ? &const_names_ : nullptr, module_global_clocking_event_};
+  // §9.2.2.1 with Annex P: a general purpose always may let time advance
+  // through a task it enables, so its checks are handed the tasks a call in it
+  // can name.
+  const std::unordered_set<std::string> kTasks =
+      kind == RtlirProcessKind::kAlways ? ReachableTaskNames()
+                                        : std::unordered_set<std::string>{};
+  const ProcessBuildEnv kEnv{arena_,
+                             diag_,
+                             infers ? &inference_funcs_ : nullptr,
+                             infers ? &const_names_ : nullptr,
+                             module_global_clocking_event_,
+                             &kTasks};
   AddProcess(kind, item, mod, kEnv, BuildParamScope(mod));
   mod->processes.back().checker_instances = std::move(sites);
 }

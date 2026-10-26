@@ -138,6 +138,10 @@ struct ProcessBuildEnv {
   // body is used as it stands and §14.14's own report of a $global_clock
   // reference with no declaration in scope is the only account of it.
   const std::vector<EventExpr>* global_clocking_event = nullptr;
+  // §9.2.2.1 with Annex P: the tasks a call in the process can name, as
+  // Elaborator::ReachableTaskNames spells them; enabling one is a way for a
+  // general purpose always to let time advance. Null where none is consulted.
+  const std::unordered_set<std::string>* task_names = nullptr;
 };
 // §5.12: `params` is the parameter scope the attributes the process is written
 // with fold their values against.

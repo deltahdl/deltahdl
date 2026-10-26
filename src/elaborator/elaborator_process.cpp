@@ -129,7 +129,9 @@ static RtlirProcess BuildProcessWithSensitivity(RtlirProcessKind kind,
 void AddProcess(RtlirProcessKind kind, ModuleItem* item, RtlirModule* mod,
                 const ProcessBuildEnv& env, const ScopeMap& params) {
   RtlirProcess proc = BuildProcessWithSensitivity(kind, item, env);
-  ValidateProcess(kind, item, proc, env.diag);
+  static const std::unordered_set<std::string> kNoTasks;
+  ValidateProcess(kind, item, proc, env.diag,
+                  env.task_names != nullptr ? *env.task_names : kNoTasks);
   proc.attrs = ResolveAttributes(item->attrs, env.diag, params);
   mod->processes.push_back(proc);
 }
@@ -137,7 +139,7 @@ void AddProcess(RtlirProcessKind kind, ModuleItem* item, RtlirModule* mod,
 void AddStaticAssertionProcess(RtlirProcessKind kind, ModuleItem* item,
                                RtlirModule* mod, const ProcessBuildEnv& env) {
   RtlirProcess proc = BuildProcessWithSensitivity(kind, item, env);
-  ValidateProcess(kind, item, proc, env.diag);
+  ValidateProcess(kind, item, proc, env.diag, {});
   proc.is_static_assertion = true;
   mod->processes.push_back(proc);
 }
