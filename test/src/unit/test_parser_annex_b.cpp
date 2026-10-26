@@ -275,19 +275,10 @@ std::string VarDecl(std::string_view word) {
   return "module m;\n  reg [7:0] " + std::string(word) + ";\nendmodule\n";
 }
 
-// An enumeration opener is still left out of the statement-bearing positions
-// below, where an inline enumeration among a block's items once kept the
-// parser from returning.
-bool IsEnumOpenerWord(std::string_view word) { return word == "enum"; }
-
 // A constructor's name is spelled with a listed word, and the function-name
 // production takes it in that role rather than as a chosen name, so what that
 // position would record for it is not a reservation result.
 bool IsConstructorWord(std::string_view word) { return word == "new"; }
-
-bool ExcludeEnumOpenerAndConstructor(std::string_view word) {
-  return IsEnumOpenerWord(word) || IsConstructorWord(word);
-}
 
 // The listed words that begin a type or stand as a primary in their own right.
 // In an expression they are consumed in that role, so their acceptance says
@@ -338,7 +329,7 @@ constexpr Position kPositions[] = {
      "  task @; r = 8'd1; endtask\n"
      "  initial begin : blk @; end\n"
      "endmodule\n",
-     IsEnumOpenerWord, 247},
+     nullptr, 248},
     {"function name",
      "module m;\n"
      "  reg [7:0] r;\n"
@@ -347,7 +338,7 @@ constexpr Position kPositions[] = {
      "  endfunction\n"
      "  initial r = @(8'd4);\n"
      "endmodule\n",
-     ExcludeEnumOpenerAndConstructor, 246},
+     IsConstructorWord, 247},
     {"gate instance name",
      "module m (input wire a, output wire y);\n"
      "  and @ (y, a, a);\n"
@@ -368,7 +359,7 @@ constexpr Position kPositions[] = {
      "  reg [7:0] r;\n"
      "  initial begin : @ r = 8'd1; end\n"
      "endmodule\n",
-     IsEnumOpenerWord, 247},
+     nullptr, 248},
     {"expression operand",
      "module m;\n"
      "  reg [7:0] r;\n"
