@@ -544,10 +544,18 @@ void CheckMatchItems(const std::vector<SeqMatchAssign>& items, const Site& site,
   }
 }
 
+void CheckTree(const PropertyExprNode* node, const Site& site,
+               const RuleEnv& env);
+
+// The chains of `body`. An operand that is a group holding and, or,
+// intersect or within at its own depth is a sequence of its own, which the
+// parser hangs off the operand as a property tree (§16.9.5 to §16.9.7 and
+// §16.9.10), and is read through that tree.
 void CheckBody(const SeqLinearBody& body, const Site& site,
                const RuleEnv& env) {
   for (size_t i = 0; i < body.operands.size(); ++i) {
     CheckRoot(body.operands[i], site, env);
+    CheckTree(body.operands[i]->property_actual, site, env);
     CheckEmptyMatchItems(body.match_items[i], body.operands[i]->range.start,
                          env.diag);
   }

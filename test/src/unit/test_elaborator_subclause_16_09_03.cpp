@@ -291,4 +291,34 @@ TEST(SampledValueRules, AnUnclockedCallInADisableConditionIsReported) {
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 6, "16.9.3"));
 }
 
+// §16.9.3 with §16.9.7: a $past written inside a group that `or` makes a
+// sequence of its own, standing as one operand of the chain around it, is held
+// to the rule as one written in the chain is: s1 writes it in the chain, s2
+// and the antecedent of a1 inside an `or` group, and s3 a well-formed one
+// there.
+TEST(SampledValueRules, APastInsideAnOrGroupIsHeldToTheTicksRule) {
+  const char* const kReport =
+      "the number_of_ticks of $past shall be 1 or greater";
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk, a, b, c;\n"
+      "  sequence s1;\n"
+      "    @(posedge clk) a ##1 $past(b, 0);\n"
+      "  endsequence\n"
+      "  sequence s2;\n"
+      "    @(posedge clk) a ##1 ($past(b, 0) or c);\n"
+      "  endsequence\n"
+      "  sequence s3;\n"
+      "    @(posedge clk) a ##1 ($past(b, 1) or c);\n"
+      "  endsequence\n"
+      "  a1: assert property (@(posedge clk) a ##1 ($past(c, 0) or b) |-> a);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 4, "16.9.3"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 7, "16.9.3"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 10, "16.9.3"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 12, "16.9.3"));
+}
+
 }  // namespace

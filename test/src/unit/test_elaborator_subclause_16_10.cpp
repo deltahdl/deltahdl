@@ -291,4 +291,30 @@ TEST(LocalVariableFlow,
                              "16.10"));
 }
 
+// §16.10 with §16.9.7: the rule holds where the assignment is written inside
+// a group that `or` makes a sequence of its own: b[*0:1] admits an empty
+// match there as in a chain, while a ##1 b[*0:1] does not.
+TEST(LocalVariableFlow, AnAssignmentOnAnEmptyMatchInsideAnOrGroupIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit clk, a, b, c;\n"
+      "  int e;\n"
+      "  sequence s;\n"
+      "    int x;\n"
+      "    @(posedge clk) a ##1 ((b[*0:1], x = e) or c) ##1 c[*2];\n"
+      "  endsequence\n"
+      "  sequence t;\n"
+      "    int x;\n"
+      "    @(posedge clk) a ##1 ((a ##1 b[*0:1], x = e) or c) ##1 c[*2];\n"
+      "  endsequence\n"
+      "endmodule\n",
+      f);
+  const char* const kReport =
+      "a local variable assignment may not be attached to a sequence that "
+      "admits an empty match";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 6, "16.10"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 10, "16.10"));
+}
+
 }  // namespace
