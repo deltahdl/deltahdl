@@ -500,6 +500,15 @@ void CheckMatchItems(const std::vector<SeqMatchAssign>& items, const Site& site,
                      const RuleEnv& env) {
   for (const SeqMatchAssign& item : items) {
     CheckRoot(item.rhs, site, env);
+    // A.10 footnote 51: every select of the variable_lvalue a match item
+    // assigns is a constant_select, A.8.5's production the footnote is on.
+    if (item.target != nullptr &&
+        !SelectPathIsConstant(item.target, env.params)) {
+      env.diag.Error(
+          item.target->range.start,
+          "a sequence match item assigns through a select that is not constant",
+          Subclause("A.8.5"));
+    }
     // §16.11: a subroutine attached to a sequence may have side effects, so
     // its arguments are checked as the assertion's expressions and the call
     // by §16.11's own rules. The parser records the call as a kCall or, for

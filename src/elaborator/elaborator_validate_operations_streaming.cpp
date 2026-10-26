@@ -183,6 +183,26 @@ void CheckTaggedUnionStreamOperand(
              Subclause("11.4.14.1"));
 }
 
+// A.10 footnote 52, on A.8.5's variable_lvalue: no streaming concatenation
+// stands nested within another variable_lvalue, and a streaming concatenation
+// written as an assignment's target, `target` here, is one. Reports each
+// streaming concatenation among its stream expressions, and among theirs in
+// turn. §11.4.14 lets a stream used as a source nest another, so the context
+// rule walks a stream's own elements as valid contexts and reaches none of
+// these; one nested through a concatenation or any other operator is an
+// operand that rule reports.
+void ReportStreamsNestedInTarget(const Expr* target, DiagEngine& diag) {
+  if (target->kind != ExprKind::kStreamingConcat) return;
+  for (const Expr* elem : target->elements) {
+    if (elem->kind != ExprKind::kStreamingConcat) continue;
+    diag.Error(elem->range.start,
+               "a streaming concatenation written as a target holds no "
+               "streaming concatenation among its stream expressions",
+               Subclause("A.8.5"));
+    ReportStreamsNestedInTarget(elem, diag);
+  }
+}
+
 }  // namespace
 
 void ElaboratorOperationRules::WalkExprForStreamingContext(
@@ -220,6 +240,7 @@ void ElaboratorOperationRules::WalkExprForStreamingContext(
   // no compound operator take a streaming target, so one is read below as the
   // operator it applies.
   if (expr->kind == ExprKind::kBinary && expr->op == TokenKind::kEq) {
+    ReportStreamsNestedInTarget(expr->lhs, diag_);
     WalkExprForStreamingContext(expr->lhs, true);
     WalkExprForStreamingContext(expr->rhs, true);
     return;
@@ -295,6 +316,7 @@ void ElaboratorOperationRules::WalkStmtsForStreamingContext(const Stmt* s) {
   if (is_assign) {
     CheckStreamingSourceTargetType(s->lhs, s->rhs);
     CheckStreamingUnpackSourceType(s->lhs, s->rhs);
+    ReportStreamsNestedInTarget(s->lhs, diag_);
   }
   // §11.4.14 lets a streaming concatenation stand whole as an assignment's
   // target or source. §13.4.1 assigns a return statement's expression to the
@@ -347,6 +369,7 @@ void ElaboratorOperationRules::ValidateStreamingConcatContext(
       WalkExprForStreamingContext(item->assign_rhs, true);
       CheckStreamingSourceTargetType(item->assign_lhs, item->assign_rhs);
       CheckStreamingUnpackSourceType(item->assign_lhs, item->assign_rhs);
+      ReportStreamsNestedInTarget(item->assign_lhs, diag_);
     }
   }
 }

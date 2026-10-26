@@ -1,6 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <initializer_list>
+#include <string_view>
+
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -256,4 +261,68 @@ TEST(LvalueElaboration, NetLvalueAssignmentPatternContAssign) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+}
+
+// A.10 footnote 51 (printed page 1218), on A.8.5's variable_lvalue, holds
+// every select in the variable_lvalue a sequence match item assigns to a
+// constant_select. A module variable and a local variable are no constants,
+// and a literal and a parameter are.
+TEST(LvalueElaboration, MatchItemTargetSelectThatIsNotConstantIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  parameter int P = 2;\n"
+      "  logic clk, a, b;\n"
+      "  int k;\n"
+      "  property p;\n"
+      "    logic [7:0] v;\n"
+      "    @(posedge clk) (a, v[k] = b) |-> 1;\n"
+      "  endproperty\n"
+      "  property q;\n"
+      "    logic [7:0] v;\n"
+      "    @(posedge clk) (a, v[1] = b, v[P] = b) |-> 1;\n"
+      "  endproperty\n"
+      "  property r;\n"
+      "    logic [7:0] v;\n"
+      "    int i;\n"
+      "    @(posedge clk) (a, i = 0, v[i] = b) |-> 1;\n"
+      "  endproperty\n"
+      "  assert property (p);\n"
+      "  assert property (q);\n"
+      "  assert property (r);\n"
+      "endmodule\n",
+      f);
+  constexpr std::string_view kMessage =
+      "a sequence match item assigns through a select that is not constant";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, 7, "A.8.5"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, 16, "A.8.5"));
+  EXPECT_EQ(f.diag.ErrorCount(), 2u);
+}
+
+// A.10 footnote 52 (printed page 1218), on A.8.5's variable_lvalue, nests no
+// streaming concatenation within another variable_lvalue, and a streaming
+// concatenation written as the target of a procedural assignment, of an
+// assignment within an expression or of a continuous assignment is one. A
+// streaming concatenation read as a source may nest another, as §11.4.14.2's
+// own example does.
+TEST(LvalueElaboration, StreamNestedInAStreamTargetIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [3:0] v, n, x, y, p, q;\n"
+      "  initial {>>{v, {<<{n}}}} = {x, x};\n"
+      "  initial y = ({>>{v, {<<{n}}}} = {x, x});\n"
+      "  assign {>>{p, {<<{q}}}} = {x, x};\n"
+      "  initial {>>{v, n}} = {x, x};\n"
+      "  initial y = {<<2{{<<{4'b1101}}}};\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {3u, 4u, 5u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "a streaming concatenation written as a target "
+                              "holds no streaming concatenation among its "
+                              "stream expressions",
+                              line, "A.8.5"));
+  }
+  EXPECT_EQ(f.diag.ErrorCount(), 3u);
 }
