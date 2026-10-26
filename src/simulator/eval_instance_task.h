@@ -46,8 +46,9 @@ void ExecCallStmtExpr(const Expr* expr, SimContext& ctx, Arena& arena);
 // not only as a statement -- a bare `m` inside a method of the class, `C::m`
 // or `T::m` through the class scope, `h.m` through a handle -- as the call
 // with the empty parentheses would be; so is the built-in randomize (§18.6.1),
-// bare in a method or through a handle variable. True with the call's value in
-// `out` when `expr` is such a name; false, having evaluated nothing,
+// bare in a method or through a handle variable, and a bare randomize outside
+// any class method, which is the scope randomize (§18.12). True with the call's
+// value in `out` when `expr` is such a name; false, having evaluated nothing,
 // otherwise.
 bool TryEvalParenFreeMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                                 Logic4Vec& out);

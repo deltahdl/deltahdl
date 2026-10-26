@@ -113,4 +113,27 @@ TEST(ScopeRandomizeRun, NoArgumentListBeforeTheClauseIsTheSameCheck) {
   EXPECT_EQ(out, "1 0 1 1\n");
 }
 
+// 18.12 with A.8.2: outside any class method a bare randomize, written with
+// neither the std:: prefix nor its argument list, is the scope randomize
+// called with no argument, in an initial block as in a module's function: it
+// leaves a untouched and returns 1 each time.
+TEST(ScopeRandomizeRun, ABareRandomizeOutsideAClassIsTheNoArgumentCall) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  bit [7:0] a = 3;\n"
+      "  int ok, in_f;\n"
+      "  function int f;\n"
+      "    return randomize;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    ok = randomize;\n"
+      "    in_f = f();\n"
+      "    $display(\"%0d %0d %0d\", ok, in_f, a);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 1 3\n");
+}
+
 }  // namespace

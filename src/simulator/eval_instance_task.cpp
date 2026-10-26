@@ -516,17 +516,20 @@ static const Expr* ParenFreeCall(const Expr* name, SimContext& ctx) {
 // class and declared by none, so MethodNamedAsAValue never finds it, and read
 // with no argument list it is the call randomize() all the same -- bare in a
 // method of the class, as this.randomize(), or through a handle variable,
-// `h.randomize`. A receiver no variable names, an element of an array, is
-// left to be read as a member, and so is a struct's member named randomize,
-// TryEvalRandomizeMethodCall finding no object behind it; nothing is
-// evaluated in either.
+// `h.randomize`. Bare outside any class method it is §18.12's scope randomize
+// called with no argument, which TryEvalScopeRandomizeCall runs. A receiver no
+// variable names, an element of an array, is left to be read as a member, and
+// so is a struct's member named randomize, TryEvalRandomizeMethodCall finding
+// no object behind it; nothing is evaluated in either.
 static bool TryEvalParenFreeRandomize(const Expr* expr, SimContext& ctx,
                                       Arena& arena, Logic4Vec& out) {
   const bool kMember = expr->kind == ExprKind::kMemberAccess;
   MethodCallParts parts;
   if (kMember && !ExtractHandleAccessParts(expr, arena, parts)) return false;
   if ((kMember ? parts.method_name : expr->text) != "randomize") return false;
-  return TryEvalRandomizeMethodCall(ParenFreeCall(expr, ctx), ctx, arena, out);
+  const Expr* call = ParenFreeCall(expr, ctx);
+  return TryEvalScopeRandomizeCall(call, ctx, arena, out) ||
+         TryEvalRandomizeMethodCall(call, ctx, arena, out);
 }
 
 bool TryEvalParenFreeMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
