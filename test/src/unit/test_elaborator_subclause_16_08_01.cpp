@@ -275,7 +275,8 @@ TEST(TypedSequenceFormal, ATypedFormalAssignedInAMatchItemIsReported) {
 // §16.8.1: a typed formal argument referenced in a cycle delay range or a
 // repetition's bound is of type shortint, int or longint. d of s1, n of s2
 // and g of s3 are not, so each is reported; the three of s4 are, and d of
-// s5 is untyped, so neither line is.
+// s5 is untyped, so neither line is. v of s6 is of another type but bounds
+// nothing, the int k bounding its one delay, so its line is not either.
 TEST(TypedSequenceFormal, ABoundOfAnotherTypeIsReported) {
   const char* const kReport =
       "bounds a cycle delay or a repetition but is of a type other than "
@@ -299,6 +300,9 @@ TEST(TypedSequenceFormal, ABoundOfAnotherTypeIsReported) {
       "  sequence s5(d);\n"
       "    a ##d b;\n"
       "  endsequence\n"
+      "  sequence s6(bit [3:0] v, int k);\n"
+      "    a ##k (v == 4'd1);\n"
+      "  endsequence\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(
@@ -312,6 +316,7 @@ TEST(TypedSequenceFormal, ABoundOfAnotherTypeIsReported) {
       std::string("the formal argument 'g' of 's3' ") + kReport, 10, "16.8.1"));
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 13, "16.8.1"));
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 16, "16.8.1"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 19, "16.8.1"));
 }
 
 // §16.8.1: a formal argument of type sequence is not the operand of a goto
