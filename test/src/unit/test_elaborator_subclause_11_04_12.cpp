@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <initializer_list>
+
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
@@ -493,6 +496,36 @@ TEST(ConcatenationElaboration, ConcatenationRulesHeldInSubroutines) {
                             "replication",
                             11, "11.4.12.1"));
   EXPECT_EQ(f.diag.ErrorCount(), 3u);
+}
+
+// §11.4.12 bars a select of a concatenation as any variable_lvalue, and an
+// expression assigns one in two places: an increment's or decrement's operand,
+// which §11.4.2 makes an assignment, and the target of an assignment written
+// within an expression (A.8.3). A compound assignment statement, whose
+// right-hand side holds its target again as the operator's left operand, is
+// reported once, and a select of a concatenation read as a value stands.
+TEST(ConcatenationElaboration,
+     SelectOnConcatAssignedWithinAnExpressionRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [3:0] a, b, x;\n"
+      "  initial begin\n"
+      "    ++{a, b}[0];\n"
+      "    x = ({a, b}[0] = 1'b1);\n"
+      "    x = ({a, b}[1] += 1'b1);\n"
+      "    {a, b}[2] += 1'b1;\n"
+      "    x = {a, b}[3:0];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {4u, 5u, 6u, 7u}) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "select of a concatenation shall not be used as an lvalue", line,
+        "11.4.12"));
+  }
+  EXPECT_EQ(f.diag.ErrorCount(), 4u);
 }
 
 }  // namespace

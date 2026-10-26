@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <initializer_list>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -746,6 +749,35 @@ TEST(ReplicationElaboration, NonConstantMultiplierOfNonStringReported) {
                             "expression",
                             6, "11.4.12.1"));
   EXPECT_EQ(f.diag.ErrorCount(), 1u);
+}
+
+// §11.4.12.1 keeps a replication off an assignment's left-hand side, and an
+// expression assigns in two places: an increment's or decrement's operand,
+// which §11.4.2 makes an assignment, and the target of an assignment written
+// within an expression (A.8.3). A compound assignment statement, whose
+// right-hand side holds its target again as the operator's left operand, is
+// reported once, and a replication read as a value stands.
+TEST(ReplicationElaboration, ReplicationAssignedWithinAnExpressionRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [3:0] a;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    ++{2{a}};\n"
+      "    x = ({2{a}} = 8'h0);\n"
+      "    {2{a}} += 8'h1;\n"
+      "    x = {2{a}};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {5u, 6u, 7u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "an assignment target cannot contain a "
+                              "replication",
+                              line, "11.4.12.1"));
+  }
+  EXPECT_EQ(f.diag.ErrorCount(), 3u);
 }
 
 }  // namespace

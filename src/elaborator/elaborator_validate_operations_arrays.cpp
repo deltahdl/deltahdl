@@ -11,10 +11,12 @@
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/elaborator_validate_operations.h"
+#include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
+#include "parser/parser_token_skips.h"
 
 namespace delta {
 
@@ -422,6 +424,43 @@ void ElaboratorOperationRules::ValidateUnpackedArrayConcatNesting(
   }
 }
 
+namespace {
+
+// The variable_lvalue `e` assigns where it is an expression rather than a
+// statement: the operand of an increment or decrement, which §11.4.2 makes an
+// assignment, or the target of an assignment written within an expression
+// (A.8.3). Null where `e` assigns nothing.
+const Expr* AssignedOperand(const Expr* e) {
+  switch (e->kind) {
+    case ExprKind::kPostfixUnary:
+      return e->lhs;
+    case ExprKind::kUnary:
+      return e->op == TokenKind::kPlusPlus || e->op == TokenKind::kMinusMinus
+                 ? e->lhs
+                 : nullptr;
+    case ExprKind::kBinary:
+      return e->op == TokenKind::kEq || IsCompoundAssignOp(e->op) ? e->lhs
+                                                                  : nullptr;
+    default:
+      return nullptr;
+  }
+}
+
+// Runs `fn` over every variable_lvalue the expressions of `s` assign, as
+// AssignedOperand finds them, other than the target of `s` itself, which a
+// compound assignment statement holds again as the left operand of the
+// operation on its right-hand side.
+template <typename Fn>
+void ForEachAssignedOperand(const Stmt* s, const Fn& fn) {
+  auto visit = [&](const Expr* e) {
+    const Expr* target = AssignedOperand(e);
+    if (target != nullptr && target != s->lhs) fn(target);
+  };
+  ForEachChildExpr(s, [&](const Expr* root) { ForEachExprUnder(root, visit); });
+}
+
+}  // namespace
+
 static bool IsSelectOnConcat(const Expr* expr) {
   if (!expr || expr->kind != ExprKind::kSelect) return false;
   const Expr* base = expr->base;
@@ -448,6 +487,8 @@ void ElaboratorOperationRules::WalkStmtsForSelectOnConcatLvalue(const Stmt* s) {
       s->kind == StmtKind::kForce) {
     CheckSelectOnConcatLvalue(s->lhs);
   }
+  ForEachAssignedOperand(
+      s, [this](const Expr* target) { CheckSelectOnConcatLvalue(target); });
   // §11.4.12 bars a select of a concatenation as a net_lvalue, a
   // variable_lvalue or any equivalent use, the left-hand side of an assignment
   // among them, which is a rule about the lvalue and not about the statement
@@ -501,6 +542,8 @@ void ElaboratorOperationRules::WalkStmtsForReplicateLvalue(const Stmt* s) {
       s->kind == StmtKind::kForce) {
     CheckReplicateLvalue(s->lhs);
   }
+  ForEachAssignedOperand(
+      s, [this](const Expr* target) { CheckReplicateLvalue(target); });
   // §11.4.12.1 keeps a replication off the left-hand side of an assignment, a
   // rule about the lvalue and not about the statement the assignment stands in,
   // so this descends every link ForEachChildStmt in
