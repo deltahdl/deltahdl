@@ -19,6 +19,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_scope_rules_names.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "elaborator/implication_operator_rules.h"
 #include "elaborator/net_data_type.h"
 #include "elaborator/nettype_uses.h"
 #include "elaborator/return_value_fit.h"
@@ -284,8 +285,10 @@ void Elaborator::ValidatePerDeclarationRulesInUnitScopes() {
     CheckPatternsIn(items);
     // Footnote 25 of Syntax 13-1 and 13-2 for the same two scopes, whose
     // subroutines, a class's out-of-block definitions among them, are in no
-    // module's item list for Elaborator::ElaborateDeclItem to report.
+    // module's item list for Elaborator::ElaborateDeclItem to report. A.8.6
+    // for every item of them, which Elaborator::ElaborateItem never reaches.
     for (const ModuleItem* item : items) {
+      ReportItemImplicationOperators(*item, diag_);
       if (item->kind == ModuleItemKind::kFunctionDecl ||
           item->kind == ModuleItemKind::kTaskDecl) {
         ReportMisplacedOverrideSpecifiers(*item, diag_);
@@ -332,6 +335,7 @@ void Elaborator::ValidatePerDeclarationRulesInUnitScopes() {
     CheckRandsequenceNamesIn(methods);
     CheckForeachLoopsInClass(cls);
     CheckPatternsInClass(cls);
+    ReportClassImplicationOperators(cls, diag_);
   }
 }
 

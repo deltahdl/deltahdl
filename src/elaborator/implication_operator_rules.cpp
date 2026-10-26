@@ -5,9 +5,11 @@
 #include "common/diagnostic.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "lexer/token.h"
+#include "parser/ast_class.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 
 namespace delta {
 
@@ -24,6 +26,11 @@ bool HoldsProperty(const Stmt& stmt) {
 
 void ReportStmtImplicationOperators(const Stmt* stmt, DiagEngine& diag) {
   if (stmt == nullptr) return;
+  // A let, typedef, nettype or import among a block's items is carried over
+  // the item its declaration makes; a let's body is an expression.
+  if (stmt->kind == StmtKind::kBlockItemDecl) {
+    ReportItemImplicationOperators(*stmt->decl_item, diag);
+  }
   if (!HoldsProperty(*stmt)) {
     ForEachChildExpr(stmt, [&diag](const Expr* expr) {
       ReportImplicationOperators(expr, diag);
@@ -32,6 +39,24 @@ void ReportStmtImplicationOperators(const Stmt* stmt, DiagEngine& diag) {
   ForEachChildStmt(stmt, [&diag](const Stmt* sub) {
     ReportStmtImplicationOperators(sub, diag);
   });
+}
+
+// A class member's initializer and constraints, and its method's or nested
+// class's expressions. A constraint is built from expressions (A.1.10); the
+// implication it does hold is `->`.
+void ReportMemberImplicationOperators(const ClassMember& member,
+                                      DiagEngine& diag) {
+  ReportImplicationOperators(member.init_expr, diag);
+  for (const Expr* expr : member.constraint_exprs) {
+    ReportImplicationOperators(expr, diag);
+  }
+  for (const Expr* expr : member.constraint_soft_exprs) {
+    ReportImplicationOperators(expr, diag);
+  }
+  if (member.method != nullptr) {
+    ReportItemImplicationOperators(*member.method, diag);
+  }
+  ReportClassImplicationOperators(member.nested_class, diag);
 }
 
 }  // namespace
@@ -55,6 +80,19 @@ void ReportImplicationOperators(const Expr* expr, DiagEngine& diag) {
   ForEachExprUnder(expr, report);
 }
 
+void ReportClassImplicationOperators(const ClassDecl* cls, DiagEngine& diag) {
+  if (cls == nullptr) return;
+  for (const auto& param : cls->params) {
+    ReportImplicationOperators(param.second, diag);
+  }
+  for (const Expr* arg : cls->extends_args) {
+    ReportImplicationOperators(arg, diag);
+  }
+  for (const ClassMember* member : cls->members) {
+    ReportMemberImplicationOperators(*member, diag);
+  }
+}
+
 void ReportItemImplicationOperators(const ModuleItem& item, DiagEngine& diag) {
   switch (item.kind) {
     case ModuleItemKind::kContAssign:
@@ -64,10 +102,18 @@ void ReportItemImplicationOperators(const ModuleItem& item, DiagEngine& diag) {
     case ModuleItemKind::kNetDecl:
     case ModuleItemKind::kVarDecl:
     case ModuleItemKind::kParamDecl:
+    case ModuleItemKind::kLetDecl:
       ReportImplicationOperators(item.init_expr, diag);
+      break;
+    case ModuleItemKind::kClassDecl:
+      ReportClassImplicationOperators(item.class_decl, diag);
       break;
     default:
       break;
+  }
+  // A subroutine's or a let's port defaults (A.2.7, A.2.12).
+  for (const FunctionArg& arg : item.func_args) {
+    ReportImplicationOperators(arg.default_value, diag);
   }
   ReportStmtImplicationOperators(item.body, diag);
   for (const Stmt* stmt : item.func_body_stmts) {

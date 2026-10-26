@@ -3,6 +3,7 @@
 namespace delta {
 
 class DiagEngine;
+struct ClassDecl;
 struct Expr;
 struct ModuleItem;
 
@@ -13,10 +14,17 @@ struct ModuleItem;
 void ReportImplicationOperators(const Expr* expr, DiagEngine& diag);
 
 // The same for the ordinary expressions `item` holds: a continuous
-// assignment's, a declaration's initializer, and those of the statements its
-// body and its subroutine body hold. A concurrent assertion's property and an
-// expect statement's are property expressions and are left out; the
-// statements of their action blocks are not.
+// assignment's, a declaration's initializer or a let's body, a subroutine's or
+// a let's port defaults, those of a class it declares, and those of the
+// statements its body and its subroutine body hold, the lets declared among a
+// block's items included. A concurrent assertion's property and an expect
+// statement's are property expressions and are left out; the statements of
+// their action blocks are not.
 void ReportItemImplicationOperators(const ModuleItem& item, DiagEngine& diag);
+
+// The same for the ordinary expressions of the class `cls`: its parameter
+// values, the arguments it hands its base's constructor, and each member's
+// initializer, constraints and method, nested classes included.
+void ReportClassImplicationOperators(const ClassDecl* cls, DiagEngine& diag);
 
 }  // namespace delta
