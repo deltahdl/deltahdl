@@ -61,8 +61,7 @@ void VpiContext::LeaveApplicationRoutine() {
   for (const std::function<void()>& task : requested) task();
 }
 
-int VpiContext::Control(int operation, int arg0, int arg1, int arg2,
-                        VpiHandle scope) {
+int VpiContext::Control(int operation, int arg0, VpiHandle scope) {
   // §38.4: vpiFinish/vpiStop request the matching built-in task on return of
   // the application routine and carry its diagnostic message level (see 20.2).
   // §20.2: the run ends as $finish ends it, at that level; it is suspended as
@@ -76,19 +75,6 @@ int VpiContext::Control(int operation, int arg0, int arg1, int arg2,
     });
     return 1;
   }
-  // §38.4: vpiReset requests $reset and is passed three additional integer
-  // arguments (stop_value, reset_value, diagnostics_value), the same values the
-  // $reset task takes (see D.8). Record them, then route through the one
-  // DispatchReset path so the reset-callback sequence (§38.36.3) runs exactly
-  // as it does for a directly invoked $reset.
-  if (operation == kVpiReset) {
-    control_.reset_requested = true;
-    control_.reset_stop_value = arg0;
-    control_.reset_reset_value = arg1;
-    control_.reset_diag_value = arg2;
-    OnRoutineReturn(control_, [this] { DispatchReset(); });
-    return 1;
-  }
   // §38.4: vpiSetInteractiveScope immediately retargets the tool's interactive
   // scope to the supplied handle, which names an object of the vpiScope class
   // (§37.12); with no such object there is no scope to change to.
@@ -97,6 +83,8 @@ int VpiContext::Control(int operation, int arg0, int arg1, int arg2,
     NoteInteractiveScope(scope);
     return 1;
   }
+  // §38.4: any other operation fails. vpiReset is among them: it asks for
+  // $reset, which this implementation is without, as Annex D.1 allows.
   return 0;
 }
 

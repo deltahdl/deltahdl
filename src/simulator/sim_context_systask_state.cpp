@@ -30,11 +30,6 @@ void SimContext::RequestFinish() {
   stop_requested_ = true;
 }
 
-void SimContext::RecordReset(int64_t reset_value) {
-  ++reset_count_;
-  reset_value_ = reset_value;
-}
-
 void SimContext::SetInteractiveScope(std::string_view name) {
   interactive_scope_ = std::string(name);
 }

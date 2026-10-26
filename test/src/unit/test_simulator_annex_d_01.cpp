@@ -42,6 +42,17 @@ std::string AsTask(const std::string& call) {
          "endmodule\n";
 }
 
+// A source assigning what the function call `call` returns; the call stands
+// on line 3.
+std::string AsFunction(const std::string& call) {
+  return "module t;\n"
+         "  int v;\n"
+         "  initial v = " +
+         call +
+         ";\n"
+         "endmodule\n";
+}
+
 // The report D.1 owes a call of an optional task or function that is not
 // available here.
 std::string NotAvailable(const std::string& name, const std::string& sub) {
@@ -102,6 +113,32 @@ TEST(OptionalSystemTasksGeneral, AnUnavailableNokeyTaskIsReportedUnderD1) {
   ASSERT_TRUE(RunAnnexDSource(f, AsTask("$nokey")));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), NotAvailable("$nokey", "D.5"),
                             2, "D.1"));
+}
+
+// D.8's $reset, which returns the design to its state at time zero, written
+// with its stop_value and reset_value. The call is reported rather than
+// counted as a reset the run never performs.
+TEST(OptionalSystemTasksGeneral, AnUnavailableResetTaskIsReportedUnderD1) {
+  SimFixture f;
+  ASSERT_TRUE(RunAnnexDSource(f, AsTask("$reset(1, 42)")));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), NotAvailable("$reset", "D.8"),
+                            2, "D.1"));
+}
+
+// D.8's $reset_count and $reset_value, which count the resets and hand a value
+// across one. With no reset to tell of, each is reported on its own.
+TEST(OptionalSystemTasksGeneral, AnUnavailableResetCountIsReportedUnderD1) {
+  SimFixture f;
+  ASSERT_TRUE(RunAnnexDSource(f, AsFunction("$reset_count")));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            NotAvailable("$reset_count", "D.8"), 3, "D.1"));
+}
+
+TEST(OptionalSystemTasksGeneral, AnUnavailableResetValueIsReportedUnderD1) {
+  SimFixture f;
+  ASSERT_TRUE(RunAnnexDSource(f, AsFunction("$reset_value")));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            NotAvailable("$reset_value", "D.8"), 3, "D.1"));
 }
 
 // The control: an optional task this implementation does provide, D.6's

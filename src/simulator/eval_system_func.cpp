@@ -551,24 +551,6 @@ static Logic4Vec EvalGetpattern(const Expr* expr, SimContext& ctx,
   return EvalExpr(expr->args[0], ctx, arena);
 }
 
-// Optional $reset family (Annex D.8). $reset tallies a reset of the tool and
-// captures its reset_value argument (the second argument, after stop_value)
-// so that the value can be communicated to after the reset; the other
-// arguments are accepted but carry no observable state here.
-static Logic4Vec EvalAnnexDReset(const Expr* expr, SimContext& ctx,
-                                 Arena& arena) {
-  int64_t reset_value = 0;
-  if (expr->args.size() > 1 && expr->args[1]) {
-    reset_value =
-        static_cast<int64_t>(EvalExpr(expr->args[1], ctx, arena).ToUint64());
-  }
-  ctx.RecordReset(reset_value);
-  // §38.36.3: a $reset invoked directly calls the cbStartOfReset and
-  // cbEndOfReset callbacks as one vpi_control(vpiReset) requests does.
-  GetGlobalVpiContext().DispatchReset();
-  return MakeLogic4VecVal(arena, 1, 0);
-}
-
 // Optional $scope system task (Annex D.11). It selects a level of hierarchy
 // as the interactive scope used to identify objects. Its single argument is
 // the complete hierarchical name of a module, task, function, or named block;
@@ -720,28 +702,17 @@ static Logic4Vec EvalAnnexDLog(const Expr* expr, SimContext& ctx,
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
-// Dispatch the optional Annex-D interactive/diagnostic tasks ($reset family,
-// $scope, $list, $showscopes, $showvars, $nolog, $log). Returns true and writes
-// the call's value to `out` when `name` is one of them; returns false otherwise
-// so the caller continues its own dispatch. The branches and their semantics
-// are exactly those of the original inline chain.
+// Dispatch the optional Annex-D interactive/diagnostic tasks ($scope, $list,
+// $showscopes, $showvars, $nolog, $log). Returns true and writes the call's
+// value to `out` when `name` is one of them; returns false otherwise so the
+// caller continues its own dispatch. The branches and their semantics are
+// exactly those of the original inline chain. D.8's $reset, $reset_count and
+// $reset_value are not among them: this implementation is without the reset
+// they describe, as D.1 allows, so a call of one reaches ReportUnknownSysCall's
+// D.1 report.
 static bool TryEvalAnnexDInteractiveTask(const Expr* expr, SimContext& ctx,
                                          Arena& arena, std::string_view name,
                                          Logic4Vec& out) {
-  if (name == "$reset") {
-    out = EvalAnnexDReset(expr, ctx, arena);
-    return true;
-  }
-  // $reset_count reports how many times the tool has been reset.
-  if (name == "$reset_count") {
-    out = MakeLogic4VecVal(arena, 32, ctx.ResetCount());
-    return true;
-  }
-  // $reset_value returns the reset_value argument supplied to the last $reset.
-  if (name == "$reset_value") {
-    out = MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(ctx.ResetValue()));
-    return true;
-  }
   if (name == "$scope") {
     out = EvalAnnexDScope(expr, ctx, arena);
     return true;

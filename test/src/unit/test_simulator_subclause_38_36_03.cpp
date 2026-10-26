@@ -481,9 +481,11 @@ TEST_F(EventCallbacksOfARun, ATchkViolationCallbackIsGivenTheCheck) {
   EXPECT_EQ(violated_tchk_type, vpiSetup);
 }
 
-// §38.36.3: a $reset the design invokes calls cbStartOfReset and then
-// cbEndOfReset (#7485).
-TEST_F(EventCallbacksOfARun, ADirectResetCallsTheResetCallbacks) {
+// §38.36.3: cbStartOfReset and cbEndOfReset are called around a reset, and a
+// $reset the design invokes performs none: this implementation is without
+// $reset, as Annex D.1 allows, so the call is reported and neither callback
+// is called.
+TEST_F(EventCallbacksOfARun, ADirectResetCallsNoResetCallback) {
   Armer() = [] {
     PlaceEventCallback(cbStartOfReset, nullptr);
     PlaceEventCallback(cbEndOfReset, nullptr);
@@ -491,9 +493,13 @@ TEST_F(EventCallbacksOfARun, ADirectResetCallsTheResetCallbacks) {
   Run("module top; timeunit 1ns; timeprecision 1ns;\n"
       "  initial begin $arm; #5 $reset; end\n"
       "endmodule\n");
-  ASSERT_EQ(EventDeliveries().size(), 2u);
-  EXPECT_EQ(EventDeliveries()[0].reason, cbStartOfReset);
-  EXPECT_EQ(EventDeliveries()[1].reason, cbEndOfReset);
+  EXPECT_TRUE(ReportedError(f_.diag.Diagnostics(),
+                            "$reset is the optional system task or system "
+                            "function D.8 describes, which Annex D.1 allows "
+                            "an implementation to be without; this "
+                            "implementation is one without it",
+                            2, "D.1"));
+  EXPECT_TRUE(EventDeliveries().empty());
 }
 
 // §38.36.3 with D.11: a $scope the design invokes changes the interactive

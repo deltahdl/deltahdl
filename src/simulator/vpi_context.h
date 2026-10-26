@@ -272,8 +272,8 @@ class VpiContext {
   void NoteDisabled(std::string_view label, std::string prefix);
 
   // §38.36.3: a reset delivers cbStartOfReset at the start of the operation and
-  // cbEndOfReset once it has completed. This is the single path used whether
-  // the reset was requested directly or through vpi_control(vpiReset, ...).
+  // cbEndOfReset once it has completed. No run reaches it: this implementation
+  // is without $reset, as Annex D.1 allows, and vpi_control(vpiReset) fails.
   int DispatchReset();
 
   // §38.36.3: a restart first removes every registered callback except the
@@ -306,12 +306,11 @@ class VpiContext {
   // vpi_release_handle() backend) for the live operation.
   int FreeObject(VpiHandle obj);
   // §38.4: vpi_control() passes an operation-specific request from the PLI
-  // application to the simulator. arg0..arg2 carry the operation's additional
-  // integer arguments (the diagnostic level for vpiStop/vpiFinish, or the
-  // stop/reset/diagnostics values for vpiReset); scope carries the vpiHandle
-  // argument of vpiSetInteractiveScope. Returns 1 on success, 0 on failure.
-  int Control(int operation, int arg0 = 0, int arg1 = 0, int arg2 = 0,
-              VpiHandle scope = nullptr);
+  // application to the simulator. arg0 carries the diagnostic level vpiStop and
+  // vpiFinish take; scope carries the vpiHandle argument of
+  // vpiSetInteractiveScope. Returns 1 on success, 0 on failure, which is what
+  // vpiReset gets: this implementation is without $reset, as Annex D.1 allows.
+  int Control(int operation, int arg0 = 0, VpiHandle scope = nullptr);
 
   // §40.5.3: control of coverage collection is requested through vpi_control()
   // using the coverage control constants of §40.5.1. `operation` selects the
@@ -679,10 +678,6 @@ class VpiContext {
   bool FinishRequested() const { return control_.finish_requested; }
   int StopDiagLevel() const { return control_.stop_diag_level; }
   int FinishDiagLevel() const { return control_.finish_diag_level; }
-  bool ResetRequested() const { return control_.reset_requested; }
-  int ResetStopValue() const { return control_.reset_stop_value; }
-  int ResetResetValue() const { return control_.reset_reset_value; }
-  int ResetDiagValue() const { return control_.reset_diag_value; }
   VpiHandle InteractiveScope() const { return control_.interactive_scope; }
   // §38.4: an application routine starts, and returns; the built-in tasks
   // vpi_control() requested while one ran execute once the outermost returns.

@@ -137,14 +137,6 @@ class SimContext : public DeclaredNameTables,
   void NoteRuntimeError() { ++runtime_error_count_; }
   bool HasRuntimeErrors() const { return runtime_error_count_ > 0; }
 
-  // Optional $reset family (Annex D.8). RecordReset tallies one reset of the
-  // tool and remembers the reset_value argument so that the $reset_value
-  // system function can hand that value back after the reset. $reset_count
-  // reports how many resets have occurred.
-  void RecordReset(int64_t reset_value);
-  uint32_t ResetCount() const { return reset_count_; }
-  int64_t ResetValue() const { return reset_value_; }
-
   // Optional $scope system task (Annex D.11). The interactive scope names the
   // level of hierarchy used when identifying objects interactively, as the one
   // vpi_control reaches through vpiSetInteractiveScope (§38.4) does. It starts
@@ -842,8 +834,6 @@ class SimContext : public DeclaredNameTables,
   bool stop_requested_ = false;
   bool finish_requested_ = false;
   uint32_t runtime_error_count_ = 0;
-  uint32_t reset_count_ = 0;
-  int64_t reset_value_ = 0;
   std::string interactive_scope_;
   std::unordered_set<std::string> hierarchical_scopes_;
   std::string last_listed_scope_;

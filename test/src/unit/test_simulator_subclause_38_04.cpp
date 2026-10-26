@@ -51,16 +51,13 @@ TEST_F(VpiSimControlSim, ControlStopCarriesDiagLevel) {
   EXPECT_EQ(vpi_ctx_.StopDiagLevel(), 1);
 }
 
-// §38.4: vpiReset requests the $reset built-in and is passed three additional
-// integer arguments (stop_value, reset_value, diagnostics_value).
-TEST_F(VpiSimControlSim, ControlResetCarriesThreeArguments) {
-  EXPECT_FALSE(vpi_ctx_.ResetRequested());
-  int result = vpi_control(vpiReset, 4, 5, 6);
-  EXPECT_EQ(result, 1);
-  EXPECT_TRUE(vpi_ctx_.ResetRequested());
-  EXPECT_EQ(vpi_ctx_.ResetStopValue(), 4);
-  EXPECT_EQ(vpi_ctx_.ResetResetValue(), 5);
-  EXPECT_EQ(vpi_ctx_.ResetDiagValue(), 6);
+// §38.4: vpiReset asks for $reset, which this implementation is without, as
+// Annex D.1 allows, so the request fails, and neither a stop nor a finish is
+// requested in its place.
+TEST_F(VpiSimControlSim, ControlResetFails) {
+  EXPECT_EQ(vpi_control(vpiReset, 4, 5, 6), 0);
+  EXPECT_FALSE(vpi_ctx_.StopRequested());
+  EXPECT_FALSE(vpi_ctx_.FinishRequested());
 }
 
 // §38.4: vpiSetInteractiveScope immediately switches the tool's interactive
@@ -79,22 +76,6 @@ TEST_F(VpiSimControlSim, ControlSetInteractiveScopeReplacesPriorScope) {
   EXPECT_EQ(vpi_ctx_.InteractiveScope(), second);
 }
 
-// §38.4: vpiReset is signalled by the request itself, not by the magnitude of
-// its arguments. Passing zero for all three values still requests the reset and
-// records those zeros.
-TEST_F(VpiSimControlSim, ControlResetWithZeroArgumentsStillRequestsReset) {
-  EXPECT_FALSE(vpi_ctx_.ResetRequested());
-  int result = vpi_control(vpiReset, 0, 0, 0);
-  EXPECT_EQ(result, 1);
-  EXPECT_TRUE(vpi_ctx_.ResetRequested());
-  EXPECT_EQ(vpi_ctx_.ResetStopValue(), 0);
-  EXPECT_EQ(vpi_ctx_.ResetResetValue(), 0);
-  EXPECT_EQ(vpi_ctx_.ResetDiagValue(), 0);
-}
-
-// §38.4: an operation vpi_control() does not recognize fails (returns 0) and
-// must do nothing else — no stop, finish, or reset is requested and the
-// interactive scope is left as it was.
 // §38.4: vpiSetInteractiveScope takes a handle of an object of the vpiScope
 // class (§37.12). A null handle, or one naming a net, names no scope to change
 // to, so the call fails and the scope stays where it was (#7454).
@@ -109,12 +90,14 @@ TEST_F(VpiSimControlSim, ControlSetInteractiveScopeRefusesWhatIsNoScope) {
   EXPECT_EQ(vpi_ctx_.InteractiveScope(), top);
 }
 
+// §38.4: an operation vpi_control() does not recognize fails (returns 0) and
+// does nothing else: no stop or finish is requested and the interactive scope
+// is left as it was.
 TEST_F(VpiSimControlSim, ControlUnknownOpIsInert) {
   int result = vpi_control(12345, 0);
   EXPECT_EQ(result, 0);
   EXPECT_FALSE(vpi_ctx_.StopRequested());
   EXPECT_FALSE(vpi_ctx_.FinishRequested());
-  EXPECT_FALSE(vpi_ctx_.ResetRequested());
   EXPECT_EQ(vpi_ctx_.InteractiveScope(), nullptr);
 }
 
@@ -166,7 +149,7 @@ TEST_F(FinishOfARun, AStopFromACalltfStopsTheRun) {
 SimContext* looked_at_run = nullptr;
 bool finish_seen_in_routine = true;
 int reset_callbacks = 0;
-int reset_callbacks_in_routine = -1;
+int reset_result = -1;
 
 PLI_INT32 FinishThenLookCalltf(PLI_BYTE8* /*user_data*/) {
   vpi_control(vpiFinish, 0);
@@ -179,9 +162,8 @@ PLI_INT32 CountResetCallback(p_cb_data /*data*/) {
   return 0;
 }
 
-PLI_INT32 ResetThenLookCalltf(PLI_BYTE8* /*user_data*/) {
-  vpi_control(vpiReset, 0, 0, 0);
-  reset_callbacks_in_routine = reset_callbacks;
+PLI_INT32 ResetCalltf(PLI_BYTE8* /*user_data*/) {
+  reset_result = vpi_control(vpiReset, 0, 0, 0);
   return 0;
 }
 
@@ -195,18 +177,19 @@ TEST_F(FinishOfARun, AFinishActsOnceTheRoutineReturns) {
   EXPECT_TRUE(f_.ctx.FinishRequested());
 }
 
-// §38.4 with §38.36.3: vpiReset has $reset execute on return of the
-// application routine, so its reset callbacks are called after the routine
-// that requested it has returned (#7452).
-TEST_F(FinishOfARun, AResetCallsItsCallbacksOnceTheRoutineReturns) {
+// §38.4 with §38.36.3: a vpiReset from a calltf fails, as this implementation
+// is without $reset, so no reset callback is called once the routine returns
+// and the run goes on to the event it scheduled for later.
+TEST_F(FinishOfARun, AResetFromACalltfFailsAndTheRunGoesOn) {
   reset_callbacks = 0;
+  reset_result = -1;
   s_cb_data cb = {};
   cb.reason = cbEndOfReset;
   cb.cb_rtn = &CountResetCallback;
   ASSERT_NE(vpi_register_cb(&cb), nullptr);
-  AfterOnceProbedBy(&ResetThenLookCalltf);
-  EXPECT_EQ(reset_callbacks_in_routine, 0);
-  EXPECT_EQ(reset_callbacks, 1);
+  EXPECT_EQ(AfterOnceProbedBy(&ResetCalltf), 1);
+  EXPECT_EQ(reset_result, 0);
+  EXPECT_EQ(reset_callbacks, 0);
 }
 
 // §38.4: vpiSetInteractiveScope changes the interactive scope the tool's

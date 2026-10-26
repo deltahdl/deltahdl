@@ -291,17 +291,9 @@ PLI_INT32 VpiControlWithArgs(PLI_INT32 operation, va_list args) {
       result = delta::GetGlobalVpiContext().Control(operation, diag_level);
       break;
     }
-    case delta::kVpiReset: {
-      int stop_value = va_arg(args, int);
-      int reset_value = va_arg(args, int);
-      int diag_value = va_arg(args, int);
-      result = delta::GetGlobalVpiContext().Control(operation, stop_value,
-                                                    reset_value, diag_value);
-      break;
-    }
     case delta::kVpiSetInteractiveScope: {
       vpiHandle scope = va_arg(args, vpiHandle);
-      result = delta::GetGlobalVpiContext().Control(operation, 0, 0, 0,
+      result = delta::GetGlobalVpiContext().Control(operation, 0,
                                                     delta::VpiObjectOf(scope));
       break;
     }
