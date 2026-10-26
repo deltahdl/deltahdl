@@ -1,6 +1,4 @@
 #include <algorithm>
-#include <cctype>
-#include <cstdarg>
 #include <vector>
 
 #include "simulator/vpi_class_typespecs.h"

@@ -1,5 +1,3 @@
-#include <cctype>
-#include <cstdarg>
 #include <optional>
 
 #include "simulator/vpi_class_typespecs.h"

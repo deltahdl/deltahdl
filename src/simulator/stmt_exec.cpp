@@ -1,7 +1,6 @@
 #include "simulator/stmt_exec.h"
 
 #include <cstdint>
-#include <cstring>
 #include <functional>
 #include <string>
 #include <string_view>

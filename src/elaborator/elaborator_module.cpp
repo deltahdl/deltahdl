@@ -1,6 +1,5 @@
 #include <algorithm>
 #include <cstdint>
-#include <cstdlib>
 #include <format>
 #include <string>
 #include <string_view>

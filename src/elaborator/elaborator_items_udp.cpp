@@ -1,5 +1,4 @@
 #include <cstdint>
-#include <cstdlib>
 #include <format>
 #include <optional>
 #include <string>

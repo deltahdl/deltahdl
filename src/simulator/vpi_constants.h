@@ -1,7 +1,5 @@
 #pragma once
 
-#include <cstdarg>
-
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_user.h"
 
