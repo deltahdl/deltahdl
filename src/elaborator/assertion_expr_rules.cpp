@@ -378,9 +378,18 @@ void CheckIncOrDec(const Expr* e, DiagEngine& diag) {
              Subclause("16.6"));
 }
 
-// The rules on each subexpression of the root `e` standing at `site`.
+void CheckTree(const PropertyExprNode* node, const Site& site,
+               const RuleEnv& env);
+
+// The rules on each subexpression of the root `e` standing at `site`. An
+// expression standing for a sequence or property the parser read into a tree
+// of its own is read through that tree: a group holding and, or, intersect or
+// within at its own depth, one operand of the chain around it (§16.9.5 to
+// §16.9.7 and §16.9.10), and an instance's actual written as a sequence or a
+// property (§16.8.1, §16.12.18).
 void CheckSubexpressions(const Expr* e, const Site& site, const RuleEnv& env) {
   if (e == nullptr) return;
+  CheckTree(e->property_actual, site, env);
   if (IsSampledValueFunction(e)) {
     CheckSampledArguments(e, site, env.diag);
     CheckPastTicks(e, env);
@@ -544,18 +553,10 @@ void CheckMatchItems(const std::vector<SeqMatchAssign>& items, const Site& site,
   }
 }
 
-void CheckTree(const PropertyExprNode* node, const Site& site,
-               const RuleEnv& env);
-
-// The chains of `body`. An operand that is a group holding and, or,
-// intersect or within at its own depth is a sequence of its own, which the
-// parser hangs off the operand as a property tree (§16.9.5 to §16.9.7 and
-// §16.9.10), and is read through that tree.
 void CheckBody(const SeqLinearBody& body, const Site& site,
                const RuleEnv& env) {
   for (size_t i = 0; i < body.operands.size(); ++i) {
     CheckRoot(body.operands[i], site, env);
-    CheckTree(body.operands[i]->property_actual, site, env);
     CheckEmptyMatchItems(body.match_items[i], body.operands[i]->range.start,
                          env.diag);
   }

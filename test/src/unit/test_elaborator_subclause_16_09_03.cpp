@@ -1,5 +1,12 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <string>
+#include <vector>
+
+#include "common/diagnostic.h"
 #include "elaborator/sampled_value.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
@@ -291,14 +298,25 @@ TEST(SampledValueRules, AnUnclockedCallInADisableConditionIsReported) {
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 6, "16.9.3"));
 }
 
+constexpr const char* kTicksReport =
+    "the number_of_ticks of $past shall be 1 or greater";
+
+// How many times the run reported on `line` that a $past's number_of_ticks
+// is under 1, which is once for each $past breaking the rule there.
+std::ptrdiff_t TicksReportsOn(const std::vector<Diagnostic>& diags,
+                              uint32_t line) {
+  return std::ranges::count_if(diags, [line](const Diagnostic& d) {
+    return d.loc.line == line &&
+           d.message.find(kTicksReport) != std::string::npos;
+  });
+}
+
 // §16.9.3 with §16.9.7: a $past written inside a group that `or` makes a
 // sequence of its own, standing as one operand of the chain around it, is held
 // to the rule as one written in the chain is: s1 writes it in the chain, s2
 // and the antecedent of a1 inside an `or` group, and s3 a well-formed one
-// there.
+// there. Each breach is reported once.
 TEST(SampledValueRules, APastInsideAnOrGroupIsHeldToTheTicksRule) {
-  const char* const kReport =
-      "the number_of_ticks of $past shall be 1 or greater";
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -315,10 +333,32 @@ TEST(SampledValueRules, APastInsideAnOrGroupIsHeldToTheTicksRule) {
       "  a1: assert property (@(posedge clk) a ##1 ($past(c, 0) or b) |-> a);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 4, "16.9.3"));
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 7, "16.9.3"));
-  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 10, "16.9.3"));
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 12, "16.9.3"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kTicksReport, 4, "16.9.3"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kTicksReport, 7, "16.9.3"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kTicksReport, 10, "16.9.3"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kTicksReport, 12, "16.9.3"));
+  EXPECT_EQ(TicksReportsOn(f.diag.Diagnostics(), 7), 1);
+  EXPECT_EQ(TicksReportsOn(f.diag.Diagnostics(), 12), 1);
+}
+
+// §16.9.3 with §16.8.1: a $past written in an actual of a sequence instance
+// that is itself a sequence, `s(a ##1 $past(b, 0))`, is held to the rule as
+// one written in the assertion is, once; a2's $past(b, 1) keeps it.
+TEST(SampledValueRules, APastInsideASequenceActualIsHeldToTheTicksRule) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk, a, b, c;\n"
+      "  sequence s(sequence q);\n"
+      "    q ##1 c;\n"
+      "  endsequence\n"
+      "  a1: assert property (@(posedge clk) s(a ##1 $past(b, 0)));\n"
+      "  a2: assert property (@(posedge clk) s(a ##1 $past(b, 1)));\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kTicksReport, 6, "16.9.3"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kTicksReport, 7, "16.9.3"));
+  EXPECT_EQ(TicksReportsOn(f.diag.Diagnostics(), 6), 1);
 }
 
 }  // namespace
