@@ -65,19 +65,19 @@ TEST(SvDpi, ScopeSetToNullClearsActiveScopeAndReturnsPrior) {
 }
 
 // The user data these cases store lives as long as the process, so each case's
-// scope and key are static objects of its own, whose addresses no other case
-// can repeat; §H.9.3 likewise suggests the address of a static symbol as a key.
-// Stack locals would be laid out at the same addresses by cases run one after
-// another in one process, and a case's never-stored key would find what an
-// earlier case stored.
+// scope is a registered name of its own and its key a static object of its
+// own, whose address no other case can repeat; §H.9.3 likewise suggests the
+// address of a static symbol as a key. Stack locals would be laid out at the
+// same addresses by cases run one after another in one process, and a case's
+// never-stored key would find what an earlier case stored.
 
 // §H.9.3: a pointer stored under a (scope, key) pair is returned by a later
 // svGetUserData with the same scope and key.
 TEST(SvDpi, UserDataStoreRoundTrip) {
-  static int scope_obj = 0;
   static int key_obj = 0;
   int payload = 99;
-  auto scope = reinterpret_cast<svScope>(&scope_obj);
+  svScope scope =
+      const_cast<DpiScope*>(DpiRegisterScope("top.round_trip_h_09_03"));
 
   EXPECT_EQ(svPutUserData(scope, &key_obj, &payload), 0);
   EXPECT_EQ(svGetUserData(scope, &key_obj), &payload);
@@ -86,15 +86,13 @@ TEST(SvDpi, UserDataStoreRoundTrip) {
 // §H.9.3: the key together with the scope identifies an entry, so different
 // keys (and different scopes) address independent storage.
 TEST(SvDpi, UserDataKeyedByScopeAndKey) {
-  static int scope_a = 0;
-  static int scope_b = 0;
   static int key1 = 0;
   static int key2 = 0;
   int data1 = 1;
   int data2 = 2;
   int data3 = 3;
-  auto sa = reinterpret_cast<svScope>(&scope_a);
-  auto sb = reinterpret_cast<svScope>(&scope_b);
+  svScope sa = const_cast<DpiScope*>(DpiRegisterScope("top.keyed_a_h_09_03"));
+  svScope sb = const_cast<DpiScope*>(DpiRegisterScope("top.keyed_b_h_09_03"));
 
   ASSERT_EQ(svPutUserData(sa, &key1, &data1), 0);
   ASSERT_EQ(svPutUserData(sa, &key2, &data2), 0);
@@ -107,9 +105,9 @@ TEST(SvDpi, UserDataKeyedByScopeAndKey) {
 
 // §H.9.3: a lookup for a (scope, key) that was never stored returns null.
 TEST(SvDpi, UserDataReturnsNullWhenNeverStored) {
-  static int scope_obj = 0;
   static int key_obj = 0;
-  auto scope = reinterpret_cast<svScope>(&scope_obj);
+  svScope scope =
+      const_cast<DpiScope*>(DpiRegisterScope("top.never_stored_h_09_03"));
 
   EXPECT_EQ(svGetUserData(scope, &key_obj), nullptr);
 }
@@ -117,10 +115,10 @@ TEST(SvDpi, UserDataReturnsNullWhenNeverStored) {
 // §H.9.3 error cases: a null scope or null payload makes svPutUserData fail
 // with -1 and stores nothing; svGetUserData with a null scope returns null.
 TEST(SvDpi, UserDataRejectsNullScopeOrPayload) {
-  static int scope_obj = 0;
   static int key_obj = 0;
   int payload = 5;
-  auto scope = reinterpret_cast<svScope>(&scope_obj);
+  svScope scope =
+      const_cast<DpiScope*>(DpiRegisterScope("top.rejects_null_h_09_03"));
 
   EXPECT_EQ(svPutUserData(nullptr, &key_obj, &payload), -1);
   EXPECT_EQ(svPutUserData(scope, &key_obj, nullptr), -1);
@@ -128,6 +126,48 @@ TEST(SvDpi, UserDataRejectsNullScopeOrPayload) {
 
   // The rejected put left no entry behind.
   EXPECT_EQ(svGetUserData(scope, &key_obj), nullptr);
+}
+
+// §H.9.3: an svScope that names no instance scope is invalid, and passing one
+// is an error: svPutUserData returns -1 and stores nothing, and svGetUserData
+// returns NULL, even where a scope that is one holds data under the same key.
+// Both took any non-null handle, so the address of an object stood as a scope.
+TEST(SvDpi, UserDataRejectsAHandleThatNamesNoScope) {
+  static int not_a_scope = 0;
+  static int key_obj = 0;
+  int payload = 7;
+  int peer_payload = 8;
+  auto invalid = reinterpret_cast<svScope>(&not_a_scope);
+  svScope peer =
+      const_cast<DpiScope*>(DpiRegisterScope("top.invalid_peer_h_09_03"));
+
+  ASSERT_EQ(svPutUserData(peer, &key_obj, &peer_payload), 0);
+  EXPECT_EQ(svPutUserData(invalid, &key_obj, &payload), -1);
+  EXPECT_EQ(svGetUserData(invalid, &key_obj), nullptr);
+  EXPECT_EQ(svGetUserData(peer, &key_obj), &peer_payload);
+}
+
+// §H.9.3: the scope svGetScope reports inside a call chain is a valid one,
+// the unnamed scope a frame pushes among them, so user data is stored and
+// retrieved under it; a handle no frame holds stays invalid while one stands.
+TEST(SvDpi, UserDataAcceptsTheUnnamedScopeOfTheCurrentFrame) {
+  static int not_a_scope = 0;
+  static int key_obj = 0;
+  int payload = 11;
+  DpiRuntime* installed = DpiForeignRuntime();
+  DpiRuntime rt;
+  DpiSetForeignRuntime(&rt);
+  rt.PushScope(DpiScope{});
+  svScope scope = svGetScope();
+
+  EXPECT_EQ(svPutUserData(scope, &key_obj, &payload), 0);
+  EXPECT_EQ(svGetUserData(scope, &key_obj), &payload);
+  EXPECT_EQ(svPutUserData(reinterpret_cast<svScope>(&not_a_scope), &key_obj,
+                          &payload),
+            -1);
+
+  rt.PopScope();
+  DpiSetForeignRuntime(installed);
 }
 
 // §H.9.3: svGetScopeFromName shall return NULL for a name that is not a

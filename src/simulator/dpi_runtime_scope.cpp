@@ -1,6 +1,7 @@
 // §H.9.3: the scope-name registry the svGetScopeFromName and svGetNameFromScope
 // entry points consult, and the scope stack the context import frames of a
 // DpiRuntime push, whose entries are the registry's handles.
+#include <algorithm>
 #include <cstdint>
 #include <functional>
 #include <list>
@@ -70,6 +71,12 @@ DpiScope* RegisteredScope(const DpiScope* scope) {
 }
 }  // namespace
 
+bool DpiScopeIsValid(const DpiScope* scope) {
+  if (RegisteredScope(scope) != nullptr) return true;
+  const DpiRuntime* runtime = DpiForeignRuntime();
+  return scope != nullptr && runtime != nullptr && runtime->HoldsScope(scope);
+}
+
 void DpiSetScopeTimescale(const DpiScope* scope, int32_t time_unit,
                           int32_t time_precision) {
   DpiScope* registered = RegisteredScope(scope);
@@ -124,5 +131,10 @@ const DpiScope* DpiRuntime::CurrentScope() const { return current_scope_; }
 void DpiRuntime::SetScope(const DpiScope* scope) { current_scope_ = scope; }
 
 const DpiScope* DpiRuntime::GetScope() const { return current_scope_; }
+
+bool DpiRuntime::HoldsScope(const DpiScope* scope) const {
+  return std::find(scope_stack_.begin(), scope_stack_.end(), scope) !=
+         scope_stack_.end();
+}
 
 }  // namespace delta

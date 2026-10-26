@@ -224,6 +224,12 @@ bool DpiCurrentDisableAcknowledged();
 const DpiScope* DpiRegisterScope(std::string_view name);
 const DpiScope* DpiScopeFromName(std::string_view name);
 const char* DpiNameFromScope(const DpiScope* scope);
+// Whether `scope` names an instance scope: a handle this registry produced, or
+// the unnamed scope a frame of the installed run (DpiForeignRuntime) holds
+// while the frame stands -- every handle svGetScope can report. §H.9.3 makes
+// any other svScope invalid and passing one to svPutUserData or svGetUserData
+// an error. False for NULL.
+bool DpiScopeIsValid(const DpiScope* scope);
 
 // §H.13: bind the time unit and precision of the instance scope a registered
 // handle names, each a base-ten exponent of one second, so that svGetTime
@@ -371,6 +377,9 @@ class DpiRuntime {
   const DpiScope* CurrentScope() const;
   void SetScope(const DpiScope* scope);
   const DpiScope* GetScope() const;
+  // Whether a frame pushed here holds `scope` -- the registry's handle for a
+  // named scope, or the unnamed scope the frame keeps for itself.
+  bool HoldsScope(const DpiScope* scope) const;
 
   // §35.5.3 call-chain instrumentation. A DPI import call chain begins when
   // SystemVerilog calls an import; the chain's context property comes from

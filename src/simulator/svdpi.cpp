@@ -716,9 +716,11 @@ svScope svGetScopeFromName(const char* scope_name) {
 }
 
 int svPutUserData(svScope scope, void* user_key, void* user_data) {
-  // §H.9.3: a null scope or null payload is an error. Report failure (-1)
-  // without recording anything; success returns 0.
-  if (scope == nullptr || user_data == nullptr) {
+  // §H.9.3: a null payload is an error, and so is a scope that names no
+  // instance scope, NULL among them. Report failure (-1) without recording
+  // anything; success returns 0.
+  if (!delta::DpiScopeIsValid(static_cast<const delta::DpiScope*>(scope)) ||
+      user_data == nullptr) {
     return -1;
   }
   DpiUserDataStore()[std::make_pair(scope, user_key)] = user_data;
@@ -726,9 +728,10 @@ int svPutUserData(svScope scope, void* user_key, void* user_data) {
 }
 
 void* svGetUserData(svScope scope, void* user_key) {
-  // §H.9.3: error cases and lookups that were never stored both surface as a
-  // null pointer; a successful retrieval returns the previously stored pointer.
-  if (scope == nullptr) {
+  // §H.9.3: error cases -- a scope that names no instance scope, NULL among
+  // them -- and lookups that were never stored both surface as a null pointer;
+  // a successful retrieval returns the previously stored pointer.
+  if (!delta::DpiScopeIsValid(static_cast<const delta::DpiScope*>(scope))) {
     return nullptr;
   }
   auto& store = DpiUserDataStore();
