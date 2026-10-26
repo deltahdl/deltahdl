@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <initializer_list>
+#include <string_view>
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -549,6 +550,73 @@ TEST(LvalueParsing, ProceduralContinuousTargetOfNoLvalueFormIsError) {
         line, "A.8.5"));
   }
   EXPECT_EQ(r.diags.size(), 5u);
+}
+
+// A.8.5 (printed page 1212) roots variable_lvalue's name form at a
+// hierarchical_variable_identifier, so a select of a call's result or a member
+// of a name written in parentheses is no target of a blocking or nonblocking
+// assignment. A select of a concatenation is no name form either, but §11.4.12
+// bars it by name and the elaborator reports it under that subclause, as it
+// reports a replication under §11.4.12.1, so the parser leaves it be. A
+// parenthesized target assigned a `new` is reported once, as no
+// variable_lvalue, and not again as the aggregate A.6.2 refuses a `new` to.
+TEST(LvalueParsing, ProceduralTargetRootedAtNoNameIsError) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef struct packed { logic a; logic b; } pair_t;\n"
+      "  class C; endclass\n"
+      "  logic [3:0] a, b;\n"
+      "  pair_t s;\n"
+      "  C h;\n"
+      "  function automatic logic [7:0] f(); return 0; endfunction\n"
+      "  initial begin\n"
+      "    {a, b}[0] = 1'b1;\n"
+      "    f()[1] <= 1'b0;\n"
+      "    (s).a = 1'b0;\n"
+      "    (h) = new;\n"
+      "    s.a = 1'b0;\n"
+      "    a[1] <= 1'b0;\n"
+      "  end\n"
+      "endmodule\n");
+  for (uint32_t line : {10u, 11u, 12u}) {
+    EXPECT_TRUE(ReportedError(
+        r.diags, "this target is neither a variable_lvalue nor a net_lvalue",
+        line, "A.8.5"));
+  }
+  EXPECT_EQ(r.diags.size(), 3u);
+}
+
+// A.8.3 writes an increment's operand, and A.6.2 the target of an assignment
+// within an expression, as a variable_lvalue, whose name form A.8.5 (printed
+// page 1212) roots at a hierarchical_variable_identifier: a select of a call's
+// result or a member of a name written in parentheses is neither.
+TEST(LvalueParsing, ExpressionTargetRootedAtNoNameIsError) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef struct packed { logic a; logic b; } pair_t;\n"
+      "  logic [3:0] a, x;\n"
+      "  pair_t s;\n"
+      "  function automatic logic [7:0] f(); return 0; endfunction\n"
+      "  initial begin\n"
+      "    ++(s).a;\n"
+      "    f()[1]++;\n"
+      "    x = ((s).a = 1'b1);\n"
+      "    x = (f()[1] = 1'b0);\n"
+      "    a[0]++;\n"
+      "    x = (a[0] = 1'b1);\n"
+      "  end\n"
+      "endmodule\n");
+  constexpr std::string_view kIncDec =
+      "an increment or decrement's operand is a variable_lvalue; this one is "
+      "not";
+  constexpr std::string_view kParenAssign =
+      "an assignment within an expression assigns a variable_lvalue; this "
+      "target is none";
+  EXPECT_TRUE(ReportedError(r.diags, kIncDec, 7, "A.8.3"));
+  EXPECT_TRUE(ReportedError(r.diags, kIncDec, 8, "A.8.3"));
+  EXPECT_TRUE(ReportedError(r.diags, kParenAssign, 9, "A.6.2"));
+  EXPECT_TRUE(ReportedError(r.diags, kParenAssign, 10, "A.6.2"));
+  EXPECT_EQ(r.diags.size(), 4u);
 }
 
 }  // namespace

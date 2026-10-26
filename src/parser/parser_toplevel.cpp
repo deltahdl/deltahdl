@@ -12,6 +12,7 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_gate_type.h"
 #include "parser/ast_module.h"
+#include "parser/expr_parser_internal.h"
 #include "parser/parser.h"
 #include "parser/parser_instance_internal.h"
 
@@ -99,16 +100,6 @@ static bool GateUsesDelay3(GateKind kind) {
   }
 }
 
-// Whether the selects and member accesses `e` is built of stand under a name,
-// as A.8.5 writes a net_lvalue's constant_select after its
-// ps_or_hierarchical_net_identifier. A select of a concatenation, a call or
-// any other expression stands under none.
-static bool IsRootedAtName(const Expr* e) {
-  while (e->kind == ExprKind::kSelect || e->kind == ExprKind::kMemberAccess)
-    e = e->kind == ExprKind::kSelect ? e->base : e->lhs;
-  return e->kind == ExprKind::kIdentifier;
-}
-
 // Whether `e` has one of the forms A.8.5 gives net_lvalue: a
 // ps_or_hierarchical_net_identifier with its constant_select, `{ net_lvalue
 // { , net_lvalue } }`, or `[ assignment_pattern_expression_type ]
@@ -122,7 +113,7 @@ bool IsNetLvalue(const Expr* e) {
     case ExprKind::kIdentifier:
     case ExprKind::kSelect:
     case ExprKind::kMemberAccess:
-      return IsRootedAtName(e);
+      return IsNamedLvalue(e);
     case ExprKind::kAssignmentPattern:
       if (!e->pattern_keys.empty()) return false;
       [[fallthrough]];

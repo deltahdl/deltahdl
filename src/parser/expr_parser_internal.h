@@ -98,19 +98,23 @@ void ReportPredicateOperator(const Expr* e, DiagEngine& diag);
 void ReportEmptyConcatItems(const Expr* concat, DiagEngine& diag);
 
 // A.8.5's (printed page 1212) name form of an lvalue: a name, scoped or
-// reached through member selects, under any selects. Defined in
-// expr_parser_aux.cpp, and shared with the statement parser in
-// parser_stmt.cpp, where a `new` is assigned to one alone.
+// reached through member selects, under any selects, rooted at the identifier
+// the parser heads a name with, that of `this`, `super`, a `$root.` name and a
+// `$unit::` name included. A select or member of a concatenation, a call's
+// result, a cast or anything written in parentheses is rooted at no name.
+// Defined in expr_parser_aux.cpp, and shared with the statement parser in
+// parser_stmt.cpp, where a `new` is assigned to one alone, and with
+// IsNetLvalue in parser_toplevel.cpp.
 bool IsNamedLvalue(const Expr* e);
 
 // Whether `e` has a form A.8.5 (printed page 1212) gives variable_lvalue,
 // which covers every form it gives net_lvalue: a name under selects, a
 // concatenation of such targets, an assignment pattern of them, typed or not,
 // or a streaming concatenation. None is written in parentheses. A replication
-// is left to §11.4.12.1's report on a target holding one. Defined in
-// expr_parser_aux.cpp, and shared by the procedural assignment targets in
-// parser_stmt.cpp with the operand of an increment or decrement and the target
-// of an assignment within an expression.
+// is left to §11.4.12.1's report on a target holding one, and a select within
+// a concatenation to §11.4.12's. Defined in expr_parser_aux.cpp, and shared by
+// the procedural assignment targets in parser_stmt.cpp with the operand of an
+// increment or decrement and the target of an assignment within an expression.
 bool HasLvalueForm(const Expr* e);
 
 // Reports the `local::` qualifier at `loc` as standing outside an inline

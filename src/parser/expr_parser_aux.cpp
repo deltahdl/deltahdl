@@ -12,11 +12,25 @@
 namespace delta {
 
 bool IsNamedLvalue(const Expr* e) {
-  static constexpr ExprKind kNamed[] = {
-      ExprKind::kIdentifier, ExprKind::kSelect, ExprKind::kMemberAccess};
-  return std::ranges::any_of(kNamed,
-                             [e](ExprKind kind) { return kind == e->kind; });
+  while (!e->is_parenthesized &&
+         (e->kind == ExprKind::kSelect || e->kind == ExprKind::kMemberAccess)) {
+    e = e->kind == ExprKind::kSelect ? e->base : e->lhs;
+  }
+  return !e->is_parenthesized && e->kind == ExprKind::kIdentifier;
 }
+
+namespace {
+
+// Whether `e` selects within a concatenation, `{a, b}[2]` or `{a, b}[3:0][1]`,
+// a target §11.4.12 bars by name and the elaborator reports under that
+// subclause (ElaboratorOperationRules::CheckSelectOnConcatLvalue).
+bool SelectsWithinConcatenation(const Expr* e) {
+  if (e->kind != ExprKind::kSelect) return false;
+  while (e->kind == ExprKind::kSelect) e = e->base;
+  return e->kind == ExprKind::kConcatenation;
+}
+
+}  // namespace
 
 bool HasLvalueForm(const Expr* e) {
   if (e->is_parenthesized) return false;
@@ -28,7 +42,8 @@ bool HasLvalueForm(const Expr* e) {
       e->kind == ExprKind::kAssignmentPattern) {
     return std::ranges::all_of(e->elements, HasLvalueForm);
   }
-  return IsNamedLvalue(e) || e->kind == ExprKind::kStreamingConcat ||
+  return IsNamedLvalue(e) || SelectsWithinConcatenation(e) ||
+         e->kind == ExprKind::kStreamingConcat ||
          e->kind == ExprKind::kReplicate;
 }
 

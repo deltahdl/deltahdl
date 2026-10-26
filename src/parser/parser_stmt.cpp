@@ -244,10 +244,12 @@ struct ParserStmtHelpers {
   // blocking assignment in two forms: a dynamic_array_new assigned to a
   // nonrange_variable_lvalue, a name whose selects hold no part-select, and a
   // class_new assigned to a name under any select. Neither is a concatenation,
-  // a streaming concatenation or an assignment pattern.
+  // a streaming concatenation or an assignment pattern. A target of no
+  // variable_lvalue form at all is left to CheckLvalueForm's report.
   static void CheckNewTarget(Parser& p, const Stmt* stmt, bool dynamic_new) {
     if (!IsNewExpr(stmt->rhs)) return;
     if (!IsNamedLvalue(stmt->lhs)) {
+      if (!HasLvalueForm(stmt->lhs)) return;
       p.diag_.Error(stmt->lhs->range.start,
                     "a 'new' is assigned to a variable, never to a "
                     "concatenation, a streaming concatenation or an "

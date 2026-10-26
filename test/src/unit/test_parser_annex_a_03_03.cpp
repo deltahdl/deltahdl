@@ -506,8 +506,8 @@ TEST(PrimitiveTerminalParsing, Error_KeyedPatternTerminal) {
 
 // A.3.3 (printed page 1194) makes a gate's output_terminal and inout_terminal a
 // net_lvalue, whose forms A.8.5 (printed page 1212) writes in no parentheses,
-// whole or as an element of a concatenation. The same terminals written without
-// them stand.
+// whole, as an element of a concatenation or as the name a member select is
+// taken of. The same terminals written without them stand.
 TEST(PrimitiveTerminalParsing, Error_ParenthesizedDrivenTerminal) {
   auto r = Parse(
       "module m;\n"
@@ -516,6 +516,7 @@ TEST(PrimitiveTerminalParsing, Error_ParenthesizedDrivenTerminal) {
       "  buf b2 ({(z), y}, a);\n"
       "  tran t1 ((p), q);\n"
       "  buf b3 ({z, y}, a);\n"
+      "  buf b4 ((y).f, a);\n"
       "endmodule\n");
   EXPECT_TRUE(ReportedError(r.diags, "output terminal must be a net lvalue", 3,
                             "28.3"));
@@ -525,6 +526,8 @@ TEST(PrimitiveTerminalParsing, Error_ParenthesizedDrivenTerminal) {
       ReportedError(r.diags, "inout terminal must be a net lvalue", 5, "28.3"));
   EXPECT_FALSE(ReportedError(r.diags, "output terminal must be a net lvalue", 6,
                              "28.3"));
+  EXPECT_TRUE(ReportedError(r.diags, "output terminal must be a net lvalue", 7,
+                            "28.3"));
 }
 
 }  // namespace
