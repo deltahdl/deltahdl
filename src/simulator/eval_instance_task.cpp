@@ -531,7 +531,6 @@ static bool TryEvalParenFreeRandomize(const Expr* expr, SimContext& ctx,
 
 bool TryEvalParenFreeMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                                 Logic4Vec& out) {
-  if (expr == nullptr) return false;
   if (TryEvalParenFreeRandomize(expr, ctx, arena, out)) return true;
   if (!CallableWithoutParens(MethodNamedAsAValue(expr, ctx, arena))) {
     return false;
