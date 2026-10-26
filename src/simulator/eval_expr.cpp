@@ -337,7 +337,6 @@ static bool TryPropertyTagMismatch(const MemberAccess& ma, Logic4Vec& out) {
   return true;
 }
 
-// Handles the named-event `.triggered` and named-sequence `.triggered`/`.ended`
 // §16.13.5: whether the end point named `ep_name` is matched as read now,
 // its match stored until the first tick of the reading clock after it.
 static bool SequenceMatched(std::string_view ep_name, SimContext& ctx) {
@@ -387,8 +386,9 @@ static bool TryHierarchicalSequenceMethod(const Expr* expr, SimContext& ctx,
   return TryEndPointMethod(ep_name, expr->rhs->text, ctx, arena, out);
 }
 
-// pseudo-methods. Returns true and fills `out` when `field_name` named one of
-// these and the base referred to a matching event/sequence.
+// Handles the named-event `.triggered` and named-sequence `.triggered` and
+// `.matched` pseudo-methods. Returns true and fills `out` when `field_name`
+// named one of these and the base referred to a matching event/sequence.
 static bool TryEventSequenceMethod(const MemberAccess& ma, Logic4Vec& out) {
   Variable* base_var = ma.base_var;
   SimContext& ctx = ma.ctx;
@@ -404,27 +404,8 @@ static bool TryEventSequenceMethod(const MemberAccess& ma, Logic4Vec& out) {
                                  ctx.IsEventTriggered(base_name) ? 1u : 0u);
     return true;
   }
-  if (!base_var && ctx.FindSequenceDecl(base_name) &&
-      TrySequenceEndPointMethod(base_name, field_name, ctx, arena, out)) {
-    return true;
-  }
-  if (!base_var && field_name == "ended" && ctx.FindSequenceDecl(base_name)) {
-    // Annex C.2.3: IEEE 1800-2005 supplied the ended sequence method to detect
-    // a sequence end point inside a sequence expression, while triggered served
-    // the same role in other contexts. The two had identical meaning but
-    // mutually exclusive uses, so this version retires ended and lets triggered
-    // cover both. A reference to ended on a named sequence therefore names a
-    // removed method and is reported rather than silently evaluated.
-    ctx.GetDiag().Error(
-        ma.loc,
-        "the ended sequence method has been removed; use the triggered "
-        "method to detect the end point of sequence '" +
-            std::string(base_name) + "'",
-        Subclause("C.2.3"));
-    out = MakeLogic4Vec(arena, 1);
-    return true;
-  }
-  return false;
+  return !base_var && ctx.FindSequenceDecl(base_name) &&
+         TrySequenceEndPointMethod(base_name, field_name, ctx, arena, out);
 }
 
 // §15.5.3: `function bit triggered()` may be called with its empty argument

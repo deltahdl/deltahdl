@@ -19,8 +19,10 @@ namespace {
 // other contexts. Because the two had identical meaning under mutually
 // exclusive usage rules, IEEE 1800-2023 removed ended and lets triggered serve
 // both roles. A surviving reference to the ended method on a named sequence is
-// the removed construct and must be reported when the simulator evaluates it,
-// while the retained triggered method must still evaluate without complaint.
+// the removed construct, and a design holding one is rejected. Elaboration
+// reports it, ahead of any run; test_elaborator_annex_c_02_03.cpp covers it in
+// code no run reaches. The retained triggered method still evaluates without
+// complaint.
 
 // Helper: elaborate and lower a design, run it, and report whether the run
 // produced any diagnostics.
@@ -35,7 +37,7 @@ bool RunReportsError(const std::string& src) {
 }
 
 // Reading the deprecated ended method off a named sequence names a method that
-// no longer exists; evaluating it is rejected.
+// no longer exists; a design that does so is rejected.
 TEST(EndedSequenceMethodDeprecated, EndedMethodOnSequenceIsRejected) {
   EXPECT_TRUE(
       RunReportsError("module t;\n"

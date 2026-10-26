@@ -293,6 +293,24 @@ void CheckMethodContext(const Expr* e, const ModuleItem* seq, const Site& site,
                  Subclause("16.13.6"));
 }
 
+// Annex C.2.3: ended, the end-point method IEEE 1800-2005 had a sequence
+// expression read, is removed in favour of triggered, so a read of it off a
+// named sequence names a method the language no longer has, wherever it is
+// written and whether or not a run would evaluate it.
+void CheckRemovedEndedMethod(const Expr* e, const RuleEnv& env) {
+  if (e->kind != ExprKind::kMemberAccess || e->is_scope_resolution ||
+      e->rhs->text != "ended") {
+    return;
+  }
+  const ModuleItem* seq = InstantiatedDecl(e->lhs, env.sequences);
+  if (seq == nullptr) return;
+  env.diag.Error(e->range.start,
+                 "the ended sequence method has been removed; use the "
+                 "triggered method to detect the end point of sequence '" +
+                     std::string(seq->name) + "'",
+                 Subclause("C.2.3"));
+}
+
 void CheckMethodOperand(const Expr* e, const Site& site, const RuleEnv& env) {
   const ModuleItem* seq = InstantiatedDecl(e->lhs, env.sequences);
   CheckMethodContext(e, seq, site, env);
@@ -372,6 +390,7 @@ void CheckSubexpressions(const Expr* e, const Site& site, const RuleEnv& env) {
     CheckDisableTriggered(e, env);
   }
   if (!SequenceMethodOf(e).empty()) CheckMethodOperand(e, site, env);
+  CheckRemovedEndedMethod(e, env);
   if (IsFutureGclkCall(e)) CheckFutureGclkNesting(e, env.diag);
   if (e->kind == ExprKind::kCall) {
     const ModuleItem* seq = InstantiatedDecl(e, env.sequences);
@@ -745,6 +764,16 @@ void CheckProcedure(const ModuleItem* item, const RtlirModule* mod,
   });
 }
 
+// The rules a continuous assignment, which stands outside every procedure and
+// assertion, is held to here: Annex C.2.3's on either side.
+void CheckContinuousAssign(const ModuleItem* item, const RuleEnv& env) {
+  if (item->kind != ModuleItemKind::kContAssign) return;
+  for (const Expr* side : {item->assign_lhs, item->assign_rhs}) {
+    ForEachSubExpr(side,
+                   [&env](const Expr* e) { CheckRemovedEndedMethod(e, env); });
+  }
+}
+
 }  // namespace
 
 void ValidateAssertionExprRules(const ModuleInUnit& scope,
@@ -777,6 +806,7 @@ void ValidateAssertionExprRules(const ModuleInUnit& scope,
       CheckAssertionStmt(item->body, nullptr, kEnv);
     }
     CheckProcedure(item, mod, kEnv);
+    CheckContinuousAssign(item, kEnv);
   }
 }
 
