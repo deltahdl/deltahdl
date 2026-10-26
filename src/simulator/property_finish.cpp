@@ -248,6 +248,10 @@ PropertyVerdict VerdictOf(const PropertyExprNode* root,
   return verdict;
 }
 
+void ReadPlainSequencesAsStrong(PropertyTreeState& state) {
+  state.plain_sequences_strong = true;
+}
+
 std::vector<PropertyVerdict> FinishPropertyTree(PropertyTreeState& state) {
   std::vector<PropertyVerdict> verdicts;
   verdicts.reserve(state.attempts.size());

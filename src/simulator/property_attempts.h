@@ -80,6 +80,12 @@ void ForEachPropertyActual(
     const Expr* instance,
     const std::function<void(const PropertyExprNode*)>& fn);
 
+// §16.12.2 and F.3.4.3.1: the tree is the property of a cover property or
+// an expect, which read a sequence written with no sequence operator as
+// strong, where an assert property and an assume property, the default,
+// read one as weak. Called before the tree's first tick.
+void ReadPlainSequencesAsStrong(PropertyTreeState& state);
+
 // The end of the run: each attempt still in flight is decided with its
 // sequence operands still in flight read as §16.12.2 has them, a strong one
 // false and a weak one true, and reaches its verdict.
