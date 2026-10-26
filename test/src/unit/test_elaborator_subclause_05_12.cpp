@@ -556,4 +556,38 @@ TEST(LexicalConventionElaboration, AttrValueNamesUnfoldedClassParam) {
   EXPECT_EQ(NodeAttrValues(*design->top_modules[0], "width"), kNothing);
 }
 
+// A concurrent assertion in the clocked boolean form and a deferred immediate
+// assertion item are each modeled as a process, and the attributes such an
+// assertion is written with are its own, so each §5.12 report about them is
+// made once: the value that is not constant on lines 3 and 5, and the
+// attribute given twice on line 4.
+TEST(LexicalConventionElaboration, AssertionAttrReportsAreMadeOnce) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk, a, sig;\n"
+      "  (* weight = sig *) assert property (@(posedge clk) a);\n"
+      "  (* w = 1, w = 2 *) cover property (@(posedge clk) a);\n"
+      "  (* weight = sig *) assert #0 (a);\n"
+      "endmodule\n",
+      f);
+  const auto kCount = [&f](std::string_view message) {
+    const auto& diags = f.diag.Diagnostics();
+    return std::count_if(diags.begin(), diags.end(), [message](const auto& d) {
+      return d.message == message;
+    });
+  };
+  EXPECT_EQ(kCount("value of attribute 'weight' is not a constant expression"),
+            2);
+  EXPECT_EQ(kCount("duplicate attribute 'w'; last value used"), 1);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "value of attribute 'weight' is not a constant "
+                            "expression",
+                            3, "5.12"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "value of attribute 'weight' is not a constant "
+                            "expression",
+                            5, "5.12"));
+}
+
 }  // namespace

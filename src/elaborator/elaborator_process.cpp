@@ -134,6 +134,14 @@ void AddProcess(RtlirProcessKind kind, ModuleItem* item, RtlirModule* mod,
   mod->processes.push_back(proc);
 }
 
+void AddStaticAssertionProcess(RtlirProcessKind kind, ModuleItem* item,
+                               RtlirModule* mod, const ProcessBuildEnv& env) {
+  RtlirProcess proc = BuildProcessWithSensitivity(kind, item, env);
+  ValidateProcess(kind, item, proc, env.diag);
+  proc.is_static_assertion = true;
+  mod->processes.push_back(proc);
+}
+
 // §12.7.1: the variables a for loop's header declares, as in
 // `for (int j = 0; ...)`, appended to `locals`. Returns how many were appended.
 static size_t PushForHeaderLocals(const Stmt* stmt,

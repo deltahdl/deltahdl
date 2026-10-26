@@ -773,19 +773,17 @@ void Elaborator::ElaborateAssertPropertyItem(ModuleItem* item,
   // §16.5.2: `assert property(@$global_clock a);` under a
   // `global clocking @clk; endclocking` declaration is logically equivalent to
   // `assert property(@clk a);`, so the assertion's leading clocking event is
-  // the event that declaration names. AddProcess substitutes it onto the
-  // process rather than onto `item`, which the one ModuleDecl the parser built
-  // for the module holds: §14.14 rule b) can give two instances of that module
-  // different events, and a rewrite made on `item` would give both whichever
-  // instance was elaborated first.
+  // the event that declaration names. AddStaticAssertionProcess substitutes it
+  // onto the process rather than onto `item`, which the one ModuleDecl the
+  // parser built for the module holds: §14.14 rule b) can give two instances
+  // of that module different events, and a rewrite made on `item` would give
+  // both whichever instance was elaborated first.
   const ProcessBuildEnv kEnv{arena_, diag_, &inference_funcs_, &const_names_,
                              module_global_clocking_event_};
   // §16.4.3: a module-item deferred immediate assertion is a static deferred
   // assertion, modeled as an implicit always_comb procedure.
   if (IsStaticDeferredAssertion(item)) {
-    AddProcess(RtlirProcessKind::kAlwaysComb, item, mod, kEnv,
-               BuildParamScope(mod));
-    mod->processes.back().is_static_assertion = true;
+    AddStaticAssertionProcess(RtlirProcessKind::kAlwaysComb, item, mod, kEnv);
     return;
   }
   // §16.14.5: a static concurrent assertion outside procedural code uses
@@ -794,9 +792,7 @@ void Elaborator::ElaborateAssertPropertyItem(ModuleItem* item,
   // item->body; model it as a clocked process so the property is checked at
   // each leading clock edge.
   if (item->body != nullptr && !item->sensitivity.empty()) {
-    AddProcess(RtlirProcessKind::kAlwaysFF, item, mod, kEnv,
-               BuildParamScope(mod));
-    mod->processes.back().is_static_assertion = true;
+    AddStaticAssertionProcess(RtlirProcessKind::kAlwaysFF, item, mod, kEnv);
     // §16.5: the process just added carries a concurrent assertion's property.
     // The mark is taken from the statement the parser built for that property
     // rather than set outright, so the one place that decides what a concurrent

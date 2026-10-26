@@ -143,6 +143,13 @@ struct ProcessBuildEnv {
 // with fold their values against.
 void AddProcess(RtlirProcessKind kind, ModuleItem* item, RtlirModule* mod,
                 const ProcessBuildEnv& env, const ScopeMap& params);
+// The process a static assertion, the assertion item `item`, is modeled as
+// (§16.4.3, §16.14.5). The attributes the assertion is written with are the
+// item's, which RecordNodeAttributes resolves into RtlirModule::node_attrs and
+// §37.83's view reads there; resolving them onto the process as well would
+// make each §5.12 report about them twice.
+void AddStaticAssertionProcess(RtlirProcessKind kind, ModuleItem* item,
+                               RtlirModule* mod, const ProcessBuildEnv& env);
 
 void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena,
                        const ScopeMap& scope);
