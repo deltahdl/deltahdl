@@ -21,6 +21,7 @@
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/elaborator_node_attributes.h"
+#include "elaborator/implication_operator_rules.h"
 #include "elaborator/interface_property_instance.h"
 #include "elaborator/property_instance.h"
 #include "elaborator/property_rewrite.h"
@@ -534,6 +535,11 @@ void Elaborator::RunPostItemValidations(const ModuleDecl* decl,
   ValidateHierRefToImportedName(decl, mod);
   ValidateUnresolvedReferences(decl, mod);
   ValidateHierRefInstanceArray(decl, mod);
+  // A.8.6: a parameter port's value is an ordinary expression, joining no
+  // operands under a property operator.
+  for (const auto& param : decl->params) {
+    ReportImplicationOperators(param.second, diag_);
+  }
   ValidateForwardTypedefsInScope(decl->items);
   ValidateForwardTypedefScopePrefix(decl);
 }

@@ -24,6 +24,7 @@
 #include "elaborator/elaborator_node_attributes.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/global_clock_assertion_event.h"
+#include "elaborator/implication_operator_rules.h"
 #include "elaborator/procedural_checker_instance.h"
 #include "elaborator/procedural_concurrent_assertion.h"
 #include "elaborator/property_instance.h"
@@ -518,6 +519,9 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
   // no record of the item's own keeps.
   RecordNodeAttributes(*item, *mod, diag_,
                        [&] { return BuildParamScope(mod); });
+  // A.8.6: the item's ordinary expressions join no operands under a property
+  // operator.
+  ReportItemImplicationOperators(*item, diag_);
   if (ElaborateDeclItem(item, mod)) return;
   ResolveProceduralTypeRefs(
       item, [&](DataType& dt, SourceLoc loc) { ResolveTypeRef(dt, loc, mod); },
