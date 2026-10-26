@@ -2,6 +2,8 @@
 
 #include <functional>
 #include <optional>
+#include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/diagnostic.h"
@@ -43,9 +45,26 @@ bool KeepsNodeAttributes(ModuleItemKind kind) {
   }
 }
 
+// §8.25 with §6.20: a class's value parameters and its local parameters are
+// constants within the class, entered over the scope around it with the value
+// each folds to. A type parameter names a type and no value.
+void LayerClassParams(const ClassDecl& decl, ScopeMap& scope) {
+  auto add = [&scope](std::string_view name, const Expr* value) {
+    if (auto folded = ConstEvalInt(value, scope)) scope[name] = *folded;
+  };
+  for (const auto& [name, value] : decl.params) {
+    if (decl.type_param_names.count(name) == 0) add(name, value);
+  }
+  for (const ClassMember* member : decl.members) {
+    if (member->kind == ClassMemberKind::kProperty && member->is_param) {
+      add(member->name, member->init_expr);
+    }
+  }
+}
+
 // What resolving attributes works with: where they are kept, where a
 // duplicate is reported, and the parameter scope, built the first time an
-// attribute asks for it.
+// attribute or a class asks for it.
 struct NodeAttributeRecord {
   RtlirNodeAttributes& table;
   DiagEngine& diag;
@@ -93,10 +112,15 @@ struct NodeAttributeRecord {
   }
 
   // §8.3 with §5.12: a class written with attributes, its items written with
-  // them, and the operators its extends arguments and constraints are.
+  // them, and the operators its extends arguments and constraints are. The
+  // class's own attributes stand before it; the rest stand inside it, where
+  // its parameters are constants as well.
   void RecordClass(const ClassDecl* decl) {
     if (decl == nullptr) return;
     Record(decl, decl->attrs);
+    if (!scope.has_value()) scope = params();
+    ScopeMap outer = *scope;
+    LayerClassParams(*decl, *scope);
     for (const Expr* arg : decl->extends_args) RecordExpr(arg);
     for (const ClassMember* member : decl->members) {
       Record(member, member->attrs);
@@ -105,6 +129,7 @@ struct NodeAttributeRecord {
         RecordConstraintItem(item);
       }
     }
+    scope = std::move(outer);
   }
 
   // §9.4.2 with §5.12: the operators the event expressions `events` are

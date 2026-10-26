@@ -2,11 +2,13 @@
 
 #include <cstdint>
 #include <optional>
+#include <string_view>
 #include <vector>
 
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_attribute.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -385,6 +387,93 @@ TEST(LexicalConventionElaboration, AttrValueNamingAParameterFoldsOnEachItem) {
   EXPECT_EQ(kValueOf(mod->processes[0].attrs), std::optional<int64_t>{8});
   ASSERT_EQ(mod->assigns.size(), 1u);
   EXPECT_EQ(kValueOf(mod->assigns[0].attrs), std::optional<int64_t>{9});
+}
+
+// §5.12 writes an attribute's value as a constant expression, and a name of a
+// variable is none (§11.2.1), alone or as an operand. A parameter expression,
+// a string and a real literal are constants, so only the first two values are
+// reported.
+TEST(LexicalConventionElaboration, AttrValueThatIsNotConstantIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  parameter int P = 3;\n"
+      "  logic sig;\n"
+      "  (* weight = sig *) logic x;\n"
+      "  (* weight = sig + P *) logic y;\n"
+      "  (* weight = P + 1 *) logic z;\n"
+      "  (* weight = \"fast\" *) logic w;\n"
+      "  (* weight = 1.5 *) logic v;\n"
+      "endmodule\n",
+      f);
+  constexpr std::string_view kMessage =
+      "value of attribute 'weight' is not a constant expression";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, 4, "5.12"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, 5, "5.12"));
+  EXPECT_EQ(f.diag.ErrorCount(), 2u);
+}
+
+// The same holds for the attributes a subroutine and a statement carry, which
+// are kept beside the module's items rather than on a record of their own.
+TEST(LexicalConventionElaboration, NodeAttrValueThatIsNotConstantIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic sig, x;\n"
+      "  (* w = sig *) function void f(); endfunction\n"
+      "  initial begin\n"
+      "    (* w = sig *) x = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  constexpr std::string_view kMessage =
+      "value of attribute 'w' is not a constant expression";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, 3, "5.12"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, 5, "5.12"));
+}
+
+// An attribute written before a module declaration stands in the compilation
+// unit, so a parameter declared there is a constant it may name, and its value
+// folds against that parameter.
+TEST(LexicalConventionElaboration, ModuleAttrValueNamesUnitParameter) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "localparam int U = 5;\n"
+      "(* level = U + 1 *) module m;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  ASSERT_EQ(design->top_modules.size(), 1u);
+  const auto& attrs = design->top_modules[0]->attrs;
+  ASSERT_EQ(attrs.size(), 1u);
+  EXPECT_EQ(attrs[0].resolved_value, std::optional<int64_t>{6});
+}
+
+// A class member's attribute stands in the class, where the class's value
+// parameters and local parameters are constants it may name. A property of
+// the class is no constant, and neither a type parameter, a real parameter nor
+// a method adds a name an attribute folds against.
+TEST(LexicalConventionElaboration, ClassMemberAttrValueNamesClassParameter) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  class C #(parameter int N = 2, type T = int,\n"
+      "            parameter real R = 1.5);\n"
+      "    localparam int K = 3;\n"
+      "    int s;\n"
+      "    (* w = N *) int a;\n"
+      "    (* w = K + N *) int b;\n"
+      "    (* w = s *) int c;\n"
+      "    function void f(); endfunction\n"
+      "  endclass\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "value of attribute 'w' is not a constant "
+                            "expression",
+                            8, "5.12"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
 }  // namespace

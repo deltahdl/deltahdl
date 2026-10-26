@@ -63,9 +63,12 @@ void CollectInstantiations(const std::vector<ModuleItem*>& items,
 void CollectInstantiatedNames(const std::vector<ModuleItem*>& items,
                               std::unordered_set<std::string_view>& names);
 
+// §5.12: the attributes `attrs`, each value folded against `scope`, the
+// constants visible where the attributes are written, and reported when it is
+// not a constant expression there.
 std::vector<ResolvedAttribute> ResolveAttributes(
     const std::vector<Attribute>& attrs, DiagEngine& diag,
-    const ScopeMap& scope = {});
+    const ScopeMap& scope);
 // §10.3.2: the name a left-hand side drives as a whole, empty where it drives
 // no single declared signal under a name. The clause admits a concatenation, a
 // select and a member access there as well as a plain name, none of which names

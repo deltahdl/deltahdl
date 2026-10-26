@@ -169,9 +169,11 @@ static void InitInterfaceHeader(RtlirModule* mod, const ModuleDecl* decl) {
 }
 
 // Initialize the standalone (non-port, non-item) header fields of a freshly
-// created RtlirModule from its declaration.
+// created RtlirModule from its declaration. `unit_params` are the parameters of
+// the compilation unit that declares it.
 static void InitRtlirModuleHeader(RtlirModule* mod, const ModuleDecl* decl,
                                   const CompilationUnit* unit,
+                                  const ScopeMap& unit_params,
                                   DiagEngine& diag) {
   mod->name = decl->name;
   mod->loc = decl->range.start;
@@ -204,7 +206,9 @@ static void InitRtlirModuleHeader(RtlirModule* mod, const ModuleDecl* decl,
       decl->has_net_directives ? decl->default_nettype : unit->default_nettype;
   mod->unconnected_drive = decl->has_net_directives ? decl->unconnected_drive
                                                     : unit->unconnected_drive;
-  mod->attrs = ResolveAttributes(decl->attrs, diag);
+  // §5.12: the attributes written before the declaration stand in the
+  // compilation unit, so their values fold against its parameters.
+  mod->attrs = ResolveAttributes(decl->attrs, diag, unit_params);
   // §20.4.1: the time unit and precision $timeunit and $timeprecision report
   // for the element.
   mod->timescale = ModuleTimescale(decl, *unit);
@@ -529,7 +533,7 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   UnitScopeTables::Switch unit_scope(*this, decl);
   auto* mod = arena_.Create<RtlirModule>();
   if (!units_.views.empty()) mod->unit_index = static_cast<int>(units_.current);
-  InitRtlirModuleHeader(mod, decl, unit_, diag_);
+  InitRtlirModuleHeader(mod, decl, unit_, cu_param_scope_, diag_);
   mod->config = active_config_;
 
   // The per-module item-elaboration state (the members reset by

@@ -56,6 +56,16 @@ std::vector<ResolvedAttribute> ResolveAttributes(
     const ScopeMap& scope) {
   std::vector<ResolvedAttribute> result;
   for (const auto& attr : attrs) {
+    // §5.12: an attribute's value is a constant expression. One that does not
+    // fold to an integer may still be a constant, a real or a string, so the
+    // report asks constancy rather than whether EvalAttribute folded a number.
+    if (attr.value && !IsConstantExpr(attr.value, scope)) {
+      diag.Error(attr.loc,
+                 std::format("value of attribute '{}' is not a constant "
+                             "expression",
+                             attr.name),
+                 Subclause("5.12"));
+    }
     auto ra = EvalAttribute(attr, scope);
     auto it = std::find_if(result.begin(), result.end(),
                            [&](const auto& e) { return e.name == ra.name; });
