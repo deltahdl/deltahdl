@@ -174,8 +174,9 @@ struct NodeAttributeRecord {
   void RecordClass(const ClassDecl* decl) {
     if (decl == nullptr) return;
     Record(decl, decl->attrs);
-    AttributeScope outer = Scope();
-    LayerClassParams(*decl, *scope);
+    AttributeScope& in_class = Scope();
+    AttributeScope outer = in_class;
+    LayerClassParams(*decl, in_class);
     for (const Expr* arg : decl->extends_args) RecordExpr(arg);
     for (const ClassMember* member : decl->members) {
       Record(member, member->attrs);
