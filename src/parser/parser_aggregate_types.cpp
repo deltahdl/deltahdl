@@ -313,7 +313,8 @@ void Parser::ParseStructMembers(DataType& dtype) {
   auto open_brace_loc = CurrentLoc();
   Expect(TokenKind::kLBrace, Subclause("7.2"));
 
-  while (!Check(TokenKind::kRBrace) && !AtEnd()) {
+  bool stalled = false;
+  while (!Check(TokenKind::kRBrace) && !AtEnd() && !stalled) {
     auto member_attrs = ParseAttributes();
     bool is_rand = Match(TokenKind::kKwRand);
     bool is_randc = !is_rand && Match(TokenKind::kKwRandc);
@@ -324,14 +325,18 @@ void Parser::ParseStructMembers(DataType& dtype) {
     // member's names, and the body holds members and no null item, so a
     // signing or packed dimension alone, a bare name and a lone `;` are each
     // reported. A name after the implicit type is still read as the member's,
-    // and anything else is skipped to the semicolon.
+    // and anything else is skipped to the semicolon. Skipping stops short of
+    // an enclosing construct's end keyword, which then ends the list as well,
+    // so that the missing '}' is reported and that construct closes.
     if (member_type.kind == DataTypeKind::kImplicit &&
         member_type.type_ref_expr == nullptr) {
       diag_.Error(type_loc,
                   "a structure or union member names a data type or void",
                   Subclause("A.2.2.1"));
       if (!CheckIdentifier()) {
+        auto before = lexer_.SavePos().pos;
         Synchronize();
+        stalled = lexer_.SavePos().pos == before;
         continue;
       }
     }

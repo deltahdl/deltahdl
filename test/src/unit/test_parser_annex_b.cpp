@@ -268,14 +268,6 @@ constexpr const char* kReservedKeywords[] = {
 
 constexpr size_t kReservedKeywordCount = std::size(kReservedKeywords);
 
-// Two entries open an aggregate type declaration. In a slot that has no way to
-// close the type they start, the parser does not come back from reading one --
-// a pre-existing fault, not this annex's. Positions that do close the type
-// sweep them like any other word; the rest leave them to the lexer stage.
-bool IsAggregateOpenerWord(std::string_view word) {
-  return word == "struct" || word == "union";
-}
-
 // The plainest identifier slot there is: the name of a variable. No compiler
 // directive is in force anywhere in this file, which is the point -- Annex B
 // describes what the language reserves on its own, with nothing turned on.
@@ -283,27 +275,18 @@ std::string VarDecl(std::string_view word) {
   return "module m;\n  reg [7:0] " + std::string(word) + ";\nendmodule\n";
 }
 
-// An enumeration opener in a statement slot leaves the parser in the same
-// state the aggregate openers do, so the statement-bearing positions below
-// leave it out for the same pre-existing reason.
+// An enumeration opener is still left out of the statement-bearing positions
+// below, where an inline enumeration among a block's items once kept the
+// parser from returning.
 bool IsEnumOpenerWord(std::string_view word) { return word == "enum"; }
-
-// Which openers a position has to leave out depends on the position: three of
-// them close the type the opener starts, so they sweep the whole list.
-bool ExcludeAggregateOpeners(std::string_view word) {
-  return IsAggregateOpenerWord(word);
-}
-bool ExcludeAllTypeOpeners(std::string_view word) {
-  return IsAggregateOpenerWord(word) || IsEnumOpenerWord(word);
-}
 
 // A constructor's name is spelled with a listed word, and the function-name
 // production takes it in that role rather than as a chosen name, so what that
 // position would record for it is not a reservation result.
 bool IsConstructorWord(std::string_view word) { return word == "new"; }
 
-bool ExcludeTypeOpenersAndConstructor(std::string_view word) {
-  return ExcludeAllTypeOpeners(word) || IsConstructorWord(word);
+bool ExcludeEnumOpenerAndConstructor(std::string_view word) {
+  return IsEnumOpenerWord(word) || IsConstructorWord(word);
 }
 
 // The listed words that begin a type or stand as a primary in their own right.
@@ -334,12 +317,12 @@ struct Position {
   size_t expected_swept;
 };
 constexpr Position kPositions[] = {
-    {"design element", "module @;\nendmodule\n", ExcludeAggregateOpeners, 246},
+    {"design element", "module @;\nendmodule\n", nullptr, 248},
     {"port",
      "module m (input wire @, output wire y);\n"
      "  assign y = @;\n"
      "endmodule\n",
-     ExcludeAggregateOpeners, 246},
+     nullptr, 248},
     {"instance name",
      "module ch (input wire a, output wire y);\n"
      "  assign y = a;\n"
@@ -348,14 +331,14 @@ constexpr Position kPositions[] = {
      "  wire a, b;\n"
      "  ch @ (.a(a), .y(b));\n"
      "endmodule\n",
-     ExcludeAggregateOpeners, 246},
+     nullptr, 248},
     {"task name",
      "module m;\n"
      "  reg [7:0] r;\n"
      "  task @; r = 8'd1; endtask\n"
      "  initial begin : blk @; end\n"
      "endmodule\n",
-     ExcludeAllTypeOpeners, 245},
+     IsEnumOpenerWord, 247},
     {"function name",
      "module m;\n"
      "  reg [7:0] r;\n"
@@ -364,7 +347,7 @@ constexpr Position kPositions[] = {
      "  endfunction\n"
      "  initial r = @(8'd4);\n"
      "endmodule\n",
-     ExcludeTypeOpenersAndConstructor, 244},
+     ExcludeEnumOpenerAndConstructor, 246},
     {"gate instance name",
      "module m (input wire a, output wire y);\n"
      "  and @ (y, a, a);\n"
@@ -379,13 +362,13 @@ constexpr Position kPositions[] = {
      "    end\n"
      "  endgenerate\n"
      "endmodule\n",
-     ExcludeAggregateOpeners, 246},
+     nullptr, 248},
     {"named block",
      "module m;\n"
      "  reg [7:0] r;\n"
      "  initial begin : @ r = 8'd1; end\n"
      "endmodule\n",
-     ExcludeAllTypeOpeners, 245},
+     IsEnumOpenerWord, 247},
     {"expression operand",
      "module m;\n"
      "  reg [7:0] r;\n"
@@ -397,18 +380,18 @@ constexpr Position kPositions[] = {
      "  parameter @ = 8;\n"
      "  reg [7:0] r;\n"
      "endmodule\n",
-     ExcludeAggregateOpeners, 246},
+     nullptr, 248},
     {"type name",
      "module m;\n"
      "  typedef logic [7:0] @;\n"
      "  reg [7:0] r;\n"
      "endmodule\n",
-     ExcludeAggregateOpeners, 246},
+     nullptr, 248},
     {"package name",
      "package @;\n"
      "  localparam int k = 1;\n"
      "endpackage\n",
-     ExcludeAggregateOpeners, 246},
+     nullptr, 248},
     {"enumeration member",
      "module m;\n"
      "  typedef enum logic [1:0] { @ } e_t;\n"
@@ -422,7 +405,7 @@ constexpr Position kPositions[] = {
      "  wire a, b;\n"
      "  ch u (.@(a), .y(b));\n"
      "endmodule\n",
-     ExcludeAggregateOpeners, 246},
+     nullptr, 248},
 };
 
 // Substitutes one name for every placeholder in a position template.
@@ -446,11 +429,8 @@ constexpr const char* kControlName = "ctrl_name";
 // reservation doing its work rather than a template that never parsed.
 TEST(KeywordListParsing, NoReservedWordCanNameAVariable) {
   EXPECT_EQ(kReservedKeywordCount, 248u);
-  size_t swept = 0;
   for (size_t i = 0; i < kReservedKeywordCount; ++i) {
     std::string_view word = kReservedKeywords[i];
-    if (IsAggregateOpenerWord(word)) continue;
-    ++swept;
     EXPECT_FALSE(ParseOk(VarDecl(word)))
         << word << " is reserved and cannot name a variable";
 
@@ -463,7 +443,6 @@ TEST(KeywordListParsing, NoReservedWordCanNameAVariable) {
                                  ModuleItemKind::kVarDecl, free_name))
         << free_name << " is not reserved and names the variable";
   }
-  EXPECT_EQ(swept, 246u) << "the two aggregate openers are swept at the lexer";
 }
 
 // Reservation has to stop a word from naming anything at all, not just a

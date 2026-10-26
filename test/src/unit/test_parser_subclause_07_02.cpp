@@ -320,4 +320,49 @@ TEST(StructDeclarationParsing, StructMemberKeepsItsClassSpecialization) {
   EXPECT_TRUE(members[2].type_params.empty());
 }
 
+// §7.2 closes a structure's member list with '}'. A list the module's end
+// reaches first is reported as missing it, and the module still ends there.
+TEST(StructDeclarationParsing, StructBodyLeftOpenEndsAtTheModuleEnd) {
+  auto r = Parse(
+      "module m;\n"
+      "  struct { int a;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->name, "m");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected '}', got 'endmodule'", 3, "7.2"));
+}
+
+// A structure with no '{' at all: the tag is reported, the missing brace is,
+// and the member list read from the ';' on stops at the module's end.
+TEST(StructDeclarationParsing, StructWithNoBodyEndsAtTheModuleEnd) {
+  auto r = Parse(
+      "module m;\n"
+      "  struct x;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "structure declarations may not have a tag before '{'", 2,
+      "7.2"));
+  EXPECT_TRUE(ReportedError(r.diags, "expected '{', got ';'", 2, "7.2"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected '}', got 'endmodule'", 3, "7.2"));
+}
+
+// A union's member list left open inside a procedural block stops at the
+// block's 'end', which still closes the block.
+TEST(StructDeclarationParsing, UnionBodyLeftOpenEndsAtTheBlockEnd) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    union { int a;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_TRUE(ReportedError(r.diags, "expected '}', got 'end'", 4, "7.2"));
+}
+
 }  // namespace
