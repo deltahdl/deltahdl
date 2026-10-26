@@ -6,7 +6,10 @@
 #include <string>
 #include <vector>
 
+#include "common/arena.h"
+#include "common/types.h"
 #include "fixture_vpi_run.h"
+#include "simulator/variable.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_internal.h"
@@ -173,6 +176,30 @@ TEST_F(DelayTerminals, LoadFromATerminalReachesTheNetLoadKinds) {
   ASSERT_NE(itr, nullptr);
   EXPECT_EQ(VpiObjectOf(vpi_scan(itr)), &assign_stmt);
   EXPECT_EQ(vpi_scan(itr), nullptr);
+}
+
+// Details 1 and 2: an input term reads the net it is placed on as it stands
+// where no module path transition runs there, and a net the run holds no net
+// for has none running (#7852).
+TEST_F(DelayTerminals, AnInputTermOnANetWithNoRunNetReadsTheNet) {
+  Arena arena;
+  Variable storage;
+  storage.value = MakeLogic4VecVal(arena, 1, 1);
+  VpiObject net;
+  net.type = vpiNet;
+  net.var = &storage;
+  VpiObject device;
+  device.type = vpiDelayDevice;
+  VpiObject in_term;
+  in_term.type = vpiDelayTerm;
+  in_term.parent = &device;
+  in_term.term_net = &net;
+  device.in_term = &in_term;
+
+  s_vpi_value value = {};
+  value.format = vpiIntVal;
+  vpi_get_value(VpiHandleOf(&in_term), &value);
+  EXPECT_EQ(value.value.integer, 1);
 }
 
 // The delay device of vpiDelayType `kind` whose input term is among the loads

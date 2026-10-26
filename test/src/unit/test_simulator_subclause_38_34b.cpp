@@ -293,6 +293,20 @@ TEST_F(PutsOfARun, ARealVariableHoldsTheRealOrIntegerPut) {
   EXPECT_DOUBLE_EQ(read.value.real, -3.0);
 }
 
+// §38.34 with §6.12: a real member of an unpacked structure holds a real put
+// to it as that real too, its storage being what says it holds a real (#7852).
+TEST_F(PutsOfARun, ARealMemberOfAStructureHoldsTheRealPut) {
+  Run("module top; struct { real r; int i; } s; initial $noop; endmodule\n");
+  s_vpi_value half = {};
+  half.format = vpiRealVal;
+  half.value.real = 2.5;
+  vpi_put_value(By("top.s.r"), &half, nullptr, vpiNoDelay);
+  s_vpi_value read = {};
+  read.format = vpiRealVal;
+  vpi_get_value(By("top.s.r"), &read);
+  EXPECT_DOUBLE_EQ(read.value.real, 2.5);
+}
+
 // What the vpiStringVal put to the `$half_of_five` call recorded.
 int string_put_error = 0;
 

@@ -216,6 +216,25 @@ TEST_F(VariablesOfARun, AnArrayOrClassVariableHasNoValue) {
   }
 }
 
+// D11: having no value, an array var or a class var takes none put to it
+// either, the put being refused with an error (#7851).
+TEST_F(VariablesOfARun, AValuePutToAnArrayOrClassVariableIsRefused) {
+  Run("module top; class D; endclass int m[2]; D d; endmodule\n");
+  for (const char* name : {"top.m", "top.d"}) {
+    s_vpi_value value = {};
+    value.format = vpiIntVal;
+    value.value.integer = 5;
+    EXPECT_EQ(vpi_put_value(By(name), &value, nullptr, vpiNoDelay), nullptr)
+        << name;
+    s_vpi_error_info info = {};
+    ASSERT_EQ(vpi_chk_error(&info), vpiError) << name;
+    EXPECT_STREQ(info.message,
+                 "vpi_put_value(): an array, class or virtual interface "
+                 "variable has no value")
+        << name;
+  }
+}
+
 // D20: a member of a structure and an element of an array are scalars or
 // vectors as a variable of their type is (#7010).
 TEST_F(VariablesOfARun, AMemberOrElementIsAScalarOrAVectorByItsType) {

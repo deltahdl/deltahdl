@@ -760,5 +760,24 @@ TEST_F(ElementValuesOfARun, AnUnknownBitOfAnElementReadsAsZero) {
             (std::vector<PLI_INT32>{9, 0}));
 }
 
+// §38.16 by way of Table 38-3: an element of a signed array keeps its sign in
+// an integer arm though the value it holds is marked unsigned, as an unsigned
+// literal assigned to it leaves it, its variable giving the sign (#7848).
+TEST_F(VpiGetValueArraySim, ASignedElementHoldingAnUnsignedValueReadsSigned) {
+  VpiHandle arr = MakeArray("b", {{0, 1}}, 2, 8);
+  for (Variable* elem : elems_) elem->is_signed = true;
+  SetElem(0, 0xF0);
+  SetElem(1, 0x01);
+
+  s_vpi_arrayvalue av = {};
+  av.format = vpiIntVal;
+  PLI_INT32 first[1] = {0};
+  vpi_get_value_array(VpiHandleOf(arr), &av, first, 2);
+
+  ASSERT_NE(av.value.integers, nullptr);
+  EXPECT_EQ(av.value.integers[0], -16);
+  EXPECT_EQ(av.value.integers[1], 1);
+}
+
 }  // namespace
 }  // namespace delta

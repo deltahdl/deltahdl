@@ -12,6 +12,7 @@
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
+#include "simulator/vpi_value_numbers.h"
 
 namespace delta {
 namespace {
@@ -349,6 +350,29 @@ TEST_F(ValuesByTypeOfARun, ASignedValueKeepsItsSign) {
   }
   EXPECT_EQ(Read("top.u", vpiIntVal).value.integer, 255);
   EXPECT_DOUBLE_EQ(Read("top.u", vpiRealVal).value.real, 255.0);
+}
+
+// §38.15: an int variable is an integer, so vpiObjTypeVal reads it as
+// vpiIntVal too, and Table 38-3 has a longint, signed and 64 bits wide, keep
+// its sign in vpiIntVal (#7850).
+TEST_F(ValuesByTypeOfARun, AnIntReadsAsAnIntegerAndALongintKeepsItsSign) {
+  Run("module top;\n"
+      "  int k = -7;\n"
+      "  longint q = -5;\n"
+      "  initial $noop;\n"
+      "endmodule\n");
+  const s_vpi_value kInt = Read("top.k", vpiObjTypeVal);
+  EXPECT_EQ(kInt.format, vpiIntVal);
+  EXPECT_EQ(kInt.value.integer, -7);
+  EXPECT_EQ(Read("top.q", vpiIntVal).value.integer, -5);
+}
+
+// Table 38-3: a signed value of no width holds no bit to take a sign from and
+// reads as the integer 0 (#7850).
+TEST(KnownIntegerValues, ASignedValueOfNoWidthReadsAsZero) {
+  Logic4Vec empty;
+  empty.is_signed = true;
+  EXPECT_EQ(VpiKnownIntegerValue(empty), 0);
 }
 
 }  // namespace

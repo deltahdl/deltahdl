@@ -413,8 +413,9 @@ static VpiHandle ValueStandIn(VpiHandle obj, s_vpi_value* value,
   // §37.45 details 1 and 2: a delay term reads the value on its side of the
   // delay. The input term's is the value a module path transition still
   // carries across the delay where one runs on its net, and otherwise the
-  // net's as it stands; the output term's is the net's past the delay.
-  if (obj->type == vpiDelayTerm && obj->term_net != nullptr) {
+  // net's as it stands; the output term's is the net's past the delay. Every
+  // delay term is made on its net (MakeDelayTerm).
+  if (obj->type == vpiDelayTerm) {
     const Net* run_net = obj->term_net->net;
     if (obj->parent->in_term == obj && run_net != nullptr &&
         run_net->pending_path_value) {
