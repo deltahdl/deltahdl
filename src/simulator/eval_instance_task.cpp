@@ -512,10 +512,28 @@ static const Expr* ParenFreeCall(const Expr* name, SimContext& ctx) {
   return it->second;
 }
 
+// §18.6.1 with A.8.2 (printed page 1209): randomize is built in on every
+// class and declared by none, so MethodNamedAsAValue never finds it, and read
+// with no argument list it is the call randomize() all the same -- bare in a
+// method of the class, as this.randomize(), or through a handle variable,
+// `h.randomize`. A receiver no variable names, an element of an array, is
+// left to be read as a member, and so is a struct's member named randomize,
+// TryEvalRandomizeMethodCall finding no object behind it; nothing is
+// evaluated in either.
+static bool TryEvalParenFreeRandomize(const Expr* expr, SimContext& ctx,
+                                      Arena& arena, Logic4Vec& out) {
+  const bool kMember = expr->kind == ExprKind::kMemberAccess;
+  MethodCallParts parts;
+  if (kMember && !ExtractHandleAccessParts(expr, arena, parts)) return false;
+  if ((kMember ? parts.method_name : expr->text) != "randomize") return false;
+  return TryEvalRandomizeMethodCall(ParenFreeCall(expr, ctx), ctx, arena, out);
+}
+
 bool TryEvalParenFreeMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                                 Logic4Vec& out) {
-  if (expr == nullptr ||
-      !CallableWithoutParens(MethodNamedAsAValue(expr, ctx, arena))) {
+  if (expr == nullptr) return false;
+  if (TryEvalParenFreeRandomize(expr, ctx, arena, out)) return true;
+  if (!CallableWithoutParens(MethodNamedAsAValue(expr, ctx, arena))) {
     return false;
   }
   out = EvalExpr(ParenFreeCall(expr, ctx), ctx, arena);

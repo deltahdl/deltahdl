@@ -156,4 +156,38 @@ TEST(RandomizeMethodRun, ANullHandleExpressionIsReported) {
                             15, "8.4"));
 }
 
+// 18.6.1 with A.8.2: randomize is built in on every class and its call may be
+// written without its argument list, so h.randomize is h.randomize() and a
+// bare randomize in a method of the class is this.randomize(), each drawing x
+// to 9. A struct's member named randomize, through a variable or an element
+// of an array, stays the member it reads as (#8152).
+TEST(RandomizeMethodRun, ACallWrittenWithoutItsListRandomizes) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  class C;\n"
+      "    rand bit [3:0] x;\n"
+      "    constraint c { x == 4'd9; }\n"
+      "    function int again(); return randomize; endfunction\n"
+      "  endclass\n"
+      "  typedef struct { int randomize; } s_t;\n"
+      "  C h = new;\n"
+      "  s_t s;\n"
+      "  s_t sa [2];\n"
+      "  int ok1, ok2, field, element;\n"
+      "  initial begin\n"
+      "    s.randomize = 6;\n"
+      "    sa[1].randomize = 4;\n"
+      "    ok1 = h.randomize;\n"
+      "    h.x = 0;\n"
+      "    ok2 = h.again();\n"
+      "    field = s.randomize;\n"
+      "    element = sa[1].randomize;\n"
+      "    $display(\"%0d %0d %0d %0d %0d\", ok1, ok2, h.x, field, element);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 1 9 6 4\n");
+}
+
 }  // namespace
