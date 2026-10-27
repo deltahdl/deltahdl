@@ -51,12 +51,13 @@ class AssignedExpressionsOfARun : public VpiDesignRun {
     return values;
   }
 
-  // The vpiOpType of each of `exprs`, in order.
-  static std::vector<int> OpTypesOf(const std::vector<vpiHandle>& exprs) {
-    std::vector<int> ops;
-    ops.reserve(exprs.size());
-    for (vpiHandle expr : exprs) ops.push_back(vpi_get(vpiOpType, expr));
-    return ops;
+  // The integer property `property` of each of `exprs`, in order.
+  static std::vector<int> PropertiesOf(int property,
+                                       const std::vector<vpiHandle>& exprs) {
+    std::vector<int> values;
+    values.reserve(exprs.size());
+    for (vpiHandle expr : exprs) values.push_back(vpi_get(property, expr));
+    return values;
   }
 
   // The right sides of the assignments top's one procedure runs, in order.
@@ -298,6 +299,22 @@ TEST_F(AssignedExpressionsOfARun, AnIndexedPartSelectIsSizedByItsWidth) {
   EXPECT_EQ(vpi_get(vpiSize, Rhs()), 5);
 }
 
+// So are they, and a replication by its count (§11.4.12.1), where the bounds,
+// width or count read parameters or combine constants with an operator, as a
+// constant expression may (§11.2.1): a[W-1:0] is 4 bits, a[4:P] 3, a[i+:W+1]
+// 5, and {N{b}} 6.
+TEST_F(AssignedExpressionsOfARun,
+       ConstantExpressionsSizeSelectsAndReplications) {
+  Run("module top; localparam W = 4, P = 2, N = 3;\n"
+      "  logic [7:0] a, x; logic [1:0] b; logic [2:0] i;\n"
+      "  initial begin\n"
+      "    x = a[W-1:0]; x = a[4:P]; x = a[i+:W+1]; x = {N{b}};\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_EQ(PropertiesOf(vpiSize, ProcedureRightSides()),
+            (std::vector<int>{4, 3, 5, 6}));
+}
+
 // A bit select and a part select hold no storage of their own; each reads the
 // bits it selects out of its parent's value.
 TEST_F(AssignedExpressionsOfARun, ABitSelectReadsItsBit) {
@@ -425,7 +442,7 @@ TEST_F(AssignedExpressionsOfARun, EachBinaryOperatorReportsItsOwnOpType) {
       vpiBitXnorOp,     vpiLogAndOp,     vpiCaseNeqOp, vpiWildEqOp,
       vpiWildNeqOp,     vpiGeOp,         vpiLShiftOp,  vpiRShiftOp,
       vpiArithLShiftOp, vpiArithRShiftOp};
-  EXPECT_EQ(OpTypesOf(ProcedureRightSides()), kOps);
+  EXPECT_EQ(PropertiesOf(vpiOpType, ProcedureRightSides()), kOps);
 }
 
 // §37.59 with §11.4: so is one written with a prefix unary operator, unary
@@ -439,7 +456,7 @@ TEST_F(AssignedExpressionsOfARun, EachUnaryOperatorReportsItsOwnOpType) {
       "endmodule\n");
   const std::vector<int> kOps = {vpiPlusOp,     vpiUnaryAndOp,  vpiUnaryNandOp,
                                  vpiUnaryNorOp, vpiUnaryXNorOp, vpiUnaryXNorOp};
-  EXPECT_EQ(OpTypesOf(ProcedureRightSides()), kOps);
+  EXPECT_EQ(PropertiesOf(vpiOpType, ProcedureRightSides()), kOps);
 }
 
 }  // namespace

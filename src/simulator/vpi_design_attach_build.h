@@ -373,11 +373,6 @@ int VpiIncDecOpType(TokenKind op, bool postfix);
 // class var, a virtual interface var or a clocking block.
 bool VpiIsDynamicPrefixHolderType(int type);
 
-// §37.59: gives an operation, a part select or an indexed part select built
-// with no size its self-determined width (§11.6.1), read off its operands and
-// its range; any other expression is left as it is.
-void VpiSizeExpression(VpiObject* expr);
-
 // `scope` where it is given, and otherwise the instance `objects` holds under
 // `instance`; null for neither.
 const VpiObject* VpiScopeOrInstance(const VpiObject* scope,

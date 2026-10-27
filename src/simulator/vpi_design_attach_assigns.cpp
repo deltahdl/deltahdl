@@ -189,15 +189,12 @@ VpiObject* GenvarParameter(std::string_view name, const AssignBuild& build) {
   return param;
 }
 
-// §11.2.1: the value of the index `index` where it is an elaboration-time
-// constant, folded from the values of the names it reads -- parameters and
-// spec params, which the objects those names resolve to hold, and genvars;
-// none where it reads a name of anything else, a net or a variable among
-// them, whose value only the run fixes.
-std::optional<int64_t> ConstantIndex(const Expr* index,
-                                     const AssignBuild& build) {
+}  // namespace
+
+std::optional<int64_t> ElaborationConstant(const Expr* expr,
+                                           const AssignBuild& build) {
   std::vector<std::string_view> names;
-  CollectReads(index, names);
+  CollectReads(expr, names);
   ScopeMap scope;
   for (std::string_view name : names) {
     const VpiObject* named = Resolve(build.names, name);
@@ -207,8 +204,10 @@ std::optional<int64_t> ConstantIndex(const Expr* index,
     if (!kValue) return std::nullopt;
     scope[name] = *kValue;
   }
-  return ConstEvalInt(index, scope);
+  return ConstEvalInt(expr, scope);
 }
+
+namespace {
 
 // `first` followed by `rest`, as the operands of an operation.
 std::vector<const Expr*> Operands(const Expr* first,
@@ -349,7 +348,7 @@ VpiObject* PackedSelectObject(VpiObject* base, const Expr* index,
   std::vector<PackedRange> rest(base->packed_dims.begin() + 1,
                                 base->packed_dims.end());
   const int64_t kWidth = PackedDimsWidth(rest);
-  const std::optional<int64_t> kConstant = ConstantIndex(index, build);
+  const std::optional<int64_t> kConstant = ElaborationConstant(index, build);
   if (!kConstant) {
     VpiObject* select = SliceObject(root, std::move(rest), kWidth, build);
     select->select_dim = kDim;
@@ -403,7 +402,8 @@ VpiObject* BitSelectObject(const Expr* expr, const AssignBuild& build) {
   // A varying bit of a vector was made above (PackedSelectObject), so what a
   // varying index selects from here is an element, a var select of an array
   // var's (§37.19). An array net's has no object.
-  const std::optional<int64_t> kConstant = ConstantIndex(expr->index, build);
+  const std::optional<int64_t> kConstant =
+      ElaborationConstant(expr->index, build);
   if (!kConstant) {
     return base->type == vpiArrayVar ? VarSelectObject(base, expr->index, build)
                                      : nullptr;
@@ -827,7 +827,7 @@ VpiObject* ModelledExpression(const Expr* expr, const AssignBuild& build) {
 VpiObject* ExpressionObject(const Expr* expr, const AssignBuild& build) {
   if (expr == nullptr) return nullptr;
   VpiObject* obj = ModelledExpression(expr, build);
-  VpiSizeExpression(obj);
+  VpiSizeExpression(obj, *expr, build);
   // §37.3.5 with §38.15: an operation, a function, method function or system
   // function call, and a bit select, part select or indexed part select
   // (§37.59) hold no storage, so the value of each is its expression evaluated

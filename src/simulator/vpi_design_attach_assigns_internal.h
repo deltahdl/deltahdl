@@ -1,6 +1,8 @@
 #pragma once
 
+#include <cstdint>
 #include <functional>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -80,9 +82,24 @@ struct AssignBuild {
 // reads its prefix; the member is no name of the scope.
 void CollectReads(const Expr* expr, std::vector<std::string_view>& out);
 
+// §11.2.1: the value of `expr`, an index, a bound, a width or a count, where
+// it is an elaboration-time constant, folded from the values of the names it
+// reads -- parameters and spec params, which the objects those names resolve
+// to hold, and genvars; none where it reads a name of anything else, a net or
+// a variable among them, whose value only the run fixes.
+std::optional<int64_t> ElaborationConstant(const Expr* expr,
+                                           const AssignBuild& build);
+
 // §37.58 and §37.59: the expression object `expr` stands for, built with
 // `build`; null for a kind of expression not modelled.
 VpiObject* ExpressionObject(const Expr* expr, const AssignBuild& build);
+
+// §37.59: gives `obj`, an operation, a part select or an indexed part select
+// built with `build` for `expr` and given no size, its self-determined width
+// (§11.6.1), read off its operands' sizes and the constants `expr` writes its
+// range or count with; any other expression is left as it is.
+void VpiSizeExpression(VpiObject* obj, const Expr& expr,
+                       const AssignBuild& build);
 
 // The expression object `expr` stands for, assigned to `target`, whose
 // members or elements order a keyed pattern's expressions (§37.59 detail 6).

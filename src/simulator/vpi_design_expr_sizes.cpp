@@ -2,12 +2,12 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <optional>
 #include <vector>
 
-#include "common/types.h"
+#include "parser/ast_expr.h"
 #include "simulator/sv_vpi_user.h"
-#include "simulator/variable.h"
-#include "simulator/vpi_design_attach_build.h"
+#include "simulator/vpi_design_attach_assigns_internal.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
@@ -15,12 +15,6 @@
 namespace delta {
 
 namespace {
-
-// The value of `expr` where it is a constant, which a range or a count is
-// written as; null for any other expression.
-const Variable* ConstantValue(const VpiObject* expr) {
-  return expr != nullptr && expr->type == vpiConstant ? expr->var : nullptr;
-}
 
 // §11.6.1 Table 11-21: an operator whose result is one bit wide.
 bool IsOneBitOp(int op_type) {
@@ -94,11 +88,25 @@ int CastWidth(const VpiObject& op) {
   return 0;
 }
 
-// §11.6.1 Table 11-21: the self-determined width of the operation `op` over
-// operands of the sizes `sizes`, in order; 0 for one the table does not
-// size.
+// §11.4.12.1 with §11.6.1 Table 11-21: the width of the replication `expr`,
+// its count, a constant expression, times the widths of the expressions it
+// repeats, which follow the count among `sizes` (§37.59 detail 1); 0 where
+// the count does not fold.
+int ReplicationWidth(const Expr& expr, const std::vector<int>& sizes,
+                     const AssignBuild& build) {
+  const std::optional<int64_t> kCount =
+      ElaborationConstant(expr.repeat_count, build);
+  if (!kCount) return 0;
+  int sum = 0;
+  for (std::size_t i = 1; i < sizes.size(); ++i) sum += sizes[i];
+  return static_cast<int>(*kCount) * sum;
+}
+
+// §11.6.1 Table 11-21: the self-determined width of the operation `op`, built
+// for `expr`, over operands of the sizes `sizes`, in order; 0 for one the
+// table does not size.
 int OperationWidth(const VpiObject& op, const std::vector<int>& sizes,
-                   const std::vector<VpiHandle>& operands) {
+                   const Expr& expr, const AssignBuild& build) {
   if (sizes.empty()) return 0;
   if (IsOneBitOp(op.op_type)) return 1;
   if (IsLeftWidthOp(op.op_type)) return sizes.front();
@@ -112,47 +120,42 @@ int OperationWidth(const VpiObject& op, const std::vector<int>& sizes,
       for (int size : sizes) sum += size;
       return sum;
     }
-    case vpiMultiConcatOp: {
-      const Variable* count = ConstantValue(operands.front());
-      if (count == nullptr) return 0;
-      int sum = 0;
-      for (std::size_t i = 1; i < sizes.size(); ++i) sum += sizes[i];
-      return static_cast<int>(count->value.ToUint64()) * sum;
-    }
+    case vpiMultiConcatOp:
+      return ReplicationWidth(expr, sizes, build);
     default:
       return *std::ranges::max_element(sizes);
   }
 }
 
-// §11.5.1: the width a part select of constant bounds, or an indexed part
-// select of constant width, selects; 0 where they are not constants.
-int PartSelectWidth(const VpiObject& select) {
-  if (select.type == vpiIndexedPartSelect) {
-    const Variable* width = ConstantValue(select.width_expr);
-    return width != nullptr ? static_cast<int>(width->value.ToUint64()) : 0;
+// §11.5.1: the width the select `expr` selects, the span of a part select's
+// bounds or an indexed part select's width, each a constant expression; 0
+// where one does not fold.
+int SelectWidth(const Expr& expr, const AssignBuild& build) {
+  const std::optional<int64_t> kSecond =
+      ElaborationConstant(expr.index_end, build);
+  if (expr.is_part_select_plus || expr.is_part_select_minus) {
+    return static_cast<int>(kSecond.value_or(0));
   }
-  const Variable* left = ConstantValue(select.left_range);
-  const Variable* right = ConstantValue(select.right_range);
-  if (left == nullptr || right == nullptr) return 0;
-  const auto kSpan = static_cast<int64_t>(left->value.ToUint64()) -
-                     static_cast<int64_t>(right->value.ToUint64());
-  return static_cast<int>(std::abs(kSpan) + 1);
+  const std::optional<int64_t> kFirst = ElaborationConstant(expr.index, build);
+  if (!kFirst || !kSecond) return 0;
+  return static_cast<int>(std::abs(*kFirst - *kSecond) + 1);
 }
 
 }  // namespace
 
-void VpiSizeExpression(VpiObject* expr) {
-  if (expr == nullptr || expr->size != 0) return;
-  if (expr->type == vpiPartSelect || expr->type == vpiIndexedPartSelect) {
-    expr->size = PartSelectWidth(*expr);
+void VpiSizeExpression(VpiObject* obj, const Expr& expr,
+                       const AssignBuild& build) {
+  if (obj == nullptr || obj->size != 0) return;
+  if (obj->type == vpiPartSelect || obj->type == vpiIndexedPartSelect) {
+    obj->size = SelectWidth(expr, build);
     return;
   }
-  if (expr->type != vpiOperation) return;
-  const std::vector<VpiHandle> kOperands = VpiOperationOperands(expr);
+  if (obj->type != vpiOperation) return;
+  const std::vector<VpiHandle> kOperands = VpiOperationOperands(obj);
   std::vector<int> sizes;
   sizes.reserve(kOperands.size());
   for (const VpiObject* operand : kOperands) sizes.push_back(operand->size);
-  expr->size = OperationWidth(*expr, sizes, kOperands);
+  obj->size = OperationWidth(*obj, sizes, expr, build);
 }
 
 }  // namespace delta
