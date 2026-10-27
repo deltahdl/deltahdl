@@ -1,12 +1,13 @@
 #include <cstddef>
 #include <string>
-#include <string_view>
 #include <utility>
+#include <vector>
 
 #include "parser/ast_stmt.h"
 #include "simulator/variable.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_internal.h"
+#include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_stmt_objects.h"
 #include "simulator/vpi_user.h"
@@ -16,6 +17,18 @@
 // and the callbacks placed on them that are called for it.
 
 namespace delta {
+
+namespace {
+
+// Whether `obj` is written in `scope` or in a scope nested in it.
+bool HeldBy(const VpiObject& obj, const VpiObject& scope) {
+  for (const VpiObject* at = obj.parent; at != nullptr; at = at->parent) {
+    if (at == &scope) return true;
+  }
+  return false;
+}
+
+}  // namespace
 
 void VpiContext::NoteStmtExecuting(const Stmt* stmt, std::string prefix) {
   // §37.43 detail 4: the statement beginning in a frame is the one active
@@ -66,19 +79,27 @@ void VpiContext::NoteForce(int reason, const Variable* var, const Stmt* stmt,
   }
 }
 
-void VpiContext::NoteDisabled(std::string_view label, std::string prefix) {
+void VpiContext::NoteDisabled(const Stmt* disable, std::string prefix) {
   if (!HasCallbackFor(callbacks_, cbDisable)) return;
-  // §38.36.1: the named begin or fork the disable names, among the blocks of
-  // the instance it ran in, whose prefix ends in a dot where it is not empty.
-  if (!prefix.empty()) prefix.pop_back();
-  const std::string_view kLeaf = label.substr(label.rfind('.') + 1);
-  for (const auto& [key, obj] : stmt_objects_) {
-    if (key.second == prefix && obj->name == kLeaf &&
-        (obj->type == vpiNamedBegin || obj->type == vpiNamedFork)) {
-      DispatchCallbacks(cbDisable, obj);
-      return;
+  // §38.36.1 with §37.77: the task, function, named begin or named fork the
+  // disable statement names, which the model resolved upward from where the
+  // statement stands (§23.8).
+  VpiObject* target = VpiDisableExpr(
+      VpiStmtObjectFor(stmt_objects_, disable, std::move(prefix)));
+  if (target == nullptr) return;
+  // §38.36.1: the callback occurs for a block or task holding a call of a
+  // system task or system function, and a callback placed on such a call
+  // occurs with it.
+  std::vector<VpiObject*> held;
+  for (const auto& [site, call] : call_site_objects_) {
+    if ((call->type == vpiSysTaskCall || call->type == vpiSysFuncCall) &&
+        HeldBy(*call, *target)) {
+      held.push_back(call);
     }
   }
+  if (held.empty()) return;
+  DispatchCallbacks(cbDisable, target);
+  for (VpiObject* call : held) DispatchCallbacks(cbDisable, call);
 }
 
 }  // namespace delta

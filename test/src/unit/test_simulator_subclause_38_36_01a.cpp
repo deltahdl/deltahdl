@@ -6,6 +6,7 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "helpers_event_callbacks.h"
+#include "parser/ast_stmt.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
@@ -363,6 +364,22 @@ TEST_F(VpiSimEventCbDelivery, DisableCallbackDeliversDisabledConstructHandle) {
   EXPECT_EQ(fired, 1);
   EXPECT_EQ(g_delivered_reason, cbDisable);
   EXPECT_EQ(g_delivered_obj, &disabled_task);
+}
+
+// §38.36.1 with §37.77: a disable the model holds no statement object for
+// names no block or task the callback could be given, so a cbDisable placed on
+// no object is not called for it.
+TEST_F(VpiSimEventCbDelivery, ADisableWithNoStatementObjectCallsNothing) {
+  s_cb_data cb = {};
+  cb.reason = cbDisable;
+  cb.cb_rtn = &RecordDelivery;
+  ASSERT_NE(vpi_register_cb(&cb), nullptr);
+
+  Stmt disable{};
+  disable.kind = StmtKind::kDisable;
+  vpi_ctx_.NoteDisabled(&disable, "");
+
+  EXPECT_EQ(g_deliver_calls, 0);
 }
 
 // §38.36.1: a cbValueChange callback may be placed on an event statement. Since

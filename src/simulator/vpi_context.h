@@ -257,8 +257,8 @@ class VpiContext {
   // costing nothing where none of its reason is registered: a process created
   // or ended, an object constructed or reclaimed, a variable `stmt` in the
   // instance `prefix` forced, released, assigned or deassigned (cbForce,
-  // cbRelease, cbAssign, cbDeassign), and the named block `label` there
-  // disabled (cbDisable).
+  // cbRelease, cbAssign, cbDeassign), and the disable statement `disable`
+  // there run (cbDisable).
   void NoteThreadCreated(Process* proc);
   void NoteThreadEnded(Process* proc);
   // §38.36.1: the thread `proc` resumes execution (cbEnterThread).
@@ -269,7 +269,7 @@ class VpiContext {
   void NoteObjectReclaimed(ClassObject& obj);
   void NoteForce(int reason, const Variable* var, const Stmt* stmt,
                  std::string prefix);
-  void NoteDisabled(std::string_view label, std::string prefix);
+  void NoteDisabled(const Stmt* disable, std::string prefix);
 
   // §38.36.3: a reset delivers cbStartOfReset at the start of the operation and
   // cbEndOfReset once it has completed. No run reaches it: this implementation

@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <cstdint>
+#include <string>
 #include <vector>
 
 #include "helpers_event_callbacks.h"
@@ -192,6 +194,109 @@ TEST_F(EventCallbacksOfARun, ADisableCallbackNamesEachDisabledBlock) {
   std::ranges::sort(kinds);
   EXPECT_EQ(kinds,
             (std::vector<int>{vpiNamedBegin, vpiNamedBegin, vpiNamedFork}));
+}
+
+// §38.36.1 with §37.77: a cbDisable is called for the block or task the
+// disable statement names, resolved upward from where it stands (§23.8): a
+// task, the named begin a label creates around a statement (§9.3.5), the
+// block a hierarchical name reaches past another of its last name, and a
+// block of another instance.
+TEST_F(EventCallbacksOfARun, ADisableCallbackIsCalledForTheScopeItNames) {
+  Armer() = [] {
+    for (const char* name : {"top.t", "top.lbl", "top.b.inner", "top.c.blk"}) {
+      vpiHandle scope = TopObject(name);
+      EXPECT_NE(scope, nullptr) << name;
+      PlaceEventCallback(cbDisable, scope);
+    }
+  };
+  Run("module child; timeunit 1ns; timeprecision 1ns;\n"
+      "  initial begin : blk #9 $display(\"blk ran on\"); end\n"
+      "endmodule\n"
+      "module top; timeunit 1ns; timeprecision 1ns;\n"
+      "  child c();\n"
+      "  task t; #9 $display(\"t ran on\"); endtask\n"
+      "  initial $arm;\n"
+      "  initial t;\n"
+      "  initial begin lbl: #9 $display(\"lbl ran on\"); end\n"
+      "  initial begin : a begin : inner #9 $display(\"a ran on\"); end end\n"
+      "  initial begin : b begin : inner #9 $display(\"b ran on\"); end end\n"
+      "  initial begin\n"
+      "    #1 disable t; #1 disable lbl; #1 disable a.inner;\n"
+      "    #1 disable b.inner; #1 disable c.blk;\n"
+      "  end\n"
+      "endmodule\n");
+  std::vector<std::string> names;
+  std::vector<uint32_t> times;
+  for (const EventDelivery& d : DeliveriesOf(cbDisable)) {
+    names.push_back(d.obj);
+    times.push_back(d.now);
+  }
+  EXPECT_EQ(names, (std::vector<std::string>{"t", "lbl", "inner", "blk"}));
+  EXPECT_EQ(times, (std::vector<uint32_t>{1, 2, 4, 5}));
+}
+
+// §38.36.1: a cbDisable is called after a named block holding a call of a
+// system task or system function is disabled, and not after one holding
+// none: a block whose one system call is a system function in an expression
+// holds one, and a block of assignments alone does not.
+TEST_F(EventCallbacksOfARun, ADisableCallbackNeedsASystemCallInTheBlock) {
+  Armer() = [] { PlaceEventCallback(cbDisable, nullptr); };
+  Run("module top; timeunit 1ns; timeprecision 1ns; int x;\n"
+      "  initial $arm;\n"
+      "  initial begin : plain #9 x = 1; end\n"
+      "  initial begin : calls #9 x = $urandom; end\n"
+      "  initial begin #1 disable plain; #1 disable calls; end\n"
+      "endmodule\n");
+  const std::vector<EventDelivery> kDisables = DeliveriesOf(cbDisable);
+  ASSERT_EQ(kDisables.size(), 1u);
+  EXPECT_EQ(kDisables[0].obj, "calls");
+  EXPECT_EQ(kDisables[0].now, 2u);
+}
+
+// §38.36.1: a cbDisable placed on a system task call is called, with obj that
+// call, after a named block holding it is disabled, here the block around the
+// one it is written in; one placed on a call outside that block is not.
+TEST_F(EventCallbacksOfARun, ADisableCallbackOnASystemCallFiresWithItsBlock) {
+  Armer() = [] {
+    PlaceEventCallback(cbDisable,
+                       FirstStmtOf(vpiSysTaskCall, TopObject("top.outer")));
+    PlaceEventCallback(cbDisable,
+                       FirstStmtOf(vpiSysTaskCall, TopObject("top.other")));
+  };
+  Run("module top; timeunit 1ns; timeprecision 1ns;\n"
+      "  initial $arm;\n"
+      "  initial begin : outer\n"
+      "    begin : inner #9 $display(\"outer ran on\"); end\n"
+      "  end\n"
+      "  initial begin : other #9 $display(\"other ran on\"); end\n"
+      "  initial #1 disable outer;\n"
+      "endmodule\n");
+  const std::vector<EventDelivery> kDisables = DeliveriesOf(cbDisable);
+  ASSERT_EQ(kDisables.size(), 1u);
+  EXPECT_EQ(kDisables[0].obj_type, vpiSysTaskCall);
+  EXPECT_EQ(kDisables[0].now, 1u);
+}
+
+// §38.36.1 with §9.6.2: a cbDisable is called after a function body disables
+// a named block of its own holding a system task call, with obj that block.
+TEST_F(EventCallbacksOfARun, ADisableCallbackFiresForAFunctionsBlock) {
+  Armer() = [] { PlaceEventCallback(cbDisable, nullptr); };
+  Run("module top; timeunit 1ns; timeprecision 1ns;\n"
+      "  function int f(int n);\n"
+      "    begin : body\n"
+      "      if (n > 0) disable body;\n"
+      "      $display(\"body ran on\");\n"
+      "    end\n"
+      "    return n;\n"
+      "  endfunction\n"
+      "  int r;\n"
+      "  initial begin $arm; #1 r = f(1); end\n"
+      "endmodule\n");
+  const std::vector<EventDelivery> kDisables = DeliveriesOf(cbDisable);
+  ASSERT_EQ(kDisables.size(), 1u);
+  EXPECT_EQ(kDisables[0].obj, "body");
+  EXPECT_EQ(kDisables[0].obj_type, vpiNamedBegin);
+  EXPECT_EQ(kDisables[0].now, 1u);
 }
 
 // §38.36.1: cbEnterThread is called each time a thread resumes execution,

@@ -154,8 +154,9 @@ StmtResult ExecDisableImpl(const Stmt* stmt, SimContext& ctx) {
 
   bool named_a_procedure_scope =
       FlushDeferredQueueOfOutermostScope(target, current, ctx);
-  // §38.36.1: a cbDisable callback is called after the block is disabled.
-  GetGlobalVpiContext().NoteDisabled(target, ctx.ActiveInstancePrefix());
+  // §38.36.1: a cbDisable callback is called after the block or task is
+  // disabled.
+  GetGlobalVpiContext().NoteDisabled(stmt, ctx.ActiveInstancePrefix());
 
   if (self_disable) {
     ctx.SetDisableTarget(target);

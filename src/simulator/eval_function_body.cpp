@@ -27,7 +27,9 @@
 #include "simulator/statement_coverage.h"
 #include "simulator/stmt_exec.h"
 #include "simulator/stmt_exec_internal.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_design_attach.h"
+#include "simulator/vpi_globals.h"
 
 namespace delta {
 // The statement executor for a subroutine body (13.4). A function or task
@@ -174,6 +176,8 @@ static FuncFlow ExecFuncDisable(const Stmt* stmt, const FuncExecCtx& exec) {
   if (std::find(scopes.begin(), scopes.end(), target) == scopes.end()) {
     return FuncFlow::kNext;
   }
+  // §38.36.1: a cbDisable callback is called after the block is disabled.
+  GetGlobalVpiContext().NoteDisabled(stmt, exec.ctx.ActiveInstancePrefix());
   exec.ctx.SetDisableTarget(target);
   return FuncFlow::kDisable;
 }

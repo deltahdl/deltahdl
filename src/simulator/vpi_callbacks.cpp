@@ -566,10 +566,17 @@ std::string_view ClassNameOf(const VpiObject& obj) {
 
 // §38.36.1: whether the registration `reg` placed no callback on `obj`, the
 // object a delivery for `reason` is about: a cbStmt placed on another
-// statement or another module's, or a cbValueChange placed on another object.
+// statement or another module's, a cbValueChange placed on another object, or
+// a cbDisable about a system task or function call the disabled block or task
+// holds placed anywhere but on that call, one placed on none being called
+// about the block or task alone.
 bool PlacedElsewhere(const s_cb_data& reg, int reason, VpiHandle obj) {
   if (obj == nullptr) return false;
   if (reason == cbStmt) return !VpiCbStmtIsPlacedOn(reg, obj);
+  if (reason == cbDisable &&
+      (obj->type == vpiSysTaskCall || obj->type == vpiSysFuncCall)) {
+    return VpiObjectOf(reg.obj) != obj;
+  }
   if (reg.obj == nullptr) return false;
   if (reason == cbValueChange || reason == cbSizeChange ||
       reason == cbDisable || reason == cbEnterThread) {
