@@ -94,9 +94,9 @@ TEST_F(VariablesOfARun, ABuiltInTypedVariableHasAnUnnamedTypespec) {
 // D15, D16 and D22: a class property reports the randomization type it was
 // declared with, and any other variable vpiNotRand; a random property, randc
 // or rand, static or not, is randomized until rand_mode() turns it off, and
-// again once rand_mode() turns it back on, and so is one of the class defn.
-// An object that is no variable has no randomization type (#7000, #7001,
-// #8190).
+// again once rand_mode() turns it back on, and so is one of the class defn,
+// which, being automatic, has no full name (D25). An object that is no
+// variable has no randomization type (#7000, #7001, #8190).
 TEST_F(VariablesOfARun, AVariableReportsItsRandomization) {
   Run("module top;\n"
       "  class C; rand int r; randc bit [1:0] k; rand int off; int n;\n"
@@ -122,6 +122,7 @@ TEST_F(VariablesOfARun, AVariableReportsItsRandomization) {
   vpiHandle defn = Named(vpiClassDefn, By("top"), "C");
   ASSERT_NE(defn, nullptr);
   EXPECT_EQ(vpi_get(vpiIsRandomized, Named(vpiVariables, defn, "r")), 1);
+  EXPECT_EQ(vpi_get_str(vpiFullName, Named(vpiVariables, defn, "r")), nullptr);
   EXPECT_EQ(vpi_get(vpiRandType, By("top")), vpiUndefined);
 }
 
