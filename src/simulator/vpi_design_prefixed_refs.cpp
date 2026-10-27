@@ -17,8 +17,8 @@
 
 namespace delta {
 
-const RtlirModule* VpiVirtualInterfaceOf(const RtlirDesign& design,
-                                         const DataType* type) {
+const ModuleDecl* VpiVirtualInterfaceOf(const RtlirDesign& design,
+                                        const DataType* type) {
   if (type == nullptr) return nullptr;
   std::string_view interface_name = type->type_name;
   if (type->kind == DataTypeKind::kNamed) {
@@ -28,8 +28,7 @@ const RtlirModule* VpiVirtualInterfaceOf(const RtlirDesign& design,
   } else if (type->kind != DataTypeKind::kVirtualInterface) {
     return nullptr;
   }
-  const auto kFound = design.all_modules.find(interface_name);
-  return kFound != design.all_modules.end() ? kFound->second : nullptr;
+  return &ElementDeclNamed(design, interface_name);
 }
 
 bool VpiIsDynamicPrefixHolderType(int type) {
@@ -84,15 +83,13 @@ VpiObject* VpiPrefixedReference(VpiObject* holder, std::string_view written,
 VpiObject* VpiVirtualInterfaceClockingBlock(
     VpiObject* holder, std::string_view written,
     const std::function<VpiObject*()>& alloc, const VpiNameKeeper& keep) {
-  const RtlirModule* iface = holder->decl_facts.vif_interface;
-  if (holder->type != vpiVirtualInterfaceVar || iface == nullptr) {
-    return nullptr;
-  }
+  const ModuleDecl* iface = holder->decl_facts.vif_interface;
+  if (iface == nullptr) return nullptr;
   const std::string_view kMember = written.substr(written.find('.') + 1);
-  if (std::ranges::none_of(iface->clocking_blocks,
-                           [kMember](const ModuleItem* declared) {
-                             return declared->name == kMember;
-                           })) {
+  if (std::ranges::none_of(iface->items, [kMember](const ModuleItem* declared) {
+        return declared->kind == ModuleItemKind::kClockingBlock &&
+               declared->name == kMember;
+      })) {
     return nullptr;
   }
   VpiObject* block = alloc();

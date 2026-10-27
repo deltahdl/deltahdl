@@ -10,24 +10,25 @@ namespace delta {
 
 class SimContext;
 struct DataType;
+struct ModuleDecl;
 struct RtlirDesign;
-struct RtlirModule;
 struct VpiObject;
 
-// §25.9: the interface a virtual interface var declared with `type` refers to
-// an instance of, as `design` declares it, which tells a clocking block the var
-// names from any other member (VpiVirtualInterfaceClockingBlock). A typedef
-// name stands for the type at the end of its chain (§6.18), whose interface the
-// design records (RtlirDesign::type_interfaces). Null for any other type, and
-// for no type.
-const RtlirModule* VpiVirtualInterfaceOf(const RtlirDesign& design,
-                                         const DataType* type);
+// §25.9: the declaration of the interface a virtual interface var declared
+// with `type` refers to an instance of, as the compilation unit of `design`
+// holds it whether or not the design instantiates the interface, which tells a
+// clocking block the var names from any other member
+// (VpiVirtualInterfaceClockingBlock). A typedef name stands for the type at the
+// end of its chain (§6.18), whose interface the design records
+// (RtlirDesign::type_interfaces). Null for any other type, and for no type.
+const ModuleDecl* VpiVirtualInterfaceOf(const RtlirDesign& design,
+                                        const DataType* type);
 
 // §37.48 details 2 and 3: `vif.cb` written in an expression, where `holder`
 // is the virtual interface var `vif` and `written` the whole dotted name it
 // heads: a clocking block whose vpiPrefix is the var, where the interface the
 // var's declaration names declares a clocking block of that name; null for
-// any other member.
+// any other member, and for a holder declared with no virtual interface type.
 VpiObject* VpiVirtualInterfaceClockingBlock(
     VpiObject* holder, std::string_view written,
     const std::function<VpiObject*()>& alloc, const VpiNameKeeper& keep);

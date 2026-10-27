@@ -387,14 +387,20 @@ TEST_F(ClockingBlocksOfARun,
   ExpectBlockPrefixedBy("wait_arg", "v");
 }
 
-// Detail 2: a member that is no clocking block, named through a virtual
-// interface var of an interface the design never instantiates, stays a
-// reference the var prefixes.
-TEST_F(ClockingBlocksOfARun, AnUninstantiatedInterfacesSignalIsARefObj) {
-  Run("interface bus(input logic clk); endinterface\n"
+// Details 2 and 3: so is one named through a virtual interface var of an
+// interface the design never instantiates, whose declaration still declares
+// the block (§25.9), while a member that is no clocking block stays a
+// reference the var prefixes (#8206).
+TEST_F(ClockingBlocksOfARun,
+       AnUninstantiatedInterfacesClockingBlockHasPrefixAndActual) {
+  Run("interface bus(input logic clk);\n"
+      "  clocking cb @(posedge clk); endclocking\n"
+      "endinterface\n"
       "module top; virtual bus vif;\n"
+      "  task wait_block; @(vif.cb); endtask\n"
       "  task wait_signal; @(vif.clk); endtask\n"
       "endmodule\n");
+  ExpectBlockPrefixedBy("wait_block", "vif");
   vpiHandle control = ControlOf("wait_signal");
   ASSERT_NE(control, nullptr);
   vpiHandle signal = vpi_handle(vpiCondition, control);
