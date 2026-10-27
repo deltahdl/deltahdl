@@ -53,11 +53,21 @@ const char* VpiCheckCallbackPlacement(const s_cb_data& data,
            "while VPI functionality is restricted";
   }
 
+  // §38.36.1: the obj field holds the object a simulation event callback is
+  // for, and a NULL one has a meaning for a force or release callback alone,
+  // every force or release. A value or size change callback placed on no object
+  // names nothing whose value or size could change, so the registration is
+  // refused rather than called back for every object's change.
+  if ((data.reason == cbValueChange || data.reason == cbSizeChange) &&
+      data.obj == nullptr) {
+    return "vpi_register_cb(): a cbValueChange or cbSizeChange callback must "
+           "be placed on an object";
+  }
+
   // §37.43 detail 2: it is illegal to place a value change callback on an
   // automatic variable - automatic storage exists only while its frame is
   // active, so there is no persistent object to watch. Reject the registration.
-  if (data.reason == cbValueChange && data.obj &&
-      VpiObjectOf(data.obj)->automatic) {
+  if (data.reason == cbValueChange && VpiObjectOf(data.obj)->automatic) {
     return "vpi_register_cb(): a value change callback may not be placed on an "
            "automatic variable";
   }
@@ -259,9 +269,8 @@ void WatchStrengthIfAsked(const s_cb_data& data) {
 // NoteStmtExecuting is told of: a cbStmt, or a cbValueChange placed on an
 // event statement.
 bool IsCalledAsAStatementRuns(const s_cb_data& data) {
-  return data.reason == cbStmt ||
-         (data.reason == cbValueChange && data.obj != nullptr &&
-          VpiObjectOf(data.obj)->type == vpiEventStmt);
+  return data.reason == cbStmt || (data.reason == cbValueChange &&
+                                   VpiObjectOf(data.obj)->type == vpiEventStmt);
 }
 
 }  // namespace
@@ -306,8 +315,7 @@ VpiHandle VpiContext::RegisterCb(s_cb_data* data) {
       VpiObjectOf(data->obj)->callback == nullptr) {
     VpiObjectOf(data->obj)->callback = cb_obj;
   }
-  if ((data->reason == cbValueChange || data->reason == cbSizeChange) &&
-      data->obj != nullptr) {
+  if (data->reason == cbValueChange || data->reason == cbSizeChange) {
     WatchStrengthIfAsked(*data);
     WatchObjectChanges(*this, VpiObjectOf(data->obj));
     VpiWatchContAssignChanges(*this, VpiObjectOf(data->obj), sim_ctx_);
@@ -493,7 +501,7 @@ void VpiNormalizeSimEventCbData(s_cb_data& data) {
   // refers to is identified through vpiObjId instead). In either case the
   // routine sees value = NULL rather than the format requested at registration.
   // A cbValueChange on an ordinary object keeps its value field.
-  if (data.reason == cbValueChange && data.obj != nullptr &&
+  if (data.reason == cbValueChange &&
       (VpiObjectOf(data.obj)->type == vpiEventStmt ||
        VpiObjectOf(data.obj)->type == vpiNamedEvent ||
        VpiObjectOf(data.obj)->type == vpiClassVar)) {
@@ -617,10 +625,7 @@ void FillEventValue(s_cb_data& data, s_vpi_value& value, VpiContext& ctx,
     data.value = nullptr;
     return;
   }
-  if (data.value == nullptr || data.value->format == vpiSuppressVal ||
-      obj == nullptr) {
-    return;
-  }
+  if (data.value == nullptr || data.value->format == vpiSuppressVal) return;
   value.format = data.value->format;
   if (data.reason == cbSizeChange) {
     value.format = vpiIntVal;
@@ -645,7 +650,7 @@ void VpiFillSimEventCbData(s_cb_data& data, s_vpi_time& time,
     data.time = &time;
   }
   FillEventValue(data, value, ctx, obj);
-  if (data.reason == cbValueChange && obj != nullptr) {
+  if (data.reason == cbValueChange) {
     data.index = VpiVariableIsArrayMember(obj) ? obj->index : 0;
   }
 }

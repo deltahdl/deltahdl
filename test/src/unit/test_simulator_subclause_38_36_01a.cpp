@@ -21,11 +21,12 @@ namespace delta {
 namespace {
 
 // §38.36.1 covers the simulation-event callback reasons registered through
-// vpi_register_cb(). The single registration-time rule this subclause's text
-// states - distinct from the firing semantics of the individual reasons - is
-// that a cbForce, cbRelease, or cbDisable callback may not be placed on a
-// variable bit-select. These tests observe vpi_register_cb() applying that
-// rule.
+// vpi_register_cb(). Two registration-time rules follow from this subclause's
+// text - distinct from the firing semantics of the individual reasons: a
+// cbForce, cbRelease, or cbDisable callback may not be placed on a variable
+// bit-select, and a callback about one object's change of value or size is
+// placed on an object, the obj field holding NULL with a meaning for a force
+// or release alone. These tests observe vpi_register_cb() applying both rules.
 class VpiSimEventCb : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
@@ -85,6 +86,33 @@ TEST_F(VpiSimEventCb, DisableCallbackOnBitSelectRejected) {
   s_cb_data cb = {};
   cb.reason = cbDisable;
   cb.obj = bit;
+  EXPECT_EQ(vpi_register_cb(&cb), nullptr);
+
+  s_vpi_error_info info = {};
+  EXPECT_EQ(vpi_chk_error(&info), vpiError);
+}
+
+// §38.36.1: the obj field holds the object a callback is for, and a NULL one
+// means something for a force or release callback alone. A value change
+// callback placed on no object names nothing whose value could change, so
+// vpi_register_cb() refuses it and reports why.
+TEST_F(VpiSimEventCb, ValueChangeCallbackOnNoObjectRejected) {
+  s_cb_data cb = {};
+  cb.reason = cbValueChange;
+  EXPECT_EQ(vpi_register_cb(&cb), nullptr);
+
+  s_vpi_error_info info = {};
+  EXPECT_EQ(vpi_chk_error(&info), vpiError);
+  EXPECT_STREQ(info.message,
+               "vpi_register_cb(): a cbValueChange or cbSizeChange callback "
+               "must be placed on an object");
+}
+
+// §38.36.1: so is a size change callback placed on no object, which names no
+// array, queue or string whose size could change.
+TEST_F(VpiSimEventCb, SizeChangeCallbackOnNoObjectRejected) {
+  s_cb_data cb = {};
+  cb.reason = cbSizeChange;
   EXPECT_EQ(vpi_register_cb(&cb), nullptr);
 
   s_vpi_error_info info = {};
@@ -166,6 +194,7 @@ class VpiSimEventCbDelivery : public ::testing::Test {
     g_delivered_value = nullptr;
     g_delivered_user_data = nullptr;
     g_delivered_obj = nullptr;
+    watched_.type = vpiReg;
     SetGlobalVpiContext(&vpi_ctx_);
   }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
@@ -176,6 +205,9 @@ class VpiSimEventCbDelivery : public ::testing::Test {
   DiagEngine diag_{mgr_};
   SimContext sim_ctx_{scheduler_, arena_, diag_};
   VpiContext vpi_ctx_;
+  // A variable to place a value change callback on where the case is about
+  // the delivery rather than the object.
+  VpiObject watched_;
 };
 
 // §38.36.1: a cbReclaimObj callback has no relationship to simulation time, so
@@ -229,6 +261,7 @@ TEST_F(VpiSimEventCbDelivery, ValueChangeCallbackKeepsRequestedTime) {
   s_cb_data cb = {};
   cb.reason = cbValueChange;
   cb.cb_rtn = &RecordDelivery;
+  cb.obj = VpiHandleOf(&watched_);
   cb.time = &requested;
   ASSERT_NE(vpi_register_cb(&cb), nullptr);
 
@@ -249,6 +282,7 @@ TEST_F(VpiSimEventCbDelivery,
   s_cb_data cb = {};
   cb.reason = cbValueChange;
   cb.cb_rtn = &RecordDelivery;
+  cb.obj = VpiHandleOf(&watched_);
   cb.user_data = reinterpret_cast<PLI_BYTE8*>(&payload);
   ASSERT_NE(vpi_register_cb(&cb), nullptr);
 
@@ -394,6 +428,7 @@ TEST_F(VpiSimEventCbDelivery, ValueChangeOnNamedEventDeliversNullValue) {
   s_cb_data cb = {};
   cb.reason = cbValueChange;
   cb.cb_rtn = &RecordDelivery;
+  cb.obj = VpiHandleOf(&named_event);
   cb.value = &requested;
   ASSERT_NE(vpi_register_cb(&cb), nullptr);
 
@@ -413,6 +448,7 @@ TEST_F(VpiSimEventCbDelivery, ValueChangeOnEventStatementDeliversNullValue) {
   s_cb_data cb = {};
   cb.reason = cbValueChange;
   cb.cb_rtn = &RecordDelivery;
+  cb.obj = VpiHandleOf(&event_stmt);
   cb.value = &requested;
   ASSERT_NE(vpi_register_cb(&cb), nullptr);
 
@@ -434,6 +470,7 @@ TEST_F(VpiSimEventCbDelivery, ValueChangeOnClassVarDeliversNullValue) {
   s_cb_data cb = {};
   cb.reason = cbValueChange;
   cb.cb_rtn = &RecordDelivery;
+  cb.obj = VpiHandleOf(&class_var);
   cb.value = &requested;
   ASSERT_NE(vpi_register_cb(&cb), nullptr);
 
@@ -457,6 +494,7 @@ TEST_F(VpiSimEventCbDelivery, ValueChangeOnOrdinaryVariableKeepsValue) {
   s_cb_data cb = {};
   cb.reason = cbValueChange;
   cb.cb_rtn = &RecordDelivery;
+  cb.obj = var;
   cb.value = &requested;
   ASSERT_NE(vpi_register_cb(&cb), nullptr);
 

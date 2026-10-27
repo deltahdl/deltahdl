@@ -8,6 +8,7 @@
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_internal.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 // §38.39 vpi_remove_cb(): removes a simulation-related callback that was
@@ -36,6 +37,7 @@ class VpiRemoveCbSim : public ::testing::Test {
   void SetUp() override {
     g_38_39_fired = 0;
     g_38_39_fired_other = 0;
+    watched_.type = vpiReg;
     SetGlobalVpiContext(&vpi_ctx_);
   }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
@@ -46,6 +48,8 @@ class VpiRemoveCbSim : public ::testing::Test {
   DiagEngine diag_{mgr_};
   SimContext sim_ctx_{scheduler_, arena_, diag_};
   VpiContext vpi_ctx_;
+  // The variable the value change callbacks removed here are placed on.
+  VpiObject watched_;
 };
 
 // §38.39: vpi_remove_cb() shall remove a callback registered with
@@ -55,6 +59,7 @@ TEST_F(VpiRemoveCbSim, RemovesRegisteredCallbackAndReturnsOne) {
   s_cb_data cb = {};
   cb.reason = cbValueChange;
   cb.cb_rtn = &CountingCb;
+  cb.obj = VpiHandleOf(&watched_);
   vpiHandle h = vpi_register_cb(&cb);
   ASSERT_NE(h, nullptr);
 
@@ -76,12 +81,14 @@ TEST_F(VpiRemoveCbSim, RemovesOnlyTheTargetedCallback) {
   s_cb_data cb_a = {};
   cb_a.reason = cbValueChange;
   cb_a.cb_rtn = &CountingCb;
+  cb_a.obj = VpiHandleOf(&watched_);
   vpiHandle ha = vpi_register_cb(&cb_a);
   ASSERT_NE(ha, nullptr);
 
   s_cb_data cb_b = {};
   cb_b.reason = cbValueChange;
   cb_b.cb_rtn = &OtherCountingCb;
+  cb_b.obj = VpiHandleOf(&watched_);
   vpiHandle hb = vpi_register_cb(&cb_b);
   ASSERT_NE(hb, nullptr);
 
@@ -132,6 +139,7 @@ TEST_F(VpiRemoveCbSim, ASystfHandleIsNotRemoved) {
   s_cb_data cb = {};
   cb.reason = cbValueChange;
   cb.cb_rtn = &CountingCb;
+  cb.obj = VpiHandleOf(&watched_);
   ASSERT_NE(vpi_register_cb(&cb), nullptr);
   s_vpi_systf_data task = {};
   task.type = vpiSysTask;

@@ -70,8 +70,11 @@ TEST_F(VpiCallbackSim, RegisterCbStmt) {
 }
 
 TEST_F(VpiCallbackSim, RemoveCbMarksRemoved) {
+  VpiObject watched;
+  watched.type = vpiReg;
   s_cb_data cb = {};
   cb.reason = cbValueChange;
+  cb.obj = VpiHandleOf(&watched);
   vpiHandle h = vpi_register_cb(&cb);
   ASSERT_NE(h, nullptr);
 

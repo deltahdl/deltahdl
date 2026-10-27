@@ -109,8 +109,11 @@ TEST_F(VpiHandleReleaseSim, RestartReleasesAllButRestartCallbackHandles) {
   end.reason = cbEndOfRestart;
   auto* end_cb = vpi_ctx_.RegisterCb(&end);
 
+  VpiObject watched;
+  watched.type = vpiReg;
   s_cb_data ordinary{};
-  ordinary.reason = cbValueChange;  // obj left null - not a restart reason
+  ordinary.reason = cbValueChange;  // not a restart reason
+  ordinary.obj = VpiHandleOf(&watched);
   auto* ordinary_cb = vpi_ctx_.RegisterCb(&ordinary);
 
   auto* mod = vpi_ctx_.CreateModule("top", "top");

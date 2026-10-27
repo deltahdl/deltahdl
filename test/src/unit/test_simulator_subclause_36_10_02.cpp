@@ -11,6 +11,7 @@
 #include "simulator/vpi_data_structs.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_internal.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 // The compile-based variants of vpi_iterate, declared as vpi_compatibility.cpp
@@ -49,9 +50,12 @@ void StartupRoutine() {
   g_routine_allowed_cb_registered = vpi_register_cb(&ok) != nullptr;
 
   // ...while a callback for any other reason is refused during startup.
+  VpiObject watched;
+  watched.type = vpiReg;
   s_cb_data bad = {};
   bad.reason = cbValueChange;
   bad.cb_rtn = NoopCb;
+  bad.obj = VpiHandleOf(&watched);
   g_routine_illegal_cb_registered = vpi_register_cb(&bad) != nullptr;
 }
 
@@ -122,9 +126,12 @@ TEST_F(VpiFunctionAvailability, RegisterCbRejectsOtherReasonInStartup) {
   vpi_ctx_.SetToolPhase(VpiToolPhase::kStartup);
   size_t before = vpi_ctx_.RegisteredCallbacks().size();
 
+  VpiObject watched;
+  watched.type = vpiReg;
   s_cb_data cb = {};
   cb.reason = cbValueChange;
   cb.cb_rtn = NoopCb;
+  cb.obj = VpiHandleOf(&watched);
   EXPECT_EQ(vpi_register_cb(&cb), nullptr);
   EXPECT_EQ(vpi_ctx_.RegisteredCallbacks().size(), before);
   EXPECT_EQ(vpi_ctx_.LastError().level, vpiError);
@@ -144,9 +151,12 @@ TEST_F(VpiFunctionAvailability, RegisterCbRejectsOtherReasonInSizetfPhase) {
 // any callback reason is accepted.
 TEST_F(VpiFunctionAvailability, RegisterCbAcceptsAnyReasonInFullPhase) {
   vpi_ctx_.SetToolPhase(VpiToolPhase::kFull);
+  VpiObject watched;
+  watched.type = vpiReg;
   s_cb_data cb = {};
   cb.reason = cbValueChange;
   cb.cb_rtn = NoopCb;
+  cb.obj = VpiHandleOf(&watched);
   EXPECT_NE(vpi_register_cb(&cb), nullptr);
 }
 

@@ -36,9 +36,12 @@ class VpiGetCbInfoSim : public ::testing::Test {
 // related callback into an s_cb_data structure.
 TEST_F(VpiGetCbInfoSim, ReportsRegisteredCallbackInfo) {
   int marker = 0;
+  VpiObject watched;
+  watched.type = vpiReg;
   s_cb_data reg = {};
   reg.reason = cbValueChange;
   reg.cb_rtn = SampleCbRtn;
+  reg.obj = VpiHandleOf(&watched);
   reg.index = 7;
   reg.user_data = reinterpret_cast<PLI_BYTE8*>(&marker);
 
