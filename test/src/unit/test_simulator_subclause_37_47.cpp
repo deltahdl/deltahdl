@@ -217,31 +217,59 @@ PLI_INT32 UnwatchBitCalltf(PLI_BYTE8* /*user_data*/) {
   return 0;
 }
 
-// $watchca: place a value change callback on the first continuous assignment
-// top reaches and one on its bit at offset 3.
-PLI_INT32 WatchAssignCalltf(PLI_BYTE8* /*user_data*/) {
+// The first continuous assignment top reaches; null for none.
+vpiHandle FirstAssignOfTop() {
   vpiHandle it =
       vpi_iterate(vpiContAssign, vpi_handle_by_name(VpiText("top"), nullptr));
   vpiHandle assign = it == nullptr ? nullptr : vpi_scan(it);
-  if (assign == nullptr) return 0;
-  vpi_release_handle(it);
+  if (assign != nullptr) vpi_release_handle(it);
+  return assign;
+}
+
+// Places on `obj` a value change callback calling `routine`.
+vpiHandle PlaceValueChange(vpiHandle obj, PLI_INT32 (*routine)(p_cb_data)) {
   s_cb_data cb = {};
   cb.reason = cbValueChange;
-  cb.obj = assign;
-  cb.cb_rtn = &CountAssignChange;
-  vpi_register_cb(&cb);
+  cb.obj = obj;
+  cb.cb_rtn = routine;
+  return vpi_register_cb(&cb);
+}
+
+// $watchca: place a value change callback on the first continuous assignment
+// top reaches and one on its bit at offset 3.
+PLI_INT32 WatchAssignCalltf(PLI_BYTE8* /*user_data*/) {
+  vpiHandle assign = FirstAssignOfTop();
+  if (assign == nullptr) return 0;
+  PlaceValueChange(assign, &CountAssignChange);
   vpiHandle bits = vpi_iterate(vpiBit, assign);
   while (vpiHandle bit = bits == nullptr ? nullptr : vpi_scan(bits)) {
     if (vpi_get(vpiOffset, bit) != 3) continue;
-    cb.obj = bit;
-    cb.cb_rtn = &CountBitChange;
-    g_bit_callback = vpi_register_cb(&cb);
+    g_bit_callback = PlaceValueChange(bit, &CountBitChange);
   }
+  return 0;
+}
+
+// $watchcatwice: place two value change callbacks on the first continuous
+// assignment top reaches, each counted with the assignment's.
+PLI_INT32 WatchAssignTwiceCalltf(PLI_BYTE8* /*user_data*/) {
+  vpiHandle assign = FirstAssignOfTop();
+  if (assign == nullptr) return 0;
+  PlaceValueChange(assign, &CountAssignChange);
+  PlaceValueChange(assign, &CountAssignChange);
   return 0;
 }
 
 class ContinuousAssignmentsOfARun : public VpiDesignRun {
  protected:
+  // Registers the system task `name`, which runs `calltf`.
+  static void RegisterTask(const char* name, PLI_INT32 (*calltf)(PLI_BYTE8*)) {
+    s_vpi_systf_data data = {};
+    data.type = vpiSysTask;
+    data.tfname = VpiText(name);
+    data.calltf = calltf;
+    ASSERT_NE(vpi_register_systf(&data), nullptr);
+  }
+
   // How many objects of `type` `ref` reaches.
   static int CountOf(int type, vpiHandle ref) {
     int count = 0;
@@ -412,14 +440,8 @@ TEST_F(ContinuousAssignmentsOfARun,
 TEST_F(ContinuousAssignmentsOfARun, AVectorAssignmentHasAValueAndBits) {
   g_assign_changes = 0;
   g_bit_changes = 0;
-  s_vpi_systf_data data = {};
-  data.type = vpiSysTask;
-  data.tfname = VpiText("$watchca");
-  data.calltf = &WatchAssignCalltf;
-  ASSERT_NE(vpi_register_systf(&data), nullptr);
-  data.tfname = VpiText("$unwatchbit");
-  data.calltf = &UnwatchBitCalltf;
-  ASSERT_NE(vpi_register_systf(&data), nullptr);
+  RegisterTask("$watchca", &WatchAssignCalltf);
+  RegisterTask("$unwatchbit", &UnwatchBitCalltf);
   Run(kVectorAssignment);
   vpiHandle assign = AssignStatementOfTop();
   ASSERT_NE(assign, nullptr);
@@ -477,6 +499,40 @@ TEST_F(ContinuousAssignmentsOfARun, AnAssignmentsValueHasItsLeftSidesWidth) {
     if (kOffset >= 4) high |= IntValueOf(bit) << (kOffset - 4);
   }
   EXPECT_EQ(high, 1);
+}
+
+// §37.47 detail 2 with §38.36.1: a second value change callback placed on an
+// assignment already watched is called back along with the first as the
+// assignment's value changes, each once per change, and neither for a write
+// that leaves the value as it was.
+TEST_F(ContinuousAssignmentsOfARun, TwoCallbacksOnOneAssignmentEachCalledOnce) {
+  g_assign_changes = 0;
+  RegisterTask("$watchcatwice", &WatchAssignTwiceCalltf);
+  Run("module top; logic [3:0] a; wire [3:0] y;\n"
+      "  assign y = ~a;\n"
+      "  initial begin\n"
+      "    a = 4'b0000; $watchcatwice;\n"
+      "    #5 a = 4'b0011; #5 a = 4'b0011;\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_EQ(g_assign_changes, 2);
+}
+
+// §37.47 detail 2: an assignment of an enumeration's constant reads no net or
+// variable, so its value is the constant's throughout, and a value change
+// callback placed on it is never called back while another variable changes.
+TEST_F(ContinuousAssignmentsOfARun, AnAssignmentOfAConstantIsNeverCalledBack) {
+  g_assign_changes = 0;
+  RegisterTask("$watchca", &WatchAssignCalltf);
+  Run("module top; typedef enum logic [1:0] {A, B, C} e_t;\n"
+      "  logic [1:0] a; wire [1:0] y;\n"
+      "  assign y = C;\n"
+      "  initial begin a = 2'b00; $watchca; #5 a = 2'b11; end\n"
+      "endmodule\n");
+  vpiHandle assign = FirstAssignOfTop();
+  ASSERT_NE(assign, nullptr);
+  EXPECT_EQ(IntValueOf(assign), 2);
+  EXPECT_EQ(g_assign_changes, 0);
 }
 
 }  // namespace

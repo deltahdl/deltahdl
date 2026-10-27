@@ -38,7 +38,8 @@ Logic4Vec VpiEvaluateExpressionObject(const VpiObject& obj, SimContext& sim) {
 namespace {
 
 // The aval and bval words of the value of `obj` now: the whole assignment's,
-// or a cont assign bit's one bit of it.
+// or a cont assign bit's one bit of it. A bit lies below the width of the left
+// side, which the value is evaluated at, so the word holding it is there.
 std::vector<uint64_t> ValueBitsNow(const VpiObject& obj, SimContext& sim) {
   const Logic4Vec kValue = VpiEvaluateExpressionObject(obj, sim);
   std::vector<uint64_t> bits;
@@ -50,10 +51,8 @@ std::vector<uint64_t> ValueBitsNow(const VpiObject& obj, SimContext& sim) {
     return bits;
   }
   const auto kBit = static_cast<uint32_t>(obj.bit_offset);
-  if (kBit / 64 < kValue.nwords) {
-    bits.push_back((kValue.words[kBit / 64].aval >> (kBit % 64)) & 1);
-    bits.push_back((kValue.words[kBit / 64].bval >> (kBit % 64)) & 1);
-  }
+  bits.push_back((kValue.words[kBit / 64].aval >> (kBit % 64)) & 1);
+  bits.push_back((kValue.words[kBit / 64].bval >> (kBit % 64)) & 1);
   return bits;
 }
 
@@ -71,12 +70,12 @@ void CollectReadStorage(const VpiObject* expr, std::vector<Variable*>& out) {
   }
 }
 
-// Whether a cbValueChange registration placed on `obj` is still live.
+// Whether a cbValueChange registration placed on `obj` is still live. One
+// placed on no object is not placed on `obj`, which is never null.
 bool HasValueChangeOn(const VpiContext& vpi, const VpiObject* obj) {
   return std::ranges::any_of(
       vpi.RegisteredCallbacks(), [obj](const s_cb_data& cb) {
-        return cb.reason == cbValueChange && cb.obj != nullptr &&
-               VpiObjectOf(cb.obj) == obj;
+        return cb.reason == cbValueChange && VpiObjectOf(cb.obj) == obj;
       });
 }
 
@@ -84,8 +83,8 @@ bool HasValueChangeOn(const VpiContext& vpi, const VpiObject* obj) {
 
 void VpiWatchContAssignChanges(VpiContext& vpi, VpiObject* obj,
                                SimContext* sim) {
-  if (obj == nullptr || sim == nullptr || !VpiIsContAssignKind(obj->type) ||
-      obj->expr_scope == nullptr || obj->value_change_watched) {
+  if (sim == nullptr || !VpiIsContAssignKind(obj->type) ||
+      obj->value_change_watched) {
     return;
   }
   obj->value_change_watched = true;
