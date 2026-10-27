@@ -17,6 +17,7 @@
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_primitive_value.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -120,6 +121,37 @@ TEST_F(PrimitivePrimTerm, IndexTransitionIsNullWhenNotAnArrayElement) {
   standalone.children.push_back(&stray_expr);
 
   EXPECT_EQ(vpi_handle(vpiIndex, VpiHandleOf(&standalone)), nullptr);
+}
+
+// §37.35: a primitive's value is that of the expression its first prim term
+// that is no input connects, passing over an input term and any child that is
+// no prim term ahead of it, and a prim term's is that of the expression it
+// connects; a term connecting none has none.
+TEST_F(PrimitivePrimTerm, AValueIsThatOfTheDrivenTermsExpression) {
+  VpiObject a;
+  a.type = vpiNet;
+  VpiObject y;
+  y.type = vpiNet;
+  VpiObject in;
+  in.type = vpiPrimTerm;
+  in.direction = vpiInput;
+  in.children.push_back(&a);
+  VpiObject other;
+  other.type = vpiConstant;
+  VpiObject out;
+  out.type = vpiPrimTerm;
+  out.direction = vpiOutput;
+  out.children.push_back(&y);
+  VpiObject gate;
+  gate.type = vpiGate;
+  gate.children = {&in, &other, &out};
+  EXPECT_EQ(VpiPrimitiveValueSource(&gate), &y);
+  EXPECT_EQ(VpiPrimitiveValueSource(&in), &a);
+
+  VpiObject unconnected;
+  unconnected.type = vpiPrimTerm;
+  unconnected.direction = vpiInput;
+  EXPECT_EQ(VpiPrimitiveValueSource(&unconnected), nullptr);
 }
 
 // D2: vpi_put_value() applied to a primitive that is not a sequential UDP - a
@@ -655,7 +687,8 @@ TEST_F(PrimitivesOfARun, AnArrayElementReportsTheArraysDelays) {
 // becomes its state and its output at once, so the row that holds the output
 // (en low) holds the value put when an input moves after it. A put with a
 // scheduled delay is refused, and one in a format giving no bit writes
-// nothing (#7137).
+// nothing (#7137). An x put is the state x, and a put with no value at all
+// writes nothing either.
 class SequentialUdpPuts : public PrimitivesOfARun {
  protected:
   void SetUp() override {
@@ -716,6 +749,16 @@ TEST_F(SequentialUdpPuts, APutBecomesTheUdpsState) {
 
   vpi_put_value(u1, &zero, nullptr, vpiNoDelay);
   EXPECT_EQ(IntValueOf(By("top.q")), 0);
+
+  s_vpi_value unknown = {};
+  unknown.format = vpiScalarVal;
+  unknown.value.scalar = vpiX;
+  vpi_put_value(u1, &unknown, nullptr, vpiNoDelay);
+  vpi_put_value(u1, nullptr, nullptr, vpiNoDelay);
+  s_vpi_value q = {};
+  q.format = vpiScalarVal;
+  vpi_get_value(By("top.q"), &q);
+  EXPECT_EQ(q.value.scalar, vpiX);
 }
 
 // ...and so does one put to an element of an instance array of them, a
