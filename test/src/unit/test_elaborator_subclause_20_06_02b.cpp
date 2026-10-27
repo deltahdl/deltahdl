@@ -36,9 +36,10 @@ TEST(BitsOfDeclaration, QueueTypedefNameIsLeftToTheRun) {
 }
 
 // §20.6.2 (printed page 629): $bits answers at elaboration only on an
-// expression of fixed size, so $bits of a queue, a dynamic array or an
-// associative array variable is no constant expression and cannot initialize
-// a localparam (§6.20.4); $bits of a fixed-size array can.
+// expression of fixed size, so $bits of a queue, a dynamic array, an
+// associative array or a string variable (§6.16) is no constant expression
+// and cannot initialize a localparam (§6.20.4); $bits of a fixed-size array
+// can.
 TEST(BitsOfDeclaration, BitsOfADynamicallySizedVariableIsNoConstant) {
   ElabFixture f;
   ElaborateSrc(
@@ -46,29 +47,35 @@ TEST(BitsOfDeclaration, BitsOfADynamicallySizedVariableIsNoConstant) {
       "  logic [7:0] q[$];\n"
       "  logic [7:0] d[];\n"
       "  logic [7:0] a[int];\n"
+      "  string t;\n"
       "  logic [7:0] s[4];\n"
       "  localparam int BQ = $bits(q);\n"
       "  localparam int BD = $bits(d);\n"
       "  localparam int BA = $bits(a);\n"
+      "  localparam int BT = $bits(t);\n"
       "  localparam int BS = $bits(s);\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "localparam 'BQ' initializer is not a constant "
                             "expression",
-                            6, "6.20.4"));
+                            7, "6.20.4"));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "localparam 'BD' initializer is not a constant "
                             "expression",
-                            7, "6.20.4"));
+                            8, "6.20.4"));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "localparam 'BA' initializer is not a constant "
                             "expression",
-                            8, "6.20.4"));
+                            9, "6.20.4"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "localparam 'BT' initializer is not a constant "
+                            "expression",
+                            10, "6.20.4"));
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
                              "localparam 'BS' initializer is not a constant "
                              "expression",
-                             9, "6.20.4"));
+                             11, "6.20.4"));
 }
 
 // §11.4.3 (printed page 275): an addition carries out of bit 63 into the

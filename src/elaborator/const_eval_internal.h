@@ -384,10 +384,11 @@ uint32_t RegisteredTypeWidth(const DataType& type, const ScopeMap& scope);
 // the argument's dimensions are not known here or the answer would be 'x.
 // Defined in const_eval_array_query.cpp.
 bool IsArrayQueryFunction(std::string_view name);
-// §20.7: whether `arg` names a parameter or a variable of the registered
-// module with a dynamic, queue or associative dimension, on which an array
-// query is no constant expression.
-bool HasDynamicDimension(const Expr* arg);
+// §20.6.2 and §20.7: whether `arg` names a parameter or a variable of the
+// registered module with a dynamic, queue or associative dimension, or a
+// string variable (§6.16), whose size only the run fixes, so that $bits or an
+// array query on it is no constant expression.
+bool IsDynamicallySized(const Expr* arg);
 // §7.4.2: the bounds an unpacked dimension declares, `[l:r]` as written and
 // `[size]` as `[0:size-1]`, folded in `scope`; empty where they do not fold.
 // Defined in const_eval_array_query.cpp.

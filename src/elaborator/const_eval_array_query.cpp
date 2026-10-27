@@ -224,7 +224,7 @@ std::optional<RtlirUnpackedDim> FoldUnpackedDimBounds(const Expr* dim,
   return RtlirUnpackedDim{0, *sv - 1};
 }
 
-bool HasDynamicDimension(const Expr* arg) {
+bool IsDynamicallySized(const Expr* arg) {
   if (arg == nullptr || arg->kind != ExprKind::kIdentifier) return false;
   if (const RtlirParamDecl* param = RegisteredParamNamed(arg->text)) {
     if (param->unpacked_dims == nullptr) return false;
@@ -237,7 +237,7 @@ bool HasDynamicDimension(const Expr* arg) {
   if (mod == nullptr) return false;
   return std::ranges::any_of(mod->variables, [&](const RtlirVariable& var) {
     return var.name == arg->text &&
-           (var.is_dynamic || var.is_queue || var.is_assoc);
+           (var.is_dynamic || var.is_queue || var.is_assoc || var.is_string);
   });
 }
 
