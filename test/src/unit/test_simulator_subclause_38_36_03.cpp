@@ -191,14 +191,14 @@ TEST_F(VpiActionFeatureCallbacks, ARaisedSignalCallsOnlyItsOwnCallbacks) {
   s_cb_data asked = {};
   asked.reason = cbSignal;
   asked.cb_rtn = &RecordingCb;
-  asked.index = SIGUSR1;
+  asked.index = SIGINT;
   vpiHandle own = vpi_register_cb(&asked);
-  asked.index = SIGHUP;
+  asked.index = SIGILL;
   vpiHandle other = vpi_register_cb(&asked);
-  asked.index = SIGUSR1;
+  asked.index = SIGINT;
   asked.cb_rtn = nullptr;
   vpiHandle routineless = vpi_register_cb(&asked);
-  std::raise(SIGUSR1);
+  std::raise(SIGINT);
   EXPECT_EQ(vpi_ctx_.DeliverRaisedSignals(), 1);
   EXPECT_EQ(g_invocations, 1);
   EXPECT_EQ(g_seen_reason, cbSignal);
@@ -604,15 +604,17 @@ TEST(VpiSignalTraps, ASignalIsTrappedWhileAskedFor) {
 }
 
 // §38.36.3: no trap is set for a number past the last signal one can record,
-// nor for a signal the platform lets no handler catch (SIGKILL), and
-// releasing a signal never trapped changes nothing: none of them is recorded
-// as raised.
+// nor for a signal no process may catch, and releasing a signal never trapped
+// changes nothing: none of them is recorded as raised. The uncatchable signal
+// is 9, the number POSIX's kill utility gives SIGKILL; <csignal> names only
+// the signals the C standard defines.
 TEST(VpiSignalTraps, ASignalNoTrapCanHoldIsLeftAlone) {
+  constexpr int kUncatchable = 9;
   VpiTrapSignal(65);
-  VpiTrapSignal(SIGKILL);
+  VpiTrapSignal(kUncatchable);
   VpiReleaseSignal(65, {});
-  VpiReleaseSignal(SIGKILL, {});
-  VpiReleaseSignal(SIGUSR2, {});
+  VpiReleaseSignal(kUncatchable, {});
+  VpiReleaseSignal(SIGSEGV, {});
   EXPECT_TRUE(VpiTakeRaisedSignals().empty());
 }
 
@@ -620,32 +622,32 @@ TEST(VpiSignalTraps, ASignalNoTrapCanHoldIsLeftAlone) {
 }  // namespace delta
 
 extern "C" {
-// Whether SIGUSR2 has reached the handler the case below installs ahead of
+// Whether SIGABRT has reached the handler the case below installs ahead of
 // the trap.
-static volatile std::sig_atomic_t g_user2_handled = 0;
-static void CountUser2(int /*signal*/) { g_user2_handled = 1; }
+static volatile std::sig_atomic_t g_abort_handled = 0;
+static void NoteAbort(int /*signal*/) { g_abort_handled = 1; }
 }
 
 namespace delta {
 namespace {
 
 // §38.36.3: a cbSignal asking for another signal keeps no trap, so releasing
-// SIGUSR2 while one asks for SIGUSR1 hands SIGUSR2 back to the handler it had
-// before it was trapped, which the next SIGUSR2 reaches in place of the trap.
+// SIGABRT while one asks for SIGILL hands SIGABRT back to the handler it had
+// before it was trapped, which the next SIGABRT reaches in place of the trap.
 TEST(VpiSignalTraps, ReleasingASignalRestoresItsEarlierHandler) {
-  std::signal(SIGUSR2, &CountUser2);
-  VpiTrapSignal(SIGUSR2);
-  std::raise(SIGUSR2);
-  EXPECT_EQ(VpiTakeRaisedSignals(), std::vector<int>{SIGUSR2});
-  EXPECT_EQ(g_user2_handled, 0);
+  std::signal(SIGABRT, &NoteAbort);
+  VpiTrapSignal(SIGABRT);
+  std::raise(SIGABRT);
+  EXPECT_EQ(VpiTakeRaisedSignals(), std::vector<int>{SIGABRT});
+  EXPECT_EQ(g_abort_handled, 0);
   std::vector<s_cb_data> asked(1);
   asked[0].reason = cbSignal;
-  asked[0].index = SIGUSR1;
-  VpiReleaseSignal(SIGUSR2, asked);
-  std::raise(SIGUSR2);
-  EXPECT_EQ(g_user2_handled, 1);
+  asked[0].index = SIGILL;
+  VpiReleaseSignal(SIGABRT, asked);
+  std::raise(SIGABRT);
+  EXPECT_EQ(g_abort_handled, 1);
   EXPECT_TRUE(VpiTakeRaisedSignals().empty());
-  std::signal(SIGUSR2, SIG_DFL);
+  std::signal(SIGABRT, SIG_DFL);
 }
 
 }  // namespace
