@@ -273,9 +273,13 @@ int VpiGetTypeRestricted(int property, VpiHandle obj, bool& handled) {
     case vpiVector:
       return VpiGetScalarOrVector(property, obj);
     // §37.17 detail 21 and §37.25: an array var's or array typespec's kind of
-    // array; zero for any other.
+    // array. No other object carries the property, an array net (§37.16)
+    // among them, and 0 is none of its values, so §38.6 has any other answer
+    // vpiUndefined.
     case vpiArrayType:
-      return obj->array_type;
+      return VpiIsArrayVarType(obj->type) || obj->type == vpiArrayTypespec
+                 ? obj->array_type
+                 : vpiUndefined;
     // §37.25 and §37.17 details 15, 16 and 22: whether a typespec member or a
     // variable is rand or randc, and whether a random variable is active.
     case vpiRandType:

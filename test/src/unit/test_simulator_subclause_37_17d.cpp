@@ -126,6 +126,17 @@ TEST_F(VariablesOfARun, AVariableReportsItsRandomization) {
   EXPECT_EQ(vpi_get(vpiRandType, By("top")), vpiUndefined);
 }
 
+// D21 with §37.16 and §38.6: an array var reports its kind of array, and an
+// array net and a logic var, neither of which carries vpiArrayType, answer
+// vpiUndefined (#8191).
+TEST_F(VariablesOfARun, OnlyAnArrayVarHasAnArrayType) {
+  Run("module top; int q[$]; wire w[2]; logic l; endmodule\n");
+  EXPECT_EQ(vpi_get(vpiArrayType, By("top.q")), vpiQueueArray);
+  ASSERT_EQ(vpi_get(vpiType, By("top.w")), vpiArrayNet);
+  EXPECT_EQ(vpi_get(vpiArrayType, By("top.w")), vpiUndefined);
+  EXPECT_EQ(vpi_get(vpiArrayType, By("top.l")), vpiUndefined);
+}
+
 // D16, D25 and D28 read off objects standing in no design. A static random
 // property of an object with no class type keeps its rand_mode() state with
 // the object, here off. A variable with no parent is full-named and
