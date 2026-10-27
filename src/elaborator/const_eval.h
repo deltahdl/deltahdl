@@ -282,6 +282,12 @@ bool IsConstantExpr(const Expr* expr, const ScopeMap& scope);
 // invoke per §13.4.3 constraint (g).
 bool IsConstantSysFunc(std::string_view name);
 
+// §20.6.2 and §20.7: whether the system function call `call` is a constant
+// expression whatever its arguments are -- $bits, $typename, or an array
+// query on an argument whose dimensions are fixed -- since it answers from
+// the type of what it is called on and reads no value of it.
+bool IsConstantWhateverItsArguments(const Expr* call);
+
 // §5.13 with §7.12, §6.16 and §6.19.5: the member access a built-in method
 // call is written through, `q.size()` or, the parentheses dropped, `q.size`;
 // null for any other expression. Defined in const_eval_builtin_method.cpp.

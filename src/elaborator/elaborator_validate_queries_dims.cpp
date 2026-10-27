@@ -257,6 +257,10 @@ bool ExprNamesSignal(const Expr* e,
                      const std::unordered_set<std::string_view>& signals) {
   if (!e) return false;
   if (e->kind == ExprKind::kIdentifier) return signals.count(e->text) > 0;
+  // §20.6.2 and §20.7: $bits, or an array query of fixed dimensions, reads no
+  // value of what it is called on, so a signal there is no read of it.
+  if (e->kind == ExprKind::kSystemCall && IsConstantWhateverItsArguments(e))
+    return false;
   if (ScalarChildNamesSignal(e, signals)) return true;
   for (const auto* a : e->args)
     if (ExprNamesSignal(a, signals)) return true;

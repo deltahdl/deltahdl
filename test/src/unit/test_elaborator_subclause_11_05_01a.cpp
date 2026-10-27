@@ -212,6 +212,47 @@ TEST(SelectElaboration, NonIndexedPartSelectBoundsMustBeConstant) {
                             5, "11.5.1"));
 }
 
+// §20.6.2 and §20.7: $bits of a signal, and an array query of an array of fixed
+// dimensions, answer from the type of what they are called on and read none of
+// its value, so a bound written with them is a constant expression.
+TEST(SelectElaboration, PartSelectBoundsMayQueryASignal) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  logic [3:0] b;\n"
+      "  logic [7:0] m [4];\n"
+      "  logic [15:0] data;\n"
+      "  logic [3:0] y, z;\n"
+      "  assign y = data[$bits(b)-1:0];\n"
+      "  assign z = data[$size(m)+3:$size(m)];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// A signal a bound reads beside such a query, or through a system function
+// that reads its value, is still no constant.
+TEST(SelectElaboration, PartSelectBoundReadingASignalBesideAQueryIsNot) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  logic [3:0] b;\n"
+      "  integer w;\n"
+      "  logic [15:0] data;\n"
+      "  logic [7:0] y, z;\n"
+      "  assign y = data[$bits(b)+w:0];\n"
+      "  assign z = data[$clog2(w):0];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "non-indexed part-select bounds shall be constant",
+                            6, "11.5.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "non-indexed part-select bounds shall be constant",
+                            7, "11.5.1"));
+}
+
 TEST(SelectElaboration, PartSelectReversedOrderError) {
   ElabFixture f;
   ElaborateSrc(

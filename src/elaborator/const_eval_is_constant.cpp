@@ -96,15 +96,19 @@ static bool IsConstEvenWithNonConstArgs(std::string_view name) {
   return kFuncs.count(name) > 0;
 }
 
-static bool IsConstantSysCallExpr(const Expr* expr, const ScopeMap& scope) {
-  if (!IsConstantSysFunc(expr->callee)) return false;
+bool IsConstantWhateverItsArguments(const Expr* call) {
+  if (!IsConstEvenWithNonConstArgs(call->callee)) return false;
   // §20.7: an array query is a constant expression only on an argument whose
   // dimensions are fixed.
-  if (IsArrayQueryFunction(expr->callee) && !expr->args.empty() &&
-      HasDynamicDimension(expr->args[0])) {
-    return false;
+  return !(IsArrayQueryFunction(call->callee) && !call->args.empty() &&
+           HasDynamicDimension(call->args[0]));
+}
+
+static bool IsConstantSysCallExpr(const Expr* expr, const ScopeMap& scope) {
+  if (!IsConstantSysFunc(expr->callee)) return false;
+  if (IsConstEvenWithNonConstArgs(expr->callee)) {
+    return IsConstantWhateverItsArguments(expr);
   }
-  if (IsConstEvenWithNonConstArgs(expr->callee)) return true;
   return AllElementsConstant(expr->args, scope);
 }
 
