@@ -2,6 +2,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <numeric>
 #include <optional>
 #include <vector>
 
@@ -115,11 +116,8 @@ int OperationWidth(const VpiObject& op, const std::vector<int>& sizes,
       return CastWidth(op) != 0 ? CastWidth(op) : sizes.front();
     case vpiConditionOp:
       return sizes.size() == 3 ? std::max(sizes[1], sizes[2]) : 0;
-    case vpiConcatOp: {
-      int sum = 0;
-      for (int size : sizes) sum += size;
-      return sum;
-    }
+    case vpiConcatOp:
+      return std::accumulate(sizes.begin(), sizes.end(), 0);
     case vpiMultiConcatOp:
       return ReplicationWidth(expr, sizes, build);
     default:

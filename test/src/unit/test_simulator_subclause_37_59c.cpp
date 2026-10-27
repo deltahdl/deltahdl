@@ -282,6 +282,35 @@ TEST_F(AssignedExpressionsOfARun, AnEqualityIsOneBit) {
   EXPECT_EQ(vpi_get(vpiSize, Rhs()), 1);
 }
 
+// A cast to a built-in type a keyword names is as wide as that type (§6.11
+// Table 6-8): byte 8 bits, shortint 16, integer 32, and longint and time 64.
+TEST_F(AssignedExpressionsOfARun, ACastIsAsWideAsTheKeywordTypeItNames) {
+  Run("module top; logic [3:0] a; logic [63:0] x;\n"
+      "  initial begin\n"
+      "    x = byte'(a); x = shortint'(a); x = integer'(a); x = longint'(a);\n"
+      "    x = time'(a);\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_EQ(PropertiesOf(vpiSize, ProcedureRightSides()),
+            (std::vector<int>{8, 16, 32, 64, 64}));
+}
+
+// A conditional is as wide as the wider of its two results (§11.6.1 Table
+// 11-21), which only its three operands tell. Neither Annex K nor Annex M
+// names an operation type for the logical equivalence a <-> b (§11.4.7), so
+// that operand has no object, the conditional has two operands, and it is
+// left unsized rather than sized from the wrong ones.
+TEST_F(AssignedExpressionsOfARun, AConditionalMissingAnOperandIsLeftUnsized) {
+  Run("module top; logic a, b, c; logic [7:0] d, x;\n"
+      "  initial x = c ? (a <-> b) : d;\n"
+      "endmodule\n");
+  const std::vector<vpiHandle> kRights = ProcedureRightSides();
+  ASSERT_EQ(kRights.size(), 1U);
+  ASSERT_EQ(vpi_get(vpiOpType, kRights[0]), vpiConditionOp);
+  EXPECT_EQ(OperandsOf(kRights[0]).size(), 2U);
+  EXPECT_EQ(vpi_get(vpiSize, kRights[0]), 0);
+}
+
 // A part select is as wide as its bounds span, and an indexed part select as
 // its width.
 TEST_F(AssignedExpressionsOfARun, PartSelectsAreSizedByTheirRanges) {
