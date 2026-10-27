@@ -89,7 +89,7 @@ TEST(ThreadModel, OriginRelationReachesTheOriginatingStatement) {
 
 // frame -- thread with §37.43 detail 4: a thread reaches the frame active in
 // it now, the innermost active frame of its call chain, passing over a frame
-// that has ended, and none when no frame is active.
+// that has ended and a thread it spawned, and none when no frame is active.
 TEST(ThreadModel, FrameRelationReachesTheActiveFrame) {
   VpiObject inner;
   inner.type = vpiFrame;
@@ -98,9 +98,12 @@ TEST(ThreadModel, FrameRelationReachesTheActiveFrame) {
   outer.active = true;
   outer.children = {&inner};
 
+  VpiObject spawned;
+  spawned.type = vpiThread;
+  spawned.active = true;
   VpiObject thread;
   thread.type = vpiThread;
-  thread.children = {&outer};
+  thread.children = {&outer, &spawned};
   EXPECT_EQ(VpiThreadFrame(&thread), &outer);
   inner.active = true;
   EXPECT_EQ(VpiThreadFrame(&thread), &inner);
@@ -112,6 +115,17 @@ TEST(ThreadModel, FrameRelationReachesTheActiveFrame) {
   bare.type = vpiThread;
   EXPECT_EQ(VpiThreadFrame(&bare), nullptr);
   EXPECT_EQ(VpiThreadFrame(nullptr), nullptr);
+}
+
+// The thread's own relations are vpiParent, vpiOrigin and vpiFrame: asked for
+// another, its resolver declines and leaves the answer as it was.
+TEST(ThreadModel, AnotherRelationIsNotTheThreadsToResolve) {
+  VpiObject thread;
+  thread.type = vpiThread;
+  VpiObject before;
+  VpiHandle out = &before;
+  EXPECT_FALSE(VpiTryResolveThreadRelation(vpiStmt, &thread, out));
+  EXPECT_EQ(out, &before);
 }
 
 // thread one-to-many thread: the iteration yields the threads this thread

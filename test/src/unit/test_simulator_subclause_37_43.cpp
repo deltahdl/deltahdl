@@ -201,6 +201,26 @@ TEST(FrameModel, AutomaticsEmptyForNullAndNone) {
   EXPECT_TRUE(VpiFrameAutomatics(nullptr).empty());
 }
 
+// The frame's own relations are vpiParent, vpiOrigin, vpiStmt and vpiThread,
+// and vpiAutomatics is iterated from a frame alone: a frame asked for another
+// relation, and an object that is no frame asked for its automatics, are
+// declined, the answer and the iterator left as they were.
+TEST(FrameModel, AnotherRelationOrObjectIsNotTheFramesToResolve) {
+  VpiObject frame;
+  frame.type = vpiFrame;
+  VpiObject before;
+  VpiHandle out = &before;
+  EXPECT_FALSE(VpiTryResolveFrameRelation(vpiScope, &frame, out));
+  EXPECT_EQ(out, &before);
+
+  VpiObject module;
+  module.type = vpiModule;
+  VpiObject iter;
+  iter.type = vpiIterator;
+  EXPECT_FALSE(VpiCollectFrameAutomatics(vpiAutomatics, &module, &iter));
+  EXPECT_TRUE(iter.children.empty());
+}
+
 // detail 4: there is at most one active frame at a time in a given thread, and
 // an application reaches it with vpi_handle(vpiFrame, NULL). Before any frame
 // is made active, that query reports none.
