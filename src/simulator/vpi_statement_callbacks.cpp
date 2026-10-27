@@ -69,8 +69,8 @@ void VpiContext::NoteForce(int reason, const Variable* var, const Stmt* stmt,
 void VpiContext::NoteDisabled(std::string_view label, std::string prefix) {
   if (!HasCallbackFor(callbacks_, cbDisable)) return;
   // §38.36.1: the named begin or fork the disable names, among the blocks of
-  // the instance it ran in.
-  if (!prefix.empty() && prefix.back() == '.') prefix.pop_back();
+  // the instance it ran in, whose prefix ends in a dot where it is not empty.
+  if (!prefix.empty()) prefix.pop_back();
   const std::string_view kLeaf = label.substr(label.rfind('.') + 1);
   for (const auto& [key, obj] : stmt_objects_) {
     if (key.second == prefix && obj->name == kLeaf &&

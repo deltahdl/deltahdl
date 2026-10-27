@@ -9,6 +9,7 @@
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/variable.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_internal.h"
@@ -273,6 +274,29 @@ TEST_F(VpiSimEventCbDelivery, ForceCallbackDeliversForceStatementHandle) {
 
   EXPECT_EQ(fired, 1);
   EXPECT_EQ(g_delivered_obj, &force_stmt);
+}
+
+// §38.36.1: a force the run reports with no statement the model holds an
+// object for still calls a cbForce placed on no object, with no statement in
+// obj and, there being no left-hand side to read, the value structure it was
+// registered with as it was.
+TEST_F(VpiSimEventCbDelivery, AForceWithNoStatementObjectStillCallsBack) {
+  s_vpi_value value = {};
+  value.format = vpiIntVal;
+  value.value.integer = 7;
+  s_cb_data cb = {};
+  cb.reason = cbForce;
+  cb.cb_rtn = &RecordDelivery;
+  cb.value = &value;
+  ASSERT_NE(vpi_register_cb(&cb), nullptr);
+
+  Variable forced{};
+  vpi_ctx_.NoteForce(cbForce, &forced, nullptr, "");
+
+  EXPECT_EQ(g_deliver_calls, 1);
+  EXPECT_EQ(g_delivered_obj, nullptr);
+  EXPECT_EQ(g_delivered_value, &value);
+  EXPECT_EQ(value.value.integer, 7);
 }
 
 // §38.36.1: the obj-is-the-statement rule covers cbRelease as well as cbForce;

@@ -260,5 +260,21 @@ TEST_F(StmtCallbacksOfARun, ACbStmtIsCalledBeforeEachStatementOfItsModule) {
                               vpiDelayControl, vpiAssignment}));
 }
 
+// §38.36.1.1: a declaration among a block's statements is no behavioral
+// statement, and the model holds no object for it, so a cbStmt placed on the
+// module is called for the block and the assignments around it alone.
+TEST_F(StmtCallbacksOfARun, ACbStmtPassesOverADeclarationInABlock) {
+  StmtsCalledBack().clear();
+  s_cb_data data = {};
+  data.reason = cbStartOfSimulation;
+  data.cb_rtn = &PlaceModuleWideCbStmt;
+  ASSERT_NE(vpi_register_cb(&data), nullptr);
+  Run("module top; int a;\n"
+      "  initial begin int x; x = 2; a = x; end\n"
+      "endmodule\n");
+  EXPECT_EQ(StmtsCalledBack(),
+            (std::vector<int>{vpiBegin, vpiAssignment, vpiAssignment}));
+}
+
 }  // namespace
 }  // namespace delta

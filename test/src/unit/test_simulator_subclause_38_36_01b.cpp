@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <vector>
 
 #include "helpers_event_callbacks.h"
@@ -107,6 +108,43 @@ TEST_F(EventCallbacksOfARun, AForceCallbackOnNoObjectIsGivenTheValue) {
   EXPECT_EQ(kReleases[0].now, 2u);
 }
 
+// §38.36.1: a cbForce placed on a variable is called for a force of that
+// variable and not for one of another: placed on b, it is called once, after
+// b is forced to 5, and not after a is forced to 9.
+TEST_F(EventCallbacksOfARun, AForceCallbackOnOneVariableSkipsAnother) {
+  Armer() = [] { PlaceEventCallback(cbForce, TopObject("top.b")); };
+  Run("module top; timeunit 1ns; timeprecision 1ns;\n"
+      "  logic [3:0] a = 0, b = 0;\n"
+      "  initial begin $arm; #1 force a = 4'd9; #1 force b = 4'd5; end\n"
+      "endmodule\n");
+  const std::vector<EventDelivery> kForces = DeliveriesOf(cbForce);
+  ASSERT_EQ(kForces.size(), 1u);
+  EXPECT_EQ(kForces[0].value, 5);
+  EXPECT_EQ(kForces[0].now, 2u);
+}
+
+// §38.36.1 with §38.36: a cbForce registered with no value structure is given
+// none, one registered in vpiSuppressVal is given its structure unread, and
+// one registered with no routine calls nothing.
+TEST_F(EventCallbacksOfARun, AForceCallbackTakesTheValueItWasRegisteredFor) {
+  Armer() = [] {
+    s_cb_data data = {};
+    data.reason = cbForce;
+    data.cb_rtn = &RecordEventDelivery;
+    ASSERT_NE(vpi_register_cb(&data), nullptr);
+    data.cb_rtn = nullptr;
+    ASSERT_NE(vpi_register_cb(&data), nullptr);
+    PlaceEventCallback(cbForce, nullptr, vpiSuppressVal);
+  };
+  Run(kForceReleaseOfA);
+  const std::vector<EventDelivery> kForces = DeliveriesOf(cbForce);
+  ASSERT_EQ(kForces.size(), 2u);
+  EXPECT_FALSE(kForces[0].has_value);
+  EXPECT_TRUE(kForces[1].has_value);
+  EXPECT_EQ(kForces[1].format, vpiSuppressVal);
+  EXPECT_EQ(kForces[1].value, 0);
+}
+
 // §38.36.1: cbAssign is called after a procedural assign and cbDeassign after
 // a deassign, each given the statement and the target's value (#7481).
 TEST_F(EventCallbacksOfARun, AssignAndDeassignCallbacksFire) {
@@ -127,6 +165,33 @@ TEST_F(EventCallbacksOfARun, AssignAndDeassignCallbacksFire) {
   EXPECT_EQ(kDeassigns[0].obj_type, vpiDeassign);
   EXPECT_EQ(kDeassigns[0].value, 1);
   EXPECT_EQ(kDeassigns[0].now, 2u);
+}
+
+// §38.36.1: a cbDisable is called after a named block containing a system task
+// is disabled, with obj that block: the named begin of each of two instances
+// of a module, found among the blocks of the instance the disable ran in, and
+// a named fork.
+TEST_F(EventCallbacksOfARun, ADisableCallbackNamesEachDisabledBlock) {
+  Armer() = [] { PlaceEventCallback(cbDisable, nullptr); };
+  Run("module child; timeunit 1ns; timeprecision 1ns;\n"
+      "  initial begin : blk #2 $display(\"blk ran on\"); end\n"
+      "  initial #1 disable blk;\n"
+      "endmodule\n"
+      "module top; timeunit 1ns; timeprecision 1ns;\n"
+      "  child a(); child b();\n"
+      "  initial $arm;\n"
+      "  initial fork : f #2 $display(\"f ran on\"); join\n"
+      "  initial #1 disable f;\n"
+      "endmodule\n");
+  std::vector<int> kinds;
+  for (const EventDelivery& d : DeliveriesOf(cbDisable)) {
+    EXPECT_EQ(d.now, 1u);
+    EXPECT_EQ(d.obj, d.obj_type == vpiNamedFork ? "f" : "blk");
+    kinds.push_back(d.obj_type);
+  }
+  std::ranges::sort(kinds);
+  EXPECT_EQ(kinds,
+            (std::vector<int>{vpiNamedBegin, vpiNamedBegin, vpiNamedFork}));
 }
 
 // §38.36.1: cbEnterThread is called each time a thread resumes execution,
