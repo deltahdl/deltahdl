@@ -198,6 +198,7 @@ TEST_F(ContinuousAssignment, TheEdgesStayDistinctAndReportNoneWhenAbsent) {
 // continuous assignment and on that assignment's bit 3 have been called back.
 int g_assign_changes = 0;
 int g_bit_changes = 0;
+vpiHandle g_assign_callback = nullptr;
 vpiHandle g_bit_callback = nullptr;
 
 PLI_INT32 CountAssignChange(p_cb_data /*data*/) {
@@ -240,7 +241,7 @@ vpiHandle PlaceValueChange(vpiHandle obj, PLI_INT32 (*routine)(p_cb_data)) {
 PLI_INT32 WatchAssignCalltf(PLI_BYTE8* /*user_data*/) {
   vpiHandle assign = FirstAssignOfTop();
   if (assign == nullptr) return 0;
-  PlaceValueChange(assign, &CountAssignChange);
+  g_assign_callback = PlaceValueChange(assign, &CountAssignChange);
   vpiHandle bits = vpi_iterate(vpiBit, assign);
   while (vpiHandle bit = bits == nullptr ? nullptr : vpi_scan(bits)) {
     if (vpi_get(vpiOffset, bit) != 3) continue;
@@ -533,6 +534,24 @@ TEST_F(ContinuousAssignmentsOfARun, AnAssignmentOfAConstantIsNeverCalledBack) {
   ASSERT_NE(assign, nullptr);
   EXPECT_EQ(IntValueOf(assign), 2);
   EXPECT_EQ(g_assign_changes, 0);
+}
+
+// §37.47 detail 2: a value change callback may be placed on an assignment of
+// an equivalence, an operator Annex M gives no operation type, so that the
+// right side is no expression object; the callback is placed all the same, and
+// the assignment's value is still the equivalence's, true for two equal bits.
+TEST_F(ContinuousAssignmentsOfARun,
+       ACallbackIsPlacedOnAnEquivalencesAssignment) {
+  g_assign_callback = nullptr;
+  RegisterTask("$watchca", &WatchAssignCalltf);
+  Run("module top; logic a, b; wire y;\n"
+      "  assign y = a <-> b;\n"
+      "  initial begin a = 1'b0; b = 1'b0; $watchca; end\n"
+      "endmodule\n");
+  vpiHandle assign = FirstAssignOfTop();
+  ASSERT_NE(assign, nullptr);
+  EXPECT_NE(g_assign_callback, nullptr);
+  EXPECT_EQ(IntValueOf(assign), 1);
 }
 
 }  // namespace
