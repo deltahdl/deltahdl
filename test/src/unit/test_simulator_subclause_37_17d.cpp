@@ -3,7 +3,10 @@
 #include <vector>
 
 #include "fixture_vpi_run.h"
+#include "simulator/class_object.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
+#include "simulator/vpi_globals.h"
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
@@ -89,14 +92,20 @@ TEST_F(VariablesOfARun, ABuiltInTypedVariableHasAnUnnamedTypespec) {
 }
 
 // D15, D16 and D22: a class property reports the randomization type it was
-// declared with, and any other variable vpiNotRand; a random property is
-// randomized until rand_mode() turns it off (#7000, #7001).
+// declared with, and any other variable vpiNotRand; a random property, randc
+// or rand, static or not, is randomized until rand_mode() turns it off, and
+// again once rand_mode() turns it back on, and so is one of the class defn.
+// An object that is no variable has no randomization type (#7000, #7001,
+// #8190).
 TEST_F(VariablesOfARun, AVariableReportsItsRandomization) {
   Run("module top;\n"
       "  class C; rand int r; randc bit [1:0] k; rand int off; int n;\n"
+      "    static rand int s; rand int back;\n"
       "  endclass\n"
       "  C c = new; int x;\n"
-      "  initial c.off.rand_mode(0);\n"
+      "  initial begin\n"
+      "    c.off.rand_mode(0); c.back.rand_mode(0); c.back.rand_mode(1);\n"
+      "  end\n"
       "endmodule\n");
   vpiHandle obj = vpi_handle(vpiClassObj, By("top.c"));
   ASSERT_NE(obj, nullptr);
@@ -107,6 +116,36 @@ TEST_F(VariablesOfARun, AVariableReportsItsRandomization) {
   EXPECT_EQ(vpi_get(vpiIsRandomized, Named(vpiVariables, obj, "r")), 1);
   EXPECT_EQ(vpi_get(vpiIsRandomized, Named(vpiVariables, obj, "off")), 0);
   EXPECT_EQ(vpi_get(vpiIsRandomized, Named(vpiVariables, obj, "n")), 0);
+  EXPECT_EQ(vpi_get(vpiIsRandomized, Named(vpiVariables, obj, "k")), 1);
+  EXPECT_EQ(vpi_get(vpiIsRandomized, Named(vpiVariables, obj, "s")), 1);
+  EXPECT_EQ(vpi_get(vpiIsRandomized, Named(vpiVariables, obj, "back")), 1);
+  vpiHandle defn = vpi_handle(vpiClassDefn, obj);
+  EXPECT_EQ(vpi_get(vpiIsRandomized, Named(vpiVariables, defn, "r")), 1);
+  EXPECT_EQ(vpi_get(vpiRandType, By("top")), vpiUndefined);
+}
+
+// D16, D25 and D28 read off objects standing in no design. A static random
+// property of an object with no class type keeps its rand_mode() state with
+// the object, here off. A variable with no parent is full-named and
+// decompiled by its own name alone.
+TEST(VariablesStandingAlone, ReportTheirRandomizationNameAndDecompile) {
+  VpiContext ctx;
+  SetGlobalVpiContext(&ctx);
+  ClassObject holder;
+  holder.rand_active["s"] = false;
+  VpiObject s;
+  s.type = vpiIntVar;
+  s.name = "s";
+  s.rand_type = vpiRand;
+  s.property_of = &holder;
+  EXPECT_EQ(vpi_get(vpiIsRandomized, VpiHandleOf(&s)), 0);
+
+  VpiObject v;
+  v.type = vpiIntVar;
+  v.name = "v";
+  EXPECT_STREQ(vpi_get_str(vpiFullName, VpiHandleOf(&v)), "v");
+  EXPECT_STREQ(vpi_get_str(vpiDecompile, VpiHandleOf(&v)), "v");
+  SetGlobalVpiContext(nullptr);
 }
 
 // D17: a member of a structure variable is a struct union member, and a

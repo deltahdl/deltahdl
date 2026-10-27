@@ -455,10 +455,13 @@ bool VpiIsRandomized(bool active_for_randomization) {
 }
 
 int VpiRandTypeOf(VpiHandle obj) {
-  if (obj->rand_type != 0 || !VpiIsVariablesType(obj->type)) {
-    return obj->rand_type;
-  }
-  return vpiNotRand;
+  // §37.17 details 15 and 22 and §37.25: a variable and a typespec member hold
+  // the randomization type they were declared with, a variable declared with
+  // neither rand nor randc being vpiNotRand. No other object carries the
+  // property, and 0 is none of its values, so §38.6 has any other answer
+  // vpiUndefined.
+  if (obj->rand_type != 0) return obj->rand_type;
+  return VpiIsVariablesType(obj->type) ? vpiNotRand : vpiUndefined;
 }
 
 bool VpiVariableIsRandomized(VpiHandle var) {
