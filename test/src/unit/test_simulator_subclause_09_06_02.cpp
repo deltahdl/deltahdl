@@ -923,4 +923,24 @@ TEST(DisableStatementExecution, AnInstancesTaskNotRunningLeavesTheTopsBlock) {
       "top.t ran on\n");
 }
 
+// §9.6.2: a disable of a block that has finished ends nothing. In a class's
+// task, whose blocks are no instance's, the search for the name finds no scope
+// at all, and the task goes on after the disable.
+TEST(DisableStatementExecution, DisablingAClassTasksFinishedBlockEndsNothing) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class C;\n"
+                       "  task run();\n"
+                       "    begin : b #1; end\n"
+                       "    disable b;\n"
+                       "    $display(\"after at %0t\", $time);\n"
+                       "  endtask\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  C h = new;\n"
+                       "  initial h.run();\n"
+                       "endmodule\n",
+                       f),
+            "after at 1\n");
+}
+
 }  // namespace
