@@ -116,7 +116,8 @@ static std::vector<std::string> DisabledDefinitionInstances(const Expr* e,
   };
   const std::string kPath = EvaluatedHierarchicalPath(e, ctx, ctx.GetArena());
   const std::string kLocal = ctx.ActiveInstancePrefix() + kPath;
-  if (kDefinedIn(kLocal) || kDefinedIn(kPath)) return instances;
+  if (!kDefinedIn(kLocal)) kDefinedIn(kPath);
+  if (!instances.empty()) return instances;
   const std::vector<std::string_view>* definitions =
       ctx.FindForkjoinTask(kLocal);
   if (definitions == nullptr) definitions = ctx.FindForkjoinTask(kPath);

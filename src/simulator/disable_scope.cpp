@@ -29,8 +29,12 @@ StandingScopes ScopesOf(const Process& proc, SimContext& ctx) {
   StandingScopes scopes;
   scopes.base = proc.inst_prefix;
   scopes.base += SimContext::GenBlockPrefixOf(proc);
-  scopes.labels = &proc == ctx.CurrentProcess() ? ctx.ActiveNamedScopes()
-                                                : proc.saved_named_scopes;
+  // §9.3.2: a fork branch stands in the scopes the fork does.
+  scopes.labels = proc.spawned_in_named_scopes;
+  const std::vector<std::string_view>& own = &proc == ctx.CurrentProcess()
+                                                 ? ctx.ActiveNamedScopes()
+                                                 : proc.saved_named_scopes;
+  scopes.labels.insert(scopes.labels.end(), own.begin(), own.end());
   std::string path;
   for (std::string_view label : scopes.labels) {
     if (ctx.FindFunction(label) != nullptr) path.clear();

@@ -289,6 +289,11 @@ static Process* CreateForkChildProcess(SimContext& ctx, Arena& arena,
     p->gen_prefixes = spawning_proc->gen_prefixes;
     p->gen_block_name = spawning_proc->gen_block_name;
     p->frame_owners = spawning_proc->frame_owners;
+    // §9.6.2: the named scopes the fork stands in are the branch's as well.
+    p->spawned_in_named_scopes = spawning_proc->spawned_in_named_scopes;
+    const std::vector<std::string_view>& spawner_in = ctx.ActiveNamedScopes();
+    p->spawned_in_named_scopes.insert(p->spawned_in_named_scopes.end(),
+                                      spawner_in.begin(), spawner_in.end());
   }
   ctx.CopyCarriedStacksTo(*p);
   // §18.14.2: a new thread's RNG is seeded with the next random value drawn

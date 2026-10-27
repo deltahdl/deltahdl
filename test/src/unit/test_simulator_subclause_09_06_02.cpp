@@ -758,6 +758,65 @@ TEST(DisableStatementExecution, AnUpwardNameEndsTheEnclosingInstancesBlock) {
             "2 ran on\n");
 }
 
+// §9.6.2: two disables in one time step of blocks a process waits in,
+// outer.inner and then outer around it, end the process: the first sets it to
+// unwind out of inner, and the second, finding it no longer waiting, ends it
+// outright, so neither block's later statements run.
+TEST(DisableStatementExecution, DisablingInnerThenOuterAtOnceEndsTheProcess) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  initial begin : outer\n"
+                       "    begin : inner #5 $display(\"inner ran on\"); end\n"
+                       "    $display(\"outer ran on\");\n"
+                       "  end\n"
+                       "  initial begin\n"
+                       "    #1 disable outer.inner;\n"
+                       "    disable outer;\n"
+                       "  end\n"
+                       "  initial #9 $display(\"done\");\n"
+                       "endmodule\n",
+                       f),
+            "done\n");
+}
+
+// §9.6.2 with §9.3.2: a fork branch stands in the block the fork is written
+// in, so a disable of that block from another process ends the branch too,
+// though the branch has gone on into a named block of its own.
+TEST(DisableStatementExecution, DisablingABlockEndsItsRunningNamedBranch) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  initial begin : outer\n"
+                       "    fork begin : fb #5 $display(\"fb ran on\"); end "
+                       "join_none\n"
+                       "    #9 $display(\"outer ran on\");\n"
+                       "  end\n"
+                       "  initial #1 disable outer;\n"
+                       "  initial #12 $display(\"done\");\n"
+                       "endmodule\n",
+                       f),
+            "done\n");
+}
+
+// §9.6.2 with §9.3.2: a fork branch's block is one a disable names from the
+// moment the branch is spawned, so a disable of it at once, before the branch
+// has begun, ends it in its own instance alone.
+TEST(DisableStatementExecution, DisablingAnUnstartedForkBranchEndsItsOwn) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module child #(parameter int ID = 0);\n"
+                       "  initial begin\n"
+                       "    fork begin : fb #5 $display(\"%0d ran on\", ID); "
+                       "end join_none\n"
+                       "    if (ID == 1) disable fb;\n"
+                       "  end\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  child #(1) a();\n"
+                       "  child #(2) b();\n"
+                       "endmodule\n",
+                       f),
+            "2 ran on\n");
+}
+
 // §9.6.2 with §9.3.5: a labelled foreach is a block its label names, which a
 // disable within it ends in its own instance alone; the other instance's loop
 // runs its three passes.

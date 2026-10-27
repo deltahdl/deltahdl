@@ -343,6 +343,12 @@ struct Process {
   // any procedure starts (Lowerer::InitializeStaticLocals), which carries the
   // instance they stand in and is no process at all.
   bool is_static_init = false;
+  // §9.3.2 with §9.6.2: the labels of the named scopes the fork that spawned
+  // this process stands in, outermost first: those its spawner was spawned in,
+  // then the ones its spawner stood in itself. A branch stands in them though
+  // it never enters them, so a disable of one of them reaches the branch
+  // (ProcessesInDisabledScope); empty for a process no fork spawned.
+  std::vector<std::string_view> spawned_in_named_scopes;
 
   ~Process() {
     if (coro) coro.destroy();
