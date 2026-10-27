@@ -3,7 +3,6 @@
 #include <functional>
 #include <string>
 #include <string_view>
-#include <utility>
 #include <vector>
 
 #include "common/arena.h"
@@ -280,19 +279,18 @@ VpiHandle VpiContext::MakeSystfCallObject(const s_vpi_systf_data& data,
   // for, which the application reaches with vpi_handle(vpiSysTfCall, NULL).
   // Where the model holds the statement making the call, the call is that
   // object, so the handle the application is given and the one it reaches by
-  // walking the design are one object under §38.3; a call the model builds no
-  // statement for, such as one written in a task's body, stands up an object
-  // of its own. Each invocation hangs its own arguments and value storage on
-  // the call.
+  // walking the design are one object under §38.3; a call the model holds no
+  // object for stands up an object of its own. Each invocation hangs its own
+  // arguments and value storage on the call.
   VpiObject* call = VpiCallSiteObjectFor(call_site_objects_, call_site,
                                          ctx.ActiveInstancePrefix());
   if (call == nullptr) {
     // §38.14 with §38.33: such a call is still one call instance from one
     // invocation to the next, the call site in the instance running it, and
-    // keeps the user data an application associated with it.
-    std::string instance = ctx.ActiveInstancePrefix();
-    if (!instance.empty()) instance.pop_back();
-    VpiObject*& made = invoked_call_objects_[{call_site, std::move(instance)}];
+    // keeps the user data an application associated with it. The map is this
+    // lookup's alone, so the instance's prefix keys it as it stands.
+    VpiObject*& made =
+        invoked_call_objects_[{call_site, ctx.ActiveInstancePrefix()}];
     if (made == nullptr) {
       made = AllocObject();
       // A registration is refused without a name (RegisterSystf). A system
