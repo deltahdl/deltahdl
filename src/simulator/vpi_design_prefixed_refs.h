@@ -12,9 +12,10 @@ class SimContext;
 struct VpiObject;
 
 // §37.48 details 2 and 3: `vif.cb` written in an expression, where `holder`
-// is the virtual interface var `vif` and `written` the whole name: a clocking
-// block whose vpiPrefix is the var, where the interface the var's declaration
-// names declares a clocking block of that name; null for any other member.
+// is the virtual interface var `vif` and `written` the whole dotted name it
+// heads: a clocking block whose vpiPrefix is the var, where the interface the
+// var's declaration names declares a clocking block of that name; null for
+// any other member.
 VpiObject* VpiVirtualInterfaceClockingBlock(
     VpiObject* holder, std::string_view written,
     const std::function<VpiObject*()>& alloc, const VpiNameKeeper& keep);

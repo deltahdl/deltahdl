@@ -2,6 +2,7 @@
 
 #include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/variable.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
@@ -261,6 +262,22 @@ TEST_F(VirtualInterface, ActualIsNullWhileUninitialized) {
   vif.type = vpiVirtualInterfaceVar;  // no actual bound yet
 
   EXPECT_EQ(vpi_handle(vpiActual, VpiHandleOf(&vif)), nullptr);
+}
+
+// A context attached to no run has no run to say what a var holding storage
+// refers to now, so its vpiActual reaches the interface instance it was built
+// holding.
+TEST_F(VirtualInterface, ActualWithNoRunIsTheInstanceTheVarWasBuiltHolding) {
+  VpiObject iface;
+  iface.type = vpiInterface;
+
+  Variable storage;
+  VpiObject vif;
+  vif.type = vpiVirtualInterfaceVar;
+  vif.var = &storage;
+  vif.actual = &iface;
+
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiActual, VpiHandleOf(&vif))), &iface);
 }
 
 // Figure properties: the virtual interface var carries vpiName/vpiFullName and

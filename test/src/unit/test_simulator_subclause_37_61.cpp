@@ -345,10 +345,10 @@ TEST(DynamicPrefixHasActual, AnUnlistedOriginTracksTheCurrentActual) {
 // interface, a class var or a clocking block, and the objects it declares.
 class PrefixingOfARun : public VpiDesignRun {
  protected:
-  // The right side of the assignment the procedure of `top` that runs one
-  // runs.
-  static vpiHandle RhsOfFirst() {
-    vpiHandle it = vpi_iterate(vpiProcess, By("top"));
+  // The right side of the assignment the procedure of the instance named
+  // `instance` that runs one runs.
+  static vpiHandle RhsOfFirst(const char* instance) {
+    vpiHandle it = vpi_iterate(vpiProcess, By(instance));
     if (it == nullptr) return nullptr;
     vpiHandle rhs = nullptr;
     for (vpiHandle proc = vpi_scan(it); proc != nullptr; proc = vpi_scan(it)) {
@@ -359,8 +359,8 @@ class PrefixingOfARun : public VpiDesignRun {
 
   // That right side is a ref obj reaching an object of kind `holder` through
   // vpiPrefix.
-  static void ExpectRhsPrefixedBy(int holder) {
-    vpiHandle ref = RhsOfFirst();
+  static void ExpectRhsPrefixedBy(const char* instance, int holder) {
+    vpiHandle ref = RhsOfFirst(instance);
     ASSERT_NE(ref, nullptr);
     EXPECT_EQ(vpi_get(vpiType, ref), vpiRefObj);
     vpiHandle prefix = vpi_handle(vpiPrefix, ref);
@@ -387,7 +387,7 @@ TEST_F(PrefixingOfARun, AnExpressionThroughAVirtualInterfaceReachesIt) {
       "module top; ifc i0(); virtual ifc vif = i0; logic y;\n"
       "  initial y = vif.a;\n"
       "endmodule\n");
-  ExpectRhsPrefixedBy(vpiVirtualInterfaceVar);
+  ExpectRhsPrefixedBy("top", vpiVirtualInterfaceVar);
 }
 
 // Detail 1: a class property written through a class var reaches the class
@@ -397,7 +397,7 @@ TEST_F(PrefixingOfARun, APropertyThroughAClassVarReachesIt) {
       "module top; C c; int y;\n"
       "  initial y = c.x;\n"
       "endmodule\n");
-  ExpectRhsPrefixedBy(vpiClassVar);
+  ExpectRhsPrefixedBy("top", vpiClassVar);
 }
 
 // Detail 1: an expression written through a clocking block reaches the
@@ -407,7 +407,18 @@ TEST_F(PrefixingOfARun, AnExpressionThroughAClockingBlockReachesIt) {
       "  clocking cb @(posedge clk); input d; endclocking\n"
       "  initial y = cb.d;\n"
       "endmodule\n");
-  ExpectRhsPrefixedBy(vpiClockingBlock);
+  ExpectRhsPrefixedBy("top", vpiClockingBlock);
+}
+
+// Detail 1: so does one written through a clocking block of an instance below
+// the top, the block being a scope that instance holds (§14.3).
+TEST_F(PrefixingOfARun, AnExpressionThroughAnInstancesClockingBlockReachesIt) {
+  Run("module m; logic clk, d, y;\n"
+      "  clocking cb @(posedge clk); input d; endclocking\n"
+      "  initial y = cb.d;\n"
+      "endmodule\n"
+      "module top; m u(); endmodule\n");
+  ExpectRhsPrefixedBy("top.u", vpiClockingBlock);
 }
 
 }  // namespace

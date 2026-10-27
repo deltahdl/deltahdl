@@ -1,7 +1,6 @@
 #include "simulator/vpi_design_prefixed_refs.h"
 
 #include <algorithm>
-#include <cstddef>
 #include <functional>
 #include <string>
 #include <string_view>
@@ -12,6 +11,7 @@
 #include "simulator/sv_vpi_user.h"
 #include "simulator/variable.h"
 #include "simulator/vpi_design_attach_build.h"
+#include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_object.h"
 
 namespace delta {
@@ -69,12 +69,10 @@ VpiObject* VpiVirtualInterfaceClockingBlock(
     VpiObject* holder, std::string_view written,
     const std::function<VpiObject*()>& alloc, const VpiNameKeeper& keep) {
   const RtlirModule* iface = holder->decl_facts.vif_interface;
-  const std::size_t kDot = written.find('.');
-  if (holder->type != vpiVirtualInterfaceVar || iface == nullptr ||
-      kDot == std::string_view::npos) {
+  if (holder->type != vpiVirtualInterfaceVar || iface == nullptr) {
     return nullptr;
   }
-  const std::string_view kMember = written.substr(kDot + 1);
+  const std::string_view kMember = written.substr(written.find('.') + 1);
   if (std::ranges::none_of(iface->clocking_blocks,
                            [kMember](const ModuleItem* declared) {
                              return declared->name == kMember;
@@ -90,22 +88,25 @@ VpiObject* VpiVirtualInterfaceClockingBlock(
 
 namespace {
 
+// §25.9: the interface instance a virtual interface holding the scope `scope`
+// refers to, found by that name through `by_name`; null for the empty scope
+// of one holding none.
+VpiObject* HeldInstance(
+    std::string_view scope,
+    const std::function<VpiObject*(const std::string&)>& by_name) {
+  return scope.empty() ? nullptr : by_name(std::string(scope));
+}
+
 // The clocking block `block`, which a virtual interface var prefixes, stands
-// for now in the run `ctx` (VpiRefreshPrefixedClockingBlock).
+// for now in the run `ctx` (VpiRefreshPrefixedClockingBlock): the child of
+// its name of the instance the var holds, and null while the var holds none.
 VpiObject* PrefixedClockingBlockActual(
     const VpiObject& block, SimContext& ctx,
     const std::function<VpiObject*(const std::string&)>& by_name) {
-  Variable* vif = block.prefix->var;
-  if (vif == nullptr || !ctx.VirtualInterfaceIsBound(vif)) return nullptr;
-  const VpiObject* instance =
-      by_name(std::string(ctx.VirtualInterfaceBinding(vif)));
+  VpiObject* instance =
+      HeldInstance(ctx.VirtualInterfaceBinding(block.prefix->var), by_name);
   if (instance == nullptr) return nullptr;
-  const std::string_view kMember = block.name.substr(block.name.rfind('.') + 1);
-  auto found = std::ranges::find_if(
-      instance->children, [kMember](const VpiObject* child) {
-        return child->type == vpiClockingBlock && child->name == kMember;
-      });
-  return found != instance->children.end() ? *found : nullptr;
+  return ChildNamed(instance, block.name.substr(block.name.rfind('.') + 1));
 }
 
 }  // namespace
@@ -117,9 +118,8 @@ void VpiRefreshVirtualInterfaceActual(
       ref.var == nullptr || ctx == nullptr) {
     return;
   }
-  const std::string_view kScope =
-      ctx->VirtualInterfaceScope(ref.var->value.ToUint64());
-  ref.actual = kScope.empty() ? nullptr : by_name(std::string(kScope));
+  ref.actual = HeldInstance(
+      ctx->VirtualInterfaceScope(ref.var->value.ToUint64()), by_name);
 }
 
 void VpiRefreshPrefixedClockingBlock(

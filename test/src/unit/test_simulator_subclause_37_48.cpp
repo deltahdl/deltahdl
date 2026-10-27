@@ -124,6 +124,24 @@ TEST_F(ClockingBlock, ActualReachesActualWhenNotVirtualInterfacePrefixed) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiActual, VpiHandleOf(&block))), &resolved);
 }
 
+// D3 with no run: a context attached to none has no run to say what the
+// virtual interface var prefixing a clocking block holds now, so the block's
+// vpiActual reaches the block it was built standing for.
+TEST_F(ClockingBlock, ActualWithNoRunIsTheBlockAPrefixedBlockWasBuiltWith) {
+  VpiObject vif;
+  vif.type = vpiVirtualInterfaceVar;
+
+  VpiObject resolved;
+  resolved.type = vpiClockingBlock;
+
+  VpiObject block;
+  block.type = vpiClockingBlock;
+  block.prefix = &vif;
+  block.actual = &resolved;
+
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiActual, VpiHandleOf(&block))), &resolved);
+}
+
 // Figure (clocking io decl -> nets / variables / ref obj): the io-decl expr
 // predicate recognizes a ref obj, a net, and a variable of any kind the
 // `variables` class groups (§37.4.1) -- a logic var and an int var alike -- and
@@ -281,13 +299,15 @@ class ClockingBlocksOfARun : public VpiDesignRun {
 
 // Details 2 and 3: a clocking block named through a virtual interface var,
 // vif.cb, is a clocking block whose prefix is the var, and stands for the
-// block of the interface instance the var holds now, or for none while it
-// holds none (#7175); a member of the interface that is no clocking block,
-// vif.clk, stays a reference the var prefixes. The tasks waiting on them are
-// never called, so no wait runs through a null interface.
+// block of that name, not one declared before it, of the interface instance
+// the var holds now, or for none while it holds none (#7175); a member of the
+// interface that is no clocking block, vif.clk, stays a reference the var
+// prefixes. The tasks waiting on them are never called, so no wait runs
+// through a null interface.
 TEST_F(ClockingBlocksOfARun,
        AVirtualInterfacesClockingBlockHasPrefixAndActual) {
   Run("interface bus(input logic clk);\n"
+      "  clocking first @(negedge clk); endclocking\n"
       "  clocking cb @(posedge clk); endclocking\n"
       "endinterface\n"
       "module top; logic clk; bus b(clk); virtual bus vif, vu;\n"
