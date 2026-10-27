@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
+#include "common/types.h"
 #include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/variable.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_model_helpers1.h"
@@ -184,6 +186,63 @@ TEST_F(DelayControl, StatementScanSkipsDelayExpressionChild) {
   EXPECT_EQ(VpiDelayControlStmt(&delay_control), nullptr);
 }
 
+// §38.10: a delay control with no delay expression, as one whose delay the
+// model built no object for, has no delay to give, so vpi_get_delays() writes
+// a zero delay over the caller's slot and records no error.
+TEST_F(DelayControl, ADelayControlWithNoDelayExpressionGivesAZeroDelay) {
+  VpiObject guarded;
+  guarded.type = vpiNullStmt;
+  VpiObject delay_control;
+  delay_control.type = vpiDelayControl;
+  delay_control.children = {&guarded};
+
+  s_vpi_time slot = {};
+  slot.low = 7;
+  s_vpi_delay delay = {};
+  delay.da = &slot;
+  delay.no_of_delays = 1;
+  delay.time_type = vpiSimTime;
+  vpi_get_delays(VpiHandleOf(&delay_control), &delay);
+  EXPECT_EQ(ctx_.LastError().level, 0);
+  EXPECT_EQ(slot.type, vpiSimTime);
+  EXPECT_EQ(slot.low, 0U);
+}
+
+// §38.10 with §11.11: a min:typ:max delay holding fewer than three operands,
+// as one with an operand the model built no object for, cannot say which of
+// the three it holds, so under mtm_flag each reads the whole delay's value,
+// never an operand's: here the operation's, none, as it has no expression to
+// evaluate, where its first operand holds 9.
+TEST_F(DelayControl, AMinTypMaxDelayShortOfAnOperandGivesItsWholeValue) {
+  Logic4Word nine{9, 0};
+  Variable held{};
+  held.value.width = 32;
+  held.value.nwords = 1;
+  held.value.words = &nine;
+  VpiObject typ;
+  typ.type = vpiConstant;
+  typ.var = &held;
+  VpiObject max;
+  max.type = vpiConstant;
+  VpiObject min_typ_max;
+  min_typ_max.type = vpiOperation;
+  min_typ_max.op_type = vpiMinTypMaxOp;
+  min_typ_max.children = {&typ, &max};
+  VpiObject delay_control;
+  delay_control.type = vpiDelayControl;
+  delay_control.children = {&min_typ_max};
+
+  s_vpi_time slots[3] = {};
+  for (s_vpi_time& slot : slots) slot.low = 7;
+  s_vpi_delay delay = {};
+  delay.da = slots;
+  delay.no_of_delays = 1;
+  delay.time_type = vpiSimTime;
+  delay.mtm_flag = 1;
+  vpi_get_delays(VpiHandleOf(&delay_control), &delay);
+  for (const s_vpi_time& slot : slots) EXPECT_EQ(slot.low, 0U);
+}
+
 // The delay controls of a run: those a design's procedures write, built from
 // the elaborated design rather than by hand (#5002).
 class DelayControlsOfARun : public VpiDesignRun {
@@ -249,6 +308,26 @@ TEST_F(DelayControlsOfARun, ADelayControlGivesItsDelayThroughGetDelays) {
   EXPECT_EQ(slot.type, vpiSimTime);
   EXPECT_EQ(slot.high, 0U);
   EXPECT_EQ(slot.low, 5000U);
+}
+
+// §38.10 with §11.11: a delay written as an operation other than min:typ:max
+// has one value to give, the operation's, so under mtm_flag the minimum,
+// typical and maximum delays all read it: #(d + 1) with d 2 waits 3.
+TEST_F(DelayControlsOfARun, AComputedDelayGivesItsValueAsEachOfTheThree) {
+  Run("module top; timeunit 1ns; timeprecision 1ns;\n"
+      "  int d = 2; int a; initial #(d + 1) a = 1;\n"
+      "endmodule\n");
+  vpiHandle control = Control();
+  ASSERT_NE(control, nullptr);
+  ASSERT_EQ(vpi_get(vpiOpType, vpi_handle(vpiDelay, control)), vpiAddOp);
+  s_vpi_time slots[3] = {};
+  s_vpi_delay delay = {};
+  delay.da = slots;
+  delay.no_of_delays = 1;
+  delay.time_type = vpiSimTime;
+  delay.mtm_flag = 1;
+  vpi_get_delays(control, &delay);
+  for (const s_vpi_time& slot : slots) EXPECT_EQ(slot.low, 3U);
 }
 
 }  // namespace

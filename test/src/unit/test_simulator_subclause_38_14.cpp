@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <deque>
 #include <vector>
 
@@ -191,6 +192,20 @@ TEST_F(UserDataOfACallInATask, ItLastsFromOneInvocationToTheNext) {
       "  initial begin t; t; end\n"
       "endmodule\n");
   EXPECT_EQ(counts_read, (std::vector<int>{1, 2}));
+}
+
+// ...and one call instance in each instance of the module declaring the task,
+// so each instance's invocations count up from its own user data rather than
+// one count running through both.
+TEST_F(UserDataOfACallInATask, EachInstanceOfItsModuleHasItsOwn) {
+  Run("module child;\n"
+      "  task t; $count; endtask\n"
+      "  initial begin t; t; end\n"
+      "endmodule\n"
+      "module top; child a(); child b(); endmodule\n");
+  std::vector<int> counts = counts_read;
+  std::ranges::sort(counts);
+  EXPECT_EQ(counts, (std::vector<int>{1, 1, 2, 2}));
 }
 
 }  // namespace
