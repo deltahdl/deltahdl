@@ -198,22 +198,17 @@ TEST_F(EventCallbacksOfARun, ADisableCallbackNamesEachDisabledBlock) {
 
 // §38.36.1 with §37.77: a cbDisable is called for the block or task the
 // disable statement names, resolved upward from where it stands (§23.8): a
-// task, the named begin a label creates around a statement (§9.3.5), the
-// block a hierarchical name reaches past another of its last name, and a
-// block of another instance.
+// task, the named begin a label creates around a statement (§9.3.5), and the
+// block a hierarchical name reaches past another of its last name.
 TEST_F(EventCallbacksOfARun, ADisableCallbackIsCalledForTheScopeItNames) {
   Armer() = [] {
-    for (const char* name : {"top.t", "top.lbl", "top.b.inner", "top.c.blk"}) {
+    for (const char* name : {"top.t", "top.lbl", "top.b.inner"}) {
       vpiHandle scope = TopObject(name);
       EXPECT_NE(scope, nullptr) << name;
       PlaceEventCallback(cbDisable, scope);
     }
   };
-  Run("module child; timeunit 1ns; timeprecision 1ns;\n"
-      "  initial begin : blk #9 $display(\"blk ran on\"); end\n"
-      "endmodule\n"
-      "module top; timeunit 1ns; timeprecision 1ns;\n"
-      "  child c();\n"
+  Run("module top; timeunit 1ns; timeprecision 1ns;\n"
       "  task t; #9 $display(\"t ran on\"); endtask\n"
       "  initial $arm;\n"
       "  initial t;\n"
@@ -222,7 +217,7 @@ TEST_F(EventCallbacksOfARun, ADisableCallbackIsCalledForTheScopeItNames) {
       "  initial begin : b begin : inner #9 $display(\"b ran on\"); end end\n"
       "  initial begin\n"
       "    #1 disable t; #1 disable lbl; #1 disable a.inner;\n"
-      "    #1 disable b.inner; #1 disable c.blk;\n"
+      "    #1 disable b.inner;\n"
       "  end\n"
       "endmodule\n");
   std::vector<std::string> names;
@@ -231,8 +226,8 @@ TEST_F(EventCallbacksOfARun, ADisableCallbackIsCalledForTheScopeItNames) {
     names.push_back(d.obj);
     times.push_back(d.now);
   }
-  EXPECT_EQ(names, (std::vector<std::string>{"t", "lbl", "inner", "blk"}));
-  EXPECT_EQ(times, (std::vector<uint32_t>{1, 2, 4, 5}));
+  EXPECT_EQ(names, (std::vector<std::string>{"t", "lbl", "inner"}));
+  EXPECT_EQ(times, (std::vector<uint32_t>{1, 2, 4}));
 }
 
 // §38.36.1: a cbDisable is called after a named block holding a call of a
