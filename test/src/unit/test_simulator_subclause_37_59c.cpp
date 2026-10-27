@@ -6,6 +6,9 @@
 
 #include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
+#include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -83,6 +86,63 @@ TEST_F(AssignedExpressionsOfARun, AnIndexedPartSelectWithAVaryingBaseIsNot) {
   ASSERT_NE(select, nullptr);
   ASSERT_EQ(vpi_get(vpiType, select), vpiIndexedPartSelect);
   EXPECT_EQ(vpi_get(vpiConstantSelect, select), 0);
+}
+
+// Detail 9 read off objects standing in no design. A part select reaching no
+// parent is no constant select, nor is one whose parent is none, a variable
+// of automatic lifetime (§37.17 detail 27). Into an array, the parent's bounds
+// must be static, so one into a static array var is and one into a dynamic
+// array is not. Each range expression must be an elaboration-time constant,
+// so a variable written as either bound, or as the width, makes it none.
+TEST(PartSelectConstantSelect, ReadOffTheSelectItsParentAndItsRange) {
+  VpiContext ctx;
+  SetGlobalVpiContext(&ctx);
+  VpiObject constant;
+  constant.type = vpiConstant;
+  VpiObject variable;
+  variable.type = vpiIntegerVar;
+  VpiObject vector;
+  vector.type = vpiLogicVar;
+  const auto kSelectOf = [](VpiObject* parent, VpiObject* left,
+                            VpiObject* right) {
+    VpiObject select;
+    select.type = vpiPartSelect;
+    select.parent = parent;
+    select.left_range = left;
+    select.right_range = right;
+    return select;
+  };
+  const auto kConstantSelect = [](VpiObject select) {
+    return vpi_get(vpiConstantSelect, VpiHandleOf(&select));
+  };
+  EXPECT_EQ(kConstantSelect(kSelectOf(&vector, &constant, &constant)), 1);
+  EXPECT_EQ(kConstantSelect(kSelectOf(nullptr, &constant, &constant)), 0);
+
+  VpiObject automatic_vector;
+  automatic_vector.type = vpiLogicVar;
+  automatic_vector.automatic = true;
+  EXPECT_EQ(kConstantSelect(kSelectOf(&automatic_vector, &constant, &constant)),
+            0);
+
+  VpiObject static_array;
+  static_array.type = vpiArrayVar;
+  static_array.array_type = vpiStaticArray;
+  EXPECT_EQ(kConstantSelect(kSelectOf(&static_array, &constant, &constant)), 1);
+  VpiObject dynamic_array;
+  dynamic_array.type = vpiArrayVar;
+  dynamic_array.array_type = vpiDynamicArray;
+  EXPECT_EQ(kConstantSelect(kSelectOf(&dynamic_array, &constant, &constant)),
+            0);
+
+  EXPECT_EQ(kConstantSelect(kSelectOf(&vector, &variable, &constant)), 0);
+  EXPECT_EQ(kConstantSelect(kSelectOf(&vector, &constant, &variable)), 0);
+  VpiObject indexed;
+  indexed.type = vpiIndexedPartSelect;
+  indexed.parent = &vector;
+  indexed.base_expr = &constant;
+  indexed.width_expr = &variable;
+  EXPECT_EQ(kConstantSelect(indexed), 0);
+  SetGlobalVpiContext(nullptr);
 }
 
 // Details 3 and 5: a cast is a unary operation whose typespec is the type it
