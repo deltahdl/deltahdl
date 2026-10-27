@@ -121,9 +121,13 @@ TEST_F(BitSelectObject, AConstantIndexIntoAStaticVectorIsAConstantSelect) {
   EXPECT_EQ(vpi_get(vpiConstantSelect, VpiHandleOf(&select_)), 1);
 }
 
-// Detail 3, first condition: an index that is not an elaboration-time constant.
+// Detail 3, first condition: an index that is not an elaboration-time
+// constant, an operation reading a variable (§11.2.1).
 TEST_F(BitSelectObject, ANonConstantIndexMakesTheSelectNonConstant) {
+  VpiObject variable;
+  variable.type = vpiIntegerVar;
   index_.type = vpiOperation;
+  index_.children = {&variable};
 
   EXPECT_EQ(vpi_get(vpiConstantSelect, VpiHandleOf(&select_)), 0);
 }
