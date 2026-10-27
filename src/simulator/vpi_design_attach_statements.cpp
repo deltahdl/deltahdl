@@ -742,11 +742,11 @@ void VpiFillStmt(VpiObject* obj, const Stmt& stmt, const VpiStmtBuild& with) {
     case StmtKind::kWaitOrder:
       FillOrderedWait(obj, stmt, with);
       return;
-    case StmtKind::kDisable:
-      obj->disable_target = DisableTarget(obj->parent, stmt.expr);
-      return;
     case StmtKind::kWaitFork:
     case StmtKind::kDisableFork:
+    // §37.77: what a disable names is resolved once every scope has its
+    // object (VpiResolveDisableTargets).
+    case StmtKind::kDisable:
       return;
     case StmtKind::kReturn:
       // §37.78: the value returned, which vpiCondition reaches; none for a
@@ -762,6 +762,14 @@ void VpiFillStmt(VpiObject* obj, const Stmt& stmt, const VpiStmtBuild& with) {
     default:
       FillConditional(obj, stmt, with);
       return;
+  }
+}
+
+void VpiResolveDisableTargets(const VpiStmtObjects& stmts) {
+  for (const auto& [key, obj] : stmts) {
+    if (key.first->kind == StmtKind::kDisable) {
+      obj->disable_target = DisableTarget(obj->parent, key.first->expr);
+    }
   }
 }
 

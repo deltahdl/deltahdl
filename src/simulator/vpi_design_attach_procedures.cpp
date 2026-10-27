@@ -933,6 +933,9 @@ void AttachProcedures(const RtlirDesign* design, const VpiObjectMap& objects,
   kWalk(AttachInstanceSubroutineBodies);
   AttachPackageSubroutineBodies(*design, objects, calls, build);
   AttachClassMethodBodies(*design, objects, calls, build);
+  // §37.77: a disable may name a block written after it or in an instance
+  // below its own, so what it names is resolved once every body is walked.
+  VpiResolveDisableTargets(calls.stmts);
 }
 
 }  // namespace delta

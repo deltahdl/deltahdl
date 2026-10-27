@@ -664,6 +664,12 @@ using VpiCallSiteObjects =
 using VpiStmtObjects =
     std::map<std::pair<const Stmt*, std::string>, VpiObject*>;
 
+// §37.77 with §9.6.2: give each disable statement among `stmts` the task,
+// function, named begin or named fork its name resolves to, once every scope
+// it may reach has its object: a block written after the statement, or in an
+// instance below its own, has one only once every body has been walked.
+void VpiResolveDisableTargets(const VpiStmtObjects& stmts);
+
 // What the procedure walk builds a call statement with: the run, which an
 // argument's value is read through; the registration a system call's name
 // resolves to; the record of the call statements made, which a run's

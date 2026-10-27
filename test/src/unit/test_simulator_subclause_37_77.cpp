@@ -238,6 +238,52 @@ TEST_F(DisablesOfARun, AHierarchicalNameReachesTheBlockItNames) {
             VpiObjectOf(By("top.outer.inner")));
 }
 
+// A name is resolved once the whole design has its scopes, so a disable
+// reaches a block written in a procedure after its own.
+TEST_F(DisablesOfARun, ADisableOfALaterProceduresBlockIsReached) {
+  Run("module top;\n"
+      "  initial #1 disable later;\n"
+      "  initial begin : later #2; end\n"
+      "endmodule\n");
+  vpiHandle delay = NthBody(0);
+  ASSERT_NE(delay, nullptr);
+  vpiHandle disable = vpi_handle(vpiStmt, delay);
+  ASSERT_NE(disable, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, disable)),
+            VpiObjectOf(By("top.later")));
+}
+
+// ...and a block of an instance below its own, built after it.
+TEST_F(DisablesOfARun, ADisableOfAChildInstancesBlockIsReached) {
+  Run("module child; initial begin : blk #2; end endmodule\n"
+      "module top; child c(); initial #1 disable c.blk; endmodule\n");
+  vpiHandle delay = NthBody(0);
+  ASSERT_NE(delay, nullptr);
+  vpiHandle disable = vpi_handle(vpiStmt, delay);
+  ASSERT_NE(disable, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, disable)),
+            VpiObjectOf(By("top.c.blk")));
+}
+
+// The upward search stops at the nearest scope holding the name (§23.8),
+// even where that block is written after the disable and a block of the
+// name further out is written before it.
+TEST_F(DisablesOfARun, TheNearestBlockOfTheNameIsReachedWhereverWritten) {
+  Run("module top;\n"
+      "  initial begin : y #2; end\n"
+      "  initial begin : outer\n"
+      "    begin : x disable y; end\n"
+      "    begin : y #2; end\n"
+      "  end\n"
+      "endmodule\n");
+  vpiHandle x = By("top.outer.x");
+  ASSERT_NE(x, nullptr);
+  vpiHandle it = vpi_iterate(vpiDisable, x);
+  ASSERT_NE(it, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, vpi_scan(it))),
+            VpiObjectOf(By("top.outer.y")));
+}
+
 // A disable fork names nothing to disable.
 TEST_F(DisablesOfARun, ADisableForkReachesNothing) {
   Run("module top; initial begin fork #1; join_none disable fork; end\n"
