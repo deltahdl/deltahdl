@@ -565,6 +565,18 @@ TEST_F(ClassTypespecsOfARun, ABuiltInClassReportsItsClassType) {
   EXPECT_EQ(kTypeOf("top.s"), vpiSemaphoreClass);
 }
 
+// §37.32 with §37.12: the typespec of a class that extends another holds the
+// typespec of the class it extends as an object it relates to, not a scope,
+// so D, which declares no method, has no internal scope, B #(8) not among
+// them.
+TEST_F(ClassTypespecsOfARun, TheTypespecAClassExtendsIsNoInternalScope) {
+  Run(kSpecializations);
+  vpiHandle d =
+      vpi_handle(vpiClassTypespec, vpi_handle(vpiClassObj, By("top.d")));
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(NamesOf(vpiInternalScope, d), (std::vector<std::string>{}));
+}
+
 // §37.32 with §38.6: vpiClassType is drawn on a class typespec alone, so a
 // class defn, a class obj and a module, none of which carries it, answer
 // vpiUndefined (#8189).
