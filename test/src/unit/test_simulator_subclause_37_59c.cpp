@@ -228,6 +228,33 @@ TEST_F(AssignedExpressionsOfARun, ASizeCastOfAMixedOperationIsALogicVector) {
   EXPECT_EQ(vpi_get(vpiType, typespec), vpiLogicTypespec);
 }
 
+// ...a select being as its vector is, 2-state from a bit vector and 4-state
+// from a logic vector, a var select or an array net element, as is a bit,
+// byte, shortint or longint variable 2-state; an operation none of whose
+// operands has an object, such as a logical equivalence (§11.4.7), which no
+// operation type names, is any expression it cannot judge, 4-state...
+TEST_F(AssignedExpressionsOfARun, ASizeCastKeepsTheNatureOfWhatItCasts) {
+  Run("module top; bit [7:0] b; logic [7:0] l; logic [0:3][7:0] r [1:4];\n"
+      "  wire [7:0] n [4]; int i; logic a, c; bit [3:0] bt; byte y;\n"
+      "  shortint s; longint g; logic [3:0] x;\n"
+      "  initial begin\n"
+      "    x = 4'(b[i]); x = 4'(b[3:0]); x = 4'(b[i+:4]); x = 4'(l[3:0]);\n"
+      "    x = 4'(r[i+1][3]); x = 4'(n[i][3:0]); x = 4'(bt); x = 4'(y);\n"
+      "    x = 4'(s); x = 4'(g); x = 4'(-(a <-> c));\n"
+      "  end\n"
+      "endmodule\n");
+  std::vector<int> kinds;
+  for (vpiHandle right : ProcedureRightSides()) {
+    vpiHandle typespec = CastTypespec(right);
+    kinds.push_back(typespec != nullptr ? vpi_get(vpiType, typespec) : 0);
+  }
+  const std::vector<int> kKinds = {
+      vpiBitTypespec,   vpiBitTypespec,   vpiBitTypespec,  vpiLogicTypespec,
+      vpiLogicTypespec, vpiLogicTypespec, vpiBitTypespec,  vpiBitTypespec,
+      vpiBitTypespec,   vpiBitTypespec,   vpiLogicTypespec};
+  EXPECT_EQ(kinds, kKinds);
+}
+
 // ...as wide as its size expression's value, a parameter's included...
 TEST_F(AssignedExpressionsOfARun, ASizeCastIsAsWideAsItsSizeExpression) {
   Run("module top; localparam W = 6; logic [3:0] r; wire [7:0] w;\n"

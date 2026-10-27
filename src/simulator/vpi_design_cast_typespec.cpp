@@ -81,7 +81,7 @@ bool IsTwoState(VpiObject& expr) {
     const std::vector<VpiHandle> kOperands = VpiOperationOperands(&expr);
     return !kOperands.empty() &&
            std::ranges::all_of(kOperands, [](VpiHandle operand) {
-             return operand != nullptr && IsTwoState(*operand);
+             return IsTwoState(*operand);
            });
   }
   switch (expr.type) {
@@ -110,11 +110,10 @@ bool IsTwoState(VpiObject& expr) {
 VpiObject* NamedTypespec(const Expr& cast, const VpiObject* from,
                          const std::function<VpiObject*()>& alloc) {
   // The type is named as text or as an identifier, as the parser read it.
-  const std::string_view kName =
-      !cast.text.empty() ? cast.text
-      : cast.rhs != nullptr && cast.rhs->kind == ExprKind::kIdentifier
-          ? cast.rhs->text
-          : std::string_view{};
+  const std::string_view kName = !cast.text.empty() ? cast.text
+                                 : cast.rhs->kind == ExprKind::kIdentifier
+                                     ? cast.rhs->text
+                                     : std::string_view{};
   if (kName.empty()) return nullptr;
   VpiObject* typespec = TypedefAround(from, kName);
   for (const auto& [keyword, kind] : kKeywordTypespecs) {
@@ -153,7 +152,6 @@ VpiObject* OperandTypespec(const Expr& cast, VpiObject& operand,
 VpiObject* VpiTypedCast(VpiObject* op, const Expr& cast, const VpiObject* from,
                         const VpiObject* width,
                         const std::function<VpiObject*()>& alloc) {
-  if (op == nullptr) return nullptr;
   VpiObject* typespec = NamedTypespec(cast, from, alloc);
   if (typespec == nullptr && !op->children.empty()) {
     typespec = OperandTypespec(cast, *op->children.front(), width, alloc);
