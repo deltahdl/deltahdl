@@ -283,7 +283,7 @@ bool IsConstantExpr(const Expr* expr, const ScopeMap& scope);
 bool IsConstantSysFunc(std::string_view name);
 
 // §20.6.2 and §20.7: whether the system function call `call` is a constant
-// expression whatever its arguments are -- $bits, $typename, or an array
+// expression whatever its arguments are -- $typename, or $bits or an array
 // query on an argument whose dimensions are fixed -- since it answers from
 // the type of what it is called on and reads no value of it.
 bool IsConstantWhateverItsArguments(const Expr* call);

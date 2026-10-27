@@ -98,9 +98,10 @@ static bool IsConstEvenWithNonConstArgs(std::string_view name) {
 
 bool IsConstantWhateverItsArguments(const Expr* call) {
   if (!IsConstEvenWithNonConstArgs(call->callee)) return false;
-  // §20.7: an array query is a constant expression only on an argument whose
-  // dimensions are fixed.
-  return !IsArrayQueryFunction(call->callee) || call->args.empty() ||
+  // §20.6.2 and §20.7: $bits and an array query answer from the dimensions
+  // of what they are called on, so each is a constant expression only on an
+  // argument whose dimensions are fixed; $typename answers from its type.
+  return call->callee == "$typename" || call->args.empty() ||
          !HasDynamicDimension(call->args[0]);
 }
 

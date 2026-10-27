@@ -753,8 +753,8 @@ TEST(BitsOfDeclaration, LiteralOverrideReadsAboveBitSixtyFour) {
 // §20.6.2 (printed page 629) with §6.24.3: an unpacked array holds its
 // element's bits per element, so `logic [7:0] arr[4]` is 32 bits, and a net
 // is sized as a variable is -- `wire [3:0] v` four bits and `wire [7:0] w[3]`
-// twenty-four. An array whose extent the declaration does not fix, a dynamic
-// array, is left to the run.
+// twenty-four. An array whose extent the declaration does not fix is no
+// constant at all (test_elaborator_subclause_20_06_02b.cpp).
 TEST(BitsOfDeclaration, NetAndUnpackedArrayAnswerTheirBits) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -763,12 +763,10 @@ TEST(BitsOfDeclaration, NetAndUnpackedArrayAnswerTheirBits) {
       "  logic [7:0] grid[2][3];\n"
       "  wire [7:0] w[3];\n"
       "  wire [3:0] v;\n"
-      "  logic [7:0] dyn[];\n"
       "  localparam int BA = $bits(arr);\n"
       "  localparam int BG = $bits(grid);\n"
       "  localparam int BW = $bits(w);\n"
       "  localparam int BV = $bits(v);\n"
-      "  localparam int BD = $bits(dyn);\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
@@ -776,7 +774,6 @@ TEST(BitsOfDeclaration, NetAndUnpackedArrayAnswerTheirBits) {
   EXPECT_EQ(ParamValue(design, "BG"), 48);
   EXPECT_EQ(ParamValue(design, "BW"), 24);
   EXPECT_EQ(ParamValue(design, "BV"), 4);
-  EXPECT_TRUE(ParamUnresolved(design, "BD"));
   const auto* w = FindNet(design, "m", "w");
   ASSERT_NE(w, nullptr);
   EXPECT_EQ(w->num_unpacked_dims, 1u);
