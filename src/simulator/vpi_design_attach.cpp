@@ -33,6 +33,7 @@
 #include "simulator/vpi_design_attach_interconnects.h"
 #include "simulator/vpi_design_attach_packed_arrays.h"
 #include "simulator/vpi_design_attach_typespecs.h"
+#include "simulator/vpi_design_prefixed_refs.h"
 #include "simulator/vpi_design_viewports.h"
 #include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_globals.h"
@@ -124,15 +125,6 @@ VpiHandle VpiContext::DesignObjectForFlatName(std::string_view flat_name) {
     consumed += 1;  // the separator this component was followed by
   }
   return current;
-}
-
-const RtlirModule* VpiVirtualInterfaceOf(const RtlirDesign& design,
-                                         const DataType* type) {
-  if (type == nullptr || type->kind != DataTypeKind::kVirtualInterface) {
-    return nullptr;
-  }
-  const auto kFound = design.all_modules.find(type->type_name);
-  return kFound != design.all_modules.end() ? kFound->second : nullptr;
 }
 
 namespace {
@@ -661,6 +653,26 @@ void VpiContext::AttachUdpDefns(const RtlirDesign* design) {
   }
 }
 
+namespace {
+
+// Whether the run's variable `var`, keyed `name`, has no object made where
+// its key places it. §37.10 detail 6: an imported item is not reached through
+// the scope that imported it, the key the import enters being the run's; by
+// §37.12 a named block's variable hangs from the block, which the block walk
+// makes; and the event a clocking block's name carries (§14.10) is a variable
+// of the run's that no scope declares, the object of the block's name being
+// the block itself (§37.48), which AttachClockingBlocks makes.
+bool HasNoObjectAtItsKey(SimContext& sim_ctx, std::string_view name,
+                         const Variable* var) {
+  if (sim_ctx.IsImportedName(name) || sim_ctx.IsBlockVariable(name)) {
+    return true;
+  }
+  const ClockingManager* clocking = sim_ctx.GetClockingManager();
+  return clocking != nullptr && clocking->IsBlockEventVar(var);
+}
+
+}  // namespace
+
 void VpiContext::Attach(SimContext& sim_ctx, const RtlirDesign* design) {
   // §37.44: the run the thread objects are made against. They cannot all be
   // made here -- a fork branch begins while the design executes, long after
@@ -680,16 +692,8 @@ void VpiContext::Attach(SimContext& sim_ctx, const RtlirDesign* design) {
   // entered whole and resolved a component at a time, so nothing but a
   // top-level name ever matched -- and the nets, which were not entered at all
   // though a wire is the clause's own example of an object VPI reaches.
-  const ClockingManager* clocking = sim_ctx.GetClockingManager();
   for (auto& [name, var] : sim_ctx.GetVariables()) {
-    // §37.10 detail 6: an imported item is not reached through the scope that
-    // imported it, the key the import enters being the run's; and by §37.12 a
-    // named block's variable hangs from the block, which the block walk makes.
-    if (sim_ctx.IsImportedName(name) || sim_ctx.IsBlockVariable(name)) continue;
-    // §14.10: the event a clocking block's name carries is a variable of the
-    // run's, which no scope declares; the object of the block's name is the
-    // block itself (§37.48), which AttachClockingBlocks makes.
-    if (clocking != nullptr && clocking->IsBlockEventVar(var)) continue;
+    if (HasNoObjectAtItsKey(sim_ctx, name, var)) continue;
     VpiHandle obj = DesignObjectForFlatName(name);
     if (obj == nullptr || var == nullptr) continue;
     obj->type = kVpiReg;

@@ -7,6 +7,7 @@
 
 #include "elaborator/rtlir.h"
 #include "parser/ast_module.h"
+#include "parser/ast_type.h"
 #include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/variable.h"
@@ -15,8 +16,18 @@
 
 namespace delta {
 
+const RtlirModule* VpiVirtualInterfaceOf(const RtlirDesign& design,
+                                         const DataType* type) {
+  if (type == nullptr || type->kind != DataTypeKind::kVirtualInterface) {
+    return nullptr;
+  }
+  const auto kFound = design.all_modules.find(type->type_name);
+  return kFound != design.all_modules.end() ? kFound->second : nullptr;
+}
+
 bool VpiIsDynamicPrefixHolderType(int type) {
-  return type == vpiClassVar || type == vpiVirtualInterfaceVar;
+  return type == vpiClassVar || type == vpiVirtualInterfaceVar ||
+         type == vpiClockingBlock;
 }
 
 namespace {

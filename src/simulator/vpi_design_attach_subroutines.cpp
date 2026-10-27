@@ -19,6 +19,7 @@
 #include "simulator/vpi_alloc_scheme.h"
 #include "simulator/vpi_declared_shape.h"
 #include "simulator/vpi_design_attach_build.h"
+#include "simulator/vpi_design_prefixed_refs.h"
 #include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_method_contents.h"
 #include "simulator/vpi_model_helpers2.h"

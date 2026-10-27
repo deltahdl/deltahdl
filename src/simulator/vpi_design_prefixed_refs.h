@@ -9,7 +9,17 @@
 namespace delta {
 
 class SimContext;
+struct DataType;
+struct RtlirDesign;
+struct RtlirModule;
 struct VpiObject;
+
+// §25.9: the interface a virtual interface var declared with `type` refers to
+// an instance of, as `design` declares it, which tells a clocking block the var
+// names from any other member (VpiVirtualInterfaceClockingBlock); null for any
+// other type, and for no type.
+const RtlirModule* VpiVirtualInterfaceOf(const RtlirDesign& design,
+                                         const DataType* type);
 
 // §37.48 details 2 and 3: `vif.cb` written in an expression, where `holder`
 // is the virtual interface var `vif` and `written` the whole dotted name it
