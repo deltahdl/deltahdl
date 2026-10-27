@@ -256,7 +256,8 @@ TEST_F(WaitsOfARun, AnElseActionAloneIsTheElseStatement) {
 }
 
 // An ordered wait reaches the events it waits on through its one-to-many
-// vpiCondition, in the order written, and not its actions.
+// vpiCondition, in the order written, and not its actions; asked for its
+// attributes, of which it has none, it reaches no event.
 TEST_F(WaitsOfARun, AnOrderedWaitIteratesTheEventsItWaitsOn) {
   Run("module top; event a, b; int r;\n"
       "  initial begin wait_order (b, a) r = 1; else r = 2; end\n"
@@ -268,6 +269,7 @@ TEST_F(WaitsOfARun, AnOrderedWaitIteratesTheEventsItWaitsOn) {
   EXPECT_EQ(VpiObjectOf(vpi_scan(it)), VpiObjectOf(By("top.b")));
   EXPECT_EQ(VpiObjectOf(vpi_scan(it)), VpiObjectOf(By("top.a")));
   EXPECT_EQ(vpi_scan(it), nullptr);
+  EXPECT_EQ(vpi_iterate(vpiAttribute, kStmts[0]), nullptr);
 }
 
 }  // namespace

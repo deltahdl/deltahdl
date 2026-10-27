@@ -466,7 +466,8 @@ std::vector<int> Ascending(std::vector<int> kinds) {
 
 // §37.58 detail 1: the uses of a vector are those of the vector and of its
 // bit and part selects, a continuous assignment and a statement among them,
-// and no other.
+// and no other. An operation is no simple expression, so it has no uses, the
+// assignment it is the right side of not among them.
 TEST_F(BitSelectsOfARun, AVectorIsUsedWhereItOrASelectOfItIs) {
   Run("module top; logic [7:0] v; wire a, b, c; logic [7:0] w;\n"
       "assign a = v[2];\n"
@@ -475,6 +476,10 @@ TEST_F(BitSelectsOfARun, AVectorIsUsedWhereItOrASelectOfItIs) {
       "initial w = v;\n"
       "endmodule\n");
   EXPECT_EQ(LinesOfUses(By("top.v")), (std::vector<int>{2, 4, 5}));
+  const std::vector<vpiHandle> kSides = RightSides(By("top"));
+  ASSERT_EQ(kSides.size(), 3U);
+  ASSERT_EQ(vpi_get(vpiType, kSides[2]), vpiOperation);
+  EXPECT_EQ(vpi_iterate(vpiUse, kSides[2]), nullptr);
 }
 
 // §37.58 detail 2: the uses of a bit select are those of that bit, of the
