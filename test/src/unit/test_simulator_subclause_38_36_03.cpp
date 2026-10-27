@@ -14,6 +14,9 @@
 #include "helpers_reported_error.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
+#include "simulator/specify.h"
+#include "simulator/specify_path_delay.h"
+#include "simulator/specify_timing_check.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_internal.h"
@@ -217,6 +220,48 @@ TEST_F(VpiActionFeatureCallbacks, TchkViolationDeliversTimingCheckHandle) {
 
   EXPECT_EQ(fired, 1);
   EXPECT_EQ(g_seen_obj, &timing_check);
+}
+
+// §38.36.3 with §37.40, read off runs made by hand. In a run with no specify
+// manager a violation is reported against nothing.
+TEST_F(VpiActionFeatureCallbacks,
+       TchkViolationOfARunWithNoChecksReachesNoTchk) {
+  Register(cbTchkViolation);
+  vpi_ctx_.Attach(sim_ctx_);
+  TimingCheckEntry stray;
+  vpi_ctx_.NoteTimingViolation(stray);
+  EXPECT_EQ(g_invocations, 0);
+}
+
+// Otherwise a violation is reported against the tchk the run's objects hold
+// for the check violated, a check declared by no source, as $sdf_annotate
+// registers one (§32.9), having one as well; a check added after the objects
+// were made, which no tchk stands for, is reported against nothing.
+TEST_F(VpiActionFeatureCallbacks, TchkViolationReachesTheTchkOfTheCheck) {
+  SpecifyManager& specify = sim_ctx_.AcquireSpecifyManager();
+  PathDelay path;
+  path.inst_prefix = "u.";
+  specify.MutablePathDelays().push_back(path);
+  TimingCheckEntry check;
+  check.inst_prefix = "u.";
+  specify.MutableTimingChecks() = {check, check};
+  Register(cbTchkViolation);
+  vpi_ctx_.Attach(sim_ctx_);
+  specify.MutableTimingChecks().push_back(check);
+  std::vector<VpiHandle> tchks;
+  vpiHandle it =
+      vpi_iterate(vpiTchk, vpi_handle_by_name(VpiText("u"), nullptr));
+  for (vpiHandle tchk = it ? vpi_scan(it) : nullptr; tchk != nullptr;
+       tchk = vpi_scan(it)) {
+    tchks.push_back(VpiObjectOf(tchk));
+  }
+  ASSERT_EQ(tchks.size(), 2u);
+
+  vpi_ctx_.NoteTimingViolation(specify.GetTimingChecks()[1]);
+  EXPECT_EQ(g_invocations, 1);
+  EXPECT_EQ(g_seen_obj, tchks[1]);
+  vpi_ctx_.NoteTimingViolation(specify.GetTimingChecks()[2]);
+  EXPECT_EQ(g_invocations, 1);
 }
 
 // §38.36.3: for a cbInteractiveScopeChange callback the obj field is a handle

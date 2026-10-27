@@ -5,12 +5,18 @@
 #include <vector>
 
 #include "common/arena.h"
+#include "fixture_simulator.h"
 #include "fixture_vpi_run.h"
+#include "parser/ast_specify.h"
 #include "simulator/scheduler.h"
+#include "simulator/sim_context.h"
+#include "simulator/specify.h"
+#include "simulator/specify_path_delay.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -344,6 +350,43 @@ TEST_F(ModulePathsOfARun, AModulePathReportsHowItWasWritten) {
   EXPECT_EQ(vpi_get(vpiPathType, kPaths[2]), vpiPathParallel);
   EXPECT_EQ(vpi_get(vpiPolarity, kPaths[2]), vpiUnknown);
   EXPECT_EQ(vpi_get(vpiDataPolarity, kPaths[2]), vpiNegative);
+}
+
+// §37.39 with §38.10, read off a run made by hand. A path whose declaration
+// names no port has no term, and a delay its declaration left unwritten reads
+// back as the delay the path holds, its minimum, typical and maximum alike.
+TEST(ModPathsOfAHandMadeRun, APortlessPathHasNoTermsAndReadsItsHeldDelay) {
+  SimFixture f;
+  SpecifyPathDecl decl;
+  decl.delays = {nullptr};
+  PathDelay path;
+  path.decl = &decl;
+  path.inst_prefix = "u.";
+  path.delay_count = 1;
+  path.delays[0] = 7;
+  path.source_delays = {nullptr};
+  f.ctx.AcquireSpecifyManager().MutablePathDelays().push_back(path);
+  VpiContext vpi;
+  SetGlobalVpiContext(&vpi);
+  vpi.Attach(f.ctx);
+  vpiHandle paths =
+      vpi_iterate(vpiModPath, vpi_handle_by_name(VpiText("u"), nullptr));
+  ASSERT_NE(paths, nullptr);
+  vpiHandle mod_path = vpi_scan(paths);
+  ASSERT_NE(mod_path, nullptr);
+  EXPECT_EQ(vpi_iterate(vpiModPathIn, mod_path), nullptr);
+  EXPECT_EQ(vpi_iterate(vpiModPathOut, mod_path), nullptr);
+  s_vpi_time times[3] = {};
+  s_vpi_delay delay = {};
+  delay.da = times;
+  delay.no_of_delays = 1;
+  delay.time_type = vpiSimTime;
+  delay.mtm_flag = 1;
+  vpi_get_delays(mod_path, &delay);
+  EXPECT_EQ(times[0].low, 7u);
+  EXPECT_EQ(times[1].low, 7u);
+  EXPECT_EQ(times[2].low, 7u);
+  SetGlobalVpiContext(nullptr);
 }
 
 }  // namespace

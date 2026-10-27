@@ -456,8 +456,8 @@ TEST_F(UdpDefnsOfARun, ASequentialUdpReachesItsInitial) {
 }
 
 // §37.36 (figure) with §29.3.3 and §37.63: a UDP's initial runs a blocking
-// assignment of the bit its output starts at to its output reg, x where the
-// initial statement writes x (#7368).
+// assignment of the bit its output starts at to its output reg, 1 where the
+// initial statement writes 1 and x where it writes x (#7368).
 TEST_F(UdpDefnsOfARun, AUdpsInitialAssignsItsOutput) {
   Run("primitive zero(q, d);\n"
       "  output reg q; input d;\n"
@@ -469,8 +469,13 @@ TEST_F(UdpDefnsOfARun, AUdpsInitialAssignsItsOutput) {
       "  initial q = 1'bx;\n"
       "  table 0 : ? : 0; 1 : ? : 1; endtable\n"
       "endprimitive\n"
-      "module top; reg d; wire a, b;\n"
-      "  zero z(a, d); unknown u(b, d);\n"
+      "primitive one(q, d);\n"
+      "  output reg q; input d;\n"
+      "  initial q = 1'b1;\n"
+      "  table 0 : ? : 0; 1 : ? : 1; endtable\n"
+      "endprimitive\n"
+      "module top; reg d; wire a, b, c;\n"
+      "  zero z(a, d); unknown u(b, d); one o(c, d);\n"
       "endmodule\n");
   vpiHandle zero = vpi_handle(
       vpiStmt, vpi_handle(vpiInitial, Named(vpiUdpDefn, nullptr, "zero")));
@@ -487,6 +492,11 @@ TEST_F(UdpDefnsOfARun, AUdpsInitialAssignsItsOutput) {
   ASSERT_NE(unknown, nullptr);
   vpi_get_value(vpi_handle(vpiRhs, unknown), &value);
   EXPECT_STREQ(value.value.str, "x");
+  vpiHandle one = vpi_handle(
+      vpiStmt, vpi_handle(vpiInitial, Named(vpiUdpDefn, nullptr, "one")));
+  ASSERT_NE(one, nullptr);
+  vpi_get_value(vpi_handle(vpiRhs, one), &value);
+  EXPECT_STREQ(value.value.str, "1");
 }
 
 constexpr std::string_view kUdpKey = "udp-exchange-key";

@@ -521,6 +521,28 @@ TEST_F(TimingChecksOfARun, ACheckIteratesEveryArgumentAsWritten) {
                               {kReg, "dd"}}));
 }
 
+// §37.40 (figure) and detail 2: an event naming one bit of a vector has that
+// bit for its term's expression, and a delayed signal written as one bit of a
+// vector is that bit among the check's arguments.
+TEST_F(TimingChecksOfARun, ABitOfAVectorIsATermsAndADelayedSignalsExpression) {
+  Run("module m(input clk, input [1:0] d);\n"
+      "  reg ntfr, dclk; reg [1:0] dd;\n"
+      "  specify\n"
+      "    $setuphold(posedge clk, d[1], 1, 2, ntfr, , , dclk, dd[1]);\n"
+      "  endspecify\n"
+      "endmodule\n"
+      "module top; reg clk; reg [1:0] d; m m1(clk, d); endmodule\n");
+  vpiHandle setuphold = CheckOfType(vpiSetupHold, By("top.m1"));
+  ASSERT_NE(setuphold, nullptr);
+  vpiHandle data = vpi_handle(vpiExpr, vpi_handle(vpiTchkDataTerm, setuphold));
+  ASSERT_NE(data, nullptr);
+  EXPECT_EQ(NameOf(data), "d[1]");
+  EXPECT_EQ(NameOf(vpi_handle(vpiParent, data)), "d");
+  const std::vector<std::pair<int, std::string>> kArgs = ArgumentsOf(setuphold);
+  ASSERT_FALSE(kArgs.empty());
+  EXPECT_EQ(kArgs.back().second, "dd[1]");
+}
+
 // §37.40 (figure) with A.7.3: an event naming a member of an interface port,
 // `b.clk`, has that member for its expression, the signal of the interface
 // instance the port is bound to.
