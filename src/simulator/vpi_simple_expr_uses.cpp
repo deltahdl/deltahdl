@@ -7,9 +7,7 @@
 #include <utility>
 #include <vector>
 
-#include "common/types.h"
 #include "simulator/sv_vpi_user.h"
-#include "simulator/variable.h"
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers2.h"
@@ -53,30 +51,24 @@ bool IsVectorOrSelectOf(const VpiObject* node, const VpiObject* vector) {
   return false;
 }
 
-// The value of `expr` where it is a constant; empty for any other expression.
-std::optional<int64_t> ConstantOf(const VpiObject* expr) {
-  if (expr == nullptr || expr->type != vpiConstant || expr->var == nullptr) {
-    return std::nullopt;
-  }
-  return static_cast<int64_t>(expr->var->value.ToUint64());
-}
-
 // The lowest and highest index the part select `select` holds, where the
-// bounds, or the base and the width, it was written with are constants; none
-// for an object written with no bounds, which is no part select.
+// bounds, or the base and the width, it was written with hold values at
+// elaboration; none for an object written with no bounds, which is no part
+// select.
 std::optional<std::pair<int64_t, int64_t>> PartSelectSpan(
     const VpiObject& select) {
   if (select.type == vpiIndexedPartSelect) {
-    const std::optional<int64_t> kBase = ConstantOf(select.base_expr);
-    const std::optional<int64_t> kWidth = ConstantOf(select.width_expr);
+    const std::optional<int64_t> kBase = VpiElaborationValue(select.base_expr);
+    const std::optional<int64_t> kWidth =
+        VpiElaborationValue(select.width_expr);
     if (!kBase || !kWidth) return std::nullopt;
     if (select.indexed_part_select_type == vpiPosIndexed) {
       return std::pair{*kBase, *kBase + *kWidth - 1};
     }
     return std::pair{*kBase - *kWidth + 1, *kBase};
   }
-  const std::optional<int64_t> kLeft = ConstantOf(select.left_range);
-  const std::optional<int64_t> kRight = ConstantOf(select.right_range);
+  const std::optional<int64_t> kLeft = VpiElaborationValue(select.left_range);
+  const std::optional<int64_t> kRight = VpiElaborationValue(select.right_range);
   if (!kLeft || !kRight) return std::nullopt;
   return std::pair{std::min(*kLeft, *kRight), std::max(*kLeft, *kRight)};
 }
@@ -87,9 +79,9 @@ std::optional<std::pair<int64_t, int64_t>> PartSelectSpan(
 bool IsUseOfBit(const VpiObject* node, const VpiObject& bit) {
   if (node == &bit || node == bit.parent) return true;
   if (bit.parent == nullptr || node->parent != bit.parent) return false;
-  const std::optional<int64_t> kIndex = ConstantOf(bit.index_expr);
+  const std::optional<int64_t> kIndex = VpiElaborationValue(bit.index_expr);
   if (!kIndex) return false;
-  if (IsBit(*node)) return ConstantOf(node->index_expr) == kIndex;
+  if (IsBit(*node)) return VpiElaborationValue(node->index_expr) == kIndex;
   const auto kSpan = PartSelectSpan(*node);
   return kSpan && kSpan->first <= *kIndex && *kIndex <= kSpan->second;
 }
@@ -132,16 +124,37 @@ bool IsUseKind(VpiHandle obj) {
   }
 }
 
+void GatherUses(VpiObject* scope, const VpiObject& expr,
+                std::unordered_set<const VpiObject*>& seen,
+                std::vector<VpiObject*>& uses);
+
+// Gathers into `uses` those of the delay terms standing on the net `net` that
+// use `expr`. §37.45 keeps a delay device out of its module's children, so
+// its terms are reached through the net, among whose children they hang
+// (vpi_delay_devices.cpp).
+void GatherDelayTermUses(const VpiObject& net, const VpiObject& expr,
+                         std::unordered_set<const VpiObject*>& seen,
+                         std::vector<VpiObject*>& uses) {
+  for (VpiObject* term : net.children) {
+    if (term->type == vpiDelayTerm) GatherUses(term, expr, seen, uses);
+  }
+}
+
 // Gathers into `uses`, once each, the uses of `expr` held under `scope`, the
 // statements inside a statement among them. An expression's children are
-// walked by ExpressionUses alone, a statement written as a call excepted.
+// walked by ExpressionUses alone, a statement written as a call excepted, and
+// of a net's only the delay terms standing on it.
 void GatherUses(VpiObject* scope, const VpiObject& expr,
                 std::unordered_set<const VpiObject*>& seen,
                 std::vector<VpiObject*>& uses) {
   if (scope == nullptr || !seen.insert(scope).second) return;
   if (IsUseKind(scope) && VpiUsesExpr(*scope, expr)) uses.push_back(scope);
   for (VpiObject* child : scope->children) {
-    if (!VpiIsOperandObject(child)) GatherUses(child, expr, seen, uses);
+    if (!VpiIsOperandObject(child)) {
+      GatherUses(child, expr, seen, uses);
+    } else if (VpiIsNetsType(child->type)) {
+      GatherDelayTermUses(*child, expr, seen, uses);
+    }
   }
   GatherUses(scope->body, expr, seen, uses);
   GatherUses(scope->else_stmt, expr, seen, uses);
@@ -150,8 +163,15 @@ void GatherUses(VpiObject* scope, const VpiObject& expr,
 }  // namespace
 
 bool VpiUsesExpr(const VpiObject& use, const VpiObject& expr) {
-  for (const VpiObject* side :
-       {use.lhs, use.rhs, use.high_conn, use.low_conn}) {
+  // §37.47 gives a cont assign bit no sides of its own: its value is its bit
+  // of the assignment's, so it reads what the assignment reads.
+  if (use.type == vpiContAssignBit) {
+    return use.parent != nullptr && VpiUsesExpr(*use.parent, expr);
+  }
+  // A path term and a tchk term hold the expression of their terminal (§37.39,
+  // §37.40), and a delay term the net it stands on (§37.45).
+  for (const VpiObject* side : {use.lhs, use.rhs, use.high_conn, use.low_conn,
+                                use.term_expr, use.term_net}) {
     if (VpiExpressionUses(side, expr)) return true;
   }
   return std::ranges::any_of(use.children, [&](VpiObject* child) {

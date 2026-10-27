@@ -1,3 +1,9 @@
+#include <algorithm>
+#include <cstdint>
+#include <optional>
+
+#include "common/types.h"
+#include "simulator/variable.h"
 #include "simulator/vpi_dynamic_ranges.h"
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers1.h"
@@ -18,6 +24,36 @@ bool VpiIsOperandObject(VpiHandle obj) {
 
 bool VpiIsExprObject(VpiHandle obj) {
   return VpiIsExprType(obj->type) && !obj->written_as_stmt;
+}
+
+std::optional<int64_t> VpiElaborationValue(const VpiObject* expr) {
+  if (expr == nullptr || expr->var == nullptr) return std::nullopt;
+  switch (expr->type) {
+    case vpiConstant:
+    case vpiParameter:
+    case vpiSpecParam:
+      return static_cast<int64_t>(expr->var->value.ToUint64());
+    default:
+      return std::nullopt;
+  }
+}
+
+bool VpiIsElaborationConstant(const VpiObject* expr) {
+  if (expr == nullptr) return false;
+  switch (expr->type) {
+    case vpiConstant:
+    case vpiParameter:
+    case vpiSpecParam:
+      return true;
+    case vpiOperation:
+      // An operation's children are its operands and the attributes its
+      // operator is written with (§37.83), which are no part of its value.
+      return std::ranges::all_of(expr->children, [](VpiObject* child) {
+        return !VpiIsOperandObject(child) || VpiIsElaborationConstant(child);
+      });
+    default:
+      return false;
+  }
 }
 
 namespace {

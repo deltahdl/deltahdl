@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -165,6 +166,17 @@ bool VpiIsExprOperandType(int type);
 // written as a statement (§37.42), which a statement holding both a condition
 // and a body tells its condition by.
 bool VpiIsOperandObject(VpiHandle obj);
+
+// §11.2.1: the value of `expr` where it is an elaboration-time constant
+// holding one -- a constant, a parameter or a spec param, a genvar standing
+// as the local parameter of its value; empty for any other expression.
+std::optional<int64_t> VpiElaborationValue(const VpiObject* expr);
+
+// §11.2.1: whether `expr` is an elaboration-time constant expression -- a
+// constant, a parameter or a spec param, or an operation whose operands all
+// are. §37.58 detail 3, §37.59 detail 9 and §37.16 detail 23 make a select
+// written with such indices or bounds a constant select.
+bool VpiIsElaborationConstant(const VpiObject* expr);
 
 // §37.59: the relations of a part select (vpiLeftRange, vpiRightRange,
 // vpiParent) and an indexed part select (vpiBaseExpr, vpiWidthExpr,

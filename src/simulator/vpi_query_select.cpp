@@ -36,7 +36,8 @@ bool VpiNetOrVariableConstantSelect(VpiHandle obj) {
   bool all_elements_static_members = true;
   for (VpiHandle node = obj, prefix = VpiSelectPrefix(obj); prefix != nullptr;
        node = prefix, prefix = VpiSelectPrefix(prefix)) {
-    if (node->index_expr != nullptr && node->index_expr->type != vpiConstant) {
+    if (node->index_expr != nullptr &&
+        !VpiIsElaborationConstant(node->index_expr)) {
       all_indices_constant = false;
     }
     // §37.17 detail 21: an array var's vpiArrayType says whether its bounds
@@ -68,13 +69,12 @@ bool VpiPartSelectConstantSelect(VpiHandle select) {
   if (kParent->array_type != 0 && kParent->array_type != vpiStaticArray) {
     return false;
   }
-  const auto kConstant = [](const VpiObject* range) {
-    return range != nullptr && range->type == vpiConstant;
-  };
   if (select->type == vpiIndexedPartSelect) {
-    return kConstant(select->base_expr) && kConstant(select->width_expr);
+    return VpiIsElaborationConstant(select->base_expr) &&
+           VpiIsElaborationConstant(select->width_expr);
   }
-  return kConstant(select->left_range) && kConstant(select->right_range);
+  return VpiIsElaborationConstant(select->left_range) &&
+         VpiIsElaborationConstant(select->right_range);
 }
 
 }  // namespace

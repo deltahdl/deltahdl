@@ -75,6 +75,11 @@ struct AssignBuild {
   const RtlirNodeAttributes* attrs = nullptr;  // §37.83: its operators'.
 };
 
+// §37.46: the names `expr` reads, wherever they stand in it, appended to
+// `out`: an assignment's right side, or a select's index. A member access
+// reads its prefix; the member is no name of the scope.
+void CollectReads(const Expr* expr, std::vector<std::string_view>& out);
+
 // §37.58 and §37.59: the expression object `expr` stands for, built with
 // `build`; null for a kind of expression not modelled.
 VpiObject* ExpressionObject(const Expr* expr, const AssignBuild& build);

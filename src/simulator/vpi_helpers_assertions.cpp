@@ -835,13 +835,13 @@ bool VpiBitSelectConstantSelectOf(VpiHandle select) {
   if (!select || select->type != vpiBitSelect) return false;
 
   // The index expressions are the one the select was written with, which
-  // vpiIndex reaches, and the select's expression children; an index that is
-  // an elaboration-time constant stands as a constant expression object.
-  bool all_indices_constant =
-      select->index_expr == nullptr || select->index_expr->type == vpiConstant;
+  // vpiIndex reaches, and the select's expression children; one written as a
+  // parameter, or an operation over parameters, keeps that form (§11.2.1).
+  bool all_indices_constant = select->index_expr == nullptr ||
+                              VpiIsElaborationConstant(select->index_expr);
   for (const VpiObject* child : select->children) {
     if (!VpiIsExprType(child->type)) continue;
-    if (child->type != vpiConstant) all_indices_constant = false;
+    if (!VpiIsElaborationConstant(child)) all_indices_constant = false;
   }
 
   // The prefix the figure draws vpiParent to is a var select, an integer var, a

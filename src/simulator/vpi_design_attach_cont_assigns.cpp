@@ -44,8 +44,8 @@ void CollectTargets(const Expr* expr, std::vector<std::string_view>& out) {
   }
 }
 
-// §37.46: the names an assignment's right side reads, wherever they stand in
-// it. A member access reads its prefix; the member is no name of the scope.
+}  // namespace
+
 void CollectReads(const Expr* expr, std::vector<std::string_view>& out) {
   if (expr == nullptr) return;
   if (expr->kind == ExprKind::kIdentifier) {
@@ -64,6 +64,8 @@ void CollectReads(const Expr* expr, std::vector<std::string_view>& out) {
   for (const Expr* arg : expr->args) CollectReads(arg, out);
   for (const Expr* element : expr->elements) CollectReads(element, out);
 }
+
+namespace {
 
 // Hangs `assign` among the children of each object `names` resolve to once,
 // which is where §37.46's driver and load iterations look for it.

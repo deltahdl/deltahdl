@@ -215,6 +215,86 @@ TEST_F(BitSelectsOfARun, ABitOfANetIsTheNetsBit) {
                        vpi_handle_by_name(VpiText("top.a"), nullptr), 3));
 }
 
+// The right-hand sides of the continuous assignments `scope` holds, in the
+// order vpiContAssign reaches them.
+std::vector<vpiHandle> RightSides(vpiHandle scope) {
+  std::vector<vpiHandle> sides;
+  vpiHandle it = vpi_iterate(vpiContAssign, scope);
+  if (it == nullptr) return sides;
+  for (vpiHandle ca = vpi_scan(it); ca != nullptr; ca = vpi_scan(it)) {
+    sides.push_back(vpi_handle(vpiRhs, ca));
+  }
+  return sides;
+}
+
+// §37.16 with §11.2.1: an index that is an elaboration-time constant without
+// being a literal -- a parameter, or an operation over one -- chooses the
+// net's bit its value names, as a literal index does, and so a constant
+// select (§37.16 detail 23).
+TEST_F(BitSelectsOfARun, AParameterIndexChoosesTheNetsOwnBit) {
+  Run("module top; parameter P = 4; wire [7:0] a; wire y, z;\n"
+      "assign y = a[P]; assign z = a[P-1];\n"
+      "endmodule\n");
+  const std::vector<vpiHandle> kSides = RightSides(By("top"));
+  ASSERT_EQ(kSides.size(), 2U);
+  EXPECT_EQ(kSides[0], vpi_handle_by_index(By("top.a"), 4));
+  EXPECT_EQ(kSides[1], vpi_handle_by_index(By("top.a"), 3));
+  EXPECT_EQ(vpi_get(vpiConstantSelect, kSides[0]), 1);
+}
+
+// ...as does a genvar, a constant in each block instance its loop generates
+// (§27.4).
+TEST_F(BitSelectsOfARun, AGenvarIndexChoosesTheNetsOwnBit) {
+  Run("module top; wire [7:0] a;\n"
+      "  for (genvar g = 2; g < 4; g++) begin : gb\n"
+      "    wire y; assign y = a[g];\n"
+      "  end\n"
+      "endmodule\n");
+  const std::vector<vpiHandle> kSides = RightSides(By("top.gb[3]"));
+  ASSERT_EQ(kSides.size(), 1U);
+  EXPECT_EQ(kSides[0], vpi_handle_by_index(By("top.a"), 3));
+}
+
+// §37.17 details 2 and 18: into an unpacked array var, such an index chooses
+// the element its value names, as a literal index does, and no var select.
+TEST_F(BitSelectsOfARun, AParameterIndexChoosesTheArraysElement) {
+  Run("module top; parameter P = 1; logic [7:0] arr [0:3]; wire [7:0] y;\n"
+      "assign y = arr[P];\n"
+      "endmodule\n");
+  EXPECT_EQ(Rhs(), vpi_handle_by_index(By("top.arr"), 1));
+}
+
+// §37.58 detail 3 with §11.2.1: a bit select of an integer var keeps the index
+// it was written with, and is a constant select where that is a parameter or
+// an operation over one, and not where it is an operation over a variable.
+TEST_F(BitSelectsOfARun, AParameterIndexedBitSelectIsAConstantSelect) {
+  Run("module top; parameter P = 4; integer i, k; wire a, b, c;\n"
+      "assign a = i[P]; assign b = i[P-1]; assign c = i[k+1];\n"
+      "endmodule\n");
+  const std::vector<vpiHandle> kSides = RightSides(By("top"));
+  ASSERT_EQ(kSides.size(), 3U);
+  EXPECT_EQ(vpi_get(vpiType, kSides[0]), vpiBitSelect);
+  EXPECT_EQ(vpi_get(vpiConstantSelect, kSides[0]), 1);
+  EXPECT_EQ(vpi_get(vpiConstantSelect, kSides[1]), 1);
+  EXPECT_EQ(vpi_get(vpiConstantSelect, kSides[2]), 0);
+}
+
+// §37.59 detail 9: so is a part select bounded by a parameter, and an indexed
+// part select of a parameter width based on a constant, but not one based on
+// a variable.
+TEST_F(BitSelectsOfARun, AParameterBoundedPartSelectIsAConstantSelect) {
+  Run("module top; parameter P = 4; wire [7:0] n; integer k;\n"
+      "wire [2:0] a; wire [3:0] b, c;\n"
+      "assign a = n[P:2]; assign b = n[2+:P]; assign c = n[k+:P];\n"
+      "endmodule\n");
+  const std::vector<vpiHandle> kSides = RightSides(By("top"));
+  ASSERT_EQ(kSides.size(), 3U);
+  EXPECT_EQ(vpi_get(vpiType, kSides[0]), vpiPartSelect);
+  EXPECT_EQ(vpi_get(vpiConstantSelect, kSides[0]), 1);
+  EXPECT_EQ(vpi_get(vpiConstantSelect, kSides[1]), 1);
+  EXPECT_EQ(vpi_get(vpiConstantSelect, kSides[2]), 0);
+}
+
 constexpr const char* kVaryingNetBit =
     "module top; wire [7:0] a; integer i = 2; wire y; assign y = a[i];\n"
     "endmodule\n";
@@ -350,17 +430,34 @@ TEST_F(BitSelectsOfARun, AnElementsBitsAreNoIndicesOfIt) {
   EXPECT_EQ(count, 1);
 }
 
+// The integer property `property` of each object vpiUse reaches from `expr`,
+// lowest first.
+std::vector<int> PropertyOfUses(int property, vpiHandle expr) {
+  std::vector<int> values;
+  vpiHandle it = vpi_iterate(vpiUse, expr);
+  if (it == nullptr) return values;
+  for (vpiHandle use = vpi_scan(it); use != nullptr; use = vpi_scan(it)) {
+    values.push_back(vpi_get(property, use));
+  }
+  std::ranges::sort(values);
+  return values;
+}
+
 // The lines the objects vpiUse reaches from `expr` were written on, lowest
 // first.
 std::vector<int> LinesOfUses(vpiHandle expr) {
-  std::vector<int> lines;
-  vpiHandle it = vpi_iterate(vpiUse, expr);
-  if (it == nullptr) return lines;
-  for (vpiHandle use = vpi_scan(it); use != nullptr; use = vpi_scan(it)) {
-    lines.push_back(vpi_get(vpiLineNo, use));
-  }
-  std::ranges::sort(lines);
-  return lines;
+  return PropertyOfUses(vpiLineNo, expr);
+}
+
+// The kinds of the objects vpiUse reaches from `expr`, lowest first.
+std::vector<int> KindsOfUses(vpiHandle expr) {
+  return PropertyOfUses(vpiType, expr);
+}
+
+// `kinds`, lowest first, to set against KindsOfUses.
+std::vector<int> Ascending(std::vector<int> kinds) {
+  std::ranges::sort(kinds);
+  return kinds;
 }
 
 // §37.58 detail 1: the uses of a vector are those of the vector and of its
@@ -396,11 +493,11 @@ TEST_F(BitSelectsOfARun, ABitIsUsedWhereItItsVectorOrASelectHoldingItIs) {
 // where it indexes such a select.
 TEST_F(BitSelectsOfARun, AVectorIsUsedThroughEverySelectKindAndAnIndex) {
   Run("module top; integer i; logic [7:0] v; wire [3:0] n;\n"
-      "logic [7:0] arr [0:3]; wire a, b, c; wire [7:0] y;\n"
+      "logic [7:0] arr [0:3]; wire a, b, c, y;\n"
       "assign a = i[3];\n"
       "assign b = ^v[2+:2];\n"
       "assign c = n[1] | v[i];\n"
-      "assign y = arr[i];\n"
+      "assign y = ^arr[i];\n"
       "endmodule\n");
   EXPECT_EQ(LinesOfUses(By("top.i")), (std::vector<int>{3, 5, 6}));
   EXPECT_EQ(LinesOfUses(By("top.v")), (std::vector<int>{4, 5}));
@@ -424,11 +521,42 @@ TEST_F(BitSelectsOfARun, ANetBitIsUsedWhereASelectsBoundsHoldIt) {
   EXPECT_EQ(LinesOfUses(Rhs()), (std::vector<int>{2, 3, 4, 5}));
 }
 
+// §37.58 detail 2 with §11.5.1: the bounds, base and width of a part select
+// are constant expressions, a parameter among them, so one bounded by a
+// parameter, based on one, or of a parameter width holds the bits their values
+// span, and uses a bit it holds. A bit selected by a variable is no specific
+// use of the bit, whichever bit the variable picks out.
+TEST_F(BitSelectsOfARun, ANetBitIsUsedWhereAParameterBoundedSelectHoldsIt) {
+  Run("module top; parameter P = 4; wire [7:0] n; integer k;\n"
+      "wire a, b, c, d, e; assign a = n[3];\n"
+      "assign b = ^n[P:2];\n"
+      "assign c = ^n[2+:P];\n"
+      "assign d = ^n[P+:2];\n"
+      "assign e = n[k];\n"
+      "endmodule\n");
+  EXPECT_EQ(LinesOfUses(Rhs()), (std::vector<int>{2, 3, 4}));
+}
+
+// The same of a genvar, which stands for a constant in each block its loop
+// generates (§27.4): of the two blocks below, the select of the first, based
+// at 2, holds the bit, and that of the second, based at 4, does not.
+TEST_F(BitSelectsOfARun, ANetBitIsUsedWhereAGenvarBasedSelectHoldsIt) {
+  Run("module top; wire [7:0] n; wire a;\n"
+      "assign a = n[3];\n"
+      "for (genvar g = 2; g < 5; g += 2) begin : blk\n"
+      "  wire b;\n"
+      "  assign b = ^n[g+:2];\n"
+      "end\n"
+      "endmodule\n");
+  EXPECT_EQ(LinesOfUses(Rhs()), (std::vector<int>{2, 5}));
+}
+
 // §37.58 detail 2 on objects the model holds no index or bounds for: a bit
-// matches another bit of its vector, or a part select of it, by the constant
-// values of their indices and bounds alone. A bit with no index, a bit whose
-// index holds no value, and a part select missing a bound, its base or its
-// width match none, while a bit at the same constant index does.
+// matches another bit of its vector, or a part select of it, by the values of
+// their indices and bounds alone, a constant's, a parameter's or a spec
+// param's. A bit with no index, a bit whose index holds no value, and a part
+// select missing a bound, its base or its width match none, while a bit at
+// the same index does.
 TEST(SimpleExpressionModel, ABitMatchesASelectOnlyByConstantValues) {
   Arena arena;
   Variable three_value;
@@ -452,6 +580,12 @@ TEST(SimpleExpressionModel, ABitMatchesASelectOnlyByConstantValues) {
   VpiObject twin = kSelectOf(vpiRegBit);
   twin.index_expr = &three;
   EXPECT_TRUE(VpiExpressionUses(&twin, bit));
+  VpiObject spec_three;
+  spec_three.type = vpiSpecParam;
+  spec_three.var = &three_value;
+  VpiObject spec_twin = kSelectOf(vpiRegBit);
+  spec_twin.index_expr = &spec_three;
+  EXPECT_TRUE(VpiExpressionUses(&spec_twin, bit));
   VpiObject no_value = kSelectOf(vpiRegBit);
   no_value.index_expr = &valueless;
   EXPECT_FALSE(VpiExpressionUses(&no_value, bit));
@@ -472,19 +606,26 @@ TEST(SimpleExpressionModel, ABitMatchesASelectOnlyByConstantValues) {
   EXPECT_FALSE(VpiExpressionUses(&no_width, bit));
 }
 
+// A cell whose input `a` feeds a gate, a module path and a timing check, and
+// whose output `y` the gate drives and the path's delay device stands on
+// (§37.45), instanced in a top driving a two-bit wire by a continuous
+// assignment of its own.
+constexpr const char* kTimedCell =
+    "module m(input a, input c, output y);\n"
+    "  buf g(y, a);\n"
+    "  specify (a => y) = 3; $setup(a, posedge c, 1); endspecify\n"
+    "endmodule\n"
+    "module top; wire p, q, r; wire [1:0] w; assign w = 2'b01;\n"
+    "  m u(p, r, q);\n"
+    "endmodule\n";
+
 // §37.58 (figure): of the prim terms, path terms, tchk terms, ports and
 // continuous assignments and their bits a design holds, a wire is used by the
 // ones naming it. The cell's gate, module path and timing check and the top's
 // vector assignment name other signals, so the port the wire connects is its
 // one use.
 TEST_F(BitSelectsOfARun, AWireIsUsedByThePortItConnectsAlone) {
-  Run("module m(input a, input c, output y);\n"
-      "  buf g(y, a);\n"
-      "  specify (a => y) = 3; $setup(a, posedge c, 1); endspecify\n"
-      "endmodule\n"
-      "module top; wire p, q, r; wire [1:0] w; assign w = 2'b01;\n"
-      "  m u(p, r, q);\n"
-      "endmodule\n");
+  Run(kTimedCell);
   vpiHandle it = vpi_iterate(vpiUse, By("top.p"));
   ASSERT_NE(it, nullptr);
   vpiHandle use = vpi_scan(it);
@@ -492,6 +633,46 @@ TEST_F(BitSelectsOfARun, AWireIsUsedByThePortItConnectsAlone) {
   EXPECT_EQ(vpi_get(vpiType, use), vpiPort);
   EXPECT_STREQ(vpi_get_str(vpiName, use), "a");
   EXPECT_EQ(vpi_scan(it), nullptr);
+}
+
+// §37.58 (figure) with §37.39 and §37.40: a path term and a tchk term whose
+// terminal names a net use it, so the cell's input is used by the input term
+// of its module path and the data term of its timing check, beside its gate's
+// prim term and its port.
+TEST_F(BitSelectsOfARun, ACellInputIsUsedByItsPathAndTimingCheckTerms) {
+  Run(kTimedCell);
+  EXPECT_EQ(KindsOfUses(By("top.u.a")),
+            Ascending({vpiPort, vpiPrimTerm, vpiPathTerm, vpiTchkTerm}));
+}
+
+// §37.58 (figure) with §37.45: the two delay terms of a delay device stand on
+// the net it is placed on and use it, so the cell's output is used by those of
+// its module path's device, beside its gate's prim term, the path's output term
+// and its port.
+TEST_F(BitSelectsOfARun, ACellOutputIsUsedByItsPathDevicesDelayTerms) {
+  Run(kTimedCell);
+  EXPECT_EQ(KindsOfUses(By("top.u.y")),
+            Ascending({vpiPort, vpiPrimTerm, vpiPathTerm, vpiDelayTerm,
+                       vpiDelayTerm}));
+}
+
+// §37.58 (figure) with §37.47: a cont assign bit has no sides of its own, its
+// value being its bit of its assignment's, so it uses what the assignment
+// uses: a vector read by a two-bit assignment is used by the assignment and by
+// both its bits.
+TEST_F(BitSelectsOfARun, AnAssignmentsBitsUseWhatTheAssignmentUses) {
+  Run("module top; logic [1:0] v; wire [1:0] w; assign w = v; endmodule\n");
+  EXPECT_EQ(KindsOfUses(By("top.v")),
+            Ascending({vpiContAssign, vpiContAssignBit, vpiContAssignBit}));
+}
+
+// ...and a cont assign bit belonging to no assignment uses nothing.
+TEST(SimpleExpressionModel, AnAssignmentBitOfNoAssignmentUsesNothing) {
+  VpiObject net;
+  net.type = vpiNet;
+  VpiObject bit;
+  bit.type = vpiContAssignBit;
+  EXPECT_FALSE(VpiUsesExpr(bit, net));
 }
 
 // §37.58 (figure): the simple expressions are the nets, the variables, a ref
@@ -585,6 +766,28 @@ TEST(BitSelectConstantSelect, ReadOffTheSelectAndItsParent) {
   EXPECT_EQ(VpiBitSelectConstantSelectOf(&of_var_select),
             VpiVarSelectConstantSelectOf(&var_select));
 }
+// §11.2.1 read off the objects: a constant, a parameter and a spec param are
+// elaboration-time constants, and an operation is one where each of its
+// operands is, the attributes its operator carries being none of them. No
+// object, a variable and an operation over one are none.
+TEST(SimpleExpressionModel, ElaborationConstantsAreConstantsAndParameters) {
+  EXPECT_FALSE(VpiIsElaborationConstant(nullptr));
+  VpiObject spec;
+  spec.type = vpiSpecParam;
+  EXPECT_TRUE(VpiIsElaborationConstant(&spec));
+  VpiObject attribute;
+  attribute.type = vpiAttribute;
+  VpiObject operation;
+  operation.type = vpiOperation;
+  operation.children = {&spec, &attribute};
+  EXPECT_TRUE(VpiIsElaborationConstant(&operation));
+  VpiObject var;
+  var.type = vpiIntegerVar;
+  EXPECT_FALSE(VpiIsElaborationConstant(&var));
+  operation.children.push_back(&var);
+  EXPECT_FALSE(VpiIsElaborationConstant(&operation));
+}
+
 // A design run with a PLI application registered, its VPI model read back
 // once the run is over.
 class ConstantsOfARun : public VpiDesignRun {};

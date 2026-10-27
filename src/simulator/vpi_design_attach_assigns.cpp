@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -11,6 +12,7 @@
 #include "common/arena.h"
 #include "common/packed_range.h"
 #include "common/types.h"
+#include "elaborator/const_eval.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
 #include "lexer/token.h"
@@ -154,20 +156,29 @@ VpiObject* ConstantObject(const Expr* expr, const AssignBuild& build) {
   return constant;
 }
 
+// §27.4: the value the loop generate block's genvar `name` holds in the block
+// instance an expression of `build` stands in; none where `name` is no such
+// genvar.
+std::optional<int64_t> GenvarValue(std::string_view name,
+                                   const AssignBuild& build) {
+  const auto kGenvar = std::ranges::find_if(
+      build.names.genvars,
+      [name](const auto& genvar) { return genvar.first == name; });
+  if (kGenvar == build.names.genvars.end()) return std::nullopt;
+  return kGenvar->second;
+}
+
 // §27.4 with §37.85 detail 3: a loop generate block's genvar named in a
 // continuous assignment the block holds, as the local parameter §27.4 declares
 // in the block instance under the genvar's name, holding the value it holds
 // there; no name the run keys resolves to it. Null where `name` is no such
 // genvar.
 VpiObject* GenvarParameter(std::string_view name, const AssignBuild& build) {
-  const auto kGenvar = std::ranges::find_if(
-      build.names.genvars,
-      [name](const auto& genvar) { return genvar.first == name; });
-  if (kGenvar == build.names.genvars.end()) return nullptr;
+  const std::optional<int64_t> kValue = GenvarValue(name, build);
+  if (!kValue) return nullptr;
   Arena& arena = build.sim->GetArena();
   auto* storage = arena.Create<Variable>();
-  storage->value =
-      MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(kGenvar->second));
+  storage->value = MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(*kValue));
   storage->value.is_signed = true;
   VpiObject* param = build.alloc();
   param->type = vpiParameter;
@@ -176,6 +187,27 @@ VpiObject* GenvarParameter(std::string_view name, const AssignBuild& build) {
   param->var = storage;
   param->size = 32;
   return param;
+}
+
+// §11.2.1: the value of the index `index` where it is an elaboration-time
+// constant, folded from the values of the names it reads -- parameters and
+// spec params, which the objects those names resolve to hold, and genvars;
+// none where it reads a name of anything else, a net or a variable among
+// them, whose value only the run fixes.
+std::optional<int64_t> ConstantIndex(const Expr* index,
+                                     const AssignBuild& build) {
+  std::vector<std::string_view> names;
+  CollectReads(index, names);
+  ScopeMap scope;
+  for (std::string_view name : names) {
+    const VpiObject* named = Resolve(build.names, name);
+    const std::optional<int64_t> kValue = named != nullptr
+                                              ? VpiElaborationValue(named)
+                                              : GenvarValue(name, build);
+    if (!kValue) return std::nullopt;
+    scope[name] = *kValue;
+  }
+  return ConstEvalInt(index, scope);
 }
 
 // `first` followed by `rest`, as the operands of an operation.
@@ -317,7 +349,8 @@ VpiObject* PackedSelectObject(VpiObject* base, const Expr* index,
   std::vector<PackedRange> rest(base->packed_dims.begin() + 1,
                                 base->packed_dims.end());
   const int64_t kWidth = PackedDimsWidth(rest);
-  if (index->kind != ExprKind::kIntegerLiteral) {
+  const std::optional<int64_t> kConstant = ConstantIndex(index, build);
+  if (!kConstant) {
     VpiObject* select = SliceObject(root, std::move(rest), kWidth, build);
     select->select_dim = kDim;
     select->select_base_offset = static_cast<int>(kBaseOffset);
@@ -327,7 +360,7 @@ VpiObject* PackedSelectObject(VpiObject* base, const Expr* index,
     }
     return select;
   }
-  const auto kIndex = static_cast<int64_t>(index->int_val);
+  const int64_t kIndex = *kConstant;
   if (!kDim.Contains(kIndex)) return nullptr;
   const int64_t kOffset = kBaseOffset + (kDim.OffsetOf(kIndex) * kWidth);
   if (rest.empty()) return VpiBitAtOffset(*root, kOffset);
@@ -370,11 +403,12 @@ VpiObject* BitSelectObject(const Expr* expr, const AssignBuild& build) {
   // A varying bit of a vector was made above (PackedSelectObject), so what a
   // varying index selects from here is an element, a var select of an array
   // var's (§37.19). An array net's has no object.
-  if (expr->index->kind != ExprKind::kIntegerLiteral) {
+  const std::optional<int64_t> kConstant = ConstantIndex(expr->index, build);
+  if (!kConstant) {
     return base->type == vpiArrayVar ? VarSelectObject(base, expr->index, build)
                                      : nullptr;
   }
-  const auto kIndex = static_cast<int>(expr->index->int_val);
+  const auto kIndex = static_cast<int>(*kConstant);
   for (VpiObject* child : base->children) {
     if (VpiIndexSelects(*base, *child, kIndex)) return child;
   }
