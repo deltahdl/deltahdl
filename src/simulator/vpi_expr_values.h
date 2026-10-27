@@ -6,7 +6,14 @@ namespace delta {
 
 class SimContext;
 class VpiContext;
+struct VpiExprScope;
 struct VpiObject;
+
+// The value of the expression `scope` records, evaluated where the source
+// wrote it, by a stand-in process of the instance and generate blocks it
+// stands in, as a process running there would read its names, and at the
+// context width `scope` gives, if any.
+Logic4Vec VpiEvaluateWhereWritten(const VpiExprScope& scope, SimContext& sim);
 
 // §37.3.5 with §38.15: the value of `obj`, which holds no storage but stands
 // for an expression, an operation, a call or a continuous assignment (its

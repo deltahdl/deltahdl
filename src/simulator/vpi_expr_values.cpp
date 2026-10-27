@@ -40,8 +40,7 @@ void StandInWhere(Process& stand_in, const VpiExprScope& scope) {
 
 }  // namespace
 
-Logic4Vec VpiEvaluateExpressionObject(const VpiObject& obj, SimContext& sim) {
-  const VpiExprScope& scope = *obj.expr_scope;
+Logic4Vec VpiEvaluateWhereWritten(const VpiExprScope& scope, SimContext& sim) {
   Process stand_in;
   StandInWhere(stand_in, scope);
   const CallerStandIn kStandIn(&stand_in, sim);
@@ -50,6 +49,10 @@ Logic4Vec VpiEvaluateExpressionObject(const VpiObject& obj, SimContext& sim) {
   return ResizeToWidth(
       EvalExpr(scope.expr, sim, sim.GetArena(), scope.context_width),
       scope.context_width, sim.GetArena());
+}
+
+Logic4Vec VpiEvaluateExpressionObject(const VpiObject& obj, SimContext& sim) {
+  return VpiEvaluateWhereWritten(*obj.expr_scope, sim);
 }
 
 namespace {

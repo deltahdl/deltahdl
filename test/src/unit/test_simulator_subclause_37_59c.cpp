@@ -344,6 +344,19 @@ TEST_F(AssignedExpressionsOfARun,
             (std::vector<int>{4, 3, 5, 6}));
 }
 
+// So does any other constant §11.2.1 admits there, which the run values where
+// the source wrote it: $bits of a variable (§20.6.2) as a replication's count,
+// and a constant function call (§13.4.3) as a part select's bound.
+// {$bits(b){c}} is 8 bits and a[f():0] 4.
+TEST_F(AssignedExpressionsOfARun, ConstantsTheRunValuesSizeTheirExpressions) {
+  Run("module top; function automatic int f(); return 3; endfunction\n"
+      "  logic [3:0] b; logic [1:0] c; logic [7:0] a, x;\n"
+      "  initial begin x = {$bits(b){c}}; x = a[f():0]; end\n"
+      "endmodule\n");
+  EXPECT_EQ(PropertiesOf(vpiSize, ProcedureRightSides()),
+            (std::vector<int>{8, 4}));
+}
+
 // A bit select and a part select hold no storage of their own; each reads the
 // bits it selects out of its parent's value.
 TEST_F(AssignedExpressionsOfARun, ABitSelectReadsItsBit) {

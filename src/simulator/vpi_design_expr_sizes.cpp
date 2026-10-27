@@ -4,11 +4,16 @@
 #include <cstdlib>
 #include <numeric>
 #include <optional>
+#include <string>
 #include <vector>
 
 #include "parser/ast_expr.h"
+#include "simulator/evaluation.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_design_attach_assigns_internal.h"
+#include "simulator/vpi_design_walk.h"
+#include "simulator/vpi_expr_scope.h"
+#include "simulator/vpi_expr_values.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
@@ -89,18 +94,29 @@ int CastWidth(const VpiObject& op) {
   return 0;
 }
 
+// §11.5.1 and §11.4.12.1: the value of `constant`, a select's bound or width
+// or a replication's count, which those clauses make a constant expression:
+// its fold, where ElaborationConstant folds it, and otherwise its value where
+// the source wrote it, in the instance and the generate blocks `build` stands
+// in, as for $bits of a variable (§20.6.2), an array query (§20.7) or a
+// constant function call (§13.4.3), all constants §11.2.1 admits.
+int64_t ConstantWhereWritten(const Expr* constant, const AssignBuild& build) {
+  const std::optional<int64_t> kFolded = ElaborationConstant(constant, build);
+  if (kFolded) return *kFolded;
+  const VpiExprScope kScope{
+      constant, VpiFlatName(build.names.prefix, ""),
+      std::vector<std::string>(build.names.gen.begin(), build.names.gen.end())};
+  return SelectBoundValue(VpiEvaluateWhereWritten(kScope, *build.sim));
+}
+
 // §11.4.12.1 with §11.6.1 Table 11-21: the width of the replication `expr`,
-// its count, a constant expression, times the widths of the expressions it
-// repeats, which follow the count among `sizes` (§37.59 detail 1); 0 where
-// the count does not fold.
+// its count times the widths of the expressions it repeats, which follow the
+// count among `sizes` (§37.59 detail 1).
 int ReplicationWidth(const Expr& expr, const std::vector<int>& sizes,
                      const AssignBuild& build) {
-  const std::optional<int64_t> kCount =
-      ElaborationConstant(expr.repeat_count, build);
-  if (!kCount) return 0;
   int sum = 0;
   for (std::size_t i = 1; i < sizes.size(); ++i) sum += sizes[i];
-  return static_cast<int>(*kCount) * sum;
+  return static_cast<int>(ConstantWhereWritten(expr.repeat_count, build)) * sum;
 }
 
 // §11.6.1 Table 11-21: the self-determined width of the operation `op`, built
@@ -126,17 +142,14 @@ int OperationWidth(const VpiObject& op, const std::vector<int>& sizes,
 }
 
 // §11.5.1: the width the select `expr` selects, the span of a part select's
-// bounds or an indexed part select's width, each a constant expression; 0
-// where one does not fold.
+// bounds or an indexed part select's width.
 int SelectWidth(const Expr& expr, const AssignBuild& build) {
-  const std::optional<int64_t> kSecond =
-      ElaborationConstant(expr.index_end, build);
+  const int64_t kSecond = ConstantWhereWritten(expr.index_end, build);
   if (expr.is_part_select_plus || expr.is_part_select_minus) {
-    return static_cast<int>(kSecond.value_or(0));
+    return static_cast<int>(kSecond);
   }
-  const std::optional<int64_t> kFirst = ElaborationConstant(expr.index, build);
-  if (!kFirst || !kSecond) return 0;
-  return static_cast<int>(std::abs(*kFirst - *kSecond) + 1);
+  const int64_t kFirst = ConstantWhereWritten(expr.index, build);
+  return static_cast<int>(std::abs(kFirst - kSecond) + 1);
 }
 
 }  // namespace
