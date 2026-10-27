@@ -865,10 +865,13 @@ VpiCallSite CallSiteOf(const BlockParent& parent, const BodyWalk& walk) {
 }
 
 int TypeVariableKind(const DataType& type, const BodyWalk& walk) {
-  if (type.kind == DataTypeKind::kNamed) {
+  if (type.kind != DataTypeKind::kNamed) {
+    return VpiDataTypeVariableKind(type.kind);
+  }
+  if (walk.package.empty() && type.scope_name.empty()) {
     return VpiNamedTypeVariableKind(walk.design, walk.mod, type.type_name);
   }
-  return VpiDataTypeVariableKind(type.kind);
+  return VpiScopedTypeVariableKind(walk.design, walk.package, type);
 }
 
 int ForeachIndexKind(const Expr* array, const BlockParent& parent,

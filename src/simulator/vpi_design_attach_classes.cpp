@@ -16,7 +16,6 @@
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_class_objects.h"
 #include "simulator/vpi_class_typespecs.h"
-#include "simulator/vpi_constants.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_prefixed_refs.h"
 #include "simulator/vpi_design_walk.h"
@@ -285,9 +284,12 @@ int DeclaredVisibility(const ClassMember& member) {
 }
 
 // §37.17 with §6.18 and §8.3: the kind of variable a property of `type`
-// is, a class var where the type names a class or a typedef of one.
+// is, a class var where the type names a class or a typedef of one. A typedef
+// name resolves among the declarations of the package written before it, or
+// of `package`, the package declaring the class, empty for none (§26.3).
 int PropertyKind(const DataType& type, const RtlirDesign& design,
-                 const std::vector<MadeClassDefn>& made) {
+                 const std::vector<MadeClassDefn>& made,
+                 std::string_view package) {
   if (type.kind != DataTypeKind::kNamed) {
     return VpiDataTypeVariableKind(type.kind);
   }
@@ -295,12 +297,8 @@ int PropertyKind(const DataType& type, const RtlirDesign& design,
       std::ranges::any_of(made, [&](const MadeClassDefn& candidate) {
         return candidate.decl->name == type.type_name;
       });
-  if (kNamesMadeClass || design.type_targets.contains(type.type_name)) {
-    return vpiClassVar;
-  }
-  const auto kFound = design.type_kinds.find(type.type_name);
-  if (kFound == design.type_kinds.end()) return kVpiReg;
-  return VpiDataTypeVariableKind(kFound->second);
+  if (kNamesMadeClass) return vpiClassVar;
+  return VpiScopedTypeVariableKind(design, package, type);
 }
 
 // §37.25 detail 11: the type parameter of the class `owner` was made for
@@ -329,7 +327,7 @@ VpiObject* MakeProperty(const MadeClassDefn& owner, const ClassMember& member,
                         const RtlirDesign& design,
                         const std::vector<MadeClassDefn>& made,
                         const VpiAttachBuild& build) {
-  const int kKind = PropertyKind(member.data_type, design, made);
+  const int kKind = PropertyKind(member.data_type, design, made, owner.package);
   VpiObject* var = build.alloc();
   if (member.unpacked_dims.empty()) {
     var->type = kKind;

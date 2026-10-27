@@ -94,7 +94,9 @@ inline const std::vector<Stmt*>& BlockItems(const Stmt& block) {
 VpiCallSite CallSiteOf(const BlockParent& parent, const BodyWalk& walk);
 
 // §37.17: the object kind of a variable declared with `type` in the instance,
-// leaving its unpacked dimensions aside.
+// or in the package the walk stands in, leaving its unpacked dimensions aside;
+// a typedef name resolves among the declarations of the package written
+// before it, or of the walk's own package (§26.3).
 int TypeVariableKind(const DataType& type, const BodyWalk& walk);
 
 // §23.9: the declaration of the variable `name` a block around the statement

@@ -487,5 +487,104 @@ TEST_F(VariablesOfARun, TheCompilationUnitsVariablesHaveTheirTypesKinds) {
   EXPECT_EQ(vpi_get(vpiType, Named(vpiVariables, unit, "r")), vpiRealVar);
 }
 
+// D19 with §26.3: a variable declared with a typedef another package
+// declares, written `a::t`, is of the kind `t` stands for whatever declares
+// it: a package, the compilation unit, a task or function of a module or of
+// the unit, or a block, as a module's is (#8209).
+TEST_F(VariablesOfARun, AQualifiedTypedefsVariableHasItsKindWhereverDeclared) {
+  Run("package a; typedef int t; endpackage\n"
+      "package b; a::t pv; endpackage\n"
+      "a::t g;\n"
+      "function automatic void uf(); a::t uv; endfunction\n"
+      "module top;\n"
+      "  a::t mv;\n"
+      "  task run; a::t tv; endtask\n"
+      "  initial begin : blk a::t bv; end\n"
+      "endmodule\n");
+  vpiHandle unit = Named(vpiPackage, nullptr, "$unit");
+  ASSERT_NE(unit, nullptr);
+  const auto kKindOf = [](vpiHandle scope, const char* name) {
+    return vpi_get(vpiType, Named(vpiVariables, scope, name));
+  };
+  EXPECT_EQ(vpi_get(vpiType, By("top.mv")), vpiIntVar);
+  EXPECT_EQ(kKindOf(By("b"), "pv"), vpiIntVar);
+  EXPECT_EQ(kKindOf(unit, "g"), vpiIntVar);
+  EXPECT_EQ(kKindOf(Named(vpiTaskFunc, unit, "uf"), "uv"), vpiIntVar);
+  EXPECT_EQ(kKindOf(Named(vpiTaskFunc, By("top"), "run"), "tv"), vpiIntVar);
+  EXPECT_EQ(kKindOf(By("top.blk"), "bv"), vpiIntVar);
+}
+
+// D19 with §26.2: a variable a block of a package's task declares with the
+// package's own typedef is of the kind the typedef stands for, as one the
+// task declares at the head of its body is (#8213).
+TEST_F(VariablesOfARun, APackageTasksBlockVariableHasItsTypedefsKind) {
+  Run("package pkg;\n"
+      "  typedef int t;\n"
+      "  task run; t hv; begin : blk t bv; end endtask\n"
+      "endpackage\n"
+      "module top; endmodule\n");
+  vpiHandle run = Named(vpiTaskFunc, By("pkg"), "run");
+  ASSERT_NE(run, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, Named(vpiVariables, run, "hv")), vpiIntVar);
+  EXPECT_EQ(
+      vpi_get(vpiType, Named(vpiVariables, vpi_handle(vpiStmt, run), "bv")),
+      vpiIntVar);
+}
+
+// D19 and D20: a package's variable is signed, a scalar or a vector as its
+// declaration says, an int being signed (§6.11) and a vector, through a
+// typedef the package declares as through the type written out; so is the
+// compilation unit's (#8211).
+TEST_F(VariablesOfARun, APackagesVariablesAreSignedScalarOrVectorAsDeclared) {
+  Run("package pkg;\n"
+      "  typedef logic [3:0] nib_t;\n"
+      "  int pv; logic sl; logic signed [3:0] sv; bit [3:0] uv; nib_t nv;\n"
+      "endpackage\n"
+      "int g;\n"
+      "module top; endmodule\n");
+  vpiHandle pkg = By("pkg");
+  ASSERT_NE(pkg, nullptr);
+  const auto kOf = [pkg](int property, const char* name) {
+    return vpi_get(property, Named(vpiVariables, pkg, name));
+  };
+  EXPECT_EQ(kOf(vpiSigned, "pv"), 1);
+  EXPECT_EQ(kOf(vpiVector, "pv"), 1);
+  EXPECT_EQ(kOf(vpiScalar, "pv"), 0);
+  EXPECT_EQ(kOf(vpiScalar, "sl"), 1);
+  EXPECT_EQ(kOf(vpiVector, "sl"), 0);
+  EXPECT_EQ(kOf(vpiSigned, "sv"), 1);
+  EXPECT_EQ(kOf(vpiVector, "sv"), 1);
+  EXPECT_EQ(kOf(vpiSigned, "uv"), 0);
+  EXPECT_EQ(kOf(vpiVector, "nv"), 1);
+  EXPECT_EQ(kOf(vpiScalar, "nv"), 0);
+  vpiHandle g = Named(vpiVariables, Named(vpiPackage, nullptr, "$unit"), "g");
+  EXPECT_EQ(vpi_get(vpiSigned, g), 1);
+  EXPECT_EQ(vpi_get(vpiVector, g), 1);
+}
+
+// D9 and D21: a package's array var reports the kind of array its first
+// unpacked dimension makes it, and a fixed-size one the number of variables
+// along that dimension, a package parameter's value among the bounds (#8212).
+TEST_F(VariablesOfARun, APackagesArrayVarsReportTheirArrayTypeAndSize) {
+  Run("package pkg;\n"
+      "  parameter int N = 3;\n"
+      "  int pa[4]; int pn[N]; int pr[1:2][3]; int pd[]; int pq[$];\n"
+      "  int pm[string];\n"
+      "endpackage\n"
+      "module top; endmodule\n");
+  vpiHandle pkg = By("pkg");
+  ASSERT_NE(pkg, nullptr);
+  const auto kOf = [pkg](int property, const char* name) {
+    return vpi_get(property, Named(vpiVariables, pkg, name));
+  };
+  EXPECT_EQ(kOf(vpiArrayType, "pa"), vpiStaticArray);
+  EXPECT_EQ(kOf(vpiSize, "pa"), 4);
+  EXPECT_EQ(kOf(vpiSize, "pn"), 3);
+  EXPECT_EQ(kOf(vpiSize, "pr"), 2);
+  EXPECT_EQ(kOf(vpiArrayType, "pd"), vpiDynamicArray);
+  EXPECT_EQ(kOf(vpiArrayType, "pq"), vpiQueueArray);
+  EXPECT_EQ(kOf(vpiArrayType, "pm"), vpiAssocArray);
+}
+
 }  // namespace
 }  // namespace delta

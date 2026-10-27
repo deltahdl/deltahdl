@@ -1,18 +1,24 @@
 #include "simulator/vpi_design_attach_vars.h"
 
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
 
+#include "common/packed_range.h"
 #include "elaborator/net_data_type.h"
+#include "elaborator/queue_dim.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast_design.h"
+#include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
+#include "simulator/statement_assign_internal.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/unit_scope_items.h"
+#include "simulator/variable.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_declared_shape.h"
 #include "simulator/vpi_design_attach_build.h"
@@ -128,30 +134,76 @@ void RecordVariableFacts(VpiObject* obj, const RtlirVariable& var,
 }
 
 // §37.17 with Table 36-10: the object kind of the variable the declaration
-// `item` of the package `package`, or of the compilation unit where that is
-// null, makes: the kind of the type it is written with, through a typedef
-// name the kind at the end of its chain resolved in that scope (§26.3), and
-// for an unpacked array one kind whatever it holds, an array of events apart
-// (§37.27).
-int ScopeVariableKind(const ModuleItem& item, const PackageDecl* package,
+// `item` of the package named `package`, or of the compilation unit where that
+// is empty, makes: the kind of the type it is written with, through a typedef
+// name the kind at the end of its chain resolved in that scope or in the
+// package written before the name (§26.3), and for an unpacked array one kind
+// whatever it holds, an array of events apart (§37.27).
+int ScopeVariableKind(const ModuleItem& item, std::string_view package,
                       const RtlirDesign& design) {
   const DataType& type = item.data_type;
-  const int kKind =
-      type.kind == DataTypeKind::kNamed
-          ? VpiPackageNamedTypeVariableKind(design, package, type.type_name)
-          : VpiDataTypeVariableKind(type.kind);
+  const int kKind = type.kind == DataTypeKind::kNamed
+                        ? VpiScopedTypeVariableKind(design, package, type)
+                        : VpiDataTypeVariableKind(type.kind);
   if (item.unpacked_dims.empty()) return kKind;
   return kKind == vpiNamedEvent ? vpiNamedEventArray : vpiRegArray;
 }
 
+// §37.17 detail 20 with §6.18: the shape the package's or unit's variable
+// `obj` was declared with, written as `type` in the package named `package`,
+// empty for the unit: signed as the run's storage of it is, which follows a
+// typedef name to its type (§6.11), and a scalar or a vector as the type a
+// typedef name stands for says, followed through the chain to the first
+// declaration writing a packed dimension (§7.4.4). A name written alone is the
+// package's own, which the run keys `p::t`, and the unit's typedef is keyed by
+// its bare name.
+void RecordScopeDeclaredShape(VpiObject& obj, const DataType& type,
+                              std::string_view package, SimContext& ctx) {
+  obj.decl_signed = obj.var->is_signed;
+  DataType written = type;
+  if (written.scope_name.empty()) written.scope_name = package;
+  const DataTypeKind kKind = type.kind == DataTypeKind::kNamed
+                                 ? ctx.FindTypeKind(NamedTypeKey(written))
+                                 : type.kind;
+  const VpiScalarVectorQuery kQuery =
+      DeclaredShapeQuery(obj.type, ctx.PackedTypeBehind(written), kKind);
+  obj.decl_scalar = VpiVariableScalar(kQuery);
+  obj.decl_vector = VpiVariableVector(kQuery);
+}
+
+// §37.17 details 9 and 21: the kind of array the package's or unit's array var
+// `obj`, keyed `key`, is by the first unpacked dimension `dim` it was declared
+// with, read in the scope named `scope`, with the run's store of its elements
+// (lowerer_package_data.cpp): a dynamic array's queue (§7.5), a queue's
+// (§7.10) and an associative array's object (§7.8), and for a fixed-size
+// array the number of variables along that dimension.
+void RecordScopeArrayFacts(VpiObject& obj, const Expr* dim,
+                           const std::string& key, std::string_view scope,
+                           SimContext& ctx) {
+  ctx.PushScope(scope);
+  if (dim == nullptr || IsQueueDim(dim)) {
+    obj.array_type = dim == nullptr ? vpiDynamicArray : vpiQueueArray;
+    obj.queue = ctx.FindQueue(key);
+  } else if (IsAssocIndexDim(dim, ctx)) {
+    obj.array_type = vpiAssocArray;
+    obj.assoc = ctx.FindAssocArray(key);
+  } else {
+    const PackedRange kRange =
+        WrittenUnpackedDim(dim, ctx).value_or(PackedRange{});
+    obj.array_type = vpiStaticArray;
+    obj.size = static_cast<int>(kRange.HighIndex() - kRange.LowIndex() + 1);
+  }
+  ctx.PopScope();
+}
+
 // A package, or the compilation unit, as the scope of the variables it
 // declares (§26.2, §3.12.1): the items it declares, the name the run keys
-// their storage under, and the package a typedef name they are written with
-// resolves in, null for the unit.
+// their storage under, and the name of the package a typedef name they are
+// written with resolves in, empty for the unit.
 struct DeclaringScope {
   const std::vector<ModuleItem*>& items;
   std::string_view name;
-  const PackageDecl* package;
+  std::string_view package;
 };
 
 // The kind of each variable `scope` declares and the facts read off the
@@ -178,6 +230,11 @@ void RecordScopeVariableKinds(const DeclaringScope& scope,
     obj->decl_facts.vif_interface = VpiVirtualInterfaceOf(design, &type);
     obj->is_modport = !type.modport_name.empty();
     RecordAggregateFacts(obj, kKey, ctx);
+    RecordScopeDeclaredShape(*obj, type, scope.package, ctx);
+    if (!item->unpacked_dims.empty()) {
+      RecordScopeArrayFacts(*obj, item->unpacked_dims.front(), kKey, scope.name,
+                            ctx);
+    }
   }
 }
 
@@ -277,12 +334,12 @@ int VpiVariableObjectKind(const RtlirVariable& var, const RtlirDesign& design,
 void VpiRecordScopeVariableKinds(const RtlirDesign& design,
                                  const VpiObjectMap& objects, SimContext& ctx) {
   for (const PackageDecl* pkg : design.packages) {
-    RecordScopeVariableKinds({pkg->items, pkg->name, pkg}, design, objects,
-                             ctx);
+    RecordScopeVariableKinds({pkg->items, pkg->name, pkg->name}, design,
+                             objects, ctx);
   }
   ForEachUnitScope(&design, ctx.GetArena(),
                    [&](const CompilationUnit& unit, std::string_view scope) {
-                     RecordScopeVariableKinds({unit.cu_items, scope, nullptr},
+                     RecordScopeVariableKinds({unit.cu_items, scope, ""},
                                               design, objects, ctx);
                    });
 }

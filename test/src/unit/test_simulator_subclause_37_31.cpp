@@ -680,5 +680,21 @@ TEST_F(ClassDefinitionsOfARun, ALoopGenerateBlocksClassExtendsTheModulesClass) {
                                    vpi_handle(vpiClassTypespec, extends))),
             VpiObjectOf(b));
 }
+
+// Detail 1 with §37.17 and §26.3: a property declared with a package's typedef
+// is of the kind the typedef stands for, whether the name is written through
+// the package, `a::t`, or alone in a class the package declares (#8210).
+TEST_F(ClassDefinitionsOfARun, APropertyOfAPackagesTypedefHasItsKind) {
+  Run("package a; typedef int t; endpackage\n"
+      "package p;\n"
+      "  typedef real r;\n"
+      "  class C; r own; a::t other; endclass\n"
+      "endpackage\n"
+      "module top; endmodule\n");
+  vpiHandle defn = DefnIn(By("p"), "C");
+  ASSERT_NE(defn, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, Named(vpiVariables, defn, "own")), vpiRealVar);
+  EXPECT_EQ(vpi_get(vpiType, Named(vpiVariables, defn, "other")), vpiIntVar);
+}
 }  // namespace
 }  // namespace delta

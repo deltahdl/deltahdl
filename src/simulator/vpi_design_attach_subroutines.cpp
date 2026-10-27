@@ -119,15 +119,17 @@ bool DeclaredInGenerateBlock(const RtlirModule& mod, const ModuleItem* item) {
       [item](const RtlirGenBlockSubroutine& sub) { return sub.decl == item; });
 }
 
-// §37.17 with §6.18: the object kind of a variable `where` declares with a
-// type standing for `name`, resolved among the declarations of the instance's
-// module, or of the package or the compilation unit (§26.3).
-int NamedVariableKind(std::string_view name, const SubroutineScope& where,
+// §37.17 with §6.18: the object kind of a variable `where` declares with the
+// named type `type`, resolved among the declarations of the instance's module,
+// or of the package or the compilation unit, or of the package written before
+// the name (§26.3).
+int NamedVariableKind(const DataType& type, const SubroutineScope& where,
                       const RtlirDesign& design) {
-  if (where.mod != nullptr) {
-    return VpiNamedTypeVariableKind(design, *where.mod, name);
+  if (where.mod != nullptr && type.scope_name.empty()) {
+    return VpiNamedTypeVariableKind(design, *where.mod, type.type_name);
   }
-  return VpiPackageNamedTypeVariableKind(design, where.package, name);
+  return VpiScopedTypeVariableKind(
+      design, where.package != nullptr ? where.package->name : "", type);
 }
 
 // §37.17 with §37.27: the object kind of a variable `where` declares with
@@ -136,7 +138,7 @@ int DeclaredVariableKind(const DataType& type, bool unpacked,
                          const SubroutineScope& where,
                          const RtlirDesign& design) {
   const int kKind = type.kind == DataTypeKind::kNamed
-                        ? NamedVariableKind(type.type_name, where, design)
+                        ? NamedVariableKind(type, where, design)
                         : VpiDataTypeVariableKind(type.kind);
   if (!unpacked) return kKind;
   return kKind == vpiNamedEvent ? vpiNamedEventArray : vpiArrayVar;

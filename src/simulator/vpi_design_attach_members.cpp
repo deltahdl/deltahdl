@@ -133,6 +133,17 @@ int VpiPackageNamedTypeVariableKind(const RtlirDesign& design,
                        std::string(package->name) + "::" + std::string(name));
 }
 
+int VpiScopedTypeVariableKind(const RtlirDesign& design,
+                              std::string_view package, const DataType& type) {
+  const std::string_view kScope =
+      type.scope_name.empty() ? package : type.scope_name;
+  const auto kNamed =
+      std::ranges::find(design.packages, kScope, &PackageDecl::name);
+  return VpiPackageNamedTypeVariableKind(
+      design, kNamed == design.packages.end() ? nullptr : *kNamed,
+      type.type_name);
+}
+
 namespace {
 
 // What the members of one instance are made from: its design and module, the

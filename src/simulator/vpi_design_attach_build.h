@@ -108,6 +108,15 @@ int VpiPackageNamedTypeVariableKind(const RtlirDesign& design,
                                     const PackageDecl* package,
                                     std::string_view name);
 
+// §6.18 with §26.3: the same for a variable the package named `package`
+// declares with the named type `type`, or the compilation unit where `package`
+// names none (empty among them); a package's name written before the type's,
+// `a::t`, resolves it in that package instead. A scope naming no package,
+// `$unit::t`, resolves in the compilation unit, whose typedefs are recorded
+// under their bare names as well.
+int VpiScopedTypeVariableKind(const RtlirDesign& design,
+                              std::string_view package, const DataType& type);
+
 // §26.2: the classes the package `package` declares, in the order written.
 std::vector<ClassDecl*> VpiPackageClasses(const PackageDecl& package);
 
