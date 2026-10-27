@@ -18,7 +18,8 @@ Logic4Vec VpiEvaluateExpressionObject(const VpiObject& obj, SimContext& sim);
 
 // §37.47 detail 2: watch the continuous assignment or cont assign bit `obj`,
 // which holds no storage, for changes of its value, through the storage of
-// every net and variable its right-hand side reads, calling back the
+// every net and variable its right-hand side reads and the class of every
+// static class property it reads, calling back the
 // cbValueChange registrations placed on it as its value changes, until none is
 // left. Does nothing for any other object, or without the run `sim`. `obj` is
 // never null, and a continuous assignment or cont assign bit carries the

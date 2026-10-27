@@ -2,16 +2,23 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <functional>
 #include <memory>
+#include <string>
+#include <string_view>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
 #include "common/types.h"
+#include "simulator/awaiters.h"
+#include "simulator/class_object.h"
 #include "simulator/deferred_caller.h"
 #include "simulator/evaluation.h"
 #include "simulator/process.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
+#include "simulator/stmt_exec_internal.h"
 #include "simulator/variable.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_expr_scope.h"
@@ -21,12 +28,22 @@
 
 namespace delta {
 
-Logic4Vec VpiEvaluateExpressionObject(const VpiObject& obj, SimContext& sim) {
-  const VpiExprScope& scope = *obj.expr_scope;
-  Process stand_in;
+namespace {
+
+// Makes `stand_in` a process of the instance and generate blocks `scope`
+// records, which reads names as a process running there would.
+void StandInWhere(Process& stand_in, const VpiExprScope& scope) {
   stand_in.stand_in = true;
   stand_in.inst_prefix = scope.inst_prefix;
   stand_in.gen_prefixes = scope.gen_prefixes;
+}
+
+}  // namespace
+
+Logic4Vec VpiEvaluateExpressionObject(const VpiObject& obj, SimContext& sim) {
+  const VpiExprScope& scope = *obj.expr_scope;
+  Process stand_in;
+  StandInWhere(stand_in, scope);
   const CallerStandIn kStandIn(&stand_in, sim);
   if (scope.context_width == 0)
     return EvalExpr(scope.expr, sim, sim.GetArena());
@@ -56,18 +73,42 @@ std::vector<uint64_t> ValueBitsNow(const VpiObject& obj, SimContext& sim) {
   return bits;
 }
 
-// The storage of each net and variable the expression object `expr` reads,
-// itself where it holds storage, and otherwise among its operands, at any
-// depth.
-void CollectReadStorage(const VpiObject* expr, std::vector<Variable*>& out) {
-  if (expr == nullptr) return;
-  if (expr->var != nullptr) {
-    out.push_back(expr->var);
-    return;
+// The class whose own storage the static property `name`, written `C::n`, is
+// (§8.9), which NamesStaticProperty has found it to be.
+const ClassTypeInfo* StaticPropertyClass(SimContext& sim,
+                                         std::string_view name) {
+  const auto kScope = name.rfind("::");
+  return sim.FindClassType(name.substr(0, kScope))
+      ->StaticPropertyDeclarer(name.substr(kScope + 2));
+}
+
+// Has `notify` called as anything changes that the right-hand side of the
+// continuous assignment or cont assign bit `obj` reads (§10.3.2): the storage
+// of each net and variable, and the class of each static class property,
+// which its writes notify (§8.9). The names are those the source
+// expression reads, resolved where it stands, so a right side the VPI model
+// gives no expression object, or one whose operands it models only in part, is
+// watched all the same; a name that stands for neither, which no change can
+// come to, is dropped.
+void WatchReads(const VpiObject& obj, SimContext& sim,
+                const std::function<bool()>& notify) {
+  Process stand_in;
+  StandInWhere(stand_in, *obj.expr_scope);
+  const CallerStandIn kStandIn(&stand_in, sim);
+  std::unordered_set<std::string> names;
+  CollectExprAndStaticReads(obj.expr_scope->expr, sim, names);
+  std::vector<Variable*> storage;
+  std::vector<const ClassTypeInfo*> classes;
+  for (const std::string& name : names) {
+    storage.push_back(sim.FindVariable(name));
+    classes.push_back(NamesStaticProperty(sim, name)
+                          ? StaticPropertyClass(sim, name)
+                          : nullptr);
   }
-  for (const VpiObject* operand : expr->children) {
-    CollectReadStorage(operand, out);
-  }
+  std::erase(storage, nullptr);
+  std::erase(classes, nullptr);
+  for (Variable* var : storage) var->AddWatcher(notify);
+  for (const ClassTypeInfo* cls : classes) cls->AddStaticWatcher(notify);
 }
 
 // Whether a cbValueChange registration placed on `obj` is still live. One
@@ -88,23 +129,18 @@ void VpiWatchContAssignChanges(VpiContext& vpi, VpiObject* obj,
     return;
   }
   obj->value_change_watched = true;
-  const VpiObject* assign = obj->type == vpiContAssign ? obj : obj->parent;
-  std::vector<Variable*> read;
-  CollectReadStorage(assign->rhs, read);
   auto held = std::make_shared<std::vector<uint64_t>>(ValueBitsNow(*obj, *sim));
-  for (Variable* storage : read) {
-    storage->AddWatcher([&vpi, obj, sim, held]() {
-      if (!HasValueChangeOn(vpi, obj)) {
-        obj->value_change_watched = false;
-        return true;
-      }
-      std::vector<uint64_t> now = ValueBitsNow(*obj, *sim);
-      if (now == *held) return false;
-      *held = std::move(now);
-      vpi.DispatchCallbacks(cbValueChange, obj);
-      return false;
-    });
-  }
+  WatchReads(*obj, *sim, [&vpi, obj, sim, held]() {
+    if (!HasValueChangeOn(vpi, obj)) {
+      obj->value_change_watched = false;
+      return true;
+    }
+    std::vector<uint64_t> now = ValueBitsNow(*obj, *sim);
+    if (now == *held) return false;
+    *held = std::move(now);
+    vpi.DispatchCallbacks(cbValueChange, obj);
+    return false;
+  });
 }
 
 }  // namespace delta

@@ -536,22 +536,44 @@ TEST_F(ContinuousAssignmentsOfARun, AnAssignmentOfAConstantIsNeverCalledBack) {
   EXPECT_EQ(g_assign_changes, 0);
 }
 
-// §37.47 detail 2: a value change callback may be placed on an assignment of
-// an equivalence, an operator Annex M gives no operation type, so that the
-// right side is no expression object; the callback is placed all the same, and
-// the assignment's value is still the equivalence's, true for two equal bits.
+// §37.47 detail 2: a value change callback placed on an assignment of an
+// equivalence, an operator Annex M gives no operation type, so that the right
+// side is no expression object, is called back as the assignment's value
+// changes, which it does as either operand does, and not for a write that
+// leaves it as it was; its value is the equivalence's, true for equal bits.
 TEST_F(ContinuousAssignmentsOfARun,
-       ACallbackIsPlacedOnAnEquivalencesAssignment) {
+       AnEquivalencesAssignmentIsCalledBackAsItChanges) {
+  g_assign_changes = 0;
   g_assign_callback = nullptr;
   RegisterTask("$watchca", &WatchAssignCalltf);
   Run("module top; logic a, b; wire y;\n"
       "  assign y = a <-> b;\n"
-      "  initial begin a = 1'b0; b = 1'b0; $watchca; end\n"
+      "  initial begin\n"
+      "    a = 1'b0; b = 1'b0; $watchca;\n"
+      "    #5 a = 1'b1; #5 b = 1'b1; #5 b = 1'b1;\n"
+      "  end\n"
       "endmodule\n");
   vpiHandle assign = FirstAssignOfTop();
   ASSERT_NE(assign, nullptr);
   EXPECT_NE(g_assign_callback, nullptr);
+  EXPECT_EQ(g_assign_changes, 2);
   EXPECT_EQ(IntValueOf(assign), 1);
+}
+
+// §37.47 detail 2 with §8.9: an assignment reading a static class property,
+// which is its class's own storage and no variable, is called back as the
+// property changes, and not for a write that leaves it as it was.
+TEST_F(ContinuousAssignmentsOfARun,
+       AStaticPropertysAssignmentIsCalledBackAsItChanges) {
+  g_assign_changes = 0;
+  RegisterTask("$watchca", &WatchAssignCalltf);
+  Run("module top;\n"
+      "  class C; static int s; endclass\n"
+      "  wire [31:0] y;\n"
+      "  assign y = C::s + 1;\n"
+      "  initial begin $watchca; #5 C::s = 3; #5 C::s = 3; end\n"
+      "endmodule\n");
+  EXPECT_EQ(g_assign_changes, 1);
 }
 
 }  // namespace
