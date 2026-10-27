@@ -16,8 +16,8 @@
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
-#include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_attach_procedures_internal.h"
+#include "simulator/vpi_named_type_kinds.h"
 
 // The declarations a call the procedure walk resolves is made against: the
 // class a name stands for where the call stands, the methods it declares, the

@@ -21,6 +21,7 @@
 #include "simulator/vpi_design_attach_procedures_internal.h"
 #include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_model_helpers1.h"
+#include "simulator/vpi_named_type_kinds.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 

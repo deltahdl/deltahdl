@@ -24,6 +24,7 @@
 #include "simulator/vpi_method_contents.h"
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_model_helpers3.h"
+#include "simulator/vpi_named_type_kinds.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
