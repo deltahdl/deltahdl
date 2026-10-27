@@ -37,14 +37,13 @@ VpiObject* VpiResolveSameObject(VpiObject* obj);
 bool VpiIsScopeBodyStmtType(int type);
 
 // §37.60 with §37.42 and §37.59: whether `obj` stands as an atomic statement,
-// as a statement a scope body or a statement's body holds, or as an
-// expression. A function call is drawn both in the tf call class of atomic
-// stmt and in expr, and is the one where it was written as a statement and
-// the other everywhere else. Defined in vpi_helpers_statements.cpp, used by
-// the scans that tell a statement's body from its condition.
+// or as a statement a scope body or a statement's body holds. A function call
+// is drawn both in the tf call class of atomic stmt and in expr, and is the
+// one where it was written as a statement and the other everywhere else.
+// Defined in vpi_helpers_statements.cpp, used by the scans that tell a
+// statement's body from its condition.
 bool VpiIsAtomicStmtObject(VpiHandle obj);
 bool VpiIsScopeBodyStmtObject(VpiHandle obj);
-bool VpiIsExprObject(VpiHandle obj);
 
 // §37.12: the kinds the scope class groups, which vpiInternalScope reaches,
 // and whether an object of one of them is a scope (details 1 and 2). Defined

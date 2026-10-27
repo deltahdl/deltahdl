@@ -5,7 +5,6 @@
 #include "common/types.h"
 #include "simulator/variable.h"
 #include "simulator/vpi_dynamic_ranges.h"
-#include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_model_helpers3.h"
@@ -20,10 +19,6 @@ bool VpiIsExprOperandType(int type) {
 
 bool VpiIsOperandObject(VpiHandle obj) {
   return VpiIsExprOperandType(obj->type) && !obj->written_as_stmt;
-}
-
-bool VpiIsExprObject(VpiHandle obj) {
-  return VpiIsExprType(obj->type) && !obj->written_as_stmt;
 }
 
 std::optional<int64_t> VpiElaborationValue(const VpiObject* expr) {

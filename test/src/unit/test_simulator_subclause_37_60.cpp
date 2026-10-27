@@ -18,6 +18,7 @@
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers1.h"
+#include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -153,10 +154,10 @@ TEST_F(AtomicStatement, AFunctionCallWrittenAsAStatementIsOne) {
     VpiObject call;
     call.type = type;
     EXPECT_FALSE(VpiIsAtomicStmtObject(&call)) << type;
-    EXPECT_TRUE(VpiIsExprObject(&call)) << type;
+    EXPECT_TRUE(VpiIsOperandObject(&call)) << type;
     call.written_as_stmt = true;
     EXPECT_TRUE(VpiIsAtomicStmtObject(&call)) << type;
-    EXPECT_FALSE(VpiIsExprObject(&call)) << type;
+    EXPECT_FALSE(VpiIsOperandObject(&call)) << type;
   }
 }
 
