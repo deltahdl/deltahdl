@@ -11,6 +11,7 @@
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_declared_shape.h"
 #include "simulator/vpi_design_attach_build.h"
+#include "simulator/vpi_design_attach_packed_arrays.h"
 #include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_object.h"
@@ -163,6 +164,54 @@ void AttachVariableInitializers(const RtlirDesign& design,
               VpiInstanceExpression(var.init_expr, objects, prefix, ctx, build);
         }
       });
+}
+
+int VpiVariableObjectKind(const RtlirVariable& var, const RtlirDesign& design,
+                          const RtlirModule& mod) {
+  // §37.62 (figure): the object an event statement triggers is a named event,
+  // and §37.27 draws the array of them beside it. A named event is not a
+  // variable holding a value, so Table 36-10's rule that an unpacked array of
+  // variables is one vpiRegArray object says nothing about it and the event
+  // kinds answer ahead of that rule. Without this an event declaration's object
+  // was a reg, so the arrow §37.62 draws from an event statement reached an
+  // object of a kind the figure has no box for.
+  if (var.is_event) {
+    return var.num_unpacked_dims > 0 ? vpiNamedEventArray : vpiNamedEvent;
+  }
+  // §37.17 detail 1 with Table 36-10: an array of variables is one array var,
+  // whether its unpacked dimension is fixed or a queue's, a dynamic array's or
+  // an associative array's.
+  if (var.num_unpacked_dims > 0 || var.is_queue || var.is_dynamic ||
+      var.is_assoc) {
+    return vpiRegArray;
+  }
+  // A name declared through a typedef reports kNamed, so the flags the
+  // elaborator resolved through the typedef answer first for the kinds that
+  // have one.
+  // §37.33: a variable declared with a class type is the clause's "class var",
+  // the object every rule of the subclause is written about. A class type is
+  // named rather than a DataTypeKind of its own, so decl_kind leaves it in the
+  // kNamed default and the variable was stamped vpiReg: a design's class
+  // variables were class vars to nothing, vpiObjId and vpiClassObj answered for
+  // none of them, and a vpiClassVar iteration reached none.
+  if (!var.class_type_name.empty()) return vpiClassVar;
+  if (VpiVariableIsPackedArray(var)) return vpiPackedArrayVar;
+  if (var.decl_kind == DataTypeKind::kShortreal) return vpiShortRealVar;
+  if (var.is_real) return vpiRealVar;
+  if (var.is_string) return vpiStringVar;
+  if (var.is_chandle) return vpiChandleVar;
+  // A variable declared with an enum typedef reports kNamed; the enum it names
+  // makes it an enum var all the same.
+  if (!var.enum_type_name.empty()) return vpiEnumVar;
+  // A typedef name no fact above claims, an int's or a virtual interface's
+  // among them, is told through the kind the design records at the end of its
+  // chain, as a task's or function's variable is (DeclaredVariableKind).
+  if (var.decl_kind == DataTypeKind::kNamed) {
+    return VpiNamedTypeVariableKind(design, mod, var.written_type->type_name);
+  }
+  // §37.17 detail 19: a logic var and a reg are the same object kind, and it
+  // is what a variable the clause draws no separate box for carries.
+  return VpiDataTypeVariableKind(var.decl_kind);
 }
 
 }  // namespace delta

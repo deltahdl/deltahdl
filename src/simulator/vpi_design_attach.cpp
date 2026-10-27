@@ -31,8 +31,8 @@
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_attach_interconnects.h"
-#include "simulator/vpi_design_attach_packed_arrays.h"
 #include "simulator/vpi_design_attach_typespecs.h"
+#include "simulator/vpi_design_attach_vars.h"
 #include "simulator/vpi_design_prefixed_refs.h"
 #include "simulator/vpi_design_viewports.h"
 #include "simulator/vpi_design_walk.h"
@@ -240,62 +240,6 @@ void FillInterconnectNetObject(VpiObject* obj, const RtlirPort& port,
   port_obj->low_conn = obj;
 }
 
-// §37.3.3: the location properties apply to every object that stands for
-// something in the source code. Nothing under src/ ever wrote either
-// one, so vpiLineNo answered zero and vpiFile answered NULL for every object of
-// every design, and the two location properties could be read back only off an
-// object a test had built and stamped by hand. Where an object stands is a fact
-// about the declaration it was made from, which the run does not carry and the
-// design does: this walks the design's declarations and tells each object the
-// run built for one where it is.
-// §36.12.1 Table 36-10 rows 3, 4 and 7: the object kind an elaborated variable
-// carries. In the IEEE 1800 standards those arrays are always vpiRegArray
-// objects while vpiIntegerVar and vpiTimeVar objects are never arrays, a real
-// array is a vpiRegArray object and nothing else, and so a vpiRegArray
-// iteration takes in arrays of integer, time and real variables. So an unpacked
-// array is one kind whatever it holds, and every other variable is the kind it
-// was declared.
-int VpiVariableObjectKind(const RtlirVariable& var) {
-  // §37.62 (figure): the object an event statement triggers is a named event,
-  // and §37.27 draws the array of them beside it. A named event is not a
-  // variable holding a value, so Table 36-10's rule that an unpacked array of
-  // variables is one vpiRegArray object says nothing about it and the event
-  // kinds answer ahead of that rule. Without this an event declaration's object
-  // was a reg, so the arrow §37.62 draws from an event statement reached an
-  // object of a kind the figure has no box for.
-  if (var.is_event) {
-    return var.num_unpacked_dims > 0 ? vpiNamedEventArray : vpiNamedEvent;
-  }
-  // §37.17 detail 1 with Table 36-10: an array of variables is one array var,
-  // whether its unpacked dimension is fixed or a queue's, a dynamic array's or
-  // an associative array's.
-  if (var.num_unpacked_dims > 0 || var.is_queue || var.is_dynamic ||
-      var.is_assoc) {
-    return vpiRegArray;
-  }
-  // A name declared through a typedef reports kNamed, so the flags the
-  // elaborator resolved through the typedef answer first for the kinds that
-  // have one.
-  // §37.33: a variable declared with a class type is the clause's "class var",
-  // the object every rule of the subclause is written about. A class type is
-  // named rather than a DataTypeKind of its own, so decl_kind leaves it in the
-  // kNamed default and the variable was stamped vpiReg: a design's class
-  // variables were class vars to nothing, vpiObjId and vpiClassObj answered for
-  // none of them, and a vpiClassVar iteration reached none.
-  if (!var.class_type_name.empty()) return vpiClassVar;
-  if (VpiVariableIsPackedArray(var)) return vpiPackedArrayVar;
-  if (var.decl_kind == DataTypeKind::kShortreal) return vpiShortRealVar;
-  if (var.is_real) return vpiRealVar;
-  if (var.is_string) return vpiStringVar;
-  if (var.is_chandle) return vpiChandleVar;
-  // A variable declared with an enum typedef reports kNamed; the enum it names
-  // makes it an enum var all the same.
-  if (!var.enum_type_name.empty()) return vpiEnumVar;
-  // §37.17 detail 19: a logic var and a reg are the same object kind, and it
-  // is what a variable the clause draws no separate box for carries.
-  return VpiDataTypeVariableKind(var.decl_kind);
-}
-
 // §36.12.1 Table 36-10: tell each object the run built for a variable which
 // kind of variable it is. VpiContext::Attach stamps every one of them vpiReg,
 // which rows 3, 4 and 7 rule out: a design's array variables were vpiRegArray
@@ -313,7 +257,7 @@ void RecordVariableObjectKinds(
           VpiHandle obj =
               FindObjectForFlatName(objects, VpiFlatName(prefix, var.name));
           if (obj == nullptr) continue;
-          obj->type = VpiVariableObjectKind(var);
+          obj->type = VpiVariableObjectKind(var, *design, *mod);
           // §37.17 (printed page 1025) with §6.20.6: a variable declared
           // const is a constant variable.
           obj->decl_facts.constant_variable =
@@ -327,6 +271,14 @@ void RecordVariableObjectKinds(
       });
 }
 
+// §37.3.3: the location properties apply to every object that stands for
+// something in the source code. Nothing under src/ ever wrote either
+// one, so vpiLineNo answered zero and vpiFile answered NULL for every object of
+// every design, and the two location properties could be read back only off an
+// object a test had built and stamped by hand. Where an object stands is a fact
+// about the declaration it was made from, which the run does not carry and the
+// design does: this walks the design's declarations and tells each object the
+// run built for one where it is.
 void RecordDeclarationSourceLocations(
     const RtlirDesign* design,
     const std::unordered_map<std::string_view, VpiObject*>& objects,

@@ -9,6 +9,8 @@ namespace delta {
 class SimContext;
 struct DataType;
 struct RtlirDesign;
+struct RtlirModule;
+struct RtlirVariable;
 struct StructTypeInfo;
 
 // §37.17 detail 8: give each variable an instance of `design` declares with an
@@ -40,5 +42,16 @@ void VpiMakeVarBits(VpiObject& var, const DataType& type, uint32_t width,
 // storage (§37.52 detail 1).
 void VpiMakeLocalMembers(VpiObject* local, const StructTypeInfo& layout,
                          SimContext& ctx, const VpiAttachBuild& build);
+
+// §36.12.1 Table 36-10 rows 3, 4 and 7: the object kind an elaborated variable
+// carries. In the IEEE 1800 standards those arrays are always vpiRegArray
+// objects while vpiIntegerVar and vpiTimeVar objects are never arrays, a real
+// array is a vpiRegArray object and nothing else, and so a vpiRegArray
+// iteration takes in arrays of integer, time and real variables. So an unpacked
+// array is one kind whatever it holds, and every other variable is the kind it
+// was declared: through a typedef name, the kind of the type at the end of its
+// chain (§6.18), which `design` records and `mod` may declare a class under.
+int VpiVariableObjectKind(const RtlirVariable& var, const RtlirDesign& design,
+                          const RtlirModule& mod);
 
 }  // namespace delta

@@ -39,6 +39,21 @@ TEST_F(VariablesOfARun, ATypedefPackedVectorVariableHasBits) {
   EXPECT_EQ(ObjectsOf(vpiBit, By("top.b")).size(), 3U);
 }
 
+// §6.18: a variable a module declares with a typedef name is the kind of the
+// type at the end of the name's chain, as a task's is: an int var for a typedef
+// of int, and a virtual interface var for a typedef of a virtual interface type
+// (§37.29), where no fact the elaborator records on the variable says so
+// (#8205).
+TEST_F(VariablesOfARun, ATypedefNamedVariableIsTheKindItsTypedefNames) {
+  Run("interface bus; endinterface\n"
+      "module top; bus b();\n"
+      "  typedef int myint; typedef virtual bus vbus_t;\n"
+      "  myint x; vbus_t vif;\n"
+      "endmodule\n");
+  EXPECT_EQ(vpi_get(vpiType, By("top.x")), vpiIntVar);
+  EXPECT_EQ(vpi_get(vpiType, By("top.vif")), vpiVirtualInterfaceVar);
+}
+
 // An element of an array of a built-in type other than logic is a variable of
 // that type, an int var of `int a[4]`, so the array is no memory; an element of
 // a logic array stays a reg (#6996).
