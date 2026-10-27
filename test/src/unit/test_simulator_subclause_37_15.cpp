@@ -54,6 +54,52 @@ TEST_F(RefObjContext, ARefObjInNoInstanceReachesNoPorts) {
   EXPECT_EQ(vpi_iterate(vpiPortInst, VpiHandleOf(&ref_obj)), nullptr);
 }
 
+// The figure with detail 4, read off objects standing in no design. A ref obj
+// held in module m is the lower connection of m's port whose lower connection
+// it is, not of m's other port, and the higher connection of the port of an
+// instance m holds in a generate block of a generate scope array, whose ports
+// connected to a net are none of its. A ref obj with no holder has no parent.
+TEST_F(RefObjContext, PortsAreThoseItConnectsAndParentIsARefObjHoldingIt) {
+  VpiObject m;
+  m.type = vpiModule;
+  VpiObject r;
+  r.type = vpiRefObj;
+  r.parent = &m;
+  VpiObject net;
+  net.type = vpiNet;
+
+  VpiObject own;
+  own.type = vpiPort;
+  own.low_conn = &r;
+  VpiObject other;
+  other.type = vpiPort;
+  other.low_conn = &net;
+  VpiObject to_r;
+  to_r.type = vpiPort;
+  to_r.high_conn = &r;
+  VpiObject to_net;
+  to_net.type = vpiPort;
+  to_net.high_conn = &net;
+  VpiObject u;
+  u.type = vpiModule;
+  u.children = {&to_net, &to_r};
+  VpiObject block;
+  block.type = vpiGenScope;
+  block.children = {&u};
+  VpiObject blocks;
+  blocks.type = vpiGenScopeArray;
+  blocks.children = {&block};
+  m.children = {&own, &other, &blocks};
+
+  EXPECT_EQ(VpiRefObjPorts(vpiLowConn, &r), std::vector<VpiHandle>{&own});
+  EXPECT_EQ(VpiRefObjPorts(vpiHighConn, &r), std::vector<VpiHandle>{&to_r});
+  EXPECT_EQ(VpiRefObjPorts(vpiPortInst, &r), std::vector<VpiHandle>{&to_r});
+
+  VpiObject orphan;
+  orphan.type = vpiRefObj;
+  EXPECT_EQ(VpiRefObjParent(&orphan), nullptr);
+}
+
 // D4: vpiParent traverses from a ref obj that is a subelement of a ref obj up
 // to its containing ref obj. Modelled on the clause's example: r[0] is a ref
 // obj whose parent is the ref obj r; vpiActual of r[0] is the var bit a[0], and
