@@ -185,6 +185,28 @@ TEST_F(VpiActionFeatureCallbacks, SignalCallbackPreservesSignalNumber) {
   EXPECT_EQ(stored.index, 15);
 }
 
+// §38.36.3: a raised signal calls the cbSignal callbacks whose index names it,
+// one with no routine to call excepted, and none asking for another signal.
+TEST_F(VpiActionFeatureCallbacks, ARaisedSignalCallsOnlyItsOwnCallbacks) {
+  s_cb_data asked = {};
+  asked.reason = cbSignal;
+  asked.cb_rtn = &RecordingCb;
+  asked.index = SIGUSR1;
+  vpiHandle own = vpi_register_cb(&asked);
+  asked.index = SIGHUP;
+  vpiHandle other = vpi_register_cb(&asked);
+  asked.index = SIGUSR1;
+  asked.cb_rtn = nullptr;
+  vpiHandle routineless = vpi_register_cb(&asked);
+  std::raise(SIGUSR1);
+  EXPECT_EQ(vpi_ctx_.DeliverRaisedSignals(), 1);
+  EXPECT_EQ(g_invocations, 1);
+  EXPECT_EQ(g_seen_reason, cbSignal);
+  for (vpiHandle cb : {own, other, routineless}) {
+    EXPECT_EQ(vpi_remove_cb(cb), 1);
+  }
+}
+
 // §38.36.3: for a cbTchkViolation callback the obj field is a handle to the
 // timing check; the simulator supplies it when the callback is delivered.
 TEST_F(VpiActionFeatureCallbacks, TchkViolationDeliversTimingCheckHandle) {
@@ -579,6 +601,51 @@ TEST(VpiSignalTraps, ASignalIsTrappedWhileAskedFor) {
   EXPECT_EQ(VpiTakeRaisedSignals(), std::vector<int>{SIGINT});
   VpiReleaseSignal(SIGINT, {});
   VpiReleaseSignal(0, {});
+}
+
+// §38.36.3: no trap is set for a number past the last signal one can record,
+// nor for a signal the platform lets no handler catch (SIGKILL), and
+// releasing a signal never trapped changes nothing: none of them is recorded
+// as raised.
+TEST(VpiSignalTraps, ASignalNoTrapCanHoldIsLeftAlone) {
+  VpiTrapSignal(65);
+  VpiTrapSignal(SIGKILL);
+  VpiReleaseSignal(65, {});
+  VpiReleaseSignal(SIGKILL, {});
+  VpiReleaseSignal(SIGUSR2, {});
+  EXPECT_TRUE(VpiTakeRaisedSignals().empty());
+}
+
+}  // namespace
+}  // namespace delta
+
+extern "C" {
+// Whether SIGUSR2 has reached the handler the case below installs ahead of
+// the trap.
+static volatile std::sig_atomic_t g_user2_handled = 0;
+static void CountUser2(int /*signal*/) { g_user2_handled = 1; }
+}
+
+namespace delta {
+namespace {
+
+// §38.36.3: a cbSignal asking for another signal keeps no trap, so releasing
+// SIGUSR2 while one asks for SIGUSR1 hands SIGUSR2 back to the handler it had
+// before it was trapped, which the next SIGUSR2 reaches in place of the trap.
+TEST(VpiSignalTraps, ReleasingASignalRestoresItsEarlierHandler) {
+  std::signal(SIGUSR2, &CountUser2);
+  VpiTrapSignal(SIGUSR2);
+  std::raise(SIGUSR2);
+  EXPECT_EQ(VpiTakeRaisedSignals(), std::vector<int>{SIGUSR2});
+  EXPECT_EQ(g_user2_handled, 0);
+  std::vector<s_cb_data> asked(1);
+  asked[0].reason = cbSignal;
+  asked[0].index = SIGUSR1;
+  VpiReleaseSignal(SIGUSR2, asked);
+  std::raise(SIGUSR2);
+  EXPECT_EQ(g_user2_handled, 1);
+  EXPECT_TRUE(VpiTakeRaisedSignals().empty());
+  std::signal(SIGUSR2, SIG_DFL);
 }
 
 }  // namespace

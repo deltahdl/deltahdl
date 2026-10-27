@@ -38,11 +38,11 @@ bool InRange(int signal) { return signal > 0 && signal < kSignalSlots; }
 }  // namespace delta
 
 extern "C" {
+// Installed by VpiTrapSignal alone, for a signal InRange holds, so the number
+// it is handed is one of the record's slots.
 static void RecordVpiSignal(int signal) {
-  if (signal > 0 && signal < delta::kSignalSlots) {
-    delta::g_raised[signal] = 1;
-    delta::g_any_raised = 1;
-  }
+  delta::g_raised[signal] = 1;
+  delta::g_any_raised = 1;
 }
 }
 
