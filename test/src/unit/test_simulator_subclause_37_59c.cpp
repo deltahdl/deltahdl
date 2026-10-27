@@ -51,6 +51,14 @@ class AssignedExpressionsOfARun : public VpiDesignRun {
     return values;
   }
 
+  // The vpiOpType of each of `exprs`, in order.
+  static std::vector<int> OpTypesOf(const std::vector<vpiHandle>& exprs) {
+    std::vector<int> ops;
+    ops.reserve(exprs.size());
+    for (vpiHandle expr : exprs) ops.push_back(vpi_get(vpiOpType, expr));
+    return ops;
+  }
+
   // The right sides of the assignments top's one procedure runs, in order.
   static std::vector<vpiHandle> ProcedureRightSides() {
     const std::vector<vpiHandle> kProcs = ObjectsOf(vpiProcess, By("top"));
@@ -399,6 +407,39 @@ TEST_F(AssignedExpressionsOfARun, AStepOfASelectDecompilesWithoutParentheses) {
   const char* decompiled = vpi_get_str(vpiDecompile, right);
   ASSERT_NE(decompiled, nullptr);
   EXPECT_STREQ(decompiled, "- r[i] ++");
+}
+
+// §37.59 with §11.4: an expression written with a binary operator is an
+// operation reporting that operator's own vpiOpType, the two spellings of
+// exclusive nor (§11.4.8) reporting the one constant.
+TEST_F(AssignedExpressionsOfARun, EachBinaryOperatorReportsItsOwnOpType) {
+  Run("module top; int a, b, x;\n"
+      "  initial begin\n"
+      "    x = a / b; x = a % b; x = a ** b; x = a ~^ b; x = a ^~ b;\n"
+      "    x = a && b; x = a !== b; x = a ==? b; x = a !=? b; x = a >= b;\n"
+      "    x = a << b; x = a >> b; x = a <<< b; x = a >>> b;\n"
+      "  end\n"
+      "endmodule\n");
+  const std::vector<int> kOps = {
+      vpiDivOp,         vpiModOp,        vpiPowerOp,   vpiBitXnorOp,
+      vpiBitXnorOp,     vpiLogAndOp,     vpiCaseNeqOp, vpiWildEqOp,
+      vpiWildNeqOp,     vpiGeOp,         vpiLShiftOp,  vpiRShiftOp,
+      vpiArithLShiftOp, vpiArithRShiftOp};
+  EXPECT_EQ(OpTypesOf(ProcedureRightSides()), kOps);
+}
+
+// §37.59 with §11.4: so is one written with a prefix unary operator, unary
+// plus and each reduction (§11.4.9) among them, both spellings of the
+// reduction exclusive nor reporting the one constant.
+TEST_F(AssignedExpressionsOfARun, EachUnaryOperatorReportsItsOwnOpType) {
+  Run("module top; logic [3:0] a, x;\n"
+      "  initial begin\n"
+      "    x = +a; x = &a; x = ~&a; x = ~|a; x = ~^a; x = ^~a;\n"
+      "  end\n"
+      "endmodule\n");
+  const std::vector<int> kOps = {vpiPlusOp,     vpiUnaryAndOp,  vpiUnaryNandOp,
+                                 vpiUnaryNorOp, vpiUnaryXNorOp, vpiUnaryXNorOp};
+  EXPECT_EQ(OpTypesOf(ProcedureRightSides()), kOps);
 }
 
 }  // namespace
