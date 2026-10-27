@@ -1,17 +1,24 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 
 #include "fixture_simulator.h"
 #include "fixture_vpi_run.h"
 #include "helpers_vpi_delays_fixture.h"
+#include "simulator/sim_context.h"
+#include "simulator/specify.h"
+#include "simulator/specify_path_delay.h"
+#include "simulator/specify_timing_check.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_put_run_delays.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -850,6 +857,66 @@ TEST_F(DelaysPutInARun, ATimingCheckIsJudgedAgainstItsPutLimit) {
       "  end\n"
       "endmodule\n");
   EXPECT_EQ(IntOf("top.violations"), 1);
+}
+
+// §38.32 with §28.16 and §31.2, read off objects standing in no design. A gate
+// under the instance c given one delay files it with the primitive driving its
+// output below c, as its rise, its fall and its turn-off alike. A gate driving
+// nothing, one holding no delays, and one no run named file none. A timing
+// check's limits take its first two delays, and one holding none keeps its
+// own.
+TEST(RunDelaysOfObjects, AreFiledWhereTheRunKeepsThem) {
+  SimFixture f;
+  SpecifyManager& specify = f.ctx.AcquireSpecifyManager();
+  VpiObject net;
+  net.type = vpiNet;
+  net.name = "y";
+  VpiObject out;
+  out.type = vpiPrimTerm;
+  out.direction = vpiOutput;
+  out.children.push_back(&net);
+  const auto kGate = [&out](const char* run_key, bool drives) {
+    VpiObject gate;
+    gate.type = vpiGate;
+    gate.run_key = run_key;
+    if (drives) gate.children.push_back(&out);
+    gate.delays = {VpiDelayInfo{4.0}, VpiDelayInfo{6.0}};
+    return gate;
+  };
+  VpiObject under_c = kGate("c.g", true);
+  under_c.delays.resize(1);
+  VpiObject driving_nothing = kGate("h", false);
+  VpiObject holding_none = kGate("e", true);
+  holding_none.delays.clear();
+  VpiObject unnamed = kGate("", true);
+
+  specify.MutableTimingChecks().resize(2);
+  for (TimingCheckEntry& check : specify.MutableTimingChecks()) {
+    check.limit = 5;
+    check.limit2 = 5;
+  }
+  VpiObject two_limits;
+  two_limits.type = vpiTchk;
+  two_limits.delays = {VpiDelayInfo{2.0}, VpiDelayInfo{3.0}};
+  VpiObject no_limits;
+  no_limits.type = vpiTchk;
+  const std::unordered_map<const VpiObject*, std::size_t> kEntries = {
+      {&two_limits, 0}, {&no_limits, 1}};
+
+  VpiObject* const kObjects[] = {&under_c, &driving_nothing, &holding_none,
+                                 &unnamed, &two_limits,      &no_limits};
+  for (VpiObject* obj : kObjects) VpiPutRunDelays(*obj, kEntries, f.ctx);
+  const PrimitiveDriver* driver =
+      specify.FindAnnotatedPrimitiveDriver("c.", "y");
+  ASSERT_NE(driver, nullptr);
+  EXPECT_EQ(driver->delays[0], 4u);
+  EXPECT_EQ(driver->delays[1], 4u);
+  EXPECT_EQ(driver->delays[2], 4u);
+  EXPECT_EQ(specify.GetPrimitiveDrivers().size(), 1u);
+  EXPECT_EQ(specify.MutableTimingChecks()[0].limit, 2u);
+  EXPECT_EQ(specify.MutableTimingChecks()[0].limit2, 3u);
+  EXPECT_EQ(specify.MutableTimingChecks()[1].limit, 5u);
+  EXPECT_EQ(specify.MutableTimingChecks()[1].limit2, 5u);
 }
 
 }  // namespace
