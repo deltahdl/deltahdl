@@ -62,7 +62,8 @@ std::optional<int64_t> ConstantOf(const VpiObject* expr) {
 }
 
 // The lowest and highest index the part select `select` holds, where the
-// bounds, or the base and the width, it was written with are constants.
+// bounds, or the base and the width, it was written with are constants; none
+// for an object written with no bounds, which is no part select.
 std::optional<std::pair<int64_t, int64_t>> PartSelectSpan(
     const VpiObject& select) {
   if (select.type == vpiIndexedPartSelect) {
@@ -89,9 +90,6 @@ bool IsUseOfBit(const VpiObject* node, const VpiObject& bit) {
   const std::optional<int64_t> kIndex = ConstantOf(bit.index_expr);
   if (!kIndex) return false;
   if (IsBit(*node)) return ConstantOf(node->index_expr) == kIndex;
-  if (node->type != vpiPartSelect && node->type != vpiIndexedPartSelect) {
-    return false;
-  }
   const auto kSpan = PartSelectSpan(*node);
   return kSpan && kSpan->first <= *kIndex && *kIndex <= kSpan->second;
 }

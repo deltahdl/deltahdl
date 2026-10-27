@@ -3,14 +3,18 @@
 #include <algorithm>
 #include <vector>
 
+#include "common/arena.h"
+#include "common/types.h"
 #include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/variable.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_simple_expr_uses.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -384,6 +388,147 @@ TEST_F(BitSelectsOfARun, ABitIsUsedWhereItItsVectorOrASelectHoldingItIs) {
       "initial j = i;\n"
       "endmodule\n");
   EXPECT_EQ(LinesOfUses(Rhs()), (std::vector<int>{2, 3, 5, 6}));
+}
+
+// §37.58 detail 1: a vector is used through a select of any kind written of
+// it -- a bit select of an integer var, an indexed part select, a net bit, a
+// varying var bit and a var select of an array -- and a variable is used
+// where it indexes such a select.
+TEST_F(BitSelectsOfARun, AVectorIsUsedThroughEverySelectKindAndAnIndex) {
+  Run("module top; integer i; logic [7:0] v; wire [3:0] n;\n"
+      "logic [7:0] arr [0:3]; wire a, b, c; wire [7:0] y;\n"
+      "assign a = i[3];\n"
+      "assign b = ^v[2+:2];\n"
+      "assign c = n[1] | v[i];\n"
+      "assign y = arr[i];\n"
+      "endmodule\n");
+  EXPECT_EQ(LinesOfUses(By("top.i")), (std::vector<int>{3, 5, 6}));
+  EXPECT_EQ(LinesOfUses(By("top.v")), (std::vector<int>{4, 5}));
+  EXPECT_EQ(LinesOfUses(By("top.n")), (std::vector<int>{5}));
+  EXPECT_EQ(LinesOfUses(By("top.arr")), (std::vector<int>{6}));
+}
+
+// §37.58 detail 2 for a bit of a net: a part select or an indexed part
+// select, up or down, of the net is a use where its constant bounds hold the
+// bit, and not where they lie below or above it.
+TEST_F(BitSelectsOfARun, ANetBitIsUsedWhereASelectsBoundsHoldIt) {
+  Run("module top; wire [7:0] n; wire a, b, c, d, e, f;\n"
+      "assign a = n[3];\n"
+      "assign b = ^n[5:2];\n"
+      "assign c = ^n[2+:2];\n"
+      "assign d = ^n[4-:2];\n"
+      "assign e = ^n[2:0];\n"
+      "assign f = ^n[6:4];\n"
+      "endmodule\n");
+  EXPECT_EQ(vpi_get(vpiType, Rhs()), vpiNetBit);
+  EXPECT_EQ(LinesOfUses(Rhs()), (std::vector<int>{2, 3, 4, 5}));
+}
+
+// §37.58 detail 2 on objects the model holds no index or bounds for: a bit
+// matches another bit of its vector, or a part select of it, by the constant
+// values of their indices and bounds alone. A bit with no index, a bit whose
+// index holds no value, and a part select missing a bound, its base or its
+// width match none, while a bit at the same constant index does.
+TEST(SimpleExpressionModel, ABitMatchesASelectOnlyByConstantValues) {
+  Arena arena;
+  Variable three_value;
+  three_value.value = MakeLogic4VecVal(arena, 32, 3);
+  VpiObject three;
+  three.type = vpiConstant;
+  three.var = &three_value;
+  VpiObject valueless;
+  valueless.type = vpiConstant;
+  VpiObject vector;
+  vector.type = vpiLogicVar;
+  const auto kSelectOf = [&vector](int type) {
+    VpiObject select;
+    select.type = type;
+    select.parent = &vector;
+    return select;
+  };
+
+  VpiObject bit = kSelectOf(vpiRegBit);
+  bit.index_expr = &three;
+  VpiObject twin = kSelectOf(vpiRegBit);
+  twin.index_expr = &three;
+  EXPECT_TRUE(VpiExpressionUses(&twin, bit));
+  VpiObject no_value = kSelectOf(vpiRegBit);
+  no_value.index_expr = &valueless;
+  EXPECT_FALSE(VpiExpressionUses(&no_value, bit));
+  VpiObject no_index = kSelectOf(vpiRegBit);
+  EXPECT_FALSE(VpiExpressionUses(&bit, no_index));
+
+  VpiObject no_left = kSelectOf(vpiPartSelect);
+  no_left.right_range = &three;
+  EXPECT_FALSE(VpiExpressionUses(&no_left, bit));
+  VpiObject no_right = kSelectOf(vpiPartSelect);
+  no_right.left_range = &three;
+  EXPECT_FALSE(VpiExpressionUses(&no_right, bit));
+  VpiObject no_base = kSelectOf(vpiIndexedPartSelect);
+  no_base.width_expr = &three;
+  EXPECT_FALSE(VpiExpressionUses(&no_base, bit));
+  VpiObject no_width = kSelectOf(vpiIndexedPartSelect);
+  no_width.base_expr = &three;
+  EXPECT_FALSE(VpiExpressionUses(&no_width, bit));
+}
+
+// §37.58 (figure): of the prim terms, path terms, tchk terms, ports and
+// continuous assignments and their bits a design holds, a wire is used by the
+// ones naming it. The cell's gate, module path and timing check and the top's
+// vector assignment name other signals, so the port the wire connects is its
+// one use.
+TEST_F(BitSelectsOfARun, AWireIsUsedByThePortItConnectsAlone) {
+  Run("module m(input a, input c, output y);\n"
+      "  buf g(y, a);\n"
+      "  specify (a => y) = 3; $setup(a, posedge c, 1); endspecify\n"
+      "endmodule\n"
+      "module top; wire p, q, r; wire [1:0] w; assign w = 2'b01;\n"
+      "  m u(p, r, q);\n"
+      "endmodule\n");
+  vpiHandle it = vpi_iterate(vpiUse, By("top.p"));
+  ASSERT_NE(it, nullptr);
+  vpiHandle use = vpi_scan(it);
+  ASSERT_NE(use, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, use), vpiPort);
+  EXPECT_STREQ(vpi_get_str(vpiName, use), "a");
+  EXPECT_EQ(vpi_scan(it), nullptr);
+}
+
+// §37.58 (figure): the simple expressions are the nets, the variables, a ref
+// obj, a parameter, a spec param, a var select and a bit select; no other
+// object, and no object at all, is one.
+TEST(SimpleExpressionModel, TheSimpleExpressionsAreTheFiguresKinds) {
+  EXPECT_FALSE(VpiIsSimpleExpr(nullptr));
+  for (int type :
+       {vpiRefObj, vpiParameter, vpiSpecParam, vpiVarSelect, vpiBitSelect,
+        vpiNet, vpiNetBit, vpiLogicVar, vpiIntegerVar}) {
+    VpiObject obj;
+    obj.type = type;
+    EXPECT_TRUE(VpiIsSimpleExpr(&obj)) << type;
+  }
+  for (int type : {vpiPartSelect, vpiOperation, vpiConstant, vpiModule}) {
+    VpiObject obj;
+    obj.type = type;
+    EXPECT_FALSE(VpiIsSimpleExpr(&obj)) << type;
+  }
+}
+
+// §37.58 details 1 and 2 on objects standing in no design: a select reaching
+// no object through vpiParent selects out of no vector and uses none, and a
+// bit with no parent is used only where that very bit stands.
+TEST(SimpleExpressionModel, ASelectOrBitOfNothingIsUsedOnlyWhereItStands) {
+  VpiObject vector;
+  vector.type = vpiLogicVar;
+  VpiObject select;
+  select.type = vpiPartSelect;
+  EXPECT_FALSE(VpiExpressionUses(&select, vector));
+
+  VpiObject bit;
+  bit.type = vpiBitSelect;
+  VpiObject other;
+  other.type = vpiBitSelect;
+  EXPECT_FALSE(VpiExpressionUses(&other, bit));
+  EXPECT_TRUE(VpiExpressionUses(&bit, bit));
 }
 
 // §37.58 with §37.16: a bit reaches its index and the object it is a bit of,
