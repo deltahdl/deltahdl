@@ -54,4 +54,13 @@ void VpiMakeLocalMembers(VpiObject* local, const StructTypeInfo& layout,
 int VpiVariableObjectKind(const RtlirVariable& var, const RtlirDesign& design,
                           const RtlirModule& mod);
 
+// §37.17 with §26.2 and §3.12.1: tell each variable a package of `design` or
+// its compilation unit declares, among `objects` under the package's name or
+// the unit's scope name, the kind its declaration makes it, with the facts
+// read off the declaration and the run `ctx` alongside, as the variables of an
+// instance are told theirs. VpiContext::Attach stamps every variable vpiReg,
+// and the instances' pass reaches none of these.
+void VpiRecordScopeVariableKinds(const RtlirDesign& design,
+                                 const VpiObjectMap& objects, SimContext& ctx);
+
 }  // namespace delta

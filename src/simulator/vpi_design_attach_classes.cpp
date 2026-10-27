@@ -18,6 +18,7 @@
 #include "simulator/vpi_class_typespecs.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_design_attach_build.h"
+#include "simulator/vpi_design_prefixed_refs.h"
 #include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_method_contents.h"
 #include "simulator/vpi_model_helpers1.h"
@@ -341,6 +342,10 @@ VpiObject* MakeProperty(const MadeClassDefn& owner, const ClassMember& member,
   var->parent = owner.defn;
   var->decl_facts.visibility = DeclaredVisibility(member);
   VpiRecordPropertyDecl(*var, member);
+  // §25.9 with §37.48: the interface whose clocking blocks a virtual interface
+  // property names, `vif.cb` in a method of the class.
+  var->decl_facts.vif_interface =
+      VpiVirtualInterfaceOf(design, &member.data_type);
   if (VpiObject* param = NamedTypeParameter(owner, member.data_type)) {
     var->children.push_back(param);
   }

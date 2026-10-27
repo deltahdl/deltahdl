@@ -442,5 +442,50 @@ TEST_F(VariablesOfARun, AMultidimensionalArrayMemberHasSubarrays) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiParent, element)), VpiObjectOf(row));
 }
 
+// D19 with Table 36-10: a variable a package declares is of the kind its type
+// makes it, as a module's is, through a typedef the package declares (§26.3),
+// an unpacked array of them one array var and of events a named event array;
+// one declared const is a constant variable, and a packed structure is a
+// packed struct var whose value is read whole (§37.26 detail 1) (#8207).
+TEST_F(VariablesOfARun, APackagesVariablesHaveTheKindsTheirTypesMake) {
+  Run("interface bus; endinterface\n"
+      "package pkg;\n"
+      "  typedef int t;\n"
+      "  int pv; real pr; virtual bus vif; t tv; int pa[2]; event pe[2];\n"
+      "  const int pc = 1;\n"
+      "  struct packed { logic [3:0] a; } ps = 4'd5;\n"
+      "endpackage\n"
+      "module top; endmodule\n");
+  vpiHandle pkg = By("pkg");
+  ASSERT_NE(pkg, nullptr);
+  const auto kKindOf = [pkg](const char* name) {
+    return vpi_get(vpiType, Named(vpiVariables, pkg, name));
+  };
+  EXPECT_EQ(kKindOf("pv"), vpiIntVar);
+  EXPECT_EQ(kKindOf("pr"), vpiRealVar);
+  EXPECT_EQ(kKindOf("vif"), vpiVirtualInterfaceVar);
+  EXPECT_EQ(kKindOf("tv"), vpiIntVar);
+  EXPECT_EQ(kKindOf("pa"), vpiArrayVar);
+  EXPECT_EQ(vpi_get(vpiType, Named(vpiNamedEventArray, pkg, "pe")),
+            vpiNamedEventArray);
+  EXPECT_EQ(vpi_get(vpiConstantVariable, Named(vpiVariables, pkg, "pc")), 1);
+  EXPECT_EQ(vpi_get(vpiConstantVariable, Named(vpiVariables, pkg, "pv")), 0);
+  vpiHandle ps = Named(vpiVariables, pkg, "ps");
+  EXPECT_EQ(vpi_get(vpiType, ps), vpiStructVar);
+  EXPECT_EQ(vpi_get(vpiPacked, ps), 1);
+  EXPECT_EQ(IntOf(ps), 5);
+}
+
+// D19: so is one the compilation unit declares (§3.12.1), the unit's scope
+// holding it (#8207).
+TEST_F(VariablesOfARun, TheCompilationUnitsVariablesHaveTheirTypesKinds) {
+  Run("int g; real r;\n"
+      "module top; endmodule\n");
+  vpiHandle unit = Named(vpiPackage, nullptr, "$unit");
+  ASSERT_NE(unit, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, Named(vpiVariables, unit, "g")), vpiIntVar);
+  EXPECT_EQ(vpi_get(vpiType, Named(vpiVariables, unit, "r")), vpiRealVar);
+}
+
 }  // namespace
 }  // namespace delta

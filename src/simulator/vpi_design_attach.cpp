@@ -245,11 +245,15 @@ void FillInterconnectNetObject(VpiObject* obj, const RtlirPort& port,
 // which rows 3, 4 and 7 rule out: a design's array variables were vpiRegArray
 // objects to nothing, so a vpiRegArray iteration reached none of them, and an
 // integer, time or real variable answered that it was a reg. The variable an
-// ANSI variable port declares is told as the body's are (VpiDeclaredVariables).
+// ANSI variable port declares is told as the body's are (VpiDeclaredVariables),
+// and a package's or the compilation unit's as an instance's are, by the scope
+// name the run `ctx` keys it under.
 void RecordVariableObjectKinds(
     const RtlirDesign* design,
-    const std::unordered_map<std::string_view, VpiObject*>& objects) {
+    const std::unordered_map<std::string_view, VpiObject*>& objects,
+    SimContext& ctx) {
   if (design == nullptr) return;
+  VpiRecordScopeVariableKinds(*design, objects, ctx);
 
   WalkInstancePaths(
       design, [&](const RtlirModule* mod, const std::string& prefix) {
@@ -671,7 +675,7 @@ void VpiContext::Attach(SimContext& sim_ctx, const RtlirDesign* design) {
     }
   }
   AttachSourceDelayExpressions(sim_ctx, design);
-  RecordVariableObjectKinds(design, object_map_);
+  RecordVariableObjectKinds(design, object_map_, sim_ctx);
   RecordDeclarationSourceLocations(design, object_map_, SourcesOf(sim_ctx_));
   AttachPackages(design);
   AttachTopModules(design);

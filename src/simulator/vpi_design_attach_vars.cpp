@@ -1,17 +1,23 @@
 #include "simulator/vpi_design_attach_vars.h"
 
 #include <string>
+#include <string_view>
+#include <vector>
 
 #include "elaborator/net_data_type.h"
 #include "elaborator/rtlir.h"
+#include "parser/ast_design.h"
+#include "parser/ast_module.h"
 #include "parser/ast_type.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/unit_scope_items.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_declared_shape.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_attach_packed_arrays.h"
+#include "simulator/vpi_design_prefixed_refs.h"
 #include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_object.h"
@@ -121,6 +127,48 @@ void RecordVariableFacts(VpiObject* obj, const RtlirVariable& var,
   RecordArrayFacts(obj, var, key, ctx);
 }
 
+// §37.17 with Table 36-10: the object kind of the variable the declaration
+// `item` of the package `package`, or of the compilation unit where that is
+// null, makes: the kind of the type it is written with, through a typedef
+// name the kind at the end of its chain resolved in that scope (§26.3), and
+// for an unpacked array one kind whatever it holds, an array of events apart
+// (§37.27).
+int ScopeVariableKind(const ModuleItem& item, const PackageDecl* package,
+                      const RtlirDesign& design) {
+  const DataType& type = item.data_type;
+  const int kKind =
+      type.kind == DataTypeKind::kNamed
+          ? VpiPackageNamedTypeVariableKind(design, package, type.type_name)
+          : VpiDataTypeVariableKind(type.kind);
+  if (item.unpacked_dims.empty()) return kKind;
+  return kKind == vpiNamedEvent ? vpiNamedEventArray : vpiRegArray;
+}
+
+// The kind of each variable `items` declare, keyed under `scope`, and the
+// facts read off the declaration with it, as a module's variable is told
+// them: whether it is constant (§6.20.6), the interface a virtual interface
+// var's clocking blocks are found in (§25.9), whether it is a modport, and
+// for a structure or union whether it is packed, from the layout the run
+// `ctx` holds under the variable's key (§37.26).
+void RecordScopeVariableKinds(const std::vector<ModuleItem*>& items,
+                              std::string_view scope,
+                              const PackageDecl* package,
+                              const RtlirDesign& design,
+                              const VpiObjectMap& objects, SimContext& ctx) {
+  for (const ModuleItem* item : items) {
+    if (item->kind != ModuleItemKind::kVarDecl) continue;
+    const std::string kKey = std::string(scope) + "." + std::string(item->name);
+    VpiHandle obj = FindObjectForFlatName(objects, kKey);
+    if (obj == nullptr) continue;
+    const DataType& type = item->data_type;
+    obj->type = ScopeVariableKind(*item, package, design);
+    obj->decl_facts.constant_variable = type.is_const;
+    obj->decl_facts.vif_interface = VpiVirtualInterfaceOf(design, &type);
+    obj->is_modport = !type.modport_name.empty();
+    RecordAggregateFacts(obj, kKey, ctx);
+  }
+}
+
 }  // namespace
 
 void VpiRecordDeclaredShape(VpiObject* var, const DataType& type) {
@@ -212,6 +260,18 @@ int VpiVariableObjectKind(const RtlirVariable& var, const RtlirDesign& design,
   // §37.17 detail 19: a logic var and a reg are the same object kind, and it
   // is what a variable the clause draws no separate box for carries.
   return VpiDataTypeVariableKind(var.decl_kind);
+}
+
+void VpiRecordScopeVariableKinds(const RtlirDesign& design,
+                                 const VpiObjectMap& objects, SimContext& ctx) {
+  for (const PackageDecl* pkg : design.packages) {
+    RecordScopeVariableKinds(pkg->items, pkg->name, pkg, design, objects, ctx);
+  }
+  ForEachUnitScope(&design, ctx.GetArena(),
+                   [&](const CompilationUnit& unit, std::string_view scope) {
+                     RecordScopeVariableKinds(unit.cu_items, scope, nullptr,
+                                              design, objects, ctx);
+                   });
 }
 
 }  // namespace delta

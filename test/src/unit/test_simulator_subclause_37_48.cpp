@@ -296,20 +296,26 @@ class ClockingBlocksOfARun : public VpiDesignRun {
     return vpi_handle(vpiStmt, Named(vpiTaskFunc, By("top"), name));
   }
 
-  // The condition of that event control in top's task `task` is a clocking
-  // block whose prefix is the virtual interface var `var_name`, standing for
-  // no block while the var holds none, as every var here does.
-  static void ExpectBlockPrefixedBy(const char* task, const char* var_name) {
-    vpiHandle control = ControlOf(task);
-    ASSERT_NE(control, nullptr) << task;
+  // The condition of the event control the body of the task `tf` is, is a
+  // clocking block whose prefix is the virtual interface var `var_name`,
+  // standing for no block while the var holds none, as every var here does.
+  static void ExpectBlockPrefixedBy(vpiHandle tf, const char* var_name) {
+    ASSERT_NE(tf, nullptr) << var_name;
+    vpiHandle control = vpi_handle(vpiStmt, tf);
+    ASSERT_NE(control, nullptr) << var_name;
     vpiHandle block = vpi_handle(vpiCondition, control);
-    ASSERT_NE(block, nullptr) << task;
-    EXPECT_EQ(vpi_get(vpiType, block), vpiClockingBlock) << task;
+    ASSERT_NE(block, nullptr) << var_name;
+    EXPECT_EQ(vpi_get(vpiType, block), vpiClockingBlock) << var_name;
     vpiHandle var = vpi_handle(vpiPrefix, block);
-    ASSERT_NE(var, nullptr) << task;
-    EXPECT_EQ(vpi_get(vpiType, var), vpiVirtualInterfaceVar) << task;
-    EXPECT_STREQ(vpi_get_str(vpiName, var), var_name) << task;
-    EXPECT_EQ(vpi_handle(vpiActual, block), nullptr) << task;
+    ASSERT_NE(var, nullptr) << var_name;
+    EXPECT_EQ(vpi_get(vpiType, var), vpiVirtualInterfaceVar) << var_name;
+    EXPECT_STREQ(vpi_get_str(vpiName, var), var_name);
+    EXPECT_EQ(vpi_handle(vpiActual, block), nullptr) << var_name;
+  }
+
+  // The same for top's task `task`.
+  static void ExpectBlockPrefixedBy(const char* task, const char* var_name) {
+    ExpectBlockPrefixedBy(Named(vpiTaskFunc, By("top"), task), var_name);
   }
 };
 
@@ -408,6 +414,34 @@ TEST_F(ClockingBlocksOfARun,
   EXPECT_EQ(vpi_get(vpiType, signal), vpiRefObj);
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiPrefix, signal)),
             VpiObjectOf(By("top.vif")));
+}
+
+// Details 2 and 3: so is one named in a method through a virtual interface
+// property of its class (§25.9), the property the class defn holds (#8208).
+TEST_F(ClockingBlocksOfARun,
+       AClassPropertysVirtualInterfaceClockingBlockHasPrefixAndActual) {
+  Run("interface bus(input logic clk);\n"
+      "  clocking cb @(posedge clk); endclocking\n"
+      "endinterface\n"
+      "module top; logic clk; bus b(clk);\n"
+      "  class C; virtual bus vif; task run; @(vif.cb); endtask endclass\n"
+      "endmodule\n");
+  ExpectBlockPrefixedBy(
+      Named(vpiTaskFunc, Named(vpiClassDefn, By("top"), "C"), "run"), "vif");
+}
+
+// Details 2 and 3: and one named in a package's task through a virtual
+// interface var the package declares (§26.2), which is a virtual interface
+// var as a module's is (#8207).
+TEST_F(ClockingBlocksOfARun,
+       APackagesVirtualInterfaceClockingBlockHasPrefixAndActual) {
+  Run("interface bus(input logic clk);\n"
+      "  clocking cb @(posedge clk); endclocking\n"
+      "endinterface\n"
+      "package pkg; virtual bus vif; task run; @(vif.cb); endtask\n"
+      "endpackage\n"
+      "module top; logic clk; bus b(clk); endmodule\n");
+  ExpectBlockPrefixedBy(Named(vpiTaskFunc, By("pkg"), "run"), "vif");
 }
 
 // A module's default clocking block is reached from it as a clocking block and
