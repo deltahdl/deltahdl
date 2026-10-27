@@ -5,6 +5,7 @@
 #include <string>
 #include <string_view>
 
+#include "elaborator/net_data_type.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
@@ -18,10 +19,16 @@ namespace delta {
 
 const RtlirModule* VpiVirtualInterfaceOf(const RtlirDesign& design,
                                          const DataType* type) {
-  if (type == nullptr || type->kind != DataTypeKind::kVirtualInterface) {
+  if (type == nullptr) return nullptr;
+  std::string_view interface_name = type->type_name;
+  if (type->kind == DataTypeKind::kNamed) {
+    const auto kTypedef = design.type_interfaces.find(NamedTypeKey(*type));
+    if (kTypedef == design.type_interfaces.end()) return nullptr;
+    interface_name = kTypedef->second;
+  } else if (type->kind != DataTypeKind::kVirtualInterface) {
     return nullptr;
   }
-  const auto kFound = design.all_modules.find(type->type_name);
+  const auto kFound = design.all_modules.find(interface_name);
   return kFound != design.all_modules.end() ? kFound->second : nullptr;
 }
 

@@ -24,6 +24,7 @@ struct TypeNameFacts {
   std::unordered_map<std::string_view, std::string_view>& targets;
   std::unordered_map<std::string_view, PackedRange>& ranges;
   std::unordered_map<std::string_view, const DataType*>& enums;
+  std::unordered_map<std::string_view, std::string_view>& interfaces;
 };
 
 // What the typedef table has to say about the names in it: the table itself,
@@ -38,11 +39,11 @@ struct TypeNameSources {
 
 // §6.18: the facts recorded about every name the typedef table holds -- how
 // wide, what kind, signed or not, the layout of a packed structure or union,
-// the class at the end of a chain of typedefs, the packed range and the
-// enumeration a name stands for -- each into the map of `out` that
-// RtlirDesign carries it in. Defined in elaborator_type_facts.cpp, moved out
-// of elaborator.cpp, which stood at the size the
-// assert-no-oversized-source-files job fails at.
+// the class at the end of a chain of typedefs, the packed range, the
+// enumeration and the virtual interface's interface a name stands for -- each
+// into the map of `out` that RtlirDesign carries it in. Defined in
+// elaborator_type_facts.cpp, moved out of elaborator.cpp, which stood at the
+// size the assert-no-oversized-source-files job fails at.
 void PopulateTypeWidths(const TypeNameSources& src, TypeNameFacts& out);
 
 }  // namespace delta

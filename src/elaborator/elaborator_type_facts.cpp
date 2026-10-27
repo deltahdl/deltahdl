@@ -104,6 +104,11 @@ void PopulateTypeWidths(const TypeNameSources& src, TypeNameFacts& out) {
     if (end.kind == DataTypeKind::kEnum) {
       out.enums[name] = src.arena.Create<DataType>(end);
     }
+    // §25.9: the interface a virtual interface type at the end of the chain
+    // names (RtlirDesign::type_interfaces).
+    if (end.kind == DataTypeKind::kVirtualInterface) {
+      out.interfaces[name] = end.type_name;
+    }
     if (auto range = TypeNameRange(dtype, src.typedefs)) {
       out.ranges[name] = *range;
     }

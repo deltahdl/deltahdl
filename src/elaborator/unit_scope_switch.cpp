@@ -119,9 +119,9 @@ void UnitScopeTables::PopulateUnitTypeFacts(Elaborator& e,
   for (size_t k = 0; k < e.units_.tables.size(); ++k) {
     const UnitScopeTables& unit = *e.units_.tables[k];
     RtlirDesign own;
-    TypeNameFacts facts{own.type_widths,  own.type_kinds,   own.type_signed,
-                        own.type_layouts, own.type_targets, own.type_ranges,
-                        own.type_enums};
+    TypeNameFacts facts{own.type_widths,  own.type_kinds,     own.type_signed,
+                        own.type_layouts, own.type_targets,   own.type_ranges,
+                        own.type_enums,   own.type_interfaces};
     PopulateTypeWidths({unit.typedefs, unit.aggregate_typedef_names, e.arena_},
                        facts);
     const std::string kScope = "$unit#" + std::to_string(k);
@@ -132,6 +132,8 @@ void UnitScopeTables::PopulateUnitTypeFacts(Elaborator& e,
     AddUnitScoped(design->type_targets, own.type_targets, kScope, e.arena_);
     AddUnitScoped(design->type_ranges, own.type_ranges, kScope, e.arena_);
     AddUnitScoped(design->type_enums, own.type_enums, kScope, e.arena_);
+    AddUnitScoped(design->type_interfaces, own.type_interfaces, kScope,
+                  e.arena_);
   }
 }
 

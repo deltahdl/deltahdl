@@ -16,8 +16,10 @@ struct VpiObject;
 
 // §25.9: the interface a virtual interface var declared with `type` refers to
 // an instance of, as `design` declares it, which tells a clocking block the var
-// names from any other member (VpiVirtualInterfaceClockingBlock); null for any
-// other type, and for no type.
+// names from any other member (VpiVirtualInterfaceClockingBlock). A typedef
+// name stands for the type at the end of its chain (§6.18), whose interface the
+// design records (RtlirDesign::type_interfaces). Null for any other type, and
+// for no type.
 const RtlirModule* VpiVirtualInterfaceOf(const RtlirDesign& design,
                                          const DataType* type);
 

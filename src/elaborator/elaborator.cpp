@@ -373,7 +373,7 @@ void FinalizeDesignTail(RtlirDesign* design, const CompilationUnit* unit,
   TypeNameFacts facts{design->type_widths,  design->type_kinds,
                       design->type_signed,  design->type_layouts,
                       design->type_targets, design->type_ranges,
-                      design->type_enums};
+                      design->type_enums,   design->type_interfaces};
   PopulateTypeWidths(src, facts);
   CopyDesignMetadata(design, unit, meta);
 }

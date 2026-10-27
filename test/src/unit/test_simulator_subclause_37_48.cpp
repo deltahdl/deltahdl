@@ -1,7 +1,5 @@
 #include <gtest/gtest.h>
 
-#include <utility>
-
 #include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_constants.h"
@@ -297,6 +295,22 @@ class ClockingBlocksOfARun : public VpiDesignRun {
   static vpiHandle ControlOf(const char* name) {
     return vpi_handle(vpiStmt, Named(vpiTaskFunc, By("top"), name));
   }
+
+  // The condition of that event control in top's task `task` is a clocking
+  // block whose prefix is the virtual interface var `var_name`, standing for
+  // no block while the var holds none, as every var here does.
+  static void ExpectBlockPrefixedBy(const char* task, const char* var_name) {
+    vpiHandle control = ControlOf(task);
+    ASSERT_NE(control, nullptr) << task;
+    vpiHandle block = vpi_handle(vpiCondition, control);
+    ASSERT_NE(block, nullptr) << task;
+    EXPECT_EQ(vpi_get(vpiType, block), vpiClockingBlock) << task;
+    vpiHandle var = vpi_handle(vpiPrefix, block);
+    ASSERT_NE(var, nullptr) << task;
+    EXPECT_EQ(vpi_get(vpiType, var), vpiVirtualInterfaceVar) << task;
+    EXPECT_STREQ(vpi_get_str(vpiName, var), var_name) << task;
+    EXPECT_EQ(vpi_handle(vpiActual, block), nullptr) << task;
+  }
 };
 
 // Details 2 and 3: a clocking block named through a virtual interface var,
@@ -352,20 +366,42 @@ TEST_F(ClockingBlocksOfARun,
       "  task wait_arg(virtual bus v); @(v.cb); endtask\n"
       "  task wait_local; virtual bus lv; @(lv.cb); endtask\n"
       "endmodule\n");
-  const std::pair<const char*, const char*> kTasks[] = {{"wait_arg", "v"},
-                                                        {"wait_local", "lv"}};
-  for (const auto& [task, var_name] : kTasks) {
-    vpiHandle control = ControlOf(task);
-    ASSERT_NE(control, nullptr) << task;
-    vpiHandle block = vpi_handle(vpiCondition, control);
-    ASSERT_NE(block, nullptr) << task;
-    EXPECT_EQ(vpi_get(vpiType, block), vpiClockingBlock) << task;
-    vpiHandle var = vpi_handle(vpiPrefix, block);
-    ASSERT_NE(var, nullptr) << task;
-    EXPECT_EQ(vpi_get(vpiType, var), vpiVirtualInterfaceVar) << task;
-    EXPECT_STREQ(vpi_get_str(vpiName, var), var_name) << task;
-    EXPECT_EQ(vpi_handle(vpiActual, block), nullptr) << task;
-  }
+  ExpectBlockPrefixedBy("wait_arg", "v");
+  ExpectBlockPrefixedBy("wait_local", "lv");
+}
+
+// Details 2 and 3: so is one named through a var declared with a typedef of a
+// virtual interface type, whose interface the design records for the name
+// (§6.18), whether the module or a task declares the var (#8204).
+TEST_F(ClockingBlocksOfARun,
+       ATypedefVirtualInterfacesClockingBlockHasPrefixAndActual) {
+  Run("interface bus(input logic clk);\n"
+      "  clocking cb @(posedge clk); endclocking\n"
+      "endinterface\n"
+      "module top; logic clk; bus b(clk);\n"
+      "  typedef virtual bus vbus_t; vbus_t mv;\n"
+      "  task wait_module; @(mv.cb); endtask\n"
+      "  task wait_arg(vbus_t v); @(v.cb); endtask\n"
+      "endmodule\n");
+  ExpectBlockPrefixedBy("wait_module", "mv");
+  ExpectBlockPrefixedBy("wait_arg", "v");
+}
+
+// Detail 2: a member that is no clocking block, named through a virtual
+// interface var of an interface the design never instantiates, stays a
+// reference the var prefixes.
+TEST_F(ClockingBlocksOfARun, AnUninstantiatedInterfacesSignalIsARefObj) {
+  Run("interface bus(input logic clk); endinterface\n"
+      "module top; virtual bus vif;\n"
+      "  task wait_signal; @(vif.clk); endtask\n"
+      "endmodule\n");
+  vpiHandle control = ControlOf("wait_signal");
+  ASSERT_NE(control, nullptr);
+  vpiHandle signal = vpi_handle(vpiCondition, control);
+  ASSERT_NE(signal, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, signal), vpiRefObj);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiPrefix, signal)),
+            VpiObjectOf(By("top.vif")));
 }
 
 // A module's default clocking block is reached from it as a clocking block and
