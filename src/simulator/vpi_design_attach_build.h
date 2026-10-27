@@ -390,8 +390,10 @@ int VpiUnaryOpType(TokenKind op);
 // and `--i`; 0 for an operator that is neither.
 int VpiIncDecOpType(TokenKind op, bool postfix);
 
-// §37.61 (figure): whether an object of `type` can prefix an expression - a
-// class var, a virtual interface var or a clocking block.
+// §37.61 (figure): whether a variable of `type`, which a name resolves to, can
+// prefix an expression - a class var or a virtual interface var. The figure's
+// third prefix, a clocking block, is no variable a name resolves to, and is
+// found as a scope around the expression (VpiClockingBlockAround).
 bool VpiIsDynamicPrefixHolderType(int type);
 
 // §37.59: gives an operation, a part select or an indexed part select built

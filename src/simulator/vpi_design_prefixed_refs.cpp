@@ -16,8 +16,7 @@
 namespace delta {
 
 bool VpiIsDynamicPrefixHolderType(int type) {
-  return type == vpiClassVar || type == vpiVirtualInterfaceVar ||
-         type == vpiClockingBlock;
+  return type == vpiClassVar || type == vpiVirtualInterfaceVar;
 }
 
 namespace {
