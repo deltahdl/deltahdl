@@ -209,17 +209,18 @@ void WalkInstancePaths(const RtlirDesign* design, Visit visit) {
 // (AttachGenBlockInstances), and only the first component of a flat name is
 // kept among `objects`, so below another instance its path, `i7.gb_c_g`, and
 // the paths of the instances inside it name nothing once it has moved. Each is
-// then found under its parent's object instead.
+// then found under its parent's object instead, in the gen scope it moved
+// into. Both are there: a design instantiating no module it declares stops at
+// elaboration, before any run, so every instance of one that runs has an
+// object (AttachInstanceObjects), its parent's among them, and an instance is
+// moved only into a gen scope its parent holds.
 inline VpiHandle VpiChildInstanceObject(
     const std::unordered_map<std::string_view, VpiObject*>& objects,
     VpiHandle parent, const std::string& path, const RtlirModuleInst& child) {
   if (VpiHandle flat = FindObjectForFlatName(objects, path)) return flat;
-  VpiHandle scope =
-      parent == nullptr ? nullptr : VpiGenScopeOf(parent, child.gen_block_path);
-  return scope == nullptr ? nullptr
-                          : ChildNamed(scope, child.gen_block_path.empty()
-                                                  ? child.inst_name
-                                                  : child.simple_inst_name);
+  return ChildNamed(
+      VpiGenScopeOf(parent, child.gen_block_path),
+      child.gen_block_path.empty() ? child.inst_name : child.simple_inst_name);
 }
 
 // The same walk, visiting each scope with the object the run built for its

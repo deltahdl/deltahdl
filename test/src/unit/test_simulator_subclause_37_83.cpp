@@ -337,14 +337,17 @@ TEST_F(AttributesOfARun, AProcessCarriesItsAttributes) {
 }
 
 // An attribute is written on its holder, not declared in it: a name it shares
-// with what the holder declares reaches the declaration, and an index selects
-// no attribute, here where the vector it is written on has no bit 0.
+// with what the holder declares reaches the declaration, a name only it
+// carries reaches nothing, and an index selects no attribute, here where the
+// vector it is written on has no bit 0.
 TEST_F(AttributesOfARun, NoNameOrIndexReachesAnAttribute) {
-  Run("(* w = 2 *) module top;\n"
+  Run("(* w = 2, only *) module top;\n"
       "  wire w;\n"
       "  (* keep *) wire [2:1] bus;\n"
       "endmodule\n");
+  ASSERT_NE(Named(vpiAttribute, By("top"), "only"), nullptr);
   EXPECT_EQ(vpi_get(vpiType, By("top.w")), vpiNet);
+  EXPECT_EQ(By("top.only"), nullptr);
   EXPECT_EQ(vpi_handle_by_index(By("top.bus"), 0), nullptr);
 }
 

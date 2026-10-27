@@ -155,6 +155,34 @@ TEST_F(HandleByIndexOfARun, AScalarNetsLoadPortIsNoIndexedSubobject) {
   EXPECT_EQ(vpi_handle_by_index(trinet, 1), nullptr);
 }
 
+// §38.19 with §37.46: the terminal of a gate driving a scalar net, and the
+// force of the net, hang among the net's children as its drivers, each with
+// the index of its place, 0 for the gate's output and the force alike, but
+// neither is a sub-object an index into the net selects, so 0 names nothing.
+TEST_F(HandleByIndexOfARun, AScalarNetsDriversAreNoIndexedSubobjects) {
+  Run("module top; wire a, b, w, f; and g(w, a, b);\n"
+      "  initial force f = 1'b1; endmodule\n");
+  for (const char* name : {"top.w", "top.f"}) {
+    vpiHandle net = By(name);
+    ASSERT_NE(net, nullptr) << name;
+    EXPECT_EQ(ObjectsOf(vpiDriver, net).size(), 1U) << name;
+    EXPECT_EQ(vpi_handle_by_index(net, 0), nullptr) << name;
+  }
+}
+
+// §38.19 with §37.19: a var select of an array var hangs among the array's
+// children, but which element it stands for varies as its index does, so it
+// is no sub-object an index selects: into an array of elements 1 and 2, 0
+// names nothing, and 1 the element.
+TEST_F(HandleByIndexOfARun, AnArraysVarSelectIsNoIndexedSubobject) {
+  Run("module top; int a[1:2]; int i; initial a[i] = 1; endmodule\n");
+  vpiHandle a = By("top.a");
+  ASSERT_NE(a, nullptr);
+  EXPECT_EQ(ObjectsOf(vpiVarSelect, a).size(), 1U);
+  EXPECT_EQ(vpi_handle_by_index(a, 0), nullptr);
+  EXPECT_EQ(vpi_get(vpiType, vpi_handle_by_index(a, 1)), vpiIntVar);
+}
+
 // §38.19 with §37.10: a module instance that is no element of an instance
 // array has no access by index, so no index into it is a legal index select
 // and each names nothing, though the instance holds ports and nets (#7404).
