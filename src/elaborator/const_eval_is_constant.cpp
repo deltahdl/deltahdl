@@ -100,8 +100,8 @@ bool IsConstantWhateverItsArguments(const Expr* call) {
   if (!IsConstEvenWithNonConstArgs(call->callee)) return false;
   // §20.7: an array query is a constant expression only on an argument whose
   // dimensions are fixed.
-  return !(IsArrayQueryFunction(call->callee) && !call->args.empty() &&
-           HasDynamicDimension(call->args[0]));
+  return !IsArrayQueryFunction(call->callee) || call->args.empty() ||
+         !HasDynamicDimension(call->args[0]);
 }
 
 static bool IsConstantSysCallExpr(const Expr* expr, const ScopeMap& scope) {
