@@ -270,4 +270,21 @@ TEST(TaskAndFunctionNameResolutionSimulation,
             "101\n2\n");
 }
 
+// §23.8 with §23.9: a bare name the top calls is found in the top first, so
+// its own task runs, not the instance's of the same name below it.
+TEST(TaskAndFunctionNameResolutionSimulation,
+     TopsBareCallRunsItsOwnTaskAheadOfAnInstancesOfTheSameName) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module child;\n"
+                       "  task t; $display(\"child.t\"); endtask\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  child c();\n"
+                       "  task t; $display(\"top.t\"); endtask\n"
+                       "  initial t();\n"
+                       "endmodule\n",
+                       f),
+            "top.t\n");
+}
+
 }  // namespace

@@ -359,6 +359,15 @@ SubroutineTarget FindSubroutineTarget(const Expr* call, SimContext& ctx,
   // A path from the top of the design, "u1.tk" as written; a bare name found
   // here is the top's, a package's or the compilation unit's and runs where
   // the caller stands, as it did before instances were registered by prefix.
+  // §23.8 with §23.9: a bare name the first top's own processes call is the
+  // top's subroutine where it declares one, kept under the top's name too
+  // (RegisterInstanceSubroutines); every child instance registers its own
+  // under the bare name after the top, so that key may hold another's.
+  if (!is_hierarchical && active.empty()) {
+    target.func =
+        ctx.FindFunction(std::string(ctx.FirstTopModule()) + "." + path);
+    if (target.func != nullptr) return target;
+  }
   target.func = ctx.FindFunction(path);
   target.inst_prefix = is_hierarchical ? InstanceOfKey(path) : active;
   // §27.4 with §23.6: a path into a generate block instance, "blk[1].triple"
