@@ -565,6 +565,19 @@ TEST_F(ClassTypespecsOfARun, ABuiltInClassReportsItsClassType) {
   EXPECT_EQ(kTypeOf("top.s"), vpiSemaphoreClass);
 }
 
+// §37.32 with §38.6: vpiClassType is drawn on a class typespec alone, so a
+// class defn, a class obj and a module, none of which carries it, answer
+// vpiUndefined (#8189).
+TEST_F(ClassTypespecsOfARun, AnObjectOtherThanAClassTypespecHasNoClassType) {
+  Run(kSpecializations);
+  vpiHandle b = Named(vpiClassDefn, By("top"), "B");
+  ASSERT_NE(b, nullptr);
+  EXPECT_EQ(vpi_get(vpiClassType, b), vpiUndefined);
+  EXPECT_EQ(vpi_get(vpiClassType, vpi_handle(vpiClassObj, By("top.m"))),
+            vpiUndefined);
+  EXPECT_EQ(vpi_get(vpiClassType, By("top")), vpiUndefined);
+}
+
 // §37.32 detail 1 with §37.33: a class obj of a class no class defn stands
 // for still holds a typespec of its class, reaching no defn.
 TEST(ClassObjTypespec, AClassWithNoDefnHasATypespecOfItsOwn) {

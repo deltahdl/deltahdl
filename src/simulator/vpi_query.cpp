@@ -616,9 +616,12 @@ int VpiGetSimplePropertyB(int property, VpiHandle obj, bool& handled) {
     // §37.34: the distribution kind a dist item carries, as an int property.
     case vpiDistType:
       return obj->dist_type;
-    // §37.32: the kind of class a class typespec stands for.
+    // §37.32: the kind of class a class typespec stands for. No other object
+    // carries the property, and 0 is none of its values, so §38.6 has any
+    // other answer vpiUndefined.
     case vpiClassType:
-      return obj->type == vpiClassTypespec ? VpiClassTypeOf(*obj) : 0;
+      return obj->type == vpiClassTypespec ? VpiClassTypeOf(*obj)
+                                           : vpiUndefined;
     // §37.26 (figure): a structure or union object reports whether it is packed
     // as the vpiPacked Boolean property (TRUE for a packed aggregate). Any
     // object not declared packed reports FALSE.
