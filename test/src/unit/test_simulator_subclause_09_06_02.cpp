@@ -871,4 +871,56 @@ TEST(DisableStatementExecution, DisablingAForeachLabelInAFunctionEndsTheLoop) {
             "102 201\n");
 }
 
+// §9.6.2 with §23.8: a disable's name is the nearest scope declaring it,
+// running or not. Written in outer.x, y names outer.y, which has not begun, so
+// the disable ends nothing and the module's block y runs on.
+TEST(DisableStatementExecution, ANearerBlockNotRunningLeavesAFartherOne) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module top;\n"
+                 "  initial begin : y #5 $display(\"top.y ran on\"); end\n"
+                 "  initial begin : outer\n"
+                 "    #1;\n"
+                 "    begin : x disable y; end\n"
+                 "    begin : y #2; end\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "top.y ran on\n");
+}
+
+// The same where the nearer block is an instance's: written in c, y names c.y,
+// not begun at 1, and not the top's block y.
+TEST(DisableStatementExecution, AnInstancesBlockNotRunningLeavesTheTops) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module child;\n"
+                 "  initial #1 disable y;\n"
+                 "  initial #3 begin : y #1; end\n"
+                 "endmodule\n"
+                 "module top;\n"
+                 "  child c();\n"
+                 "  initial begin : y #5 $display(\"top.y ran on\"); end\n"
+                 "endmodule\n",
+                 f),
+      "top.y ran on\n");
+}
+
+// And where it is a task: written in c, t names c.t, which nothing runs, and
+// not the top's task t a top process is running.
+TEST(DisableStatementExecution, AnInstancesTaskNotRunningLeavesTheTops) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module child;\n"
+                       "  task t; #1; endtask\n"
+                       "  initial #1 disable t;\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  child c();\n"
+                       "  task t; #5 $display(\"top.t ran on\"); endtask\n"
+                       "  initial t();\n"
+                       "endmodule\n",
+                       f),
+            "top.t ran on\n");
+}
+
 }  // namespace

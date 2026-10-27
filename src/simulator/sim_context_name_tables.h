@@ -87,6 +87,18 @@ class DeclaredNameTables {
   const Stmt* FindForkjoinCall(const Expr* call) const;
   void RecordForkjoinCall(const Expr* call, const Stmt* fork);
 
+  // §9.6.2 with §23.8: the named blocks, labelled statements and subroutines
+  // the design declares, each under the key a process standing in it is keyed
+  // by -- its instance's prefix, its generate block's, then the labels from its
+  // procedure or subroutine on, "c.outer.y" -- whether or not any process runs
+  // in it (DeclareModuleNamedScopes in disable_scope.h).
+  void DeclareNamedScope(std::string key) {
+    declared_named_scopes_.insert(std::move(key));
+  }
+  bool DeclaresNamedScope(const std::string& key) const {
+    return declared_named_scopes_.contains(key);
+  }
+
   // §25.5.4: a modport expression port, `.P(r[3:0])`, as a module connected
   // through the modport names it, under the port's path, "u1.i.P", with the
   // expression it stands for and the prefix of the interface instance the
@@ -494,6 +506,8 @@ class DeclaredNameTables {
   std::unordered_map<std::string, std::vector<std::string_view>>
       forkjoin_tasks_;
   std::unordered_map<const Expr*, const Stmt*> forkjoin_calls_;
+  // §9.6.2: see DeclareNamedScope.
+  std::unordered_set<std::string> declared_named_scopes_;
   // §25.5.4: see RegisterModportExpression.
   std::unordered_map<std::string, ModportExpressionPort> modport_expressions_;
   std::map<std::pair<const Stmt*, const ModportExpressionPort*>, const Stmt*>

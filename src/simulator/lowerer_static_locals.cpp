@@ -102,23 +102,6 @@ void InitSubroutineStatics(const StaticLocalOwner& owner, SimContext& ctx,
   ctx.PopStaticScope(func->name);
 }
 
-// §27.4: the record of a generate block of `mod` declaring `func`, null
-// where none does. The elaborator lists such a subroutine among the module's
-// own function_decls as well, under its bare name and possibly as a copy, so
-// it is told by where it is written; made from there, its static locals were
-// made without the block's loop constants their initializers read.
-const RtlirGenBlockSubroutine* DeclaringGenBlock(const ModuleItem* func,
-                                                 const RtlirModule* mod) {
-  auto it = std::ranges::find_if(
-      mod->gen_block_subroutines, [&](const RtlirGenBlockSubroutine& sub) {
-        const SourceLoc& at = sub.decl->loc;
-        return std::tie(sub.decl->name, at.file_id, at.line, at.column) ==
-               std::tie(func->name, func->loc.file_id, func->loc.line,
-                        func->loc.column);
-      });
-  return it != mod->gen_block_subroutines.end() ? &*it : nullptr;
-}
-
 // §10.5 with §13.4.2: the static locals of the package and compilation-unit
 // subroutines, each made in the one frame its calls share, kept under its
 // package's or unit's name (DeclaredNameTables::StaticFrameOwner) whatever
@@ -395,6 +378,18 @@ void MakeNamedBlockStatics(const Stmt* s, SimContext& ctx, Arena& arena) {
 }
 
 }  // namespace
+
+const RtlirGenBlockSubroutine* DeclaringGenBlock(const ModuleItem* func,
+                                                 const RtlirModule* mod) {
+  auto it = std::ranges::find_if(
+      mod->gen_block_subroutines, [&](const RtlirGenBlockSubroutine& sub) {
+        const SourceLoc& at = sub.decl->loc;
+        return std::tie(sub.decl->name, at.file_id, at.line, at.column) ==
+               std::tie(func->name, func->loc.file_id, func->loc.line,
+                        func->loc.column);
+      });
+  return it != mod->gen_block_subroutines.end() ? &*it : nullptr;
+}
 
 void Lowerer::RecordStaticLocalSubroutines(const RtlirModule* mod) {
   if (!mod->class_decls.empty()) {

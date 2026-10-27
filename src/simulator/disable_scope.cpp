@@ -6,7 +6,13 @@
 #include <string_view>
 #include <vector>
 
+#include "elaborator/elaborator_validate_internal.h"
+#include "elaborator/rtlir.h"
+#include "elaborator/rtlir_scopes.h"
+#include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
 #include "simulator/eval_function_hier.h"
+#include "simulator/lowerer.h"
 #include "simulator/process.h"
 #include "simulator/sim_context.h"
 
@@ -100,6 +106,41 @@ std::vector<std::string> CandidateKeys(const std::string& path,
   return keys;
 }
 
+// Declares the labelled statements at and under `s`, each under `scope`, the
+// key of the named scope it stands in and a dot, or its instance's and its
+// generate block's prefix where it stands in no labelled one, then its label.
+void DeclareLabelledStmts(const Stmt* s, const std::string& scope,
+                          SimContext& ctx) {
+  if (s == nullptr) return;
+  std::string inner = scope;
+  if (!s->label.empty()) {
+    inner += s->label;
+    ctx.DeclareNamedScope(inner);
+    inner += '.';
+  }
+  ForEachChildStmt(s, [&inner, &ctx](const Stmt* sub) {
+    DeclareLabelledStmts(sub, inner, ctx);
+  });
+}
+
+// Declares the subroutine `func`, standing under `base`, and the labelled
+// statements of its body, its name starting their path afresh.
+void DeclareSubroutine(const ModuleItem* func, std::string base,
+                       SimContext& ctx) {
+  base += func->name;
+  ctx.DeclareNamedScope(base);
+  base += '.';
+  for (const Stmt* s : func->func_body_stmts) {
+    DeclareLabelledStmts(s, base, ctx);
+  }
+}
+
+// §27.4: the prefix of the innermost generate block instance of `prefixes`,
+// empty for a declaration standing in none.
+std::string InnermostGenBlock(const GenBlockPrefixes& prefixes) {
+  return prefixes.empty() ? std::string() : std::string(prefixes.back());
+}
+
 }  // namespace
 
 std::vector<Process*> ProcessesInDisabledScope(
@@ -116,9 +157,26 @@ std::vector<Process*> ProcessesInDisabledScope(
     for (std::size_t i = 0; i < procs.size(); ++i) {
       if (StandsIn(standing[i], key)) in.push_back(procs[i]);
     }
-    if (!in.empty()) return in;
+    if (!in.empty() || ctx.DeclaresNamedScope(key)) return in;
   }
   return {};
+}
+
+void DeclareModuleNamedScopes(const RtlirModule& mod,
+                              std::string_view inst_prefix, SimContext& ctx) {
+  const std::string kInstance(inst_prefix);
+  for (const RtlirProcess& proc : mod.processes) {
+    DeclareLabelledStmts(
+        proc.body, kInstance + InnermostGenBlock(proc.gen_block_prefixes), ctx);
+  }
+  for (const RtlirGenBlockSubroutine& sub : mod.gen_block_subroutines) {
+    DeclareSubroutine(
+        sub.decl, kInstance + InnermostGenBlock(sub.gen_block_prefixes), ctx);
+  }
+  for (const ModuleItem* func : mod.function_decls) {
+    if (func->method_class.empty() && DeclaringGenBlock(func, &mod) == nullptr)
+      DeclareSubroutine(func, kInstance, ctx);
+  }
 }
 
 }  // namespace delta

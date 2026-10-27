@@ -55,6 +55,16 @@ struct Process;
 // is its second caller.
 void ScheduleProcess(Process* proc, SimContext& ctx);
 
+// §27.4: the record of a generate block of `mod` declaring `func`, null
+// where none does. The elaborator lists such a subroutine among the module's
+// own function_decls as well, under its bare name and possibly as a copy, so
+// it is told by where it is written; made from there, its static locals were
+// made without the block's loop constants their initializers read, and its
+// name was declared a scope of the module's (DeclareModuleNamedScopes).
+// Defined in lowerer_static_locals.cpp.
+const RtlirGenBlockSubroutine* DeclaringGenBlock(const ModuleItem* func,
+                                                 const RtlirModule* mod);
+
 // The timing one module instance declares -- §30.3's specify blocks and §28.4's
 // gate instantiations -- with the instance they belong to. The prefix is what
 // tells two instances of one cell apart, since §30.4 has a specify block name

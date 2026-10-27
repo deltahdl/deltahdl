@@ -20,6 +20,7 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "simulator/class_object.h"
+#include "simulator/disable_scope.h"
 #include "simulator/dpi_export.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
@@ -746,6 +747,7 @@ void Lowerer::LowerChildInstance(const RtlirModuleInst& child) {
   RegisterChildInstanceDecls(child.resolved, inst_prefix_, ctx_, arena_);
   RecordSubroutineAssertionSampleScopes(child.resolved);
   RecordStaticLocalSubroutines(child.resolved);
+  DeclareModuleNamedScopes(*child.resolved, inst_prefix_, ctx_);
 
   // Port connections resolve in the parent scope (see LowerPortBindings),
   // then restore the child prefix for the child's own body.

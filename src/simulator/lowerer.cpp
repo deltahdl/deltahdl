@@ -29,6 +29,7 @@
 #include "simulator/class_object.h"
 #include "simulator/code_coverage.h"
 #include "simulator/coverage_control.h"
+#include "simulator/disable_scope.h"
 #include "simulator/dpi_export.h"
 #include "simulator/dpi_formal_type.h"
 #include "simulator/dpi_runtime.h"
@@ -310,6 +311,7 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
                               ctx_, arena_);
   RecordSubroutineAssertionSampleScopes(mod);
   RecordStaticLocalSubroutines(mod);
+  DeclareModuleNamedScopes(*mod, inst_prefix_, ctx_);
   // §35.5.4: an imported subroutine is declared where the source writes it and
   // called like a native one, so the declarations of the module being lowered
   // go into the registry EvalDpiCall reaches an import through.
