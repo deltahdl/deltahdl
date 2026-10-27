@@ -154,6 +154,28 @@ TEST_F(VariableSelectObject,
   EXPECT_EQ(VpiObjectOf(seen[1]), &second);
 }
 
+// The figure's vpiTypespec with §37.25 detail 8: a var select's typespec is its
+// array's unwound through vpiElemTypespec once per select, so a select of an
+// array reaching no typespec has none, and so has a select nested deeper than
+// the array's typespec unwinds.
+TEST_F(VariableSelectObject, ATypespecIsTheArraysUnwoundOncePerSelect) {
+  EXPECT_EQ(vpi_handle(vpiTypespec, VpiHandleOf(&select_)), nullptr);
+
+  VpiObject element_typespec;
+  element_typespec.type = vpiIntTypespec;
+  VpiObject array_typespec;
+  array_typespec.type = vpiArrayTypespec;
+  array_typespec.inner_typespec = &element_typespec;
+  array_.children.push_back(&array_typespec);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiTypespec, VpiHandleOf(&select_))),
+            &element_typespec);
+
+  VpiObject deeper;
+  deeper.type = vpiVarSelect;
+  deeper.parent = &select_;
+  EXPECT_EQ(vpi_handle(vpiTypespec, VpiHandleOf(&deeper)), nullptr);
+}
+
 // The var selects of a run: the second terminal of the gate g of top, written
 // as an element of the array var v selected by an index that varies.
 class VarSelectsOfARun : public VpiDesignRun {
