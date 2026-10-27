@@ -20,14 +20,18 @@ void RecordVpiError(s_vpi_error_info& error, const char* message) {
 }
 
 // §38.34: whether vpi_put_value() can be applied to an object of kind `type`:
-// a net, a variable (a memory word being a reg, §37.20 detail 1), a select of
-// either, a named event, a system function call, a primitive, of which a
-// sequential UDP is the one a value is put to (§37.35 detail 2), or a
-// scheduled event. A system task call is not among them: a task returns no
-// value (§36.5), so its call has none for a put to write.
+// a net, a variable (a memory word being a reg, §37.20 detail 1), a variable
+// select, which is a var select (§37.19), a named event, a system function
+// call, a primitive, of which a sequential UDP is the one a value is put to
+// (§37.35 detail 2), or a scheduled event. A bit select, a part select and an
+// indexed part select are not among them: each is an expression (§37.58,
+// §37.59) holding no storage of its own, the bits of a vector a put writes
+// being a net bit, a var bit or a slice of the vector's own kind. Nor is a
+// system task call: a task returns no value (§36.5), so its call has none for
+// a put to write.
 bool IsPutValueTargetType(int type) {
   if (VpiIsNetsType(type) || VpiIsVariablesType(type) ||
-      VpiIsVariableSelectType(type) || VpiObjectIsPrimitive(type)) {
+      VpiObjectIsPrimitive(type)) {
     return true;
   }
   return type == vpiVarSelect || type == vpiNamedEvent ||
@@ -167,12 +171,13 @@ bool VpiPutValueTargetIsRejected(VpiHandle obj, s_vpi_error_info& error) {
 
   // §38.34: nor can it be applied to an object of any kind the clause does not
   // list, a parameter, a specparam and a UDP table entry among those that hold
-  // a value. The put is rejected, an error is recorded, and the object is left
-  // unchanged.
+  // a value, and a bit select and a part select among the expressions that
+  // select bits. The put is rejected, an error is recorded, and the object is
+  // left unchanged.
   if (!IsPutValueTargetType(obj->type)) {
     RecordVpiError(error,
                    "vpi_put_value(): a value can be put only to a net, a "
-                   "variable, a select of either, a named event, a system "
+                   "variable, a variable select, a named event, a system "
                    "function call, a sequential UDP or a scheduled event");
     return true;
   }

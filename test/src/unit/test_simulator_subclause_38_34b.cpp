@@ -421,10 +421,23 @@ int IntValueOf(vpiHandle obj) {
   return value.value.integer;
 }
 
-// §38.34: vpi_put_value applies to nets, variables and selects of either,
-// named events, system function calls, sequential UDPs and scheduled events
-// alone, so a put to a parameter, a specparam or a UDP table entry is refused
-// with an error and leaves the object as it was (#8172).
+// Expects `put` to `target` to be refused as a put to an object of a kind
+// §38.34 does not list: no event handle answered, an error recorded, and the
+// message naming the kinds it does list.
+void ExpectPutTargetRefused(vpiHandle target, s_vpi_value put) {
+  EXPECT_EQ(vpi_put_value(target, &put, nullptr, vpiNoDelay), nullptr);
+  s_vpi_error_info info = {};
+  EXPECT_EQ(vpi_chk_error(&info), vpiError);
+  EXPECT_STREQ(info.message,
+               "vpi_put_value(): a value can be put only to a net, a "
+               "variable, a variable select, a named event, a system "
+               "function call, a sequential UDP or a scheduled event");
+}
+
+// §38.34: vpi_put_value applies to nets, variables, variable selects, named
+// events, system function calls, sequential UDPs and scheduled events alone,
+// so a put to a parameter, a specparam or a UDP table entry is refused with
+// an error and leaves the object as it was (#8172).
 TEST_F(PutsOfARun, APutToAParameterSpecparamOrTableEntryIsRefused) {
   Run("primitive inv(output o, input i);\n"
       "  table 0 : 1; 1 : 0; endtable\n"
@@ -442,17 +455,34 @@ TEST_F(PutsOfARun, APutToAParameterSpecparamOrTableEntryIsRefused) {
     s_vpi_value put = {};
     put.format = vpiStringVal;
     put.value.str = VpiText("(");
-    EXPECT_EQ(vpi_put_value(target, &put, nullptr, vpiNoDelay), nullptr);
-    s_vpi_error_info info = {};
-    EXPECT_EQ(vpi_chk_error(&info), vpiError);
-    EXPECT_STREQ(info.message,
-                 "vpi_put_value(): a value can be put only to a net, a "
-                 "variable, a select of either, a named event, a system "
-                 "function call, a sequential UDP or a scheduled event");
+    ExpectPutTargetRefused(target, put);
   }
   EXPECT_EQ(IntValueOf(kTargets[0]), 5);
   EXPECT_EQ(IntValueOf(kTargets[1]), 7);
   EXPECT_EQ(StringOf(kRows[0]), "0 : 1");
+}
+
+// §38.34 with §37.19, §37.58 and §37.59: the variable selects vpi_put_value
+// applies to are var selects. A bit select, a part select and an indexed part
+// select are expressions holding no storage of their own, so a put to one is
+// refused with an error and leaves the bits it selects as they were.
+TEST_F(PutsOfARun, APutToABitSelectOrAPartSelectIsRefused) {
+  Run("module top; integer n = 5; logic [7:0] r = 8'hA5; logic [2:0] i = 1;\n"
+      "  wire b; wire [3:0] p, q;\n"
+      "  assign b = n[2]; assign p = r[7:4]; assign q = r[i+:4];\n"
+      "endmodule\n");
+  std::vector<int> kinds;
+  for (vpiHandle assign : ObjectsOf(vpiContAssign, By("top"))) {
+    vpiHandle select = vpi_handle(vpiRhs, assign);
+    kinds.push_back(vpi_get(vpiType, select));
+    s_vpi_value put = {};
+    put.format = vpiIntVal;
+    ExpectPutTargetRefused(select, put);
+  }
+  EXPECT_EQ(kinds, (std::vector<int>{vpiBitSelect, vpiPartSelect,
+                                     vpiIndexedPartSelect}));
+  EXPECT_EQ(IntOf("top.n"), 5);
+  EXPECT_EQ(IntOf("top.r"), 0xA5);
 }
 
 }  // namespace

@@ -170,7 +170,7 @@ TEST_F(ClassDefinition, ValueRestrictionAppliesOnlyToVariableAndEventMembers) {
   ASSERT_EQ(vpi_chk_error(&put_info), vpiError);
   EXPECT_STREQ(put_info.message,
                "vpi_put_value(): a value can be put only to a net, a "
-               "variable, a select of either, a named event, a system "
+               "variable, a variable select, a named event, a system "
                "function call, a sequential UDP or a scheduled event");
 }
 
