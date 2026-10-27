@@ -539,9 +539,9 @@ static const char* VpiConfigStr(VpiHandle obj) {
 // than an empty string.
 static const char* VpiDecompileStr(VpiHandle obj) {
   // §37.17 detail 28 and §37.16 detail 34: a variable or net decompiles to the
-  // name an expression would write it by, built when it is first asked for.
-  if (VpiIsVariablesType(obj->type) || obj->type == vpiRegBit ||
-      VpiIsNetsType(obj->type)) {
+  // name an expression would write it by, built when it is first asked for. A
+  // var bit is among the variables, sv_vpi_user.h making vpiVarBit vpiRegBit.
+  if (VpiIsVariablesType(obj->type) || VpiIsNetsType(obj->type)) {
     if (obj->decompile.empty()) {
       obj->decompile = VpiStructMemberDecompileOf(obj);
     }
