@@ -907,20 +907,20 @@ TEST(DisableStatementExecution, AnInstancesBlockNotRunningLeavesTheTops) {
 }
 
 // And where it is a task: written in c, t names c.t, which nothing runs, and
-// not the top's task t a top process is running.
-TEST(DisableStatementExecution, AnInstancesTaskNotRunningLeavesTheTops) {
+// not the top's block t, which is running.
+TEST(DisableStatementExecution, AnInstancesTaskNotRunningLeavesTheTopsBlock) {
   SimFixture f;
-  EXPECT_EQ(RunCapture("module child;\n"
-                       "  task t; #1; endtask\n"
-                       "  initial #1 disable t;\n"
-                       "endmodule\n"
-                       "module top;\n"
-                       "  child c();\n"
-                       "  task t; #5 $display(\"top.t ran on\"); endtask\n"
-                       "  initial t();\n"
-                       "endmodule\n",
-                       f),
-            "top.t ran on\n");
+  EXPECT_EQ(
+      RunCapture("module child;\n"
+                 "  task t; #1; endtask\n"
+                 "  initial #1 disable t;\n"
+                 "endmodule\n"
+                 "module top;\n"
+                 "  child c();\n"
+                 "  initial begin : t #5 $display(\"top.t ran on\"); end\n"
+                 "endmodule\n",
+                 f),
+      "top.t ran on\n");
 }
 
 }  // namespace
