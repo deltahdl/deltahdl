@@ -89,8 +89,8 @@ TEST_F(AssignedExpressionsOfARun, AnIndexedPartSelectWithAVaryingBaseIsNot) {
 }
 
 // Detail 9 read off objects standing in no design. A part select reaching no
-// parent is no constant select, nor is one whose parent is none, a variable
-// of automatic lifetime (§37.17 detail 27). Into an array, the parent's bounds
+// parent is no constant select, nor is one whose parent is none, an element
+// of a dynamic array (§37.17 detail 27). Into an array, the parent's bounds
 // must be static, so one into a static array var is and one into a dynamic
 // array is not. Each range expression must be an elaboration-time constant,
 // so a variable written as either bound, or as the width, makes it none.
@@ -118,12 +118,6 @@ TEST(PartSelectConstantSelect, ReadOffTheSelectItsParentAndItsRange) {
   EXPECT_EQ(kConstantSelect(kSelectOf(&vector, &constant, &constant)), 1);
   EXPECT_EQ(kConstantSelect(kSelectOf(nullptr, &constant, &constant)), 0);
 
-  VpiObject automatic_vector;
-  automatic_vector.type = vpiLogicVar;
-  automatic_vector.automatic = true;
-  EXPECT_EQ(kConstantSelect(kSelectOf(&automatic_vector, &constant, &constant)),
-            0);
-
   VpiObject static_array;
   static_array.type = vpiArrayVar;
   static_array.array_type = vpiStaticArray;
@@ -133,6 +127,13 @@ TEST(PartSelectConstantSelect, ReadOffTheSelectItsParentAndItsRange) {
   dynamic_array.array_type = vpiDynamicArray;
   EXPECT_EQ(kConstantSelect(kSelectOf(&dynamic_array, &constant, &constant)),
             0);
+
+  VpiObject element;
+  element.type = vpiLogicVar;
+  element.array_member = true;
+  element.parent = &dynamic_array;
+  element.index_expr = &constant;
+  EXPECT_EQ(kConstantSelect(kSelectOf(&element, &constant, &constant)), 0);
 
   EXPECT_EQ(kConstantSelect(kSelectOf(&vector, &variable, &constant)), 0);
   EXPECT_EQ(kConstantSelect(kSelectOf(&vector, &constant, &variable)), 0);
