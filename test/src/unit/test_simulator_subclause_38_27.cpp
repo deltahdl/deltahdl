@@ -271,5 +271,32 @@ TEST_F(ChannelsSharedWithFopen, EachSideWritesThroughTheOthersMcd) {
   EXPECT_EQ(FileText("application.txt"), "from the design\n");
 }
 
+// What vpi_mcd_open returned for the file the design's $fopen opened as an fd.
+PLI_UINT32 beside_fd = 0;
+
+class ChannelBesideAnFd : public RunFilesRun {
+ protected:
+  static PLI_INT32 OpenTheFdsFile(PLI_BYTE8* /*user_data*/) {
+    beside_fd = vpi_mcd_open(VpiText("as_fd.txt"));
+    return 0;
+  }
+};
+
+// §38.27 with §21.3.1: a file the design's $fopen opened as an fd holds no
+// channel, the MSB of its descriptor set, so vpi_mcd_open of it hands back a
+// channel of its own rather than the fd.
+TEST_F(ChannelBesideAnFd, AnFdsFileIsOpenedOnAChannelOfItsOwn) {
+  RegisterTask("$open_fds_file", &OpenTheFdsFile);
+  Run("module top; integer fd;\n"
+      "  initial begin\n"
+      "    fd = $fopen(\"as_fd.txt\", \"w\");\n"
+      "    $open_fds_file;\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_NE(beside_fd, 0u);
+  EXPECT_EQ(beside_fd & SimContext::kFdMsb, 0u);
+  EXPECT_NE(beside_fd, DescriptorIn("top.fd"));
+}
+
 }  // namespace
 }  // namespace delta

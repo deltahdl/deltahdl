@@ -5,10 +5,12 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "helpers_run_files.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -106,6 +108,29 @@ TEST_F(VpiMcdPrintfSim, AnFdWritesNoneOfTheChannelsItsLowerBitsWouldName) {
   EXPECT_EQ(vpi_ctx_.McdChannelBuffer(mcd), "");
   EXPECT_EQ(vpi_ctx_.OutputChannelBuffer(), "");
   EXPECT_EQ(vpi_ctx_.LogFileBuffer(), "");
+}
+
+class PrintOnARunChannel : public RunFilesRun {
+ protected:
+  // Prints on the channel beside the design's mcd, on which no file is open.
+  static PLI_INT32 PrintBeside(PLI_BYTE8* /*user_data*/) {
+    vpi_mcd_printf(DescriptorIn("top.mcd") << 1, VpiText("stray"));
+    return 0;
+  }
+};
+
+// §38.28: in a run, text printed on a channel with no file open is written to
+// no file, the design's file on the channel beside it among them.
+TEST_F(PrintOnARunChannel, AChannelWithNoFileWritesNowhere) {
+  RegisterTask("$print_beside", &PrintBeside);
+  Run("module top; integer mcd;\n"
+      "  initial begin\n"
+      "    mcd = $fopen(\"kept.txt\");\n"
+      "    $print_beside;\n"
+      "    $fclose(mcd);\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_EQ(FileText("kept.txt"), "");
 }
 
 }  // namespace

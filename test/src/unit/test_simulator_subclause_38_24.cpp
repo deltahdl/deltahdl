@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <vector>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -204,6 +206,40 @@ TEST_F(CloseOfAFopenedFile, BothFormsAreClosed) {
   EXPECT_EQ(unopened_close_result, PLI_UINT32{1} << 20);
   EXPECT_EQ(FileText("fd.txt"), "");
   EXPECT_EQ(FileText("mcd.txt"), "");
+}
+
+// An fd naming no file the run has open: the MSB set, the rest a number the
+// run never handed out.
+constexpr PLI_UINT32 kUnopenedFd = SimContext::kFdMsb | 7u;
+
+// What vpi_mcd_close returned for the run's three standard stream fds, in
+// order, and for kUnopenedFd.
+std::vector<PLI_UINT32> stream_close_results;
+PLI_UINT32 unopened_fd_close_result = 0;
+
+class CloseOfAStreamFd : public RunFilesRun {
+ protected:
+  static PLI_INT32 CloseStreams(PLI_BYTE8* /*user_data*/) {
+    for (const PLI_UINT32 kFd :
+         {SimContext::kStdinFd, SimContext::kStdoutFd, SimContext::kStderrFd}) {
+      stream_close_results.push_back(vpi_mcd_close(kFd));
+    }
+    unopened_fd_close_result = vpi_mcd_close(kUnopenedFd);
+    return 0;
+  }
+};
+
+// §38.24 with §21.3.1: in a run, the fds of the standard streams are not
+// closed, nor is an fd naming no file the run has open; each comes back as it
+// was given, the descriptor of what was not closed.
+TEST_F(CloseOfAStreamFd, NeitherAStreamNorAnUnopenedFdIsClosed) {
+  RegisterTask("$close_streams", &CloseStreams);
+  Run("module top; initial $close_streams; endmodule\n");
+  EXPECT_EQ(
+      stream_close_results,
+      (std::vector<PLI_UINT32>{SimContext::kStdinFd, SimContext::kStdoutFd,
+                               SimContext::kStderrFd}));
+  EXPECT_EQ(unopened_fd_close_result, kUnopenedFd);
 }
 
 }  // namespace

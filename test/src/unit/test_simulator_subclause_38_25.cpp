@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <filesystem>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -8,6 +10,7 @@
 #include "simulator/sim_context.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -174,6 +177,44 @@ TEST_F(FlushOfAFopenedFile, ItsTextIsInTheFile) {
       "endmodule\n");
   EXPECT_EQ(run_flush_result, 0);
   EXPECT_EQ(FileText("mcd.txt"), "before");
+}
+
+// What vpi_mcd_flush returned for a channel of the run with no file open, and
+// for the channel of a file that takes no write.
+PLI_INT32 unopened_flush_result = 1;
+PLI_INT32 refused_flush_result = 0;
+
+class FlushOfARunChannel : public RunFilesRun {
+ protected:
+  static PLI_INT32 FlushUnopened(PLI_BYTE8* /*user_data*/) {
+    unopened_flush_result = vpi_mcd_flush(PLI_UINT32{1} << 20);
+    return 0;
+  }
+  static PLI_INT32 FlushRefused(PLI_BYTE8* /*user_data*/) {
+    const PLI_UINT32 kMcd = vpi_mcd_open(VpiText("/dev/full"));
+    vpi_mcd_printf(kMcd, VpiText("lost"));
+    refused_flush_result = vpi_mcd_flush(kMcd);
+    vpi_mcd_close(kMcd);
+    return 0;
+  }
+};
+
+// §38.25: a channel of the run with no file open holds nothing to flush, and
+// flushing it succeeds.
+TEST_F(FlushOfARunChannel, AChannelWithNoFileFlushesWithoutError) {
+  RegisterTask("$flush_unopened", &FlushUnopened);
+  Run("module top; initial $flush_unopened; endmodule\n");
+  EXPECT_EQ(unopened_flush_result, 0);
+}
+
+// §38.25: a flush the file refuses is an error, reported by a nonzero return.
+// Linux's /dev/full takes no write, so the text printed on its channel cannot
+// be committed; a platform without it has no such file to open.
+TEST_F(FlushOfARunChannel, AFlushTheFileRefusesIsReported) {
+  if (!std::filesystem::exists("/dev/full")) GTEST_SKIP() << "no /dev/full";
+  RegisterTask("$flush_refused", &FlushRefused);
+  Run("module top; initial $flush_refused; endmodule\n");
+  EXPECT_NE(refused_flush_result, 0);
 }
 
 }  // namespace

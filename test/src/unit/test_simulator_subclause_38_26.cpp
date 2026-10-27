@@ -116,6 +116,8 @@ TEST_F(VpiMcdNameSim, AMultiChannelDescriptorNamesNoOneFile) {
 // The names vpi_mcd_name gave the fd and the mcd the design's $fopen opened.
 std::string fd_name;
 std::string mcd_name;
+// Whether vpi_mcd_name named anything for a channel of the run with no file.
+bool unopened_named = true;
 
 class NameOfAFopenedFile : public RunFilesRun {
  protected:
@@ -126,6 +128,10 @@ class NameOfAFopenedFile : public RunFilesRun {
   static PLI_INT32 NameBoth(PLI_BYTE8* /*user_data*/) {
     fd_name = NameOf(DescriptorIn("top.fd"));
     mcd_name = NameOf(DescriptorIn("top.mcd"));
+    return 0;
+  }
+  static PLI_INT32 NameUnopened(PLI_BYTE8* /*user_data*/) {
+    unopened_named = vpi_mcd_name(PLI_UINT32{1} << 20) != nullptr;
     return 0;
   }
 };
@@ -143,6 +149,14 @@ TEST_F(NameOfAFopenedFile, BothFormsAreNamed) {
       "endmodule\n");
   EXPECT_EQ(fd_name, "named_fd.txt");
   EXPECT_EQ(mcd_name, "named_mcd.txt");
+}
+
+// §38.26: in a run, a channel with no file open names none, which the routine
+// reports as an error by returning NULL.
+TEST_F(NameOfAFopenedFile, AChannelWithNoFileIsNamedNothing) {
+  RegisterTask("$name_unopened", &NameUnopened);
+  Run("module top; initial $name_unopened; endmodule\n");
+  EXPECT_FALSE(unopened_named);
 }
 
 }  // namespace
