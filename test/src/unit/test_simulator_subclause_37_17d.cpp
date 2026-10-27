@@ -41,17 +41,20 @@ TEST_F(VariablesOfARun, ATypedefPackedVectorVariableHasBits) {
 
 // §6.18: a variable a module declares with a typedef name is the kind of the
 // type at the end of the name's chain, as a task's is: an int var for a typedef
-// of int, and a virtual interface var for a typedef of a virtual interface type
-// (§37.29), where no fact the elaborator records on the variable says so
-// (#8205).
+// of int, a virtual interface var for a typedef of a virtual interface type
+// (§37.29), and a struct var for a typedef a package declares, named through
+// the package (§26.3), where no fact the elaborator records on the variable
+// says so (#8205).
 TEST_F(VariablesOfARun, ATypedefNamedVariableIsTheKindItsTypedefNames) {
   Run("interface bus; endinterface\n"
+      "package p; typedef struct { int a; int b; } ps_t; endpackage\n"
       "module top; bus b();\n"
       "  typedef int myint; typedef virtual bus vbus_t;\n"
-      "  myint x; vbus_t vif;\n"
+      "  myint x; vbus_t vif; p::ps_t s;\n"
       "endmodule\n");
   EXPECT_EQ(vpi_get(vpiType, By("top.x")), vpiIntVar);
   EXPECT_EQ(vpi_get(vpiType, By("top.vif")), vpiVirtualInterfaceVar);
+  EXPECT_EQ(vpi_get(vpiType, By("top.s")), vpiStructVar);
 }
 
 // An element of an array of a built-in type other than logic is a variable of

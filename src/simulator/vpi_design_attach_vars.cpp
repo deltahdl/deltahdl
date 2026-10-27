@@ -2,12 +2,12 @@
 
 #include <string>
 
+#include "elaborator/net_data_type.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast_type.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/sv_vpi_user.h"
-#include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_declared_shape.h"
 #include "simulator/vpi_design_attach_build.h"
@@ -88,19 +88,16 @@ void RecordArrayFacts(VpiObject* obj, const RtlirVariable& var,
   }
 }
 
-// §37.17 and §37.26: a variable whose type is a struct or union named through
-// a typedef reports kNamed and was stamped a reg; the run's layout of it says
-// which of the two it is, and an unpacked one's size is its number of fields
-// (detail 9). Every struct or union var has that layout: the elaborator gives
-// an aggregate declaration its type and Lowerer::LowerVar registers the
+// §37.17 and §37.26: a struct or union var, one named through a typedef told
+// its kind as one written out is (VpiVariableObjectKind), is packed or not as
+// the run's layout of it says, and an unpacked one's size is its number of
+// fields (detail 9). Every struct or union var has that layout: the elaborator
+// gives an aggregate declaration its type and Lowerer::LowerVar registers the
 // layout under the variable's name (RegisterAggregateLayout).
 void RecordAggregateFacts(VpiObject* obj, const std::string& key,
                           SimContext& ctx) {
   const StructTypeInfo* info = ctx.GetVariableStructType(key);
   if (info == nullptr) return;
-  if (obj->type == kVpiReg) {
-    obj->type = info->is_union ? vpiUnionVar : vpiStructVar;
-  }
   if (obj->type != vpiStructVar && obj->type != vpiUnionVar) return;
   // §37.26: whether it is packed, which vpiPacked reports and which leaves
   // its value accessible (detail 1).
@@ -204,11 +201,13 @@ int VpiVariableObjectKind(const RtlirVariable& var, const RtlirDesign& design,
   // A variable declared with an enum typedef reports kNamed; the enum it names
   // makes it an enum var all the same.
   if (!var.enum_type_name.empty()) return vpiEnumVar;
-  // A typedef name no fact above claims, an int's or a virtual interface's
-  // among them, is told through the kind the design records at the end of its
-  // chain, as a task's or function's variable is (DeclaredVariableKind).
+  // A typedef name no fact above claims, an int's, a struct's or a virtual
+  // interface's among them, is told through the kind the design records at
+  // the end of its chain, as a task's or function's variable is
+  // (DeclaredVariableKind), under `p::t` for one a package declares (§26.3).
   if (var.decl_kind == DataTypeKind::kNamed) {
-    return VpiNamedTypeVariableKind(design, mod, var.written_type->type_name);
+    return VpiNamedTypeVariableKind(design, mod,
+                                    NamedTypeKey(*var.written_type));
   }
   // §37.17 detail 19: a logic var and a reg are the same object kind, and it
   // is what a variable the clause draws no separate box for carries.
