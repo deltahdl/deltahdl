@@ -58,7 +58,8 @@ TEST_F(RefObjContext, ARefObjInNoInstanceReachesNoPorts) {
 // held in module m is the lower connection of m's port whose lower connection
 // it is, not of m's other port, and the higher connection of the port of an
 // instance m holds in a generate block of a generate scope array, whose ports
-// connected to a net are none of its. A ref obj with no holder has no parent.
+// connected to a net or to another ref obj are none of its. A ref obj with no
+// holder has no parent.
 TEST_F(RefObjContext, PortsAreThoseItConnectsAndParentIsARefObjHoldingIt) {
   VpiObject m;
   m.type = vpiModule;
@@ -80,9 +81,14 @@ TEST_F(RefObjContext, PortsAreThoseItConnectsAndParentIsARefObjHoldingIt) {
   VpiObject to_net;
   to_net.type = vpiPort;
   to_net.high_conn = &net;
+  VpiObject stranger;
+  stranger.type = vpiRefObj;
+  VpiObject to_stranger;
+  to_stranger.type = vpiPort;
+  to_stranger.high_conn = &stranger;
   VpiObject u;
   u.type = vpiModule;
-  u.children = {&to_net, &to_r};
+  u.children = {&to_net, &to_stranger, &to_r};
   VpiObject block;
   block.type = vpiGenScope;
   block.children = {&u};
