@@ -23,6 +23,7 @@
 #include "simulator/scope.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
+#include "simulator/unit_scopes.h"
 #include "simulator/variable.h"
 #include "simulator/virtual_interface.h"
 
@@ -225,6 +226,20 @@ ModuleItem* FirstTopsOwnSubroutine(const std::string& path,
   return ctx.FindFunction(std::string(ctx.FirstTopModule()) + "." + path);
 }
 
+// §23.9 with §3.12.1: the subroutine the compilation unit holding the calling
+// instance `active` declares under the bare callee `path`, the scope a module
+// item's name is looked for in next, kept under "$unit::name", or
+// "$unit#k::name" where the units are separate (RegisterFreeCuFunctions). The
+// bare-name registry holds whichever instance's subroutine of the name was
+// registered last instead. Null for a dotted path or a name the unit declares
+// no subroutine by.
+ModuleItem* UnitSubroutine(const std::string& path, const std::string& active,
+                           SimContext& ctx) {
+  if (path.find('.') != std::string::npos) return nullptr;
+  return ctx.FindFunction(UnitScopes::ScopeName(ctx.Units().UnitOf(active)) +
+                          "::" + path);
+}
+
 // The member access a dotted callee is written as: the call's own name,
 // `v.add` of `v.add(20)`, or the enable itself, `b.t` of `b.t;`; null for a
 // callee of any other shape.
@@ -372,10 +387,11 @@ SubroutineTarget FindSubroutineTarget(const Expr* call, SimContext& ctx,
   // A path from the top of the design, "u1.tk" as written; a bare name found
   // here is the top's, a package's or the compilation unit's and runs where
   // the caller stands, as it did before instances were registered by prefix.
-  // The first top's own subroutine comes first (FirstTopsOwnSubroutine).
+  // The first top's own subroutine comes first (FirstTopsOwnSubroutine), and
+  // then the compilation unit's (UnitSubroutine).
   target.func = FirstTopsOwnSubroutine(path, active, ctx);
-  if (target.func != nullptr) return target;
-  target.func = ctx.FindFunction(path);
+  if (target.func == nullptr) target.func = UnitSubroutine(path, active, ctx);
+  if (target.func == nullptr) target.func = ctx.FindFunction(path);
   target.inst_prefix = is_hierarchical ? InstanceOfKey(path) : active;
   // §27.4 with §23.6: a path into a generate block instance, "blk[1].triple"
   // from the top's own processes.

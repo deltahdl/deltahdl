@@ -287,4 +287,22 @@ TEST(TaskAndFunctionNameResolutionSimulation,
             "top.t\n");
 }
 
+// §23.9 with §3.12.1: a bare name the top declares nothing by is looked for in
+// the compilation unit next, so the unit's function runs, not the one an
+// instance below the top declares.
+TEST(TaskAndFunctionNameResolutionSimulation,
+     TopsBareCallRunsTheUnitsFunctionAheadOfAnInstancesOfTheSameName) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("function void f; $display(\"unit.f\"); endfunction\n"
+                       "module child;\n"
+                       "  function void f; $display(\"child.f\"); endfunction\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  child c();\n"
+                       "  initial f();\n"
+                       "endmodule\n",
+                       f),
+            "unit.f\n");
+}
+
 }  // namespace
