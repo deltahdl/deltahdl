@@ -715,17 +715,16 @@ void VpiContext::Attach(SimContext& sim_ctx, const RtlirDesign* design) {
   RecordDeclarationSourceLocations(design, object_map_, SourcesOf(sim_ctx_));
   AttachPackages(design);
   AttachTopModules(design);
-  // §37.39: the paths a specify block declares, made from the run's
-  // SpecifyManager once the tops have objects, since the first top's own hang
-  // from it.
-  AttachModulePathDelays(sim_ctx);
   // §37.35: the UDP definitions are made ahead of the instances' contents,
   // whose udps reach them.
   AttachUdpDefns(design);
   AttachInstanceContents(design);
-  // §37.40: the checks a specify block declares, made likewise, and after the
-  // instances' contents, since an event or delayed signal written as one bit
-  // of a vector is the bit made there.
+  // §37.39 and §37.40: the paths and checks a specify block declares, made from
+  // the run's SpecifyManager once the tops have objects, since the first top's
+  // own hang from it, and after the instances' contents, since a terminal,
+  // condition, event or delayed signal written as one bit of a vector is the
+  // bit made there.
+  AttachModulePathDelays(sim_ctx);
   AttachTimingChecks(sim_ctx);
   RecordProtectedDeclarations(design, object_map_, SourcesOf(sim_ctx_));
   RecordViewportGrants(design, object_map_, sim_ctx.GetDiag().Sources());

@@ -325,6 +325,27 @@ TEST_F(ModulePathsOfARun, AStateDependentPathReachesItsCondition) {
   EXPECT_EQ(vpi_get(vpiModPathHasIfNone, kPaths[2]), 0);
 }
 
+// §37.39 (figure) with §30.4.4.1: a terminal written as one bit of a vector
+// has that bit for its path term's expression, and a condition selecting one
+// bit of a vector is that bit, reaching the vector through vpiParent.
+TEST_F(ModulePathsOfARun, ABitOfAVectorIsATermsAndAConditionsExpression) {
+  Run("module m(input [1:0] s, input [1:0] a, output [1:0] b);\n"
+      "  specify\n"
+      "    if (s[1]) (a[0] => b[1]) = 1;\n"
+      "  endspecify\n"
+      "endmodule\n"
+      "module top; reg [1:0] s, a; wire [1:0] b; m m1(s, a, b); endmodule\n");
+  const std::vector<vpiHandle> kPaths = ObjectsOf(vpiModPath, By("top.m1"));
+  ASSERT_EQ(kPaths.size(), 1u);
+  EXPECT_EQ(TermsOf(vpiModPathIn, kPaths[0]),
+            (std::vector<Term>{{"a[0]", vpiNoEdge}}));
+  EXPECT_EQ(TermsOf(vpiModPathOut, kPaths[0]),
+            (std::vector<Term>{{"b[1]", vpiNoEdge}}));
+  vpiHandle condition = vpi_handle(vpiCondition, kPaths[0]);
+  EXPECT_EQ(NameOf(condition), "s[1]");
+  EXPECT_EQ(NameOf(vpi_handle(vpiParent, condition)), "s");
+}
+
 // §37.39 (figure) with §30.4.5 and §30.4.6: a path reports through
 // vpiPathType whether it was written as a parallel or a full connection, and
 // through vpiPolarity the polarity its operator was written with, unknown
