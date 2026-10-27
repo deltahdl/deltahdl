@@ -406,6 +406,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/stmt_exec.cpp
     simulator/stmt_exec_deferred.cpp
     simulator/stmt_exec_disable.cpp
+    simulator/disable_scope.cpp
     simulator/stmt_exec_process.cpp
     simulator/systf_call_statement.cpp
     simulator/statement_assign.cpp

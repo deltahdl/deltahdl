@@ -665,6 +665,122 @@ TEST(DisableStatementExecution, HierarchicalDisableOfABlockInATask) {
       "n=3 t=35 after=1\n");
 }
 
+// §9.6.2 with §23.8: a disable ends the block its name resolves to and no
+// other of the same name: a.blk is instance a's block, so instance b's goes on
+// and prints.
+TEST(DisableStatementExecution, DisablingOneInstancesBlockLeavesAnothers) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module child #(parameter int ID = 0);\n"
+                       "  initial begin : blk #5 $display(\"%0d ran on\", ID); "
+                       "end\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  child #(1) a();\n"
+                       "  child #(2) b();\n"
+                       "  initial #1 disable a.blk;\n"
+                       "endmodule\n",
+                       f),
+            "2 ran on\n");
+}
+
+// §9.6.2 with §23.8: a simple name is resolved upward from where the disable
+// stands, so a disable of blk in one instance of a module ends that
+// instance's blk alone.
+TEST(DisableStatementExecution, AModulesDisableEndsItsOwnInstancesBlock) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module child #(parameter int ID = 0, STOP = 0);\n"
+                       "  initial begin : blk #5 $display(\"%0d ran on\", ID); "
+                       "end\n"
+                       "  initial #1 if (STOP) disable blk;\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  child #(1, 1) a();\n"
+                       "  child #(2, 0) b();\n"
+                       "endmodule\n",
+                       f),
+            "2 ran on\n");
+}
+
+// §9.6.2 with §23.8: each component of a hierarchical name narrows the
+// scope, so x.inner is not y.inner though both blocks are named inner.
+TEST(DisableStatementExecution, AHierarchicalDisableEndsOnlyTheBlockItReaches) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module top;\n"
+                 "  initial begin : x\n"
+                 "    begin : inner #5 $display(\"x.inner ran on\"); end\n"
+                 "  end\n"
+                 "  initial begin : y\n"
+                 "    begin : inner #5 $display(\"y.inner ran on\"); end\n"
+                 "  end\n"
+                 "  initial #1 disable x.inner;\n"
+                 "endmodule\n",
+                 f),
+      "y.inner ran on\n");
+}
+
+// §9.6.2 with §23.9: a name a generate block does not declare is looked for
+// in the module around it, so a disable written in one ends the module's
+// block of that name.
+TEST(DisableStatementExecution, AGenerateBlocksDisableEndsTheModulesBlock) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module top;\n"
+                 "  initial begin : blk #5 $display(\"blk ran on\"); end\n"
+                 "  initial begin : other #5 $display(\"other ran on\"); "
+                 "end\n"
+                 "  if (1) begin : g\n"
+                 "    initial #1 disable blk;\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "other ran on\n");
+}
+
+// §9.6.2 with §23.8: the first component of a hierarchical name not found in
+// the instance a disable is written in is looked for in the instances holding
+// it, so sib.blk written two levels down names the block of the instance sib
+// the top holds, and the block of that name in sib2 goes on.
+TEST(DisableStatementExecution, AnUpwardNameEndsTheEnclosingInstancesBlock) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module sibm #(parameter int ID = 0);\n"
+                       "  initial begin : blk #5 $display(\"%0d ran on\", ID); "
+                       "end\n"
+                       "endmodule\n"
+                       "module low; initial #1 disable sib.blk; endmodule\n"
+                       "module leaf; low w(); endmodule\n"
+                       "module top;\n"
+                       "  leaf l();\n"
+                       "  sibm #(1) sib();\n"
+                       "  sibm #(2) sib2();\n"
+                       "endmodule\n",
+                       f),
+            "2 ran on\n");
+}
+
+// §9.6.2 with §9.3.5: a labelled foreach is a block its label names, which a
+// disable within it ends in its own instance alone; the other instance's loop
+// runs its three passes.
+TEST(DisableStatementExecution, DisablingALoopLabelEndsOnlyItsInstancesLoop) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module child #(parameter int ID = 0);\n"
+                       "  int a [3];\n"
+                       "  initial begin\n"
+                       "    lp: foreach (a[i]) begin\n"
+                       "      #1;\n"
+                       "      if (ID == 1 && i == 1) disable lp;\n"
+                       "    end\n"
+                       "    $display(\"%0d done at %0t\", ID, $time);\n"
+                       "  end\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  child #(1) a();\n"
+                       "  child #(2) b();\n"
+                       "endmodule\n",
+                       f),
+            "1 done at 2\n2 done at 3\n");
+}
+
 // §9.6.2 with §12.7.3: a foreach is an implicit block its label names, so a
 // disable of that label inside a function ends the loop and the function goes
 // on after it. The fixed-size array is walked by its dimensions and the queue

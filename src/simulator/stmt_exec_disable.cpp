@@ -13,6 +13,7 @@
 #include "common/types.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
+#include "simulator/disable_scope.h"
 #include "simulator/eval_function_hier.h"
 #include "simulator/exec_task.h"
 #include "simulator/procedural_assertion.h"
@@ -128,6 +129,10 @@ StmtResult ExecDisableImpl(const Stmt* stmt, SimContext& ctx) {
     std::erase_if(procs, [instance](const Process* proc) {
       return proc->inst_prefix != *instance;
     });
+  } else {
+    // §9.6.2 with §23.8: of the processes inside a scope of the label, those
+    // inside the one block or task the name resolves to.
+    procs = ProcessesInDisabledScope(stmt->expr, procs, ctx);
   }
   bool self_disable = false;
 

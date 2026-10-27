@@ -386,6 +386,8 @@ class SimContext : public DeclaredNameTables,
   std::string_view ActiveGenBlockPrefix() const;  // §27.4, sim_context_scope
   UnitScopes& Units() { return units_; }          // §3.12.1, unit_scopes.h
   std::string ActiveUnitScope() const;  // "$unit#k" running, "" for one unit
+  // §27.4: the generate block prefix of the process `proc`, running or not.
+  static std::string_view GenBlockPrefixOf(const Process& proc);
 
   // §32.4.3: the instance an evaluation stands in, where that is not the
   // running process's. simulator/instance_prefix_override.h holds the reason

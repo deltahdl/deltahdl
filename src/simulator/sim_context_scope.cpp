@@ -158,8 +158,12 @@ std::string_view SimContext::ActiveGenBlockPrefix() const {
   // body the block declaring the subroutine, none for one the module declares
   // (FrameOwnerEntry::gen_depth).
   if (current_process_ == nullptr) return {};
-  const std::vector<FrameOwnerEntry>& owners = current_process_->frame_owners;
-  const std::vector<std::string>& blocks = current_process_->gen_prefixes;
+  return GenBlockPrefixOf(*current_process_);
+}
+
+std::string_view SimContext::GenBlockPrefixOf(const Process& proc) {
+  const std::vector<FrameOwnerEntry>& owners = proc.frame_owners;
+  const std::vector<std::string>& blocks = proc.gen_prefixes;
   const size_t kDepth = owners.empty()
                             ? blocks.size()
                             : std::min(owners.back().gen_depth, blocks.size());
