@@ -81,15 +81,21 @@ inline FuncFlow LoopExitFlow(FuncFlow last) {
 
 // §9.6.2: the named block or labeled statement `label` enters, which a
 // disable in it can end. Leave() answers what the scope hands on: a disable
-// naming this scope ends here and control goes on after it.
+// naming this scope ends here and control goes on after it. §21.2.1.5: the
+// scope is a level of the hierarchical name while it runs, beneath the
+// function's own, so a report under it, %m among them, names it.
 class FuncNamedScope {
  public:
   FuncNamedScope(std::string_view label, const FuncExecCtx& exec)
       : label_(label), exec_(exec) {
-    if (!label_.empty()) exec_.named_scopes->push_back(label_);
+    if (label_.empty()) return;
+    exec_.named_scopes->push_back(label_);
+    exec_.ctx.PushActiveNamedScope(label_);
   }
   ~FuncNamedScope() {
-    if (!label_.empty()) exec_.named_scopes->pop_back();
+    if (label_.empty()) return;
+    exec_.ctx.PopActiveNamedScope();
+    exec_.named_scopes->pop_back();
   }
   FuncNamedScope(const FuncNamedScope&) = delete;
   FuncNamedScope& operator=(const FuncNamedScope&) = delete;

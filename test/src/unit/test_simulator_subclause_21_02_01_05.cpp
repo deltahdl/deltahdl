@@ -132,6 +132,26 @@ TEST(HierarchicalNameFormat, FunctionScopeInHierarchy) {
   EXPECT_EQ(testing::internal::GetCapturedStdout(), "chip.get\n");
 }
 
+// §21.2.1.5 (C2): a named block of a function is a level beneath the function,
+// so %m written in it names the block too.
+TEST(HierarchicalNameFormat, FunctionNamedBlockInHierarchy) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module chip;\n"
+      "  function void f;\n"
+      "    begin : b\n"
+      "      $display(\"%m\");\n"
+      "    end\n"
+      "  endfunction\n"
+      "  initial f();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  testing::internal::CaptureStdout();
+  LowerAndRun(design, f);
+  EXPECT_EQ(testing::internal::GetCapturedStdout(), "chip.f.b\n");
+}
+
 // §21.2.1.5 (C2): a labeled statement is a hierarchy level of its own. A label
 // prefixed directly to the display call contributes that level to %m.
 TEST(HierarchicalNameFormat, LabeledStatementScope) {
