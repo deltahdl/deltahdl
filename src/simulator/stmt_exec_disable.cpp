@@ -98,21 +98,32 @@ static bool TryUnwindForDisable(Process* proc, std::string_view target,
   return true;
 }
 
-// §25.7.4 with §9.6.2: the instance the definition a hierarchical disable
-// names runs in, where the path names one module instance's definition of a
-// task, `m1.a.Hit` for the task m1 defines through its port `a`, read from
-// the calling instance first and then from the top of the design; null for
-// any other path. A disable of such a path ends only the calls running in
-// that instance, while `s.Hit`, the interface instance's own extern forkjoin
-// task, names none and ends the calls of every definition.
-static const std::string* DisabledDefinitionInstance(const Expr* e,
-                                                     SimContext& ctx) {
-  if (e->kind != ExprKind::kMemberAccess) return nullptr;
-  std::string path = EvaluatedHierarchicalPath(e, ctx, ctx.GetArena());
-  const GenBlockSubroutineScope* scope =
-      ctx.FindGenBlockSubroutineScope(ctx.ActiveInstancePrefix() + path);
-  if (scope == nullptr) scope = ctx.FindGenBlockSubroutineScope(path);
-  return scope != nullptr ? &scope->inst_prefix : nullptr;
+// §25.7.4 with §9.6.2: the instances the definitions a hierarchical disable
+// names run in, where the path names an extern forkjoin task: one module
+// instance's definition, `m1.a.Hit` for the task m1 defines through its port
+// `a`, or `s.Hit`, the interface instance's own task, every definition the
+// modules connected to it export. Each path is read from the calling instance
+// first and then from the top of the design; none for any other path. A
+// disable of such a path ends the calls running in those instances alone.
+static std::vector<std::string> DisabledDefinitionInstances(const Expr* e,
+                                                            SimContext& ctx) {
+  std::vector<std::string> instances;
+  if (e->kind != ExprKind::kMemberAccess) return instances;
+  const auto kDefinedIn = [&instances, &ctx](std::string_view key) {
+    const GenBlockSubroutineScope* scope = ctx.FindGenBlockSubroutineScope(key);
+    if (scope != nullptr) instances.push_back(scope->inst_prefix);
+    return scope != nullptr;
+  };
+  const std::string kPath = EvaluatedHierarchicalPath(e, ctx, ctx.GetArena());
+  const std::string kLocal = ctx.ActiveInstancePrefix() + kPath;
+  if (kDefinedIn(kLocal) || kDefinedIn(kPath)) return instances;
+  const std::vector<std::string_view>* definitions =
+      ctx.FindForkjoinTask(kLocal);
+  if (definitions == nullptr) definitions = ctx.FindForkjoinTask(kPath);
+  if (definitions != nullptr) {
+    for (std::string_view definition : *definitions) kDefinedIn(definition);
+  }
+  return instances;
 }
 
 StmtResult ExecDisableImpl(const Stmt* stmt, SimContext& ctx) {
@@ -124,10 +135,12 @@ StmtResult ExecDisableImpl(const Stmt* stmt, SimContext& ctx) {
   auto procs = ctx.FindNamedScopeProcesses(target);
   std::sort(procs.begin(), procs.end());
   procs.erase(std::unique(procs.begin(), procs.end()), procs.end());
-  if (const std::string* instance =
-          DisabledDefinitionInstance(stmt->expr, ctx)) {
-    std::erase_if(procs, [instance](const Process* proc) {
-      return proc->inst_prefix != *instance;
+  const std::vector<std::string> kInstances =
+      DisabledDefinitionInstances(stmt->expr, ctx);
+  if (!kInstances.empty()) {
+    std::erase_if(procs, [&kInstances](const Process* proc) {
+      return std::ranges::find(kInstances, proc->inst_prefix) ==
+             kInstances.end();
     });
   } else {
     // §9.6.2 with §23.8: of the processes inside a scope of the label, those
