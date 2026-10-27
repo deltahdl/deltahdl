@@ -141,9 +141,12 @@ TEST_F(VpiFunctionAvailability, RegisterCbRejectsOtherReasonInStartup) {
 // so the same callback-reason restriction is in force.
 TEST_F(VpiFunctionAvailability, RegisterCbRejectsOtherReasonInSizetfPhase) {
   vpi_ctx_.SetToolPhase(VpiToolPhase::kSizetf);
+  VpiObject stmt;
+  stmt.type = vpiAssignment;
   s_cb_data cb = {};
   cb.reason = cbStmt;
   cb.cb_rtn = NoopCb;
+  cb.obj = VpiHandleOf(&stmt);
   EXPECT_EQ(vpi_register_cb(&cb), nullptr);
 }
 

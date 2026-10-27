@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
@@ -104,19 +105,33 @@ TEST_F(VpiSimEventCb, ValueChangeCallbackOnNoObjectRejected) {
   s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
   EXPECT_STREQ(info.message,
-               "vpi_register_cb(): a cbValueChange or cbSizeChange callback "
-               "must be placed on an object");
+               "vpi_register_cb(): a callback for this reason must be placed "
+               "on an object");
 }
 
-// §38.36.1: so is a size change callback placed on no object, which names no
-// array, queue or string whose size could change.
-TEST_F(VpiSimEventCb, SizeChangeCallbackOnNoObjectRejected) {
-  s_cb_data cb = {};
-  cb.reason = cbSizeChange;
-  EXPECT_EQ(vpi_register_cb(&cb), nullptr);
+// §38.36.1 and §38.36.1.1: so is every other callback about the one object its
+// obj field names: a size change of an array, queue or string, a statement
+// about to run, a disable of a block, task or call, and the making (on a class
+// typespec) or reclaiming (on one, or on a class object) of class objects.
+TEST_F(VpiSimEventCb, EveryCallbackAboutOneObjectIsRejectedOnNoObject) {
+  for (int reason :
+       {cbSizeChange, cbStmt, cbDisable, cbCreateObj, cbReclaimObj}) {
+    s_cb_data cb = {};
+    cb.reason = reason;
+    EXPECT_EQ(vpi_register_cb(&cb), nullptr) << "reason " << reason;
+    s_vpi_error_info info = {};
+    EXPECT_EQ(vpi_chk_error(&info), vpiError) << "reason " << reason;
+  }
+}
 
-  s_vpi_error_info info = {};
-  EXPECT_EQ(vpi_chk_error(&info), vpiError);
+// §38.36.1: a NULL obj stands for every force or release, so a force or
+// release callback placed on no object is accepted.
+TEST_F(VpiSimEventCb, ForceAndReleaseCallbacksOnNoObjectAccepted) {
+  for (int reason : {cbForce, cbRelease}) {
+    s_cb_data cb = {};
+    cb.reason = reason;
+    EXPECT_NE(vpi_register_cb(&cb), nullptr) << "reason " << reason;
+  }
 }
 
 // §38.36.1: the prohibition is specific to a bit-select target. A cbForce
@@ -217,9 +232,12 @@ TEST_F(VpiSimEventCbDelivery, ReclaimObjCallbackDeliveredWithoutTime) {
   s_vpi_time requested = {};
   requested.type = vpiSimTime;
 
+  VpiObject class_object;
+  class_object.type = vpiClassObj;
   s_cb_data cb = {};
   cb.reason = cbReclaimObj;
   cb.cb_rtn = &RecordDelivery;
+  cb.obj = VpiHandleOf(&class_object);
   cb.time = &requested;
   ASSERT_NE(vpi_register_cb(&cb), nullptr);
 
@@ -391,6 +409,7 @@ TEST_F(VpiSimEventCbDelivery, DisableCallbackDeliversDisabledConstructHandle) {
   s_cb_data cb = {};
   cb.reason = cbDisable;
   cb.cb_rtn = &RecordDelivery;
+  cb.obj = VpiHandleOf(&disabled_task);
   ASSERT_NE(vpi_register_cb(&cb), nullptr);
 
   int fired = vpi_ctx_.DispatchCallbacks(cbDisable, &disabled_task);
@@ -401,12 +420,13 @@ TEST_F(VpiSimEventCbDelivery, DisableCallbackDeliversDisabledConstructHandle) {
 }
 
 // §38.36.1 with §37.77: a disable the model holds no statement object for
-// names no block or task the callback could be given, so a cbDisable placed on
-// no object is not called for it.
+// names no block or task the callback could be given, so a cbDisable is not
+// called for it.
 TEST_F(VpiSimEventCbDelivery, ADisableWithNoStatementObjectCallsNothing) {
   s_cb_data cb = {};
   cb.reason = cbDisable;
   cb.cb_rtn = &RecordDelivery;
+  cb.obj = VpiHandleOf(&watched_);
   ASSERT_NE(vpi_register_cb(&cb), nullptr);
 
   Stmt disable{};
@@ -414,6 +434,92 @@ TEST_F(VpiSimEventCbDelivery, ADisableWithNoStatementObjectCallsNothing) {
   vpi_ctx_.NoteDisabled(&disable, "");
 
   EXPECT_EQ(g_deliver_calls, 0);
+}
+
+// §38.36.1: a cbReclaimObj placed on a class typespec is called as an object
+// of that class is reclaimed, and not as an object of another class is.
+TEST_F(VpiSimEventCbDelivery, AReclaimCallbackOnATypespecIsAboutItsClass) {
+  VpiObject spec_c;
+  spec_c.type = vpiClassTypespec;
+  spec_c.name = "C";
+  VpiObject spec_d;
+  spec_d.type = vpiClassTypespec;
+  spec_d.name = "D";
+  VpiObject of_c;
+  of_c.type = vpiClassObj;
+  of_c.children.push_back(&spec_c);
+  VpiObject of_d;
+  of_d.type = vpiClassObj;
+  of_d.children.push_back(&spec_d);
+
+  s_cb_data cb = {};
+  cb.reason = cbReclaimObj;
+  cb.cb_rtn = &RecordDelivery;
+  cb.obj = VpiHandleOf(&spec_c);
+  ASSERT_NE(vpi_register_cb(&cb), nullptr);
+
+  vpi_ctx_.ReleaseClassObject(&of_d);
+  EXPECT_EQ(g_deliver_calls, 0);
+  vpi_ctx_.ReleaseClassObject(&of_c);
+  EXPECT_EQ(g_deliver_calls, 1);
+  EXPECT_EQ(g_delivered_obj, &of_c);
+}
+
+// §38.36.1: a cbReclaimObj placed on a class object is called as that object
+// is reclaimed, and not as another object of its class is.
+TEST_F(VpiSimEventCbDelivery, AReclaimCallbackOnAnObjectIsAboutItAlone) {
+  VpiObject spec;
+  spec.type = vpiClassTypespec;
+  spec.name = "C";
+  VpiObject placed_on;
+  placed_on.type = vpiClassObj;
+  placed_on.children.push_back(&spec);
+  VpiObject other;
+  other.type = vpiClassObj;
+  other.children.push_back(&spec);
+
+  s_cb_data cb = {};
+  cb.reason = cbReclaimObj;
+  cb.cb_rtn = &RecordDelivery;
+  cb.obj = VpiHandleOf(&placed_on);
+  ASSERT_NE(vpi_register_cb(&cb), nullptr);
+
+  vpi_ctx_.ReleaseClassObject(&other);
+  EXPECT_EQ(g_deliver_calls, 0);
+  vpi_ctx_.ReleaseClassObject(&placed_on);
+  EXPECT_EQ(g_deliver_calls, 1);
+}
+
+// §38.36.1: a cbEndOfFrame, cbEndOfThread or cbEndOfObject placed on a frame, a
+// thread or a transient object is called as that one ends, and not as another
+// of its kind does.
+TEST_F(VpiSimEventCbDelivery, AnEndCallbackIsAboutTheObjectItIsPlacedOn) {
+  VpiObject frames[2];
+  VpiObject threads[2];
+  VpiObject objects[2];
+  for (int i = 0; i < 2; ++i) {
+    frames[i].type = vpiFrame;
+    threads[i].type = vpiThread;
+    objects[i].type = vpiClassObj;
+  }
+  for (const auto& [reason, on] : {std::pair{cbEndOfFrame, &frames[0]},
+                                   std::pair{cbEndOfThread, &threads[0]},
+                                   std::pair{cbEndOfObject, &objects[0]}}) {
+    s_cb_data cb = {};
+    cb.reason = reason;
+    cb.cb_rtn = &RecordDelivery;
+    cb.obj = VpiHandleOf(on);
+    ASSERT_NE(vpi_register_cb(&cb), nullptr);
+  }
+
+  vpi_ctx_.ReleaseFrameOrThreadObject(&frames[1]);
+  vpi_ctx_.ReleaseFrameOrThreadObject(&threads[1]);
+  vpi_ctx_.ReleaseClassObject(&objects[1]);
+  EXPECT_EQ(g_deliver_calls, 0);
+  vpi_ctx_.ReleaseFrameOrThreadObject(&frames[0]);
+  vpi_ctx_.ReleaseFrameOrThreadObject(&threads[0]);
+  vpi_ctx_.ReleaseClassObject(&objects[0]);
+  EXPECT_EQ(g_deliver_calls, 3);
 }
 
 // §38.36.1: a cbValueChange callback may be placed on an event statement. Since

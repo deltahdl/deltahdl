@@ -62,8 +62,11 @@ TEST_F(VpiCallbackSim, RegisterCbReturnsCallbackObjectHandle) {
 }
 
 TEST_F(VpiCallbackSim, RegisterCbStmt) {
+  VpiObject stmt;
+  stmt.type = vpiAssignment;
   s_cb_data cb = {};
   cb.reason = cbStmt;
+  cb.obj = VpiHandleOf(&stmt);
   vpiHandle h = vpi_register_cb(&cb);
   EXPECT_NE(h, nullptr);
   EXPECT_EQ(vpi_ctx_.RegisteredCallbacks().back().reason, cbStmt);

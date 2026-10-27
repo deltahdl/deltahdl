@@ -7,6 +7,7 @@
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -49,10 +50,12 @@ class TransientObjectCallbacks : public ::testing::Test {
   }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
 
-  void RegisterFor(int reason) {
+  // Registers for `reason`, placed on `on` where one is given.
+  void RegisterFor(int reason, vpiHandle on = nullptr) {
     s_cb_data data = {};
     data.reason = reason;
     data.cb_rtn = &RecordTransientEvent;
+    data.obj = on;
     ASSERT_NE(vpi_register_cb(&data), nullptr);
   }
 
@@ -93,11 +96,11 @@ TEST_F(TransientObjectCallbacks, FreeingAThreadDeliversEndOfThreadOnly) {
 // gives it two callbacks: cbReclaimObj for the reclaim and cbEndOfObject for
 // the object ceasing to exist. Both are delivered, and both name the object.
 TEST_F(TransientObjectCallbacks, ReclaimingAClassObjectDeliversBothReasons) {
-  RegisterFor(cbReclaimObj);
-  RegisterFor(cbEndOfObject);
-
   VpiObject class_object;
   class_object.type = vpiClassObj;
+  RegisterFor(cbReclaimObj, VpiHandleOf(&class_object));
+  RegisterFor(cbEndOfObject);
+
   ctx_.ReleaseClassObject(&class_object);
 
   ASSERT_EQ(g_reasons.size(), 2u);
@@ -194,7 +197,10 @@ TEST_F(TransientObjectCallbacks, ARunDeliversTheEndOfAThreadAndAFrame) {
 }
 
 // The design below makes a class object and drops it, so the garbage
-// collector's next pass reclaims it.
+// collector's next pass reclaims it. It calls $arm first, which places a
+// callback for each reason in g_armed on the typespec of c's class: §38.36.1
+// has a cbCreateObj or cbReclaimObj placed on a class typespec, which the run
+// makes an object of the model only once it starts.
 constexpr const char* kDroppedObject =
     "module t;\n"
     "  class C;\n"
@@ -202,13 +208,36 @@ constexpr const char* kDroppedObject =
     "  endclass\n"
     "  C c;\n"
     "  initial begin\n"
+    "    $arm;\n"
     "    c = new;\n"
     "    c = null;\n"
     "  end\n"
     "endmodule\n";
 
-// Runs kDroppedObject and then the garbage collector.
-void RunAndCollect() {
+std::vector<int> g_armed;
+
+PLI_INT32 ArmCalltf(PLI_BYTE8* /*user_data*/) {
+  vpiHandle spec =
+      vpi_handle(vpiTypespec, vpi_handle_by_name(VpiText("t.c"), nullptr));
+  for (int reason : g_armed) {
+    s_cb_data data = {};
+    data.reason = reason;
+    data.cb_rtn = &RecordTransientEvent;
+    data.obj = spec;
+    vpi_register_cb(&data);
+  }
+  return 0;
+}
+
+// Runs kDroppedObject, $arm placing a callback for each of `armed`, and then
+// the garbage collector.
+void RunAndCollect(const std::vector<int>& armed = {}) {
+  g_armed = armed;
+  s_vpi_systf_data task = {};
+  task.type = vpiSysTask;
+  task.tfname = VpiText("$arm");
+  task.calltf = &ArmCalltf;
+  ASSERT_NE(vpi_register_systf(&task), nullptr);
   SimFixture f;
   auto* design = ElaborateSrc(kDroppedObject, f);
   ASSERT_NE(design, nullptr);
@@ -219,10 +248,8 @@ void RunAndCollect() {
 // Reclaiming the object delivers cbReclaimObj and cbEndOfObject and, by
 // §37.2.2 item 3, releases the handle cbCreateObj was given for the object...
 TEST_F(TransientObjectCallbacks, ReclaimingARunsObjectDeliversBothReasons) {
-  RegisterFor(cbCreateObj);
-  RegisterFor(cbReclaimObj);
   RegisterFor(cbEndOfObject);
-  RunAndCollect();
+  RunAndCollect({cbCreateObj, cbReclaimObj});
   EXPECT_EQ(g_reasons,
             (std::vector<int>{cbCreateObj, cbReclaimObj, cbEndOfObject}));
   ASSERT_FALSE(g_objects.empty());
@@ -232,8 +259,7 @@ TEST_F(TransientObjectCallbacks, ReclaimingARunsObjectDeliversBothReasons) {
 // ...each reason delivered to an application that registered for it alone,
 // though no handle to the object was handed out before...
 TEST_F(TransientObjectCallbacks, ReclaimingDeliversReclaimObjAlone) {
-  RegisterFor(cbReclaimObj);
-  RunAndCollect();
+  RunAndCollect({cbReclaimObj});
   EXPECT_EQ(g_reasons, (std::vector<int>{cbReclaimObj}));
 }
 

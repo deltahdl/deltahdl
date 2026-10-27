@@ -143,6 +143,7 @@ TEST_F(VpiStmtCallback,
   s_cb_data cb = {};
   cb.reason = cbStmt;
   cb.cb_rtn = &RecordStmtCb;
+  cb.obj = MakeStatementHandle("m", /*protect=*/false);
   ASSERT_NE(vpi_register_cb(&cb), nullptr);
   ASSERT_NE(vpi_register_cb(&cb), nullptr);
 
@@ -159,6 +160,7 @@ TEST_F(VpiStmtCallback, DispatchedDataHasNullValueAndZeroIndex) {
   s_cb_data cb = {};
   cb.reason = cbStmt;
   cb.cb_rtn = &RecordStmtCb;
+  cb.obj = MakeStatementHandle("v", /*protect=*/false);
   cb.value = &supplied_value;
   cb.index = 5;
   ASSERT_NE(vpi_register_cb(&cb), nullptr);
@@ -179,6 +181,7 @@ TEST_F(VpiStmtCallback, SuppressTimeNullsDispatchedTimePointer) {
   s_cb_data cb = {};
   cb.reason = cbStmt;
   cb.cb_rtn = &RecordStmtCb;
+  cb.obj = MakeStatementHandle("n", /*protect=*/false);
   cb.time = &t;
   ASSERT_NE(vpi_register_cb(&cb), nullptr);
 
@@ -206,6 +209,7 @@ TEST_F(VpiStmtCallback, DispatchedTimeCarriesTheCurrentSimulationTime) {
   s_cb_data cb = {};
   cb.reason = cbStmt;
   cb.cb_rtn = &RecordStmtCb;
+  cb.obj = MakeStatementHandle("c", /*protect=*/false);
   cb.time = &t;
   ASSERT_NE(vpi_register_cb(&cb), nullptr);
 

@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -41,6 +42,17 @@ bool IsVariableBitSelect(const VpiObject& obj) {
   return obj.type == vpiBitSelect || obj.type == vpiVarBit;
 }
 
+// §38.36.1: whether a simulation event callback for `reason` is about the one
+// object its obj field names, of which a NULL one names none: a change of a
+// value or a size, a statement about to run (§38.36.1.1), a disable, and the
+// making or reclaiming of a class's objects.
+bool IsPlacedOnAnObject(int reason) {
+  static constexpr std::array kReasons = {cbValueChange, cbSizeChange,
+                                          cbStmt,        cbDisable,
+                                          cbCreateObj,   cbReclaimObj};
+  return std::ranges::find(kReasons, reason) != kReasons.end();
+}
+
 const char* VpiCheckCallbackPlacement(const s_cb_data& data,
                                       VpiToolPhase tool_phase) {
   // §36.10.2: while VPI functionality is restricted - the startup phase, and
@@ -55,13 +67,12 @@ const char* VpiCheckCallbackPlacement(const s_cb_data& data,
 
   // §38.36.1: the obj field holds the object a simulation event callback is
   // for, and a NULL one has a meaning for a force or release callback alone,
-  // every force or release. A value or size change callback placed on no object
-  // names nothing whose value or size could change, so the registration is
-  // refused rather than called back for every object's change.
-  if ((data.reason == cbValueChange || data.reason == cbSizeChange) &&
-      data.obj == nullptr) {
-    return "vpi_register_cb(): a cbValueChange or cbSizeChange callback must "
-           "be placed on an object";
+  // every force or release. A callback about one object placed on no object
+  // names nothing it could be called about, so the registration is refused
+  // rather than called back about every object.
+  if (IsPlacedOnAnObject(data.reason) && data.obj == nullptr) {
+    return "vpi_register_cb(): a callback for this reason must be placed on an "
+           "object";
   }
 
   // §37.43 detail 2: it is illegal to place a value change callback on an
@@ -89,8 +100,7 @@ const char* VpiCheckCallbackPlacement(const s_cb_data& data,
   // protected portion of the code is not allowed. Such a statement is sealed
   // behind encryption, so a per-statement callback cannot be placed on it;
   // reject the registration with a null handle and a recorded error message.
-  if (data.reason == cbStmt && data.obj &&
-      VpiObjectOf(data.obj)->is_protected) {
+  if (data.reason == cbStmt && VpiObjectOf(data.obj)->is_protected) {
     return "vpi_register_cb(): a cbStmt callback may not be placed on a "
            "statement "
            "in a protected portion of the code";
@@ -104,8 +114,7 @@ const char* VpiCheckCallbackPlacement(const s_cb_data& data,
   // ever fire. The one handle in the field that is not a statement is a module
   // instance, which §38.36.1.3 defines as placing the callback on every
   // statement the instance holds rather than on the module itself.
-  if (data.reason == cbStmt && data.obj &&
-      VpiObjectOf(data.obj)->type != kVpiModule &&
+  if (data.reason == cbStmt && VpiObjectOf(data.obj)->type != kVpiModule &&
       !VpiIsScopeBodyStmtType(VpiObjectOf(data.obj)->type)) {
     return "vpi_register_cb(): a cbStmt callback may be placed only on one of "
            "the statement objects Table 38-6 lists, or on a module instance";
@@ -539,8 +548,7 @@ void VpiNormalizeSimTimeCbData(s_cb_data& data, s_vpi_time& delivered,
 // cbStmt callback, which must fan out to every statement in the module rather
 // than fire once for the module as a whole.
 bool VpiIsModuleWideCbStmt(const s_cb_data& data) {
-  return data.reason == cbStmt && data.obj != nullptr &&
-         VpiObjectOf(data.obj)->type == kVpiModule;
+  return data.reason == cbStmt && VpiObjectOf(data.obj)->type == kVpiModule;
 }
 
 // §38.36.1.3: report whether a cbStmt registration placed a callback on the
@@ -549,11 +557,10 @@ bool VpiIsModuleWideCbStmt(const s_cb_data& data) {
 // it names a module instance, on every statement in that instance which can
 // have one. So a registration against another statement, or against a module
 // instance this statement does not belong to, placed no callback where this
-// statement is executing. A registration whose obj field named no object at
-// all placed the callback on no statement in particular, and stands for
-// whichever one the dispatch names.
+// statement is executing. A registration names an object in that field, since
+// vpi_register_cb() refuses one placed on none.
 bool VpiCbStmtIsPlacedOn(const s_cb_data& reg, VpiHandle stmt) {
-  if (reg.obj == nullptr || VpiObjectOf(reg.obj) == stmt) return true;
+  if (VpiObjectOf(reg.obj) == stmt) return true;
   if (VpiObjectOf(reg.obj)->type != kVpiModule) return false;
   std::vector<VpiObject*> placed;
   VpiCollectModuleWideStmtTargets(VpiObjectOf(reg.obj), placed);
@@ -572,26 +579,31 @@ std::string_view ClassNameOf(const VpiObject& obj) {
   return {};
 }
 
+// §38.36.1: whether a callback for `reason` placed on an object is called
+// about that object alone: a change of its value or size, a disable of it, its
+// thread resuming, and the end of a frame, a thread or a transient object.
+bool IsAboutTheObjectPlacedOn(int reason) {
+  static constexpr std::array kReasons = {
+      cbValueChange, cbSizeChange,  cbDisable,    cbEnterThread,
+      cbEndOfFrame,  cbEndOfThread, cbEndOfObject};
+  return std::ranges::find(kReasons, reason) != kReasons.end();
+}
+
 // §38.36.1: whether the registration `reg` placed no callback on `obj`, the
 // object a delivery for `reason` is about: a cbStmt placed on another
-// statement or another module's, a cbValueChange placed on another object, or
-// a cbDisable about a system task or function call the disabled block or task
-// holds placed anywhere but on that call, one placed on none being called
-// about the block or task alone.
+// statement or another module's, a callback about one object placed on
+// another, and a cbCreateObj or cbReclaimObj placed on another class's
+// typespec, or a cbReclaimObj on another class object. A reason
+// vpi_register_cb() lets be placed on no object is called about every object.
 bool PlacedElsewhere(const s_cb_data& reg, int reason, VpiHandle obj) {
   if (obj == nullptr) return false;
   if (reason == cbStmt) return !VpiCbStmtIsPlacedOn(reg, obj);
-  if (reason == cbDisable &&
-      (obj->type == vpiSysTaskCall || obj->type == vpiSysFuncCall)) {
-    return VpiObjectOf(reg.obj) != obj;
-  }
   if (reg.obj == nullptr) return false;
-  if (reason == cbValueChange || reason == cbSizeChange ||
-      reason == cbDisable || reason == cbEnterThread) {
-    return VpiObjectOf(reg.obj) != obj;
-  }
-  if (reason == cbCreateObj) {
-    return VpiObjectOf(reg.obj)->name != ClassNameOf(*obj);
+  const VpiObject* placed = VpiObjectOf(reg.obj);
+  if (IsAboutTheObjectPlacedOn(reason)) return placed != obj;
+  if (reason == cbCreateObj || reason == cbReclaimObj) {
+    return placed->type == vpiClassTypespec ? placed->name != ClassNameOf(*obj)
+                                            : placed != obj;
   }
   return false;
 }

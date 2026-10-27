@@ -74,10 +74,12 @@ class VpiActionFeatureCallbacks : public ::testing::Test {
   }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
 
-  vpiHandle Register(int reason) {
+  // Registers a callback for `reason`, placed on `on` where one is given.
+  vpiHandle Register(int reason, VpiObject* on = nullptr) {
     s_cb_data cb = {};
     cb.reason = reason;
     cb.cb_rtn = &RecordingCb;
+    cb.obj = VpiHandleOf(on);
     return vpi_register_cb(&cb);
   }
 
@@ -310,9 +312,13 @@ TEST_F(VpiActionFeatureCallbacks, ResetDeliversStartThenEnd) {
 // while the restart pair both survives and is delivered.
 TEST_F(VpiActionFeatureCallbacks,
        RestartPurgesOthersAndDeliversRestartCallbacks) {
-  Register(cbValueChange);
-  Register(cbStmt);
-  Register(cbStartOfSave);
+  VpiObject watched;
+  watched.type = vpiReg;
+  VpiObject stmt;
+  stmt.type = vpiAssignment;
+  ASSERT_NE(Register(cbValueChange, &watched), nullptr);
+  ASSERT_NE(Register(cbStmt, &stmt), nullptr);
+  ASSERT_NE(Register(cbStartOfSave), nullptr);
   vpiHandle start_restart = Register(cbStartOfRestart);
   vpiHandle end_restart = Register(cbEndOfRestart);
   ASSERT_NE(start_restart, nullptr);
