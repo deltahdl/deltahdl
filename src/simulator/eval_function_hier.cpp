@@ -212,6 +212,19 @@ ModuleItem* ScopedOrPackageFunction(const std::string& name, SimContext& ctx) {
   return ctx.FindFunctionInPackageScope(name);
 }
 
+// §23.8 with §23.9: the subroutine the first top declares under the bare
+// callee `path`, called with no instance prefix in force (`active` empty) and
+// so from the first top's own processes, kept under the top's name as well
+// (RegisterInstanceSubroutines); every child instance registers its own under
+// the bare name after the top, so that key may hold another's. Null for a
+// dotted path, a call standing in an instance, or a name the top declares no
+// subroutine by.
+ModuleItem* FirstTopsOwnSubroutine(const std::string& path,
+                                   const std::string& active, SimContext& ctx) {
+  if (!active.empty() || path.find('.') != std::string::npos) return nullptr;
+  return ctx.FindFunction(std::string(ctx.FirstTopModule()) + "." + path);
+}
+
 // The member access a dotted callee is written as: the call's own name,
 // `v.add` of `v.add(20)`, or the enable itself, `b.t` of `b.t;`; null for a
 // callee of any other shape.
@@ -359,15 +372,9 @@ SubroutineTarget FindSubroutineTarget(const Expr* call, SimContext& ctx,
   // A path from the top of the design, "u1.tk" as written; a bare name found
   // here is the top's, a package's or the compilation unit's and runs where
   // the caller stands, as it did before instances were registered by prefix.
-  // §23.8 with §23.9: a bare name the first top's own processes call is the
-  // top's subroutine where it declares one, kept under the top's name too
-  // (RegisterInstanceSubroutines); every child instance registers its own
-  // under the bare name after the top, so that key may hold another's.
-  if (!is_hierarchical && active.empty()) {
-    target.func =
-        ctx.FindFunction(std::string(ctx.FirstTopModule()) + "." + path);
-    if (target.func != nullptr) return target;
-  }
+  // The first top's own subroutine comes first (FirstTopsOwnSubroutine).
+  target.func = FirstTopsOwnSubroutine(path, active, ctx);
+  if (target.func != nullptr) return target;
   target.func = ctx.FindFunction(path);
   target.inst_prefix = is_hierarchical ? InstanceOfKey(path) : active;
   // §27.4 with §23.6: a path into a generate block instance, "blk[1].triple"
