@@ -749,13 +749,20 @@ VpiObject* LetExprObject(const Expr* expr, VpiObject* decl,
 }
 
 // The net, variable or parameter the simple name `expr` resolves to, the use
-// of a let it names (§11.12), or the parameter a genvar it names stands as.
+// of a let it names (§11.12), the parameter a genvar it names stands as, or
+// the clocking block it names, which stands for the event its name carries
+// (§14.10 with §37.48), a scope of the instance rather than a name in it.
 VpiObject* NamedObject(const Expr* expr, const AssignBuild& build) {
   VpiObject* named = Resolve(build.names, expr->text);
   if (named != nullptr) return named;
   VpiObject* let =
       LetExprObject(expr, LetDeclNamed(build.names, expr->text), build);
-  return let != nullptr ? let : GenvarParameter(expr->text, build);
+  if (let != nullptr) return let;
+  VpiObject* genvar = GenvarParameter(expr->text, build);
+  return genvar != nullptr
+             ? genvar
+             : VpiClockingBlockAround(build.names.scope, build.names.objects,
+                                      build.names.prefix, expr->text);
 }
 
 // The object standing for one side of an assignment: the net or variable a

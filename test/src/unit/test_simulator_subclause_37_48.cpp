@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <utility>
+
 #include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_constants.h"
@@ -337,6 +339,35 @@ TEST_F(ClockingBlocksOfARun,
   EXPECT_EQ(vpi_get(vpiType, signal), vpiRefObj);
 }
 
+// Details 2 and 3: a clocking block named through a virtual interface var a
+// task declares, as an argument or in its body, is a clocking block whose
+// prefix is that var, as one a module declares is, standing for no block while
+// the var holds none (#8202).
+TEST_F(ClockingBlocksOfARun,
+       ATasksVirtualInterfacesClockingBlockHasPrefixAndActual) {
+  Run("interface bus(input logic clk);\n"
+      "  clocking cb @(posedge clk); endclocking\n"
+      "endinterface\n"
+      "module top; logic clk; bus b(clk);\n"
+      "  task wait_arg(virtual bus v); @(v.cb); endtask\n"
+      "  task wait_local; virtual bus lv; @(lv.cb); endtask\n"
+      "endmodule\n");
+  const std::pair<const char*, const char*> kTasks[] = {{"wait_arg", "v"},
+                                                        {"wait_local", "lv"}};
+  for (const auto& [task, var_name] : kTasks) {
+    vpiHandle control = ControlOf(task);
+    ASSERT_NE(control, nullptr) << task;
+    vpiHandle block = vpi_handle(vpiCondition, control);
+    ASSERT_NE(block, nullptr) << task;
+    EXPECT_EQ(vpi_get(vpiType, block), vpiClockingBlock) << task;
+    vpiHandle var = vpi_handle(vpiPrefix, block);
+    ASSERT_NE(var, nullptr) << task;
+    EXPECT_EQ(vpi_get(vpiType, var), vpiVirtualInterfaceVar) << task;
+    EXPECT_STREQ(vpi_get_str(vpiName, var), var_name) << task;
+    EXPECT_EQ(vpi_handle(vpiActual, block), nullptr) << task;
+  }
+}
+
 // A module's default clocking block is reached from it as a clocking block and
 // as its default clocking, named as declared and reaching its clocking event.
 TEST_F(ClockingBlocksOfARun, ADefaultClockingBlockIsReachedFromItsModule) {
@@ -427,6 +458,26 @@ TEST_F(ClockingBlocksOfARun, AGenerateBlocksClockingBlockIsItsGenScopes) {
   vpiHandle a = Named(vpiClockingIODecl, cb, "a");
   ASSERT_NE(a, nullptr);
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, a)), VpiObjectOf(By("top.a")));
+}
+
+// The event a clocking block's name carries (§14.10) is the run's, and no
+// variable of the instance: the instance holds none of the block's name, the
+// block's full name reaches the block, and `@(cb)` waits on the block, the
+// condition of its event control (§37.65) (#8203).
+TEST_F(ClockingBlocksOfARun, AClockingBlocksNameIsTheBlockAndNoVariable) {
+  Run("module top; logic clk;\n"
+      "  clocking cb @(posedge clk); endclocking\n"
+      "  task wait_block; @(cb); endtask\n"
+      "endmodule\n");
+  vpiHandle top = By("top");
+  ASSERT_NE(top, nullptr);
+  EXPECT_EQ(Named(vpiVariables, top, "cb"), nullptr);
+  vpiHandle cb = By("top.cb");
+  ASSERT_NE(cb, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, cb), vpiClockingBlock);
+  vpiHandle control = ControlOf("wait_block");
+  ASSERT_NE(control, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiCondition, control)), VpiObjectOf(cb));
 }
 
 // §37.48 detail 1: vpiInputEdge and vpiOutputEdge are drawn on a clocking

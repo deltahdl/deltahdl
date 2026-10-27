@@ -1,5 +1,6 @@
 #include "simulator/clocking.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -653,6 +654,12 @@ void ClockingManager::ScheduleCycleDelayedDrive(const ClockvarDrive& drive,
 void ClockingManager::SetBlockEventVar(std::string_view block_name,
                                        Variable* var) {
   block_event_vars_[block_name] = var;
+}
+
+bool ClockingManager::IsBlockEventVar(const Variable* var) const {
+  return std::ranges::any_of(block_event_vars_, [var](const auto& entry) {
+    return entry.second == var;
+  });
 }
 
 void ClockingManager::NotifyBlockEvent(std::string_view block_name) {

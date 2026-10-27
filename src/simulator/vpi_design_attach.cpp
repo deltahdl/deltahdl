@@ -20,6 +20,7 @@
 #include "parser/ast_module.h"
 #include "parser/ast_specify.h"
 #include "parser/ast_type.h"
+#include "simulator/clocking.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
 #include "simulator/specify.h"
@@ -123,6 +124,15 @@ VpiHandle VpiContext::DesignObjectForFlatName(std::string_view flat_name) {
     consumed += 1;  // the separator this component was followed by
   }
   return current;
+}
+
+const RtlirModule* VpiVirtualInterfaceOf(const RtlirDesign& design,
+                                         const DataType* type) {
+  if (type == nullptr || type->kind != DataTypeKind::kVirtualInterface) {
+    return nullptr;
+  }
+  const auto kFound = design.all_modules.find(type->type_name);
+  return kFound != design.all_modules.end() ? kFound->second : nullptr;
 }
 
 namespace {
@@ -294,18 +304,6 @@ int VpiVariableObjectKind(const RtlirVariable& var) {
   return VpiDataTypeVariableKind(var.decl_kind);
 }
 
-// §25.9: the interface the virtual interface variable `var` refers to an
-// instance of, as the design declares it; null for any other variable.
-const RtlirModule* VifInterfaceOf(const RtlirDesign& design,
-                                  const RtlirVariable& var) {
-  if (var.written_type == nullptr ||
-      var.written_type->kind != DataTypeKind::kVirtualInterface) {
-    return nullptr;
-  }
-  const auto kFound = design.all_modules.find(var.written_type->type_name);
-  return kFound != design.all_modules.end() ? kFound->second : nullptr;
-}
-
 // §36.12.1 Table 36-10: tell each object the run built for a variable which
 // kind of variable it is. VpiContext::Attach stamps every one of them vpiReg,
 // which rows 3, 4 and 7 rule out: a design's array variables were vpiRegArray
@@ -328,7 +326,8 @@ void RecordVariableObjectKinds(
           // const is a constant variable.
           obj->decl_facts.constant_variable =
               var.written_type != nullptr && var.written_type->is_const;
-          obj->decl_facts.vif_interface = VifInterfaceOf(*design, var);
+          obj->decl_facts.vif_interface =
+              VpiVirtualInterfaceOf(*design, var.written_type);
           // §37.29: a virtual interface var of a modport's type is a modport.
           obj->is_modport = var.written_type != nullptr &&
                             !var.written_type->modport_name.empty();
@@ -681,11 +680,16 @@ void VpiContext::Attach(SimContext& sim_ctx, const RtlirDesign* design) {
   // entered whole and resolved a component at a time, so nothing but a
   // top-level name ever matched -- and the nets, which were not entered at all
   // though a wire is the clause's own example of an object VPI reaches.
+  const ClockingManager* clocking = sim_ctx.GetClockingManager();
   for (auto& [name, var] : sim_ctx.GetVariables()) {
     // §37.10 detail 6: an imported item is not reached through the scope that
     // imported it, the key the import enters being the run's; and by §37.12 a
     // named block's variable hangs from the block, which the block walk makes.
     if (sim_ctx.IsImportedName(name) || sim_ctx.IsBlockVariable(name)) continue;
+    // §14.10: the event a clocking block's name carries is a variable of the
+    // run's, which no scope declares; the object of the block's name is the
+    // block itself (§37.48), which AttachClockingBlocks makes.
+    if (clocking != nullptr && clocking->IsBlockEventVar(var)) continue;
     VpiHandle obj = DesignObjectForFlatName(name);
     if (obj == nullptr || var == nullptr) continue;
     obj->type = kVpiReg;

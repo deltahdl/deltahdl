@@ -185,6 +185,8 @@ void MakeIoDecls(VpiObject* tf, const ModuleItem& item,
         DeclaredVariableKind(arg.data_type, !arg.unpacked_dims.empty(), where,
                              sb.design),
         tf->automatic, sb.build);
+    var->decl_facts.vif_interface =
+        VpiVirtualInterfaceOf(sb.design, &arg.data_type);
     AttachDeclaredRanges(var, arg.data_type, arg.unpacked_dims, sb.ctx,
                          sb.build);
     // §37.13: the io decl reports the size, signing and shape of the variable
@@ -299,6 +301,8 @@ void MakeBodyVariables(VpiObject* tf, const ModuleItem& item,
                                           !stmt->var_unpacked_dims.empty(),
                                           where, sb.design),
                      kAutomatic, sb.build);
+    var->decl_facts.vif_interface =
+        VpiVirtualInterfaceOf(sb.design, &stmt->var_decl_type);
     AttachDeclaredRanges(var, stmt->var_decl_type, stmt->var_unpacked_dims,
                          sb.ctx, sb.build);
   }

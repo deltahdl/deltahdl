@@ -253,6 +253,10 @@ class ClockingManager {
   std::string_view GetGlobalClocking() const { return global_clocking_; }
 
   void SetBlockEventVar(std::string_view block_name, Variable* var);
+  // §14.10: whether `var` is the event a clocking block's name carries, set by
+  // SetBlockEventVar: a variable of the run's own, which the design does not
+  // declare.
+  bool IsBlockEventVar(const Variable* var) const;
 
   // §14.11: a wait on the clocking block events of `block_name`, called once
   // per event from the Observed region, where the event fires, until it
