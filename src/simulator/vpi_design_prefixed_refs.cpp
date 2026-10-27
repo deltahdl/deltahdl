@@ -11,7 +11,6 @@
 #include "simulator/sv_vpi_user.h"
 #include "simulator/variable.h"
 #include "simulator/vpi_design_attach_build.h"
-#include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_object.h"
 
 namespace delta {
@@ -98,15 +97,19 @@ VpiObject* HeldInstance(
 }
 
 // The clocking block `block`, which a virtual interface var prefixes, stands
-// for now in the run `ctx` (VpiRefreshPrefixedClockingBlock): the child of
-// its name of the instance the var holds, and null while the var holds none.
+// for now in the run `ctx` (VpiRefreshPrefixedClockingBlock): the clocking
+// block of its name the instance the var holds declares, and null while the
+// var holds none. The block is looked for by its kind as well as its name,
+// since the instance also holds the event variable §14.10 has the run name
+// after it. The instance declares it, the var's interface having been found
+// to (VpiVirtualInterfaceClockingBlock), so the walk out from the instance
+// ends there.
 VpiObject* PrefixedClockingBlockActual(
     const VpiObject& block, SimContext& ctx,
     const std::function<VpiObject*(const std::string&)>& by_name) {
-  VpiObject* instance =
-      HeldInstance(ctx.VirtualInterfaceBinding(block.prefix->var), by_name);
-  if (instance == nullptr) return nullptr;
-  return ChildNamed(instance, block.name.substr(block.name.rfind('.') + 1));
+  return ClockingBlockOutFrom(
+      HeldInstance(ctx.VirtualInterfaceBinding(block.prefix->var), by_name),
+      block.name.substr(block.name.rfind('.') + 1));
 }
 
 }  // namespace
