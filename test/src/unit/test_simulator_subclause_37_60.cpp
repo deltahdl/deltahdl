@@ -535,14 +535,15 @@ TEST_F(StatementFill, ADisableOfNoBlockOrTaskHasNoTarget) {
   off_literal.kind = ExprKind::kMemberAccess;
   off_literal.lhs = &literal;
   off_literal.rhs = &b;
-  const auto kTarget = [this, &block](Expr* name) {
+  const auto kTarget = [&block](Expr* name) {
     Stmt stmt;
     stmt.kind = StmtKind::kDisable;
     stmt.expr = name;
     VpiObject disable;
     disable.type = vpiDisable;
     disable.parent = &block;
-    VpiFillStmt(&disable, stmt, with_);
+    const VpiStmtObjects kStmts{{{&stmt, ""}, &disable}};
+    VpiResolveDisableTargets(kStmts);
     return disable.disable_target;
   };
   EXPECT_EQ(kTarget(&b), &block);
