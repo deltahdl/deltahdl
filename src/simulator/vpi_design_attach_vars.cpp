@@ -167,8 +167,11 @@ void RecordScopeVariableKinds(const DeclaringScope& scope,
     if (item->kind != ModuleItemKind::kVarDecl) continue;
     const std::string kKey =
         std::string(scope.name) + "." + std::string(item->name);
+    // The run stores every variable a package or a unit declares under this
+    // key (lowerer_package_data.cpp), and VpiContext::Attach makes an object
+    // for each, an import's key being the importing instance's own spelling
+    // rather than the package's.
     VpiHandle obj = FindObjectForFlatName(objects, kKey);
-    if (obj == nullptr) continue;
     const DataType& type = item->data_type;
     obj->type = ScopeVariableKind(*item, scope.package, design);
     obj->decl_facts.constant_variable = type.is_const;
