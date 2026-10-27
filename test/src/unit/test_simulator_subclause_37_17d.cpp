@@ -119,7 +119,8 @@ TEST_F(VariablesOfARun, AVariableReportsItsRandomization) {
   EXPECT_EQ(vpi_get(vpiIsRandomized, Named(vpiVariables, obj, "k")), 1);
   EXPECT_EQ(vpi_get(vpiIsRandomized, Named(vpiVariables, obj, "s")), 1);
   EXPECT_EQ(vpi_get(vpiIsRandomized, Named(vpiVariables, obj, "back")), 1);
-  vpiHandle defn = vpi_handle(vpiClassDefn, obj);
+  vpiHandle defn = Named(vpiClassDefn, By("top"), "C");
+  ASSERT_NE(defn, nullptr);
   EXPECT_EQ(vpi_get(vpiIsRandomized, Named(vpiVariables, defn, "r")), 1);
   EXPECT_EQ(vpi_get(vpiRandType, By("top")), vpiUndefined);
 }
