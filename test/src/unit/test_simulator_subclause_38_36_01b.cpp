@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <initializer_list>
 #include <string>
 #include <vector>
 
@@ -169,12 +170,22 @@ TEST_F(EventCallbacksOfARun, AssignAndDeassignCallbacksFire) {
   EXPECT_EQ(kDeassigns[0].now, 2u);
 }
 
+// §38.36.1: places a cbDisable on each block or task `names` names, which
+// the obj field of one is to be.
+void PlaceDisableOn(std::initializer_list<const char*> names) {
+  for (const char* name : names) {
+    vpiHandle scope = TopObject(name);
+    EXPECT_NE(scope, nullptr) << name;
+    PlaceEventCallback(cbDisable, scope);
+  }
+}
+
 // §38.36.1: a cbDisable is called after a named block containing a system task
 // is disabled, with obj that block: the named begin of each of two instances
 // of a module, found among the blocks of the instance the disable ran in, and
 // a named fork.
 TEST_F(EventCallbacksOfARun, ADisableCallbackNamesEachDisabledBlock) {
-  Armer() = [] { PlaceEventCallback(cbDisable, nullptr); };
+  Armer() = [] { PlaceDisableOn({"top.a.blk", "top.b.blk", "top.f"}); };
   Run("module child; timeunit 1ns; timeprecision 1ns;\n"
       "  initial begin : blk #2 $display(\"blk ran on\"); end\n"
       "  initial #1 disable blk;\n"
@@ -203,11 +214,7 @@ TEST_F(EventCallbacksOfARun, ADisableCallbackNamesEachDisabledBlock) {
 // block of another instance.
 TEST_F(EventCallbacksOfARun, ADisableCallbackIsCalledForTheScopeItNames) {
   Armer() = [] {
-    for (const char* name : {"top.t", "top.lbl", "top.b.inner", "top.c.blk"}) {
-      vpiHandle scope = TopObject(name);
-      EXPECT_NE(scope, nullptr) << name;
-      PlaceEventCallback(cbDisable, scope);
-    }
+    PlaceDisableOn({"top.t", "top.lbl", "top.b.inner", "top.c.blk"});
   };
   Run("module child; timeunit 1ns; timeprecision 1ns;\n"
       "  initial begin : blk #9 $display(\"blk ran on\"); end\n"
@@ -240,7 +247,7 @@ TEST_F(EventCallbacksOfARun, ADisableCallbackIsCalledForTheScopeItNames) {
 // none: a block whose one system call is a system function in an expression
 // holds one, and a block of assignments alone does not.
 TEST_F(EventCallbacksOfARun, ADisableCallbackNeedsASystemCallInTheBlock) {
-  Armer() = [] { PlaceEventCallback(cbDisable, nullptr); };
+  Armer() = [] { PlaceDisableOn({"top.plain", "top.calls"}); };
   Run("module top; timeunit 1ns; timeprecision 1ns; int x;\n"
       "  initial $arm;\n"
       "  initial begin : plain #9 x = 1; end\n"
@@ -280,7 +287,7 @@ TEST_F(EventCallbacksOfARun, ADisableCallbackOnASystemCallFiresWithItsBlock) {
 // §38.36.1 with §9.6.2: a cbDisable is called after a function body disables
 // a named block of its own holding a system task call, with obj that block.
 TEST_F(EventCallbacksOfARun, ADisableCallbackFiresForAFunctionsBlock) {
-  Armer() = [] { PlaceEventCallback(cbDisable, nullptr); };
+  Armer() = [] { PlaceDisableOn({"top.f.body"}); };
   Run("module top; timeunit 1ns; timeprecision 1ns;\n"
       "  function int f(int n);\n"
       "    begin : body\n"
