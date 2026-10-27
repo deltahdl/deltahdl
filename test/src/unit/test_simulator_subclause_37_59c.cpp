@@ -302,7 +302,7 @@ TEST_F(AssignedExpressionsOfARun, ACastIsAsWideAsTheKeywordTypeItNames) {
 // left unsized rather than sized from the wrong ones.
 TEST_F(AssignedExpressionsOfARun, AConditionalMissingAnOperandIsLeftUnsized) {
   Run("module top; logic a, b, c; logic [7:0] d, x;\n"
-      "  initial x = c ? (a <-> b) : d;\n"
+      "  initial begin x = c ? (a <-> b) : d; end\n"
       "endmodule\n");
   const std::vector<vpiHandle> kRights = ProcedureRightSides();
   ASSERT_EQ(kRights.size(), 1U);
