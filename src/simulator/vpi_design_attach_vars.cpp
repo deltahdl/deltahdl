@@ -144,24 +144,33 @@ int ScopeVariableKind(const ModuleItem& item, const PackageDecl* package,
   return kKind == vpiNamedEvent ? vpiNamedEventArray : vpiRegArray;
 }
 
-// The kind of each variable `items` declare, keyed under `scope`, and the
-// facts read off the declaration with it, as a module's variable is told
-// them: whether it is constant (§6.20.6), the interface a virtual interface
-// var's clocking blocks are found in (§25.9), whether it is a modport, and
-// for a structure or union whether it is packed, from the layout the run
-// `ctx` holds under the variable's key (§37.26).
-void RecordScopeVariableKinds(const std::vector<ModuleItem*>& items,
-                              std::string_view scope,
-                              const PackageDecl* package,
+// A package, or the compilation unit, as the scope of the variables it
+// declares (§26.2, §3.12.1): the items it declares, the name the run keys
+// their storage under, and the package a typedef name they are written with
+// resolves in, null for the unit.
+struct DeclaringScope {
+  const std::vector<ModuleItem*>& items;
+  std::string_view name;
+  const PackageDecl* package;
+};
+
+// The kind of each variable `scope` declares and the facts read off the
+// declaration with it, as a module's variable is told them: whether it is
+// constant (§6.20.6), the interface a virtual interface var's clocking blocks
+// are found in (§25.9), whether it is a modport, and for a structure or union
+// whether it is packed, from the layout the run `ctx` holds under the
+// variable's key (§37.26).
+void RecordScopeVariableKinds(const DeclaringScope& scope,
                               const RtlirDesign& design,
                               const VpiObjectMap& objects, SimContext& ctx) {
-  for (const ModuleItem* item : items) {
+  for (const ModuleItem* item : scope.items) {
     if (item->kind != ModuleItemKind::kVarDecl) continue;
-    const std::string kKey = std::string(scope) + "." + std::string(item->name);
+    const std::string kKey =
+        std::string(scope.name) + "." + std::string(item->name);
     VpiHandle obj = FindObjectForFlatName(objects, kKey);
     if (obj == nullptr) continue;
     const DataType& type = item->data_type;
-    obj->type = ScopeVariableKind(*item, package, design);
+    obj->type = ScopeVariableKind(*item, scope.package, design);
     obj->decl_facts.constant_variable = type.is_const;
     obj->decl_facts.vif_interface = VpiVirtualInterfaceOf(design, &type);
     obj->is_modport = !type.modport_name.empty();
@@ -265,11 +274,12 @@ int VpiVariableObjectKind(const RtlirVariable& var, const RtlirDesign& design,
 void VpiRecordScopeVariableKinds(const RtlirDesign& design,
                                  const VpiObjectMap& objects, SimContext& ctx) {
   for (const PackageDecl* pkg : design.packages) {
-    RecordScopeVariableKinds(pkg->items, pkg->name, pkg, design, objects, ctx);
+    RecordScopeVariableKinds({pkg->items, pkg->name, pkg}, design, objects,
+                             ctx);
   }
   ForEachUnitScope(&design, ctx.GetArena(),
                    [&](const CompilationUnit& unit, std::string_view scope) {
-                     RecordScopeVariableKinds(unit.cu_items, scope, nullptr,
+                     RecordScopeVariableKinds({unit.cu_items, scope, nullptr},
                                               design, objects, ctx);
                    });
 }
