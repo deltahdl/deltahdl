@@ -9,6 +9,7 @@ namespace delta {
 
 class DiagEngine;
 struct CompilationUnit;
+struct ModuleDecl;
 struct ModuleItem;
 
 // Whether position `a` stands before position `b`. The preprocessor joins the
@@ -36,6 +37,12 @@ bool UnitDataDeclaredOnlyAfter(const CompilationUnit* unit,
 // `reference` and declares nothing of that name before it.
 bool UnitConstantDeclaredOnlyAfter(const CompilationUnit* unit,
                                    std::string_view name, SourceLoc reference);
+
+// §3.12.1: whether `decl` declares `name` itself, so that a declaration of the
+// name the compilation unit writes after it is not what the module's reads
+// reach: a parameter of its header, a port, an item, or an enumeration
+// constant an item's type declares (§6.19).
+bool ModuleDeclaresName(const ModuleDecl* decl, std::string_view name);
 
 // §3.12.1 (printed page 56): the items of the compilation-unit scope written
 // before `reference`, the portion of the scope a reference there searches.

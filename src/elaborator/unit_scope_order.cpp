@@ -1,5 +1,6 @@
 #include "elaborator/unit_scope_order.h"
 
+#include <algorithm>
 #include <format>
 #include <string_view>
 #include <tuple>
@@ -155,6 +156,18 @@ bool UnitConstantDeclaredOnlyAfter(const CompilationUnit* unit,
     if (declares_constant) declared_after = true;
   }
   return declared_after;
+}
+
+bool ModuleDeclaresName(const ModuleDecl* decl, std::string_view name) {
+  return std::ranges::any_of(
+             decl->params,
+             [name](const auto& param) { return param.first == name; }) ||
+         std::ranges::any_of(
+             decl->ports,
+             [name](const PortDecl& port) { return port.name == name; }) ||
+         std::ranges::any_of(decl->items, [name](const ModuleItem* item) {
+           return item->name == name || DeclaresEnumMember(item, name);
+         });
 }
 
 void ReportUnitScopedReferences(const std::vector<ModuleItem*>& items,

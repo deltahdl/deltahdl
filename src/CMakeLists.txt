@@ -166,6 +166,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/struct_pattern_checks.cpp
     elaborator/array_pattern_keys.cpp
     elaborator/unit_scope_order.cpp
+    elaborator/unit_hier_names_from_root.cpp
     elaborator/compilation_unit_set.cpp
     elaborator/unit_scope_switch.cpp
     elaborator/time_literal_scale.cpp

@@ -1,10 +1,13 @@
 #include <gtest/gtest.h>
 
 #include "elaborator/rtlir.h"
+#include "elaborator/unit_scope_order.h"
 #include "fixture_elaborator.h"
+#include "fixture_parser.h"
 #include "helpers_literal_dims.h"
 #include "helpers_reported_error.h"
 #include "helpers_rtlir_lookup.h"
+#include "parser/ast_design.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 
@@ -564,8 +567,7 @@ TEST(CompilationUnitScopeOrder, ClassDeclaredLaterInUnitIsReported) {
 
 // The nearest allowed forms: the constants written in the unit before the
 // module, and a module, or the module enclosing it, declaring its own of the
-// name, as a header parameter, a port, an item or an enumeration constant,
-// whatever the unit writes later.
+// name, as a header parameter or an item, whatever the unit writes later.
 TEST(CompilationUnitScopeOrder, UnitConstantsDeclaredBeforeTheModuleResolve) {
   EXPECT_TRUE(
       ElabOk("typedef enum {RED, GREEN} color_t;\n"
@@ -584,24 +586,11 @@ TEST(CompilationUnitScopeOrder, ModulesOwnConstantsShadowLaterUnitConstants) {
              "endmodule\n"
              "localparam int W = 8;\n"));
   EXPECT_TRUE(
-      ElabOk("module m(input int W);\n"
-             "  int y;\n"
-             "  initial y = W;\n"
-             "endmodule\n"
-             "localparam int W = 8;\n"));
-  EXPECT_TRUE(
       ElabOk("module m;\n"
              "  localparam int W = 2;\n"
              "  int y = W;\n"
              "endmodule\n"
              "localparam int W = 8;\n"));
-  EXPECT_TRUE(
-      ElabOk("module m;\n"
-             "  typedef enum {GREEN} c_t;\n"
-             "  int y;\n"
-             "  initial y = GREEN;\n"
-             "endmodule\n"
-             "typedef enum {RED, GREEN} color_t;\n"));
   EXPECT_TRUE(
       ElabOk("module outer;\n"
              "  localparam int W = 2;\n"
@@ -611,6 +600,26 @@ TEST(CompilationUnitScopeOrder, ModulesOwnConstantsShadowLaterUnitConstants) {
              "  inner i();\n"
              "endmodule\n"
              "localparam int W = 8;\n"));
+}
+
+// ModuleDeclaresName, which the check above asks before it reports a read of a
+// later unit constant, answers for the module's own header parameters, ports,
+// items and the enumeration constants its items declare, and for nothing else.
+TEST(CompilationUnitScopeOrder, ModuleDeclaresNameReadsTheModulesOwnNames) {
+  auto r = Parse(
+      "module m #(parameter int P = 1)(input int q);\n"
+      "  localparam int L = 2;\n"
+      "  typedef enum {GREEN} c_t;\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  const ModuleDecl* decl = r.cu->modules[0];
+  EXPECT_TRUE(ModuleDeclaresName(decl, "P"));
+  EXPECT_TRUE(ModuleDeclaresName(decl, "q"));
+  EXPECT_TRUE(ModuleDeclaresName(decl, "L"));
+  EXPECT_TRUE(ModuleDeclaresName(decl, "GREEN"));
+  EXPECT_FALSE(ModuleDeclaresName(decl, "W"));
 }
 
 }  // namespace

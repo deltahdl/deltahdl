@@ -158,10 +158,6 @@ class Elaborator : public ElaboratorClassRules {
   void ValidateHierRefToImportedName(const ModuleDecl* decl,
                                      const RtlirModule* mod);
 
-  // §3.12.1: reports a hierarchical name of a compilation-unit task or
-  // function that is read from $root and finds no top-level instance there.
-  void ReportUnitHierNamesFromRoot(const RtlirDesign& design);
-
   // §26.3: the three places an import is applied from, in reaching order.
   void ApplyCompilationUnitImports(const ModuleDecl* decl, RtlirModule* mod);
   void ApplyHeaderImports(const ModuleDecl* decl);

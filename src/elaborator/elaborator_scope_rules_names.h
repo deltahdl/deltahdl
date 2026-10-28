@@ -100,6 +100,17 @@ bool PackageProvidesName(const CompilationUnit* unit,
                          ProvidedNameCache& provided_cache,
                          std::string_view pkg_name, std::string_view name);
 
+// §26.3 with §23.9: whether an import declaration among `items` makes `name`
+// visible: an explicit import naming it, or a wildcard import of a package
+// declaring it. A package variable so imported is a target of a procedural
+// assignment as the module's own declaration is. The names come from the
+// import items themselves, for the checks that run without the RtlirModule
+// the read-side check takes its imports from.
+bool ImportsProvideName(const CompilationUnit* unit,
+                        ProvidedNameCache& provided_cache,
+                        const std::vector<ModuleItem*>& items,
+                        std::string_view name);
+
 // The packages a module imports by wildcard, whose declarations §26.3 makes
 // directly visible to a bare read.
 std::vector<std::string_view> WildcardImportedPackages(const RtlirModule* mod);

@@ -31,7 +31,6 @@
 #include "elaborator/type_eval.h"
 #include "elaborator/unit_scope_order.h"
 #include "elaborator/value_kind.h"
-#include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -240,16 +239,10 @@ bool PackageProvidesName(const CompilationUnit* unit,
   return !ProvidedNameOrigin(unit, provided_cache, pkg_name, name).empty();
 }
 
-// §26.3 with §23.9: a package variable an import of `items` makes visible --
-// an explicit import naming it, or a wildcard import of a package declaring
-// it -- is a target of a procedural assignment as the module's own
-// declaration is, so a write to it names nothing undeclared. The names come
-// from the import items themselves, since this check runs without the
-// RtlirModule the read-side check takes its imports from.
-static bool ImportsProvideName(const CompilationUnit* unit,
-                               ProvidedNameCache& provided_cache,
-                               const std::vector<ModuleItem*>& items,
-                               std::string_view name) {
+bool ImportsProvideName(const CompilationUnit* unit,
+                        ProvidedNameCache& provided_cache,
+                        const std::vector<ModuleItem*>& items,
+                        std::string_view name) {
   for (const auto* item : items) {
     if (item->kind != ModuleItemKind::kImportDecl) continue;
     const ImportItem& imp = item->import_item;
@@ -678,28 +671,6 @@ static std::unordered_set<std::string_view> ExplicitlyImportedNames(
   return explicit_imported;
 }
 
-// Whether `decl` declares `name` itself: a parameter of its header, a port,
-// an item, or an enumeration constant an item's type declares (§6.19).
-static bool ModuleDeclaresName(const ModuleDecl* decl, std::string_view name) {
-  for (const auto& [param, value] : decl->params) {
-    if (param == name) return true;
-  }
-  for (const auto& port : decl->ports) {
-    if (port.name == name) return true;
-  }
-  for (const ModuleItem* item : decl->items) {
-    if (item->name == name) return true;
-    bool declares_member = false;
-    ForEachEnumTypeOfItem(item, [&](std::string_view, const DataType& type) {
-      for (const auto& member : type.enum_members) {
-        if (member.name == name) declares_member = true;
-      }
-    });
-    if (declares_member) return true;
-  }
-  return false;
-}
-
 // True where any of `pkgs` declares `name`. §26.3 makes every name a
 // wildcard-imported package declares directly visible, so a bare read of one
 // resolves without the package qualifier.
@@ -964,40 +935,6 @@ void ReportUnresolvedInPackageSubroutines(const CompilationUnit* unit,
     };
     ReportSubroutineUnresolved(pkg->items, pkg_declares, unit, provided_cache,
                                diag);
-  }
-}
-
-// §3.12.1 (printed page 56): for upward name referencing the compilation-unit
-// scope is a top-level design element, so a hierarchical name one of its tasks
-// or functions writes, headed by a name the unit neither declares nor imports,
-// is a full path from the top of the design ($root, §23.3.1) and is never
-// searched for from where the subroutine is called. Its first name has then
-// to be a top-level instance: `u.x` naming an instance of a caller names
-// nothing.
-void Elaborator::ReportUnitHierNamesFromRoot(const RtlirDesign& design) {
-  std::unordered_set<std::string_view> unit_names;
-  for (const ModuleItem* item : unit_->cu_items) {
-    unit_names.insert(item->name);
-    if (item->class_decl != nullptr) unit_names.insert(item->class_decl->name);
-    for (const DataType* type : {&item->data_type, &item->typedef_type}) {
-      for (const EnumMember& member : type->enum_members)
-        unit_names.insert(member.name);
-    }
-  }
-  for (const RtlirModule* top : design.top_modules)
-    unit_names.insert(top->name);
-  for (const Expr* head : UnitSubroutineHierHeads(*unit_)) {
-    if (unit_names.contains(head->text) ||
-        ImportsProvideName(unit_, pkg_provided_names_, unit_->cu_items,
-                           head->text)) {
-      continue;
-    }
-    diag_.Error(head->range.start,
-                std::format("hierarchical name '{}' in a compilation-unit "
-                            "task or function is read from $root, where no "
-                            "top-level instance '{}' stands",
-                            head->text, head->text),
-                Subclause("3.12.1"));
   }
 }
 

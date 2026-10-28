@@ -25,6 +25,7 @@
 #include "elaborator/rtlir.h"
 #include "elaborator/sdf_annotate_calls.h"
 #include "elaborator/time_literal_scale.h"
+#include "elaborator/unit_hier_names_from_root.h"
 #include "elaborator/unit_scope_switch.h"
 #include "elaborator/viewport_resolution.h"
 #include "parser/ast_design.h"
@@ -586,9 +587,7 @@ RtlirDesign* Elaborator::ElaborateTops(
 
     CollectAllModules(top, design->all_modules);
   }
-  // §3.12.1: a compilation-unit subroutine's hierarchical names are read from
-  // $root, whose top-level instances are known only now.
-  ReportUnitHierNamesFromRoot(*design);
+  ReportUnitHierNamesFromRoot(*unit_, *design, pkg_provided_names_, diag_);
   // §23.3.3.6: whether the design calls $sdf_annotate is known only now.
   WarnUwireNetsKeptApart(*design, diag_);
   // §23.3.3.7.1: every interconnect port connection is known only now.
