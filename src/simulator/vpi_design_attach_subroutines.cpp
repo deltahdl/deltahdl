@@ -192,7 +192,7 @@ void MakeIoDecls(VpiObject* tf, const ModuleItem& item,
         tf->automatic, sb.build);
     var->decl_facts.two_state = !DeclaredTypeIs4State(arg.data_type, sb.ctx);
     var->decl_facts.vif_interface =
-        VpiVirtualInterfaceOf(sb.design, &arg.data_type);
+        VpiVirtualInterfaceOf(sb.design, &arg.data_type, where.mod);
     AttachDeclaredRanges(var, arg.data_type, arg.unpacked_dims, sb.ctx,
                          sb.build);
     // §37.13: the io decl reports the size, signing and shape of the variable
@@ -310,7 +310,7 @@ void MakeBodyVariables(VpiObject* tf, const ModuleItem& item,
     var->decl_facts.two_state =
         !DeclaredTypeIs4State(stmt->var_decl_type, sb.ctx);
     var->decl_facts.vif_interface =
-        VpiVirtualInterfaceOf(sb.design, &stmt->var_decl_type);
+        VpiVirtualInterfaceOf(sb.design, &stmt->var_decl_type, where.mod);
     AttachDeclaredRanges(var, stmt->var_decl_type, stmt->var_unpacked_dims,
                          sb.ctx, sb.build);
   }
@@ -351,7 +351,7 @@ VpiObject* MakeSubroutine(const SubroutineScope& where, const ModuleItem* item,
 // declaring them (§27.4), keyed under that block's full name.
 void MakeScopeSubroutines(const SubroutineBuild& sb, const RtlirModule& mod,
                           VpiObject* scope, const std::string& prefix) {
-  const bool kAutomatic = ElementDeclNamed(sb.design, mod.name).is_automatic;
+  const bool kAutomatic = mod.is_automatic;
   const std::string kParams = prefix.empty() ? "" : prefix + ".";
   for (const ModuleItem* item : mod.function_decls) {
     if (DeclaredInGenerateBlock(mod, item) || DefinesClassMethod(mod, item)) {
@@ -497,19 +497,53 @@ const ModuleItem* InstanceSubroutine(const RtlirModule& mod,
   return nullptr;
 }
 
+// §23.4: the declaration whose body declares `decl` nested, among those `unit`
+// declares and the ones they nest at any depth; null for a declaration `unit`
+// declares at its top level.
+const ModuleDecl* EnclosingDecl(const CompilationUnit& unit,
+                                const ModuleDecl* decl) {
+  std::vector<const ModuleDecl*> work;
+  for (const auto* list : {&unit.modules, &unit.interfaces, &unit.programs}) {
+    work.insert(work.end(), list->begin(), list->end());
+  }
+  while (!work.empty()) {
+    const ModuleDecl* at = work.back();
+    work.pop_back();
+    for (const ModuleItem* item : at->items) {
+      if (item->kind != ModuleItemKind::kNestedModuleDecl) continue;
+      if (item->nested_module_decl == decl) return at;
+      work.push_back(item->nested_module_decl);
+    }
+  }
+  return nullptr;
+}
+
 }  // namespace
 
-const ModuleDecl& ElementDeclNamed(const RtlirDesign& design,
-                                   std::string_view name) {
+const ModuleDecl& VpiElementDeclFrom(const ModuleDecl* holder,
+                                     const CompilationUnit& unit,
+                                     std::string_view name) {
+  for (const ModuleDecl* at = holder; at != nullptr;
+       at = EnclosingDecl(unit, at)) {
+    for (const ModuleItem* item : at->items) {
+      if (item->kind == ModuleItemKind::kNestedModuleDecl &&
+          item->nested_module_decl->name == name) {
+        return *item->nested_module_decl;
+      }
+    }
+  }
   static const ModuleDecl kNone;
-  if (design.compilation_unit == nullptr) return kNone;
-  const CompilationUnit& unit = *design.compilation_unit;
   for (const auto* list : {&unit.modules, &unit.interfaces, &unit.programs}) {
     for (const ModuleDecl* decl : *list) {
       if (decl->name == name) return *decl;
     }
   }
   return kNone;
+}
+
+const ModuleDecl& VpiDeclOf(const RtlirModule& mod) {
+  static const ModuleDecl kNone;
+  return mod.decl == nullptr ? kNone : *mod.decl;
 }
 
 VpiSubroutineObjects AttachSubroutines(const RtlirDesign& design,

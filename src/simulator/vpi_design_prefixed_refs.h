@@ -12,17 +12,20 @@ class SimContext;
 struct DataType;
 struct ModuleDecl;
 struct RtlirDesign;
+struct RtlirModule;
 struct VpiObject;
 
 // §25.9: the declaration of the interface a virtual interface var declared
-// with `type` refers to an instance of, as the compilation unit of `design`
-// holds it whether or not the design instantiates the interface, which tells a
-// clocking block the var names from any other member
+// with `type` in the module `mod`, or in no module for null, refers to an
+// instance of, found from where the var is written (VpiElementDeclFrom)
+// whether or not the design instantiates the interface, which tells a clocking
+// block the var names from any other member
 // (VpiVirtualInterfaceClockingBlock). A typedef name stands for the type at the
 // end of its chain (§6.18), whose interface the design records
 // (RtlirDesign::type_interfaces). Null for any other type, and for no type.
 const ModuleDecl* VpiVirtualInterfaceOf(const RtlirDesign& design,
-                                        const DataType* type);
+                                        const DataType* type,
+                                        const RtlirModule* mod);
 
 // §37.48 details 2 and 3: `vif.cb` written in an expression, where `holder`
 // is the virtual interface var `vif` and `written` the whole dotted name it

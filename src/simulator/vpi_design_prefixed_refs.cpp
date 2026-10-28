@@ -18,7 +18,8 @@
 namespace delta {
 
 const ModuleDecl* VpiVirtualInterfaceOf(const RtlirDesign& design,
-                                        const DataType* type) {
+                                        const DataType* type,
+                                        const RtlirModule* mod) {
   if (type == nullptr) return nullptr;
   std::string_view interface_name = type->type_name;
   if (type->kind == DataTypeKind::kNamed) {
@@ -28,7 +29,8 @@ const ModuleDecl* VpiVirtualInterfaceOf(const RtlirDesign& design,
   } else if (type->kind != DataTypeKind::kVirtualInterface) {
     return nullptr;
   }
-  return &ElementDeclNamed(design, interface_name);
+  return &VpiElementDeclFrom(mod == nullptr ? nullptr : mod->decl,
+                             *design.compilation_unit, interface_name);
 }
 
 bool VpiIsDynamicPrefixHolderType(int type) {

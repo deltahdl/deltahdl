@@ -344,7 +344,7 @@ VpiObject* MakeProperty(const MadeClassDefn& owner, const ClassMember& member,
   // §25.9 with §37.48: the interface whose clocking blocks a virtual interface
   // property names, `vif.cb` in a method of the class.
   var->decl_facts.vif_interface =
-      VpiVirtualInterfaceOf(design, &member.data_type);
+      VpiVirtualInterfaceOf(design, &member.data_type, owner.mod);
   if (VpiObject* param = NamedTypeParameter(owner, member.data_type)) {
     var->children.push_back(param);
   }

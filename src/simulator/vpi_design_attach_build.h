@@ -20,6 +20,7 @@ class Arena;
 class SimContext;
 struct ClassDecl;
 struct ClassMember;
+struct CompilationUnit;
 struct ConstraintDistItem;
 struct DataType;
 struct EventExpr;
@@ -213,17 +214,26 @@ std::string VpiScopedFullName(const VpiObject* scope, std::string_view name);
 using VpiSubroutineObjects =
     std::map<std::pair<const ModuleItem*, std::string>, VpiObject*>;
 
+// §23.4: the module, interface or program `name` names where it is written in
+// the body of `holder`: one `holder` declares nested in its body, or else one
+// a declaration enclosing `holder` does, the innermost first, or else one
+// `unit` declares at its top level, an empty declaration, declaring nothing,
+// for none. `holder` is null for a scope no module declaration holds.
+const ModuleDecl& VpiElementDeclFrom(const ModuleDecl* holder,
+                                     const CompilationUnit& unit,
+                                     std::string_view name);
+
+// §23.4: the declaration `mod` was elaborated from, nested in another's body
+// or not, an empty declaration, declaring nothing, for a module built with
+// none.
+const ModuleDecl& VpiDeclOf(const RtlirModule& mod);
+
 // §37.41: give each module instance, generate block instance and package a
 // task or function per one it declares, and make one per task or function of
 // the compilation unit, each named, full-named, reporting its lifetime and
 // holding its io decls, its return variable and the variables its body
 // declares, a return variable's width read in the run `ctx`. Answers the
 // objects made.
-// The module, interface or program the compilation unit declares under
-// `name`, an empty declaration, declaring nothing, for none.
-const ModuleDecl& ElementDeclNamed(const RtlirDesign& design,
-                                   std::string_view name);
-
 VpiSubroutineObjects AttachSubroutines(const RtlirDesign& design,
                                        const VpiObjectMap& objects,
                                        SimContext& ctx,

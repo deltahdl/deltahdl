@@ -32,7 +32,6 @@
 #include "simulator/vpi_class_typespecs.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_walk.h"
-#include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
@@ -46,6 +45,10 @@ namespace {
 // The typespecs one scope declares, by typedef name.
 using TypespecsByName = std::unordered_map<std::string_view, VpiObject*>;
 
+// The declaration each instance was elaborated from, by its object.
+using InstanceDefinitions =
+    std::unordered_map<const VpiObject*, const ModuleDecl*>;
+
 // What making typespecs reads across the whole design: the model to build in,
 // the run whose scope a dimension is evaluated in, the shapes of the
 // typespecs made so far, which a type written over one of them unwinds
@@ -57,9 +60,11 @@ struct DesignTypespecs {
   VpiTypespecShapes& shapes;
   const VpiClassDefnObjects& classes;
   const VpiObjectMap& objects;
-  // §37.30: the compilation unit, whose interfaces an interface typespec's
-  // parameter values are assigned to.
+  // §37.30: the compilation unit, and the declarations of the instances,
+  // whose interfaces an interface typespec's parameter values are assigned
+  // to.
   const CompilationUnit& unit;
+  const InstanceDefinitions& definitions;
 };
 
 // What making one scope's typespecs reads: the scope object they hang from,
@@ -130,35 +135,15 @@ DataType ElementOf(const DataType& type) {
   return element;
 }
 
-// The module, interface or program `unit` declares under `name`.
-const ModuleDecl* ElementNamed(const CompilationUnit& unit,
-                               std::string_view name) {
-  for (const auto* list : {&unit.modules, &unit.interfaces, &unit.programs}) {
-    for (const ModuleDecl* decl : *list) {
-      if (decl->name == name) return decl;
-    }
-  }
-  return nullptr;
-}
-
-// §23.4: the interface `name` a type written within `scope` names: one the
-// declaration of the instance or package holding `scope` declares nested in its
-// body, or else one `unit` declares (ElementNamed); null for neither.
-const ModuleDecl* InterfaceNamedFrom(const VpiObject* scope,
-                                     const CompilationUnit& unit,
+// §23.4: the interface `name` a type written within `scope` names, found from
+// the declaration of the instance holding `scope` (VpiElementDeclFrom).
+const ModuleDecl& InterfaceNamedFrom(const VpiObject* scope,
+                                     const DesignTypespecs& design,
                                      std::string_view name) {
   const VpiObject* at = scope;
-  while (at != nullptr && !VpiIsInstanceType(at->type)) at = at->parent;
-  const ModuleDecl* holder =
-      at == nullptr ? nullptr : ElementNamed(unit, at->def_name);
-  static const std::vector<ModuleItem*> kNoItems;
-  for (const ModuleItem* item : holder == nullptr ? kNoItems : holder->items) {
-    if (item->kind == ModuleItemKind::kNestedModuleDecl &&
-        item->nested_module_decl->name == name) {
-      return item->nested_module_decl;
-    }
-  }
-  return ElementNamed(unit, name);
+  while (at != nullptr && !design.definitions.contains(at)) at = at->parent;
+  return VpiElementDeclFrom(at == nullptr ? nullptr : design.definitions.at(at),
+                            design.unit, name);
 }
 
 // The typespec a named type finds, and whether it is one a typedef declares,
@@ -367,11 +352,8 @@ class TypespecMaker {
       typespec->parent = of_interface;
     }
     of_interface->def_name = std::string(type.type_name);
-    const ModuleDecl* decl =
-        InterfaceNamedFrom(at_.scope, at_.design.unit, type.type_name);
-    const std::vector<std::string_view> kOrdered =
-        decl == nullptr ? std::vector<std::string_view>{}
-                        : OverridableParamNames(decl);
+    const std::vector<std::string_view> kOrdered = OverridableParamNames(
+        &InterfaceNamedFrom(at_.scope, at_.design, type.type_name));
     for (std::size_t i = 0; i < type.type_params.size(); ++i) {
       MakeInterfaceParamAssign(of_interface, type.type_params[i],
                                i < kOrdered.size() ? kOrdered[i] : "");
@@ -469,28 +451,29 @@ TypespecsByName MakeTypespecs(const std::vector<ModuleItem*>& items,
 }
 
 // One instance of `mod` at `prefix`: its object and the module, interface or
-// program the compilation unit declares it from.
+// program declaration it was elaborated from.
 using InstanceDeclVisit =
     std::function<void(const RtlirModule& mod, const std::string& prefix,
                        VpiObject* instance, const ModuleDecl& decl)>;
 
-// Visits each instance of the design whose module, interface or program
-// `unit` declares, `ctx`'s instance prefix set to the instance's own so that
-// the dimensions its declarations write evaluate there. An instance a
+// Visits each instance of the design whose module was elaborated from a
+// declaration, recording that declaration under the instance's object in
+// `definitions` first, `ctx`'s instance prefix set to the instance's own so
+// that the dimensions its declarations write evaluate there. An instance a
 // generate block below another instance holds is found once it has moved under
 // the block's gen scope as well (WalkInstanceObjects).
-void WalkInstanceDecls(const RtlirDesign* design, const CompilationUnit& unit,
-                       const VpiObjectMap& objects, SimContext& ctx,
+void WalkInstanceDecls(const RtlirDesign* design, const VpiObjectMap& objects,
+                       SimContext& ctx, InstanceDefinitions& definitions,
                        const InstanceDeclVisit& visit) {
   WalkInstanceObjects(design, objects,
                       [&](const RtlirModule* mod, const std::string& prefix,
                           VpiObject* instance) {
-                        const ModuleDecl* decl = ElementNamed(unit, mod->name);
-                        if (decl == nullptr) return;
+                        definitions[instance] = mod->decl;
+                        if (mod->decl == nullptr) return;
                         InstancePrefixOverride in_instance(
                             ctx.InstancePrefixOverride(),
                             prefix.empty() ? "" : prefix + ".");
-                        visit(*mod, prefix, instance, *decl);
+                        visit(*mod, prefix, instance, *mod->decl);
                       });
 }
 
@@ -878,7 +861,9 @@ VpiObjectMap AttachTypespecs(const RtlirDesign* design,
   if (design->compilation_unit == nullptr) return {};
   const CompilationUnit& unit = *design->compilation_unit;
   VpiTypespecShapes shapes(build);
-  const DesignTypespecs kDesign{build, ctx, shapes, classes, objects, unit};
+  InstanceDefinitions definitions;
+  const DesignTypespecs kDesign{build,   ctx,  shapes,     classes,
+                                objects, unit, definitions};
   auto unit_scope = objects.find("$unit");
   const TypespecsByName kNone;
   const std::vector<RtlirImport> kNoImports;
@@ -898,7 +883,7 @@ VpiObjectMap AttachTypespecs(const RtlirDesign* design,
                       AnswerPackageTypespecs(*pkg, objects, kDesign, answered));
   }
   WalkInstanceDecls(
-      design, unit, objects, ctx,
+      design, objects, ctx, definitions,
       [&](const RtlirModule& mod, const std::string& prefix, VpiObject* scope,
           const ModuleDecl& decl) {
         const ScopeTypespecs kAt{scope,    prefix,      &mod.enum_types,
@@ -932,9 +917,12 @@ void AttachPortTypespecs(const RtlirDesign* design, const VpiObjectMap& objects,
   // §37.14 (figure): a port reaches the typespec of its type through
   // vpiTypespec, which reached nothing for every port.
   VpiTypespecShapes shapes(build);
-  const DesignTypespecs kDesign{
-      build, ctx, shapes, calls.classes, objects, *design->compilation_unit};
-  WalkInstanceDecls(design, *design->compilation_unit, objects, ctx,
+  InstanceDefinitions definitions;
+  const DesignTypespecs kDesign{build,      ctx,
+                                shapes,     calls.classes,
+                                objects,    *design->compilation_unit,
+                                definitions};
+  WalkInstanceDecls(design, objects, ctx, definitions,
                     [&](const RtlirModule& mod, const std::string& prefix,
                         VpiObject* instance, const ModuleDecl& decl) {
                       RelatePortTypespecs(

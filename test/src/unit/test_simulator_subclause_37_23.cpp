@@ -221,5 +221,17 @@ TEST_F(NettypesOfARun, ANettypeOfAPackageOrUnitTypedefReachesItsTypespec) {
   EXPECT_EQ(VpiObjectOf(kTypespecOf("d")), VpiObjectOf(of_a));
 }
 
+// With §23.4: an instance of a module declared nested in another's body
+// declares the nettypes that declaration writes (#8266).
+TEST_F(NettypesOfARun, ANestedModulesInstanceDeclaresItsNettypes) {
+  Run("module top;\n"
+      "  module inner; nettype logic [1:0] pair_t; endmodule\n"
+      "  inner i();\n"
+      "endmodule\n");
+  vpiHandle pair = Named(vpiNetTypedef, By("top.i"), "pair_t");
+  ASSERT_NE(pair, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, vpi_handle(vpiTypespec, pair)), vpiLogicTypespec);
+}
+
 }  // namespace
 }  // namespace delta

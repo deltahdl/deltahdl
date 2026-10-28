@@ -383,6 +383,7 @@ TEST(TypespecModel, AttachToleratesAnEnumWithoutConstantsAndAnUnbuiltVariable) {
   written.type_name = "e_t";
   RtlirModule mod;
   mod.name = "m";
+  mod.decl = &decl;
   mod.variables.resize(1);
   mod.variables.front().name = "unbuilt";
   mod.variables.front().written_type = &written;
@@ -889,6 +890,19 @@ TEST_F(TypespecsOfARun, AClassPropertyOfATypeParameterReachesIt) {
             vpiTypeParameter);
   EXPECT_NE(KindReached(vpiTypespec, Named(vpiVariables, c, "v")),
             vpiTypeParameter);
+}
+
+// With §23.4: an instance of a module declared nested in another's body
+// declares the typedefs that declaration writes, as an instance of a module
+// declared at the top level does (#8266).
+TEST_F(TypespecsOfARun, ANestedModulesInstanceDeclaresItsTypedefs) {
+  Run("module top;\n"
+      "  module inner; typedef bit [3:0] nib_t; endmodule\n"
+      "  inner i();\n"
+      "endmodule\n");
+  vpiHandle nib = Named(vpiTypedef, By("top.i"), "nib_t");
+  ASSERT_NE(nib, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, nib), vpiBitTypespec);
 }
 
 }  // namespace

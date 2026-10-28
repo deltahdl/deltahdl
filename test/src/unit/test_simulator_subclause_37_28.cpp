@@ -579,5 +579,16 @@ TEST_F(ParametersOfARun, AnInstanceHoldsItsParamAssigns) {
   }
 }
 
+// Detail 3 with §23.4: a type parameter of an instance of a module declared
+// nested in another's body reaches the typespec of the default type that
+// declaration wrote (#8266).
+TEST_F(ParametersOfARun, ANestedModulesTypeParameterReachesItsDefault) {
+  Run("module top;\n"
+      "  module inner #(parameter type T = byte); endmodule\n"
+      "  inner i();\n"
+      "endmodule\n");
+  EXPECT_EQ(KindOf(vpiExpr, In("top.i", "T")), vpiByteTypespec);
+}
+
 }  // namespace
 }  // namespace delta

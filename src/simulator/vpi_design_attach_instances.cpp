@@ -408,9 +408,8 @@ void VpiContext::AttachInstanceDefinitions(const RtlirDesign* design) {
   WalkInstanceObjects(design, object_map_,
                       [&](const RtlirModule* mod, const std::string& /*prefix*/,
                           VpiObject* obj) {
-                        RecordInstanceDefinition(
-                            obj, mod, ElementDeclNamed(*design, mod->name),
-                            sources);
+                        RecordInstanceDefinition(obj, mod, VpiDeclOf(*mod),
+                                                 sources);
                       });
 }
 

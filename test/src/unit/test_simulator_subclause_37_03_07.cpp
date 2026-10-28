@@ -209,5 +209,21 @@ TEST_F(LifetimesOfARun, AFrameAndItsThreadHaveTheAutomaticScheme) {
   EXPECT_EQ(g_thread_scheme, vpiAutomaticScheme);
 }
 
+// With §6.21 and §23.4: a task of a module declared nested in another's body
+// takes the lifetime that declaration was written with, automatic for an
+// automatic module, as one of a module declared at the top level does
+// (#8266).
+TEST_F(LifetimesOfARun, ANestedAutomaticModulesTaskIsAutomatic) {
+  Run("module top;\n"
+      "  module automatic inner; task t(); int x; endtask endmodule\n"
+      "  inner i();\n"
+      "endmodule\n");
+  vpiHandle t = Named(vpiTaskFunc, By("top.i"), "t");
+  ASSERT_NE(t, nullptr);
+  EXPECT_EQ(vpi_get(vpiAutomatic, t), 1);
+  EXPECT_EQ(vpi_get(vpiAllocScheme, Named(vpiVariables, t, "x")),
+            vpiAutomaticScheme);
+}
+
 }  // namespace
 }  // namespace delta

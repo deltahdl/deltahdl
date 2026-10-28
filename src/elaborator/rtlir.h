@@ -825,6 +825,9 @@ struct RtlirModule {
   std::vector<RtlirImport> imports;
 
   std::unordered_map<std::string_view, std::vector<RtlirEnumMember>> enum_types;
+  // §23.4: the declaration the module was elaborated from, one another
+  // declaration declares nested in its body among them.
+  const ModuleDecl* decl = nullptr;
 };
 
 struct RtlirDesign : RtlirTypedefFacts {

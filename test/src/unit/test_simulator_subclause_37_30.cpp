@@ -310,5 +310,26 @@ TEST_F(InterfaceTypespecsOfARun, AnOrderedValueAssignsAUnitInterfacesParam) {
             (std::vector<std::pair<std::string, int>>{{"N", vpiConstant}}));
 }
 
+// ...and, from the typedefs of a module itself declared nested, an interface
+// that module's declaration nests, hiding one of the same name its enclosing
+// module nests, or else one the enclosing module nests, the outer name space
+// being visible to it (§23.4) (#8266, #8267).
+TEST_F(InterfaceTypespecsOfARun, AnOrderedValueAssignsANestedHoldersParam) {
+  Run("module top;\n"
+      "  interface bus #(parameter W = 1); endinterface\n"
+      "  interface outer #(parameter X = 1); endinterface\n"
+      "  module inner;\n"
+      "    interface bus #(parameter K = 1); endinterface\n"
+      "    typedef virtual bus #(3) t;\n"
+      "    typedef virtual outer #(4) o;\n"
+      "  endmodule\n"
+      "  inner i();\n"
+      "endmodule\n");
+  EXPECT_EQ(Assigned(Named(vpiTypedef, By("top.i"), "t")),
+            (std::vector<std::pair<std::string, int>>{{"K", vpiConstant}}));
+  EXPECT_EQ(Assigned(Named(vpiTypedef, By("top.i"), "o")),
+            (std::vector<std::pair<std::string, int>>{{"X", vpiConstant}}));
+}
+
 }  // namespace
 }  // namespace delta

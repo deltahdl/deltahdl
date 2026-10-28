@@ -231,7 +231,8 @@ void RecordScopeVariableKinds(const DeclaringScope& scope,
     const DataType& type = item->data_type;
     obj->type = ScopeVariableKind(*item, scope.package, design);
     obj->decl_facts.constant_variable = type.is_const;
-    obj->decl_facts.vif_interface = VpiVirtualInterfaceOf(design, &type);
+    obj->decl_facts.vif_interface =
+        VpiVirtualInterfaceOf(design, &type, nullptr);
     obj->is_modport = !type.modport_name.empty();
     RecordAggregateFacts(obj, kKey, ctx);
     RecordScopeDeclaredShape(*obj, type, scope.package, ctx);

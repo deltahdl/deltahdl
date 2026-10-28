@@ -568,5 +568,28 @@ TEST(ClockingBlockModel, ANetHasNoClockingEdges) {
   SetGlobalVpiContext(nullptr);
 }
 
+// Details 2 and 3 with §23.4: so is one named through a virtual interface var
+// whose type names an interface the module declares nested in its body, the
+// module's own var, a task's argument or body variable, or a property of a
+// class the module declares alike (#8267).
+TEST_F(ClockingBlocksOfARun,
+       ANestedInterfacesVirtualInterfaceClockingBlockHasPrefixAndActual) {
+  Run("module top; logic clk;\n"
+      "  interface bus(input logic clk);\n"
+      "    clocking cb @(posedge clk); endclocking\n"
+      "  endinterface\n"
+      "  virtual bus vif;\n"
+      "  task wait_module; @(vif.cb); endtask\n"
+      "  task wait_arg(virtual bus v); @(v.cb); endtask\n"
+      "  task wait_local; virtual bus lv; @(lv.cb); endtask\n"
+      "  class C; virtual bus cv; task run; @(cv.cb); endtask endclass\n"
+      "endmodule\n");
+  ExpectBlockPrefixedBy("wait_module", "vif");
+  ExpectBlockPrefixedBy("wait_arg", "v");
+  ExpectBlockPrefixedBy("wait_local", "lv");
+  ExpectBlockPrefixedBy(
+      Named(vpiTaskFunc, Named(vpiClassDefn, By("top"), "C"), "run"), "cv");
+}
+
 }  // namespace
 }  // namespace delta

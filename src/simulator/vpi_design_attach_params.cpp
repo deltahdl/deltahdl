@@ -50,13 +50,12 @@ struct ParamScope {
   const RtlirModule& mod;
 };
 
-// What an instance array's param assigns are made with: the design whose
-// declarations write the overrides, the objects the run built, the run the
-// values are read in, the model's allocation, and the module and instance
-// object of the instance writing the overrides, whose names, imports and
-// compilation unit a value finds a name among (§26.3, §3.12.1).
+// What an instance array's param assigns are made with: the objects the run
+// built, the run the values are read in, the model's allocation, and the
+// module and instance object of the instance writing the overrides, whose
+// names, imports and compilation unit a value finds a name among (§26.3,
+// §3.12.1).
 struct ParamArrayAttach {
-  const RtlirDesign& design;
   const VpiObjectMap& objects;
   SimContext& ctx;
   const VpiAttachBuild& build;
@@ -359,7 +358,7 @@ void MakeArrayParamAssigns(VpiObject* array, const RtlirModuleInst& left,
                            const ModuleItem& item, const std::string& prefix,
                            const ParamArrayAttach& with) {
   const std::vector<std::string_view> kOrdered =
-      OverridableParamNames(&ElementDeclNamed(with.design, left.module_name));
+      OverridableParamNames(&VpiDeclOf(*left.resolved));
   for (std::size_t k = 0; k < item.inst_params.size(); ++k) {
     const auto& [name, value] = item.inst_params[k];
     if (value == nullptr) continue;
@@ -407,7 +406,7 @@ ParamAssignHolder HolderOf(const RtlirModuleInst& left,
 void MakeInstanceArrayParamAssigns(const RtlirModule& mod,
                                    const std::string& prefix,
                                    const ParamArrayAttach& with) {
-  const ModuleDecl& decl = ElementDeclNamed(with.design, mod.name);
+  const ModuleDecl& decl = VpiDeclOf(mod);
   for (const RtlirModuleInst& left : mod.children) {
     if (!left.array.name.empty() && left.array.index != left.array.left) {
       continue;
@@ -440,10 +439,8 @@ void AttachParameters(const RtlirDesign* design, const VpiObjectMap& objects,
       design, [&](const RtlirModule* mod, const std::string& prefix) {
         VpiObject* scope = FindObjectForFlatName(
             objects, prefix.empty() ? std::string(mod->name) : prefix);
-        AttachScopeParameters(mod,
-                              {scope, prefix, objects,
-                               ElementDeclNamed(*design, mod->name), *mod},
-                              kWith);
+        AttachScopeParameters(
+            mod, {scope, prefix, objects, VpiDeclOf(*mod), *mod}, kWith);
         AttachScopeSpecParams(mod, prefix, objects);
       });
   for (const PackageDecl* pkg : design->packages) {
@@ -458,8 +455,7 @@ void AttachParameters(const RtlirDesign* design, const VpiObjectMap& objects,
                       [&](const RtlirModule* mod, const std::string& prefix,
                           const VpiObject* instance) {
                         MakeInstanceArrayParamAssigns(
-                            *mod, prefix,
-                            {*design, objects, ctx, build, mod, instance});
+                            *mod, prefix, {objects, ctx, build, mod, instance});
                       });
 }
 

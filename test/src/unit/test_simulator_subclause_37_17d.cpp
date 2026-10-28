@@ -594,5 +594,18 @@ TEST_F(VariablesOfARun, APackagesArrayVarsReportTheirArrayTypeAndSize) {
   EXPECT_EQ(kOf(vpiArrayType, "pm"), vpiAssocArray);
 }
 
+// §37.17 with §23.4: a variable of an instance of a module declared nested in
+// another's body reaches the typespec of the typedef that declaration declares
+// it with (#8266).
+TEST_F(VariablesOfARun, ANestedModulesVariableReachesItsTypedefsTypespec) {
+  Run("module top;\n"
+      "  module inner; typedef bit [3:0] nib_t; nib_t v; endmodule\n"
+      "  inner i();\n"
+      "endmodule\n");
+  vpiHandle typespec = vpi_handle(vpiTypespec, By("top.i.v"));
+  ASSERT_NE(typespec, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, typespec), "nib_t");
+}
+
 }  // namespace
 }  // namespace delta

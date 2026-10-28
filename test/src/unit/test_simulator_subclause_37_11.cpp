@@ -753,5 +753,24 @@ TEST_F(InstanceArraysOfARun, AnElementIsNamedByEveryIndex) {
             VpiObjectOf(By("top.w[1]")));
 }
 
+// The figure with §23.10.2 and §23.4: an array of a module declared nested in
+// the instantiating module's body assigns its ordered values to the parameters
+// that declaration declares, and an array an instance of a nested module
+// writes is reached from what its declaration writes (#8266).
+TEST_F(InstanceArraysOfARun, ANestedModulesArraysReachTheirParamAssigns) {
+  Run("module sub #(parameter int P = 1); endmodule\n"
+      "module top;\n"
+      "  module inner #(parameter int W = 1, parameter int D = 2);\n"
+      "    sub #(.P(6)) s[1:0] ();\n"
+      "  endmodule\n"
+      "  inner #(4, 5) n[1:0] ();\n"
+      "  inner m ();\n"
+      "endmodule\n");
+  EXPECT_EQ(ParamAssignsOf(By("top.n")),
+            (std::vector<AssignOf>{{"top.n[1].W", 4}, {"top.n[1].D", 5}}));
+  EXPECT_EQ(ParamAssignsOf(By("top.m.s")),
+            (std::vector<AssignOf>{{"top.m.s[1].P", 6}}));
+}
+
 }  // namespace
 }  // namespace delta

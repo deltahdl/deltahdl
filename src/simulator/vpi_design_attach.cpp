@@ -269,7 +269,7 @@ void RecordVariableObjectKinds(
           obj->decl_facts.constant_variable =
               var.written_type != nullptr && var.written_type->is_const;
           obj->decl_facts.vif_interface =
-              VpiVirtualInterfaceOf(*design, var.written_type);
+              VpiVirtualInterfaceOf(*design, var.written_type, mod);
           // §37.29: a virtual interface var of a modport's type is a modport.
           obj->is_modport = var.written_type != nullptr &&
                             !var.written_type->modport_name.empty();
@@ -818,9 +818,8 @@ void VpiContext::AttachNettypeDeclarations(const RtlirDesign* design) {
   WalkInstanceObjects(design, object_map_,
                       [&](const RtlirModule* mod, const std::string& /*prefix*/,
                           VpiObject* scope) {
-                        MakeNettypeDecls(
-                            scope, ElementDeclNamed(*design, mod->name).items,
-                            mod->imports);
+                        MakeNettypeDecls(scope, VpiDeclOf(*mod).items,
+                                         mod->imports);
                       });
   if (design == nullptr) return;
   static const std::vector<RtlirImport> kNoImports;
