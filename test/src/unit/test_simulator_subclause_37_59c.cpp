@@ -333,6 +333,24 @@ TEST_F(AssignedExpressionsOfARun, ACastFindsATypedefOfAPackageOrTheUnit) {
   EXPECT_EQ(CastTypespecKinds(ProcedureRightSides()), kKinds);
 }
 
+// A cast in a variable's initialization expression (§37.17 detail 8), which
+// its instance writes in no scope of its own, has the typespec of a built-in
+// type it names and of a typedef its module declares, found from the
+// instance.
+TEST_F(AssignedExpressionsOfARun,
+       ACastInAnInitializerFindsItsTypeInTheInstance) {
+  Run("module sub; typedef bit [3:0] nib_t; logic [7:0] r;\n"
+      "  logic [3:0] v = nib_t'(r);\n"
+      "endmodule\n"
+      "module top; logic [7:0] r; byte b = byte'(r); sub u(); endmodule\n");
+  vpiHandle keyword = CastTypespec(vpi_handle(vpiExpr, By("top.b")));
+  ASSERT_NE(keyword, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, keyword), vpiByteTypespec);
+  vpiHandle named = CastTypespec(vpi_handle(vpiExpr, By("top.u.v")));
+  ASSERT_NE(named, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, named), "nib_t");
+}
+
 // A size cast is as wide as the constant its width is, an operation over a
 // parameter, a call of $bits on a variable or a package's parameter written
 // through the package among them (§11.2.1).
@@ -411,6 +429,22 @@ TEST_F(AssignedExpressionsOfARun, ASizeCastOfAnAggregateIsAsItsMembersAre) {
                                    vpiBitTypespec, vpiBitTypespec,
                                    vpiBitTypespec};
   EXPECT_EQ(CastTypespecKinds(ProcedureRightSides()), kKinds);
+}
+
+// A size cast of a structure with a 4-state member that a task declares as
+// its argument, a variable the run keeps no storage of its own for, is a
+// logic vector.
+TEST_F(AssignedExpressionsOfARun,
+       ASizeCastOfATasksFourStateStructIsALogicVector) {
+  Run("module top; typedef struct packed { logic [3:0] a; } s4_t;\n"
+      "  logic [3:0] y;\n"
+      "  task t(input s4_t s); y = 4'(s); endtask\n"
+      "endmodule\n");
+  vpiHandle assign = vpi_handle(vpiStmt, Named(vpiTaskFunc, By("top"), "t"));
+  ASSERT_NE(assign, nullptr);
+  vpiHandle typespec = CastTypespec(vpi_handle(vpiRhs, assign));
+  ASSERT_NE(typespec, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, typespec), vpiLogicTypespec);
 }
 
 // Every expression has vpiSize, an operation's being its self-determined
