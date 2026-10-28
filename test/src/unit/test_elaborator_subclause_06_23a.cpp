@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "fixture_elaborator.h"
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
 #include "simulator/lowerer.h"
@@ -744,6 +745,20 @@ TEST(TypeOperatorSim, TypeOfAValueOfAPackageOrTheUnitIsItsType) {
   ASSERT_NE(h, nullptr);
   EXPECT_EQ(h->value.width, 4u);
   EXPECT_EQ(h->value.ToUint64(), 0xFu);
+}
+
+// §6.23 with §26.3 and §7.2 — a member of a structure variable a package
+// declares, `pkg::v.f`, names no scope, so it is no hierarchical reference.
+TEST(TypeOperatorElab, PackageStructureMemberInTypeArgAccepted) {
+  EXPECT_TRUE(
+      ElabOk("package pkg;\n"
+             "  typedef struct packed { bit [7:0] f; bit g; } st;\n"
+             "  st v;\n"
+             "endpackage\n"
+             "module m;\n"
+             "  int d;\n"
+             "  initial d = type(pkg::v.f)'(5);\n"
+             "endmodule\n"));
 }
 
 }  // namespace

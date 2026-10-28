@@ -313,6 +313,22 @@ TEST(TypeOfExprCastSim, CastToATypeReferenceReadsAMembersType) {
   EXPECT_EQ(RunAndGet(kSrc, "u"), 0u);
 }
 
+// §6.23 with §7.2: a member of a structure variable a block declares names no
+// scope, so the type operator takes it, here as eight bits.
+TEST(TypeOfExprCastSim, CastToATypeReferenceReadsABlockVariablesMember) {
+  const std::string kSrc =
+      "module t;\n"
+      "  typedef struct packed { bit [7:0] f; bit g; } st;\n"
+      "  bit [3:0] n;\n"
+      "  int d;\n"
+      "  initial begin\n"
+      "    st q;\n"
+      "    d = type(n + q.f)'(16'hABCF);\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(kSrc, "d"), 0xCFu);
+}
+
 // §6.23 with §11.4.12: a concatenation in the expression a type reference
 // names is as wide as its operands together, and 2-state where they all are.
 TEST(TypeOfExprCastSim, CastToATypeReferenceReadsAConcatenationsType) {

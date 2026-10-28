@@ -131,7 +131,14 @@ class ElaboratorOperationRules : public ElaboratorData {
   void CheckTypeRefArgInner(const Expr* inner, SourceLoc loc);
   bool TypeRefArgUsesDynamicElement(const Expr* e) const;
   bool IsHierarchicalMemberAccess(const Expr* e) const;
+  bool NamesSelectableVariable(const Expr* root) const;
+  bool DeclaresSelectableType(const DataType& type) const;
   bool TypeRefArgHasMemberAccess(const Expr* e) const;
+  // The variables the statements WalkStmtsForTypeRefArg is inside declare,
+  // innermost last, each with whether a `.` after it selects a member of it
+  // rather than naming a scope (NamesSelectableVariable): a block's declaration
+  // hides a module's of the same name for the rest of the block (§6.21).
+  std::vector<std::pair<std::string_view, bool>> type_ref_block_vars_;
 
   // §11.9: each tagged union expression against the type its context gives
   // it. Defined in elaborator_validate_operations_tagged.cpp.

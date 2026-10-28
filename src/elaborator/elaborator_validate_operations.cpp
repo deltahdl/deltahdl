@@ -1,6 +1,7 @@
 #include "elaborator/elaborator_validate_operations.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <format>
 #include <optional>
@@ -437,19 +438,60 @@ void ElaboratorOperationRules::ValidateTypeRefComparisons(
 // The descent into the children of a `::` node still runs, so `type(C::x.y)`
 // and any `::` node holding a `.` node below it remain errors.
 //
-// §7.2 with §6.23: nor is a `.` that selects a member of a variable the
-// module declares, `p.f` of a structure `p`, which names no scope. A class
-// handle's property, an element of a dynamic object, and a virtual
-// interface's member still count.
+// §7.2 with §6.23: nor is a `.` that selects a member of a variable, `p.f` of
+// a structure `p`, which names no scope (NamesSelectableVariable).
 bool ElaboratorOperationRules::IsHierarchicalMemberAccess(const Expr* e) const {
   if (e->kind != ExprKind::kMemberAccess || e->is_scope_resolution)
     return false;
-  const Expr* root = e;
-  while (root->kind == ExprKind::kMemberAccess) root = root->lhs;
+  const Expr* root = e->lhs;
+  while (root->kind == ExprKind::kMemberAccess && !root->is_scope_resolution)
+    root = root->lhs;
+  return !NamesSelectableVariable(root);
+}
+
+// The variable package `pkg` declares as `name`; null where it declares none.
+static const ModuleItem* PackageVariable(const CompilationUnit& unit,
+                                         std::string_view pkg,
+                                         std::string_view name) {
+  for (const PackageDecl* p : unit.packages) {
+    if (p->name != pkg) continue;
+    for (const ModuleItem* item : p->items) {
+      if (item->kind == ModuleItemKind::kVarDecl && item->name == name)
+        return item;
+    }
+  }
+  return nullptr;
+}
+
+// Whether a variable declared with `type` has members a `.` selects: any but
+// a class handle, whose property is an element of a dynamic object, and a
+// virtual interface, which stands for an instance.
+bool ElaboratorOperationRules::DeclaresSelectableType(
+    const DataType& type) const {
+  return type.kind != DataTypeKind::kVirtualInterface &&
+         (type.kind != DataTypeKind::kNamed ||
+          class_names_.count(type.type_name) == 0);
+}
+
+// Whether `root`, what a chain of `.` accesses starts from, names a variable
+// whose members a `.` selects: one a package declares, written behind `::`
+// (§26.3); one a block around the type operator declares, the innermost
+// declaration of the name deciding; or one the module declares, a class
+// handle and a virtual interface excepted.
+bool ElaboratorOperationRules::NamesSelectableVariable(const Expr* root) const {
+  if (root->kind == ExprKind::kMemberAccess) {
+    const ModuleItem* var =
+        PackageVariable(*unit_, root->lhs->text, root->rhs->text);
+    return var != nullptr && DeclaresSelectableType(var->data_type);
+  }
+  for (auto decl = type_ref_block_vars_.rbegin();
+       decl != type_ref_block_vars_.rend(); ++decl) {
+    if (decl->first == root->text) return decl->second;
+  }
   auto it = var_types_.find(root->text);
-  return root->kind != ExprKind::kIdentifier || it == var_types_.end() ||
-         it->second == DataTypeKind::kVirtualInterface ||
-         class_var_names_.count(root->text) != 0;
+  return root->kind == ExprKind::kIdentifier && it != var_types_.end() &&
+         it->second != DataTypeKind::kVirtualInterface &&
+         class_var_names_.count(root->text) == 0;
 }
 
 bool ElaboratorOperationRules::TypeRefArgHasMemberAccess(const Expr* e) const {
@@ -555,8 +597,19 @@ void ElaboratorOperationRules::WalkStmtsForTypeRefArg(const Stmt* s) {
   // elaborator_validate_internal.h names. It wrote out six of the thirteen, so
   // `type(d[0])` on a dynamic array `d` went unreported in a fork arm and in a
   // for-loop step.
+  //
+  // §6.21 with §7.2: a variable a block declares is in scope for the rest of
+  // the block, where a `.` after it selects a member as after a module's; the
+  // declarations a statement's children make are forgotten when it is left,
+  // and a declaration is recorded after its own initializer is checked.
+  size_t mark = type_ref_block_vars_.size();
   ForEachChildStmt(s,
                    [this](Stmt* const& sub) { WalkStmtsForTypeRefArg(sub); });
+  type_ref_block_vars_.resize(mark);
+  if (s->kind == StmtKind::kVarDecl) {
+    type_ref_block_vars_.emplace_back(s->var_name,
+                                      DeclaresSelectableType(s->var_decl_type));
+  }
 }
 
 void ElaboratorOperationRules::ValidateTypeRefArgs(const ModuleDecl* decl) {
