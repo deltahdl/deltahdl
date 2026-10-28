@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "common/types.h"
 #include "parser/ast_expr.h"
 #include "simulator/evaluation.h"
 #include "simulator/sv_vpi_user.h"
@@ -94,21 +95,6 @@ int CastWidth(const VpiObject& op) {
   return 0;
 }
 
-// §11.5.1 and §11.4.12.1: the value of `constant`, a select's bound or width
-// or a replication's count, which those clauses make a constant expression:
-// its fold, where ElaborationConstant folds it, and otherwise its value where
-// the source wrote it, in the instance and the generate blocks `build` stands
-// in, as for $bits of a variable (§20.6.2), an array query (§20.7) or a
-// constant function call (§13.4.3), all constants §11.2.1 admits.
-int64_t ConstantWhereWritten(const Expr* constant, const AssignBuild& build) {
-  const std::optional<int64_t> kFolded = ElaborationConstant(constant, build);
-  if (kFolded) return *kFolded;
-  const VpiExprScope kScope{
-      constant, VpiFlatName(build.names.prefix, ""),
-      std::vector<std::string>(build.names.gen.begin(), build.names.gen.end())};
-  return SelectBoundValue(VpiEvaluateWhereWritten(kScope, *build.sim));
-}
-
 // §11.4.12.1 with §11.6.1 Table 11-21: the width of the replication `expr`,
 // its count times the widths of the expressions it repeats, which follow the
 // count among `sizes` (§37.59 detail 1).
@@ -120,16 +106,18 @@ int ReplicationWidth(const Expr& expr, const std::vector<int>& sizes,
 }
 
 // §11.6.1 Table 11-21: the self-determined width of the operation `op`, built
-// for `expr`, over operands of the sizes `sizes`, in order; 0 for one the
-// table does not size.
+// for `expr`, over operands of the sizes `sizes`, in order, a cast to a type
+// of no bit width being as wide as its operand; 0 for one the table does not
+// size.
 int OperationWidth(const VpiObject& op, const std::vector<int>& sizes,
                    const Expr& expr, const AssignBuild& build) {
+  // A cast is as wide as the type it casts to, whose typespec it holds even
+  // where its operand has no object (§37.59 detail 5).
+  if (op.op_type == vpiCastOp && CastWidth(op) != 0) return CastWidth(op);
   if (sizes.empty()) return 0;
   if (IsOneBitOp(op.op_type)) return 1;
   if (IsLeftWidthOp(op.op_type)) return sizes.front();
   switch (op.op_type) {
-    case vpiCastOp:
-      return CastWidth(op) != 0 ? CastWidth(op) : sizes.front();
     case vpiConditionOp:
       return sizes.size() == 3 ? std::max(sizes[1], sizes[2]) : 0;
     case vpiConcatOp:
@@ -153,6 +141,19 @@ int SelectWidth(const Expr& expr, const AssignBuild& build) {
 }
 
 }  // namespace
+
+Logic4Vec ValueWhereWritten(const Expr* expr, const AssignBuild& build) {
+  const VpiExprScope kScope{
+      expr, VpiFlatName(build.names.prefix, ""),
+      std::vector<std::string>(build.names.gen.begin(), build.names.gen.end())};
+  return VpiEvaluateWhereWritten(kScope, *build.sim);
+}
+
+int64_t ConstantWhereWritten(const Expr* constant, const AssignBuild& build) {
+  const std::optional<int64_t> kFolded = ElaborationConstant(constant, build);
+  if (kFolded) return *kFolded;
+  return SelectBoundValue(ValueWhereWritten(constant, build));
+}
 
 void VpiSizeExpression(VpiObject* obj, const Expr& expr,
                        const AssignBuild& build) {

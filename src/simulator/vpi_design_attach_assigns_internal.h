@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "common/types.h"
 #include "elaborator/rtlir_attribute.h"
 #include "elaborator/rtlir_scopes.h"
 #include "simulator/vpi_design_attach_build.h"
@@ -90,9 +91,31 @@ void CollectReads(const Expr* expr, std::vector<std::string_view>& out);
 std::optional<int64_t> ElaborationConstant(const Expr* expr,
                                            const AssignBuild& build);
 
+// The value of `expr` where the source wrote it, in the instance and the
+// generate blocks `build` stands in, read at its own width.
+Logic4Vec ValueWhereWritten(const Expr* expr, const AssignBuild& build);
+
+// §11.2.1: the value of `constant`, an expression a clause makes a constant
+// expression, such as a select's bound or width or a replication's count
+// (§11.5.1, §11.4.12.1) or a size cast's width (§6.24.1): its fold, where
+// ElaborationConstant folds it, and otherwise its value where the source wrote
+// it (ValueWhereWritten), as for $bits of a variable (§20.6.2), an array query
+// (§20.7) or a constant function call (§13.4.3), all constants §11.2.1 admits.
+int64_t ConstantWhereWritten(const Expr* constant, const AssignBuild& build);
+
 // §37.58 and §37.59: the expression object `expr` stands for, built with
 // `build`; null for a kind of expression not modelled.
 VpiObject* ExpressionObject(const Expr* expr, const AssignBuild& build);
+
+// §37.59 details 3 and 5: `op`, the cast operation `cast` stands as, built
+// with `build`, related to the typespec of the type it casts to - a built-in
+// type a keyword names, a typedef or type parameter the scopes around the cast,
+// the packages its module imports or the compilation unit declare, or one a
+// package declares where the cast names it through the package; or for a
+// size, signing or const cast (§6.24.1) one made from its operand's type, a
+// size cast's being as wide as the constant it is written with. Answers `op`.
+VpiObject* VpiTypedCast(VpiObject* op, const Expr& cast,
+                        const AssignBuild& build);
 
 // §37.59: gives `obj`, an operation, a part select or an indexed part select
 // built with `build` for `expr` and given no size, its self-determined width

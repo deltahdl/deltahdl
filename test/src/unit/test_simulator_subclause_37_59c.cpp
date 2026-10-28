@@ -191,6 +191,17 @@ vpiHandle CastTypespec(vpiHandle cast) {
   return vpi_handle(vpiTypespec, cast);
 }
 
+// The typespec kinds of the casts `rights` are, 0 for one with none.
+std::vector<int> CastTypespecKinds(const std::vector<vpiHandle>& rights) {
+  std::vector<int> kinds;
+  kinds.reserve(rights.size());
+  for (vpiHandle right : rights) {
+    vpiHandle typespec = CastTypespec(right);
+    kinds.push_back(typespec != nullptr ? vpi_get(vpiType, typespec) : 0);
+  }
+  return kinds;
+}
+
 // ...or, for a size cast, a vector keeping the operand's 2-state nature
 // (§6.24.1)...
 TEST_F(AssignedExpressionsOfARun, ASizeCastOfATwoStateOperandIsABitVector) {
@@ -243,16 +254,11 @@ TEST_F(AssignedExpressionsOfARun, ASizeCastKeepsTheNatureOfWhatItCasts) {
       "    x = 4'(s); x = 4'(g); x = 4'(-(a <-> c));\n"
       "  end\n"
       "endmodule\n");
-  std::vector<int> kinds;
-  for (vpiHandle right : ProcedureRightSides()) {
-    vpiHandle typespec = CastTypespec(right);
-    kinds.push_back(typespec != nullptr ? vpi_get(vpiType, typespec) : 0);
-  }
   const std::vector<int> kKinds = {
       vpiBitTypespec,   vpiBitTypespec,   vpiBitTypespec,  vpiLogicTypespec,
       vpiLogicTypespec, vpiLogicTypespec, vpiBitTypespec,  vpiBitTypespec,
       vpiBitTypespec,   vpiBitTypespec,   vpiLogicTypespec};
-  EXPECT_EQ(kinds, kKinds);
+  EXPECT_EQ(CastTypespecKinds(ProcedureRightSides()), kKinds);
 }
 
 // ...as wide as its size expression's value, a parameter's included...
@@ -290,6 +296,118 @@ TEST_F(AssignedExpressionsOfARun, AConstCastIsTheOperandsType) {
   vpiHandle typespec = CastTypespec(Rhs());
   ASSERT_NE(typespec, nullptr);
   EXPECT_EQ(vpi_get(vpiType, typespec), vpiIntTypespec);
+}
+
+// A cast to a type parameter (§6.20.3) has the typespec of the type the
+// instance gives it, not the default its declaration writes.
+TEST_F(AssignedExpressionsOfARun, ACastToATypeParameterHasTheTypeItStandsFor) {
+  Run("module sub #(parameter type T = logic [3:0]);\n"
+      "  logic [7:0] x; wire [3:0] y; assign y = T'(x);\n"
+      "endmodule\n"
+      "module top; sub #(.T(bit [3:0])) u(); endmodule\n");
+  vpiHandle assigns = vpi_iterate(vpiContAssign, By("top.u"));
+  ASSERT_NE(assigns, nullptr);
+  vpiHandle typespec = CastTypespec(vpi_handle(vpiRhs, vpi_scan(assigns)));
+  vpi_release_handle(assigns);
+  ASSERT_NE(typespec, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, typespec), vpiBitTypespec);
+}
+
+// A cast to a typedef a package declares has its typespec, whether it names
+// the typedef through the package (§26.3) or a wildcard or an explicit import
+// makes it visible; and so does a cast to one the compilation unit declares
+// (§3.12.1), which a name finds after the imports' (§26.3).
+TEST_F(AssignedExpressionsOfARun, ACastFindsATypedefOfAPackageOrTheUnit) {
+  Run("package pk; typedef logic [3:0] nib_t; typedef bit [5:0] six_t;\n"
+      "endpackage\n"
+      "package pq; typedef byte one_t; endpackage\n"
+      "typedef shortint unit_t;\n"
+      "module top; import pk::*; import pq::one_t;\n"
+      "  logic [7:0] x; logic [3:0] y;\n"
+      "  initial begin\n"
+      "    y = pk::nib_t'(x); y = six_t'(x); y = one_t'(x); y = unit_t'(x);\n"
+      "  end\n"
+      "endmodule\n");
+  const std::vector<int> kKinds = {vpiLogicTypespec, vpiBitTypespec,
+                                   vpiByteTypespec, vpiShortIntTypespec};
+  EXPECT_EQ(CastTypespecKinds(ProcedureRightSides()), kKinds);
+}
+
+// A size cast is as wide as the constant its width is, an operation over a
+// parameter or a call of $bits on a variable among them (§11.2.1).
+TEST_F(AssignedExpressionsOfARun, ASizeCastIsAsWideAsItsConstantWidth) {
+  Run("module top; localparam W = 3; logic [4:0] b; logic [7:0] x;\n"
+      "  logic [5:0] y;\n"
+      "  initial begin y = (W+1)'(x); y = ($bits(b))'(x); end\n"
+      "endmodule\n");
+  const std::vector<vpiHandle> kRights = ProcedureRightSides();
+  EXPECT_EQ(CastTypespecKinds(kRights),
+            (std::vector<int>{vpiLogicTypespec, vpiLogicTypespec}));
+  EXPECT_EQ(PropertiesOf(vpiSize, kRights), (std::vector<int>{4, 5}));
+}
+
+// A cast of an expression the model builds no object for, a logical
+// equivalence (§11.4.7) having no operation type, takes its nature as 4-state
+// and its width and signedness from its value: a size cast is a logic vector
+// as wide as its width, and a signing or const cast a logic vector as wide as
+// the one bit the equivalence is, of the signedness the signing cast names.
+TEST_F(AssignedExpressionsOfARun, ACastOfAnOperandWithNoObjectHasATypespec) {
+  Run("module top; logic a, b; logic [3:0] y;\n"
+      "  initial begin\n"
+      "    y = 4'(a <-> b); y = signed'(a <-> b); y = const'(a <-> b);\n"
+      "  end\n"
+      "endmodule\n");
+  const std::vector<vpiHandle> kRights = ProcedureRightSides();
+  EXPECT_EQ(
+      CastTypespecKinds(kRights),
+      (std::vector<int>{vpiLogicTypespec, vpiLogicTypespec, vpiLogicTypespec}));
+  EXPECT_EQ(PropertiesOf(vpiSize, kRights), (std::vector<int>{4, 1, 1}));
+  std::vector<int> signedness;
+  for (vpiHandle right : kRights) {
+    vpiHandle typespec = CastTypespec(right);
+    signedness.push_back(typespec != nullptr ? vpi_get(vpiSigned, typespec)
+                                             : -1);
+  }
+  EXPECT_EQ(signedness, (std::vector<int>{0, 1, 0}));
+}
+
+// A size cast of an element of an unpacked array of a 2-state type is a bit
+// vector, whether the array is fixed, a queue, a dynamic array or an
+// associative array (§7.4, §7.10, §7.5, §7.8), and so is one of a bit of such
+// an element; of an element of an array of a 4-state type, a logic vector.
+TEST_F(AssignedExpressionsOfARun, ASizeCastOfAnArrayElementIsAsItsElementType) {
+  Run("module top; bit [7:0] r [1:4]; bit [7:0] q [$]; bit [7:0] d [];\n"
+      "  bit [7:0] m [int]; logic [7:0] l [4]; int i; logic [3:0] x;\n"
+      "  initial begin\n"
+      "    x = 4'(r[i]); x = 4'(r[i][3]); x = 4'(q[i]); x = 4'(d[i]);\n"
+      "    x = 4'(m[i]); x = 4'(l[i]);\n"
+      "  end\n"
+      "endmodule\n");
+  const std::vector<int> kKinds = {vpiBitTypespec, vpiBitTypespec,
+                                   vpiBitTypespec, vpiBitTypespec,
+                                   vpiBitTypespec, vpiLogicTypespec};
+  EXPECT_EQ(CastTypespecKinds(ProcedureRightSides()), kKinds);
+}
+
+// A size cast of a packed structure or union is a bit vector where every
+// member is 2-state (§7.2.1, §7.3.1), of an enumeration where its base type,
+// int by default, is (§6.19), and of a packed array of a 2-state structure
+// (§7.4.1); of a structure with a 4-state member, a logic vector.
+TEST_F(AssignedExpressionsOfARun, ASizeCastOfAnAggregateIsAsItsMembersAre) {
+  Run("module top;\n"
+      "  typedef struct packed { bit [3:0] a; byte b; } s2_t;\n"
+      "  typedef struct packed { logic [3:0] a; } s4_t;\n"
+      "  typedef union packed { bit [3:0] a; bit [3:0] b; } u2_t;\n"
+      "  typedef enum { E0, E1 } e_t;\n"
+      "  s2_t s; s4_t f; u2_t u; e_t e; s2_t [1:0] p; logic [3:0] x;\n"
+      "  initial begin\n"
+      "    x = 4'(s); x = 4'(f); x = 4'(u); x = 4'(e); x = 4'(p);\n"
+      "  end\n"
+      "endmodule\n");
+  const std::vector<int> kKinds = {vpiBitTypespec, vpiLogicTypespec,
+                                   vpiBitTypespec, vpiBitTypespec,
+                                   vpiBitTypespec};
+  EXPECT_EQ(CastTypespecKinds(ProcedureRightSides()), kKinds);
 }
 
 // Every expression has vpiSize, an operation's being its self-determined

@@ -379,15 +379,6 @@ const VpiObject* VpiScopeOrInstance(const VpiObject* scope,
                                     const VpiObjectMap& objects,
                                     const std::string& instance);
 
-// §37.59 details 3 and 5: `op`, the cast operation `cast` stands as, related
-// to the typespec of the type it casts to - a built-in type a keyword names,
-// a typedef `from`, or a scope around it, declares, or for a size, signing or
-// const cast (§6.24.1) one made from its operand's type, a size cast's being
-// as wide as the value `width` holds. Answers `op`.
-VpiObject* VpiTypedCast(VpiObject* op, const Expr& cast, const VpiObject* from,
-                        const VpiObject* width,
-                        const std::function<VpiObject*()>& alloc);
-
 // §14.3 with §23.9: the clocking block named `name` that `scope`, or a scope
 // around it, declares - from the instance `objects` holds under `instance`
 // where no scope is given; null for none.

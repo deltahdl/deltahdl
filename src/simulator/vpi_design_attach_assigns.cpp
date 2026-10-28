@@ -654,19 +654,10 @@ VpiObject* HierarchicalObject(const Expr* expr, const AssignBuild& build) {
 }
 
 // §37.59 details 3 and 5: a cast, an operation related to the typespec of the
-// type it casts its operand to. Where the cast names no type, the expression
-// it was written with is a size cast's width (§6.24.1), whose value it has
-// where the source wrote it.
+// type it casts its operand to.
 VpiObject* CastObject(const Expr* expr, const AssignBuild& build) {
-  const VpiObject* width = expr->text.empty() && expr->rhs != nullptr
-                               ? ExpressionObject(expr->rhs, build)
-                               : nullptr;
-  return VpiTypedCast(
-      OperationObject(vpiCastOp, {expr->lhs}, build), *expr,
-      VpiScopeOrInstance(build.names.scope != nullptr ? build.names.scope
-                                                      : build.names.instance,
-                         build.names.objects, build.names.prefix),
-      width, build.alloc);
+  return VpiTypedCast(OperationObject(vpiCastOp, {expr->lhs}, build), *expr,
+                      build);
 }
 
 // §37.59 with §11.4.2: a unary operation over the one operand it is written
