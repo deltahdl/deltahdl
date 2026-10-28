@@ -446,4 +446,171 @@ TEST(CompilationUnitScopeTypes, ModuleClassHidesTheUnitsArrayTypedef) {
   EXPECT_TRUE(g->func_body_stmts[0]->var_unpacked_dims.empty());
 }
 
+// §3.12.1 (printed page 56): a hierarchical name a compilation-unit function
+// writes, headed by a name the unit neither declares nor imports, is a full
+// path from $root and is never searched for from the caller. u is an instance
+// of top, which calls f, and no top-level instance named u stands at $root, so
+// `u.x` names nothing; the same written as the full path `top.u.x` is
+// accepted.
+TEST(CompilationUnitHierNames, AnInstanceOfTheCallerIsNotReachedFromRoot) {
+  ElabFixture f;
+  ElaborateSrc(
+      "function int f();\n"
+      "  return u.x;\n"
+      "endfunction\n"
+      "module sub;\n"
+      "  int x;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  int y;\n"
+      "  sub u();\n"
+      "  initial y = f();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "hierarchical name 'u' in a compilation-unit task "
+                            "or function is read from $root",
+                            2, "3.12.1"));
+}
+
+// A name the unit imports heads no path from $root: `s.a` reads a member of
+// the structure p declares and the unit imports.
+TEST(CompilationUnitHierNames, ANameTheUnitImportsIsNoPathFromRoot) {
+  EXPECT_TRUE(
+      ElabOk("package p;\n"
+             "  typedef struct { int a; } s_t;\n"
+             "  s_t s;\n"
+             "endpackage\n"
+             "import p::*;\n"
+             "function int f();\n"
+             "  return s.a;\n"
+             "endfunction\n"
+             "module top;\n"
+             "  int y;\n"
+             "  initial y = f();\n"
+             "endmodule\n"));
+}
+
+TEST(CompilationUnitHierNames, AFullPathFromTheTopIsAccepted) {
+  EXPECT_TRUE(
+      ElabOk("function int f();\n"
+             "  return top.u.x;\n"
+             "endfunction\n"
+             "module sub;\n"
+             "  int x;\n"
+             "endmodule\n"
+             "module top;\n"
+             "  int y;\n"
+             "  sub u();\n"
+             "  initial y = f();\n"
+             "endmodule\n"));
+}
+
+// §3.12.1 (printed page 57): other than a task's or a function's name, a
+// reference names only what the compilation unit has already declared. An
+// enumeration constant and a parameter written in the unit after the module
+// reading them are no names the module reaches, each read reported as
+// unresolved; a type and a class written after are §6.18's type declared after
+// its reference.
+TEST(CompilationUnitScopeOrder, EnumConstantDeclaredLaterInUnitIsUnresolved) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int y;\n"
+      "  initial y = GREEN;\n"
+      "endmodule\n"
+      "typedef enum {RED, GREEN} color_t;\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "'GREEN'", 3, "23.9"));
+}
+
+TEST(CompilationUnitScopeOrder, ParameterDeclaredLaterInUnitIsUnresolved) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int y = W;\n"
+      "endmodule\n"
+      "localparam int W = 8;\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "'W'", 2, "23.9"));
+}
+
+TEST(CompilationUnitScopeOrder, TypedefDeclaredLaterInUnitIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  word_t v;\n"
+      "endmodule\n"
+      "typedef logic [15:0] word_t;\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "declaration of type 'word_t' does not precede", 2,
+                            "6.18"));
+}
+
+TEST(CompilationUnitScopeOrder, ClassDeclaredLaterInUnitIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  C h;\n"
+      "endmodule\n"
+      "class C;\n"
+      "endclass\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "declaration of type 'C' does not precede", 2,
+                            "6.18"));
+}
+
+// The nearest allowed forms: the constants written in the unit before the
+// module, and a module, or the module enclosing it, declaring its own of the
+// name, as a header parameter, a port, an item or an enumeration constant,
+// whatever the unit writes later.
+TEST(CompilationUnitScopeOrder, UnitConstantsDeclaredBeforeTheModuleResolve) {
+  EXPECT_TRUE(
+      ElabOk("typedef enum {RED, GREEN} color_t;\n"
+             "localparam int W = 8;\n"
+             "module m;\n"
+             "  int y = W;\n"
+             "  int z;\n"
+             "  initial z = GREEN;\n"
+             "endmodule\n"));
+}
+
+TEST(CompilationUnitScopeOrder, ModulesOwnConstantsShadowLaterUnitConstants) {
+  EXPECT_TRUE(
+      ElabOk("module m #(parameter int W = 1);\n"
+             "  int y = W;\n"
+             "endmodule\n"
+             "localparam int W = 8;\n"));
+  EXPECT_TRUE(
+      ElabOk("module m(input int W);\n"
+             "  int y;\n"
+             "  initial y = W;\n"
+             "endmodule\n"
+             "localparam int W = 8;\n"));
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  localparam int W = 2;\n"
+             "  int y = W;\n"
+             "endmodule\n"
+             "localparam int W = 8;\n"));
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  typedef enum {GREEN} c_t;\n"
+             "  int y;\n"
+             "  initial y = GREEN;\n"
+             "endmodule\n"
+             "typedef enum {RED, GREEN} color_t;\n"));
+  EXPECT_TRUE(
+      ElabOk("module outer;\n"
+             "  localparam int W = 2;\n"
+             "  module inner;\n"
+             "    int y = W;\n"
+             "  endmodule\n"
+             "  inner i();\n"
+             "endmodule\n"
+             "localparam int W = 8;\n"));
+}
+
 }  // namespace

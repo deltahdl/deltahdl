@@ -12,6 +12,7 @@
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "fixture_scratch_dir.h"
+#include "helpers_reported_error.h"
 #include "helpers_rtlir_lookup.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
@@ -902,4 +903,24 @@ TEST(CompilationUnitScopeAcrossCommandLineFiles,
   EXPECT_EQ(second->cu_timescale.magnitude, 100);
   EXPECT_EQ(second->cu_timescale.precision, TimeUnit::kFs);
   EXPECT_EQ(second->cu_timescale.prec_magnitude, 10);
+}
+
+TEST(CompilationUnitScopeAcrossCommandLineFiles,
+     UnitVariableDeclaredInALaterFileIsOutOfReach) {
+  // §3.12.1 makes a file's declarations visible in the files after it by the
+  // normal rules, so a compilation-unit variable written in the second file is
+  // no name a module of the first can read: the read in top is reported as
+  // §23.9's unresolved reference, as it is when both stand in one file.
+  ScratchDir tmp;
+  tmp.Write("lib.map", kLibMap);
+  auto top = tmp.Write("src/top.sv",
+                       "module top;\n"
+                       "  int y;\n"
+                       "  initial y = g;\n"
+                       "endmodule\n");
+  auto unit = tmp.Write("src/unit.sv", "int g;\n");
+
+  CommandLineHarness h;
+  CompileCommandLineAndElaborate(h, tmp, {top, unit}, "");
+  EXPECT_TRUE(ReportedError(h.diag.Diagnostics(), "'g'", 3, "23.9"));
 }

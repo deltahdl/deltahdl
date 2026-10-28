@@ -30,6 +30,13 @@ bool UnitDeclaresData(const CompilationUnit* unit, std::string_view name,
 bool UnitDataDeclaredOnlyAfter(const CompilationUnit* unit,
                                std::string_view name, SourceLoc reference);
 
+// §3.12.1 (printed page 57): other than a task's or a function's name, a
+// reference names only what the compilation unit has already declared. Whether
+// the unit declares `name` as a parameter or an enumeration constant after
+// `reference` and declares nothing of that name before it.
+bool UnitConstantDeclaredOnlyAfter(const CompilationUnit* unit,
+                                   std::string_view name, SourceLoc reference);
+
 // §3.12.1 (printed page 56): the items of the compilation-unit scope written
 // before `reference`, the portion of the scope a reference there searches.
 std::vector<ModuleItem*> UnitItemsBefore(const CompilationUnit* unit,

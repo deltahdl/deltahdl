@@ -143,6 +143,20 @@ void CheckUnitScopedName(const Expr* ref, const CompilationUnit* unit,
 
 }  // namespace
 
+bool UnitConstantDeclaredOnlyAfter(const CompilationUnit* unit,
+                                   std::string_view name, SourceLoc reference) {
+  bool declared_after = false;
+  for (const auto* item : unit->cu_items) {
+    bool declares_constant =
+        (item->kind == ModuleItemKind::kParamDecl && item->name == name) ||
+        DeclaresEnumMember(item, name);
+    if (item->name != name && !declares_constant) continue;
+    if (PrecedesInText(item->loc, reference)) return false;
+    if (declares_constant) declared_after = true;
+  }
+  return declared_after;
+}
+
 void ReportUnitScopedReferences(const std::vector<ModuleItem*>& items,
                                 const CompilationUnit* unit, DiagEngine& diag) {
   std::vector<const Expr*> refs;

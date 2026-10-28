@@ -586,6 +586,9 @@ RtlirDesign* Elaborator::ElaborateTops(
 
     CollectAllModules(top, design->all_modules);
   }
+  // §3.12.1: a compilation-unit subroutine's hierarchical names are read from
+  // $root, whose top-level instances are known only now.
+  ReportUnitHierNamesFromRoot(*design);
   // §23.3.3.6: whether the design calls $sdf_annotate is known only now.
   WarnUwireNetsKeptApart(*design, diag_);
   // §23.3.3.7.1: every interconnect port connection is known only now.

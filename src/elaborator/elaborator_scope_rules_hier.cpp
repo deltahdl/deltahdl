@@ -884,6 +884,20 @@ void ReportUnresolvedHierHeads(
   }
 }
 
+std::vector<const Expr*> UnitSubroutineHierHeads(const CompilationUnit& unit) {
+  std::vector<const Expr*> heads;
+  for (const ModuleItem* item : unit.cu_items) {
+    bool is_subroutine = item->kind == ModuleItemKind::kTaskDecl ||
+                         item->kind == ModuleItemKind::kFunctionDecl;
+    if (!is_subroutine || !item->method_class.empty()) continue;
+    NameSet locals;
+    CollectSubroutineLocalNames(item, locals);
+    for (const Stmt* s : item->func_body_stmts)
+      CollectStmtHierHeads(s, locals, heads);
+  }
+  return heads;
+}
+
 void Elaborator::ValidateHierRefToImportedName(const ModuleDecl* decl,
                                                const RtlirModule* mod) {
   if (!mod || mod->children.empty()) return;

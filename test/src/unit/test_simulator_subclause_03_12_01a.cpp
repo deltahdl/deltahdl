@@ -901,4 +901,158 @@ TEST(CompilationUnitSim, CuScopeTaggedUnionRetaggedByItsBareNameIsOneTag) {
       7, "11.9"));
 }
 
+// §3.12.1 (printed page 56): for upward name referencing the compilation-unit
+// scope is a top-level design element, so a hierarchical name its function or
+// class method writes, headed by a name the unit neither declares nor
+// imports, is a full path from $root. holder, which calls it, has an instance
+// of its own named top, so a search upward from the caller finds that leaf's
+// x, 3, where the path from $root reaches the module top's, 7.
+constexpr const char* kTopsAndHolder =
+    "module top;\n"
+    "  int x = 7;\n"
+    "  holder h();\n"
+    "endmodule\n"
+    "module leaf;\n"
+    "  int x = 3;\n"
+    "endmodule\n";
+
+// The run's value of h.y, which holder, after its declarations `decls`, sets
+// from `call` after one time unit.
+uint64_t HolderReads(const std::string& unit_items, const std::string& decls,
+                     const std::string& call) {
+  SimFixture f;
+  auto* design = ElaborateSrcAllTops(unit_items + kTopsAndHolder +
+                                         "module holder;\n"
+                                         "  leaf top();\n"
+                                         "  int y;\n" +
+                                         decls + "  initial #1 y = " + call +
+                                         ";\n"
+                                         "endmodule\n",
+                                     f);
+  EXPECT_FALSE(f.has_errors);
+  if (design == nullptr) return ~0ull;
+  LowerAndRun(design, f);
+  auto* y = f.ctx.FindVariable("h.y");
+  return y == nullptr ? ~0ull : y->value.ToUint64();
+}
+
+TEST(CompilationUnitSim, CuFunctionHierarchicalNameIsReadFromRoot) {
+  EXPECT_EQ(HolderReads("function int f();\n"
+                        "  return top.x;\n"
+                        "endfunction\n",
+                        "", "f()"),
+            7u);
+}
+
+TEST(CompilationUnitSim, CuClassMethodHierarchicalNameIsReadFromRoot) {
+  EXPECT_EQ(HolderReads("class K;\n"
+                        "  function int g();\n"
+                        "    return top.x;\n"
+                        "  endfunction\n"
+                        "endclass\n",
+                        "  K k = new;\n", "k.g()"),
+            7u);
+}
+
+// §3.12.1 (printed page 56) searches for an identifier first in the scope
+// that holds it, then in the part of the compilation-unit scope written before
+// it, and only then up the instance hierarchy. A task's local b is its own:
+// the task writes and reads it, 2, while the unit's b keeps 1, so
+// `y * 10 + $unit::b` is 21. Resolved in the unit, both read 2: 22.
+TEST(CompilationUnitSim, ASubroutineLocalIsFoundBeforeTheUnitsName) {
+  EXPECT_EQ(RunAndGet("int b = 1;\n"
+                      "module top;\n"
+                      "  int y, r;\n"
+                      "  task t;\n"
+                      "    int b;\n"
+                      "    b = 2;\n"
+                      "    y = b;\n"
+                      "  endtask\n"
+                      "  initial begin\n"
+                      "    t();\n"
+                      "    r = y * 10 + $unit::b;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            21u);
+}
+
+// A nested module's enclosing module is among the scopes holding it, searched
+// before the compilation-unit scope: inner reads outer's x, 2, not the unit's
+// 1.
+TEST(CompilationUnitSim, ANestedModulesEnclosingDeclarationIsFoundFirst) {
+  EXPECT_EQ(RunAndGet("int x = 1;\n"
+                      "module outer;\n"
+                      "  int x = 2;\n"
+                      "  module inner;\n"
+                      "    int y;\n"
+                      "    initial y = x;\n"
+                      "  endmodule\n"
+                      "  inner i();\n"
+                      "endmodule\n",
+                      "i.y"),
+            2u);
+}
+
+// The compilation-unit scope is searched before the instance hierarchy, so a
+// child calling f, which neither it nor its own scope declares, runs the
+// unit's f, 1, not the f of the module instantiating it, 2.
+TEST(CompilationUnitSim, TheUnitsFunctionIsFoundBeforeAnEnclosingInstances) {
+  EXPECT_EQ(RunAndGet("function int f();\n"
+                      "  return 1;\n"
+                      "endfunction\n"
+                      "module child;\n"
+                      "  int y;\n"
+                      "  initial y = f();\n"
+                      "endmodule\n"
+                      "module top;\n"
+                      "  function int f();\n"
+                      "    return 2;\n"
+                      "  endfunction\n"
+                      "  child c();\n"
+                      "endmodule\n",
+                      "c.y"),
+            1u);
+}
+
+// §3.12.1 (printed page 57): `$unit::` names the compilation-unit scope's own
+// declaration past a nearer one of the name. The unit task's local b is 0 when
+// `b = 5 + $unit::b;` runs, and $unit::b is the unit's 1, so the local becomes
+// 6; read as the local, it became 5.
+TEST(CompilationUnitSim, DollarUnitReachesTheUnitsVariablePastATaskLocal) {
+  EXPECT_EQ(RunAndGet("bit b = 1;\n"
+                      "int r;\n"
+                      "task t;\n"
+                      "  int b;\n"
+                      "  b = 5 + $unit::b;\n"
+                      "  r = b;\n"
+                      "endtask\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    t();\n"
+                      "    y = r;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            6u);
+}
+
+// The same for a call: `$unit::f()` runs the unit's f, 1, past the module's
+// own f, 2.
+TEST(CompilationUnitSim, DollarUnitCallsTheUnitsFunctionPastTheModules) {
+  EXPECT_EQ(RunAndGet("function int f();\n"
+                      "  return 1;\n"
+                      "endfunction\n"
+                      "module m;\n"
+                      "  function int f();\n"
+                      "    return 2;\n"
+                      "  endfunction\n"
+                      "  int y;\n"
+                      "  initial y = $unit::f();\n"
+                      "endmodule\n",
+                      "y"),
+            1u);
+}
+
 }  // namespace

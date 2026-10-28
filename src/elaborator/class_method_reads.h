@@ -96,6 +96,11 @@ void ReportUnresolvedHierHeads(
     const ModuleDecl* decl, const std::function<bool(std::string_view)>& admits,
     DiagEngine& diag);
 
+// §3.12.1: the first name of each hierarchical name the tasks and functions
+// of `unit`'s compilation-unit scope write, but for their formals and locals.
+// Defined in elaborator_scope_rules_hier.cpp.
+std::vector<const Expr*> UnitSubroutineHierHeads(const CompilationUnit& unit);
+
 // §23.6 with §27.4 and §27.5: reports each `g.m` or `g[k].m` the continuous
 // assignments and procedural blocks of `decl` write where `g` names a generate
 // block of `decl` and nothing else of it, and no block of that name declares

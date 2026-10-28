@@ -7,10 +7,12 @@
 #include "common/diagnostic.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_primitives.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 #include "helpers_rtlir_lookup.h"
 #include "helpers_separate_units.h"
+#include "parser/ast_specify.h"
 
 using namespace delta;
 
@@ -202,6 +204,192 @@ TEST(SeparateCompilationUnits, AnonymousProgramSharesOnlyItsOwnUnitsNames) {
                   "module b; endmodule\n"},
                  f);
   for (const auto& d : f.diag.Diagnostics()) EXPECT_NE(d.subclause, "24.6");
+}
+
+// §3.12.1: packages are visible in every unit, so a module of another unit
+// reads a package's parameter through the scope resolution operator: R is
+// p's K, 3, and sizes v.
+TEST(SeparateCompilationUnits, PackageItemOfOneUnitReachedByScopeResolution) {
+  ElabFixture f;
+  auto* design = ElaborateUnits({"package p;\n"
+                                 "  parameter int K = 3;\n"
+                                 "endpackage\n",
+                                 "module top;\n"
+                                 "  localparam int R = p::K;\n"
+                                 "  logic [R-1:0] v;\n"
+                                 "endmodule\n"},
+                                f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* v = FindVar(design, "top", "v");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->width, 3u);
+}
+
+// §3.12.1: primitives are visible in every unit, so a module of another unit
+// instantiates one, unnamed as §29.8 allows, and the instance is the
+// primitive's.
+TEST(SeparateCompilationUnits, PrimitiveOfOneUnitInstantiatedInAnother) {
+  ElabFixture f;
+  auto* design = ElaborateUnits({"primitive myudp(output q, input d, e);\n"
+                                 "  table\n"
+                                 "    0 0 : 0;\n"
+                                 "    0 1 : 0;\n"
+                                 "    1 0 : 0;\n"
+                                 "    1 1 : 1;\n"
+                                 "  endtable\n"
+                                 "endprimitive\n",
+                                 "module top;\n"
+                                 "  wire q;\n"
+                                 "  logic d, e;\n"
+                                 "  myudp (q, d, e);\n"
+                                 "endmodule\n"},
+                                f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_EQ(design->top_modules.size(), 1u);
+  const auto* top = design->top_modules[0];
+  ASSERT_EQ(top->udp_insts.size(), 1u);
+  ASSERT_NE(top->udp_insts[0].decl, nullptr);
+  EXPECT_EQ(top->udp_insts[0].decl->name, "myudp");
+}
+
+// §3.12.1: interfaces are visible in every unit, so a module of another unit
+// instantiates one.
+TEST(SeparateCompilationUnits, InterfaceOfOneUnitInstantiatedInAnother) {
+  ElabFixture f;
+  auto* design = ElaborateUnits({"interface ifc;\n"
+                                 "  logic s;\n"
+                                 "endinterface\n",
+                                 "module top;\n"
+                                 "  ifc i();\n"
+                                 "endmodule\n"},
+                                f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* top = design->top_modules[0];
+  ASSERT_EQ(top->children.size(), 1u);
+  EXPECT_EQ(top->children[0].inst_name, "i");
+  ASSERT_NE(top->children[0].resolved, nullptr);
+  EXPECT_EQ(top->children[0].resolved->name, "ifc");
+  EXPECT_TRUE(top->children[0].resolved->is_interface);
+}
+
+// §3.12.1: programs are visible in every unit, so a module of another unit
+// instantiates one.
+TEST(SeparateCompilationUnits, ProgramOfOneUnitInstantiatedInAnother) {
+  ElabFixture f;
+  auto* design = ElaborateUnits({"program prg;\n"
+                                 "  int n;\n"
+                                 "endprogram\n",
+                                 "module top;\n"
+                                 "  prg p();\n"
+                                 "endmodule\n"},
+                                f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* top = design->top_modules[0];
+  ASSERT_EQ(top->children.size(), 1u);
+  EXPECT_EQ(top->children[0].inst_name, "p");
+  ASSERT_NE(top->children[0].resolved, nullptr);
+  EXPECT_EQ(top->children[0].resolved->name, "prg");
+  EXPECT_TRUE(top->children[0].resolved->is_program);
+}
+
+// §3.13(c) puts a checker declared outside every design element in its unit's
+// compilation-unit scope, and §3.12.1 keeps that scope's declarations to the
+// unit, so a module of another unit instantiating it names nothing. The same
+// instance in the unit that declares the checker is accepted.
+TEST(SeparateCompilationUnits, CheckerOfAnotherUnitsScopeIsNotVisible) {
+  ElabFixture f;
+  ElaborateUnits({"checker chk(input logic x);\n"
+                  "endchecker\n"
+                  "module a; endmodule\n",
+                  "module top;\n"
+                  "  logic v;\n"
+                  "  chk c(v);\n"
+                  "endmodule\n"},
+                 f, "top");
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "unknown module 'chk'", 3, "23.3.2"));
+
+  ElabFixture g;
+  auto* design = ElaborateUnits({"module a; endmodule\n",
+                                 "checker chk(input logic x);\n"
+                                 "endchecker\n"
+                                 "module top;\n"
+                                 "  logic v;\n"
+                                 "  chk c(v);\n"
+                                 "endmodule\n"},
+                                g, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(g.has_errors);
+}
+
+// §3.12.1 keeps a compilation-unit scope's declarations to its own unit, so a
+// module of another unit naming one of them names nothing it can reach: a
+// typedef or a class there is a type no declaration of the module's unit
+// precedes (§6.18), and a function or a parameter there is an unresolved name
+// (§23.9). Each unit's own declaration of the name is EachUnitsTypedefIsItsOwn
+// above and SeparateUnitsSim's cases in test_simulator_subclause_03_12_01b.cpp.
+TEST(SeparateCompilationUnits, AnotherUnitsTypedefIsNotAType) {
+  ElabFixture f;
+  ElaborateUnits({"typedef logic [3:0] t;\n"
+                  "module a; endmodule\n",
+                  "module top;\n"
+                  "  t v;\n"
+                  "endmodule\n"},
+                 f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "declaration of type 't' does not precede", 2,
+                            "6.18"));
+}
+
+TEST(SeparateCompilationUnits, AnotherUnitsClassIsNotAType) {
+  ElabFixture f;
+  ElaborateUnits({"class C;\n"
+                  "endclass\n"
+                  "module a; endmodule\n",
+                  "module top;\n"
+                  "  C h;\n"
+                  "endmodule\n"},
+                 f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "declaration of type 'C' does not precede", 2,
+                            "6.18"));
+}
+
+// A function or a task of the other unit, each called as a statement, names
+// nothing. A function called inside an expression is #8872's.
+TEST(SeparateCompilationUnits, AnotherUnitsFunctionAndTaskAreUndeclared) {
+  ElabFixture f;
+  ElaborateUnits({"function void fn();\n"
+                  "endfunction\n"
+                  "task tk;\n"
+                  "endtask\n"
+                  "module a; endmodule\n",
+                  "module top;\n"
+                  "  initial fn();\n"
+                  "  initial tk();\n"
+                  "endmodule\n"},
+                 f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "undeclared identifier 'fn'",
+                            2, "23.9"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "undeclared identifier 'tk'",
+                            3, "23.9"));
+}
+
+TEST(SeparateCompilationUnits, AnotherUnitsParameterIsUnresolved) {
+  ElabFixture f;
+  ElaborateUnits({"localparam int W = 8;\n"
+                  "module a; endmodule\n",
+                  "module top;\n"
+                  "  int y = W;\n"
+                  "endmodule\n"},
+                 f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to unresolved identifier 'W'", 2,
+                            "23.9"));
 }
 
 }  // namespace
