@@ -1,4 +1,5 @@
 #include <cstddef>
+#include <functional>
 #include <string_view>
 #include <unordered_set>
 
@@ -28,6 +29,24 @@
 #include "parser/ast_module.h"
 
 namespace delta {
+
+namespace {
+
+// The rules on a declaration's type that hold wherever it is written
+// (CheckDeclaredTypeRules), and §25.9's on the interface a virtual interface
+// type names (ValidateVirtualInterfaceType), `find_module` resolving the name,
+// on each declaration inside `decl` ForEachInnerDeclaredType visits.
+void CheckInnerDeclaredTypes(
+    const ModuleDecl* decl, const AggregateShapeCtx& ctx,
+    const std::function<const ModuleDecl*(std::string_view)>& find_module) {
+  ForEachInnerDeclaredType(decl, [&](const DeclaredType& declared) {
+    CheckDeclaredTypeRules(declared, ctx);
+    ValidateVirtualInterfaceType(declared.type, declared.loc, find_module,
+                                 ctx.diag);
+  });
+}
+
+}  // namespace
 
 void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl,
                                            RtlirModule* mod) {
@@ -179,17 +198,11 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl,
   CheckNettypeUses(decl, *unit_, nettype_names_, diag_);
   CheckNewPlacement(decl, diag_);
   const TypeShapeTables kShapeTables{typedefs_, td_array_dims_, class_names_};
-  const AggregateShapeCtx kShapeCtx{kShapeTables, &scope, diag_};
-  ForEachInnerDeclaredType(
-      decl, [this, &kShapeCtx](const DeclaredType& declared) {
-        CheckDeclaredTypeRules(declared, kShapeCtx);
-        // §25.9 with §23.4: the interface a virtual interface type names, one
-        // the module declares nested among them.
-        ValidateVirtualInterfaceType(
-            declared.type, declared.loc,
-            [this](std::string_view name) { return FindModuleInScope(name); },
-            diag_);
-      });
+  // §25.9 with §23.4: the interface a virtual interface type names is found
+  // from the module's scope, its nested declarations among it.
+  CheckInnerDeclaredTypes(
+      decl, {kShapeTables, &scope, diag_},
+      [this](std::string_view name) { return FindModuleInScope(name); });
 }
 
 namespace {

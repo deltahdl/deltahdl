@@ -494,6 +494,11 @@ class ElaboratorData {
   // sees: those enclosing it, with the scope's own hiding theirs.
   std::unordered_map<std::string_view, ModuleDecl*> NestedDeclsSeenInside()
       const;
+  // Takes what the site instantiating a nested declaration handed on, the
+  // enclosing scope's default disable iff and default clocking and the
+  // declarations the enclosing scopes nest, as ElaborateModule enters; none of
+  // it reaches any other instance.
+  void TakeNestedDeclInheritance();
 
   // The names each package makes directly visible, each with the package
   // declaring it (elaborator_scope_rules_names.h), filled on first use.

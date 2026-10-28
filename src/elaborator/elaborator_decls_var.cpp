@@ -2,7 +2,6 @@
 #include <cstdint>
 #include <cstdlib>
 #include <format>
-#include <functional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -570,18 +569,20 @@ struct VirtualInterfaceVarTables {
 };
 
 // §25.9: register a virtual interface variable's interface/modport bindings and
-// validate the named interface target, found by `find_module`.
-static void RegisterVirtualInterfaceVarDecl(
-    const ModuleItem* item,
-    const std::function<const ModuleDecl*(std::string_view)>& find_module,
-    VirtualInterfaceVarTables tables, const ScopeMap& scope, DiagEngine& diag) {
+// validate the named interface target (`iface_decl` is the resolved interface,
+// or null when unknown).
+static void RegisterVirtualInterfaceVarDecl(const ModuleItem* item,
+                                            const ModuleDecl* iface_decl,
+                                            VirtualInterfaceVarTables tables,
+                                            const ScopeMap& scope,
+                                            DiagEngine& diag) {
   if (item->data_type.kind != DataTypeKind::kVirtualInterface) return;
   auto iface_name = item->data_type.type_name;
   auto modport_name = item->data_type.modport_name;
   tables.vi_var_interface_types[item->name] = iface_name;
   tables.vi_var_modports[item->name] = modport_name;
   RecordViParamOverrides(item, tables.vi_var_param_values, scope);
-  ValidateVirtualInterfaceType(item->data_type, item->loc, find_module, diag);
+  ValidateVirtualInterfaceTarget(item->data_type, item->loc, iface_decl, diag);
 }
 
 // §6.18 / §7.4 / §10.10.1: when a variable's named type is a fixed unpacked-
@@ -732,7 +733,10 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
                        typedefs_, diag_);
   // §25.9 with §23.4: the interface named may be one nested in the module.
   RegisterVirtualInterfaceVarDecl(
-      item, [this](std::string_view name) { return FindModuleInScope(name); },
+      item,
+      item->data_type.kind == DataTypeKind::kVirtualInterface
+          ? FindModuleInScope(item->data_type.type_name)
+          : nullptr,
       {vi_var_interface_types_, vi_var_modports_, vi_var_param_values_},
       BuildParamScope(mod), diag_);
 

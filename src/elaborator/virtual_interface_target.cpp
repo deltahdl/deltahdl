@@ -133,13 +133,13 @@ bool InterfaceContainsExternalReference(const ModuleDecl* iface) {
   return BodyRefersOutsideInterface(iface, local);
 }
 
-// §25.9: validate that a virtual interface declaration at `loc` names a real
-// interface, a modport that exists on it, and an interface free of external
-// references; `iface_decl` is the declaration its name finds, null for none.
-void ValidateVirtualInterfaceTarget(SourceLoc loc, const ModuleDecl* iface_decl,
-                                    std::string_view iface_name,
-                                    std::string_view modport_name,
+}  // namespace
+
+void ValidateVirtualInterfaceTarget(const DataType& type, SourceLoc loc,
+                                    const ModuleDecl* iface_decl,
                                     DiagEngine& diag) {
+  std::string_view iface_name = type.type_name;
+  std::string_view modport_name = type.modport_name;
   if (!iface_decl || iface_decl->decl_kind != ModuleDeclKind::kInterface) {
     diag.Error(loc,
                std::format("unknown interface '{}' in virtual interface "
@@ -175,15 +175,12 @@ void ValidateVirtualInterfaceTarget(SourceLoc loc, const ModuleDecl* iface_decl,
   }
 }
 
-}  // namespace
-
 void ValidateVirtualInterfaceType(
     const DataType& type, SourceLoc loc,
     const std::function<const ModuleDecl*(std::string_view)>& find_module,
     DiagEngine& diag) {
   if (type.kind != DataTypeKind::kVirtualInterface) return;
-  ValidateVirtualInterfaceTarget(loc, find_module(type.type_name),
-                                 type.type_name, type.modport_name, diag);
+  ValidateVirtualInterfaceTarget(type, loc, find_module(type.type_name), diag);
 }
 
 }  // namespace delta

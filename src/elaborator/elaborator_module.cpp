@@ -568,11 +568,8 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   // §16.15: the default disable iff a nested declaration inherits from the
   // scope it is declared in, taken here so that the instances this cell
   // contains, other than its own nested declarations, inherit none.
-  inherited_default_disable_iff_ = nested_default_disable_iff_;
-  nested_default_disable_iff_ = nullptr;
-  inherited_default_clock_ = std::exchange(nested_default_clock_, {});
   // §23.4: likewise the declarations the enclosing scopes nest.
-  enclosing_nested_decls_ = std::exchange(pending_enclosing_nested_decls_, {});
+  TakeNestedDeclInheritance();
 
   // While this cell is elaborated it is the parent of any instances it
   // contains; record its library so child binding can fall back to it

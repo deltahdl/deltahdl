@@ -83,6 +83,13 @@ ElaboratorData::NestedDeclsSeenInside() const {
   return seen;
 }
 
+void ElaboratorData::TakeNestedDeclInheritance() {
+  inherited_default_disable_iff_ =
+      std::exchange(nested_default_disable_iff_, nullptr);
+  inherited_default_clock_ = std::exchange(nested_default_clock_, {});
+  enclosing_nested_decls_ = std::exchange(pending_enclosing_nested_decls_, {});
+}
+
 void ElaboratorData::BeginNestedDeclScope(
     const ModuleDecl* nested,
     std::unordered_set<std::string_view> at_instance) {
