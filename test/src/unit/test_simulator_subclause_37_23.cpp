@@ -196,11 +196,12 @@ TEST_F(NettypesOfARun, ANettypeReachesTheTypespecOfItsType) {
 // name written there does: one the compilation unit declares (§3.12.1), one a
 // package declares, made visible by an import or named through the package
 // (§26.3), and for an alias of such a nettype, the typespec that one reaches
-// (#8263).
+// (#8263), rather than a typedef of another name the module declares.
 TEST_F(NettypesOfARun, ANettypeOfAPackageOrUnitTypedefReachesItsTypespec) {
   Run("typedef logic [5:0] unit_t;\n"
       "package pk; typedef bit [2:0] pk_t; endpackage\n"
       "module top; import pk::*;\n"
+      "  typedef int other_t;\n"
       "  nettype unit_t a;\n"
       "  nettype pk_t b;\n"
       "  nettype pk::pk_t c;\n"
