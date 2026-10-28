@@ -43,6 +43,7 @@ struct ParserPropertySpecHelpers {
   static Expr* PropertySpecPlaceholder(Arena& arena, SourceLoc loc);
   static ModuleItem* TryParseSequenceSpec(Parser& p, bool& strong,
                                           bool& written, bool term);
+  static bool AtSpecScanEnd(Parser& p);
   static bool AheadHolds(Parser& p, TokenKind wanted, bool to_junction);
   static bool BodyHasPropertyJunction(Parser& p);
   static bool AheadOpensKeywordTerm(Parser& p);

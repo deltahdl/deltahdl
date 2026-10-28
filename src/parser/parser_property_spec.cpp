@@ -30,6 +30,13 @@ static bool OpensKeywordTerm(TokenKind k) {
          IsAbortToken(k);
 }
 
+// Whether a look-ahead over a spec has run out of tokens it may read: the end
+// of the file, or the endproperty of a declaration whose spec has no `;` after
+// it (A.2.10), which no property_spec holds.
+bool ParserPropertySpecHelpers::AtSpecScanEnd(Parser& p) {
+  return p.Check(TokenKind::kEof) || p.Check(TokenKind::kKwEndproperty);
+}
+
 // Whether the tokens ahead, past any `not` and any opening parenthesis,
 // open an operand a keyword reads, so the spec is a property of operands
 // whether or not a junction joins them. The lexer is rewound.
@@ -53,7 +60,7 @@ bool ParserPropertySpecHelpers::AheadHoldsRepetition(Parser& p) {
   int depth = 0;
   bool found = false;
   bool bracket = false;
-  while (!p.Check(TokenKind::kEof) && !p.Check(TokenKind::kKwEndproperty)) {
+  while (!AtSpecScanEnd(p)) {
     TokenKind k = p.CurrentToken().kind;
     if (k == TokenKind::kLParen) {
       ++depth;
@@ -141,7 +148,7 @@ bool ParserPropertySpecHelpers::AheadHolds(Parser& p, TokenKind wanted,
   auto scan = p.lexer_.SavePos();
   int depth = 0;
   bool found = false;
-  while (!p.Check(TokenKind::kEof) && !p.Check(TokenKind::kKwEndproperty)) {
+  while (!AtSpecScanEnd(p)) {
     TokenKind k = p.CurrentToken().kind;
     bool junction = k == TokenKind::kKwOr || k == TokenKind::kKwAnd;
     if (k == TokenKind::kLParen) {
