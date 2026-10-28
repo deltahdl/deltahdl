@@ -258,6 +258,26 @@ TEST(TypenameConstEval, AnExpressionFoldsToItsSelfDeterminedType) {
   EXPECT_EQ(FoldedChars(design, "I"), "bit");
 }
 
+// §20.6.1 with §7.4.1 and §11.5.1: the fold sizes a select of a packed array
+// by the elements of its outermost dimension, `p[1]` one 8-bit element and
+// `p[2:1]` two, as the run does.
+TEST(TypenameConstEval, ASelectOfAPackedArrayFoldsToItsElementsWidth) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  logic [3:0][7:0] p;\n"
+      "  bit [3:0] n;\n"
+      "  localparam string A = $typename(p[1]);\n"
+      "  localparam string B = $typename(p[2:1]);\n"
+      "  localparam string C = $typename(p[1] + n);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_EQ(FoldedChars(design, "A"), "logic[7:0]");
+  EXPECT_EQ(FoldedChars(design, "B"), "logic[15:0]");
+  EXPECT_EQ(FoldedChars(design, "C"), "logic[7:0]");
+}
+
 // What the fold cannot resolve from the module's declarations it leaves to
 // the run rather than fold to a wrong name: a class type and a package's
 // type, which the module's typedef table does not hold, an enumeration

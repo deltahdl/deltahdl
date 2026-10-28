@@ -63,6 +63,9 @@ struct TypenameEnvironment {
   std::function<SelfType(std::string_view)> name_self_type;
   // §11.4.11: whether an operand makes an expression real.
   std::function<bool(const Expr*)> is_real;
+  // §7.4.1: the width of one element of the outermost packed dimension of the
+  // variable named, which a select of it counts in; 1 for a vector of bits.
+  std::function<uint32_t(std::string_view)> element_width;
 };
 
 struct TypenameParts;

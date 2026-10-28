@@ -4,6 +4,7 @@
 // method runs on, a typedef name, a type node, a built-in type keyword, or an
 // expression's self-determined type.
 
+#include <algorithm>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -79,6 +80,10 @@ TypenameEnvironment SimTypenameEnvironment(SimContext& ctx, Arena& arena) {
     return {var->value.width, var->is_signed, var->is_4state, true};
   };
   env.is_real = [&ctx](const Expr* expr) { return SimSelfReal(expr, ctx); };
+  env.element_width = [&ctx](std::string_view name) -> uint32_t {
+    const Variable* var = ctx.FindVariable(name);
+    return var == nullptr ? 1 : std::max<uint32_t>(var->packed_elem_width, 1);
+  };
   return env;
 }
 

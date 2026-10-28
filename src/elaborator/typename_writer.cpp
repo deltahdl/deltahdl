@@ -302,23 +302,26 @@ namespace {
 SelfType SelfTypeOf(const Expr* e, const TypenameEnvironment& env);
 
 // §11.8.1: a bit-select or a part-select of a vector is unsigned whatever the
-// vector is, one bit wide or as wide as the range it selects (§11.5.1).
+// vector is, one element wide or as many elements as the range it selects
+// (§11.5.1), an element being a bit of a vector and an element of the
+// outermost dimension of a packed array (§7.4.1).
 SelfType SelfTypeOfSelect(const Expr* e, const TypenameEnvironment& env) {
   if (e->base == nullptr || e->base->kind != ExprKind::kIdentifier) return {};
   SelfType vector = env.name_self_type(e->base->text);
   if (!vector.known) return {};
-  uint32_t width = 1;
+  uint32_t count = 1;
   if (e->index_end != nullptr) {
     int64_t end = env.value_of(e->index_end);
     if (e->is_part_select_plus || e->is_part_select_minus) {
-      width = static_cast<uint32_t>(end);
+      count = static_cast<uint32_t>(end);
     } else {
       int64_t start = env.value_of(e->index);
-      width =
+      count =
           static_cast<uint32_t>((start > end ? start - end : end - start) + 1);
     }
   }
-  return {width, false, vector.four_state, true};
+  return {count * env.element_width(e->base->text), false, vector.four_state,
+          true};
 }
 
 // §11.4.12 with §11.8.1: a concatenation is unsigned and as wide as its

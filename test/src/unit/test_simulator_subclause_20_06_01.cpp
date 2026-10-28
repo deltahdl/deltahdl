@@ -402,6 +402,24 @@ TEST(TypenameSim, AnExpressionTakesItsStateSignAndWidthFromItsOperands) {
             "bit[7:0]\nbit[1:0]\nbit\nreal\n");
 }
 
+// §20.6.1 with §7.4.1 and §11.5.1: a select of a packed array names whole
+// elements of its outermost dimension, so `p[1]` is one 8-bit element, `p[2:1]`
+// two of them, and a sum with a 4-bit operand as wide as the element.
+TEST(TypenameSim, ASelectOfAPackedArrayIsOfItsElementsWidth) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic [3:0][7:0] p;\n"
+                       "  bit [3:0] n;\n"
+                       "  initial begin\n"
+                       "    $display(\"%s\", $typename(p[1]));\n"
+                       "    $display(\"%s\", $typename(p[2:1]));\n"
+                       "    $display(\"%s\", $typename(p[1] + n));\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "logic[7:0]\nlogic[15:0]\nlogic[7:0]\n");
+}
+
 // An operand naming no declaration gives the expression no type to write, and
 // $typename falls back to the answer it gives any argument it cannot type.
 TEST(UtilitySystemTaskTest, TypenameOfAnExpressionOverAnUnknownNameFallsBack) {

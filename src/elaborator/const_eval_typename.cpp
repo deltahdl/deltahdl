@@ -6,7 +6,9 @@
 // TypedefRegistryGuard installed -- and declines, leaving the call to the
 // run, wherever those do not settle the answer.
 
+#include <algorithm>
 #include <cstdint>
+#include <cstdlib>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -32,6 +34,20 @@ const RtlirVariable* RegisteredVariable(std::string_view name) {
     if (var.name == name) return &var;
   }
   return nullptr;
+}
+
+// §7.4.1: the width of one element of the outermost packed dimension the
+// variable `var` was declared with, its width over that dimension's span; 1
+// where the declaration writes no packed dimension or its bounds do not fold.
+uint32_t PackedElementWidth(const RtlirVariable& var) {
+  const DataType* type = var.written_type;
+  if (type == nullptr || type->packed_dim_left == nullptr) return 1;
+  ScopeMap scope = RegisteredModuleScope();
+  std::optional<int64_t> left = ConstEvalInt(type->packed_dim_left, scope);
+  std::optional<int64_t> right = ConstEvalInt(type->packed_dim_right, scope);
+  if (!left || !right) return 1;
+  auto span = static_cast<uint32_t>(std::abs(*left - *right) + 1);
+  return std::max<uint32_t>(var.width / span, 1);
 }
 
 // What the §20.6.1 steps ask of the place a type is written in, answered from
@@ -75,6 +91,10 @@ TypenameEnvironment ElabTypenameEnvironment(bool& declined) {
     return {var->width, var->is_signed, var->is_4state, true};
   };
   env.is_real = [](const Expr* expr) { return HasRealOperand(expr); };
+  env.element_width = [](std::string_view name) -> uint32_t {
+    const RtlirVariable* var = RegisteredVariable(name);
+    return var == nullptr ? 1 : PackedElementWidth(*var);
+  };
   return env;
 }
 
