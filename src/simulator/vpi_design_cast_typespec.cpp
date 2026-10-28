@@ -61,13 +61,13 @@ VpiObject* TypedefVisible(std::string_view name, const AssignBuild& build) {
        at != nullptr; at = VpiIsInstanceType(at->type) ? nullptr : at->parent) {
     if (VpiObject* found = TypedefIn(*at, name)) return found;
   }
-  const VpiObjectMap& kAnswered = build.names.unit_typespecs;
+  const VpiObjectMap& answered = build.names.unit_typespecs;
   if (VpiObject* imported =
-          VpiImportedTypespec(name, build.names.imports, kAnswered)) {
+          VpiImportedTypespec(name, build.names.imports, answered)) {
     return imported;
   }
-  const auto kUnit = kAnswered.find(name);
-  return kUnit != kAnswered.end() ? kUnit->second : nullptr;
+  const auto kUnit = answered.find(name);
+  return kUnit != answered.end() ? kUnit->second : nullptr;
 }
 
 // §6.11 Table 6-8 with §37.25: the typespec kind of the built-in type a
