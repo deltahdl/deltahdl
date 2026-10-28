@@ -63,6 +63,13 @@ struct AssignNames {
   }
 };
 
+// The object a name written where `names` stands is looked for from first:
+// the block or statement it stands in, or else the instance object, which a
+// first top's empty prefix keys none of.
+inline const VpiObject* InnermostScope(const AssignNames& names) {
+  return names.scope != nullptr ? names.scope : names.instance;
+}
+
 // §23.9 and §27.4: the net, variable or other object the name `name` stands
 // for where `names` places it: a declaration of the blocks around the scope,
 // innermost first, then of the generate blocks it stands in, then of the
@@ -115,7 +122,7 @@ VpiObject* ExpressionObject(const Expr* expr, const AssignBuild& build);
 // with `build`, related to the typespec of the type it casts to - a built-in
 // type a keyword names, a typedef or type parameter the scopes around the cast,
 // the packages its module imports or the compilation unit declare, or one a
-// package declares where the cast names it through the package; or for a
+// package or a class declares where the cast names it through either; or for a
 // size, signing or const cast (§6.24.1) one made from its operand's type, a
 // size cast's being as wide as the constant it is written with. Answers `op`.
 VpiObject* VpiTypedCast(VpiObject* op, const Expr& cast,

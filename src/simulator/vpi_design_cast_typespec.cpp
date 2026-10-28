@@ -5,6 +5,7 @@
 #include <utility>
 #include <vector>
 
+#include "common/packed_range.h"
 #include "common/types.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_type.h"
@@ -18,6 +19,7 @@
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_typespec_shapes.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -51,17 +53,27 @@ VpiObject* TypedefIn(const VpiObject& scope, std::string_view name) {
   return nullptr;
 }
 
+// The scopes a name a cast written where `build` stands names is looked for
+// in, innermost first: the one it is written in and each around it out to its
+// instance.
+std::vector<const VpiObject*> ScopesOutToInstance(const AssignBuild& build) {
+  std::vector<const VpiObject*> scopes;
+  for (const VpiObject* at =
+           VpiScopeOrInstance(InnermostScope(build.names), build.names.objects,
+                              build.names.prefix);
+       at != nullptr; at = VpiIsInstanceType(at->type) ? nullptr : at->parent) {
+    scopes.push_back(at);
+  }
+  return scopes;
+}
+
 // §26.3 with §3.12.1: the typespec of the typedef or type parameter `name`
 // that a cast written where `build` stands names: one the scope it is written
 // in declares, or a scope around it out to its instance, then one a package
 // the instance's module imports declares, then one the compilation unit
 // declares; null for none.
 VpiObject* TypedefVisible(std::string_view name, const AssignBuild& build) {
-  for (const VpiObject* at = VpiScopeOrInstance(
-           build.names.scope != nullptr ? build.names.scope
-                                        : build.names.instance,
-           build.names.objects, build.names.prefix);
-       at != nullptr; at = VpiIsInstanceType(at->type) ? nullptr : at->parent) {
+  for (const VpiObject* at : ScopesOutToInstance(build)) {
     if (VpiObject* found = TypedefIn(*at, name)) return found;
   }
   const VpiObjectMap& answered = build.names.unit_typespecs;
@@ -71,6 +83,51 @@ VpiObject* TypedefVisible(std::string_view name, const AssignBuild& build) {
   }
   const auto kUnit = answered.find(name);
   return kUnit != answered.end() ? kUnit->second : nullptr;
+}
+
+// §26.3 with §8.23: the typespec of the typedef `name` that a cast written
+// where `build` stands names behind the scope `scope`, pk::t or C::t: a
+// package's, among the typespecs AttachTypespecs answered under the package's
+// name and "::", or a class's, among those the class defn of a class a scope
+// around the cast declares holds; null for none.
+VpiObject* ScopedTypespec(std::string_view scope, std::string_view name,
+                          const AssignBuild& build) {
+  const VpiObjectMap& answered = build.names.unit_typespecs;
+  const auto kPackaged =
+      answered.find(std::string(scope) + "::" + std::string(name));
+  if (kPackaged != answered.end()) return kPackaged->second;
+  for (const VpiObject* at : ScopesOutToInstance(build)) {
+    for (const VpiObject* child : at->children) {
+      if (child->type == vpiClassDefn && child->name == scope) {
+        return TypedefIn(*child, name);
+      }
+    }
+  }
+  return nullptr;
+}
+
+// §37.25 details 8 and 10: the typespec of the packed dimensions `packed`,
+// outermost first and at least one, written after the name of the type
+// `named` is the typespec of: a typespec of those dimensions over it, which
+// ranges over them and, where they make one of its own kind, a bit or logic
+// typespec or a packed array, over its ranges after them.
+VpiObject* DimensionedTypespec(const PackedDims& packed, VpiObject* named,
+                               const AssignBuild& build) {
+  std::vector<VpiTypespecDim> dims;
+  dims.reserve(packed.size());
+  for (const PackedRange& dim : packed) {
+    dims.push_back({false, dim, 0, nullptr});
+  }
+  const VpiAttachBuild kAttach{build.alloc, build.keep, build.sim->GetArena()};
+  VpiTypespecShapes shapes(kAttach);
+  VpiObject* typespec = build.alloc();
+  shapes.Shape(typespec, dims, named);
+  if (typespec->type == named->type) {
+    for (VpiObject* range : named->children) {
+      if (range->type == vpiRange) typespec->children.push_back(range);
+    }
+  }
+  return typespec;
 }
 
 // §6.11 Table 6-8 with §37.25: the typespec kind of the built-in type a
@@ -194,34 +251,38 @@ VpiObject* ExpressionTypespec(const Expr& expr, const AssignBuild& build) {
 
 // §6.23: the typespec of the type the type reference `ref` refers to, where
 // it is written as `build` stands: of a data type it writes, the typedef or
-// type parameter a name finds there (TypedefVisible) or a built-in type over
-// the packed dimensions written; of an expression it writes, the
-// expression's type (ExpressionTypespec).
+// type parameter a name finds there (TypedefVisible), or behind a package or
+// a class (ScopedTypespec), with any packed dimensions written after it
+// (DimensionedTypespec), or a built-in type over the packed dimensions
+// written; of an expression it writes, the expression's type
+// (ExpressionTypespec).
 VpiObject* TypeRefTypespec(const Expr& ref, const AssignBuild& build) {
   const DataType* written = ref.type_value;
   if (written == nullptr) return ExpressionTypespec(*ref.lhs, build);
-  if (written->kind == DataTypeKind::kNamed) {
-    return TypedefVisible(written->type_name, build);
+  if (written->kind != DataTypeKind::kNamed) {
+    return VpiKeywordTypespec(*written, nullptr, *build.sim,
+                              {build.alloc, build.keep, build.sim->GetArena()});
   }
-  return VpiKeywordTypespec(*written, nullptr, *build.sim,
-                            {build.alloc, build.keep, build.sim->GetArena()});
+  VpiObject* named =
+      written->scope_name.empty()
+          ? TypedefVisible(written->type_name, build)
+          : ScopedTypespec(written->scope_name, written->type_name, build);
+  const PackedDims kPacked = WrittenPackedDims(written, *build.sim);
+  if (named == nullptr || kPacked.empty()) return named;
+  return DimensionedTypespec(kPacked, named, build);
 }
 
 // The typespec `cast` names, where it is written as `build` stands: a typedef
-// or type parameter visible there (TypedefVisible), one a package declares
-// where the cast names it through the package, pk::t (§26.3), the type a type
-// reference refers to (§6.23), or a built-in type a keyword names; null where
-// it names none of them.
+// or type parameter visible there (TypedefVisible), one a package or a class
+// declares where the cast names it through the package or class, pk::t or C::t
+// (ScopedTypespec), the type a type reference refers to (§6.23), or a
+// built-in type a keyword names; null where it names none of them.
 VpiObject* NamedTypespec(const Expr& cast, const AssignBuild& build) {
   if (cast.text.empty() && cast.rhs->kind == ExprKind::kTypeRef) {
     return TypeRefTypespec(*cast.rhs, build);
   }
   if (cast.text.empty() && cast.rhs->kind == ExprKind::kMemberAccess) {
-    const auto kScoped = build.names.unit_typespecs.find(
-        std::string(cast.rhs->lhs->text) +
-        "::" + std::string(cast.rhs->rhs->text));
-    return kScoped != build.names.unit_typespecs.end() ? kScoped->second
-                                                       : nullptr;
+    return ScopedTypespec(cast.rhs->lhs->text, cast.rhs->rhs->text, build);
   }
   // The type is named as text or as an identifier, as the parser read it.
   const std::string_view kName = !cast.text.empty() ? cast.text

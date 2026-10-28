@@ -643,8 +643,9 @@ VpiObject* HierarchicalObject(const Expr* expr, const AssignBuild& build) {
         FindObjectForFlatName(VpiObjectMap{{kFirst, holder}}, dotted);
     if (member != nullptr) return member;
   }
-  if (VpiObject* block = VpiClockingBlockAround(
-          build.names.scope, build.names.objects, build.names.prefix, kFirst)) {
+  if (VpiObject* block = VpiClockingBlockAround(InnermostScope(build.names),
+                                                build.names.objects,
+                                                build.names.prefix, kFirst)) {
     return VpiPrefixedReference(block, dotted, build.alloc, build.keep);
   }
   VpiObject* below = FindObjectForFlatName(
@@ -752,8 +753,9 @@ VpiObject* NamedObject(const Expr* expr, const AssignBuild& build) {
   VpiObject* genvar = GenvarParameter(expr->text, build);
   return genvar != nullptr
              ? genvar
-             : VpiClockingBlockAround(build.names.scope, build.names.objects,
-                                      build.names.prefix, expr->text);
+             : VpiClockingBlockAround(InnermostScope(build.names),
+                                      build.names.objects, build.names.prefix,
+                                      expr->text);
 }
 
 // The object standing for one side of an assignment: the net or variable a

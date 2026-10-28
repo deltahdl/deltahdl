@@ -421,5 +421,22 @@ TEST_F(PrefixingOfARun, AnExpressionThroughAnInstancesClockingBlockReachesIt) {
   ExpectRhsPrefixedBy("top.u", vpiClockingBlock);
 }
 
+// Detail 1: so does one the first top writes outside every procedure, a
+// variable's initialization expression, though the top's instance is keyed
+// under its name rather than the empty prefix the expression is written with.
+TEST_F(PrefixingOfARun,
+       AnInitializerThroughTheFirstTopsClockingBlockReachesIt) {
+  Run("module top; logic clk, d;\n"
+      "  clocking cb @(posedge clk); input d; endclocking\n"
+      "  logic y = cb.d;\n"
+      "endmodule\n");
+  vpiHandle ref = vpi_handle(vpiExpr, By("top.y"));
+  ASSERT_NE(ref, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, ref), vpiRefObj);
+  vpiHandle prefix = vpi_handle(vpiPrefix, ref);
+  ASSERT_NE(prefix, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, prefix), vpiClockingBlock);
+}
+
 }  // namespace
 }  // namespace delta

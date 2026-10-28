@@ -38,23 +38,30 @@ struct ParamAttach {
 };
 
 // Where the parameters of one instance stand: the instance's own object, the
-// path it is keyed under among `objects`, and the declaration it is of, which
-// a type parameter's default is read from (§37.28 detail 3).
+// path it is keyed under among `objects`, the declaration it is of, which a
+// type parameter's default is read from (§37.28 detail 3), and the module it
+// is an instance of, through whose imports and compilation unit a value
+// parameter's default finds a name it does not declare (§26.3, §3.12.1).
 struct ParamScope {
   VpiObject* scope;
   const std::string& prefix;
   const VpiObjectMap& objects;
   const ModuleDecl& decl;
+  const RtlirModule& mod;
 };
 
 // What an instance array's param assigns are made with: the design whose
 // declarations write the overrides, the objects the run built, the run the
-// values are read in, and the model's allocation.
+// values are read in, the model's allocation, and the module and instance
+// object of the instance writing the overrides, whose names, imports and
+// compilation unit a value finds a name among (§26.3, §3.12.1).
 struct ParamArrayAttach {
   const RtlirDesign& design;
   const VpiObjectMap& objects;
   SimContext& ctx;
   const VpiAttachBuild& build;
+  const RtlirModule* mod = nullptr;
+  const VpiObject* instance = nullptr;
 };
 
 // The typespec `scope` declares under `name`, or null.
@@ -187,8 +194,12 @@ void DescribeValueParameter(VpiObject& obj, const RtlirParamDecl& param,
     obj.param_right_range = VpiIntConstant(param.decl_range_right, with.build);
   }
   if (param.default_value != nullptr) {
-    obj.param_default = VpiInstanceExpression(param.default_value, at.objects,
-                                              at.prefix, with.ctx, with.build);
+    static const GenBlockPrefixes kNoGenBlocks;
+    obj.param_default =
+        VpiGenBlockExpression(param.default_value,
+                              {at.objects, at.prefix, kNoGenBlocks, nullptr,
+                               nullptr, nullptr, &at.mod, at.scope},
+                              with.ctx, with.build);
   }
   if (VpiObject* typespec = ParameterTypespec(param, obj, at.scope, with)) {
     obj.children.push_back(typespec);
@@ -363,8 +374,12 @@ void MakeArrayParamAssigns(VpiObject* array, const RtlirModuleInst& left,
                                            with.objects)) {
       made->children.push_back(lhs);
     }
-    made->rhs = VpiInstanceExpression(value, with.objects, prefix, with.ctx,
-                                      with.build);
+    static const GenBlockPrefixes kNoGenBlocks;
+    made->rhs =
+        VpiGenBlockExpression(value,
+                              {with.objects, prefix, kNoGenBlocks, nullptr,
+                               nullptr, nullptr, with.mod, with.instance},
+                              with.ctx, with.build);
     array->children.push_back(made);
   }
 }
@@ -425,9 +440,10 @@ void AttachParameters(const RtlirDesign* design, const VpiObjectMap& objects,
       design, [&](const RtlirModule* mod, const std::string& prefix) {
         VpiObject* scope = FindObjectForFlatName(
             objects, prefix.empty() ? std::string(mod->name) : prefix);
-        AttachScopeParameters(
-            mod, {scope, prefix, objects, ElementDeclNamed(*design, mod->name)},
-            kWith);
+        AttachScopeParameters(mod,
+                              {scope, prefix, objects,
+                               ElementDeclNamed(*design, mod->name), *mod},
+                              kWith);
         AttachScopeSpecParams(mod, prefix, objects);
       });
   for (const PackageDecl* pkg : design->packages) {
@@ -438,11 +454,13 @@ void AttachParameters(const RtlirDesign* design, const VpiObjectMap& objects,
     }
   }
   AttachDefParams(design, objects, ctx, build);
-  const ParamArrayAttach kArrays{*design, objects, ctx, build};
-  WalkInstancePaths(design,
-                    [&](const RtlirModule* mod, const std::string& prefix) {
-                      MakeInstanceArrayParamAssigns(*mod, prefix, kArrays);
-                    });
+  WalkInstanceObjects(design, objects,
+                      [&](const RtlirModule* mod, const std::string& prefix,
+                          const VpiObject* instance) {
+                        MakeInstanceArrayParamAssigns(
+                            *mod, prefix,
+                            {*design, objects, ctx, build, mod, instance});
+                      });
 }
 
 }  // namespace delta

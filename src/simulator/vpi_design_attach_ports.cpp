@@ -273,11 +273,14 @@ void AttachPortConnections(const RtlirDesign* design,
         for (const RtlirModuleInst& inst : mod->children) {
           // §37.42: a call a connection makes stands in the instance writing
           // it, or in the gen scope the instantiation stands in (§37.85).
+          // §23.3.2 with §26.3: the connection is an expression the writing
+          // module writes, finding a name through its imports and compilation
+          // unit, and from its instance object where its prefix keys none.
           const VpiCallStand kStand{
               VpiGenScopeOf(instance, inst.gen_block_path), mod};
           ConnectPorts(inst, instance,
                        {objects, prefix, inst.gen_block_prefixes, nullptr,
-                        &mod->node_attrs, &kStand},
+                        &mod->node_attrs, &kStand, mod, instance},
                        ctx, build);
         }
       });
