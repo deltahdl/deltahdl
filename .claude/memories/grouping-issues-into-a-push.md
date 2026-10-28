@@ -30,7 +30,7 @@ A push solves a batch made of every open issue that shares one matter. The matte
    - Take an issue the batch depends on into the batch, ahead of the issues that wait on it.
    - Bring each issue up to date before starting it.
    - When an issue's subsystem cannot be told without investigating it, take it in. If its fix turns out to land elsewhere, it leaves the batch and seeds a later one.
-3. **Solve.** Solve the issues one after another in the working tree, tests first, and commit nothing until the last one is done, per [[one-commit-is-a-whole-body-of-work]]. As each issue is finished, write its paragraph of the commit message into the scratchpad, so that nothing depends on the context outlasting the batch.
+3. **Solve.** Solve the issues one after another in the working tree, tests first, each for every case of its rule ([[fixing-a-rule-in-full]]), and commit nothing until the last one is done, per [[one-commit-is-a-whole-body-of-work]]. As each issue is finished, write its paragraph of the commit message into the scratchpad, so that nothing depends on the context outlasting the batch.
    - An issue that turns out to need a person's decision is labelled for one. Its edits come out of the tree before the commit.
    - A finding made on the way joins the batch when it is of the batch's matter. Otherwise it seeds the next batch ([[solving-what-a-session-finds]]).
 4. **Commit.** Commit once.

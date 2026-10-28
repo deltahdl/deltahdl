@@ -5,7 +5,7 @@ description: Start, restart or stop the standing reminders, with or without the 
 
 # Autopilot
 
-## The eight standing reminders
+## The nine standing reminders
 
 Every `start` form creates these.
 
@@ -16,9 +16,10 @@ Every `start` form creates these.
 | `3,18,33,48 * * * *` | `REMINDER: Let every push carry exactly one commit, and let that commit hold a whole body of work: a matter solved end to end or carried out in full, or a batch of every open issue of one matter (one clause of one standard fixed in one subsystem under src/), bounded by the matter and never by a count.` |
 | `6,21,36,51 * * * *` | `REMINDER: Keep the task list itself current, not only the marks on it: a task that arises is added the moment it does, a task that turns out unneeded is removed, and a task whose shape changed is rewritten, so that the list always says what is left to do.` |
 | `7,22,37,52 * * * *` | `REMINDER: While any CI run for a pushed commit is in progress, only wait: no diagnosis, edits or commits.` |
-| `8,23,38,53 * * * *` | `REMINDER: File what you find as issues, each documenting one indivisible problem and labelled with both the standard it falls under (IEEE 1800-2023, IEEE 1800.2-2020 or IEEE 1735-2023) and its clause in that standard (§N or Annex X), creating the clause label first when the repository has none. Solve one now only if the work in hand cannot move forward without it; otherwise move on.` |
+| `8,23,38,53 * * * *` | `REMINDER: A case of the rule an issue in hand documents is part of that issue's fix, never a new issue. File anything else you find as issues: one per rule of a standard that deltahdl breaks or leaves untested, listing every case of it and labelled with both the standard it falls under (IEEE 1800-2023, IEEE 1800.2-2020 or IEEE 1735-2023) and its clause in that standard (§N or Annex X), creating the clause label first when the repository has none; or one per problem with deltahdl itself, such as a coverage gap, with neither label. Solve one now only if the work in hand cannot move forward without it; otherwise move on.` |
 | `9,24,39,54 * * * *` | `REMINDER: Ensure every task on the list is indivisible, whether it was written with TaskCreate or rewritten with TaskUpdate: read each subject as written and count the actions it names; a subject naming more than one action is divisible, whatever single purpose those actions serve, and is split into one task per action.` |
 | `10,25,40,55 * * * *` | `REMINDER: Prune completed tasks off the Claude Code structured task list: set every task marked completed to the status deleted with TaskUpdate, so that the list holds only the tasks still open.` |
+| `12,27,42,57 * * * *` | `REMINDER: Fix the rule, not the example. Before fixing an issue of a standard, list every case of the rule it documents: each form the rule allows and each form it forbids, written in every place the standard lets that form appear (a module, interface, program, checker, package, class, generate block, task or function, or the compilation unit, as applies) and with every kind of operand or type the rule names. Write a test for each case, one showing a forbidden form reported beside one showing the nearest allowed form accepted without a report, and make deltahdl pass every one of them in the same commit.` |
 
 ## The four loop reminders
 
@@ -55,7 +56,7 @@ And these:
 | Cron | Prompt |
 | --- | --- |
 | `4,19,34,49 * * * *` | `REMINDER: Continue autonomously, unless you need human feedback about ANYTHING — not just about what to take next. When you do, rewrite the issue's title if necessary, rewrite the issue's body, label the issue 'needs decision', and move on to the next issue.` |
-| `5,20,35,50 * * * *` | `REMINDER: Before working on an issue, ensure the issue is up to date. If it is outdated, rewrite its title and body as necessary, delete all its comments, and ensure its labels are correct: the label of the standard it falls under and the label of its clause in that standard. Ensure too that it documents a single indivisible problem; if it documents more than one, split it into one issue per problem, reusing the issue itself as one of those splits.` |
+| `5,20,35,50 * * * *` | `REMINDER: Before working on an issue, ensure the issue is up to date. If it is outdated, rewrite its title and body as necessary, delete all its comments, and ensure its labels are correct: the label of the standard it falls under and the label of its clause in that standard. Ensure too that it documents a single rule of a standard, or a single problem with deltahdl itself: if it documents more than one, split it into one issue per rule or problem, reusing the issue itself as one of those splits; if other open issues document cases of the same rule, fold their cases into it and close them as duplicates of it.` |
 | `11,26,41,56 * * * *` | `REMINDER: Before labeling an issue with 'needs decision', assess the issue against the sources of truth to determine whether it truly needs a decision.` |
 
 ## Start
@@ -64,7 +65,7 @@ And these:
 
 Any form but `reminders-only` may be followed by `--skip-label <label>`, once per label, quoted when it holds a space. Each adds to the loop's `gh issue list` command, right after `--state open`, a `-label:"<label>"` term in one `--search` flag — `--search '-label:"needs decision" -label:"blocked"'` — and appends to that reminder, after a space, `An issue labelled '<label>' is left to a person, whatever else it carries.`
 
-For any form but `reminders-only`, run the loop's `gh issue list` command once; if it names no issue, create the eight standing reminders only.
+For any form but `reminders-only`, run the loop's `gh issue list` command once; if it names no issue, create the nine standing reminders only.
 
 Call `CronList`. A job on one of the form's cron slots whose prompt differs from that slot's reminder is a stale version of it: `CronDelete` it. Then `CronCreate` with `recurring: true` each reminder of the form whose prompt is not already scheduled, substituting the number for `{X}` or the label for `{L}`. Then begin solving the batch the command's first issue seeds.
 
@@ -72,13 +73,13 @@ Call `CronList`. A job on one of the form's cron slots whose prompt differs from
 
 `restart` takes the forms `start` takes, with the same shorthands and the same `--skip-label` flags, and leaves scheduled exactly the reminders of the form it names, whatever was scheduled before.
 
-For any form but `reminders-only`, run the loop's `gh issue list` command once; if it names no issue, the form's reminders are the eight standing reminders only.
+For any form but `reminders-only`, run the loop's `gh issue list` command once; if it names no issue, the form's reminders are the nine standing reminders only.
 
 Call `CronList`. `CronDelete` every job that is not one of the form's reminders: a job on a slot the form does not use, a job whose prompt differs from its slot's reminder, and every job but one on a slot that holds more than one. Then `CronCreate` with `recurring: true` each reminder of the form whose prompt is not scheduled after those deletions, substituting the number for `{X}` or the label for `{L}`. Then, for any form but `reminders-only`, begin solving the batch the command's first issue seeds.
 
 ## Batches
 
-A loop takes a batch, not a single issue: the issue its command names first, with every open issue it lists of the same matter, meaning the same clause of the same standard, read from its standard label and its clause label, fixed in the same subsystem under `src/`. The batch is solved in the working tree and pushed as one commit with one `Closes #N` line per issue. `.claude/memories/grouping-issues-into-a-push.md` gives the rule in full: why the matter bounds the batch rather than a count, which changes go in a push of their own, and how a red run is traced back to an issue.
+A loop takes a batch, not a single issue: the issue its command names first, with every open issue it lists of the same matter, meaning the same clause of the same standard, read from its standard label and its clause label, fixed in the same subsystem under `src/`. Each issue in it is fixed for every case of its rule, per `.claude/memories/fixing-a-rule-in-full.md`, not only for the example it gives. The batch is solved in the working tree and pushed as one commit with one `Closes #N` line per issue. `.claude/memories/grouping-issues-into-a-push.md` gives the rule in full: why the matter bounds the batch rather than a count, which changes go in a push of their own, and how a red run is traced back to an issue.
 
 ## Stop
 

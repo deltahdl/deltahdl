@@ -57,6 +57,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 ## Tests
 
 - [Test-driven development](test-driven-development.md) — tests first, in the same commit; `pytest --cov-fail-under=100` enforces it.
+- [Fixing a rule in full](fixing-a-rule-in-full.md) — list every allowed and forbidden form of the issue's rule, in every place it can be written and with every operand it names, and test and fix them all in one commit; never only the example.
 - [Inputs that discriminate](discriminating-test-inputs.md) — choose values where incorrect code gives a different answer from correct code.
 - [Naming the report in a rejection test](naming-the-report-in-a-rejection-test.md) — use `ReportedError` with message, line and exact `Subclause("…")`; never a bare "did it fail".
 - [Naming a const local](const-local-naming.md) — `kCamelCase`, or drop the `const`; a `const` reference is a plain `lower_case` variable; the clang-tidy shards are what say so.
@@ -74,6 +75,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 ## Verification
 
 - [Verifying through CI](verifying-through-ci.md) — keep local work to what CI has no way to perform; a build, a test binary, a probe of a defect or a pre-push review workflow is replaced by pushing and reading the run.
+- [A rule conforms only when tests show it](a-rule-conforms-only-when-tests-show-it.md) — checking a clause, a case conforms only when a test in the tree exercises it and asserts the standard's outcome; reading src/ never settles it, and an untested case is filed.
 - [Reading a CI run](reading-a-ci-run.md) — `gh run list --limit 1` before pushing, `gh run view --log-failed` after.
 - [Per-line coverage from CI artifacts](per-line-coverage-from-ci-artifacts.md) — the coverage log counts misses per file; read the missed lines from the run's coverage-simulator and profdata-unit-shard artifacts with a local llvm-cov.
 - [Fetching a failed job's log](fetching-a-failed-job-log.md) — when `--log-failed` breaks off or comes back empty, fetch each failed job through `gh api --allow-escape-sequences .../actions/jobs/<id>/logs`.
@@ -100,10 +102,10 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 
 ## Issues
 
-- [Solve what the session finds](solving-what-a-session-finds.md) — file what a session finds as issues of one indivisible problem each; solve one now only if the work in hand cannot go on without it.
-- [What does not get filed](what-does-not-get-filed.md) — nothing the commit in hand fixes, nothing an open issue already covers.
+- [Solve what the session finds](solving-what-a-session-finds.md) — a case of the rule in hand joins that fix; file anything else as issues of one rule or one problem each; solve one now only if the work in hand cannot go on without it.
+- [What does not get filed](what-does-not-get-filed.md) — a case of a rule the commit in hand fixes joins the fix; a case of a rule an open issue documents joins that issue.
 - [Searching for an existing report before filing](searching-for-an-existing-report-before-filing.md) — grep all of src/ and test/ for the rule's own words before filing "not reported"; a neighbouring clause or another subsystem may already report it.
-- [One indivisible problem per issue](one-indivisible-problem-per-issue.md) — one defect, one fix per issue; an issue found holding two is split there and then.
+- [One indivisible problem per issue](one-indivisible-problem-per-issue.md) — an issue of a standard holds one rule with every case of it listed, anything else one defect with one fix; two rules are split, cases of one rule merged.
 - [Research lives in issues](research-lives-in-issues.md) — a plan that outlives the session, and each finding it yields, is filed as it arises; the task list and scratchpad are not durable.
 - [Issues have no fixed form](issues-have-no-fixed-form.md) — no house style; write each so a fresh session can act on it alone.
 - [Issues carry a standard label and a clause label](issues-carry-a-standard-and-a-clause-label.md) — label a standard's issue with `IEEE 1800-2023`, `IEEE 1800.2-2020` or `IEEE 1735-2023` and with its `§N` or `Annex X` in that standard, the clause labels being shared by all three; a coverage or harness issue carries neither.
