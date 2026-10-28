@@ -226,6 +226,29 @@ ModuleItem* FirstTopsOwnSubroutine(const std::string& path,
   return ctx.FindFunction(std::string(ctx.FirstTopModule()) + "." + path);
 }
 
+// §23.4 with §3.12.1: a module declared inside another sees the enclosing
+// module's names, which the search for an identifier reaches before the
+// compilation-unit scope, so a bare callee `path` called in such a module's
+// instance `active` is the subroutine of the innermost enclosing instance that
+// declares it, run in that instance, the first top's own standing under its
+// name (FirstTopsOwnSubroutine). Answers true with `target` filled where an
+// enclosing instance declares it.
+bool TryEnclosingDeclSubroutine(const std::string& path,
+                                const std::string& active, SimContext& ctx,
+                                SubroutineTarget& target) {
+  for (const std::string& scope : ctx.NestedDeclOuterScopes(active)) {
+    std::string key = scope.empty()
+                          ? std::string(ctx.FirstTopModule()) + "." + path
+                          : scope + path;
+    ModuleItem* func = ctx.FindFunction(key);
+    if (func == nullptr) continue;
+    target.func = func;
+    target.inst_prefix = scope;
+    return true;
+  }
+  return false;
+}
+
 // §23.9 with §3.12.1: the subroutine the compilation unit holding the calling
 // instance `active` declares under the bare callee `path`, the scope a module
 // item's name is looked for in next, kept under "$unit::name", or
@@ -238,6 +261,15 @@ ModuleItem* UnitSubroutine(const std::string& path, const std::string& active,
   if (path.find('.') != std::string::npos) return nullptr;
   return ctx.FindFunction(UnitScopes::ScopeName(ctx.Units().UnitOf(active)) +
                           "::" + path);
+}
+
+// §3.12.1 (printed page 57): whether `call` names its subroutine through
+// `$unit::`, as an enable, `$unit::t;`, or a call, `$unit::f()`, whose name
+// keeps the prefix as the parser read it (Parser::MakeSysScopePrefix).
+bool IsUnitScopedCallee(const Expr* call) {
+  const Expr* name = call->kind == ExprKind::kCall ? call->lhs : call;
+  return name != nullptr && name->kind == ExprKind::kIdentifier &&
+         name->scope_prefix == "$unit";
 }
 
 // The member access a dotted callee is written as: the call's own name,
@@ -360,7 +392,13 @@ SubroutineTarget FindSubroutineTarget(const Expr* call, SimContext& ctx,
   // calls p's five ahead of the module's own. Null outside any package frame
   // or where the package provides no such name, and the module's and the
   // top's registrations are searched then.
-  if (!is_hierarchical) target.func = ScopedOrPackageFunction(path, ctx);
+  //
+  // §3.12.1: `$unit::f()` names the compilation unit's subroutine past every
+  // nearer one of the name, so it is asked for first, the search below going
+  // on only where the unit declares no subroutine of the name.
+  if (IsUnitScopedCallee(call)) target.func = UnitSubroutine(path, active, ctx);
+  if (target.func == nullptr && !is_hierarchical)
+    target.func = ScopedOrPackageFunction(path, ctx);
   if (target.func != nullptr) {
     target.inst_prefix = std::move(active);
     return target;
@@ -381,6 +419,8 @@ SubroutineTarget FindSubroutineTarget(const Expr* call, SimContext& ctx,
     ApplyGenBlockScope(relative, ctx, target);
     return target;
   }
+  if (!is_hierarchical && TryEnclosingDeclSubroutine(path, active, ctx, target))
+    return target;
   if (is_hierarchical && ResolveUpwardModulePath(path, active, ctx, target)) {
     return target;
   }

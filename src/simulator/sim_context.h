@@ -257,6 +257,9 @@ class SimContext : public DeclaredNameTables,
   std::vector<std::string> ScopedObjectKeys(std::string_view name) const;
   Variable* FindInPackageScope(std::string_view name);
   ModuleItem* FindFunctionInPackageScope(std::string_view name);
+  // §3.12.1: whether `name`, read in a compilation-unit subroutine's frame, is
+  // a path from $root, which FindVariable and FindNet then read it as.
+  bool IsUnitPathFromRoot(std::string_view name);
   // Creates a scope-local variable of `width` bits, signed when `is_signed`
   // says the declaration it stands for was (§6.11.3: `byte`, `shortint`,
   // `int`, `integer` and `longint` default to signed, and a `signed`/`unsigned`

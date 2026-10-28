@@ -76,6 +76,25 @@ std::vector<std::string> SimContext::PackageFrameKeys(
   return PackageScopedKeys(frame->package, name);
 }
 
+// §3.12.1 (printed page 56): for upward name referencing the compilation-unit
+// scope is a top-level design element, so a hierarchical name a unit task,
+// function or class method writes, its frame naming the unit's scope, is a
+// full path from the top of the design, read as a `$root.` one is
+// (RootedStorageKey) and never under the calling instance, where an instance
+// of the caller's own named like the path's head would answer it. A dotted
+// name headed by a local or by a declaration of the unit is a member of that
+// object rather than a path.
+bool SimContext::IsUnitPathFromRoot(std::string_view name) {
+  std::size_t dot = name.find('.');
+  if (dot == std::string_view::npos) return false;
+  const Scope* frame = PackageFrame();
+  if (frame == nullptr || !UnitScopes::IsUnitScope(frame->package))
+    return false;
+  std::string_view head = name.substr(0, dot);
+  return FindLocalVariable(head) == nullptr &&
+         FindInPackageScope(head) == nullptr;
+}
+
 // §23.9's upward search past the scope frames, for an object held in one of
 // the run-long tables rather than in a frame: the keys a bare `name` may
 // stand under, in the order the search tries them. A package subroutine's
@@ -265,6 +284,10 @@ Net* SimContext::FindNet(std::string_view name) {
   if (name.starts_with(kRootPrefix)) {
     auto it = nets_.find(RootedStorageKey(name.substr(kRootPrefix.size())));
     return (it != nets_.end()) ? it->second : nullptr;
+  }
+  if (IsUnitPathFromRoot(name)) {
+    auto it = nets_.find(RootedStorageKey(name));
+    if (it != nets_.end()) return it->second;
   }
   std::string prefix = ActiveInstancePrefix();
   if (Net* in_block =

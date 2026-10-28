@@ -83,4 +83,11 @@ std::vector<const ClassDecl*> UnitClassesToLower(const RtlirDesign* design);
 void EnterInstanceUnit(const RtlirDesign* design, const RtlirModule* mod,
                        std::string_view prefix, SimContext& ctx, Arena& arena);
 
+// §23.4 with §3.12.1: whether a module enclosing the nested declaration whose
+// instance stands under `prefix` holds a variable `name`, which the search for
+// an identifier reaches before the compilation-unit scope; false for an
+// instance that is no nested declaration's.
+bool EnclosingDeclHoldsVariable(std::string_view prefix, std::string_view name,
+                                const SimContext& ctx);
+
 }  // namespace delta

@@ -143,4 +143,10 @@ void EnterInstanceUnit(const RtlirDesign* design, const RtlirModule* mod,
   }
 }
 
+bool EnclosingDeclHoldsVariable(std::string_view prefix, std::string_view name,
+                                const SimContext& ctx) {
+  return ctx.FindInNestedDeclOuterScopes(ctx.GetVariables(), prefix, name) !=
+         nullptr;
+}
+
 }  // namespace delta

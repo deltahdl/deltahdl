@@ -1,6 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <string>
+
+#include "fixture_simulator.h"
 #include "helpers_scheduler.h"
+#include "simulator/variable.h"
 
 using namespace delta;
 
@@ -73,6 +78,276 @@ TEST(CompilationUnitSearchOrderSim,
                       "endmodule\n",
                       "y"),
             6u);
+}
+
+// §3.12.1 (printed page 57): `$unit::` names the compilation unit's own
+// subroutine past one of the name the calling scope declares, where the bare
+// name calls the nearer one. Called from a module, a module function's body
+// and a generate block, each declaring its own f returning 2, `$unit::f()` is
+// the unit's 1 and `f()` the scope's own, so each reads 12; a `$unit::` call
+// bound like the bare one reads 22.
+TEST(CompilationUnitSearchOrderSim,
+     DollarUnitCallsTheUnitsFunctionPastTheModules) {
+  EXPECT_EQ(RunAndGet("function int f();\n"
+                      "  return 1;\n"
+                      "endfunction\n"
+                      "module m;\n"
+                      "  function int f();\n"
+                      "    return 2;\n"
+                      "  endfunction\n"
+                      "  int y;\n"
+                      "  initial y = $unit::f() * 10 + f();\n"
+                      "endmodule\n",
+                      "y"),
+            12u);
+}
+
+TEST(CompilationUnitSearchOrderSim, DollarUnitCallFromAModuleFunctionsBody) {
+  EXPECT_EQ(RunAndGet("function int f();\n"
+                      "  return 1;\n"
+                      "endfunction\n"
+                      "module m;\n"
+                      "  function int f();\n"
+                      "    return 2;\n"
+                      "  endfunction\n"
+                      "  function int g();\n"
+                      "    return $unit::f() * 10 + f();\n"
+                      "  endfunction\n"
+                      "  int y;\n"
+                      "  initial y = g();\n"
+                      "endmodule\n",
+                      "y"),
+            12u);
+}
+
+TEST(CompilationUnitSearchOrderSim, DollarUnitCallFromAGenerateBlock) {
+  EXPECT_EQ(RunAndGet("function int f();\n"
+                      "  return 1;\n"
+                      "endfunction\n"
+                      "module m;\n"
+                      "  int y;\n"
+                      "  if (1) begin : g\n"
+                      "    function int f();\n"
+                      "      return 2;\n"
+                      "    endfunction\n"
+                      "    initial y = $unit::f() * 10 + f();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            12u);
+}
+
+// The same for a task, enabled as `$unit::t;` and as `$unit::t();`: both run
+// the unit's t, counting hits twice, and the module's own t, which would add
+// 10 to own each time, never runs, so y is 200; bound to the module's, 20.
+TEST(CompilationUnitSearchOrderSim,
+     DollarUnitEnablesTheUnitsTaskPastTheModules) {
+  EXPECT_EQ(RunAndGet("int hits;\n"
+                      "task t;\n"
+                      "  hits = hits + 1;\n"
+                      "endtask\n"
+                      "module m;\n"
+                      "  int own, y;\n"
+                      "  task t;\n"
+                      "    own = own + 10;\n"
+                      "  endtask\n"
+                      "  initial begin\n"
+                      "    $unit::t;\n"
+                      "    $unit::t();\n"
+                      "    y = hits * 100 + own;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            200u);
+}
+
+// §3.12.1 (printed page 56) searches the nested scopes first, nested module
+// declarations among them (§23.4), and the compilation-unit scope after. A
+// module declared inside outer reads outer's x, 2, ahead of the unit's 1.
+TEST(CompilationUnitSearchOrderSim,
+     ANestedModulesEnclosingVariableIsFoundFirst) {
+  EXPECT_EQ(RunAndGet("int x = 1;\n"
+                      "module outer;\n"
+                      "  int x = 2;\n"
+                      "  module inner;\n"
+                      "    int y;\n"
+                      "    initial y = x;\n"
+                      "  endmodule\n"
+                      "  inner i();\n"
+                      "endmodule\n",
+                      "i.y"),
+            2u);
+}
+
+TEST(CompilationUnitSearchOrderSim,
+     ANestedModulesEnclosingParameterIsFoundFirst) {
+  EXPECT_EQ(RunAndGet("localparam int K = 1;\n"
+                      "module outer;\n"
+                      "  localparam int K = 2;\n"
+                      "  module inner;\n"
+                      "    int y;\n"
+                      "    initial y = K;\n"
+                      "  endmodule\n"
+                      "  inner i();\n"
+                      "endmodule\n",
+                      "i.y"),
+            2u);
+}
+
+TEST(CompilationUnitSearchOrderSim,
+     ANestedModulesEnclosingFunctionIsFoundFirst) {
+  EXPECT_EQ(RunAndGet("function int f();\n"
+                      "  return 1;\n"
+                      "endfunction\n"
+                      "module outer;\n"
+                      "  function int f();\n"
+                      "    return 2;\n"
+                      "  endfunction\n"
+                      "  module inner;\n"
+                      "    int y;\n"
+                      "    initial y = f();\n"
+                      "  endmodule\n"
+                      "  inner i();\n"
+                      "endmodule\n",
+                      "i.y"),
+            2u);
+}
+
+// The search goes outward through each enclosing declaration: a module two
+// levels in, whose own enclosing module declares neither name, reaches the
+// outermost one's x and f, 20 and 2, ahead of the unit's 10 and 1, so y is 22.
+TEST(CompilationUnitSearchOrderSim, TheSearchClimbsEveryEnclosingDeclaration) {
+  EXPECT_EQ(RunAndGet("int x = 10;\n"
+                      "function int f();\n"
+                      "  return 1;\n"
+                      "endfunction\n"
+                      "module outer;\n"
+                      "  int x = 20;\n"
+                      "  function int f();\n"
+                      "    return 2;\n"
+                      "  endfunction\n"
+                      "  module middle;\n"
+                      "    module inner;\n"
+                      "      int y;\n"
+                      "      initial y = x + f();\n"
+                      "    endmodule\n"
+                      "    inner i();\n"
+                      "  endmodule\n"
+                      "  middle m();\n"
+                      "endmodule\n",
+                      "m.i.y"),
+            22u);
+}
+
+// The nearest allowed form: the nested module's own declaration of the name
+// is found before the enclosing module's and the unit's, so y is 3.
+TEST(CompilationUnitSearchOrderSim, ANestedModulesOwnVariableIsFoundBeforeAll) {
+  EXPECT_EQ(RunAndGet("int x = 1;\n"
+                      "module outer;\n"
+                      "  int x = 2;\n"
+                      "  module inner;\n"
+                      "    int x = 3;\n"
+                      "    int y;\n"
+                      "    initial y = x;\n"
+                      "  endmodule\n"
+                      "  inner i();\n"
+                      "endmodule\n",
+                      "i.y"),
+            3u);
+}
+
+// The design the cases below run: a top whose x and w are 7, instantiating
+// holder, which has an instance of its own named top, a leaf whose x and w
+// are 3.
+constexpr const char* kTopsAndHolder =
+    "module top;\n"
+    "  int x = 7;\n"
+    "  wire [7:0] w = 8'd7;\n"
+    "  holder h();\n"
+    "endmodule\n"
+    "module leaf;\n"
+    "  int x = 3;\n"
+    "  wire [7:0] w = 8'd3;\n"
+    "endmodule\n";
+
+// The run's value of h.y after holder, past its declarations `decls`, runs
+// `stmt` at time 1.
+uint64_t HolderRuns(const std::string& unit_items, const std::string& decls,
+                    const std::string& stmt) {
+  SimFixture f;
+  auto* design = ElaborateSrcAllTops(unit_items + kTopsAndHolder +
+                                         "module holder;\n"
+                                         "  leaf top();\n"
+                                         "  int y;\n" +
+                                         decls + "  initial #1 " + stmt +
+                                         "\n"
+                                         "endmodule\n",
+                                     f);
+  EXPECT_FALSE(f.has_errors);
+  if (design == nullptr) return ~0ull;
+  LowerAndRun(design, f);
+  auto* y = f.ctx.FindVariable("h.y");
+  return y == nullptr ? ~0ull : y->value.ToUint64();
+}
+
+// §3.12.1 (printed page 56): for upward name referencing the compilation-unit
+// scope is a top-level design element, so a hierarchical name a unit task,
+// function or class method writes is a full path from $root. Called from
+// holder, whose own leaf instance is named top, each reads the top module's
+// x, 7, never holder's top.x, 3.
+TEST(CompilationUnitSearchOrderSim, AUnitFunctionsPathIsReadFromRoot) {
+  EXPECT_EQ(HolderRuns("function int f();\n"
+                       "  return top.x;\n"
+                       "endfunction\n",
+                       "", "y = f();"),
+            7u);
+}
+
+TEST(CompilationUnitSearchOrderSim, AUnitClassMethodsPathIsReadFromRoot) {
+  EXPECT_EQ(HolderRuns("class K;\n"
+                       "  function int g();\n"
+                       "    return top.x;\n"
+                       "  endfunction\n"
+                       "endclass\n",
+                       "  K k = new;\n", "y = k.g();"),
+            7u);
+}
+
+TEST(CompilationUnitSearchOrderSim, AUnitTasksPathIsReadFromRoot) {
+  EXPECT_EQ(HolderRuns("task t(output int v);\n"
+                       "  v = top.x;\n"
+                       "endtask\n",
+                       "", "t(y);"),
+            7u);
+}
+
+// A net the path reaches is the top module's as a variable is: w, 7.
+TEST(CompilationUnitSearchOrderSim, AUnitFunctionsPathToANetIsReadFromRoot) {
+  EXPECT_EQ(HolderRuns("function int f();\n"
+                       "  return top.w;\n"
+                       "endfunction\n",
+                       "", "y = f();"),
+            7u);
+}
+
+// The nearest allowed form: a dotted name headed by the unit's own variable is
+// no path at all but a member of that variable, so the unit's s.a, 4, is read
+// whatever structure of the name the top declares.
+TEST(CompilationUnitSearchOrderSim, AUnitVariablesMemberIsNoPathFromRoot) {
+  EXPECT_EQ(RunAndGet("typedef struct {\n"
+                      "  int a;\n"
+                      "} st_t;\n"
+                      "st_t s = '{a: 4};\n"
+                      "function int f();\n"
+                      "  return s.a;\n"
+                      "endfunction\n"
+                      "module top;\n"
+                      "  st_t s = '{a: 9};\n"
+                      "  int y;\n"
+                      "  initial y = f();\n"
+                      "endmodule\n",
+                      "y"),
+            4u);
 }
 
 }  // namespace

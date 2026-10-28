@@ -619,18 +619,15 @@ void CreateUnitDataVariables(const RtlirDesign* design, SimContext& ctx,
 // in the compilation-unit scope next, so each of the unit's data items the
 // module `mod` does not declare -- as a variable, a port or a net
 // (ModuleDeclaresName) -- is bound under the module's `inst_prefix` to the
-// unit's storage, "g" for a top and "u.g" for an instance, with the queue,
-// the array, the class record and the other kinds the storage carries
-// (AliasVariableKinds), as an import's name is bound
-// (Lowerer::AliasImportedPackageName), and registered as a name bound
-// outside every module so that SimContext::FindVariable crosses §23.9's
-// boundary to the top's bare key from a generate block's process. A key the
-// module's imports or its parameters already hold is left to them (§26.5,
-// the import being the nearer scope's), and a name the module declares to
-// the declaration, which the nearer scope's lookup finds first. With the
-// unit's storage under the bare name alone, the top's `int g = 7` replaced
-// it and every instance's bare `g`, answered from that key, read the top's 7
-// for the unit's 5, and the top's `input int g` was the unit's variable.
+// unit's storage, "g" for a top and "u.g" for an instance, with the kinds the
+// storage carries (AliasVariableKinds), as an import's name is bound, and
+// registered as a name bound outside every module so that FindVariable
+// crosses §23.9's boundary to the top's bare key from a generate block's
+// process. A key the module's imports or parameters already hold is left to
+// them (§26.5), and a name a module enclosing a nested declaration holds to
+// that module, which §23.4 has the search reach before the unit
+// (EnclosingDeclHoldsVariable). The unit's storage under the bare name alone
+// was replaced by the top's `int g = 7`, which every instance's `g` then read.
 void AliasUnitDataItems(const RtlirDesign* design, const RtlirModule* mod,
                         std::string_view inst_prefix, SimContext& ctx,
                         Arena& arena) {
@@ -641,7 +638,8 @@ void AliasUnitDataItems(const RtlirDesign* design, const RtlirModule* mod,
   if (unit == nullptr) return;
   const std::string kScope = UnitScopes::ScopeName(mod->unit_index);
   for (const auto* item : unit->cu_items) {
-    if (!DeclaresPackageData(item) || ModuleDeclaresName(mod, item->name))
+    if (!DeclaresPackageData(item) || ModuleDeclaresName(mod, item->name) ||
+        EnclosingDeclHoldsVariable(inst_prefix, item->name, ctx))
       continue;
     std::string key = std::string(inst_prefix) + std::string(item->name);
     if (ctx.GetVariables().count(key) != 0) continue;
