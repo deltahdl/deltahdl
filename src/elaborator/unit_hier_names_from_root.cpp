@@ -21,7 +21,7 @@ namespace {
 
 // The names the compilation-unit scope of `unit` declares: its items' own,
 // the classes it declares, and the enumeration constants its types declare.
-std::unordered_set<std::string_view> UnitDeclaredNames(
+std::unordered_set<std::string_view> UnitScopeOwnNames(
     const CompilationUnit& unit) {
   std::unordered_set<std::string_view> names;
   for (const ModuleItem* item : unit.cu_items) {
@@ -41,7 +41,7 @@ void ReportUnitHierNamesFromRoot(const CompilationUnit& unit,
                                  const RtlirDesign& design,
                                  ProvidedNameCache& provided_cache,
                                  DiagEngine& diag) {
-  std::unordered_set<std::string_view> reached = UnitDeclaredNames(unit);
+  std::unordered_set<std::string_view> reached = UnitScopeOwnNames(unit);
   for (const RtlirModule* top : design.top_modules) reached.insert(top->name);
   for (const Expr* head : UnitSubroutineHierHeads(unit)) {
     if (reached.contains(head->text) ||
