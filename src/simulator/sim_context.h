@@ -258,11 +258,10 @@ class SimContext : public DeclaredNameTables,
   Variable* FindInPackageScope(std::string_view name);
   ModuleItem* FindFunctionInPackageScope(std::string_view name);
   // §3.12.1: whether `name`, read in a compilation-unit subroutine's frame, is
-  // a path from $root, and the variable and the net it reaches there, or null,
-  // which FindVariable and FindNet answer it by.
+  // a path from $root, and the variable it reaches there, or null, which
+  // FindVariable answers it by.
   bool IsUnitPathFromRoot(std::string_view name);
   Variable* FindUnitPathVariable(std::string_view name);
-  Net* FindUnitPathNet(std::string_view name);
   // Creates a scope-local variable of `width` bits, signed when `is_signed`
   // says the declaration it stands for was (§6.11.3: `byte`, `shortint`,
   // `int`, `integer` and `longint` default to signed, and a `signed`/`unsigned`

@@ -101,12 +101,6 @@ Variable* SimContext::FindUnitPathVariable(std::string_view name) {
   return it != variables_.end() ? it->second : nullptr;
 }
 
-Net* SimContext::FindUnitPathNet(std::string_view name) {
-  if (!IsUnitPathFromRoot(name)) return nullptr;
-  auto it = nets_.find(RootedStorageKey(name));
-  return it != nets_.end() ? it->second : nullptr;
-}
-
 // §23.9's upward search past the scope frames, for an object held in one of
 // the run-long tables rather than in a frame: the keys a bare `name` may
 // stand under, in the order the search tries them. A package subroutine's
@@ -297,7 +291,6 @@ Net* SimContext::FindNet(std::string_view name) {
     auto it = nets_.find(RootedStorageKey(name.substr(kRootPrefix.size())));
     return (it != nets_.end()) ? it->second : nullptr;
   }
-  if (Net* from_root = FindUnitPathNet(name)) return from_root;
   std::string prefix = ActiveInstancePrefix();
   if (Net* in_block =
           FindNetInGenerateBlock(nets_, current_process_, prefix, name)) {
