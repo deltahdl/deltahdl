@@ -644,10 +644,11 @@ bool Parser::PropertyBodyHasTemporalOperator() {
 
 // §16.12.1: an instance of a named property may stand as the property_spec of
 // a concurrent assertion, and the assertion is then the property's body in
-// that place. Trial-parses the body `@(event_list) boolean_expression ;` that
-// Parser::TryParseSimpleConcurrentProperty accepts in an assertion, and records
-// its clock in prop_clock and its boolean in prop_body_expr so the elaborator
-// can make that substitution. Diagnostics are suppressed and the lexer is
+// that place. Trial-parses the body `@(event_list) boolean_expression` that
+// Parser::TryParseSimpleConcurrentProperty accepts in an assertion, with or
+// without the `;` A.2.10 makes optional after it, and records its clock in
+// prop_clock and its boolean in prop_body_expr so the elaborator can make that
+// substitution. Diagnostics are suppressed and the lexer is
 // rewound, so the body scan in ParsePropertyDecl re-reads the same tokens; a
 // body of any other shape leaves both fields empty.
 void Parser::CaptureClockedBooleanPropertyBody(ModuleItem* item) {
@@ -670,8 +671,10 @@ void Parser::CaptureClockedBooleanPropertyBody(ModuleItem* item) {
   while (ok && Match(TokenKind::kKwNot)) negated = !negated;
   Expr* boolean =
       ok ? ParserPropertySpecHelpers::ParseExpressionOrDist(*this) : nullptr;
-  ok = boolean != nullptr && Match(TokenKind::kSemicolon) &&
-       Check(TokenKind::kKwEndproperty);
+  ok = boolean != nullptr;
+  // A.2.10: the `;` after the spec is optional.
+  if (ok) Match(TokenKind::kSemicolon);
+  ok = ok && Check(TokenKind::kKwEndproperty);
   diag_.PopSuppress();
   lexer_.RestorePos(saved);
   if (!ok) return;

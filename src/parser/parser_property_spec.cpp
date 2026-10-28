@@ -45,14 +45,15 @@ bool ParserPropertySpecHelpers::AheadOpensKeywordTerm(Parser& p) {
 
 // Whether the tokens ahead, to the closing parenthesis of the spec, the
 // semicolon ending a case item or the first `or` or `and` at the spec's
-// own depth, hold §16.9.2's repetition, `[*`, `[->`, `[=` or `[+`, which
+// own depth, or the endproperty of a declaration whose spec has no `;`
+// after it, hold §16.9.2's repetition, `[*`, `[->`, `[=` or `[+`, which
 // makes the operand a sequence where no `##` does. The lexer is rewound.
 bool ParserPropertySpecHelpers::AheadHoldsRepetition(Parser& p) {
   auto scan = p.lexer_.SavePos();
   int depth = 0;
   bool found = false;
   bool bracket = false;
-  while (!p.Check(TokenKind::kEof)) {
+  while (!p.Check(TokenKind::kEof) && !p.Check(TokenKind::kKwEndproperty)) {
     TokenKind k = p.CurrentToken().kind;
     if (k == TokenKind::kLParen) {
       ++depth;
@@ -131,7 +132,8 @@ ModuleItem* ParserPropertySpecHelpers::TryParseSequenceSpec(Parser& p,
 }
 
 // Whether the tokens ahead, to the closing parenthesis of the spec, the
-// semicolon ending a case item at the spec's own depth or, where
+// semicolon ending a case item at the spec's own depth, the endproperty of a
+// declaration whose spec has no `;` after it (A.2.10) or, where
 // `to_junction` says so, the first `or` or `and` at that depth, hold a
 // token `wanted` at that depth or below.
 bool ParserPropertySpecHelpers::AheadHolds(Parser& p, TokenKind wanted,
@@ -139,7 +141,7 @@ bool ParserPropertySpecHelpers::AheadHolds(Parser& p, TokenKind wanted,
   auto scan = p.lexer_.SavePos();
   int depth = 0;
   bool found = false;
-  while (!p.Check(TokenKind::kEof)) {
+  while (!p.Check(TokenKind::kEof) && !p.Check(TokenKind::kKwEndproperty)) {
     TokenKind k = p.CurrentToken().kind;
     bool junction = k == TokenKind::kKwOr || k == TokenKind::kKwAnd;
     if (k == TokenKind::kLParen) {
@@ -905,8 +907,9 @@ void ParserPropertySpecHelpers::CapturePropertyTreeBody(Parser& p,
   SimpleSpecBody body;
   if (ok) ok = p.TryParseDisableIff(body.disable_iff);
   if (ok) ok = ParseSimpleSpecBody(p, body);
-  ok = ok && p.Match(TokenKind::kSemicolon) &&
-       p.Check(TokenKind::kKwEndproperty);
+  // A.2.10: the `;` after the spec is optional.
+  if (ok) p.Match(TokenKind::kSemicolon);
+  ok = ok && p.Check(TokenKind::kKwEndproperty);
   p.diag_.PopSuppress();
   p.lexer_.RestorePos(saved);
   if (!ok) return;

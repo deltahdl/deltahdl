@@ -761,6 +761,24 @@ TEST_F(PropertyExprsOfARun, ADeclarationsBodyReachesItsFormalAsARefObj) {
   EXPECT_EQ(vpi_handle(vpiActual, x), nullptr);
 }
 
+// A.2.10 makes the ';' after a property declaration's spec optional, so a
+// declaration that leaves it out has the property spec it would have with
+// one: its clock, and the formal its body names as the property expr.
+TEST_F(PropertyExprsOfARun, ADeclarationsSpecWithoutItsSemicolonIsItsSpec) {
+  Run("module top; logic clk;\n"
+      "  property p(x); @(posedge clk) x endproperty\n"
+      "endmodule\n");
+  vpiHandle decl = Named(vpiPropertyDecl, By("top"), "p");
+  ASSERT_NE(decl, nullptr);
+  vpiHandle spec = vpi_handle(vpiPropertySpec, decl);
+  ASSERT_NE(spec, nullptr);
+  EXPECT_NE(vpi_handle(vpiClockingEvent, spec), nullptr);
+  vpiHandle x = vpi_handle(vpiPropertyExpr, spec);
+  ASSERT_NE(x, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, x), vpiRefObj);
+  EXPECT_STREQ(vpi_get_str(vpiName, x), "x");
+}
+
 // Detail 3 with §37.58: a strong sequence written over an operand that stands
 // for no object is no sequence expr, so no strength is set on one. A select
 // of an array net by a varying index, nw[i], is one the model makes no object

@@ -376,13 +376,14 @@ ModuleItem* Parser::ParseDeferredImmediateItem(SourceLoc loc, StmtKind kind) {
 // leaving the scan to stop on the property_spec's own closing parenthesis.
 // From the body of a named property declaration, where
 // ParserPropertySpecHelpers::CapturePropertyTreeBody calls it, the scan stops
-// at the semicolon ending the body, which stands at the same depth.
+// at the semicolon ending the body, which stands at the same depth, or, where
+// the body leaves that optional semicolon out (A.2.10), at endproperty.
 
 bool Parser::BodyHasTemporalOperator() {
   auto scan = lexer_.SavePos();
   int depth = 0;
   bool found = false;
-  while (!Check(TokenKind::kEof)) {
+  while (!Check(TokenKind::kEof) && !Check(TokenKind::kKwEndproperty)) {
     TokenKind k = CurrentToken().kind;
     if (k == TokenKind::kLParen) {
       ++depth;

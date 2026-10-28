@@ -1,12 +1,14 @@
 #include <gtest/gtest.h>
 
 #include <string>
+#include <string_view>
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
 
 using namespace delta;
 
@@ -304,6 +306,63 @@ TEST(AssertionSemanticsParsing, APropertyFormalsDefaultActualIsRecorded) {
   for (bool has : item->prop_formal_has_default) marked += has ? '1' : '0';
   EXPECT_EQ(recorded, "-IL-P");
   EXPECT_EQ(marked, "01111");
+}
+
+// A.2.10 makes the ';' after a property declaration's spec optional, so a
+// spec that leaves it out is read as it would be with one: its clock, and the
+// boolean `a` as the tree. Each declaration is followed by an assertion
+// holding, before its own ';', what makes a spec a sequence -- a cycle delay, a
+// repetition and throughout -- so a look-ahead into the body running past
+// endproperty would read that declaration's `a` as a sequence.
+TEST(AssertionSemanticsParsing, ASpecWithoutItsSemicolonIsReadAsATree) {
+  auto r = Parse(
+      "module m;\n"
+      "  property p_delay;\n"
+      "    @(posedge clk) a\n"
+      "  endproperty\n"
+      "  assert property (@(posedge clk) a ##1 b);\n"
+      "  property p_repetition;\n"
+      "    @(posedge clk) a\n"
+      "  endproperty\n"
+      "  assert property (@(posedge clk) a [*2]);\n"
+      "  property p_throughout;\n"
+      "    @(posedge clk) a\n"
+      "  endproperty\n"
+      "  assert property (@(posedge clk) a throughout b);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  for (std::string_view name : {"p_delay", "p_repetition", "p_throughout"}) {
+    SCOPED_TRACE(name);
+    const ModuleItem* decl = FindItemByName(r.cu->modules[0]->items, name);
+    ASSERT_NE(decl, nullptr);
+    ASSERT_EQ(decl->prop_clock.size(), 1u);
+    EXPECT_EQ(decl->prop_clock[0].edge, Edge::kPosedge);
+    ASSERT_NE(decl->prop_body_tree, nullptr);
+    EXPECT_EQ(decl->prop_body_tree->kind, PropertyExprNode::Kind::kBoolean);
+    ASSERT_NE(decl->prop_body_tree->boolean, nullptr);
+    EXPECT_EQ(decl->prop_body_tree->boolean->text, "a");
+  }
+}
+
+// The clocked boolean form an instance of the property is evaluated as
+// (§16.12.1) is kept from a spec without its ';' too: the clock, the disable
+// condition and the whole disjunction.
+TEST(AssertionSemanticsParsing, AClockedBooleanSpecWithoutItsSemicolonIsKept) {
+  auto r = Parse(
+      "module m;\n"
+      "  property p;\n"
+      "    @(posedge clk) disable iff (rst) !req || en\n"
+      "  endproperty\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* decl = FindItemByKind(r, ModuleItemKind::kPropertyDecl);
+  ASSERT_NE(decl, nullptr);
+  ASSERT_EQ(decl->prop_clock.size(), 1u);
+  EXPECT_NE(decl->prop_disable_iff, nullptr);
+  ASSERT_NE(decl->prop_body_expr, nullptr);
+  EXPECT_EQ(decl->prop_body_expr->kind, ExprKind::kBinary);
 }
 
 }  // namespace

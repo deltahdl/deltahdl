@@ -150,6 +150,32 @@ TEST(DeclaringProperties, InstanceMayPrecedeTheDeclaration) {
   EXPECT_EQ(f.ctx.FindVariable("fails")->value.ToUint64(), 2u);
 }
 
+// A.2.10 makes the ';' after a property declaration's spec optional, and an
+// instance of a property that leaves it out is evaluated as it would be with
+// one: p_guarded(sig, rst) is the assertion above, one pass and one failure,
+// and p_next(sig), an implication, fails once, at tick 3, where sig, high at
+// 2, is high again; left unread, neither assertion would be evaluated.
+TEST(DeclaringProperties, ASpecWithoutItsSemicolonIsEvaluated) {
+  SimFixture f;
+  auto* passes = RunAndFindVar(
+      PropertySource(
+          std::string("  int next_fails = 0;\n"
+                      "  property p_guarded(x, r);\n"
+                      "    @(posedge clk) disable iff (r) !x\n"
+                      "  endproperty\n"
+                      "  property p_next(x);\n"
+                      "    @(posedge clk) x |=> !x\n"
+                      "  endproperty\n"
+                      "  n: assert property (p_next(sig)) else next_fails++;\n"
+                      "  a: assert property (p_guarded(sig, rst))") +
+          kCounting),
+      f, "passes");
+  ASSERT_NE(passes, nullptr);
+  EXPECT_EQ(passes->value.ToUint64(), 1u);
+  EXPECT_EQ(f.ctx.FindVariable("fails")->value.ToUint64(), 1u);
+  EXPECT_EQ(f.ctx.FindVariable("next_fails")->value.ToUint64(), 1u);
+}
+
 // §16.12 with §16.8: an instance of a property that omits a formal with a
 // default actual takes the default. a is high at the rises of 5, 25 and 55 and
 // b at 15, 35, 65 and 85, so `a ##1 b`, y defaulted to b, matches from 5, 25
