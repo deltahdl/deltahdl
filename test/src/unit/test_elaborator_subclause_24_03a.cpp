@@ -858,15 +858,15 @@ TEST(ProgramConstruct, AnUninstantiatedProgramBesideAModuleIsATopToo) {
 
 // A program a module instantiates is that module's instance and no top.
 TEST(ProgramConstruct, AnInstantiatedProgramIsNoTopLevelProgram) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
+  ProgramElabFixture f;
+  auto* design = ElaborateSource(
       "program p;\n"
       "  int b;\n"
       "endprogram\n"
       "module t;\n"
       "  p u();\n"
       "endmodule\n",
-      f);
+      f, "");
   ASSERT_NE(design, nullptr);
   ASSERT_EQ(design->top_modules.size(), 1u);
   EXPECT_EQ(design->top_modules[0]->name, "t");
