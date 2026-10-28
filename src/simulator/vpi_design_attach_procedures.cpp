@@ -16,6 +16,7 @@
 #include "elaborator/rtlir_scopes.h"
 #include "lexer/token.h"
 #include "parser/ast_class.h"
+#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
@@ -751,8 +752,9 @@ void AttachInstanceSubroutineBodies(VpiObject* instance, const BodyWalk& walk) {
 }
 
 // §37.12 detail 5 with §26.2 and §3.12.1: the body of each task and function a
-// package declares, and the compilation unit's, whose names resolve in the
-// package or the unit, standing in no module.
+// package declares, standing in no module, and each compilation unit's,
+// standing in a module of that unit (RtlirModule::unit_index) the arena keeps,
+// as a call held for later outlives the walk; their names resolve there.
 void AttachPackageSubroutineBodies(const RtlirDesign& design,
                                    const VpiObjectMap& objects,
                                    const VpiCallBuild& calls,
@@ -770,13 +772,18 @@ void AttachPackageSubroutineBodies(const RtlirDesign& design,
     }
   }
   const std::string kUnit("$unit");
-  const BodyWalk kUnitWalk{design, kNoModule, objects, kUnit, calls, build};
-  for (const ModuleItem* item : design.cu_function_decls) {
-    // §8.24: a method body written outside its class is no task of the unit,
-    // and its class defn's method walks it.
-    const auto kMade = calls.subroutines.find({item, kUnit});
-    if (kMade != calls.subroutines.end()) {
-      WalkSubroutineBody(*item, kMade->second, kUnitWalk);
+  for (const VpiUnitScope& at : VpiUnitScopes(design, objects)) {
+    auto* in_unit = build.arena.Create<RtlirModule>();
+    in_unit->unit_index = at.index;
+    const BodyWalk kUnitWalk{design, *in_unit, objects, kUnit, calls, build};
+    for (const ModuleItem* item : at.unit->cu_items) {
+      // A DPI import has no body. §8.24: a method body written outside its
+      // class is no task of the unit, and its class defn's method walks it.
+      if (item->kind == ModuleItemKind::kDpiImport) continue;
+      const auto kMade = calls.subroutines.find({item, kUnit});
+      if (kMade != calls.subroutines.end()) {
+        WalkSubroutineBody(*item, kMade->second, kUnitWalk);
+      }
     }
   }
 }

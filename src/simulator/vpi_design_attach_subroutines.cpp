@@ -439,17 +439,18 @@ const ModuleItem* DpiImportNamed(const RtlirModule& mod,
   return nullptr;
 }
 
-// §35.5.4: the task or function the compilation unit of `design` imports
-// through DPI under `name`, null for none.
-const ModuleItem* UnitDpiImportNamed(const RtlirDesign& design,
-                                     std::string_view name) {
-  if (design.compilation_unit == nullptr) return nullptr;
-  for (const ModuleItem* item : design.compilation_unit->cu_items) {
-    if (item->kind == ModuleItemKind::kDpiImport && item->name == name) {
-      return item;
-    }
-  }
-  return nullptr;
+// §3.12.1 with §35.5.4: the task or function the compilation unit a site of
+// `mod` stands in declares or imports through DPI under `name`: the unit `mod`
+// was declared in where each file is a unit of its own, whose subroutines
+// alone its names reach, and otherwise the one unit; null for none.
+const ModuleItem* UnitSubroutineNamed(const RtlirDesign& design,
+                                      const RtlirModule& mod,
+                                      std::string_view name) {
+  const CompilationUnit* unit =
+      mod.unit_index >= 0
+          ? design.compilation_units[static_cast<std::size_t>(mod.unit_index)]
+          : design.compilation_unit;
+  return unit == nullptr ? nullptr : SubroutineNamed(unit->cu_items, name);
 }
 
 // `decl` with the object made for it in the scope keyed `key`, null where
@@ -673,10 +674,7 @@ VpiCalledSubroutine VpiNamedSubroutine(const VpiCallSite& site,
     return Called(found, site.prefix, site.made);
   }
   if (const ModuleItem* found =
-          SubroutineNamed(site.design.cu_function_decls, name)) {
-    return Called(found, "$unit", site.made);
-  }
-  if (const ModuleItem* found = UnitDpiImportNamed(site.design, name)) {
+          UnitSubroutineNamed(site.design, site.mod, name)) {
     return Called(found, "$unit", site.made);
   }
   for (const RtlirImport& entry : site.mod.imports) {

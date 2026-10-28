@@ -154,6 +154,10 @@ inline VpiHandle FindObjectForFlatName(
 struct VpiUnitScope {
   const CompilationUnit* unit;
   VpiObject* scope;
+  // The unit's place in RtlirDesign::compilation_units, the
+  // RtlirModule::unit_index of what it declares; -1 for the one unit of a
+  // design of one.
+  int index;
 };
 
 // The compilation units of `design`, each with its scope object among
@@ -166,14 +170,16 @@ inline std::vector<VpiUnitScope> VpiUnitScopes(
   std::vector<VpiUnitScope> units;
   units.reserve(design.compilation_units.size());
   for (std::size_t k = 0; k < design.compilation_units.size(); ++k) {
-    units.push_back({design.compilation_units[k],
-                     FindObjectForFlatName(
-                         objects, UnitScopes::ScopeName(static_cast<int>(k)))});
+    const int kIndex = static_cast<int>(k);
+    units.push_back(
+        {design.compilation_units[k],
+         FindObjectForFlatName(objects, UnitScopes::ScopeName(kIndex)),
+         kIndex});
   }
   if (units.empty() && design.compilation_unit != nullptr) {
-    units.push_back(
-        {design.compilation_unit,
-         FindObjectForFlatName(objects, UnitScopes::ScopeName(-1))});
+    units.push_back({design.compilation_unit,
+                     FindObjectForFlatName(objects, UnitScopes::ScopeName(-1)),
+                     -1});
   }
   return units;
 }

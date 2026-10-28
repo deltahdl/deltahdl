@@ -326,6 +326,23 @@ TEST(SeparateUnitsSim, EachUnitsTaskRunsInItsOwnTimeScale) {
 // The names each compilation unit reaches, one list per unit.
 using NamesByUnit = std::vector<std::vector<std::string>>;
 
+// Three files each a compilation unit: the first two each declare a function
+// f and a task t of their own and a variable marking the unit, mark0 and
+// mark1; the first's top, holding `top_items`, instantiates the second's
+// child, holding `child_items`, as c; the third declares nothing outside its
+// module.
+std::vector<std::string> UnitsOfOneName(std::string_view top_items,
+                                        std::string_view child_items) {
+  const std::string kOwn =
+      "function int f(); return 1; endfunction\n"
+      "task t(); endtask\n";
+  return {"int mark0;\n" + kOwn + "module top; child c();\n" +
+              std::string(top_items) + "endmodule\n",
+          "int mark1;\n" + kOwn + "module child;\n" + std::string(child_items) +
+              "endmodule\n",
+          "module other; endmodule\n"};
+}
+
 class SeparateUnitsVpi : public VpiDesignRun {
  protected:
   void RunUnits(const std::vector<std::string>& srcs) {
@@ -346,6 +363,22 @@ class SeparateUnitsVpi : public VpiDesignRun {
     }
     std::ranges::sort(reached);
     return reached;
+  }
+
+  // The compilation unit whose scope declares the variable `marker`, null for
+  // none.
+  static VpiObject* UnitMarked(std::string_view marker) {
+    for (vpiHandle pkg : ObjectsOf(vpiPackage, nullptr)) {
+      if (Named(vpiVariables, pkg, marker) != nullptr) return VpiObjectOf(pkg);
+    }
+    return nullptr;
+  }
+
+  // The compilation unit holding the task or function `relation` of `call`
+  // reaches, null where there is no call or it reaches nothing.
+  static VpiObject* UnitOfCallee(vpiHandle call, int relation) {
+    vpiHandle callee = call == nullptr ? nullptr : vpi_handle(relation, call);
+    return callee == nullptr ? nullptr : VpiObjectOf(callee)->parent;
   }
 
   // §37.10 detail 5: each object of `type` a compilation unit reaches is
@@ -515,6 +548,126 @@ TEST_F(SeparateUnitsVpi, AUnitsTypedefIsATypespecOfItsOwnScope) {
        "module child; endmodule\n", "module other; endmodule\n"});
   EXPECT_EQ(NamesPerUnit(vpiTypedef), (NamesByUnit{{}, {}, {"nib_t"}}));
   ExpectUnitFullNames(vpiTypedef);
+}
+
+// §3.12.1 with §37.42: where two units each declare a function f, a call
+// written in a module of each unit reaches its own unit's f, the one its run
+// calls.
+TEST_F(SeparateUnitsVpi, AModulesCallReachesItsOwnUnitsFunction) {
+  RunUnits(UnitsOfOneName("initial begin : b void'(f()); end\n",
+                          "initial begin : b void'(f()); end\n"));
+  ASSERT_NE(UnitMarked("mark0"), nullptr);
+  ASSERT_NE(UnitMarked("mark1"), nullptr);
+  EXPECT_EQ(UnitOfCallee(CallOf(vpiFuncCall, By("top.b"), "f"), vpiFunction),
+            UnitMarked("mark0"));
+  EXPECT_EQ(UnitOfCallee(CallOf(vpiFuncCall, By("top.c.b"), "f"), vpiFunction),
+            UnitMarked("mark1"));
+}
+
+// A task enable written in each unit reaches its own unit's task.
+TEST_F(SeparateUnitsVpi, AModulesTaskEnableReachesItsOwnUnitsTask) {
+  RunUnits(UnitsOfOneName("initial begin : b t(); end\n",
+                          "initial begin : b t(); end\n"));
+  ASSERT_NE(UnitMarked("mark1"), nullptr);
+  EXPECT_EQ(UnitOfCallee(CallOf(vpiTaskCall, By("top.b"), "t"), vpiTask),
+            UnitMarked("mark0"));
+  EXPECT_EQ(UnitOfCallee(CallOf(vpiTaskCall, By("top.c.b"), "t"), vpiTask),
+            UnitMarked("mark1"));
+}
+
+// A call in a generate block of the second unit's module reaches that unit's
+// f.
+TEST_F(SeparateUnitsVpi, AGenerateBlocksCallReachesItsOwnUnitsFunction) {
+  RunUnits(UnitsOfOneName(
+      "", "if (1) begin : g\n  initial begin : b void'(f()); end\nend\n"));
+  ASSERT_NE(UnitMarked("mark1"), nullptr);
+  EXPECT_EQ(
+      UnitOfCallee(CallOf(vpiFuncCall, By("top.c.g.b"), "f"), vpiFunction),
+      UnitMarked("mark1"));
+}
+
+// A call in the body of a task the second unit's module declares reaches that
+// unit's f.
+TEST_F(SeparateUnitsVpi, AModuleTasksCallReachesItsOwnUnitsFunction) {
+  RunUnits(UnitsOfOneName("", "task k(); void'(f()); endtask\n"));
+  vpiHandle k = Named(vpiTaskFunc, By("top.c"), "k");
+  ASSERT_NE(k, nullptr);
+  ASSERT_NE(UnitMarked("mark1"), nullptr);
+  EXPECT_EQ(UnitOfCallee(vpi_handle(vpiStmt, k), vpiFunction),
+            UnitMarked("mark1"));
+}
+
+// A call in a continuous assignment of the second unit's module reaches that
+// unit's f.
+TEST_F(SeparateUnitsVpi, AContinuousAssignmentsCallReachesItsOwnUnitsFunction) {
+  RunUnits(UnitsOfOneName("", "wire [31:0] y;\nassign y = f();\n"));
+  const std::vector<vpiHandle> kAssigns = ObjectsOf(vpiContAssign, By("top.c"));
+  ASSERT_EQ(kAssigns.size(), 1U);
+  ASSERT_NE(UnitMarked("mark1"), nullptr);
+  EXPECT_EQ(UnitOfCallee(vpi_handle(vpiRhs, kAssigns[0]), vpiFunction),
+            UnitMarked("mark1"));
+}
+
+// A call in an interface's and in a program's initial procedure, each declared
+// and instantiated in the second unit, reaches that unit's f.
+TEST_F(SeparateUnitsVpi, AnInterfacesAndAProgramsCallsReachTheirUnitsFunction) {
+  RunUnits(
+      {"int mark0;\n"
+       "function int f(); return 1; endfunction\n"
+       "module top; child c(); endmodule\n",
+       "int mark1;\n"
+       "function int f(); return 2; endfunction\n"
+       "interface ifc; initial begin : b void'(f()); end endinterface\n"
+       "program pg; initial begin : b void'(f()); end endprogram\n"
+       "module child; ifc i(); pg p(); endmodule\n",
+       "module other; endmodule\n"});
+  ASSERT_NE(UnitMarked("mark1"), nullptr);
+  EXPECT_EQ(
+      UnitOfCallee(CallOf(vpiFuncCall, By("top.c.i.b"), "f"), vpiFunction),
+      UnitMarked("mark1"));
+  EXPECT_EQ(
+      UnitOfCallee(CallOf(vpiFuncCall, By("top.c.p.b"), "f"), vpiFunction),
+      UnitMarked("mark1"));
+}
+
+// A call in the body of a task each unit itself declares reaches the f of the
+// unit declaring the task.
+TEST_F(SeparateUnitsVpi, AUnitTasksCallReachesItsOwnUnitsFunction) {
+  RunUnits(
+      {"function int f(); return 1; endfunction\n"
+       "task u(); void'(f()); endtask\n"
+       "module top; child c(); endmodule\n",
+       "function int f(); return 2; endfunction\n"
+       "task u(); void'(f()); endtask\n"
+       "module child; endmodule\n",
+       "module other; endmodule\n"});
+  int walked = 0;
+  for (vpiHandle pkg : ObjectsOf(vpiPackage, nullptr)) {
+    vpiHandle u = Named(vpiTaskFunc, pkg, "u");
+    if (u == nullptr) continue;
+    EXPECT_EQ(UnitOfCallee(vpi_handle(vpiStmt, u), vpiFunction),
+              VpiObjectOf(pkg));
+    ++walked;
+  }
+  EXPECT_EQ(walked, 2);
+}
+
+// §35.5.4: a call of a function both units import through DPI, written in the
+// second unit's module, reaches that unit's import.
+TEST_F(SeparateUnitsVpi, AModulesDpiCallReachesItsOwnUnitsImport) {
+  RunUnits(
+      {"int mark0;\n"
+       "import \"DPI-C\" function int c_f();\n"
+       "module top; child c(); endmodule\n",
+       "int mark1;\n"
+       "import \"DPI-C\" function int c_f();\n"
+       "module child; initial if (0) begin : b void'(c_f()); end\n"
+       "endmodule\n",
+       "module other; endmodule\n"});
+  ASSERT_NE(UnitMarked("mark1"), nullptr);
+  EXPECT_EQ(
+      UnitOfCallee(CallOf(vpiFuncCall, By("top.c.b"), "c_f"), vpiFunction),
+      UnitMarked("mark1"));
 }
 
 }  // namespace
