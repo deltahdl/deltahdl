@@ -7,11 +7,14 @@
 
 #include "common/types.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_type.h"
+#include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/variable.h"
 #include "simulator/vpi_design_attach_assigns_internal.h"
 #include "simulator/vpi_design_attach_build.h"
+#include "simulator/vpi_design_attach_typespecs.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_object.h"
@@ -109,9 +112,10 @@ bool ElementsAreTwoState(const VpiObject& array) {
 // §6.11 and §11.8.1: whether `expr` is 2-state. A variable of a built-in type
 // is as its type is, and one of a structure, union, enumeration or packed
 // array of them as the run's storage for it records (§7.2.1, §7.3.1, §6.19,
-// §7.4.1); a bit, a select or an element as what it selects from, an unpacked
-// array as its elements, and an operation when every operand is; a literal
-// and any other expression are taken as 4-state.
+// §7.4.1), or, for a task's or function's variable, which has none, as its
+// declaration does; a bit, a select or an element as what it selects from, an
+// unpacked array as its elements, and an operation when every operand is; a
+// literal and any other expression are taken as 4-state.
 bool IsTwoState(VpiObject& expr) {
   if (expr.type == vpiOperation) {
     const std::vector<VpiHandle> kOperands = VpiOperationOperands(&expr);
@@ -133,7 +137,8 @@ bool IsTwoState(VpiObject& expr) {
     case vpiUnionVar:
     case vpiEnumVar:
     case vpiPackedArrayVar:
-      return expr.var != nullptr && !expr.var->is_4state;
+      return expr.var != nullptr ? !expr.var->is_4state
+                                 : expr.decl_facts.two_state;
     default:
       break;
   }
@@ -149,11 +154,68 @@ bool IsTwoState(VpiObject& expr) {
   }
 }
 
+// `made`, the object the model builds for `expr`, or where it builds none, as
+// for a logical equivalence (§11.4.7), which no operation type names, a
+// stand-in as wide and as signed as its value where the source wrote it, of a
+// nature IsTwoState takes as 4-state.
+VpiObject& ObjectOrStandIn(VpiObject* made, const Expr* expr,
+                           const AssignBuild& build) {
+  if (made != nullptr) return *made;
+  const Logic4Vec kValue = ValueWhereWritten(expr, build);
+  VpiObject* stand_in = build.alloc();
+  stand_in->size = static_cast<int>(kValue.width);
+  stand_in->decl_signed = kValue.is_signed;
+  return *stand_in;
+}
+
+// §6.24.1 with §11.8.1: a vector typespec `size` bits wide, of the 2- or
+// 4-state nature and the signedness of `like`.
+VpiObject* VectorTypespec(VpiObject& like, int size, const AssignBuild& build) {
+  VpiObject* typespec = build.alloc();
+  typespec->type = IsTwoState(like) ? vpiBitTypespec : vpiLogicTypespec;
+  typespec->decl_signed = like.decl_signed;
+  typespec->size = size;
+  return typespec;
+}
+
+// §6.23: the typespec of the type of `expr`, an expression a type reference
+// writes where `build` stands: the typespec its object relates to, for a
+// variable that of the type it was declared with (§37.17), and otherwise that
+// of its self-determined type, a vector of its 2- or 4-state nature, width and
+// signedness, as an operation's is (§11.8.1).
+VpiObject* ExpressionTypespec(const Expr& expr, const AssignBuild& build) {
+  VpiObject& typed =
+      ObjectOrStandIn(ExpressionObject(&expr, build), &expr, build);
+  for (VpiObject* child : typed.children) {
+    if (VpiIsTypespecType(child->type)) return child;
+  }
+  return VectorTypespec(typed, typed.size, build);
+}
+
+// §6.23: the typespec of the type the type reference `ref` refers to, where
+// it is written as `build` stands: of a data type it writes, the typedef or
+// type parameter a name finds there (TypedefVisible) or a built-in type over
+// the packed dimensions written; of an expression it writes, the
+// expression's type (ExpressionTypespec).
+VpiObject* TypeRefTypespec(const Expr& ref, const AssignBuild& build) {
+  const DataType* written = ref.type_value;
+  if (written == nullptr) return ExpressionTypespec(*ref.lhs, build);
+  if (written->kind == DataTypeKind::kNamed) {
+    return TypedefVisible(written->type_name, build);
+  }
+  return VpiKeywordTypespec(*written, nullptr, *build.sim,
+                            {build.alloc, build.keep, build.sim->GetArena()});
+}
+
 // The typespec `cast` names, where it is written as `build` stands: a typedef
 // or type parameter visible there (TypedefVisible), one a package declares
-// where the cast names it through the package, pk::t (§26.3), or a built-in
-// type a keyword names; null where it names none of them.
+// where the cast names it through the package, pk::t (§26.3), the type a type
+// reference refers to (§6.23), or a built-in type a keyword names; null where
+// it names none of them.
 VpiObject* NamedTypespec(const Expr& cast, const AssignBuild& build) {
+  if (cast.text.empty() && cast.rhs->kind == ExprKind::kTypeRef) {
+    return TypeRefTypespec(*cast.rhs, build);
+  }
   if (cast.text.empty() && cast.rhs->kind == ExprKind::kMemberAccess) {
     const auto kScoped = build.names.unit_typespecs.find(
         std::string(cast.rhs->lhs->text) +
@@ -177,18 +239,11 @@ VpiObject* NamedTypespec(const Expr& cast, const AssignBuild& build) {
 }
 
 // What the cast operation `op`, written as `cast`, casts: its operand's
-// object, or where the model builds none, as for a logical equivalence
-// (§11.4.7), which no operation type names, a stand-in as wide and as signed
-// as its value where the source wrote it, of a nature IsTwoState takes as
-// 4-state.
+// object, or ObjectOrStandIn's stand-in where the model builds none.
 VpiObject& CastOperand(VpiObject& op, const Expr& cast,
                        const AssignBuild& build) {
-  if (!op.children.empty()) return *op.children.front();
-  const Logic4Vec kValue = ValueWhereWritten(cast.lhs, build);
-  VpiObject* stand_in = build.alloc();
-  stand_in->size = static_cast<int>(kValue.width);
-  stand_in->decl_signed = kValue.is_signed;
-  return *stand_in;
+  return ObjectOrStandIn(op.children.empty() ? nullptr : op.children.front(),
+                         cast.lhs, build);
 }
 
 // §6.24.1: the typespec a cast naming no type makes from `operand`, what it
@@ -198,21 +253,20 @@ VpiObject& CastOperand(VpiObject& op, const Expr& cast,
 // operand's type. Null for any other cast.
 VpiObject* OperandTypespec(const Expr& cast, VpiObject& operand,
                            const AssignBuild& build) {
-  const bool kSigning = cast.text == "signed" || cast.text == "unsigned";
   // A size cast's width is an expression the model has an object for, which
   // a type the cast names is not.
-  const bool kSize =
-      cast.text.empty() && ExpressionObject(cast.rhs, build) != nullptr;
-  if (!kSigning && !kSize && cast.text != "const") return nullptr;
+  if (cast.text.empty() && ExpressionObject(cast.rhs, build) != nullptr) {
+    return VectorTypespec(
+        operand, static_cast<int>(ConstantWhereWritten(cast.rhs, build)),
+        build);
+  }
+  const bool kSigning = cast.text == "signed" || cast.text == "unsigned";
+  if (!kSigning && cast.text != "const") return nullptr;
   VpiObject* typespec = build.alloc();
-  typespec->type =
-      kSize ? (IsTwoState(operand) ? vpiBitTypespec : vpiLogicTypespec)
-            : OperandTypespecKind(operand);
+  typespec->type = OperandTypespecKind(operand);
   typespec->decl_signed =
       kSigning ? cast.text == "signed" : operand.decl_signed;
-  typespec->size = kSize
-                       ? static_cast<int>(ConstantWhereWritten(cast.rhs, build))
-                       : operand.size;
+  typespec->size = operand.size;
   return typespec;
 }
 

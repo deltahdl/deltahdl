@@ -23,6 +23,11 @@ struct VpiDeclFacts {
   // names whether or not the design instantiates the interface; null for any
   // other variable.
   const ModuleDecl* vif_interface = nullptr;
+  // §6.11.2: whether a task's or function's variable (§37.12), which the run
+  // keeps no storage of its own for, was declared of a 2-state type: a packed
+  // structure or union with no 4-state member (§7.2.1, §7.3.1), an
+  // enumeration of a 2-state base (§6.19), or a 2-state integer type.
+  bool two_state = false;
 };
 
 }  // namespace delta

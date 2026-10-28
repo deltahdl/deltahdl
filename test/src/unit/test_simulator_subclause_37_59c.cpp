@@ -202,6 +202,16 @@ std::vector<int> CastTypespecKinds(const std::vector<vpiHandle>& rights) {
   return kinds;
 }
 
+// The number of elements the first range `typespec` reaches holds, 0 for a
+// typespec reaching none.
+int FirstRangeSize(vpiHandle typespec) {
+  vpiHandle ranges = vpi_iterate(vpiRange, typespec);
+  if (ranges == nullptr) return 0;
+  const int kSize = vpi_get(vpiSize, vpi_scan(ranges));
+  vpi_release_handle(ranges);
+  return kSize;
+}
+
 // ...or, for a size cast, a vector keeping the operand's 2-state nature
 // (§6.24.1)...
 TEST_F(AssignedExpressionsOfARun, ASizeCastOfATwoStateOperandIsABitVector) {
@@ -313,6 +323,31 @@ TEST_F(AssignedExpressionsOfARun, ACastToATypeParameterHasTheTypeItStandsFor) {
   EXPECT_EQ(vpi_get(vpiType, typespec), vpiBitTypespec);
 }
 
+// A cast to a type reference (§6.23) has the typespec of the type it refers
+// to: of a variable it names, the type the variable was declared with, a bit
+// vector of four bits or a byte; of a typedef it names, the typedef's; of a
+// built-in type it writes, that type over the range written, twelve bits; and
+// of an operation, its self-determined type, a 2-state vector where every
+// operand is 2-state (§11.8.1).
+TEST_F(AssignedExpressionsOfARun, ACastToATypeReferenceHasTheTypeItRefersTo) {
+  Run("module top; typedef logic [5:0] six_t; bit [3:0] n; byte s;\n"
+      "  logic [15:0] v; int d;\n"
+      "  initial begin\n"
+      "    d = type(n)'(v); d = type(s)'(v); d = type(six_t)'(v);\n"
+      "    d = type(bit [11:0])'(v); d = type(n + n)'(v);\n"
+      "  end\n"
+      "endmodule\n");
+  const std::vector<vpiHandle> kRights = ProcedureRightSides();
+  const std::vector<int> kKinds = {vpiBitTypespec, vpiByteTypespec,
+                                   vpiLogicTypespec, vpiBitTypespec,
+                                   vpiBitTypespec};
+  EXPECT_EQ(CastTypespecKinds(kRights), kKinds);
+  ASSERT_EQ(kRights.size(), kKinds.size());
+  EXPECT_EQ(FirstRangeSize(CastTypespec(kRights[0])), 4);
+  EXPECT_STREQ(vpi_get_str(vpiName, CastTypespec(kRights[2])), "six_t");
+  EXPECT_EQ(FirstRangeSize(CastTypespec(kRights[3])), 12);
+}
+
 // A cast to a typedef a package declares has its typespec, whether it names
 // the typedef through the package (§26.3) or a wildcard or an explicit import
 // makes it visible; and so does a cast to one the compilation unit declares
@@ -349,6 +384,40 @@ TEST_F(AssignedExpressionsOfARun,
   vpiHandle named = CastTypespec(vpi_handle(vpiExpr, By("top.u.v")));
   ASSERT_NE(named, nullptr);
   EXPECT_STREQ(vpi_get_str(vpiName, named), "nib_t");
+}
+
+// A cast in a variable's initialization expression finds a typedef a package
+// declares, named through the package or made visible by an import (§26.3),
+// and one the compilation unit declares (§3.12.1), as one in a procedure does.
+TEST_F(AssignedExpressionsOfARun,
+       ACastInAnInitializerFindsATypedefOfAPackageOrTheUnit) {
+  Run("package pk; typedef logic [3:0] nib_t; typedef bit [5:0] six_t;\n"
+      "endpackage\n"
+      "typedef shortint unit_t;\n"
+      "module sub; import pk::*; logic [7:0] x;\n"
+      "  logic [3:0] a = pk::nib_t'(x); logic [5:0] b = six_t'(x);\n"
+      "  shortint c = unit_t'(x);\n"
+      "endmodule\n"
+      "module top; sub u(); endmodule\n");
+  const std::vector<int> kKinds = {vpiLogicTypespec, vpiBitTypespec,
+                                   vpiShortIntTypespec};
+  EXPECT_EQ(CastTypespecKinds({vpi_handle(vpiExpr, By("top.u.a")),
+                               vpi_handle(vpiExpr, By("top.u.b")),
+                               vpi_handle(vpiExpr, By("top.u.c"))}),
+            kKinds);
+}
+
+// A cast in the first top module's variable initializer finds a typedef the
+// top declares (§6.18), though the top's instance is keyed under its name
+// rather than under the empty prefix its expressions are written with.
+TEST_F(AssignedExpressionsOfARun,
+       ACastInTheFirstTopsInitializerFindsItsTypedef) {
+  Run("module top; typedef bit [3:0] nib_t; logic [7:0] r;\n"
+      "  logic [3:0] v = nib_t'(r);\n"
+      "endmodule\n");
+  vpiHandle typespec = CastTypespec(vpi_handle(vpiExpr, By("top.v")));
+  ASSERT_NE(typespec, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, typespec), "nib_t");
 }
 
 // A size cast is as wide as the constant its width is, an operation over a
@@ -445,6 +514,30 @@ TEST_F(AssignedExpressionsOfARun,
   vpiHandle typespec = CastTypespec(vpi_handle(vpiRhs, assign));
   ASSERT_NE(typespec, nullptr);
   EXPECT_EQ(vpi_get(vpiType, typespec), vpiLogicTypespec);
+}
+
+// A size cast of a structure all of whose members are 2-state is a bit vector
+// (§7.2.1) wherever the structure is declared: as a task's argument or a
+// function's local, variables the run keeps no storage of their own for, and
+// as the member of a structure, whose storage is a copy of the member's bits.
+TEST_F(AssignedExpressionsOfARun,
+       ASizeCastOfATwoStateStructWithoutItsOwnStorageIsABitVector) {
+  Run("module top; typedef struct packed { bit [3:0] a; byte b; } s2_t;\n"
+      "  typedef struct packed { s2_t in; logic c; } o_t;\n"
+      "  o_t o; logic [3:0] x, y;\n"
+      "  task t(input s2_t s); y = 4'(s); endtask\n"
+      "  function void f(); s2_t l; y = 4'(l); endfunction\n"
+      "  initial begin x = 4'(o.in); end\n"
+      "endmodule\n");
+  std::vector<vpiHandle> rights;
+  for (const char* name : {"t", "f"}) {
+    vpiHandle assign = vpi_handle(vpiStmt, Named(vpiTaskFunc, By("top"), name));
+    rights.push_back(assign != nullptr ? vpi_handle(vpiRhs, assign) : nullptr);
+  }
+  const std::vector<vpiHandle> kProcedure = ProcedureRightSides();
+  rights.insert(rights.end(), kProcedure.begin(), kProcedure.end());
+  EXPECT_EQ(CastTypespecKinds(rights),
+            (std::vector<int>{vpiBitTypespec, vpiBitTypespec, vpiBitTypespec}));
 }
 
 // Every expression has vpiSize, an operation's being its self-determined

@@ -411,6 +411,15 @@ VpiObject* VpiInstanceExpression(const Expr* expr, const VpiObjectMap& objects,
                                  const std::string& prefix, SimContext& ctx,
                                  const VpiAttachBuild& build);
 
+// The same of an expression the instance `instance` of `mod` writes, whose
+// names find the instance's declarations, then those of the packages `mod`
+// imports (§26.3) and of the compilation unit it was declared in (§3.12.1).
+VpiObject* VpiModuleExpression(const Expr* expr, const RtlirModule& mod,
+                               const VpiObject* instance,
+                               const VpiObjectMap& objects,
+                               const std::string& prefix, SimContext& ctx,
+                               const VpiAttachBuild& build);
+
 // §37.42 with §37.12: where a call written outside every procedure stands:
 // the scope its vpiScope reaches - the instance, gen scope, clocking block,
 // package or class defn it is written in - and the module whose declarations
@@ -439,6 +448,14 @@ struct VpiExprNames {
   // §37.42: where a call the expression makes stands, which makes it a tf
   // call as a procedure's is once shaped; null to leave it unshaped.
   const VpiCallStand* stand = nullptr;
+  // §26.3 with §3.12.1: the module the expression is written in, through
+  // whose imports and compilation unit a name it does not declare may name a
+  // package's or the unit's declaration; null for none.
+  const RtlirModule* mod = nullptr;
+  // The instance object whose declarations a name finds where `scope` is
+  // none; null for the one `prefix` keys, which a first top's empty prefix
+  // keys none of.
+  const VpiObject* instance = nullptr;
 };
 
 // The same of an expression written in the generate block instances `names`

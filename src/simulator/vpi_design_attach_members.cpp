@@ -213,6 +213,12 @@ VpiObject* MakeMember(VpiObject* holder, const StructFieldInfo& field,
   storage->value.is_signed = field.is_signed;
   storage->value.is_real =
       member->type == vpiRealVar || member->type == vpiShortRealVar;
+  // §7.2.1 and §7.3.1: the copy of a structure or union member is 2-state
+  // where none of the member's own members is 4-state, as a variable of the
+  // member's type is.
+  if (field.nested != nullptr) {
+    storage->is_4state = HasFourStateMember(*field.nested);
+  }
   member->var = storage;
   member->size = static_cast<int>(field.width);
   member->member_of = holder;

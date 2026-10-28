@@ -865,6 +865,18 @@ VpiObject* VpiInstanceExpression(const Expr* expr, const VpiObjectMap& objects,
                                build);
 }
 
+VpiObject* VpiModuleExpression(const Expr* expr, const RtlirModule& mod,
+                               const VpiObject* instance,
+                               const VpiObjectMap& objects,
+                               const std::string& prefix, SimContext& ctx,
+                               const VpiAttachBuild& build) {
+  static const GenBlockPrefixes kNoGenBlocks;
+  return VpiGenBlockExpression(expr,
+                               {objects, prefix, kNoGenBlocks, nullptr, nullptr,
+                                nullptr, &mod, instance},
+                               ctx, build);
+}
+
 VpiObject* VpiGenBlockExpression(const Expr* expr, const VpiExprNames& names,
                                  SimContext& ctx, const VpiAttachBuild& build) {
   // §37.42: a call made where the names stand is held, unshaped and without
@@ -877,15 +889,24 @@ VpiObject* VpiGenBlockExpression(const Expr* expr, const VpiExprNames& names,
       return true;
     };
   }
+  // §26.3 with §3.12.1: a name it does not declare finds a package's
+  // declaration through its module's imports, then its compilation unit's;
+  // a type a cast names among them is one AttachTypespecs answered.
   return ExpressionObject(
-      expr, AssignBuild{build.alloc,
-                        &ctx,
-                        AssignNames{names.objects, names.prefix,
-                                    names.gen_prefixes, names.scope},
-                        {},
-                        build.keep,
-                        defer,
-                        names.attrs});
+      expr,
+      AssignBuild{
+          build.alloc,
+          &ctx,
+          AssignNames{names.objects, names.prefix, names.gen_prefixes,
+                      names.scope, AssignNames::NoGenvars(), names.instance,
+                      names.mod != nullptr ? names.mod->imports
+                                           : AssignNames::NoImports(),
+                      names.mod != nullptr ? names.mod->unit_index : -1,
+                      build.unit_typespecs},
+          {},
+          build.keep,
+          defer,
+          names.attrs});
 }
 
 namespace {

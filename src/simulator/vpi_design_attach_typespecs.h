@@ -20,6 +20,12 @@ VpiObject* VpiNettypeTypespec(const DataType& type, const VpiObject& scope,
                               VpiObject* decl, SimContext& ctx,
                               const VpiAttachBuild& build);
 
+// §37.25: a typespec of the kind of the built-in type `type`, hung from
+// `parent`, reaching a range per packed dimension written over it, evaluated
+// through `ctx`; null for a kind no typespec stands for.
+VpiObject* VpiKeywordTypespec(const DataType& type, VpiObject* parent,
+                              SimContext& ctx, const VpiAttachBuild& build);
+
 // §37.14 (figure): relate each port of the design's instances to the
 // typespec of the type its declaration wrote, its dimensions evaluated in the
 // instance through `ctx`, a typedef's among those its instance declares or

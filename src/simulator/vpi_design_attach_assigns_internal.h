@@ -37,8 +37,9 @@ struct AssignNames {
   // stands in, each with the value it holds in the block instance; none for
   // any other expression.
   const GenBlockConsts& genvars = NoGenvars();
-  // The instance object a continuous assignment stands in, where `scope` is
-  // none; a top's prefix is empty and keys no object.
+  // The instance object a continuous assignment or an expression its module
+  // writes outside every procedure stands in, where `scope` is none; a top's
+  // prefix is empty and keys no object.
   const VpiObject* instance = nullptr;
   // §26.3: the imports of the module the expression is written in, through
   // which a name it does not declare may name a package's let (§11.12); none

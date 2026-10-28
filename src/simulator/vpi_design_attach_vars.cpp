@@ -269,17 +269,19 @@ void VpiContext::AttachVariableFacts(const RtlirDesign* design) {
 void AttachVariableInitializers(const RtlirDesign& design,
                                 const VpiObjectMap& objects, SimContext& ctx,
                                 const VpiAttachBuild& build) {
-  WalkInstancePaths(
-      &design, [&](const RtlirModule* mod, const std::string& prefix) {
-        for (const RtlirVariable& var : mod->variables) {
-          if (var.init_expr == nullptr) continue;
-          VpiObject* obj =
-              FindObjectForFlatName(objects, VpiFlatName(prefix, var.name));
-          if (obj == nullptr) continue;
-          obj->decl_facts.init_expr =
-              VpiInstanceExpression(var.init_expr, objects, prefix, ctx, build);
-        }
-      });
+  WalkInstanceObjects(&design, objects,
+                      [&](const RtlirModule* mod, const std::string& prefix,
+                          const VpiObject* instance) {
+                        for (const RtlirVariable& var : mod->variables) {
+                          if (var.init_expr == nullptr) continue;
+                          VpiObject* obj = FindObjectForFlatName(
+                              objects, VpiFlatName(prefix, var.name));
+                          if (obj == nullptr) continue;
+                          obj->decl_facts.init_expr =
+                              VpiModuleExpression(var.init_expr, *mod, instance,
+                                                  objects, prefix, ctx, build);
+                        }
+                      });
 }
 
 int VpiVariableObjectKind(const RtlirVariable& var, const RtlirDesign& design,

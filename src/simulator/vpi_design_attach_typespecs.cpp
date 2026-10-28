@@ -836,11 +836,16 @@ VpiObject* VpiNettypeTypespec(const DataType& type, const VpiObject& scope,
     return (*kFound)->type == vpiNettypeDecl ? (*kFound)->children.front()
                                              : *kFound;
   }
+  return VpiKeywordTypespec(type, decl, ctx, build);
+}
+
+VpiObject* VpiKeywordTypespec(const DataType& type, VpiObject* parent,
+                              SimContext& ctx, const VpiAttachBuild& build) {
   const int kKind = VpiTypespecKind(type.kind);
   if (kKind == 0) return nullptr;
   VpiObject* typespec = build.alloc();
   typespec->type = kKind;
-  typespec->parent = decl;
+  typespec->parent = parent;
   for (const PackedRange& dim : WrittenPackedDims(&type, ctx)) {
     typespec->children.push_back(VpiRangeObject(typespec, dim, build));
   }
