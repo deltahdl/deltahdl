@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <initializer_list>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -417,6 +418,140 @@ TEST(SequenceRepetition, AFormalCountTakesItsActual) {
   ASSERT_NE(hits, nullptr);
   EXPECT_EQ(hits->value.ToUint64(), 1u);
   EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 35u);
+}
+
+// One run of the source with `rule`'s body `body` under `drive`, and the end
+// points it reaches: how many ticks, and the last of them, 0 where none.
+struct RepetitionRun {
+  const char* body;
+  const char* drive;
+  uint64_t hits;
+  uint64_t last;
+};
+
+void ExpectRepetitionRuns(std::initializer_list<RepetitionRun> runs) {
+  for (const RepetitionRun& run : runs) {
+    SCOPED_TRACE(run.body);
+    SimFixture f;
+    auto* hits =
+        RunAndFindVar(RepetitionSource(run.body, run.drive), f, "hits");
+    ASSERT_NE(hits, nullptr);
+    EXPECT_EQ(hits->value.ToUint64(), run.hits);
+    EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), run.last);
+  }
+}
+
+// a for the ticks at 15 and 35, b for those at 25 and 45, c for the tick at
+// 55: two runs of `a ##1 b` back to back, then c.
+const char* const kTwoGroupsThenC =
+    "    #10 a = 1;\n"
+    "    #10 a = 0; b = 1;\n"
+    "    #10 b = 0; a = 1;\n"
+    "    #10 a = 0; b = 1;\n"
+    "    #10 b = 0; c = 1;\n"
+    "    #10 c = 0;\n";
+
+// a at 15, b at 25 and c at 35: one run of `a ##1 b`, then c.
+const char* const kOneGroupThenC =
+    "    #10 a = 1;\n"
+    "    #10 a = 0; b = 1;\n"
+    "    #10 b = 0; c = 1;\n"
+    "    #10 c = 0;\n";
+
+// §16.9.2: a parenthesised sequence repeated by a range matches over any
+// number of back-to-back runs of it within the range, so `(a ##1 b)[*1:2] ##1
+// c` ends at 55 over the two runs and at 35 over one, where `[*2]` would need
+// two; `(a ##1 b)[*2:3] ##1 c` ends at 55 over the two runs and not over one.
+TEST(SequenceRepetition, AGroupRepeatedByARangeMatchesEachCountInIt) {
+  ExpectRepetitionRuns(
+      {RepetitionRun{"(a ##1 b)[*1:2] ##1 c", kTwoGroupsThenC, 1, 55},
+       RepetitionRun{"(a ##1 b)[*1:2] ##1 c", kOneGroupThenC, 1, 35},
+       RepetitionRun{"(a ##1 b)[*2:3] ##1 c", kTwoGroupsThenC, 1, 55},
+       RepetitionRun{"(a ##1 b)[*2:3] ##1 c", kOneGroupThenC, 0, 0}});
+}
+
+// §16.9.2: `$` leaves the number of runs unbounded, `(a ##1 b)[*1:$] ##1 c`
+// ending at 55 over the two runs.
+TEST(SequenceRepetition, AGroupRepeatedUnboundedlyMatchesEveryRun) {
+  SimFixture f;
+  auto* hits = RunAndFindVar(
+      RepetitionSource("(a ##1 b)[*1:$] ##1 c", kTwoGroupsThenC), f, "hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 1u);
+  EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 55u);
+}
+
+// §16.9.2.1: a range from 0 admits the empty match, `b ##1 empty ##1 c` being
+// `b ##1 c`, so `b ##1 (a ##1 a)[*0:1] ##1 c` ends at 25 over b at 15 and c
+// at 25; `[*0]` admits it alone, so with a at 25 and 35 and c at 45 the range
+// ends at 45 and `[*0]` nowhere.
+TEST(SequenceRepetition, AGroupRepeatedFromZeroAdmitsTheEmptyMatch) {
+  const char* const kBThenC =
+      "    #10 b = 1;\n"
+      "    #10 b = 0; c = 1;\n"
+      "    #10 c = 0;\n";
+  const char* const kBThenTwoAsThenC =
+      "    #10 b = 1;\n"
+      "    #10 b = 0; a = 1;\n"
+      "    #20 a = 0; c = 1;\n"
+      "    #10 c = 0;\n";
+  ExpectRepetitionRuns(
+      {RepetitionRun{"b ##1 (a ##1 a)[*0:1] ##1 c", kBThenC, 1, 25},
+       RepetitionRun{"b ##1 (a ##1 a)[*0] ##1 c", kBThenC, 1, 25},
+       RepetitionRun{"b ##1 (a ##1 a)[*0:1] ##1 c", kBThenTwoAsThenC, 1, 45},
+       RepetitionRun{"b ##1 (a ##1 a)[*0] ##1 c", kBThenTwoAsThenC, 0, 0}});
+}
+
+// §16.9.2 with §16.8: an instance of a named sequence repeated by a range is
+// the sequence over that many back-to-back runs, so `ab[*1:2] ##1 c` ends at
+// 35 over one run of `a ##1 b`.
+TEST(SequenceRepetition, AnInstanceRepeatedByARangeMatchesOneRun) {
+  SimFixture f;
+  auto* hits = RunAndFindVar(
+      "module t;\n"
+      "  logic clk = 0, a = 0, b = 0, c = 0;\n"
+      "  int hits = 0, last = 0;\n"
+      "  always #5 clk = ~clk;\n"
+      "  sequence ab; a ##1 b; endsequence\n"
+      "  initial begin\n" +
+          std::string(kOneGroupThenC) +
+          "    #40 $finish;\n"
+          "  end\n"
+          "  c1: cover property (@(posedge clk) ab[*1:2] ##1 c) begin\n"
+          "    hits++;\n"
+          "    last = $time;\n"
+          "  end\n"
+          "endmodule\n",
+      f, "hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 1u);
+  EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 35u);
+}
+
+// §16.9.2 with §16.12: a named property whose antecedent repeats a group by a
+// range is evaluated: `(a ##1 b)[*1:2] |=> c` over a at 15 and b at 25, c
+// never high, fails once, at 35, the tick after the one run ends.
+TEST(SequenceRepetition, APropertyRepeatingAGroupByARangeIsEvaluated) {
+  SimFixture f;
+  auto* fails = RunAndFindVar(
+      "module t;\n"
+      "  logic clk = 0, a = 0, b = 0, c = 0;\n"
+      "  int fails = 0;\n"
+      "  always #5 clk = ~clk;\n"
+      "  property p;\n"
+      "    @(posedge clk) (a ##1 b)[*1:2] |=> c;\n"
+      "  endproperty\n"
+      "  a1: assert property (p) else fails++;\n"
+      "  initial begin\n"
+      "    #10 a = 1;\n"
+      "    #10 a = 0; b = 1;\n"
+      "    #10 b = 0;\n"
+      "    #40 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "fails");
+  ASSERT_NE(fails, nullptr);
+  EXPECT_EQ(fails->value.ToUint64(), 1u);
 }
 
 }  // namespace

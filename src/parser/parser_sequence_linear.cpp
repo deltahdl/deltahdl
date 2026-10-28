@@ -184,22 +184,37 @@ struct ParserSeqLinearHelpers {
            AtSequenceOperator(p);
   }
 
-  // Whether the tokens ahead are a parenthesised group holding, at its own
-  // depth, a token `at` answers true for. The lexer is rewound.
-  static bool AheadGroupHolds(Parser& p, bool (*at)(Parser&)) {
-    if (!p.Check(TokenKind::kLParen)) return false;
-    auto saved = p.lexer_.SavePos();
+  // Consumes the parenthesised group at the cursor, answering whether it
+  // holds a token `at` answers true for: at its own depth, or at any depth
+  // inside it where `nested` says so.
+  static bool SkipGroupHolding(Parser& p, bool (*at)(Parser&), bool nested) {
     p.Consume();
     int depth = 1;
     bool holds = false;
     while (depth > 0 && !p.AtEnd()) {
       if (p.Check(TokenKind::kLParen)) ++depth;
       if (p.Check(TokenKind::kRParen)) --depth;
-      if (depth == 1 && at(p)) holds = true;
+      if ((depth == 1 || (nested && depth > 1)) && at(p)) holds = true;
       p.Consume();
     }
+    return holds;
+  }
+
+  // Whether the tokens ahead are a parenthesised group holding, at its own
+  // depth, a token `at` answers true for. The lexer is rewound.
+  static bool AheadGroupHolds(Parser& p, bool (*at)(Parser&)) {
+    if (!p.Check(TokenKind::kLParen)) return false;
+    auto saved = p.lexer_.SavePos();
+    bool holds = SkipGroupHolding(p, at, false);
     p.lexer_.RestorePos(saved);
     return holds;
+  }
+
+  // Whether the token is a `##`, a `throughout` or a repetition, any of which
+  // makes the group holding it more than one operand or a repeated one.
+  static bool AtChainToken(Parser& p) {
+    return p.Check(TokenKind::kHashHash) || p.Check(TokenKind::kKwThroughout) ||
+           AtRepetitionBracket(p);
   }
 
   // Whether the tokens ahead are a parenthesised group holding a `##`, a `,`,
@@ -368,14 +383,12 @@ struct ParserSeqLinearHelpers {
   // as the clause has it, `(a ##2 b)[*3]` being `(a ##2 b) ##1 (a ##2 b) ##1
   // (a ##2 b)`: the group's operands from `first` on are appended again
   // `count - 1` times, the copy's first operand a tick after the last. A
-  // range, an unbounded count or a count written as an expression on a group
-  // is not read.
+  // group repeated by any other consecutive count is read by
+  // ParseRepeatedGroup instead (AheadIsGroupRepeatedByRange).
   static bool UnrollGroupRepetition(SeqLinearBody& body, size_t first,
                                     const SeqRepetition& rep) {
     if (rep.kind == SeqRepetition::Kind::kNone) return true;
     if (rep.kind != SeqRepetition::Kind::kConsecutive) return false;
-    if (rep.min != rep.max || rep.min == 0) return false;
-    if (rep.max_expr != nullptr) return false;
     // §16.13.1: a group naming a clock of its own is not unrolled.
     if (!body.clocks.empty()) return false;
     size_t n = body.operands.size() - first;
@@ -420,17 +433,12 @@ struct ParserSeqLinearHelpers {
     PushOperandClock(body, clock);
   }
 
-  // §16.9.5 to §16.9.7 and §16.9.10: a group holding `and`, `or`,
-  // `intersect` or `within` at its own depth does not splice into the chain
-  // around it, so its sequence_expr is read into a sequence of its own, which
-  // stands as one operand of the chain through a placeholder carrying it, as
-  // a sequence bound to a formal of type sequence does (§16.8.1).
-  static bool ParseNestedGroup(Parser& p, SeqLinearBody& body,
-                               SeqCycleDelay before,
-                               const std::vector<EventExpr>& clock) {
+  // The placeholder standing as one operand of a chain for the group at the
+  // cursor, read into `inner`, a sequence of its own, as a sequence bound to a
+  // formal of type sequence is (§16.8.1).
+  static Expr* NestedGroupHolder(Parser& p, ModuleItem*& inner) {
     SourceLoc loc = p.CurrentLoc();
-    p.Consume();
-    auto* inner = p.arena_.Create<ModuleItem>();
+    inner = p.arena_.Create<ModuleItem>();
     inner->kind = ModuleItemKind::kSequenceDecl;
     inner->loc = loc;
     auto* tree = p.arena_.Create<PropertyExprNode>();
@@ -439,6 +447,20 @@ struct ParserSeqLinearHelpers {
     Expr* holder =
         ParserPropertySpecHelpers::PropertySpecPlaceholder(p.arena_, loc);
     holder->property_actual = tree;
+    return holder;
+  }
+
+  // §16.9.5 to §16.9.7 and §16.9.10: a group holding `and`, `or`,
+  // `intersect` or `within` at its own depth does not splice into the chain
+  // around it, so its sequence_expr is read into a sequence of its own, which
+  // stands as one operand of the chain through a placeholder carrying it, as
+  // a sequence bound to a formal of type sequence does (§16.8.1).
+  static bool ParseNestedGroup(Parser& p, SeqLinearBody& body,
+                               SeqCycleDelay before,
+                               const std::vector<EventExpr>& clock) {
+    ModuleItem* inner = nullptr;
+    Expr* holder = NestedGroupHolder(p, inner);
+    p.Consume();
     SeqRepetition rep;
     bool ok = ParseLinearSeqOperands(p, inner) && p.Match(TokenKind::kRParen) &&
               ParseSequenceRepetition(p, rep);
@@ -484,16 +506,15 @@ struct ParserSeqLinearHelpers {
     last.insert(last.end(), items.begin(), items.end());
   }
 
-  // A parenthesised group, `( sequence_expr [, match_items] )`: its operands
-  // are read into `body` as the outer operands are, the delay before the group
-  // adding to the group's leading delay, and its match items are attached at
-  // its end (AttachGroupItems).
-  static bool ParseSequenceGroup(Parser& p, SeqLinearBody& body,
-                                 SeqCycleDelay before,
-                                 const std::vector<EventExpr>& clock) {
-    if (AheadGroupHolds(p, AtSequenceOperator)) {
-      return ParseNestedGroup(p, body, before, clock);
-    }
+  // A parenthesised group, `( sequence_expr [, match_items] )`, and the
+  // repetition written after it into `rep`: its operands are read into
+  // `body` as the outer operands are, the delay before the group adding to
+  // the group's leading delay, and its match items are attached at its end
+  // (AttachGroupItems).
+  static bool ReadGroupInto(Parser& p, SeqLinearBody& body,
+                            SeqCycleDelay before,
+                            const std::vector<EventExpr>& clock,
+                            SeqRepetition& rep) {
     p.Expect(TokenKind::kLParen, Subclause("16.10"));
     size_t first = body.operands.size();
     if (!ParseLinearSeqOperandChain(p, body, before, clock)) return false;
@@ -505,8 +526,58 @@ struct ParserSeqLinearHelpers {
     MarkEmptyMatchItems(body, first, items);
     AttachGroupItems(p, body, items);
     if (!p.Match(TokenKind::kRParen)) return false;
+    return ParseSequenceRepetition(p, rep);
+  }
+
+  // §16.9.2: whether the tokens ahead are a parenthesised group holding, at
+  // any depth, a token AtChainToken answers true for, and repeated after it
+  // by a consecutive count other than the one number UnrollGroupRepetition
+  // copies the group's operands by. A malformed count is answered as the
+  // group is read. The lexer is rewound.
+  static bool AheadIsGroupRepeatedByRange(Parser& p) {
+    auto saved = p.lexer_.SavePos();
+    p.diag_.PushSuppress();
+    bool chain = SkipGroupHolding(p, AtChainToken, true);
     SeqRepetition rep;
-    if (!ParseSequenceRepetition(p, rep)) return false;
+    ParseSequenceRepetition(p, rep);
+    p.diag_.PopSuppress();
+    p.lexer_.RestorePos(saved);
+    return chain && rep.IteratesWhole();
+  }
+
+  // §16.9.2: a group of more than one operand, or of a repeated one, repeated
+  // by a range, `$`, a count of 0 or a count written as an expression, which
+  // no number of copies of its operands spliced into the chain stands for. It
+  // is read into a sequence of its own standing as one operand, as
+  // ParseNestedGroup reads one, the repetition on that operand for the
+  // sequence monitor to iterate, and the group's match items on the
+  // sequence's end, run at the end of each iteration (§16.10).
+  static bool ParseRepeatedGroup(Parser& p, SeqLinearBody& body,
+                                 SeqCycleDelay before,
+                                 const std::vector<EventExpr>& clock) {
+    ModuleItem* inner = nullptr;
+    Expr* holder = NestedGroupHolder(p, inner);
+    SeqCycleDelay none;
+    none.min = 0;
+    none.max = 0;
+    SeqRepetition rep;
+    bool ok = ReadGroupInto(p, inner->seq_linear, none, {}, rep);
+    AppendOperand(body, holder, before, rep, clock);
+    return ok;
+  }
+
+  static bool ParseSequenceGroup(Parser& p, SeqLinearBody& body,
+                                 SeqCycleDelay before,
+                                 const std::vector<EventExpr>& clock) {
+    if (AheadGroupHolds(p, AtSequenceOperator)) {
+      return ParseNestedGroup(p, body, before, clock);
+    }
+    if (AheadIsGroupRepeatedByRange(p)) {
+      return ParseRepeatedGroup(p, body, before, clock);
+    }
+    size_t first = body.operands.size();
+    SeqRepetition rep;
+    if (!ReadGroupInto(p, body, before, clock, rep)) return false;
     // §16.10: a repetition of a group holding one unrepeated operand, `(a,
     // x++)[*0:$]`, is that operand's own, its match items performed at each
     // iteration's match, which admits the ranges unrolling does not.

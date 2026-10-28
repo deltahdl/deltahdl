@@ -55,6 +55,8 @@ struct LinearAttempt {
   // §16.9.5 to §16.9.7: where the operand at pos is a nested sequence, the
   // attempt of it begun where this attempt arrived at the operand.
   LinearSequenceAttempt* sub = nullptr;
+  // §16.9.2: `sub` is an iteration begun after the one before it matched.
+  bool sub_begins = false;
 };
 
 // §16.13.1: whether the clock the operand at `pos` is evaluated on ticked at
@@ -257,6 +259,26 @@ void StepNonconsecutive(TickStep& step, const LinearAttempt& attempt,
   KeepRepeating(step, std::move(advanced));
 }
 
+// §16.9.2: the nested sequence at the attempt matched, one more iteration of
+// its repetition: the operand ends once the iterations reach the minimum, and
+// below the maximum another begins at the next tick, `s[*2]` being `s ##1 s`.
+void EndNestedIteration(TickStep& step, const LinearAttempt& holder) {
+  const SeqRepetition& rep = step.body.repetitions[holder.pos];
+  LinearAttempt ended = holder;
+  ended.sub = nullptr;
+  if (rep.kind != SeqRepetition::Kind::kConsecutive) {
+    EndOperand(step, ended);
+    return;
+  }
+  ended.count = holder.count + 1;
+  if (ended.count >= rep.min) EndOperand(step, ended);
+  if (ended.count >= rep.max) return;
+  ended.sub =
+      NewSequenceAttempt(*NestedOperand(step.body, holder.pos), step.arena);
+  ended.sub_begins = true;
+  step.carry.push_back(std::move(ended));
+}
+
 // §16.9.5 to §16.9.7: one tick of the attempt of the nested sequence the
 // attempt stands at, `begin` at the tick it arrived at the operand, read with
 // the attempt's locals in scope: the chain goes on from each of its matches,
@@ -271,13 +293,18 @@ void StepNested(TickStep& step, LinearAttempt holder, bool begin) {
   }
   if (result == SequenceStep::kMatched ||
       result == SequenceStep::kMatchedLast) {
-    LinearAttempt ended = holder;
-    ended.sub = nullptr;
-    EndOperand(step, ended);
+    EndNestedIteration(step, holder);
   }
   if (result == SequenceStep::kPending || result == SequenceStep::kMatched) {
     step.carry.push_back(std::move(holder));
   }
+}
+
+// An attempt arriving at a nested sequence begins an attempt of it here.
+void BeginNested(TickStep& step, LinearAttempt attempt,
+                 const LinearSequence& nested) {
+  attempt.sub = NewSequenceAttempt(nested, step.arena);
+  StepNested(step, std::move(attempt), true);
 }
 
 // An attempt arriving at its operand within the delay range reads it: a
@@ -287,11 +314,11 @@ void StepNested(TickStep& step, LinearAttempt holder, bool begin) {
 // be `##(n-1) seq`.
 void ArriveAtOperand(TickStep& step, const LinearAttempt& attempt,
                      const SeqRepetition& rep) {
+  const LinearSequence* nested = NestedOperand(step.body, attempt.pos);
   if (rep.kind == SeqRepetition::Kind::kNone) {
     LinearAttempt advanced = attempt;
-    if (const LinearSequence* nested = NestedOperand(step.body, attempt.pos)) {
-      advanced.sub = NewSequenceAttempt(*nested, step.arena);
-      StepNested(step, std::move(advanced), true);
+    if (nested != nullptr) {
+      BeginNested(step, std::move(advanced), *nested);
     } else if (EvalOperand(step.body, advanced, step.ctx, step.arena)) {
       EndOperand(step, advanced);
     }
@@ -304,7 +331,12 @@ void ArriveAtOperand(TickStep& step, const LinearAttempt& attempt,
   if (rep.min == 0 && attempt.pos + 1 < step.body.operands.size()) {
     step.pending.push_back({attempt.pos + 1, 1, attempt.locals});
   }
-  StepConsecutive(step, attempt, rep);
+  // §16.9.2.1: `s[*0]` admits the empty match alone, no iteration of s.
+  if (nested == nullptr) {
+    StepConsecutive(step, attempt, rep);
+  } else if (rep.max > 0) {
+    BeginNested(step, attempt, *nested);
+  }
 }
 
 // One attempt at this tick: inside a repetition it steps by the repetition's
@@ -378,7 +410,8 @@ void StepAttempt(TickStep& step, LinearAttempt attempt) {
   const SeqRepetition& rep = step.body.repetitions[attempt.pos];
   if (!ThroughoutHolds(step, attempt)) return;
   if (attempt.sub != nullptr) {
-    StepNested(step, std::move(attempt), false);
+    bool begins = std::exchange(attempt.sub_begins, false);
+    StepNested(step, std::move(attempt), begins);
     return;
   }
   if (EndsAsTrailingEmpty(step, attempt)) MatchAt(step, attempt);

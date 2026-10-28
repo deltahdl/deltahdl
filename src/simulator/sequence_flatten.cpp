@@ -241,12 +241,11 @@ const std::vector<EventExpr>& BodyOperandClock(const SeqLinearBody& body,
 // §16.9.2: consecutive repetition of an instance by an exact count, unrolled
 // as the parser unrolls a group's, the operands from `first` on appended
 // again `count - 1` times with the copy's first operand a tick after the
-// last. A range or an unbounded count on an instance is not read.
+// last. Any other consecutive count is iterated whole (IteratesWhole).
 bool UnrollInstanceRepetition(LinearSequence& out, size_t first,
                               const SeqRepetition& rep) {
   if (rep.kind == SeqRepetition::Kind::kNone) return true;
   if (rep.kind != SeqRepetition::Kind::kConsecutive) return false;
-  if (rep.min != rep.max || rep.min == 0) return false;
   size_t n = out.operands.size() - first;
   for (uint32_t k = 1; k < rep.min; ++k) {
     for (size_t i = 0; i < n; ++i) {
@@ -516,7 +515,7 @@ bool AppendInstanceOperand(const Expansion& x, size_t j, LinearSequence& out) {
 // formals' places, appended whole as one nested operand under the delay and
 // the clock written before the instance, the body's clock taken where the
 // outer sequence has none, and repeated by an exact count as an instance
-// spliced into the chain is.
+// spliced into the chain is, or carrying any other consecutive repetition.
 bool AppendNestedOperand(const InstanceOperand& op, const LinearSequence& body,
                          SimContext& ctx, Arena& arena, LinearSequence& out) {
   ActualsByFormal actuals = BindInstanceActuals(op.inner, op.instance, arena);
@@ -524,8 +523,10 @@ bool AppendNestedOperand(const InstanceOperand& op, const LinearSequence& body,
   size_t first = out.operands.size();
   Expr* operand = arena.Create<Expr>(*op.instance);
   AddNested(out, operand, SubstituteLinearSequence(body, actuals, ctx, arena));
-  AppendOperand({operand, op.before, {}, {}, op.clock}, out);
-  return UnrollInstanceRepetition(out, first, op.repetition);
+  bool kept = op.repetition.IteratesWhole();
+  SeqRepetition repetition = kept ? op.repetition : SeqRepetition{};
+  AppendOperand({operand, op.before, {}, repetition, op.clock}, out);
+  return kept || UnrollInstanceRepetition(out, first, op.repetition);
 }
 
 // Appends the instantiated body's flattened operands with the actuals
@@ -538,9 +539,10 @@ bool ExpandInstance(const InstanceOperand& op, SimContext& ctx, Arena& arena,
   LinearSequence body;
   if (!Flatten(op.inner, ctx, arena, body, depth + 1)) return false;
   // A sequence with `intersect`, `and` or `or` operands of its own does not
-  // splice into one chain, so it stands in it whole.
+  // splice into one chain, so it stands in it whole, as does one repeated by
+  // a count its spliced operands could not be copied by (§16.9.2).
   if (!body.alternatives.empty() || !body.conjuncts.empty() ||
-      !body.intersects.empty()) {
+      !body.intersects.empty() || op.repetition.IteratesWhole()) {
     return AppendNestedOperand(op, body, ctx, arena, out);
   }
   ActualsByFormal actuals = BindInstanceActuals(op.inner, op.instance, arena);

@@ -310,6 +310,14 @@ struct SeqLocalDecl {
 struct SeqRepetition : SeqCycleDelay {
   enum class Kind : uint8_t { kNone, kConsecutive, kGoto, kNonconsecutive };
   Kind kind = Kind::kNone;
+  // Whether a group or an instance this repeats is iterated whole rather than
+  // unrolled into copies of its operands: a consecutive repetition by a
+  // range, `$`, a count of 0 or a count written as an expression not yet
+  // settled, which no number of copies stands for.
+  bool IteratesWhole() const {
+    return kind == Kind::kConsecutive &&
+           (min != max || min == 0 || max_expr != nullptr);
+  }
 };
 
 // §16.9.9: `exp throughout seq` inside a chain, `(exp)[*0:$] intersect seq`,
