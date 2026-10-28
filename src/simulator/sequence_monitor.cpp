@@ -68,49 +68,6 @@ bool OperandClockTicked(const LinearSequence& body, size_t pos,
   return clock >= 32 || ((ticked >> clock) & 1u) != 0;
 }
 
-// §16.10: the attempt's locals stood up as variables of a scope of their own
-// (StandUpLocal) for the length of one operand's evaluation, read back into
-// the attempt when the scope is popped, so an operand and its match items read
-// and write the attempt's own copies.
-class AttemptLocalsScope {
- public:
-  AttemptLocalsScope(const std::vector<SeqLocalDecl>& decls,
-                     LinearAttempt& attempt, SimContext& ctx)
-      : attempt_(attempt), ctx_(ctx) {
-    ctx_.PushScope();
-    for (size_t i = 0; i < decls.size() && i < attempt.locals.size(); ++i) {
-      vars_.push_back(StandUpLocal(decls[i], attempt.locals[i], ctx_));
-    }
-  }
-  ~AttemptLocalsScope() {
-    for (size_t i = 0; i < vars_.size(); ++i) {
-      attempt_.locals[i] = vars_[i]->value;
-    }
-    ctx_.PopScope();
-  }
-  AttemptLocalsScope(const AttemptLocalsScope&) = delete;
-  AttemptLocalsScope& operator=(const AttemptLocalsScope&) = delete;
-
-  // §16.10: one match item, `lvar = rhs` or `lvar op= rhs`, assigning the
-  // attempt's copy of the local, or the select or member of it its target
-  // writes; the assigned value takes words of its own. §16.11: a subroutine
-  // call among the items is scheduled instead.
-  void Assign(const SeqMatchAssign& item, Arena& arena) {
-    if (item.call != nullptr) {
-      ScheduleMatchCall(item.call, ctx_, arena);
-      return;
-    }
-    Variable* var = ctx_.FindLocalVariable(item.lvar);
-    if (var == nullptr) return;
-    AssignMatchItem(item, EvalExpr(item.rhs, ctx_, arena), *var, ctx_, arena);
-  }
-
- private:
-  LinearAttempt& attempt_;
-  SimContext& ctx_;
-  std::vector<Variable*> vars_;
-};
-
 // One operand of an attempt at this tick: the initialization items run before
 // the Boolean is read, the Boolean is read over the attempt's locals, and the
 // locals flowing out of it and the other match items take their values where
@@ -119,19 +76,15 @@ bool EvalOperand(const LinearSequence& body, LinearAttempt& attempt,
                  SimContext& ctx, Arena& arena) {
   uint32_t pick = attempt.flow_pick;
   attempt.flow_pick = 0;
-  AttemptLocalsScope scope(body.locals, attempt, ctx);
+  AttemptLocalsScope scope(body.locals, attempt.locals, ctx);
   const std::vector<SeqMatchAssign>& items = body.match_items[attempt.pos];
-  for (const SeqMatchAssign& item : items) {
-    if (item.init) scope.Assign(item, arena);
-  }
+  scope.AssignItems(items, true, arena);
   const bool kHeld =
       EvalExpr(body.operands[attempt.pos], ctx, arena).IsTruthy();
   ctx.AssertionSamples().NoteOperand(body.operands[attempt.pos], kHeld);
   if (!kHeld) return false;
   TakeFlowedLocals(body.operands[attempt.pos], pick, ctx, arena);
-  for (const SeqMatchAssign& item : items) {
-    if (!item.init) scope.Assign(item, arena);
-  }
+  scope.AssignItems(items, false, arena);
   return true;
 }
 
@@ -262,10 +215,16 @@ void StepNonconsecutive(TickStep& step, const LinearAttempt& attempt,
 // §16.9.2: the nested sequence at the attempt matched, one more iteration of
 // its repetition: the operand ends once the iterations reach the minimum, and
 // below the maximum another begins at the next tick, `s[*2]` being `s ##1 s`.
+// §16.10: the match items of the group or instance the nested sequence stands
+// for are performed at each such match, before the chain goes on from it.
 void EndNestedIteration(TickStep& step, const LinearAttempt& holder) {
   const SeqRepetition& rep = step.body.repetitions[holder.pos];
   LinearAttempt ended = holder;
   ended.sub = nullptr;
+  {
+    AttemptLocalsScope scope(step.body.locals, ended.locals, step.ctx);
+    scope.AssignItems(step.body.match_items[holder.pos], false, step.arena);
+  }
   if (rep.kind != SeqRepetition::Kind::kConsecutive) {
     EndOperand(step, ended);
     return;
@@ -287,7 +246,7 @@ void StepNested(TickStep& step, LinearAttempt holder, bool begin) {
   const LinearSequence& nested = *NestedOperand(step.body, holder.pos);
   SequenceStep result = SequenceStep::kFailed;
   {
-    AttemptLocalsScope scope(step.body.locals, holder, step.ctx);
+    AttemptLocalsScope scope(step.body.locals, holder.locals, step.ctx);
     result =
         StepSequenceAttempt(nested, *holder.sub, begin, step.ctx, step.arena);
   }
@@ -374,7 +333,7 @@ bool InsideThroughout(const TickStep& step, const LinearAttempt& attempt,
 bool ThroughoutHolds(TickStep& step, LinearAttempt& attempt) {
   for (const SeqThroughout& guard : step.body.throughouts) {
     if (!InsideThroughout(step, attempt, guard)) continue;
-    AttemptLocalsScope scope(step.body.locals, attempt, step.ctx);
+    AttemptLocalsScope scope(step.body.locals, attempt.locals, step.ctx);
     if (!EvalExpr(guard.cond, step.ctx, step.arena).IsTruthy()) return false;
   }
   return true;

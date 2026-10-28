@@ -211,4 +211,36 @@ void ScheduleMatchCall(const Expr* call, SimContext& ctx, Arena& arena) {
   ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), Region::kReactive, ev);
 }
 
+AttemptLocalsScope::AttemptLocalsScope(const std::vector<SeqLocalDecl>& decls,
+                                       std::vector<Logic4Vec>& locals,
+                                       SimContext& ctx)
+    : locals_(locals), ctx_(ctx) {
+  ctx_.PushScope();
+  for (size_t i = 0; i < decls.size() && i < locals.size(); ++i) {
+    vars_.push_back(StandUpLocal(decls[i], locals[i], ctx_));
+  }
+}
+
+AttemptLocalsScope::~AttemptLocalsScope() {
+  for (size_t i = 0; i < vars_.size(); ++i) locals_[i] = vars_[i]->value;
+  ctx_.PopScope();
+}
+
+void AttemptLocalsScope::Assign(const SeqMatchAssign& item, Arena& arena) {
+  if (item.call != nullptr) {
+    ScheduleMatchCall(item.call, ctx_, arena);
+    return;
+  }
+  Variable* var = ctx_.FindLocalVariable(item.lvar);
+  if (var == nullptr) return;
+  AssignMatchItem(item, EvalExpr(item.rhs, ctx_, arena), *var, ctx_, arena);
+}
+
+void AttemptLocalsScope::AssignItems(const std::vector<SeqMatchAssign>& items,
+                                     bool init, Arena& arena) {
+  for (const SeqMatchAssign& item : items) {
+    if (item.init == init) Assign(item, arena);
+  }
+}
+
 }  // namespace delta

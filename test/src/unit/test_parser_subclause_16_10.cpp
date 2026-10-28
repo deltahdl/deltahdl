@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -33,6 +34,33 @@ TEST(LocalVariableParsing, AssertionVariableDeclInSequenceParses) {
   ASSERT_NE(item, nullptr);
   ASSERT_EQ(item->prop_seq_assert_vars.size(), 1u);
   EXPECT_EQ(item->prop_seq_assert_vars[0], "x");
+}
+
+// §16.10 with Syntax 16-14: the sequence_expr of a group may join sequences
+// with `or`, `and`, `intersect` or `within`, and the group's match items are
+// performed at each match of it, so they stay on the operand standing for the
+// group, which the body holds with the operand after it (#8272).
+TEST(LocalVariableParsing, MatchItemsOfAGroupJoiningSequencesAreKept) {
+  for (const char* op : {"or", "and", "intersect", "within"}) {
+    SCOPED_TRACE(op);
+    auto r = Parse(std::string("module m;\n"
+                               "  sequence s;\n"
+                               "    int x;\n"
+                               "    @(posedge clk) (a ") +
+                   op +
+                   " b, x = 1) ##1 (x == 1);\n"
+                   "  endsequence\n"
+                   "endmodule\n");
+    ASSERT_NE(r.cu, nullptr);
+    EXPECT_FALSE(r.has_errors);
+    auto* item = FindItemByKind(r, ModuleItemKind::kSequenceDecl);
+    ASSERT_NE(item, nullptr);
+    const SeqLinearBody& body = item->seq_linear;
+    ASSERT_EQ(body.operands.size(), 2u);
+    ASSERT_EQ(body.match_items[0].size(), 1u);
+    EXPECT_EQ(body.match_items[0][0].lvar, "x");
+    EXPECT_TRUE(body.match_items[1].empty());
+  }
 }
 
 // §16.10: a comma-separated list of identifiers with optional declaration

@@ -211,14 +211,16 @@ bool Flatten(const ModuleItem* seq, SimContext& ctx, Arena& arena,
              LinearSequence& out, int depth);
 
 // An operand of the sequence being flattened that instantiates a named
-// sequence: the declaration instantiated, the instance as written, and the
-// delay written before it.
+// sequence: the declaration instantiated, the instance as written, the delay
+// written before it, its repetition, its clock and, §16.10, the match items
+// of the group it was written in, performed at each match of the instance.
 struct InstanceOperand {
   const ModuleItem* inner;
   const Expr* instance;
   SeqCycleDelay before;
   SeqRepetition repetition;
   std::vector<EventExpr> clock;
+  std::vector<SeqMatchAssign> items;
 };
 
 // §16.13.1: the clock of the operand just appended to `out`, kept parallel
@@ -437,6 +439,29 @@ void AppendOperand(SubstitutedOperand sub, LinearSequence& out) {
   PushOperandClock(out, sub.clock);
 }
 
+// §16.10: the match items of the group an instance was written in, performed
+// at each match of the instance: on the last operand its body became, or,
+// where that operand repeats and would perform them at each repetition, on a
+// 1 fused to its end on its clock, as the parser's AttachGroupItems has them.
+void AttachInstanceItems(LinearSequence& out,
+                         const std::vector<SeqMatchAssign>& items,
+                         Arena& arena) {
+  if (items.empty()) return;
+  if (out.repetitions.back().kind != SeqRepetition::Kind::kNone) {
+    auto* one = arena.Create<Expr>();
+    one->kind = ExprKind::kIntegerLiteral;
+    one->text = "1";
+    one->int_val = 1;
+    SeqCycleDelay fused;
+    fused.min = 0;
+    fused.max = 0;
+    std::vector<EventExpr> clock = OperandClock(out, out.operands.size() - 1);
+    AppendOperand({one, fused, {}, SeqRepetition{}, clock}, out);
+  }
+  auto& last = out.match_items.back();
+  last.insert(last.end(), items.begin(), items.end());
+}
+
 // The sequence standing as `operand`, flattened, kept under it in `out`.
 void AddNested(LinearSequence& out, const Expr* operand,
                LinearSequence nested) {
@@ -499,13 +524,8 @@ bool AppendInstanceOperand(const Expansion& x, size_t j, LinearSequence& out) {
     return true;
   }
   if (const ModuleItem* bound = SequenceActualOf(operand, ctx)) {
-    if (!ExpandInstance({bound, operand, delay, repetition, clock}, ctx, arena,
-                        out, x.depth + 1)) {
-      return false;
-    }
-    auto& last_items = out.match_items.back();
-    last_items.insert(last_items.end(), items.begin(), items.end());
-    return true;
+    return ExpandInstance({bound, operand, delay, repetition, clock, items},
+                          ctx, arena, out, x.depth + 1);
   }
   AppendOperand({operand, delay, std::move(items), repetition, clock}, out);
   return true;
@@ -525,7 +545,7 @@ bool AppendNestedOperand(const InstanceOperand& op, const LinearSequence& body,
   AddNested(out, operand, SubstituteLinearSequence(body, actuals, ctx, arena));
   bool kept = op.repetition.IteratesWhole();
   SeqRepetition repetition = kept ? op.repetition : SeqRepetition{};
-  AppendOperand({operand, op.before, {}, repetition, op.clock}, out);
+  AppendOperand({operand, op.before, op.items, repetition, op.clock}, out);
   return kept || UnrollInstanceRepetition(out, first, op.repetition);
 }
 
@@ -574,6 +594,7 @@ bool ExpandInstance(const InstanceOperand& op, SimContext& ctx, Arena& arena,
   if (out.operands.size() == first) return true;
   AddLocalFormalAssignments(formals, out.match_items[first],
                             out.match_items.back(), arena);
+  AttachInstanceItems(out, op.items, arena);
   return UnrollInstanceRepetition(out, first, op.repetition);
 }
 
@@ -703,7 +724,7 @@ bool FlattenChain(const SeqLinearBody& body, SimContext& ctx, Arena& arena,
       out.repetitions.push_back(body.repetitions[i]);
       PushOperandClock(out, BodyOperandClock(body, i));
     } else if (!ExpandInstance({inner, operand, before, body.repetitions[i],
-                                BodyOperandClock(body, i)},
+                                BodyOperandClock(body, i), body.match_items[i]},
                                ctx, arena, out, depth)) {
       return false;
     }
@@ -719,54 +740,6 @@ bool FlattenChain(const SeqLinearBody& body, SimContext& ctx, Arena& arena,
 }
 
 }  // namespace
-
-void ForEachLinearSequenceExpr(const LinearSequence& body,
-                               const std::function<void(const Expr*)>& fn) {
-  for (const Expr* operand : body.operands) fn(operand);
-  for (const auto& items : body.match_items) {
-    for (const SeqMatchAssign& item : items) {
-      if (item.rhs != nullptr) fn(item.rhs);
-      if (item.call != nullptr) fn(item.call);
-    }
-  }
-  for (const SeqThroughout& guard : body.throughouts) fn(guard.cond);
-  for (const LinearSequence& inner : body.intersects) {
-    ForEachLinearSequenceExpr(inner, fn);
-  }
-  for (const LinearSequence& inner : body.conjuncts) {
-    ForEachLinearSequenceExpr(inner, fn);
-  }
-  for (const LinearSequence& inner : body.alternatives) {
-    ForEachLinearSequenceExpr(inner, fn);
-  }
-  for (const auto& entry : body.nested) {
-    ForEachLinearSequenceExpr(*entry.second, fn);
-  }
-}
-
-const std::vector<EventExpr>& OperandClock(const LinearSequence& body,
-                                           size_t pos) {
-  static const std::vector<EventExpr> kNone;
-  return pos < body.operand_clocks.size() ? body.operand_clocks[pos] : kNone;
-}
-
-bool NamesAnotherClock(const LinearSequence& body) {
-  for (const auto& clock : body.operand_clocks) {
-    if (clock.empty()) continue;
-    if (clock.size() != body.clock.size()) return true;
-    for (size_t i = 0; i < clock.size(); ++i) {
-      const EventExpr& a = clock[i];
-      const EventExpr& b = body.clock[i];
-      if (a.edge != b.edge || !SamePath(a.signal, b.signal)) return true;
-    }
-  }
-  return false;
-}
-
-int OperandClockIndex(const LinearSequence& body, size_t pos) {
-  return pos < body.operand_clock_index.size() ? body.operand_clock_index[pos]
-                                               : 0;
-}
 
 namespace {
 
@@ -867,13 +840,10 @@ void AppendSubstitutedOperand(SubstitutedOperand sub, SimContext& ctx,
                               Arena& arena, LinearSequence& out) {
   size_t first = out.operands.size();
   if (const ModuleItem* inner = SequenceActual(sub.operand)) {
-    ExpandInstance({inner, sub.operand, sub.delay, sub.repetition, sub.clock},
-                   ctx, arena, out, 0);
-    if (out.operands.size() > first) {
-      out.match_items.back().insert(out.match_items.back().end(),
-                                    sub.items.begin(), sub.items.end());
-      return;
-    }
+    ExpandInstance(
+        {inner, sub.operand, sub.delay, sub.repetition, sub.clock, sub.items},
+        ctx, arena, out, 0);
+    if (out.operands.size() > first) return;
   }
   AppendOperand(std::move(sub), out);
 }

@@ -96,4 +96,33 @@ std::vector<Logic4Vec> InitialLocals(const std::vector<SeqLocalDecl>& decls,
 // being read now.
 void ScheduleMatchCall(const Expr* call, SimContext& ctx, Arena& arena);
 
+// §16.10: an attempt's copies of the locals `decls`, `locals`, stood up as
+// variables of a scope of their own (StandUpLocal) for the length of one
+// operand's evaluation and read back into `locals` when the scope is popped,
+// so an operand and its match items read and write the attempt's own copies.
+class AttemptLocalsScope {
+ public:
+  AttemptLocalsScope(const std::vector<SeqLocalDecl>& decls,
+                     std::vector<Logic4Vec>& locals, SimContext& ctx);
+  ~AttemptLocalsScope();
+  AttemptLocalsScope(const AttemptLocalsScope&) = delete;
+  AttemptLocalsScope& operator=(const AttemptLocalsScope&) = delete;
+
+  // §16.10: one match item, `lvar = rhs` or `lvar op= rhs`, assigning the
+  // attempt's copy of the local, or the select or member of it its target
+  // writes; the assigned value takes words of its own. §16.11: a subroutine
+  // call among the items is scheduled instead.
+  void Assign(const SeqMatchAssign& item, Arena& arena);
+
+  // The items among `items` that are initializations where `init` holds, and
+  // the others where it does not, each assigned in the order written.
+  void AssignItems(const std::vector<SeqMatchAssign>& items, bool init,
+                   Arena& arena);
+
+ private:
+  std::vector<Logic4Vec>& locals_;
+  SimContext& ctx_;
+  std::vector<Variable*> vars_;
+};
+
 }  // namespace delta

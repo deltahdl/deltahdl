@@ -38,17 +38,23 @@ TEST(SequenceLocals, InitializationAssignmentsRunInDeclarationOrder) {
 }
 
 // Expects the sequence `body`, declaring `locals` and its module the items
+// `prelude`, driven as `drive` says, to end once, at the time `last`.
+void ExpectOneEnd(const std::string& body, const std::string& locals,
+                  const std::vector<std::vector<int>>& drive, uint64_t last,
+                  const std::string& prelude = "") {
+  SimFixture f;
+  auto* hits = RunAndFindVar(
+      SequenceTickSource(body, DriveTicks(drive), prelude, locals), f, "hits");
+  ASSERT_NE(hits, nullptr) << body;
+  EXPECT_EQ(hits->value.ToUint64(), 1u) << body;
+  EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), last) << body;
+}
+
+// Expects the sequence `body`, declaring `locals` and its module the items
 // `prelude`, to end once, at 4, the tick at 35, with te2 high at 3 alone.
 void ExpectOneEndAtFour(const std::string& body, const std::string& locals,
                         const std::string& prelude = "") {
-  SimFixture f;
-  auto* hits =
-      RunAndFindVar(SequenceTickSource(body, DriveTicks({{}, {3}, {}, {}, {}}),
-                                       prelude, locals),
-                    f, "hits");
-  ASSERT_NE(hits, nullptr) << body;
-  EXPECT_EQ(hits->value.ToUint64(), 1u) << body;
-  EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 35u) << body;
+  ExpectOneEnd(body, locals, {{}, {3}, {}, {}, {}}, 35, prelude);
 }
 
 // Expects the sequence `te2 ##1 last_operand`, declaring `locals` and its
@@ -542,17 +548,64 @@ TEST(SequenceLocals, AGroupsItemsAfterARepeatedOperandRunOnce) {
       {"(te2[->2], x += 1)", {2, 4}, 45},
   };
   for (const Case& c : kCases) {
-    SCOPED_TRACE(c.group);
-    SimFixture f;
-    auto* hits = RunAndFindVar(
-        SequenceTickSource(
-            std::string("(te1, x = 0) ##1 ") + c.group + " ##1 (x == 1)",
-            DriveTicks({{1}, c.te2, {}, {}, {}}), "", "    int x;\n"),
-        f, "hits");
-    ASSERT_NE(hits, nullptr);
-    EXPECT_EQ(hits->value.ToUint64(), 1u);
-    EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), c.last);
+    ExpectOneEnd(std::string("(te1, x = 0) ##1 ") + c.group + " ##1 (x == 1)",
+                 "    int x;\n", {{1}, c.te2, {}, {}, {}}, c.last);
   }
+}
+
+// §16.10 with Syntax 16-14: the sequence_expr of a group may join sequences
+// with `or`, `and`, `intersect` or `within`, and the group's match items are
+// performed at the end of each match of it. Each group below matches at tick
+// 3 alone, x becomes 1 there, and `##1 (x == 1)` ends the sequence at 4, the
+// tick at 35 (#8272).
+TEST(SequenceLocals, AGroupJoiningSequencesPerformsItsItemsAtItsMatch) {
+  struct Case {
+    const char* group;
+    std::vector<std::vector<int>> drive;
+  };
+  const Case kCases[] = {
+      {"(te1 or te2, x = 1)", {{}, {3}}},
+      {"(te1 and te2, x = 1)", {{3}, {3}}},
+      {"(te1 ##1 te2 intersect te3[*2], x = 1)", {{2}, {3}, {2, 3}}},
+      {"(te1 within te2[*2], x = 1)", {{3}, {2, 3}}},
+  };
+  for (const Case& c : kCases) {
+    ExpectOneEnd(std::string(c.group) + " ##1 (x == 1)", "    int x;\n",
+                 c.drive, 35);
+  }
+}
+
+// §16.10 with §16.9.2: a repeated group joining sequences performs its items
+// at the end of each iteration's match. With te2 at 2 and 3, `(te1 or te2, x
+// += 1)` repeated twice adds 1 at 2 and again at 3, so `##1 (x == 2)` ends
+// the sequence at 4, the tick at 35, the count exact or a range (#8272).
+TEST(SequenceLocals, ARepeatedGroupJoiningSequencesPerformsItsItemsEachTime) {
+  for (const char* rep : {"[*2]", "[*1:2]"}) {
+    ExpectOneEnd(std::string("(te1 or te2, x += 1)") + rep + " ##1 (x == 2)",
+                 "    int x = 0;\n", {{}, {2, 3}}, 35);
+  }
+}
+
+// §16.10: an instance of a named sequence written in a group is the
+// subsequence the group's match items are attached to, so they are performed
+// at the end of each match of the instance: once where its last operand
+// repeats, as `t`'s does, and at the match of the `or` where it joins
+// sequences, as `u` does. Each ends `##1` after the instance matches at 3, at
+// 4, the tick at 35; `s` repeated twice matches at 2 and at 4, adding 1 at
+// each, and ends at 5, the tick at 45 (#8272).
+TEST(SequenceLocals, AGroupPerformsItsItemsAtEachMatchOfAnInstance) {
+  const std::string kPrelude =
+      "  sequence s; @(posedge clk) te1 ##1 te2; endsequence\n"
+      "  sequence t; @(posedge clk) te1 ##1 te2[*2]; endsequence\n"
+      "  sequence u; @(posedge clk) te1 or te2; endsequence\n";
+  ExpectOneEnd("(s, x = 1) ##1 (x == 1)", "    int x;\n", {{2}, {3}}, 35,
+               kPrelude);
+  ExpectOneEnd("(t, x += 1) ##1 (x == 1)", "    int x = 0;\n", {{1}, {2, 3}},
+               35, kPrelude);
+  ExpectOneEnd("(u, x = 1) ##1 (x == 1)", "    int x;\n", {{}, {3}}, 35,
+               kPrelude);
+  ExpectOneEnd("(s, x += 1)[*2] ##1 (x == 2)", "    int x = 0;\n",
+               {{1, 3}, {2, 4}}, 45, kPrelude);
 }
 
 }  // namespace

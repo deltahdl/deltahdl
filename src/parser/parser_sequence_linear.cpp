@@ -454,7 +454,9 @@ struct ParserSeqLinearHelpers {
   // `intersect` or `within` at its own depth does not splice into the chain
   // around it, so its sequence_expr is read into a sequence of its own, which
   // stands as one operand of the chain through a placeholder carrying it, as
-  // a sequence bound to a formal of type sequence does (§16.8.1).
+  // a sequence bound to a formal of type sequence does (§16.8.1). §16.10: the
+  // group's match items, performed at each match of that sequence_expr, are
+  // the operand's own.
   static bool ParseNestedGroup(Parser& p, SeqLinearBody& body,
                                SeqCycleDelay before,
                                const std::vector<EventExpr>& clock) {
@@ -462,9 +464,12 @@ struct ParserSeqLinearHelpers {
     Expr* holder = NestedGroupHolder(p, inner);
     p.Consume();
     SeqRepetition rep;
-    bool ok = ParseLinearSeqOperands(p, inner) && p.Match(TokenKind::kRParen) &&
-              ParseSequenceRepetition(p, rep);
+    std::vector<SeqMatchAssign> items;
+    bool ok = ParseLinearSeqOperands(p, inner) &&
+              ParserPropertySpecHelpers::ParseSequenceMatchItems(p, items) &&
+              p.Match(TokenKind::kRParen) && ParseSequenceRepetition(p, rep);
     AppendOperand(body, holder, before, rep, clock);
+    body.match_items.back() = std::move(items);
     return ok;
   }
 

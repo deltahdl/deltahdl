@@ -356,6 +356,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/eval_static_method.cpp
     simulator/sequence_actual_cast.cpp
     simulator/sequence_flatten.cpp
+    simulator/linear_sequence_queries.cpp
     simulator/sequence_local_flow.cpp
     simulator/sequence_locals.cpp
     simulator/checker_actuals.cpp
