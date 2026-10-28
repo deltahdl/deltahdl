@@ -697,13 +697,13 @@ TEST_F(PortsOfARun, APortOverTwoStateObjectsReachesABitTypespec) {
 // another's body reaches the typespec of the type that declaration wrote for
 // it (#8266).
 TEST_F(PortsOfARun, ANestedModulesPortReachesItsTypespec) {
-  Run("module top; bit [2:0] w;\n"
-      "  module inner(input bit [2:0] p); endmodule\n"
+  Run("module top; logic [2:0] w;\n"
+      "  module inner(input logic [2:0] p); endmodule\n"
       "  inner u(.p(w));\n"
       "endmodule\n");
   vpiHandle typespec = vpi_handle(vpiTypespec, PortOfU("p"));
   ASSERT_NE(typespec, nullptr);
-  EXPECT_EQ(vpi_get(vpiType, typespec), vpiBitTypespec);
+  EXPECT_EQ(vpi_get(vpiType, typespec), vpiLogicTypespec);
 }
 
 }  // namespace
