@@ -221,10 +221,13 @@ std::unordered_map<std::string_view, const ClassDecl*> BuildParamClassRegistry(
 // so the bare name is used. §3.13 (f) has the block open a block name space of
 // its own, so a specparam it declares a second time is reported to `diag`.
 // Defined in elaborator_validate_specify.cpp.
-void RegisterSpecifyBlockSpecparams(
-    const ModuleItem* item, RtlirModule* mod, const TypedefMap& typedefs,
-    std::unordered_set<std::string_view>& specparam_names,
-    std::unordered_set<std::string_view>& const_names, DiagEngine& diag);
+struct SpecparamNameSets {
+  std::unordered_set<std::string_view>& specparams;
+  std::unordered_set<std::string_view>& constants;
+};
+void RegisterSpecifyBlockSpecparams(const ModuleItem* item, RtlirModule* mod,
+                                    const TypedefMap& typedefs,
+                                    SpecparamNameSets names, DiagEngine& diag);
 
 // §6.20.5: how wide a specify parameter is. A range specification gives it that
 // range; without one it takes the range of its final value, the width of the

@@ -850,8 +850,8 @@ bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
       }
       return true;
     case ModuleItemKind::kSpecifyBlock:
-      RegisterSpecifyBlockSpecparams(item, mod, typedefs_, specparam_names_,
-                                     const_names_, diag_);
+      RegisterSpecifyBlockSpecparams(item, mod, typedefs_,
+                                     {specparam_names_, const_names_}, diag_);
       mod->specify_blocks.push_back(item);
       return true;
     case ModuleItemKind::kCovergroupDecl:

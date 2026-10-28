@@ -23,20 +23,22 @@
 
 namespace delta {
 
-void RegisterSpecifyBlockSpecparams(
-    const ModuleItem* item, RtlirModule* mod, const TypedefMap& typedefs,
-    std::unordered_set<std::string_view>& specparam_names,
-    std::unordered_set<std::string_view>& const_names, DiagEngine& diag) {
+void RegisterSpecifyBlockSpecparams(const ModuleItem* item, RtlirModule* mod,
+                                    const TypedefMap& typedefs,
+                                    SpecparamNameSets names, DiagEngine& diag) {
   std::unordered_set<std::string_view> in_block;
   for (const auto* sp : item->specify_items) {
     if (!sp || sp->kind != SpecifyItemKind::kSpecparam) continue;
     if (sp->is_pathpulse || sp->param_name.starts_with("PATHPULSE$")) continue;
     if (!in_block.insert(sp->param_name).second) {
-      diag.Error(sp->loc, std::format("redeclaration of '{}'", sp->param_name),
+      diag.Error(sp->loc,
+                 std::format("redeclaration of specparam '{}' in the specify "
+                             "block",
+                             sp->param_name),
                  Subclause("3.13"));
     }
-    specparam_names.insert(sp->param_name);
-    const_names.insert(sp->param_name);
+    names.specparams.insert(sp->param_name);
+    names.constants.insert(sp->param_name);
     RtlirVariable var;
     var.name = sp->param_name;
     // §37.3.3: the specparam stands where the specify block wrote it.

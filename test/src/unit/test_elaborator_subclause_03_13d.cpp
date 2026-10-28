@@ -86,8 +86,9 @@ TEST(NameSpaceRedeclaration, TwoSpecparamsOfOneNameInASpecifyBlock) {
              "  endspecify\n"
              "endmodule\n",
              f));
-  EXPECT_TRUE(
-      ReportedError(f.diag.Diagnostics(), "redeclaration of 'd'", 4, "3.13"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "redeclaration of specparam 'd' in the specify block", 4, "3.13"));
   ElabFixture g;
   EXPECT_FALSE(
       ElabOk("module m;\n"
@@ -96,8 +97,9 @@ TEST(NameSpaceRedeclaration, TwoSpecparamsOfOneNameInASpecifyBlock) {
              "  endspecify\n"
              "endmodule\n",
              g));
-  EXPECT_TRUE(
-      ReportedError(g.diag.Diagnostics(), "redeclaration of 'd'", 3, "3.13"));
+  EXPECT_TRUE(ReportedError(
+      g.diag.Diagnostics(),
+      "redeclaration of specparam 'd' in the specify block", 3, "3.13"));
 }
 
 // The nearest allowed form: two specparams of two names.

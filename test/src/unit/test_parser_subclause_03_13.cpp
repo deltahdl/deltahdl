@@ -220,7 +220,7 @@ TEST(NameSpaceParsing, APrimitivesPortDeclaredTwice) {
       "  table 0 : 1; 1 : 0; endtable\n"
       "endprimitive\n");
   EXPECT_TRUE(ReportedError(kInputTwice.diags,
-                            "duplicate port declaration for 'a'", 4, "3.13"));
+                            "redeclaration of primitive port 'a'", 4, "3.13"));
   const auto kInOneList = Parse(
       "primitive p(q, a);\n"
       "  output q;\n"
@@ -228,7 +228,7 @@ TEST(NameSpaceParsing, APrimitivesPortDeclaredTwice) {
       "  table 0 : 1; 1 : 0; endtable\n"
       "endprimitive\n");
   EXPECT_TRUE(ReportedError(kInOneList.diags,
-                            "duplicate port declaration for 'a'", 3, "3.13"));
+                            "redeclaration of primitive port 'a'", 3, "3.13"));
   const auto kInputLikeOutput = Parse(
       "primitive p(q, a);\n"
       "  output q;\n"
@@ -237,7 +237,7 @@ TEST(NameSpaceParsing, APrimitivesPortDeclaredTwice) {
       "  table 0 : 1; 1 : 0; endtable\n"
       "endprimitive\n");
   EXPECT_TRUE(ReportedError(kInputLikeOutput.diags,
-                            "duplicate port declaration for 'q'", 4, "3.13"));
+                            "redeclaration of primitive port 'q'", 4, "3.13"));
   const auto kOutputLikeInput = Parse(
       "primitive p(q, a);\n"
       "  input a;\n"
@@ -246,7 +246,7 @@ TEST(NameSpaceParsing, APrimitivesPortDeclaredTwice) {
       "  table 0 : 1; 1 : 0; endtable\n"
       "endprimitive\n");
   EXPECT_TRUE(ReportedError(kOutputLikeInput.diags,
-                            "duplicate port declaration for 'a'", 3, "3.13"));
+                            "redeclaration of primitive port 'a'", 3, "3.13"));
 }
 
 // The same in a primitive's ANSI header, whose entries declare its ports.
@@ -258,14 +258,14 @@ TEST(NameSpaceParsing, AnAnsiPrimitivesPortDeclaredTwice) {
       "  table 0 : 1; 1 : 0; endtable\n"
       "endprimitive\n");
   EXPECT_TRUE(ReportedError(kInputTwice.diags,
-                            "duplicate port declaration for 'a'", 3, "3.13"));
+                            "redeclaration of primitive port 'a'", 3, "3.13"));
   const auto kInputLikeOutput = Parse(
       "primitive p(output q,\n"
       "            input q);\n"
       "  table 0 : 1; 1 : 0; endtable\n"
       "endprimitive\n");
   EXPECT_TRUE(ReportedError(kInputLikeOutput.diags,
-                            "duplicate port declaration for 'q'", 2, "3.13"));
+                            "redeclaration of primitive port 'q'", 2, "3.13"));
 }
 
 // The nearest allowed forms: each port declared once, and a sequential

@@ -152,7 +152,7 @@ static void ReportUdpPortRedeclared(DiagEngine& diag, const UdpDecl& udp,
   const bool kInput =
       std::ranges::find(udp.input_names, name) != udp.input_names.end();
   if (!kInput && !(output_too && name == udp.output_name)) return;
-  diag.Error(loc, std::format("duplicate port declaration for '{}'", name),
+  diag.Error(loc, std::format("redeclaration of primitive port '{}'", name),
              Subclause("3.13"));
 }
 

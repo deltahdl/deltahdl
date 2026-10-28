@@ -78,14 +78,6 @@ TEST(UnitScopeHierarchicalNames, PathEndingAtAUnitName) {
        "endmodule\n",
        "$root.top.c.g", "g", 7},
       {"int g;\n"
-       "module other;\n"
-       "endmodule\n"
-       "module top;\n"
-       "  int y;\n"
-       "  initial y = other.g;\n"
-       "endmodule\n",
-       "other.g", "g", 6},
-      {"int g;\n"
        "program top;\n"
        "  int y;\n"
        "  initial y = top.g;\n"
@@ -129,11 +121,8 @@ TEST(UnitScopeHierarchicalNames, PathEndingAtAnInstancesOwnName) {
              "  wire [31:0] w;\n"
              "  child c();\n"
              "  assign w = top.g;\n"
-             "  initial y = $root.top.g + $root.top.c.g + other.g;\n"
+             "  initial y = $root.top.g + $root.top.c.g;\n"
              "  initial y = $unit::g + g;\n"
-             "endmodule\n"
-             "module other;\n"
-             "  int g;\n"
              "endmodule\n"));
   EXPECT_TRUE(
       ElabOk("int g;\n"
@@ -150,15 +139,48 @@ TEST(UnitScopeHierarchicalNames, PathEndingAtAnInstancesOwnName) {
              "module top;\n"
              "  int g;\n"
              "endmodule\n"));
-  EXPECT_TRUE(
-      ElabOk("int g;\n"
-             "module other;\n"
-             "endmodule\n"
-             "module top;\n"
-             "  struct { int g; } other;\n"
-             "  int y;\n"
-             "  initial y = other.g;\n"
-             "endmodule\n"));
+}
+
+// §23.3.1: with no top named, every module no other one instantiates is a
+// top-level instance, and a path headed by its name is read from it wherever
+// the path is written. Ending at a name only the unit declares, the path names
+// nothing; ending at the other module's own g, or headed by a variable of the
+// referencing module named like the other module, it is read as written.
+TEST(UnitScopeHierarchicalNames, PathHeadedByAnotherTopLevelInstance) {
+  ElabFixture f;
+  ElaborateWithPreprocessor(
+      "int g;\n"
+      "module other;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  int y;\n"
+      "  initial y = other.g;\n"
+      "endmodule\n",
+      f, "", /*auto_top=*/true);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "hierarchical name 'other.g' is unresolved: 'g' "
+                            "is declared in the compilation-unit scope",
+                            6, "3.12.1"));
+  for (const char* src : {"int g;\n"
+                          "module other;\n"
+                          "  int g;\n"
+                          "endmodule\n"
+                          "module top;\n"
+                          "  int y;\n"
+                          "  initial y = other.g;\n"
+                          "endmodule\n",
+                          "int g;\n"
+                          "module other;\n"
+                          "endmodule\n"
+                          "module top;\n"
+                          "  struct { int g; } other;\n"
+                          "  int y;\n"
+                          "  initial y = other.g;\n"
+                          "endmodule\n"}) {
+    ElabFixture ok;
+    ElaborateWithPreprocessor(src, ok, "", /*auto_top=*/true);
+    EXPECT_FALSE(ok.has_errors) << src;
+  }
 }
 
 // A module instantiated twice writes its path once, and it is reported once.
