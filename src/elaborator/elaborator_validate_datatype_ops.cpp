@@ -764,8 +764,9 @@ void Elaborator::WalkStmtsForVirtualInterfaceOps(const Stmt* s) {
   if ((s->kind == StmtKind::kBlockingAssign ||
        s->kind == StmtKind::kNonblockingAssign) &&
       s->lhs && s->rhs) {
+    // §23.4: an interface instance's interface may be nested in the module.
     const std::function<const ModuleDecl*(std::string_view)> kFindModule =
-        [this](std::string_view name) { return FindModule(name); };
+        [this](std::string_view name) { return FindModuleInScope(name); };
     const ViAssignContext kCtx{var_types_,
                                interface_inst_types_,
                                vi_var_interface_types_,

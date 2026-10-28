@@ -520,4 +520,50 @@ TEST(VirtualInterfaceModportAssignment, InstanceModportSelectsTheType) {
                              10, "25.9"));
 }
 
+// §25.9 with §23.4: an interface a module declares nested in its body is a
+// name the module may write a virtual interface type with, its parameter
+// values and modport held to that declaration, so a modport it does not
+// declare is reported as missing from it rather than the interface as unknown
+// (#8265).
+TEST(VirtualInterfaceElaboration, ANestedInterfaceTypesAVirtualInterface) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  interface bus #(parameter W = 1); logic [W-1:0] d;\n"
+      "    modport mp(input d);\n"
+      "  endinterface\n"
+      "  bus #(4) b();\n"
+      "  virtual bus #(4) vb; virtual bus.mp vm;\n"
+      "  virtual bus.nope vn;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(NoErrorOnLine(f, 6));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "modport 'nope' not found in interface 'bus'", 7,
+                            "25.9"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "unknown interface 'bus' in virtual interface "
+                             "declaration",
+                             7, "25.9"));
+}
+
+// ...and a modport of an instance of it, `b.mq`, goes only to a virtual
+// interface selecting the same modport, the instance's interface found nested
+// as the virtual interface's is.
+TEST(VirtualInterfaceModportAssignment, ANestedInstancesModportSelectsTheType) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  interface bus; logic d;\n"
+      "    modport mp(input d); modport mq(output d);\n"
+      "  endinterface\n"
+      "  bus b(); virtual bus.mp vm;\n"
+      "  initial vm = b.mq;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "virtual interface modports do not match", 6,
+                            "25.9"));
+}
+
 }  // namespace

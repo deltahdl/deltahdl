@@ -887,10 +887,11 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
                         scalar_var_names_, real_var_names_, packed_array_vars_,
                         var_named_types_, var_select_shapes_},
                        typedefs_, diag_);
+  // §25.9 with §23.4: the interface named may be one nested in the module.
   RegisterVirtualInterfaceVarDecl(
       item,
       item->data_type.kind == DataTypeKind::kVirtualInterface
-          ? FindModule(item->data_type.type_name)
+          ? FindModuleInScope(item->data_type.type_name)
           : nullptr,
       {vi_var_interface_types_, vi_var_modports_, vi_var_param_values_},
       BuildParamScope(mod), diag_);
