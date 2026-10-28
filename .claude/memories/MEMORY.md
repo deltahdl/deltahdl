@@ -122,7 +122,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 
 ## Models and delegation
 
-- [Writing code in the main session](writing-code-in-the-main-session.md) — write every code edit in the session itself; a subagent gets none of the scheduled reminders.
+- [Working without subagents](working-without-subagents.md) — no Agent or Workflow call for any part of the work, reading and filing included; one structured task at a time in the session.
 
 ## The notes themselves
 
