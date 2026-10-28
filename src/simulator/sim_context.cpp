@@ -374,12 +374,8 @@ Variable* SimContext::FindVariable(std::string_view name) {
   auto* local = FindLocalVariable(name);
   if (local) return local;
   if (auto* in_package = FindInPackageScope(name)) return in_package;
-  // §3.12.1: a unit subroutine's path is read from the top of the design, a
-  // net it reaches being FindNet's.
-  if (IsUnitPathFromRoot(name)) {
-    auto it = variables_.find(RootedStorageKey(name));
-    if (it != variables_.end()) return it->second;
-  }
+  // §3.12.1: a unit subroutine's path is read from the top of the design.
+  if (Variable* from_root = FindUnitPathVariable(name)) return from_root;
   std::string prefix = ActiveInstancePrefix();
 
   // §27.4: a generate block is a separate scope, and its declarations are
