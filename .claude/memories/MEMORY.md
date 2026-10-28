@@ -75,7 +75,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 ## Verification
 
 - [Verifying through CI](verifying-through-ci.md) — keep local work to what CI has no way to perform; a build, a test binary, a probe of a defect or a pre-push review workflow is replaced by pushing and reading the run.
-- [A rule conforms only when tests show it](a-rule-conforms-only-when-tests-show-it.md) — checking a clause, a case conforms only when a test in the tree exercises it and asserts the standard's outcome; reading src/ never settles it, and an untested case is filed.
+- [A rule conforms only when tests show it](a-rule-conforms-only-when-tests-show-it.md) — checking a clause, a case conforms only when a test in the tree exercises it and asserts the standard's outcome; reading src/ never settles it, an untested case is filed, and the tests and open issues are the only record of conformance.
 - [Reading a CI run](reading-a-ci-run.md) — `gh run list --limit 1` before pushing, `gh run view --log-failed` after.
 - [Per-line coverage from CI artifacts](per-line-coverage-from-ci-artifacts.md) — the coverage log counts misses per file; read the missed lines from the run's coverage-simulator and profdata-unit-shard artifacts with a local llvm-cov.
 - [Fetching a failed job's log](fetching-a-failed-job-log.md) — when `--log-failed` breaks off or comes back empty, fetch each failed job through `gh api --allow-escape-sequences .../actions/jobs/<id>/logs`.
