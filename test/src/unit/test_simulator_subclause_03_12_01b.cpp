@@ -323,6 +323,9 @@ TEST(SeparateUnitsSim, EachUnitsTaskRunsInItsOwnTimeScale) {
 // §3.12.1: the PLI reaches the items of every compilation unit, each unit a
 // scope of its own drawn as a package named "$unit"; a unit declaring no data
 // adds no scope.
+// The names each compilation unit reaches, one list per unit.
+using NamesByUnit = std::vector<std::vector<std::string>>;
+
 class SeparateUnitsVpi : public VpiDesignRun {
  protected:
   void RunUnits(const std::vector<std::string>& srcs) {
@@ -332,6 +335,28 @@ class SeparateUnitsVpi : public VpiDesignRun {
     ASSERT_NE(design, nullptr);
     ASSERT_FALSE(f_.diag.HasErrors());
     LowerAndRun(design, f_);
+  }
+
+  // The names of the objects of `type` each compilation unit reaches, the
+  // lists in sorted order, so that which file a unit is does not matter.
+  static NamesByUnit NamesPerUnit(int type) {
+    NamesByUnit reached;
+    for (vpiHandle pkg : ObjectsOf(vpiPackage, nullptr)) {
+      reached.push_back(NamesOf(type, pkg));
+    }
+    std::ranges::sort(reached);
+    return reached;
+  }
+
+  // §37.10 detail 5: each object of `type` a compilation unit reaches is
+  // full-named "$unit::" followed by its name.
+  static void ExpectUnitFullNames(int type) {
+    for (vpiHandle pkg : ObjectsOf(vpiPackage, nullptr)) {
+      for (vpiHandle obj : ObjectsOf(type, pkg)) {
+        EXPECT_EQ(std::string(vpi_get_str(vpiFullName, obj)),
+                  "$unit::" + std::string(vpi_get_str(vpiName, obj)));
+      }
+    }
   }
 };
 
@@ -404,15 +429,7 @@ TEST_F(SeparateUnitsVpi, EachUnitsNettypeIsANettypeDeclOfItsOwnScope) {
        "nettype logic unb;\n"
        "module child; endmodule\n",
        "module other; endmodule\n"});
-  std::vector<std::vector<std::string>> reached;
-  vpiHandle it = vpi_iterate(vpiPackage, nullptr);
-  ASSERT_NE(it, nullptr);
-  while (vpiHandle pkg = vpi_scan(it)) {
-    reached.push_back(NamesOf(vpiNetTypedef, pkg));
-  }
-  std::ranges::sort(reached);
-  EXPECT_EQ(reached,
-            (std::vector<std::vector<std::string>>{{}, {"una"}, {"unb"}}));
+  EXPECT_EQ(NamesPerUnit(vpiNetTypedef), (NamesByUnit{{}, {"una"}, {"unb"}}));
 }
 
 // §3.12.1 (printed page 56): the PLI traverses every compilation unit, so of
@@ -433,6 +450,71 @@ TEST_F(SeparateUnitsVpi, AUnitDeclaringNothingIsReachedBesideTheOthers) {
     ++units;
   }
   EXPECT_EQ(units, 3);
+}
+
+// §3.12.1 with §37.41: a task or function a compilation unit declares is a
+// task or function of that unit's own scope, which no other unit reaches.
+TEST_F(SeparateUnitsVpi, EachUnitsTaskOrFunctionIsATaskFuncOfItsOwnScope) {
+  RunUnits(
+      {"function int f(); return 1; endfunction\n"
+       "module top; child c(); endmodule\n",
+       "task t(); endtask\n"
+       "module child; endmodule\n",
+       "module other; endmodule\n"});
+  EXPECT_EQ(NamesPerUnit(vpiTaskFunc), (NamesByUnit{{}, {"f"}, {"t"}}));
+  ExpectUnitFullNames(vpiTaskFunc);
+}
+
+// Two units each declaring a function of one name each hold their own, so the
+// unit a function is reached from is the one it is a child of.
+TEST_F(SeparateUnitsVpi, TwoUnitsFunctionsOfOneNameAreEachTheirOwn) {
+  RunUnits(
+      {"function int f(); return 1; endfunction\n"
+       "module top; child c(); endmodule\n",
+       "function int f(); return 2; endfunction\n"
+       "module child; endmodule\n",
+       "module other; endmodule\n"});
+  int found = 0;
+  for (vpiHandle pkg : ObjectsOf(vpiPackage, nullptr)) {
+    vpiHandle f = Named(vpiTaskFunc, pkg, "f");
+    if (f == nullptr) continue;
+    EXPECT_EQ(VpiObjectOf(f)->parent, VpiObjectOf(pkg));
+    ++found;
+  }
+  EXPECT_EQ(found, 2);
+}
+
+// §3.12.1 with §35.5.4: a task or function a compilation unit imports through
+// DPI is a task or function of that unit's scope alone.
+TEST_F(SeparateUnitsVpi, AUnitsDpiImportIsATaskFuncOfItsOwnScope) {
+  RunUnits({"module top; child c(); endmodule\n",
+            "import \"DPI-C\" function int c_f(input int a);\n"
+            "module child; endmodule\n",
+            "module other; endmodule\n"});
+  EXPECT_EQ(NamesPerUnit(vpiTaskFunc), (NamesByUnit{{}, {}, {"c_f"}}));
+  ExpectUnitFullNames(vpiTaskFunc);
+}
+
+// §3.12.1 with §37.31: a class a compilation unit declares is a class defn of
+// that unit's scope alone.
+TEST_F(SeparateUnitsVpi, AUnitsClassIsAClassDefnOfItsOwnScope) {
+  RunUnits({"module top; child c(); endmodule\n",
+            "class C; endclass\n"
+            "module child; endmodule\n",
+            "module other; endmodule\n"});
+  EXPECT_EQ(NamesPerUnit(vpiClassDefn), (NamesByUnit{{}, {}, {"C"}}));
+  ExpectUnitFullNames(vpiClassDefn);
+}
+
+// §3.12.1 with §37.85 detail 5: a typedef a compilation unit declares is a
+// typespec of that unit's scope alone.
+TEST_F(SeparateUnitsVpi, AUnitsTypedefIsATypespecOfItsOwnScope) {
+  RunUnits(
+      {"typedef logic [3:0] nib_t;\n"
+       "module top; child c(); endmodule\n",
+       "module child; endmodule\n", "module other; endmodule\n"});
+  EXPECT_EQ(NamesPerUnit(vpiTypedef), (NamesByUnit{{}, {}, {"nib_t"}}));
+  ExpectUnitFullNames(vpiTypedef);
 }
 
 }  // namespace

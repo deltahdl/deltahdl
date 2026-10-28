@@ -331,7 +331,7 @@ VpiObject* MakeSubroutine(const SubroutineScope& where, const ModuleItem* item,
   tf->parent = where.scope;
   tf->automatic = item->is_automatic || (where.automatic && !item->is_static);
   if (item->kind == ModuleItemKind::kDpiImport) MarkDpi(tf, *item);
-  if (where.scope != nullptr) where.scope->children.push_back(tf);
+  where.scope->children.push_back(tf);
   sb.made[{item, where.key}] = tf;
   // §37.3.3: where the task or function was written.
   VpiRecordWrittenLocation(tf, item->loc, sb.ctx);
@@ -403,29 +403,21 @@ void MakePackageSubroutines(const SubroutineBuild& sb,
   }
 }
 
-// The tasks and functions of the compilation unit, which the unit's scope
-// object holds where its data made one. §37.10 detail 6: none is reached by
-// name.
+// The tasks and functions each compilation unit declares or imports through
+// DPI (§35.5.4), each held by the scope object of the unit declaring it
+// (§3.12.1), which is one of its own for each file where each file is a unit.
 void MakeUnitSubroutines(const SubroutineBuild& sb,
                          const VpiObjectMap& objects) {
-  auto unit = objects.find("$unit");
-  const SubroutineScope kWhere{unit == objects.end() ? nullptr : unit->second,
-                               "$unit", false, nullptr, ""};
-  for (const ModuleItem* item : sb.design.cu_function_decls) {
-    // §8.24: as in a package, a body written `C::name` is a method of C.
-    if (!item->method_class.empty()) continue;
-    MakeSubroutine(kWhere, item, sb)->in_compilation_unit = true;
-  }
-  if (sb.design.compilation_unit == nullptr) return;
-  // §35.5.4: what the unit imports through DPI, which its list of functions
-  // leaves out.
-  const std::vector<ModuleItem*>& items = sb.design.compilation_unit->cu_items;
-  for (const ModuleItem* item : items) {
-    if (item->kind == ModuleItemKind::kDpiImport) {
-      MakeSubroutine(kWhere, item, sb)->in_compilation_unit = true;
+  for (const VpiUnitScope& at : VpiUnitScopes(sb.design, objects)) {
+    const SubroutineScope kWhere{at.scope, "$unit", false, nullptr, ""};
+    for (const ModuleItem* item : at.unit->cu_items) {
+      // §8.24: as in a package, a body written `C::name` is a method of C.
+      if (IsSubroutine(item) && item->method_class.empty()) {
+        MakeSubroutine(kWhere, item, sb)->in_compilation_unit = true;
+      }
     }
+    MarkDpiExports(at.scope, at.unit->cu_items);
   }
-  MarkDpiExports(kWhere.scope, items);
 }
 
 // The task or function `decls` declare under `name`, null where they declare

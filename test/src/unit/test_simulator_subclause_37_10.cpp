@@ -19,6 +19,7 @@
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
+#include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers1.h"
@@ -164,6 +165,19 @@ TEST(InstanceModel, MemoryIterationYieldsArrayVariableType) {
 // D5: a compilation-unit object's full name is prefixed with "$unit::".
 TEST(InstanceModel, CompilationUnitFullNameHasUnitPrefix) {
   EXPECT_EQ(VpiCompilationUnitFullName("top.sig"), "$unit::top.sig");
+}
+
+// D5: a name a scope declares is joined to an instance's full name with a dot
+// and to a package's or a compilation unit's, which end in "::", directly; one
+// no scope object holds is the compilation unit's, under "$unit::".
+TEST(InstanceModel, AScopedFullNameJoinsTheScopesOwn) {
+  VpiObject top;
+  top.full_name = "top";
+  VpiObject pkg;
+  pkg.full_name = "pkg::";
+  EXPECT_EQ(VpiScopedFullName(&top, "x"), "top.x");
+  EXPECT_EQ(VpiScopedFullName(&pkg, "x"), "pkg::x");
+  EXPECT_EQ(VpiScopedFullName(nullptr, "x"), "$unit::x");
 }
 
 // D5: a package's full name is its own name ending in "::", distinguishing it

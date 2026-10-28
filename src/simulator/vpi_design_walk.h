@@ -14,6 +14,7 @@
 #include "elaborator/rtlir_scopes.h"
 #include "parser/ast_design.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/unit_scopes.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers2.h"
@@ -146,6 +147,34 @@ inline VpiHandle FindObjectForFlatName(
     const std::unordered_map<std::string_view, VpiObject*>& objects,
     std::string_view flat_name) {
   return FindObjectBelow(objects, nullptr, flat_name);
+}
+
+// §3.12.1: a compilation unit of a design and the scope object
+// VpiContext::AttachPackages made for it.
+struct VpiUnitScope {
+  const CompilationUnit* unit;
+  VpiObject* scope;
+};
+
+// The compilation units of `design`, each with its scope object among
+// `objects`: where each file is a unit of its own, unit k with the object
+// keyed "$unit#k", and otherwise the one unit with the object keyed "$unit".
+// None where the design was built from no source, which has no unit.
+inline std::vector<VpiUnitScope> VpiUnitScopes(
+    const RtlirDesign& design,
+    const std::unordered_map<std::string_view, VpiObject*>& objects) {
+  std::vector<VpiUnitScope> units;
+  for (std::size_t k = 0; k < design.compilation_units.size(); ++k) {
+    units.push_back({design.compilation_units[k],
+                     FindObjectForFlatName(
+                         objects, UnitScopes::ScopeName(static_cast<int>(k)))});
+  }
+  if (units.empty() && design.compilation_unit != nullptr) {
+    units.push_back(
+        {design.compilation_unit,
+         FindObjectForFlatName(objects, UnitScopes::ScopeName(-1))});
+  }
+  return units;
 }
 
 // The instances `mod` holds, pushed onto the walk under their own paths. An

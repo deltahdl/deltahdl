@@ -441,10 +441,8 @@ TypespecsByName MakeTypespecs(const std::vector<ModuleItem*>& items,
     VpiObject* typespec = TypespecMaker(at, made).Of(
         item->typedef_type, item->unpacked_dims, item->name, at.scope);
     if (typespec == nullptr) continue;
-    typespec->full_name = at.scope != nullptr
-                              ? VpiScopedFullName(at.scope, item->name)
-                              : std::string(item->name);
-    if (at.scope != nullptr) at.scope->children.push_back(typespec);
+    typespec->full_name = VpiScopedFullName(at.scope, item->name);
+    at.scope->children.push_back(typespec);
     made[item->name] = typespec;
   }
   return made;
@@ -706,8 +704,8 @@ const TypespecsByName& ExtendsTypedefs(
 // class's through the classes holding it, as "Outer::Inner".
 std::string RunClassName(const VpiObject* defn) {
   std::string name(defn->name);
-  for (const VpiObject* at = defn->parent;
-       at != nullptr && at->type == vpiClassDefn; at = at->parent) {
+  for (const VpiObject* at = defn->parent; at->type == vpiClassDefn;
+       at = at->parent) {
     name.insert(0, "::").insert(0, at->name);
   }
   return name;
@@ -864,16 +862,21 @@ VpiObjectMap AttachTypespecs(const RtlirDesign* design,
   InstanceDefinitions definitions;
   const DesignTypespecs kDesign{build,   ctx,  shapes,     classes,
                                 objects, unit, definitions};
-  auto unit_scope = objects.find("$unit");
   const TypespecsByName kNone;
   const std::vector<RtlirImport> kNoImports;
   const std::string kUnitPrefix("$unit");
   InstancePrefixOverride unprefixed(ctx.InstancePrefixOverride(), "");
-  const TypespecsByName kUnit =
-      MakeTypespecs(unit.cu_items,
-                    {unit_scope == objects.end() ? nullptr : unit_scope->second,
-                     kUnitPrefix, nullptr, kNone, kNoImports, kDesign});
-  VpiObjectMap answered(kUnit.begin(), kUnit.end());
+  // §3.12.1: each compilation unit's typedefs are typespecs of its own scope,
+  // one of each file's where each file is a unit, and a variable a module
+  // declares with one finds it among those of every unit.
+  TypespecsByName unit_typedefs;
+  for (const VpiUnitScope& at : VpiUnitScopes(*design, objects)) {
+    const TypespecsByName kOwn = MakeTypespecs(
+        at.unit->cu_items,
+        {at.scope, kUnitPrefix, nullptr, kNone, kNoImports, kDesign});
+    unit_typedefs.insert(kOwn.begin(), kOwn.end());
+  }
+  VpiObjectMap answered(unit_typedefs.begin(), unit_typedefs.end());
   // The typedefs of each package and instance, by the key the class defns it
   // declares are found under, and those of each generate block's class.
   std::unordered_map<std::string, TypespecsByName> declaring;
@@ -897,7 +900,7 @@ VpiObjectMap AttachTypespecs(const RtlirDesign* design,
           in_blocks[{declared.decl, VpiGenScopeOf(scope, path)->full_name}] = {
               prefix, GenBlockTypedefs(scope, path, kLocal, kGen)};
         }
-        RelateVariableTypespecs(mod, {kLocal, kUnit, objects, kAt});
+        RelateVariableTypespecs(mod, {kLocal, unit_typedefs, objects, kAt});
       });
   for (const auto& [key, defn] : classes) {
     const auto kInBlock = in_blocks.find(key);

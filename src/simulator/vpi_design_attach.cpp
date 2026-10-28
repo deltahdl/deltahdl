@@ -26,7 +26,6 @@
 #include "simulator/sim_context.h"
 #include "simulator/specify.h"
 #include "simulator/sv_vpi_user.h"
-#include "simulator/unit_scopes.h"
 #include "simulator/variable.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
@@ -829,16 +828,9 @@ void VpiContext::AttachNettypeDeclarations(const RtlirDesign* design) {
   }
   // §3.12.1: the compilation unit's own nettypes are its scope's, each unit's
   // where every file is one, "$unit#k", and the one unit's, "$unit", where
-  // they are not; AttachPackages made the scope of a unit declaring one.
-  const bool kOneUnit = design->compilation_units.empty();
-  const std::size_t kUnits = kOneUnit ? 1 : design->compilation_units.size();
-  for (std::size_t k = 0; k < kUnits; ++k) {
-    const CompilationUnit* unit =
-        kOneUnit ? design->compilation_unit : design->compilation_units[k];
-    auto scope = object_map_.find(
-        UnitScopes::ScopeName(kOneUnit ? -1 : static_cast<int>(k)));
-    if (scope != object_map_.end())
-      MakeNettypeDecls(scope->second, unit->cu_items, kNoImports);
+  // they are not.
+  for (const VpiUnitScope& at : VpiUnitScopes(*design, object_map_)) {
+    MakeNettypeDecls(at.scope, at.unit->cu_items, kNoImports);
   }
 }
 

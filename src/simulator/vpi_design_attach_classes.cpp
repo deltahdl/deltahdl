@@ -9,6 +9,7 @@
 #include "elaborator/rtlir_attribute.h"
 #include "elaborator/rtlir_scopes.h"
 #include "parser/ast_class.h"
+#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
@@ -50,8 +51,8 @@ struct MadeClassDefn {
   std::string block = {};
 };
 
-// §37.31: the class defn `decl` stands as, hung from the scope declaring it
-// where a scope object holds it, reporting its name and whether it is virtual.
+// §37.31: the class defn `decl` stands as, hung from the scope declaring it,
+// reporting its name and whether it is virtual.
 void MakeClassDefn(VpiObject* scope, const ClassDecl* decl,
                    const std::string& prefix, const VpiAttachBuild& build,
                    std::vector<MadeClassDefn>& made) {
@@ -62,7 +63,7 @@ void MakeClassDefn(VpiObject* scope, const ClassDecl* decl,
   defn->full_name = VpiScopedFullName(scope, decl->name);
   defn->parent = scope;
   defn->is_virtual = decl->is_virtual;
-  if (scope != nullptr) scope->children.push_back(defn);
+  scope->children.push_back(defn);
   made.push_back({decl, defn, prefix, nullptr});
 }
 
@@ -125,19 +126,19 @@ void MakePackageClassDefns(const RtlirDesign& design,
   }
 }
 
-// The class defns of the compilation unit's classes, which the unit's scope
-// object holds where its data made one and which are otherwise reached only
-// with a NULL reference. §37.10 detail 6: none is reached by name.
+// The class defns of each compilation unit's classes, each held by the scope
+// object of the unit declaring it (§3.12.1) and reached with a NULL reference
+// too. §37.10 detail 6: none is reached by name.
 void MakeUnitClassDefns(const RtlirDesign& design, const VpiObjectMap& objects,
                         const VpiAttachBuild& build,
                         std::vector<MadeClassDefn>& made) {
-  auto unit = objects.find("$unit");
-  VpiObject* scope = unit == objects.end() ? nullptr : unit->second;
-  for (const ClassDecl* decl : design.cu_class_decls) {
-    MakeClassDefn(scope, decl, "$unit", build, made);
-    if (decl == nullptr) continue;
-    made.back().defn->in_compilation_unit = true;
-    made.back().attrs = &design.node_attrs;
+  for (const VpiUnitScope& at : VpiUnitScopes(design, objects)) {
+    for (const ClassDecl* decl : at.unit->classes) {
+      MakeClassDefn(at.scope, decl, "$unit", build, made);
+      if (decl == nullptr) continue;
+      made.back().defn->in_compilation_unit = true;
+      made.back().attrs = &design.node_attrs;
+    }
   }
 }
 
