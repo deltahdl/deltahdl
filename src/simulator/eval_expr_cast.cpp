@@ -295,6 +295,37 @@ static CastTarget ResolveCastTarget(std::string_view key, SimContext& ctx) {
   return t;
 }
 
+// §6.23 with §11.4.11: the self-determined type of an expression a type
+// reference names, `type(n + n)`, as its form gives it; an operation with a
+// real operand is real, held in 64 bits whatever width its integral operands
+// have.
+static bool ExpressionCastTarget(const Expr* e, SimContext& ctx,
+                                 CastTarget& out) {
+  out.is_real = SimSelfReal(e, ctx);
+  out.width = out.is_real ? 64 : SimSelfWidth(e, ctx);
+  out.is_4state = SimSelf4State(e, ctx);
+  out.is_signed = SimSelfSigned(e, ctx);
+  return out.width > 0;
+}
+
+// The casting type a type reference to the name `name` stands for. The parser
+// reads `type(n)` as a type named n, so a variable so named is the expression
+// whose type the reference takes; any other name is a type's, real where
+// `written`, the type as the reference spells it, is one.
+static bool NamedCastTarget(std::string_view name, const DataType* written,
+                            SimContext& ctx, CastTarget& out) {
+  if (const Variable* var = ctx.FindVariable(name)) {
+    out.width = var->value.width;
+    out.is_4state = var->is_4state;
+    out.is_signed = var->is_signed;
+    out.is_real = var->is_real;
+    return out.width > 0;
+  }
+  out = ResolveCastTarget(name, ctx);
+  out.is_real = written != nullptr && DeclaredTypeIsReal(*written, ctx);
+  return true;
+}
+
 // §6.23 with §6.24.1: the casting type a type reference stands for,
 // `type(bit [11:0])'(v)` the data type written, `type(n)'(v)` the type n was
 // declared with, and a typedef's name the type it names. A data type written
@@ -329,30 +360,12 @@ static bool TypeRefCastTarget(const Expr* ref, SimContext& ctx,
   if (written != nullptr && written->scope_name.empty()) {
     name = written->type_name;
   } else if (ref->lhs != nullptr) {
-    if (ref->lhs->kind != ExprKind::kIdentifier) {
-      // §11.4.11: an operation with a real operand is real, held in 64 bits
-      // whatever width its integral operands have.
-      out.is_real = SimSelfReal(ref->lhs, ctx);
-      out.width = out.is_real ? 64 : SimSelfWidth(ref->lhs, ctx);
-      out.is_4state = SimSelf4State(ref->lhs, ctx);
-      out.is_signed = SimSelfSigned(ref->lhs, ctx);
-      return out.width > 0;
-    }
+    if (ref->lhs->kind != ExprKind::kIdentifier)
+      return ExpressionCastTarget(ref->lhs, ctx, out);
     name = ref->lhs->text;
   }
   if (name.empty()) return false;
-  // The parser reads `type(n)` as a type named n; a variable so named is the
-  // expression whose type the reference takes.
-  if (const Variable* var = ctx.FindVariable(name)) {
-    out.width = var->value.width;
-    out.is_4state = var->is_4state;
-    out.is_signed = var->is_signed;
-    out.is_real = var->is_real;
-    return out.width > 0;
-  }
-  out = ResolveCastTarget(name, ctx);
-  out.is_real = written != nullptr && DeclaredTypeIsReal(*written, ctx);
-  return true;
+  return NamedCastTarget(name, written, ctx, out);
 }
 
 // §6.24.1: the type a cast gives its result, which a type reference to an
