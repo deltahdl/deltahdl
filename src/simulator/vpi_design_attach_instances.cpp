@@ -8,7 +8,6 @@
 #include "common/types.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_attribute.h"
-#include "parser/ast_design.h"
 #include "parser/ast_module.h"
 #include "parser/ast_specify.h"
 #include "parser/ast_type.h"
@@ -250,9 +249,11 @@ void VpiContext::AttachPackages(const RtlirDesign* design) {
     MakePackageScope(own, kUnitScope);
     MarkInCompilationUnit(own);
   }
-  if (!design->compilation_units.empty()) return;
   // The compilation unit's data is keyed the same way, under "$unit". It is
   // part of no module either, and detail 5 names its objects "$unit::name".
+  // A design built from no source has no unit to reach.
+  if (!design->compilation_units.empty() || design->compilation_unit == nullptr)
+    return;
   VpiObject* unit = DesignObjectForFlatName(kUnitScope);
   MakePackageScope(unit, kUnitScope);
   MarkInCompilationUnit(unit);
