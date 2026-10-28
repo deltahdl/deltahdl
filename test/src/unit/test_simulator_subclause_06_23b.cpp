@@ -130,4 +130,34 @@ TEST(TypeOfExprCastSim, CastToATypeReferenceReadsARealFunctionAsReal) {
   EXPECT_DOUBLE_EQ(RunAndGetReal(kSrc, "a"), 2.5);
 }
 
+// §6.23 with §6.24.2 and §20.17.1: `$cast` and `$system` called as functions
+// in the expression a type reference names each return an int, 32 bits.
+TEST(TypeOfExprCastSim, CastToATypeReferenceReadsCastAndSystemAsInts) {
+  const std::string kSrc =
+      "module t;\n"
+      "  bit [3:0] n;\n"
+      "  int a, b, d, e;\n"
+      "  initial begin\n"
+      "    d = type(n + $cast(a, b))'(16'hABCF);\n"
+      "    e = type(n + $system(\"true\"))'(16'hABCF);\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(kSrc, "d"), 0xABCFu);
+  EXPECT_EQ(RunAndGet(kSrc, "e"), 0xABCFu);
+}
+
+// §6.23 with §19.9 and §11.4.11: `$get_coverage` returns a real, so an
+// operation it is an operand of in the expression a type reference names is
+// real too.
+TEST(TypeOfExprCastSim, CastToATypeReferenceReadsGetCoverageAsReal) {
+  const std::string kSrc =
+      "module t;\n"
+      "  bit [3:0] n;\n"
+      "  int i = 5;\n"
+      "  real a;\n"
+      "  initial a = type(n + $get_coverage())'(i) / 2;\n"
+      "endmodule\n";
+  EXPECT_DOUBLE_EQ(RunAndGetReal(kSrc, "a"), 2.5);
+}
+
 }  // namespace

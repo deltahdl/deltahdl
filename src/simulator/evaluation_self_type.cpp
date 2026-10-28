@@ -144,8 +144,9 @@ static SelfType CallSelfType(const Expr* expr, SimContext& ctx) {
 // The system functions whose result has a type of its own, each with that
 // type: an integer for $bits (§20.6.2), the array query functions (§20.7),
 // $clog2 (§20.8.1), $rtoi (§20.5), $random (§20.14.1) and the distribution
-// functions (§20.14.2); an int for $countbits and $countones (§20.9); an int
-// unsigned for $urandom and $urandom_range (§18.13); a bit for $onehot,
+// functions (§20.14.2); an int for $countbits and $countones (§20.9), $cast
+// called as a function (§6.24.2) and $system (§20.17.1); an int unsigned for
+// $urandom and $urandom_range (§18.13); a bit for $onehot,
 // $onehot0 and $isunknown (§20.9); a 1'b1 or 1'b0 for the value change
 // functions (§16.9.3) and their global clocking forms (§16.9.4); a 64-bit time
 // for $time (§20.3.1), a [63:0] for $realtobits (§20.5), a 32-bit unsigned
@@ -185,6 +186,8 @@ constexpr std::array kSystemFunctionTypes = {
     SystemFunctionType{"$dist_erlang", kIntegerResult},
     SystemFunctionType{"$countbits", kIntResult},
     SystemFunctionType{"$countones", kIntResult},
+    SystemFunctionType{"$cast", kIntResult},
+    SystemFunctionType{"$system", kIntResult},
     SystemFunctionType{"$urandom", kIntUnsignedResult},
     SystemFunctionType{"$urandom_range", kIntUnsignedResult},
     SystemFunctionType{"$onehot", kBitResult},
@@ -335,18 +338,18 @@ bool SimSelfSigned(const Expr* expr, SimContext& ctx) {
 }
 
 // The system functions returning a real value: $itor, $bitstoreal and
-// $bitstoshortreal (§20.5), $realtime (§20.3.3), and each function of Table
-// 20-4 (§20.8.2).
-constexpr std::array<std::string_view, 25> kRealSystemFunctions = {
-    "$itor",     "$bitstoreal", "$bitstoshortreal",
-    "$realtime", "$ln",         "$log10",
-    "$exp",      "$sqrt",       "$pow",
-    "$floor",    "$ceil",       "$sin",
-    "$cos",      "$tan",        "$asin",
-    "$acos",     "$atan",       "$atan2",
-    "$hypot",    "$sinh",       "$cosh",
-    "$tanh",     "$asinh",      "$acosh",
-    "$atanh"};
+// $bitstoshortreal (§20.5), $realtime (§20.3.3), each function of Table 20-4
+// (§20.8.2), and $get_coverage (§19.9).
+constexpr std::array<std::string_view, 26> kRealSystemFunctions = {
+    "$itor",     "$bitstoreal",  "$bitstoshortreal",
+    "$realtime", "$ln",          "$log10",
+    "$exp",      "$sqrt",        "$pow",
+    "$floor",    "$ceil",        "$sin",
+    "$cos",      "$tan",         "$asin",
+    "$acos",     "$atan",        "$atan2",
+    "$hypot",    "$sinh",        "$cosh",
+    "$tanh",     "$asinh",       "$acosh",
+    "$atanh",    "$get_coverage"};
 
 // §11.4.11 with §6.12: whether an expression's self-determined type is real,
 // as its form says: a real or time literal, a real variable, a call of a
