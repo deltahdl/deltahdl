@@ -130,6 +130,8 @@ class ElaboratorOperationRules : public ElaboratorData {
   void WalkStmtsForTypeRefArg(const Stmt* s);
   void CheckTypeRefArgInner(const Expr* inner, SourceLoc loc);
   bool TypeRefArgUsesDynamicElement(const Expr* e) const;
+  bool IsHierarchicalMemberAccess(const Expr* e) const;
+  bool TypeRefArgHasMemberAccess(const Expr* e) const;
 
   // §11.9: each tagged union expression against the type its context gives
   // it. Defined in elaborator_validate_operations_tagged.cpp.

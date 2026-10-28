@@ -142,8 +142,7 @@ TEST(TypeOperatorElab, NonTypeRefBangEqRejected) {
 }
 
 // §6.23 — the inner expression of type(...) shall not contain a
-// hierarchical reference. A member-access subtree is treated as a
-// hierarchical reference here.
+// hierarchical reference, which a member of an instance is.
 TEST(TypeOperatorElab, HierarchicalRefInTypeArgRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -162,8 +161,8 @@ TEST(TypeOperatorElab, HierarchicalRefInTypeArgRejected) {
                     6, "6.23"));
 }
 
-// §6.23 — even when wrapped in a larger expression, a member-access
-// subtree inside type(...) is rejected.
+// §6.23 — even when wrapped in a larger expression, an instance's member
+// inside type(...) is rejected.
 TEST(TypeOperatorElab, HierarchicalRefInBinaryArgRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -180,6 +179,19 @@ TEST(TypeOperatorElab, HierarchicalRefInBinaryArgRejected) {
                     "type operator argument uses a hierarchical reference, "
                     "which the type operator does not accept",
                     6, "6.23"));
+}
+
+// §6.23 with §7.2 — a member of a structure variable the module declares
+// names no scope, so it is no hierarchical reference.
+TEST(TypeOperatorElab, StructureMemberInTypeArgAccepted) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  typedef struct packed { bit [7:0] f; bit g; } st;\n"
+             "  st p;\n"
+             "  int d, e;\n"
+             "  initial d = type(p.f)'(5);\n"
+             "  initial e = type(d + p.f)'(5);\n"
+             "endmodule\n"));
 }
 
 // §6.23 — the inner expression of type(...) shall not reference an

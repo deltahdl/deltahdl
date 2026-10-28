@@ -424,8 +424,9 @@ void ElaboratorOperationRules::ValidateTypeRefComparisons(
 // §6.23 — the expression supplied to the type operator shall not contain a
 // hierarchical reference or a reference to an element of a dynamic object.
 // A member-access subtree written with `.` is treated as a hierarchical
-// reference; a select whose base names a dynamic array or associative array is
-// treated as a reference to a dynamic-object element.
+// reference, but for the two kinds of access below; a select whose base names
+// a dynamic array or associative array is treated as a reference to a
+// dynamic-object element.
 //
 // §8.23 names the type operator as one of the contexts in which an incomplete
 // forward type, a type defined by an interface-based typedef, or a type
@@ -435,11 +436,23 @@ void ElaboratorOperationRules::ValidateTypeRefComparisons(
 // parameter: package references are permitted and hierarchical names are not.
 // The descent into the children of a `::` node still runs, so `type(C::x.y)`
 // and any `::` node holding a `.` node below it remain errors.
-static bool IsHierarchicalMemberAccess(const Expr* e) {
-  return e->kind == ExprKind::kMemberAccess && !e->is_scope_resolution;
+//
+// §7.2 with §6.23: nor is a `.` that selects a member of a variable the
+// module declares, `p.f` of a structure `p`, which names no scope. A class
+// handle's property, an element of a dynamic object, and a virtual
+// interface's member still count.
+bool ElaboratorOperationRules::IsHierarchicalMemberAccess(const Expr* e) const {
+  if (e->kind != ExprKind::kMemberAccess || e->is_scope_resolution)
+    return false;
+  const Expr* root = e;
+  while (root->kind == ExprKind::kMemberAccess) root = root->lhs;
+  auto it = var_types_.find(root->text);
+  return root->kind != ExprKind::kIdentifier || it == var_types_.end() ||
+         it->second == DataTypeKind::kVirtualInterface ||
+         class_var_names_.count(root->text) != 0;
 }
 
-static bool TypeRefArgHasMemberAccess(const Expr* e) {
+bool ElaboratorOperationRules::TypeRefArgHasMemberAccess(const Expr* e) const {
   if (!e) return false;
   if (IsHierarchicalMemberAccess(e)) return true;
   if (TypeRefArgHasMemberAccess(e->lhs)) return true;
