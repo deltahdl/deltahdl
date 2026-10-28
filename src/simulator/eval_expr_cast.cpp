@@ -245,6 +245,9 @@ struct CastTarget {
   uint32_t width = 32;
   bool is_4state = true;
   bool is_signed = false;
+  // §6.12: a real, shortreal or realtime type, which a type reference names
+  // where its type name does not spell one (TypeRefCastTarget).
+  bool is_real = false;
 };
 
 static bool IsTwoStateKind(DataTypeKind kind) {
@@ -298,8 +301,10 @@ static CastTarget ResolveCastTarget(std::string_view key, SimContext& ctx) {
 // holds its signing, the keyword's default (§6.11.3) or the `signed` or
 // `unsigned` written after it, so `type(int unsigned)` casts unsigned. Any
 // other expression, `type(n + n)'(v)`, stands for its self-determined type,
-// which its form gives without evaluating it. False where `ref` is no type
-// reference or names nothing this resolves, the cast then read as before.
+// which its form gives without evaluating it. A real type, written,
+// declared or an expression's, is marked so the cast converts to it. False
+// where `ref` is no type reference or names nothing this resolves, the cast
+// then read as before.
 static bool TypeRefCastTarget(const Expr* ref, SimContext& ctx,
                               CastTarget& out) {
   if (ref == nullptr || ref->kind != ExprKind::kTypeRef) return false;
@@ -308,6 +313,7 @@ static bool TypeRefCastTarget(const Expr* ref, SimContext& ctx,
     out.width = DeclaredTypeWidth(*written, ctx);
     out.is_4state = !IsTwoStateKind(written->kind);
     out.is_signed = written->is_signed;
+    out.is_real = DeclaredTypeIsReal(*written, ctx);
     return out.width > 0;
   }
   // §7.4.4: a type name with packed dimensions written after it stands for a
@@ -324,7 +330,10 @@ static bool TypeRefCastTarget(const Expr* ref, SimContext& ctx,
     name = written->type_name;
   } else if (ref->lhs != nullptr) {
     if (ref->lhs->kind != ExprKind::kIdentifier) {
-      out.width = SimSelfWidth(ref->lhs, ctx);
+      // §11.4.11: an operation with a real operand is real, held in 64 bits
+      // whatever width its integral operands have.
+      out.is_real = SimSelfReal(ref->lhs, ctx);
+      out.width = out.is_real ? 64 : SimSelfWidth(ref->lhs, ctx);
       out.is_4state = SimSelf4State(ref->lhs, ctx);
       out.is_signed = SimSelfSigned(ref->lhs, ctx);
       return out.width > 0;
@@ -338,9 +347,11 @@ static bool TypeRefCastTarget(const Expr* ref, SimContext& ctx,
     out.width = var->value.width;
     out.is_4state = var->is_4state;
     out.is_signed = var->is_signed;
+    out.is_real = var->is_real;
     return out.width > 0;
   }
   out = ResolveCastTarget(name, ctx);
+  out.is_real = written != nullptr && DeclaredTypeIsReal(*written, ctx);
   return true;
 }
 
@@ -846,7 +857,9 @@ Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena) {
         Subclause("6.24.3"));
   }
 
-  if (inner.is_real != IsRealCastTarget(type_name)) {
+  // §6.24.1 with §6.23: a type reference to a real type converts as the real
+  // keyword does, though the cast spells no type name (MakeNodeCast).
+  if (inner.is_real != (target.is_real || IsRealCastTarget(type_name))) {
     return CastRealConversion(inner, type_name, target_width, arena);
   }
   // §5.7.2 (printed page 80) has a cast convert a real literal to shortreal,
