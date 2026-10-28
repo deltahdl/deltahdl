@@ -38,6 +38,18 @@ inline const delta::SeqLinearBody* TreeSequenceBody(
   return &tree->sequence->seq_linear;
 }
 
+// The sequence an assertion statement stands for: the one it carries alone,
+// or, where its operands name clocks of their own and it is carried as a
+// tree, the tree's.
+inline const delta::SeqLinearBody* AssertionSequenceBody(
+    const delta::Stmt* stmt) {
+  if (stmt == nullptr) return nullptr;
+  if (stmt->assert_sequence != nullptr) {
+    return &stmt->assert_sequence->seq_linear;
+  }
+  return TreeSequenceBody(stmt->assert_property);
+}
+
 // The linear forms InEverySequencePlace's four places were read into, in its
 // order; null for a place that holds none.
 inline std::vector<const delta::SeqLinearBody*> SequenceBodiesInEveryPlace(
@@ -53,9 +65,8 @@ inline std::vector<const delta::SeqLinearBody*> SequenceBodiesInEveryPlace(
                                 : TreeSequenceBody(prop->prop_body_tree));
   const ModuleItem* assertion =
       FindItemByKind(items, ModuleItemKind::kAssertProperty);
-  out.push_back(assertion == nullptr || assertion->body == nullptr
-                    ? nullptr
-                    : TreeSequenceBody(assertion->body->assert_property));
+  out.push_back(assertion == nullptr ? nullptr
+                                     : AssertionSequenceBody(assertion->body));
   const ModuleItem* packaged =
       FindItemByKind(r.cu->packages[0]->items, ModuleItemKind::kSequenceDecl);
   out.push_back(packaged == nullptr ? nullptr : &packaged->seq_linear);
