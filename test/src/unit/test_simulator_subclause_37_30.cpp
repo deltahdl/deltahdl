@@ -285,7 +285,6 @@ TEST_F(InterfaceTypespecsOfARun, AnOrderedValueAssignsANestedInterfacesParam) {
   Run("module top;\n"
       "  interface other #(parameter X = 0); endinterface\n"
       "  interface bus #(parameter W = 1, parameter D = 2); endinterface\n"
-      "  bus #(4, 5) b();\n"
       "  typedef virtual bus #(4, 5) vb_t;\n"
       "  class C; typedef virtual bus #(6) cv_t; endclass\n"
       "endmodule\n");

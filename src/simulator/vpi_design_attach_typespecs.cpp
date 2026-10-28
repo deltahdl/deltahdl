@@ -147,17 +147,16 @@ const ModuleDecl* ElementNamed(const CompilationUnit& unit,
 const ModuleDecl* InterfaceNamedFrom(const VpiObject* scope,
                                      const CompilationUnit& unit,
                                      std::string_view name) {
-  for (const VpiObject* at = scope; at != nullptr; at = at->parent) {
-    if (!VpiIsInstanceType(at->type)) continue;
-    if (const ModuleDecl* holder = ElementNamed(unit, at->def_name)) {
-      for (const ModuleItem* item : holder->items) {
-        if (item->kind == ModuleItemKind::kNestedModuleDecl &&
-            item->nested_module_decl->name == name) {
-          return item->nested_module_decl;
-        }
-      }
+  const VpiObject* at = scope;
+  while (at != nullptr && !VpiIsInstanceType(at->type)) at = at->parent;
+  const ModuleDecl* holder =
+      at == nullptr ? nullptr : ElementNamed(unit, at->def_name);
+  static const std::vector<ModuleItem*> kNoItems;
+  for (const ModuleItem* item : holder == nullptr ? kNoItems : holder->items) {
+    if (item->kind == ModuleItemKind::kNestedModuleDecl &&
+        item->nested_module_decl->name == name) {
+      return item->nested_module_decl;
     }
-    break;
   }
   return ElementNamed(unit, name);
 }
