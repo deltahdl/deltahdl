@@ -276,5 +276,40 @@ TEST_F(InterfaceTypespecsOfARun, ATypeGivenByNameIsAssignedItsTypespec) {
             (std::vector<std::pair<std::string, int>>{{"T", vpiByteTypespec}}));
 }
 
+// §37.30 detail 3 with §23.4: the parameter an ordered value assigns is the
+// one at its place in the interface the type names where it is written, an
+// interface the module declares nested in its body found ahead of the
+// compilation unit's, from the module's typedefs and from those of a class it
+// declares alike (#8264).
+TEST_F(InterfaceTypespecsOfARun, AnOrderedValueAssignsANestedInterfacesParam) {
+  Run("module top;\n"
+      "  interface other #(parameter X = 0); endinterface\n"
+      "  interface bus #(parameter W = 1, parameter D = 2); endinterface\n"
+      "  bus #(4, 5) b();\n"
+      "  typedef virtual bus #(4, 5) vb_t;\n"
+      "  class C; typedef virtual bus #(6) cv_t; endclass\n"
+      "endmodule\n");
+  EXPECT_EQ(Assigned(Named(vpiTypedef, By("top"), "vb_t")),
+            (std::vector<std::pair<std::string, int>>{{"W", vpiConstant},
+                                                      {"D", vpiConstant}}));
+  vpiHandle defn = Named(vpiClassDefn, By("top"), "C");
+  ASSERT_NE(defn, nullptr);
+  EXPECT_EQ(Assigned(Named(vpiTypedef, defn, "cv_t")),
+            (std::vector<std::pair<std::string, int>>{{"W", vpiConstant}}));
+}
+
+// ...and an interface the compilation unit declares, from a typedef a package
+// or the compilation unit writes (#8264).
+TEST_F(InterfaceTypespecsOfARun, AnOrderedValueAssignsAUnitInterfacesParam) {
+  Run("interface ubus #(parameter N = 2); endinterface\n"
+      "package pk; typedef virtual ubus #(7) vp_t; endpackage\n"
+      "typedef virtual ubus #(3) vu_t;\n"
+      "module top; vu_t vu; ubus #(3) u(); endmodule\n");
+  EXPECT_EQ(Assigned(Named(vpiTypedef, By("pk"), "vp_t")),
+            (std::vector<std::pair<std::string, int>>{{"N", vpiConstant}}));
+  EXPECT_EQ(Assigned(vpi_handle(vpiTypespec, By("top.vu"))),
+            (std::vector<std::pair<std::string, int>>{{"N", vpiConstant}}));
+}
+
 }  // namespace
 }  // namespace delta

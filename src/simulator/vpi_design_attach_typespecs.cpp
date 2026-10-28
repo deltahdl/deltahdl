@@ -32,6 +32,7 @@
 #include "simulator/vpi_class_typespecs.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_walk.h"
+#include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
@@ -138,6 +139,27 @@ const ModuleDecl* ElementNamed(const CompilationUnit& unit,
     }
   }
   return nullptr;
+}
+
+// §23.4: the interface `name` a type written within `scope` names: one the
+// declaration of the instance or package holding `scope` declares nested in its
+// body, or else one `unit` declares (ElementNamed); null for neither.
+const ModuleDecl* InterfaceNamedFrom(const VpiObject* scope,
+                                     const CompilationUnit& unit,
+                                     std::string_view name) {
+  for (const VpiObject* at = scope; at != nullptr; at = at->parent) {
+    if (!VpiIsInstanceType(at->type)) continue;
+    if (const ModuleDecl* holder = ElementNamed(unit, at->def_name)) {
+      for (const ModuleItem* item : holder->items) {
+        if (item->kind == ModuleItemKind::kNestedModuleDecl &&
+            item->nested_module_decl->name == name) {
+          return item->nested_module_decl;
+        }
+      }
+    }
+    break;
+  }
+  return ElementNamed(unit, name);
 }
 
 // The typespec a named type finds, and whether it is one a typedef declares,
@@ -346,7 +368,8 @@ class TypespecMaker {
       typespec->parent = of_interface;
     }
     of_interface->def_name = std::string(type.type_name);
-    const ModuleDecl* decl = ElementNamed(at_.design.unit, type.type_name);
+    const ModuleDecl* decl =
+        InterfaceNamedFrom(at_.scope, at_.design.unit, type.type_name);
     const std::vector<std::string_view> kOrdered =
         decl == nullptr ? std::vector<std::string_view>{}
                         : OverridableParamNames(decl);
