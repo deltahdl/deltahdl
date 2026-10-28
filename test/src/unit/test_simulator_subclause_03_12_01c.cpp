@@ -372,4 +372,19 @@ TEST(CompilationUnitSearchOrderSim, AUnitVariablesMemberIsNoPathFromRoot) {
             4u);
 }
 
+// §3.12.1 (printed page 56): a net declaration is an item a package may hold,
+// so the compilation unit may hold one, and a module reaches it by its bare
+// name: the module's continuous assignment drives the unit's w, and its read
+// of w a time step later sees the 1 driven.
+TEST(CompilationUnitSearchOrderSim, AModuleDrivesAndReadsTheUnitsNet) {
+  EXPECT_EQ(RunAndGet("wire w;\n"
+                      "module top;\n"
+                      "  logic y;\n"
+                      "  assign w = 1;\n"
+                      "  initial #1 y = w;\n"
+                      "endmodule\n",
+                      "y"),
+            1u);
+}
+
 }  // namespace
