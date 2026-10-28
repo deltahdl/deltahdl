@@ -141,11 +141,47 @@ static SelfType CallSelfType(const Expr* expr, SimContext& ctx) {
           DeclaredTypeIs4State(type, ctx), width > 0};
 }
 
+// The system functions whose result has a type of its own, each with that
+// type: an integer for $bits (§20.6.2), the array query functions (§20.7) and
+// $clog2 (§20.8.1); an int for $countbits and $countones and a bit for
+// $onehot, $onehot0 and $isunknown (§20.9); a 64-bit time for $time and a
+// 32-bit unsigned one for $stime (§20.3).
+struct SystemFunctionType {
+  std::string_view name;
+  SelfType type;
+};
+
+constexpr SelfType kIntegerResult = {32, true, true, true};
+constexpr SelfType kIntResult = {32, true, false, true};
+constexpr SelfType kBitResult = {1, false, false, true};
+
+constexpr std::array kSystemFunctionTypes = {
+    SystemFunctionType{"$bits", kIntegerResult},
+    SystemFunctionType{"$left", kIntegerResult},
+    SystemFunctionType{"$right", kIntegerResult},
+    SystemFunctionType{"$low", kIntegerResult},
+    SystemFunctionType{"$high", kIntegerResult},
+    SystemFunctionType{"$increment", kIntegerResult},
+    SystemFunctionType{"$size", kIntegerResult},
+    SystemFunctionType{"$dimensions", kIntegerResult},
+    SystemFunctionType{"$unpacked_dimensions", kIntegerResult},
+    SystemFunctionType{"$clog2", kIntegerResult},
+    SystemFunctionType{"$countbits", kIntResult},
+    SystemFunctionType{"$countones", kIntResult},
+    SystemFunctionType{"$onehot", kBitResult},
+    SystemFunctionType{"$onehot0", kBitResult},
+    SystemFunctionType{"$isunknown", kBitResult},
+    SystemFunctionType{"$time", SelfType{64, false, true, true}},
+    SystemFunctionType{"$stime", SelfType{32, false, true, true}},
+};
+
 // §11.7: $signed and $unsigned are their argument's bits with the signing
-// each names; §20.6.2: $bits is an integer. Unknown for any other system
-// function.
+// each names; a system function kSystemFunctionTypes lists has the type it
+// gives. Unknown for any other system function.
 static SelfType SystemCallSelfType(const Expr* expr, SimContext& ctx) {
-  if (expr->callee == "$bits") return {32, true, true, true};
+  for (const SystemFunctionType& listed : kSystemFunctionTypes) {
+    if (listed.name == expr->callee) return listed.type;
+  }
   if (expr->args.size() != 1 ||
       (expr->callee != "$signed" && expr->callee != "$unsigned"))
     return {};

@@ -449,6 +449,87 @@ TEST(TypeOfExprCastSim, CastToATypeReferenceReadsASystemFunctionsType) {
   EXPECT_EQ(RunAndGet(kSrc, "u"), 0u);
 }
 
+// §6.23 with §20.8.1: `$clog2` in the expression a type reference names is an
+// integer, 32 bits, as the other utility functions returning a count are.
+TEST(TypeOfExprCastSim, CastToATypeReferenceReadsClog2AsAnInteger) {
+  const std::string kSrc =
+      "module t;\n"
+      "  bit [3:0] n;\n"
+      "  logic [7:0] m;\n"
+      "  int d;\n"
+      "  initial d = type(n + $clog2(m))'(16'hABCF);\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(kSrc, "d"), 0xABCFu);
+}
+
+// §6.23 with §20.7: an array query function in the expression a type
+// reference names returns an integer, 32 bits.
+TEST(TypeOfExprCastSim, CastToATypeReferenceReadsAnArrayQueryAsAnInteger) {
+  const std::string kSrc =
+      "module t;\n"
+      "  bit [3:0] n;\n"
+      "  logic [7:0] m;\n"
+      "  int d;\n"
+      "  initial d = type(n + $size(m))'(16'hABCF);\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(kSrc, "d"), 0xABCFu);
+}
+
+// §6.23 with §20.9: `$countones` in the expression a type reference names is
+// an int, 32 bits, and `$onehot` and `$isunknown` are one unsigned 2-state bit.
+TEST(TypeOfExprCastSim, CastToATypeReferenceReadsBitVectorFunctionsTypes) {
+  const std::string kSrc =
+      "module t;\n"
+      "  bit [3:0] n;\n"
+      "  logic [7:0] m;\n"
+      "  byte s;\n"
+      "  logic [15:0] v = 16'hABCx;\n"
+      "  int d, e;\n"
+      "  bit u;\n"
+      "  initial begin\n"
+      "    d = type(n + $countones(m))'(16'hABCF);\n"
+      "    e = type(s + $onehot(m))'(16'h00F0);\n"
+      "    u = $isunknown(type(n + $isunknown(m))'(v));\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(kSrc, "d"), 0xABCFu);
+  EXPECT_EQ(RunAndGet(kSrc, "e"), 0xF0u);
+  EXPECT_EQ(RunAndGet(kSrc, "u"), 0u);
+}
+
+// §6.23 with §20.3: `$time` in the expression a type reference names is a
+// 64-bit time and `$stime` a 32-bit unsigned one.
+TEST(TypeOfExprCastSim, CastToATypeReferenceReadsTimeFunctionsTypes) {
+  const std::string kSrc =
+      "module t;\n"
+      "  bit [3:0] n;\n"
+      "  byte s;\n"
+      "  int d, e;\n"
+      "  initial begin\n"
+      "    d = type(n + $time)'(16'hABCF);\n"
+      "    e = type(s + $stime)'(16'h00F0);\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(kSrc, "d"), 0xABCFu);
+  EXPECT_EQ(RunAndGet(kSrc, "e"), 0xF0u);
+}
+
+// §6.23 with §26.3 and §7.2: a member of a package's structure variable in the
+// expression a type reference names has its member's type, eight bits here.
+TEST(TypeOfExprCastSim, CastToATypeReferenceReadsAPackageVariablesMember) {
+  const std::string kSrc =
+      "package pkg;\n"
+      "  typedef struct packed { bit [7:0] f; bit g; } st;\n"
+      "  st v;\n"
+      "endpackage\n"
+      "module t;\n"
+      "  bit [3:0] n;\n"
+      "  int d;\n"
+      "  initial d = type(n + pkg::v.f)'(16'hABCF);\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(kSrc, "d"), 0xCFu);
+}
+
 // §6.23 with §6.24.1 and §6.11.3: a type reference to an integer atom type
 // written unsigned casts to that unsigned type, so -1 cast to `int unsigned`
 // compares above 0 and -1 cast to `byte unsigned` widens with zeros to 255,

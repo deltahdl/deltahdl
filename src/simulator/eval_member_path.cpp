@@ -225,11 +225,10 @@ bool TryStaticHandleMember(const Expr* expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
-// The root variable's name and the member path a chain of member accesses
-// names, `m` and `s.v` for `m.s.v`; false where the chain does not end at a
-// plain identifier.
-static bool MemberChainPath(const Expr* access, std::string_view& root,
-                            std::string& path) {
+// The node a chain of member accesses starts from and the member path the
+// chain names, `m` and `s.v` for `m.s.v`; `access` itself where it selects no
+// member.
+static const Expr* MemberChainRoot(const Expr* access, std::string& path) {
   path.clear();
   const Expr* e = access;
   while (e != nullptr && e->kind == ExprKind::kMemberAccess &&
@@ -239,9 +238,34 @@ static bool MemberChainPath(const Expr* access, std::string_view& root,
     path.insert(0, e->rhs->text);
     e = e->lhs;
   }
+  return e;
+}
+
+// The root variable's name and the member path a chain of member accesses
+// names, `m` and `s.v` for `m.s.v`; false where the chain does not end at a
+// plain identifier.
+static bool MemberChainPath(const Expr* access, std::string_view& root,
+                            std::string& path) {
+  const Expr* e = MemberChainRoot(access, path);
   if (e == access || e == nullptr || e->kind != ExprKind::kIdentifier)
     return false;
   root = e->text;
+  return true;
+}
+
+// As MemberChainPath, and §26.3: a chain may also start from a variable a
+// package declares, `pkg::v.f`, which is stored under `pkg.v`
+// (PackageDataKey in lowerer_package_data.cpp), the name this gives for it.
+static bool MemberChainKey(const Expr* access, std::string& key,
+                           std::string& path) {
+  const Expr* e = MemberChainRoot(access, path);
+  if (e == access || e == nullptr) return false;
+  if (e->kind == ExprKind::kIdentifier) {
+    key = e->text;
+    return true;
+  }
+  if (!e->is_scope_resolution) return false;
+  key = std::string(e->lhs->text) + "." + std::string(e->rhs->text);
   return true;
 }
 
@@ -429,11 +453,11 @@ const StructFieldInfo* ResolveStructMember(const Expr* access,
                                            SimContext& ctx) {
   if (access == nullptr || access->kind != ExprKind::kMemberAccess)
     return nullptr;
-  std::string_view name;
+  std::string key;
   std::string path;
-  if (!MemberChainPath(access, name, path)) return nullptr;
+  if (!MemberChainKey(access, key, path)) return nullptr;
   StructRoot root;
-  if (!FindStructRoot(name, path, ctx, root)) return nullptr;
+  if (!FindStructRoot(key, path, ctx, root)) return nullptr;
   uint32_t offset = 0;
   return ResolveStructField(root.info, path, &offset);
 }
