@@ -80,14 +80,14 @@ VpiHandle BlockDeclaration(const VpiObject* scope, std::string_view name,
 // the objects imported into the instance the expression stands in, which it
 // references; null where no import makes one visible. An expression of a
 // module, which alone carries imports, stands in a scope of the module's
-// instance or in the instance itself.
+// instance, or, written outside every procedure, in the instance itself.
 VpiHandle ImportedObject(const AssignNames& names, std::string_view name) {
   for (const RtlirImport& entry : names.imports) {
     if (!entry.is_wildcard && entry.item_name != name) continue;
     VpiHandle item = FindObjectForFlatName(
         names.objects, VpiFlatName(std::string(entry.package_name), name));
     if (item == nullptr) continue;
-    const VpiObject* at = names.scope;
+    const VpiObject* at = names.scope != nullptr ? names.scope : names.instance;
     while (!VpiIsInstanceType(at->type)) at = at->parent;
     std::vector<VpiObject*>& imported = at->instance_facts.imported;
     if (std::ranges::find(imported, item) == imported.end()) {
@@ -863,18 +863,6 @@ VpiObject* VpiInstanceExpression(const Expr* expr, const VpiObjectMap& objects,
   static const GenBlockPrefixes kNoGenBlocks;
   return VpiGenBlockExpression(expr, {objects, prefix, kNoGenBlocks}, ctx,
                                build);
-}
-
-VpiObject* VpiModuleExpression(const Expr* expr, const RtlirModule& mod,
-                               const VpiObject* instance,
-                               const VpiObjectMap& objects,
-                               const std::string& prefix, SimContext& ctx,
-                               const VpiAttachBuild& build) {
-  static const GenBlockPrefixes kNoGenBlocks;
-  return VpiGenBlockExpression(expr,
-                               {objects, prefix, kNoGenBlocks, nullptr, nullptr,
-                                nullptr, &mod, instance},
-                               ctx, build);
 }
 
 VpiObject* VpiGenBlockExpression(const Expr* expr, const VpiExprNames& names,

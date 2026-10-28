@@ -411,15 +411,6 @@ VpiObject* VpiInstanceExpression(const Expr* expr, const VpiObjectMap& objects,
                                  const std::string& prefix, SimContext& ctx,
                                  const VpiAttachBuild& build);
 
-// The same of an expression the instance `instance` of `mod` writes, whose
-// names find the instance's declarations, then those of the packages `mod`
-// imports (§26.3) and of the compilation unit it was declared in (§3.12.1).
-VpiObject* VpiModuleExpression(const Expr* expr, const RtlirModule& mod,
-                               const VpiObject* instance,
-                               const VpiObjectMap& objects,
-                               const std::string& prefix, SimContext& ctx,
-                               const VpiAttachBuild& build);
-
 // §37.42 with §37.12: where a call written outside every procedure stands:
 // the scope its vpiScope reaches - the instance, gen scope, clocking block,
 // package or class defn it is written in - and the module whose declarations

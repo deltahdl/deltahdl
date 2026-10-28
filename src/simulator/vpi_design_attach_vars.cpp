@@ -9,6 +9,7 @@
 #include "elaborator/net_data_type.h"
 #include "elaborator/queue_dim.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_scopes.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -269,6 +270,10 @@ void VpiContext::AttachVariableFacts(const RtlirDesign* design) {
 void AttachVariableInitializers(const RtlirDesign& design,
                                 const VpiObjectMap& objects, SimContext& ctx,
                                 const VpiAttachBuild& build) {
+  // An initializer, written outside every procedure and generate block, finds
+  // the instance's declarations, then those of the packages its module
+  // imports (§26.3) and of the compilation unit it was declared in (§3.12.1).
+  static const GenBlockPrefixes kNoGenBlocks;
   WalkInstanceObjects(&design, objects,
                       [&](const RtlirModule* mod, const std::string& prefix,
                           const VpiObject* instance) {
@@ -277,9 +282,11 @@ void AttachVariableInitializers(const RtlirDesign& design,
                           VpiObject* obj = FindObjectForFlatName(
                               objects, VpiFlatName(prefix, var.name));
                           if (obj == nullptr) continue;
-                          obj->decl_facts.init_expr =
-                              VpiModuleExpression(var.init_expr, *mod, instance,
-                                                  objects, prefix, ctx, build);
+                          obj->decl_facts.init_expr = VpiGenBlockExpression(
+                              var.init_expr,
+                              {objects, prefix, kNoGenBlocks, nullptr, nullptr,
+                               nullptr, mod, instance},
+                              ctx, build);
                         }
                       });
 }

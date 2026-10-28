@@ -146,16 +146,13 @@ int DeclaredVariableKind(const DataType& type, bool unpacked,
   return kKind == vpiNamedEvent ? vpiNamedEventArray : vpiArrayVar;
 }
 
-// §37.12: the variable `name` of `kind` the task or function `tf` declares
-// of the type `type`, full-named under it, with its lifetime (§37.3.7) and
-// whether that type is 2-state, which `ctx`'s type tables say of a name.
-VpiObject* MakeVariable(VpiObject* tf, std::string_view name,
-                        const DataType& type, int kind, bool automatic,
-                        const SimContext& ctx, const VpiAttachBuild& build) {
+// §37.12: the variable `name` of `kind` the task or function `tf` declares,
+// full-named under it, with its lifetime (§37.3.7).
+VpiObject* MakeVariable(VpiObject* tf, std::string_view name, int kind,
+                        bool automatic, const VpiAttachBuild& build) {
   VpiObject* var = build.alloc();
   var->type = kind;
   var->name = build.keep(std::string(name));
-  var->decl_facts.two_state = !DeclaredTypeIs4State(type, ctx);
   var->full_name = tf->full_name + "." + std::string(name);
   var->parent = tf;
   var->automatic = automatic;
@@ -189,10 +186,11 @@ void MakeIoDecls(VpiObject* tf, const ModuleItem& item,
                  const SubroutineScope& where, const SubroutineBuild& sb) {
   for (const FunctionArg& arg : item.func_args) {
     VpiObject* var = MakeVariable(
-        tf, arg.name, arg.data_type,
+        tf, arg.name,
         DeclaredVariableKind(arg.data_type, !arg.unpacked_dims.empty(), where,
                              sb.design),
-        tf->automatic, sb.ctx, sb.build);
+        tf->automatic, sb.build);
+    var->decl_facts.two_state = !DeclaredTypeIs4State(arg.data_type, sb.ctx);
     var->decl_facts.vif_interface =
         VpiVirtualInterfaceOf(sb.design, &arg.data_type);
     AttachDeclaredRanges(var, arg.data_type, arg.unpacked_dims, sb.ctx,
@@ -304,11 +302,13 @@ void MakeBodyVariables(VpiObject* tf, const ModuleItem& item,
     const bool kAutomatic =
         stmt->var_is_automatic || (tf->automatic && !stmt->var_is_static);
     VpiObject* var =
-        MakeVariable(tf, stmt->var_name, stmt->var_decl_type,
+        MakeVariable(tf, stmt->var_name,
                      DeclaredVariableKind(stmt->var_decl_type,
                                           !stmt->var_unpacked_dims.empty(),
                                           where, sb.design),
-                     kAutomatic, sb.ctx, sb.build);
+                     kAutomatic, sb.build);
+    var->decl_facts.two_state =
+        !DeclaredTypeIs4State(stmt->var_decl_type, sb.ctx);
     var->decl_facts.vif_interface =
         VpiVirtualInterfaceOf(sb.design, &stmt->var_decl_type);
     AttachDeclaredRanges(var, stmt->var_decl_type, stmt->var_unpacked_dims,
