@@ -164,6 +164,7 @@ inline std::vector<VpiUnitScope> VpiUnitScopes(
     const RtlirDesign& design,
     const std::unordered_map<std::string_view, VpiObject*>& objects) {
   std::vector<VpiUnitScope> units;
+  units.reserve(design.compilation_units.size());
   for (std::size_t k = 0; k < design.compilation_units.size(); ++k) {
     units.push_back({design.compilation_units[k],
                      FindObjectForFlatName(
