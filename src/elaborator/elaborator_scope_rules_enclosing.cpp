@@ -75,6 +75,14 @@ bool Elaborator::IsNameInEnclosingScope(std::string_view name) const {
 // before any item was elaborated: `M m(); wire w; module M; assign w = 1'b1;
 // endmodule` has w declared previously to M's assignment, though not to the
 // instance, so M's assignment drives the outer w.
+std::unordered_map<std::string_view, ModuleDecl*>
+ElaboratorData::NestedDeclsSeenInside() const {
+  std::unordered_map<std::string_view, ModuleDecl*> seen =
+      enclosing_nested_decls_;
+  for (const auto& [name, decl] : nested_module_decls_) seen[name] = decl;
+  return seen;
+}
+
 void ElaboratorData::BeginNestedDeclScope(
     const ModuleDecl* nested,
     std::unordered_set<std::string_view> at_instance) {

@@ -4,6 +4,7 @@
 
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 namespace {
 
@@ -585,6 +586,74 @@ TEST(NestedModuleElaboration, DoublyNestedImplicitNetRefersOutwardByOrder) {
   const auto* v_below = DoublyNestedModuleNet(design_below, "v");
   ASSERT_NE(v_below, nullptr);
   EXPECT_FALSE(v_below->refers_outward);
+}
+
+// The module the instance `inst` of `m` resolved to, null for none.
+const RtlirModule* ChildModule(const RtlirModule* m, std::string_view inst) {
+  for (const auto& c : m->children) {
+    if (c.inst_name == inst) return c.resolved;
+  }
+  return nullptr;
+}
+
+// Whether `m` declares a net named `name`.
+bool DeclaresNet(const RtlirModule* m, std::string_view name) {
+  for (const auto& net : m->nets) {
+    if (net.name == name) return true;
+  }
+  return false;
+}
+
+// §23.4: the outer name space is visible to a module declared nested in
+// another, the modules and interfaces its enclosing modules declare nested
+// among it, at any depth: inner instantiates sib and names bus, both nested in
+// top, deep names bus from two levels down, and a nested declaration of its
+// own of the same name hides an enclosing one (#8268).
+TEST(NestedModuleElaboration, AnEnclosingModulesNestedDeclarationsAreVisible) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module top;\n"
+      "  interface bus; endinterface\n"
+      "  module sib(input logic a); wire outer_sib; endmodule\n"
+      "  module leaf(input logic a); wire outer_leaf; endmodule\n"
+      "  module inner;\n"
+      "    module leaf(input logic a); wire inner_leaf; endmodule\n"
+      "    module deep; virtual bus dv; endmodule\n"
+      "    virtual bus vb; logic x;\n"
+      "    sib s(.a(x)); leaf l(.a(x)); deep d();\n"
+      "  endmodule\n"
+      "  inner i();\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const RtlirModule* inner = ChildModule(design->top_modules[0], "i");
+  ASSERT_NE(inner, nullptr);
+  const RtlirModule* sib = ChildModule(inner, "s");
+  ASSERT_NE(sib, nullptr);
+  EXPECT_TRUE(DeclaresNet(sib, "outer_sib"));
+  const RtlirModule* leaf = ChildModule(inner, "l");
+  ASSERT_NE(leaf, nullptr);
+  EXPECT_TRUE(DeclaresNet(leaf, "inner_leaf"));
+  EXPECT_FALSE(DeclaresNet(leaf, "outer_leaf"));
+}
+
+// ...but not to a module declared at the top level, though a nested module
+// instantiates it: no enclosing module's text surrounds its declaration
+// (#8268).
+TEST(NestedModuleElaboration, ATopLevelModuleSeesNoEnclosingNestedDeclaration) {
+  ElabFixture f;
+  Elaborate(
+      "module ext; virtual bus vb; endmodule\n"
+      "module top;\n"
+      "  interface bus; endinterface\n"
+      "  module inner; ext e(); endmodule\n"
+      "  inner i();\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "unknown interface 'bus' in virtual interface declaration", 1, "25.9"));
 }
 
 }  // namespace

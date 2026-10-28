@@ -22,6 +22,7 @@
 #include "elaborator/time_literal_scale.h"
 #include "elaborator/unit_scope_switch.h"
 #include "elaborator/unpacked_dim_reads.h"
+#include "elaborator/virtual_interface_target.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -179,9 +180,16 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl,
   CheckNewPlacement(decl, diag_);
   const TypeShapeTables kShapeTables{typedefs_, td_array_dims_, class_names_};
   const AggregateShapeCtx kShapeCtx{kShapeTables, &scope, diag_};
-  ForEachInnerDeclaredType(decl, [&kShapeCtx](const DeclaredType& declared) {
-    CheckDeclaredTypeRules(declared, kShapeCtx);
-  });
+  ForEachInnerDeclaredType(
+      decl, [this, &kShapeCtx](const DeclaredType& declared) {
+        CheckDeclaredTypeRules(declared, kShapeCtx);
+        // §25.9 with §23.4: the interface a virtual interface type names, one
+        // the module declares nested among them.
+        ValidateVirtualInterfaceType(
+            declared.type, declared.loc,
+            [this](std::string_view name) { return FindModuleInScope(name); },
+            diag_);
+      });
 }
 
 namespace {

@@ -11,6 +11,7 @@
 // continue and return together with §18.17.6's exemption from two of them.
 
 #include <format>
+#include <string_view>
 #include <vector>
 
 #include "common/diagnostic.h"
@@ -23,6 +24,7 @@
 #include "elaborator/net_data_type.h"
 #include "elaborator/nettype_uses.h"
 #include "elaborator/return_value_fit.h"
+#include "elaborator/virtual_interface_target.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
@@ -303,12 +305,18 @@ void Elaborator::ValidatePerDeclarationRulesInUnitScopes() {
   }
   CheckUnitNettypeUses(unit_, nettype_names_, diag_);
   // §7.2 to §7.3.2 and §7.8.5 for the same two scopes, whose parameters are
-  // not at hand to judge a member default's constancy against.
+  // not at hand to judge a member default's constancy against, and §25.9 on
+  // the interface a virtual interface type names, there one the compilation
+  // unit declares.
   const TypeShapeTables kShapeTables{typedefs_, td_array_dims_, class_names_};
   const AggregateShapeCtx kShapeCtx{kShapeTables, nullptr, diag_};
-  ForEachUnitDeclaredType(unit_, [&kShapeCtx](const DeclaredType& declared) {
-    CheckDeclaredTypeRules(declared, kShapeCtx);
-  });
+  ForEachUnitDeclaredType(
+      unit_, [this, &kShapeCtx](const DeclaredType& declared) {
+        CheckDeclaredTypeRules(declared, kShapeCtx);
+        ValidateVirtualInterfaceType(
+            declared.type, declared.loc,
+            [this](std::string_view name) { return FindModule(name); }, diag_);
+      });
   // §23.9 for the same two scopes: their subroutines are in no module's item
   // list, so Elaborator::ValidateUnresolvedReferences never reads them.
   const UnitScopeNames kNames{cu_scope_names_, cu_param_scope_, typedefs_,

@@ -5,7 +5,9 @@
 // through a variable or a class property; the cases here reach the class that
 // holds the property through a nested class, a typedef its own scope resolves
 // and a forward typedef, index an array of virtual interfaces, and stand in
-// the methods of a class and in generate blocks.
+// the methods of a class and in generate blocks. The last cases name an
+// interface a module declares nested, and hold every place a virtual interface
+// type is written, not only a module's variables, to naming an interface.
 
 #include <gtest/gtest.h>
 
@@ -564,6 +566,97 @@ TEST(VirtualInterfaceModportAssignment, ANestedInstancesModportSelectsTheType) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "virtual interface modports do not match", 6,
                             "25.9"));
+}
+
+// The message §25.9's rule gives a virtual interface type naming no interface,
+// for the name `name`.
+std::string UnknownInterface(std::string_view name) {
+  return "unknown interface '" + std::string(name) +
+         "' in virtual interface declaration";
+}
+
+// §25.9: a virtual interface type names an interface wherever it is written,
+// not only among a module's variables: a module's typedef, a task's argument
+// and a variable its body declares, a variable a procedural block declares and
+// a class property naming none are each reported, and a modport the named
+// interface does not declare is reported missing from it (#8269).
+TEST(VirtualInterfaceElaboration, EveryVirtualInterfaceTypeOfAModuleIsChecked) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface bus; logic d; modport mp(input d); endinterface\n"
+      "module top;\n"
+      "  typedef virtual nope1 t1;\n"
+      "  task t(virtual nope2 a); virtual nope3 l; endtask\n"
+      "  initial begin virtual nope4 p; end\n"
+      "  class C; virtual nope5 cv; endclass\n"
+      "  typedef virtual bus.nomp t2;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), UnknownInterface("nope1"), 3,
+                            "25.9"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), UnknownInterface("nope2"), 4,
+                            "25.9"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), UnknownInterface("nope3"), 4,
+                            "25.9"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), UnknownInterface("nope4"), 5,
+                            "25.9"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), UnknownInterface("nope5"), 6,
+                            "25.9"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "modport 'nomp' not found in interface 'bus'", 7,
+                            "25.9"));
+}
+
+// ...and an interface the module declares nested in its body (§23.4), or the
+// compilation unit declares, is one in each of those places (#8269).
+TEST(VirtualInterfaceElaboration,
+     ADeclaredInterfaceTypesEveryVirtualInterface) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "interface ubus; endinterface\n"
+      "module top;\n"
+      "  interface bus; endinterface\n"
+      "  typedef virtual bus t1;\n"
+      "  task t(virtual bus a); virtual ubus l; endtask\n"
+      "  initial begin virtual bus p; end\n"
+      "  class C; virtual ubus cv; virtual bus nv; endclass\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// ...as it does in the compilation unit and a package: a typedef, a variable,
+// a class property and a task's argument naming no interface are reported
+// there as well, and one naming an interface the compilation unit declares is
+// not (#8269).
+TEST(VirtualInterfaceElaboration, AUnitOrPackageVirtualInterfaceTypeIsChecked) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface bus; endinterface\n"
+      "typedef virtual nope1 t1;\n"
+      "virtual nope2 uv;\n"
+      "class D; virtual nope3 dv; endclass\n"
+      "package pk;\n"
+      "  typedef virtual nope4 t4; virtual nope5 pv;\n"
+      "  task pt(virtual nope6 a); endtask\n"
+      "  virtual bus ok;\n"
+      "endpackage\n"
+      "module top; endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), UnknownInterface("nope1"), 2,
+                            "25.9"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), UnknownInterface("nope2"), 3,
+                            "25.9"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), UnknownInterface("nope3"), 4,
+                            "25.9"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), UnknownInterface("nope4"), 6,
+                            "25.9"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), UnknownInterface("nope5"), 6,
+                            "25.9"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), UnknownInterface("nope6"), 7,
+                            "25.9"));
+  EXPECT_TRUE(NoErrorOnLine(f, 8));
 }
 
 }  // namespace

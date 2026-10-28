@@ -480,6 +480,20 @@ class ElaboratorData {
   std::unordered_set<std::string_view> program_inst_names_;
   std::unordered_set<std::string_view> auto_task_func_names_;
   std::unordered_map<std::string_view, ModuleDecl*> nested_module_decls_;
+  // §23.4: the modules, interfaces and programs the scopes textually enclosing
+  // the declaration being elaborated declare nested, which its own nested
+  // declarations hide (Elaborator::FindModuleInScope). The two sites
+  // instantiating a nested declaration hand them on through
+  // pending_enclosing_nested_decls_ (NestedDeclsSeenInside), and
+  // ElaborateModule takes them as it enters; a separately-instantiated module
+  // starts with none.
+  std::unordered_map<std::string_view, ModuleDecl*> enclosing_nested_decls_;
+  std::unordered_map<std::string_view, ModuleDecl*>
+      pending_enclosing_nested_decls_;
+  // The nested declarations a declaration nested in the scope being elaborated
+  // sees: those enclosing it, with the scope's own hiding theirs.
+  std::unordered_map<std::string_view, ModuleDecl*> NestedDeclsSeenInside()
+      const;
 
   // The names each package makes directly visible, each with the package
   // declaring it (elaborator_scope_rules_names.h), filled on first use.

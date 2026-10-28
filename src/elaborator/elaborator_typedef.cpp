@@ -33,6 +33,7 @@
 #include "elaborator/rtlir_enum_member.h"
 #include "elaborator/type_eval.h"
 #include "elaborator/unit_scope_order.h"
+#include "elaborator/virtual_interface_target.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -270,7 +271,9 @@ void DeclareEnumType(const DataType& type, std::string_view key, uint32_t width,
 }  // namespace
 
 // The shape rules a typedef's data type answers to wherever it is written: the
-// packed-structure and union restrictions, and the rules on packed dimensions.
+// packed-structure and union restrictions, the rules on packed dimensions, and
+// §25.9's on the interface a virtual interface type names, found from the
+// typedef's own scope.
 //
 // `member_default_scope` is the parameter scope a struct member's default value
 // is resolved against, or null when there is none to resolve against: the
@@ -284,6 +287,9 @@ void Elaborator::ValidateTypedefShape(const DataType& dtype, SourceLoc loc,
   CheckAggregateShape(dtype, loc, {kShapeTables, member_default_scope, diag_});
   ValidatePackedDimOnPredefinedType(dtype, loc);
   ValidatePackedDimOnDisallowedType(dtype, loc);
+  ValidateVirtualInterfaceType(
+      dtype, loc,
+      [this](std::string_view name) { return FindModuleInScope(name); }, diag_);
 }
 
 // §3.12: a typedef declared at compilation-unit scope is recorded in the type

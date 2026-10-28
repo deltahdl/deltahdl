@@ -924,6 +924,9 @@ ModuleDecl* Elaborator::FindDesignCell(std::string_view library,
 ModuleDecl* Elaborator::FindModuleInScope(std::string_view name) const {
   auto it = nested_module_decls_.find(name);
   if (it != nested_module_decls_.end()) return it->second;
+  // §23.4: then the outer name space's, which the scope's own hide.
+  auto outer = enclosing_nested_decls_.find(name);
+  if (outer != enclosing_nested_decls_.end()) return outer->second;
   return FindModule(name);
 }
 

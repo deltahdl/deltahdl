@@ -268,6 +268,7 @@ void Elaborator::ResetItemElaborationState() {
   program_inst_names_.clear();
   auto_task_func_names_.clear();
   nested_module_decls_.clear();
+  enclosing_nested_decls_.clear();
   task_names_.clear();
   let_names_.clear();
   sequence_names_.clear();
@@ -323,6 +324,7 @@ struct ItemElaborationStateSaver {
   decltype(Elaborator::program_inst_names_) program_inst_names;
   decltype(Elaborator::auto_task_func_names_) auto_task_func_names;
   decltype(Elaborator::nested_module_decls_) nested_module_decls;
+  decltype(Elaborator::enclosing_nested_decls_) enclosing_nested_decls;
   decltype(Elaborator::task_names_) task_names;
   decltype(Elaborator::let_names_) let_names;
   decltype(Elaborator::sequence_names_) sequence_names;
@@ -411,6 +413,7 @@ struct ItemElaborationStateSaver {
     program_inst_names = std::move(e.program_inst_names_);
     auto_task_func_names = std::move(e.auto_task_func_names_);
     nested_module_decls = std::move(e.nested_module_decls_);
+    enclosing_nested_decls = std::move(e.enclosing_nested_decls_);
     task_names = std::move(e.task_names_);
     let_names = std::move(e.let_names_);
     sequence_names = std::move(e.sequence_names_);
@@ -480,6 +483,7 @@ struct ItemElaborationStateSaver {
     e.program_inst_names_ = std::move(program_inst_names);
     e.auto_task_func_names_ = std::move(auto_task_func_names);
     e.nested_module_decls_ = std::move(nested_module_decls);
+    e.enclosing_nested_decls_ = std::move(enclosing_nested_decls);
     e.task_names_ = std::move(task_names);
     e.let_names_ = std::move(let_names);
     e.sequence_names_ = std::move(sequence_names);
@@ -567,6 +571,8 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   inherited_default_disable_iff_ = nested_default_disable_iff_;
   nested_default_disable_iff_ = nullptr;
   inherited_default_clock_ = std::exchange(nested_default_clock_, {});
+  // §23.4: likewise the declarations the enclosing scopes nest.
+  enclosing_nested_decls_ = std::exchange(pending_enclosing_nested_decls_, {});
 
   // While this cell is elaborated it is the parent of any instances it
   // contains; record its library so child binding can fall back to it

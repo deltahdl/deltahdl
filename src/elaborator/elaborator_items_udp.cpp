@@ -572,6 +572,7 @@ void Elaborator::InstantiateImplicitNestedModules(
     BeginNestedDeclScope(nested_decl, CaptureCurrentScopeNames());
     nested_default_disable_iff_ = mod->default_disable_iff;
     nested_default_clock_ = DefaultClockingEvent(mod);
+    pending_enclosing_nested_decls_ = NestedDeclsSeenInside();
     inst.resolved = ElaborateModule(nested_decl, empty_params);
     current_inst_path_ = std::move(saved_inst_path);
     config_inst_path_ = std::move(saved_config_path);

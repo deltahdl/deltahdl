@@ -782,6 +782,7 @@ void Elaborator::ElaborateChildInstance(RtlirModuleInst& inst,
   if (inst.is_nested_decl) {
     nested_default_disable_iff_ = mod->default_disable_iff;
     nested_default_clock_ = DefaultClockingEvent(mod);
+    pending_enclosing_nested_decls_ = NestedDeclsSeenInside();
     BeginNestedDeclScope(child_decl, CaptureCurrentScopeNames());
   }
   if (child_decl->decl_kind == ModuleDeclKind::kChecker) {
