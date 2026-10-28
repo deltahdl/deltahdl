@@ -79,6 +79,7 @@ void Lowerer::LowerDesignData() {
   RegisterPackageEnumConstants(design_, ctx_, arena_);
   CreatePackageDataVariables(design_, ctx_, arena_);
   CreateUnitDataVariables(design_, ctx_, arena_);
+  CreateUnitNets(design_, ctx_, arena_);
   AliasPackageExports(design_, ctx_, arena_);
   InitPackageDataVariables(design_, ctx_, arena_);
 }

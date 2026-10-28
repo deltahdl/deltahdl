@@ -6,9 +6,8 @@
 // under its "pk.name" key, the key a `pk::name` reference and an import's alias
 // resolve by, and the compilation unit's under its "$unit.name" key, which each
 // module's bare reference is bound to under the module's own prefix
-// (AliasUnitDataItems) unless the module declares the name. Moved out of
-// lowerer_register.cpp, which registers a module's own declarations, once
-// the two scopes' data outgrew it.
+// (AliasUnitDataItems) unless the module declares the name; the unit's nets
+// are made in lowerer_unit_nets.cpp and bound here beside its variables.
 
 #include <cstddef>
 #include <cstdint>
@@ -616,18 +615,18 @@ void CreateUnitDataVariables(const RtlirDesign* design, SimContext& ctx,
 
 // §3.12.1 (printed page 56) with §23.9 (printed 761) and §6.21 (printed
 // 132-133): a reference the module's own scope does not declare is resolved
-// in the compilation-unit scope next, so each of the unit's data items the
-// module `mod` does not declare -- as a variable, a port or a net
+// in the compilation-unit scope next, so each of the unit's data items and
+// nets the module `mod` does not declare -- as a variable, a port or a net
 // (ModuleDeclaresName) -- is bound under the module's `inst_prefix` to the
 // unit's storage, "g" for a top and "u.g" for an instance, with the kinds the
 // storage carries (AliasVariableKinds), as an import's name is bound, and
 // registered as a name bound outside every module so that FindVariable
 // crosses §23.9's boundary to the top's bare key from a generate block's
-// process. A key the module's imports or parameters already hold is left to
-// them (§26.5), and a name a module enclosing a nested declaration holds to
-// that module, which §23.4 has the search reach before the unit
-// (EnclosingDeclHoldsVariable). The unit's storage under the bare name alone
-// was replaced by the top's `int g = 7`, which every instance's `g` then read.
+// process; a net is bound as a net too, which the module's continuous
+// assignment drives (CreateUnitNets). A key the module's imports or
+// parameters already hold is left to them (§26.5), and a name a module
+// enclosing a nested declaration holds to that module, which §23.4 has the
+// search reach before the unit (EnclosingDeclHoldsVariable).
 void AliasUnitDataItems(const RtlirDesign* design, const RtlirModule* mod,
                         std::string_view inst_prefix, SimContext& ctx,
                         Arena& arena) {
@@ -638,7 +637,9 @@ void AliasUnitDataItems(const RtlirDesign* design, const RtlirModule* mod,
   if (unit == nullptr) return;
   const std::string kScope = UnitScopes::ScopeName(mod->unit_index);
   for (const auto* item : unit->cu_items) {
-    if (!DeclaresPackageData(item) || ModuleDeclaresName(mod, item->name) ||
+    bool is_net = item->kind == ModuleItemKind::kNetDecl;
+    if (!(is_net || DeclaresPackageData(item)) ||
+        ModuleDeclaresName(mod, item->name) ||
         EnclosingDeclHoldsVariable(inst_prefix, item->name, ctx))
       continue;
     std::string key = std::string(inst_prefix) + std::string(item->name);
@@ -646,6 +647,7 @@ void AliasUnitDataItems(const RtlirDesign* design, const RtlirModule* mod,
     std::string_view stored = *arena.Create<std::string>(key);
     std::string qname = PackageDataKey(item, kScope);
     ctx.AliasVariable(stored, qname);
+    if (is_net) ctx.AliasNet(stored, qname);
     AliasVariableKinds(stored, qname, ctx, arena);
     ctx.RegisterImportedName(stored);
     // §3.12.1: where each unit's storage stands under its own scope name, the

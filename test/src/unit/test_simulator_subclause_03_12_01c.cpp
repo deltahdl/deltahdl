@@ -387,4 +387,70 @@ TEST(CompilationUnitSearchOrderSim, AModuleDrivesAndReadsTheUnitsNet) {
             1u);
 }
 
+// The unit's net is one net for every module that reaches it: an instance
+// drives all eight bits of the unit's w, and the top reads 8'hA5 from it.
+TEST(CompilationUnitSearchOrderSim, AnInstanceDrivesTheUnitsNetTheTopReads) {
+  EXPECT_EQ(RunAndGet("wire [7:0] w;\n"
+                      "module drv;\n"
+                      "  assign w = 8'hA5;\n"
+                      "endmodule\n"
+                      "module top;\n"
+                      "  logic [7:0] y;\n"
+                      "  drv d();\n"
+                      "  initial #1 y = w;\n"
+                      "endmodule\n",
+                      "y"),
+            0xA5u);
+}
+
+// The unit's net resolves by the net type it was declared with (§6.6.3): two
+// instances drive 1 and 0 onto the unit's wand, which reads 0 where a wire
+// would read x.
+TEST(CompilationUnitSearchOrderSim, TheUnitsNetResolvesByItsNetType) {
+  EXPECT_EQ(RunAndGet("wand w;\n"
+                      "module d1;\n"
+                      "  assign w = 1'b1;\n"
+                      "endmodule\n"
+                      "module d0;\n"
+                      "  assign w = 1'b0;\n"
+                      "endmodule\n"
+                      "module top;\n"
+                      "  logic y;\n"
+                      "  d1 a();\n"
+                      "  d0 b();\n"
+                      "  initial #1 y = (w === 1'b0);\n"
+                      "endmodule\n",
+                      "y"),
+            1u);
+}
+
+// A pulled net of the unit holds its pull with nothing driving it (§6.6.5):
+// the unit's tri1 reads 1 where a wire would read z.
+TEST(CompilationUnitSearchOrderSim, TheUnitsTri1ReadsOneUndriven) {
+  EXPECT_EQ(RunAndGet("tri1 w;\n"
+                      "module top;\n"
+                      "  logic y;\n"
+                      "  initial #1 y = (w === 1'b1);\n"
+                      "endmodule\n",
+                      "y"),
+            1u);
+}
+
+// The nearest form the search does not reach: a module declaring a net of the
+// name drives its own, so the unit's w, which the top reads, stays z.
+TEST(CompilationUnitSearchOrderSim, AModulesOwnNetKeepsItsDriverFromTheUnits) {
+  EXPECT_EQ(RunAndGet("wire w;\n"
+                      "module sub;\n"
+                      "  wire w;\n"
+                      "  assign w = 1'b1;\n"
+                      "endmodule\n"
+                      "module top;\n"
+                      "  logic y;\n"
+                      "  sub s();\n"
+                      "  initial #1 y = (w === 1'bz);\n"
+                      "endmodule\n",
+                      "y"),
+            1u);
+}
+
 }  // namespace

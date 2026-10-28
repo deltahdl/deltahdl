@@ -332,6 +332,10 @@ void CreatePackageDataVariables(const RtlirDesign* design, SimContext& ctx,
 // naming the unit's.
 void CreateUnitDataVariables(const RtlirDesign* design, SimContext& ctx,
                              Arena& arena);
+// §3.12.1 with §6.7: a net of its declared net type and width for every net
+// the compilation-unit scope declares, under the same "$unit.name" key.
+// Defined in src/simulator/lowerer_unit_nets.cpp.
+void CreateUnitNets(const RtlirDesign* design, SimContext& ctx, Arena& arena);
 // §3.12.1 with §23.9: the unit's data items the module `mod` does not
 // declare, each bound under `inst_prefix` to its "$unit.name" storage with
 // the kinds the storage carries, the key a bare reference of the module's

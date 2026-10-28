@@ -80,6 +80,33 @@ TEST(SeparateUnitsSim, EachUnitsVariableIsItsOwn) {
   EXPECT_EQ(ValueOf(f, "c.sb"), 2u);
 }
 
+// §3.12.1 with §6.7: `wire [3:0] w;` in two units is two nets, so each unit's
+// module drives its own and reads back what it drove, written bare or through
+// `$unit::`; one net shared by both would read x in each.
+TEST(SeparateUnitsSim, EachUnitsNetIsItsOwn) {
+  SimFixture f;
+  ASSERT_NE(LowerUnits({"wire [3:0] w;\n"
+                        "module top;\n"
+                        "  logic [3:0] a, sa;\n"
+                        "  child c();\n"
+                        "  assign w = 4'd1;\n"
+                        "  initial #1 begin a = w; sa = $unit::w; end\n"
+                        "endmodule\n",
+                        "wire [3:0] w;\n"
+                        "module child;\n"
+                        "  logic [3:0] b, sb;\n"
+                        "  assign w = 4'd2;\n"
+                        "  initial #1 begin b = w; sb = $unit::w; end\n"
+                        "endmodule\n"},
+                       f),
+            nullptr);
+  f.scheduler.Run();
+  EXPECT_EQ(ValueOf(f, "a"), 1u);
+  EXPECT_EQ(ValueOf(f, "sa"), 1u);
+  EXPECT_EQ(ValueOf(f, "c.b"), 2u);
+  EXPECT_EQ(ValueOf(f, "c.sb"), 2u);
+}
+
 // §3.12.1 with §13.4: each unit's function of one name is its own, called by
 // the unit's modules and by the unit's own subroutines.
 TEST(SeparateUnitsSim, EachUnitsFunctionIsItsOwn) {
