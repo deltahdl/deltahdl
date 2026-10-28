@@ -326,12 +326,15 @@ struct SeqRepetition : SeqCycleDelay {
 // became, and seq's own leading delay, `lead` ticks by which the first
 // operand's delay exceeds the delay written before the throughout, so that
 // the interval exp holds over begins where seq begins rather than where its
-// first operand is read.
+// first operand is read. Where the delay before the throughout is a range,
+// each tick of it begins an interval of its own, at the tick the first
+// operand is read, a 1 standing at the interval's start (`begins_at_read`).
 struct SeqThroughout {
   Expr* cond = nullptr;
   size_t first = 0;
   size_t last = 0;
   uint32_t lead = 0;
+  bool begins_at_read = false;
 };
 
 // §16.13.6/§9.4.4: the linear form of a sequence body, `[##d0] b0 ##d1 b1

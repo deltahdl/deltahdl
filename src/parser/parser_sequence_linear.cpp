@@ -12,6 +12,7 @@
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
+#include "parser/linear_sequence_body.h"
 #include "parser/parser.h"
 #include "parser/parser_property_spec_internal.h"
 #include "parser/parser_sequence_property_decl_internal.h"
@@ -23,27 +24,6 @@ namespace delta {
 // methods as the other helper structs are, so the declarations the parser
 // header carries stay within the gate on its length.
 struct ParserSeqLinearHelpers {
-  // §16.7: a delay owed before a group and the delay the group's chain opens
-  // with add, unbounded where either is. A delay of 0 adds nothing, so the
-  // other stands as written, a bound named by a formal among it (§16.8), and
-  // `##n b` keeps n for the instantiation to supply.
-  static SeqCycleDelay AddSeqDelays(const SeqCycleDelay& a,
-                                    const SeqCycleDelay& b) {
-    if (IsNoDelay(a)) return b;
-    SeqCycleDelay sum;
-    sum.min = a.min + b.min;
-    bool unbounded = a.max == SeqCycleDelay::kUnbounded ||
-                     b.max == SeqCycleDelay::kUnbounded;
-    sum.max = unbounded ? SeqCycleDelay::kUnbounded : a.max + b.max;
-    return sum;
-  }
-
-  // A delay of exactly 0 ticks, written with no formal's name.
-  static bool IsNoDelay(const SeqCycleDelay& delay) {
-    return delay.min == 0 && delay.max == 0 && delay.min_expr == nullptr &&
-           delay.max_expr == nullptr;
-  }
-
   // One bound of §16.7's cycle_delay_range as the linear monitor reads it: an
   // integer literal, `$` where the caller admits it, or a constant expression
   // kept for the instantiation and the elaboration-time constants to settle
@@ -176,13 +156,17 @@ struct ParserSeqLinearHelpers {
            p.Check(TokenKind::kKwIntersect) || p.Check(TokenKind::kKwWithin);
   }
 
-  // Whether the token is a `##`, a `,`, a `throughout`, a repetition or a
-  // sequence operator, which only a sequence holds.
+  // Whether the token is a `##`, a `,`, a `throughout`, a repetition, a
+  // sequence operator or the `@` of a clocking event (§16.13.1), which only a
+  // sequence holds.
   static bool AtSequenceToken(Parser& p) {
     return p.Check(TokenKind::kHashHash) || p.Check(TokenKind::kComma) ||
            p.Check(TokenKind::kKwThroughout) || AtRepetitionBracket(p) ||
-           AtSequenceOperator(p);
+           AtSequenceOperator(p) || AtClockingEvent(p);
   }
+
+  // Whether the token is the `@` opening a clocking event.
+  static bool AtClockingEvent(Parser& p) { return p.Check(TokenKind::kAt); }
 
   // Consumes the parenthesised group at the cursor, answering whether it
   // holds a token `at` answers true for: at its own depth, or at any depth
@@ -379,47 +363,6 @@ struct ParserSeqLinearHelpers {
     return ParseRepetitionCount(p, rep);
   }
 
-  // §16.9.2: consecutive repetition of a group by an exact count, unrolled
-  // as the clause has it, `(a ##2 b)[*3]` being `(a ##2 b) ##1 (a ##2 b) ##1
-  // (a ##2 b)`: the group's operands from `first` on are appended again
-  // `count - 1` times, the copy's first operand a tick after the last. A
-  // group repeated by any other consecutive count is read by
-  // ParseRepeatedGroup instead (AheadIsGroupRepeatedByRange).
-  static bool UnrollGroupRepetition(SeqLinearBody& body, size_t first,
-                                    const SeqRepetition& rep) {
-    if (rep.kind == SeqRepetition::Kind::kNone) return true;
-    if (rep.kind != SeqRepetition::Kind::kConsecutive) return false;
-    // §16.13.1: a group naming a clock of its own is not unrolled.
-    if (!body.clocks.empty()) return false;
-    size_t n = body.operands.size() - first;
-    size_t guards = body.throughouts.size();
-    for (uint32_t k = 1; k < rep.min; ++k) {
-      for (size_t i = 0; i < n; ++i) {
-        body.operands.push_back(body.operands[first + i]);
-        SeqCycleDelay delay = body.delays[first + i];
-        if (i == 0) delay = SeqCycleDelay{};
-        body.delays.push_back(delay);
-        body.match_items.push_back(body.match_items[first + i]);
-        body.repetitions.push_back(body.repetitions[first + i]);
-      }
-      CopyGroupGuards(body, first, guards, n * k);
-    }
-    return true;
-  }
-
-  // §16.9.9: a throughout inside the group, among the first `guards`, spans
-  // the copy of the group `shift` operands on as it did the first.
-  static void CopyGroupGuards(SeqLinearBody& body, size_t first, size_t guards,
-                              size_t shift) {
-    for (size_t g = 0; g < guards; ++g) {
-      SeqThroughout guard = body.throughouts[g];
-      if (guard.first < first) continue;
-      guard.first += shift;
-      guard.last += shift;
-      body.throughouts.push_back(guard);
-    }
-  }
-
   // One operand of a chain, the delay owed before it, its repetition and the
   // clock it is evaluated on, appended to `body` with no match items of its
   // own.
@@ -473,21 +416,6 @@ struct ParserSeqLinearHelpers {
     return ok;
   }
 
-  // §16.10 and §16.11: marks `items`, the match items of the group of one
-  // operand from `first` on in `body`, where the group admits an empty match,
-  // its operand repeated from zero, `(b[*0:1], x = e)`, not `(a ##1 b[*0:1], x
-  // = e)`; the elaborator reports them, this parse being a trial one.
-  static void MarkEmptyMatchItems(const SeqLinearBody& body, size_t first,
-                                  std::vector<SeqMatchAssign>& items) {
-    if (body.operands.size() != first + 1) return;
-    const SeqRepetition& rep = body.repetitions[first];
-    if (rep.kind == SeqRepetition::Kind::kNone || rep.min_expr != nullptr ||
-        rep.min != 0) {
-      return;
-    }
-    for (SeqMatchAssign& item : items) item.on_empty_match = true;
-  }
-
   // §16.10 and §16.11: a group's match items run once, at each match of its
   // sequence_expr. Kept on a last operand that repeats, `(b[*2], x++)` or
   // `(b[->2], x++)`, they would run at each repetition, so they go to the
@@ -534,25 +462,32 @@ struct ParserSeqLinearHelpers {
     return ParseSequenceRepetition(p, rep);
   }
 
-  // §16.9.2: whether the tokens ahead are a parenthesised group holding, at
-  // any depth, a token AtChainToken answers true for, and repeated after it
-  // by a consecutive count other than the one number UnrollGroupRepetition
-  // copies the group's operands by. A malformed count is answered as the
-  // group is read. The lexer is rewound.
-  static bool AheadIsGroupRepeatedByRange(Parser& p) {
+  // §16.9.2: whether the tokens ahead are a parenthesised group read into a
+  // sequence of its own: one holding, at any depth, a token AtChainToken
+  // answers true for and repeated after it by a consecutive count other than
+  // the one number UnrollGroupRepetition copies the group's operands by, or,
+  // Annex F.3.2 giving a repetition no clocked form, one writing a clocking
+  // event at any depth and repeated at all, the elaborator holding that clock
+  // to the one in force where the group stands. A malformed count is
+  // answered as the group is read. The lexer is rewound.
+  static bool AheadIsGroupReadWhole(Parser& p) {
     auto saved = p.lexer_.SavePos();
     p.diag_.PushSuppress();
+    bool clocked = SkipGroupHolding(p, AtClockingEvent, true);
+    p.lexer_.RestorePos(saved);
     bool chain = SkipGroupHolding(p, AtChainToken, true);
     SeqRepetition rep;
     ParseSequenceRepetition(p, rep);
     p.diag_.PopSuppress();
     p.lexer_.RestorePos(saved);
-    return chain && rep.IteratesWhole();
+    return (chain && rep.IteratesWhole()) ||
+           (clocked && rep.kind == SeqRepetition::Kind::kConsecutive);
   }
 
   // §16.9.2: a group of more than one operand, or of a repeated one, repeated
   // by a range, `$`, a count of 0 or a count written as an expression, which
-  // no number of copies of its operands spliced into the chain stands for. It
+  // no number of copies of its operands spliced into the chain stands for, or
+  // a repeated group writing a clocking event (AheadIsGroupReadWhole). It
   // is read into a sequence of its own standing as one operand, as
   // ParseNestedGroup reads one, the repetition on that operand for the
   // sequence monitor to iterate, and the group's match items on the
@@ -577,7 +512,7 @@ struct ParserSeqLinearHelpers {
     if (AheadGroupHolds(p, AtSequenceOperator)) {
       return ParseNestedGroup(p, body, before, clock);
     }
-    if (AheadIsGroupRepeatedByRange(p)) {
+    if (AheadIsGroupReadWhole(p)) {
       return ParseRepeatedGroup(p, body, before, clock);
     }
     size_t first = body.operands.size();
@@ -619,35 +554,34 @@ struct ParserSeqLinearHelpers {
   // follows, read into `body` after the delay owed before the throughout,
   // which is where the condition's interval begins; §16.9.1 has throughout
   // bind looser than `##` and tighter than `intersect`, so seq runs to the
-  // chain's end. The delay before and seq's leading delay are each one tick
-  // count, the interval's start being told from the first operand's delay.
+  // chain's end. Where that delay is one tick count, the interval begins
+  // `lead` ticks before the first operand's least delay, seq's own leading
+  // delay being any of §16.7's. Where it is a range, each tick of it begins
+  // an interval of its own, so a 1 is read at its end, the interval
+  // beginning at the tick the 1 is read at, and seq is read after the 1.
   static bool ParseThroughout(Parser& p, SeqLinearBody& body,
                               SeqCycleDelay before, Expr* cond,
                               const std::vector<EventExpr>& clock) {
-    if (before.min != before.max) return false;
     SeqThroughout guard;
     guard.cond = cond;
     guard.first = body.operands.size();
+    if (before.min != before.max) {
+      AppendOperand(body, ParserPropertySpecHelpers::OneLiteral(p), before,
+                    SeqRepetition{}, clock);
+      guard.begins_at_read = true;
+      before = SeqCycleDelay{};
+      before.min = 0;
+      before.max = 0;
+    }
+    size_t seq_first = body.operands.size();
     if (!ParseLinearSeqOperandChain(p, body, before, clock)) return false;
-    if (body.operands.size() == guard.first) return false;
-    const SeqCycleDelay& lead = body.delays[guard.first];
-    if (lead.min != lead.max) return false;
-    guard.lead = lead.min - before.min;
+    if (body.operands.size() == seq_first) return false;
+    if (!guard.begins_at_read) {
+      guard.lead = body.delays[seq_first].min - before.min;
+    }
     guard.last = body.operands.size() - 1;
     body.throughouts.push_back(guard);
     return true;
-  }
-
-  // §16.13.1: the clock the operand just appended is evaluated on, kept
-  // parallel to the operands once any chain of the body writes one, the
-  // operands before the first written carrying none, the leading clock's.
-  static void PushOperandClock(SeqLinearBody& body,
-                               const std::vector<EventExpr>& clock) {
-    if (clock.empty() && body.clocks.empty()) return;
-    while (body.clocks.size() + 1 < body.operands.size()) {
-      body.clocks.emplace_back();
-    }
-    body.clocks.push_back(clock);
   }
 
   // §16.13.1: `@(event_list)` or, §9.4 Syntax 9-4, `@name` before an
@@ -720,49 +654,6 @@ struct ParserSeqLinearHelpers {
     return true;
   }
 
-  // §16.9.10: `seq1 within seq2` abbreviates `(1[*0:$] ##1 seq1 ##1 1[*0:$])
-  // intersect seq2`, so the chain seq1 was read into becomes that first
-  // operand: a 1 repeated any number of times before it, a tick between, and
-  // another after, its own operands' delays and throughouts moved along.
-  static void WrapWithinOperand(Parser& p, SeqLinearBody& body) {
-    SeqRepetition any;
-    any.kind = SeqRepetition::Kind::kConsecutive;
-    any.min = 0;
-    any.max = SeqCycleDelay::kUnbounded;
-    SeqCycleDelay none;
-    none.min = 0;
-    none.max = 0;
-    SeqCycleDelay one;
-    one.min = 1;
-    one.max = 1;
-    SeqLinearBody wrapped;
-    wrapped.operands.push_back(ParserPropertySpecHelpers::OneLiteral(p));
-    wrapped.delays.push_back(none);
-    wrapped.match_items.emplace_back();
-    wrapped.repetitions.push_back(any);
-    for (size_t i = 0; i < body.operands.size(); ++i) {
-      wrapped.operands.push_back(body.operands[i]);
-      wrapped.delays.push_back(i == 0 ? AddSeqDelays(one, body.delays[0])
-                                      : body.delays[i]);
-      wrapped.match_items.push_back(body.match_items[i]);
-      wrapped.repetitions.push_back(body.repetitions[i]);
-    }
-    wrapped.operands.push_back(ParserPropertySpecHelpers::OneLiteral(p));
-    wrapped.delays.push_back(one);
-    wrapped.match_items.emplace_back();
-    wrapped.repetitions.push_back(any);
-    for (SeqThroughout guard : body.throughouts) {
-      guard.first += 1;
-      guard.last += 1;
-      wrapped.throughouts.push_back(guard);
-    }
-    body.operands = std::move(wrapped.operands);
-    body.delays = std::move(wrapped.delays);
-    body.match_items = std::move(wrapped.match_items);
-    body.repetitions = std::move(wrapped.repetitions);
-    body.throughouts = std::move(wrapped.throughouts);
-  }
-
   // §16.9.1: `intersect` binds tighter than `and` and looser than `##`, so
   // an `intersect` operand is one chain, read to the next `intersect`, `and`
   // or `or`, and the operands after the first are the first's intersects;
@@ -775,9 +666,10 @@ struct ParserSeqLinearHelpers {
     if (!ParseLinearSeqOperandChain(p, body, none)) return false;
     if (body.operands.empty()) return false;
     if (p.Match(TokenKind::kKwWithin)) {
-      // §16.13.1: a chain naming a clock of its own is not wrapped.
-      if (!body.clocks.empty()) return false;
-      WrapWithinOperand(p, body);
+      // §16.13.1: a clock the chain writes is kept on its operands, for the
+      // elaborator to hold to the clock in force (Annex F.2).
+      WrapWithinOperand(body, ParserPropertySpecHelpers::OneLiteral(p),
+                        ParserPropertySpecHelpers::OneLiteral(p));
       body.within = true;
       body.intersects.emplace_back();
       SeqLinearBody& enclosing = body.intersects.back();

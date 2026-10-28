@@ -691,7 +691,7 @@ TEST(PackageDeclarationElaboration, HierarchicalRefInAPackagePropertySequence) {
 
 // §26.2 with §16.7: a package sequence's body is held to the rule whatever
 // shape it takes, one the parser's linear form of a body does not hold, a
-// throughout reached after a ranged delay, as much as one it does. Such a body
+// first_match reached after a cycle delay, as much as one it does. Such a body
 // kept no expression, so the head of a member access in it went unjudged; a
 // head the package declares or the sequence takes as a formal is no
 // hierarchical reference, and a clock the linear form does hold is judged
@@ -703,11 +703,11 @@ TEST(PackageDeclarationElaboration,
       ElabOk("package p;\n"
              "  typedef struct packed { logic f; } st_t;\n"
              "  st_t w;\n"
-             "  sequence s; 1 ##[1:2] (top.a throughout 1); endsequence\n"
-             "  sequence sc; @(posedge top.clk) 1 ##[1:2] (w throughout 1); "
+             "  sequence s; 1 ##1 first_match(top.a ##1 1); endsequence\n"
+             "  sequence sc; @(posedge top.clk) 1 ##1 first_match(w ##1 1); "
              "endsequence\n"
-             "  sequence sw; 1 ##[1:2] (w.f throughout 1); endsequence\n"
-             "  sequence sf(v); 1 ##[1:2] (v.f throughout 1); endsequence\n"
+             "  sequence sw; 1 ##1 first_match(w.f ##1 1); endsequence\n"
+             "  sequence sf(v); 1 ##1 first_match(v.f ##1 1); endsequence\n"
              "endpackage\n"
              "module top; logic clk = 0, a = 1; endmodule\n",
              f));
@@ -737,16 +737,16 @@ TEST(PackageDeclarationElaboration,
 // §26.2 with §16.7: a compilation-unit name read in a package sequence is
 // reported whatever shape the body takes, and a formal or a local of the
 // sequence spelled as that name is the sequence's own. A body the parser's
-// linear form does not hold, a throughout reached after a ranged delay, kept
+// linear form does not hold, a first_match reached after a cycle delay, kept
 // no expression, so the name went unjudged.
 TEST(PackageDeclarationElaboration, CuNameInAPackageSequenceOfAnyShape) {
   ElabFixture f;
   EXPECT_FALSE(
       ElabOk("int v;\n"
              "package p;\n"
-             "  sequence su; 1 ##[1:2] (v throughout 1); endsequence\n"
-             "  sequence sf(v); 1 ##[1:2] (v throughout 1); endsequence\n"
-             "  sequence sl; int v = 0; 1 ##[1:2] (v throughout 1); "
+             "  sequence su; 1 ##1 first_match(v ##1 1); endsequence\n"
+             "  sequence sf(v); 1 ##1 first_match(v ##1 1); endsequence\n"
+             "  sequence sl; int v = 0; 1 ##1 first_match(v ##1 1); "
              "endsequence\n"
              "endpackage\n",
              f));

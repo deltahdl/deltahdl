@@ -45,17 +45,19 @@ std::string MulticlockSource(const std::string& items) {
 }
 
 // The pass and fail counts of the assertion over `spec`, clocked on clk0,
-// and the time of its last pass.
+// and the time of its last pass; `prelude` declares what the spec names.
 struct MulticlockCounts {
   uint64_t passes;
   uint64_t fails;
   uint64_t last_pass;
 };
 
-MulticlockCounts CountsOfMulticlock(const std::string& spec) {
+MulticlockCounts CountsOfMulticlock(const std::string& spec,
+                                    const std::string& prelude = "") {
   SimFixture f;
   auto* passes = RunAndFindVar(
-      MulticlockSource("  p: assert property (@(posedge clk0) " + spec +
+      MulticlockSource(prelude + "  p: assert property (@(posedge clk0) " +
+                       spec +
                        ") begin passes++; last_pass = $time; end "
                        "else fails++;\n"),
       f, "passes");
@@ -64,6 +66,20 @@ MulticlockCounts CountsOfMulticlock(const std::string& spec) {
   Variable* last_pass = f.ctx.FindVariable("last_pass");
   return {passes->value.ToUint64(), fails->value.ToUint64(),
           last_pass->value.ToUint64()};
+}
+
+// Annex F.2 and §16.13.1: the assertion over `spec`, after `prelude`, which
+// names again a clock already in force, is evaluated as `plain`, the spec
+// without it, which the assertion evaluates to some pass or fail.
+void ExpectAsWithoutTheRedundantClock(const std::string& spec,
+                                      const std::string& plain,
+                                      const std::string& prelude = "") {
+  MulticlockCounts named = CountsOfMulticlock(spec, prelude);
+  MulticlockCounts bare = CountsOfMulticlock(plain);
+  EXPECT_NE(bare.passes + bare.fails, 0u) << plain;
+  EXPECT_EQ(named.passes, bare.passes) << spec;
+  EXPECT_EQ(named.fails, bare.fails) << spec;
+  EXPECT_EQ(named.last_pass, bare.last_pass) << spec;
 }
 
 // §16.13.1: ##1 between subsequences on different clocks moves from the
@@ -284,6 +300,71 @@ TEST(MulticlockSequences, ClocksNamedByPathsThroughTwoInstancesAreTwoClocks) {
   ASSERT_NE(path, nullptr);
   EXPECT_EQ(path->value.ToUint64(), 10u);
   EXPECT_EQ(f.ctx.FindVariable("c2")->value.ToUint64(), 10u);
+}
+
+// Annex F.2 eliminates a clocking event equal to the one in force, so a group
+// naming clk0 again under clk0 and repeated by a count is the unclocked
+// group's repetition, sig0 ##1 1 ##1 sig0 ##1 1: of the attempts the run
+// resolves, the one from tick 5 holds at 75, sig0 being high at 5 and 7, and
+// those from ticks 1, 2, 3, 4, 6 and 8 fail.
+TEST(MulticlockSequences, ARepeatedGroupNamingTheClockInForceIsUnclocked) {
+  MulticlockCounts counts =
+      CountsOfMulticlock("(@(posedge clk0) sig0 ##1 1)[*2]");
+  EXPECT_EQ(counts.passes, 1u);
+  EXPECT_EQ(counts.fails, 6u);
+  EXPECT_EQ(counts.last_pass, 75u);
+  ExpectAsWithoutTheRedundantClock("(@(posedge clk0) sig0 ##1 1)[*2]",
+                                   "(sig0 ##1 1)[*2]");
+}
+
+// Annex F.2 and §16.13.1: a clock named again where it is already in force
+// changes nothing wherever it is written: in a group repeated by a range or
+// holding one operand, in a group repeated under a clock the chain changed
+// to, in the first operand of within or of intersect, after a delay of two
+// ticks and in the sequence a throughout guards.
+TEST(MulticlockSequences, AClockNamedAgainInAnyOperandChangesNothing) {
+  ExpectAsWithoutTheRedundantClock("(@(posedge clk0) sig0 ##1 1)[*1:2]",
+                                   "(sig0 ##1 1)[*1:2]");
+  ExpectAsWithoutTheRedundantClock("(@(posedge clk0) sig0)[*2]", "sig0[*2]");
+  ExpectAsWithoutTheRedundantClock(
+      "sig0 ##1 @(posedge clk1) (@(posedge clk1) sig1 ##1 1)[*2]",
+      "sig0 ##1 @(posedge clk1) sig1 ##1 1 ##1 sig1 ##1 1");
+  ExpectAsWithoutTheRedundantClock(
+      "(@(posedge clk0) sig1) within (sig0 ##1 1 ##1 1)",
+      "sig1 within (sig0 ##1 1 ##1 1)");
+  ExpectAsWithoutTheRedundantClock(
+      "(@(posedge clk0) sig0 ##1 1) intersect (1 ##1 sig1)",
+      "(sig0 ##1 1) intersect (1 ##1 sig1)");
+  ExpectAsWithoutTheRedundantClock("sig0 ##2 @(posedge clk0) sig1",
+                                   "sig0 ##2 sig1");
+  ExpectAsWithoutTheRedundantClock("sig0 throughout (@(posedge clk0) 1 ##1 1)",
+                                   "sig0 throughout (1 ##1 1)");
+}
+
+// §16.13.1 with Annex F.3.2: a group writing no clock of its own, repeated
+// after the chain changed to clk1, is `@(posedge clk1)` over the repetition,
+// each copy of its operands read on clk1.
+TEST(MulticlockSequences, AGroupRepeatedAfterAClockChangeIsReadOnThatClock) {
+  ExpectAsWithoutTheRedundantClock(
+      "sig0 ##1 @(posedge clk1) (sig1 ##1 1)[*2]",
+      "sig0 ##1 @(posedge clk1) sig1 ##1 1 ##1 sig1 ##1 1");
+}
+
+// Annex F.2 and §16.13.1: the redundant clock is eliminated whether the
+// repeated sequence is a named sequence declared on the clock in force, or
+// the group stands in a sequence or a property declared on it.
+TEST(MulticlockSequences, ARedundantClockInADeclarationChangesNothing) {
+  ExpectAsWithoutTheRedundantClock(
+      "sc0[*2]", "(sig0 ##1 1)[*2]",
+      "  sequence sc0; @(posedge clk0) sig0 ##1 1; endsequence\n");
+  ExpectAsWithoutTheRedundantClock(
+      "r", "(sig0 ##1 1)[*2]",
+      "  sequence r; @(posedge clk0) (@(posedge clk0) sig0 ##1 1)[*2]; "
+      "endsequence\n");
+  ExpectAsWithoutTheRedundantClock(
+      "q", "(sig0 ##1 1)[*2]",
+      "  property q; @(posedge clk0) (@(posedge clk0) sig0 ##1 1)[*2]; "
+      "endproperty\n");
 }
 
 }  // namespace

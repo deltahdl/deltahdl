@@ -319,12 +319,29 @@ bool EndsAsTrailingEmpty(const TickStep& step, const LinearAttempt& attempt) {
 // this tick: past its first operand and not past its last, or at the first
 // operand, in its repetition or with the delay before the throughout up, the
 // interval beginning where the guarded sequence begins, `lead` ticks before
-// its first operand is read.
+// its first operand is read. An interval beginning at the tick its first
+// operand is read at, after a ranged delay, holds no attempt still waiting
+// for that operand (ThroughoutsBeginningHereHold).
 bool InsideThroughout(const TickStep& step, const LinearAttempt& attempt,
                       const SeqThroughout& guard) {
   if (attempt.pos < guard.first || attempt.pos > guard.last) return false;
   if (attempt.pos > guard.first || attempt.repeating) return true;
+  if (guard.begins_at_read) return false;
   return attempt.waited + guard.lead >= step.body.delays[guard.first].min;
+}
+
+// §16.9.9: whether the condition of every throughout whose interval begins
+// at the tick the attempt's operand is read at, after a ranged delay, holds
+// at this tick, the operand being read now; one that does not ends only the
+// interval beginning here, the attempt waiting on for the later ticks of the
+// range.
+bool ThroughoutsBeginningHereHold(TickStep& step, LinearAttempt& attempt) {
+  for (const SeqThroughout& guard : step.body.throughouts) {
+    if (!guard.begins_at_read || guard.first != attempt.pos) continue;
+    AttemptLocalsScope scope(step.body.locals, attempt.locals, step.ctx);
+    if (!EvalExpr(guard.cond, step.ctx, step.arena).IsTruthy()) return false;
+  }
+  return true;
 }
 
 // §16.9.9: an attempt inside the interval of a throughout whose condition
@@ -382,7 +399,10 @@ void StepAttempt(TickStep& step, LinearAttempt attempt) {
     }
     return;
   }
-  if (WithinDelay(delay, attempt.waited)) ArriveAtOperand(step, attempt, rep);
+  if (WithinDelay(delay, attempt.waited) &&
+      ThroughoutsBeginningHereHold(step, attempt)) {
+    ArriveAtOperand(step, attempt, rep);
+  }
   // A goto or nonconsecutive repetition, once begun, waits by its own rules
   // rather than by the delay range before it.
   if (rep.kind == SeqRepetition::Kind::kGoto ||

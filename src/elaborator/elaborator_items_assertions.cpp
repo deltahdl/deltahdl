@@ -489,6 +489,13 @@ void Elaborator::ElaborateSequenceDeclItem(ModuleItem* item, RtlirModule* mod) {
   // §16.10: a formal-argument name may not be redeclared as a body local.
   ValidateNoFormalShadowedByBodyLocal(item);
   ValidateClockingBlock(item, mod);
+  // §16.13.1 and Annex F.3.2: the rules on clocks are applied under the
+  // sequence's own leading clock; one that inherits its clock from where it
+  // is instantiated is not, the clock in force not being known here.
+  if (!item->seq_clock.empty()) {
+    ValidateMulticlockSequence(item, item->seq_clock, item->loc,
+                               property_registry_, diag_);
+  }
 }
 
 // §16.12.1: an instance of a named property used as a property_expr operand of

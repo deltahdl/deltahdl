@@ -167,4 +167,76 @@ TEST(SequenceThroughout, BurstRule1MatchesOnlyWithBurstModeLowThroughout) {
   EXPECT_EQ(g.ctx.FindVariable("last")->value.ToUint64(), 95u);
 }
 
+// The count of the ticks at which the sequence `rule` over `body` reaches its
+// end point under `drive`, and the time of the last.
+struct EndPoints {
+  uint64_t hits;
+  uint64_t last;
+};
+
+EndPoints EndPointsOf(const std::string& body, const std::string& drive) {
+  SimFixture f;
+  auto* hits = RunAndFindVar(SequenceTickSource(body, drive), f, "hits");
+  if (hits == nullptr) return {~0ull, ~0ull};
+  return {hits->value.ToUint64(), f.ctx.FindVariable("last")->value.ToUint64()};
+}
+
+// Expects `body` to reach its end point at one tick, at time `last`, under
+// `held`, and at none under `broken`.
+void ExpectOneEndUnlessBroken(const std::string& body, const std::string& held,
+                              uint64_t last, const std::string& broken) {
+  EndPoints ends = EndPointsOf(body, held);
+  EXPECT_EQ(ends.hits, 1u) << body;
+  EXPECT_EQ(ends.last, last) << body;
+  EXPECT_EQ(EndPointsOf(body, broken).hits, 0u) << body;
+}
+
+// §16.9.9 with §16.7: after a ranged delay, each tick of the range begins an
+// interval of its own where the guarded sequence begins. `te2 ##[1:2] (te1
+// throughout te3)` from tick 3, te3 high at 5 alone, matches by the delay of
+// two with te1 high at 5, low at 4 though it is, the interval of the delay of
+// one not being that of the delay of two; with te1 high at 4 alone neither
+// interval holds it. The delay of two written alone reads the same.
+TEST(SequenceThroughout, AnIntervalAfterARangedDelayBeginsAtItsFirstOperand) {
+  const std::string kHeld = DriveTicks({{5}, {3}, {5}, {}, {}});
+  const std::string kBroken = DriveTicks({{4}, {3}, {5}, {}, {}});
+  ExpectOneEndUnlessBroken("te2 ##[1:2] (te1 throughout te3)", kHeld, 45,
+                           kBroken);
+  ExpectOneEndUnlessBroken("te2 ##2 (te1 throughout te3)", kHeld, 45, kBroken);
+}
+
+// §16.9.9 with §16.7: an unbounded range reaches the interval as a bounded
+// one does: `te2 ##[1:$] (te1 throughout te3 ##1 te4)` from tick 2 matches at
+// 6, the tick at 55, te1 high at 5 and 6 and low while the delay runs, and
+// not with te1 low at 6.
+TEST(SequenceThroughout, AnIntervalAfterAnUnboundedDelayBeginsAtItsOperand) {
+  ExpectOneEndUnlessBroken("te2 ##[1:$] (te1 throughout te3 ##1 te4)",
+                           DriveTicks({{5, 6}, {2}, {5}, {6}, {}}), 55,
+                           DriveTicks({{5}, {2}, {5}, {6}, {}}));
+}
+
+// §16.9.9 with §16.7: after a ranged delay, a guarded sequence opening with a
+// delay of its own begins its interval where the ranged delay ends. `te2
+// ##[1:2] (te1 throughout ##2 te3)` from tick 3, te3 high at 7 alone, matches
+// by the delay of two, its interval 5 to 7, te1 low at 4 though it is, and
+// not with te1 low at 5; the delay of two written alone reads the same.
+TEST(SequenceThroughout, ASequenceOpeningWithADelayAfterARangeIsGuarded) {
+  const std::string kHeld = DriveTicks({{5, 6, 7}, {3}, {7}, {}, {}});
+  const std::string kBroken = DriveTicks({{6, 7}, {3}, {7}, {}, {}});
+  ExpectOneEndUnlessBroken("te2 ##[1:2] (te1 throughout ##2 te3)", kHeld, 65,
+                           kBroken);
+  ExpectOneEndUnlessBroken("te2 ##2 (te1 throughout ##2 te3)", kHeld, 65,
+                           kBroken);
+}
+
+// §16.9.9 with §16.7: the sequence a throughout guards may open with a ranged
+// delay, the interval beginning where the throughout does: `te1 throughout
+// ##[1:2] te3` with te3 high at 5 matches there from 3 and from 4, te1 high
+// at 3, 4 and 5, and from neither with te1 low at 4.
+TEST(SequenceThroughout, AGuardedSequenceOpeningWithARangedDelayIsGuarded) {
+  ExpectOneEndUnlessBroken("te1 throughout ##[1:2] te3",
+                           DriveTicks({{3, 4, 5}, {}, {5}, {}, {}}), 45,
+                           DriveTicks({{3, 5}, {}, {5}, {}, {}}));
+}
+
 }  // namespace

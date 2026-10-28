@@ -2,6 +2,7 @@
 
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "elaborator/multiclock_sequence.h"
@@ -19,6 +20,26 @@ std::string RulesSource(const std::string& spec) {
          "  logic clk0, clk1, clk2, sig0, sig1, s1, s2;\n"
          "  assert property (" +
          spec +
+         ");\n"
+         "endmodule\n";
+}
+
+// The module writing `body` under clk0 in each place a sequence stands, a
+// sequence declared on clk0 at line 4, a property at line 5 and an
+// assertion at line 6, beside sequences declared on clk0 and on clk1.
+std::string ClockPlaces(const std::string& body) {
+  return "module m;\n"
+         "  logic clk0, clk1, sig0, sig1;\n"
+         "  sequence sc0; @(posedge clk0) sig0 ##1 sig1; endsequence "
+         "sequence sc1; @(posedge clk1) sig0 ##1 sig1; endsequence\n"
+         "  sequence r; @(posedge clk0) " +
+         body +
+         "; endsequence\n"
+         "  property q; @(posedge clk0) " +
+         body +
+         "; endproperty\n"
+         "  assert property (@(posedge clk0) " +
+         body +
          ");\n"
          "endmodule\n";
 }
@@ -235,6 +256,88 @@ TEST(MulticlockSequenceLegality, CrossClockOtherJoinInInteriorIsIllegal) {
   if (!kError.has_value()) return;
   const std::string& error = *kError;
   EXPECT_FALSE(error.empty());
+}
+
+// Annex F.3.2 gives a repetition no clocked form, F.2 eliminating only a
+// clock equal to the one in force, so a sequence repeated under a clock of its
+// own other than clk0 is reported: a group repeated by a count or a range, a
+// group of one operand, a group joining sequences, a group changing clock
+// inside and an instance of a sequence declared on clk1; in a sequence, a
+// property and an assertion alike.
+TEST(MulticlockSequenceLegality, ARepeatedSequenceOnAnotherClockIsReported) {
+  for (const char* body :
+       {"(@(posedge clk1) sig0 ##1 sig1)[*2]",
+        "(@(posedge clk1) sig0 ##1 sig1)[*1:2]", "(@(posedge clk1) sig0)[*2]",
+        "(@(posedge clk1) sig0 and sig1)[*2]",
+        "(sig0 ##1 @(posedge clk1) sig1)[*2]", "sc1[*2]"}) {
+    ElabFixture f;
+    Elaborate(ClockPlaces(body), f);
+    for (int line : {4, 5, 6}) {
+      EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                                "a repeated sequence may name no clocking "
+                                "event other than the one in force where it "
+                                "is written",
+                                line, "F.3.2"))
+          << body << " at line " << line;
+    }
+  }
+}
+
+// Annex F.2 and F.3.2: the nearest forms, each clock written in the repeated
+// sequence equal to the one in force where it stands, clk0 or the clk1 the
+// chain changed to, are not reported, nor is a group writing no clock of its
+// own repeated under the one the chain changed to.
+TEST(MulticlockSequenceLegality, ARepeatedSequenceOnTheClockInForceIsLegal) {
+  for (const char* body :
+       {"(@(posedge clk0) sig0 ##1 sig1)[*2]",
+        "(@(posedge clk0) sig0 ##1 sig1)[*1:2]", "(@(posedge clk0) sig0)[*2]",
+        "(@(posedge clk0) sig0 and sig1)[*2]", "sc0[*2]",
+        "sig0 ##1 @(posedge clk1) (sig1 ##1 sig0)[*2]",
+        "sig0 ##1 @(posedge clk1) (@(posedge clk1) sig1 ##1 sig0)[*2]"}) {
+    ElabFixture f;
+    auto* design = ElaborateSrc(ClockPlaces(body), f);
+    EXPECT_NE(design, nullptr) << body;
+    EXPECT_FALSE(f.has_errors) << body;
+  }
+}
+
+// §16.13.1: differently clocked operands are joined by ##1 and ##0 alone, so
+// a first operand of within or intersect, or of and or or in a sequence,
+// written on clk1 under clk0 is reported, naming the operator.
+TEST(MulticlockSequenceLegality, AFirstOperandOnAnotherClockIsReported) {
+  for (const auto& [body, op] :
+       std::vector<std::pair<std::string, std::string>>{
+           {"(@(posedge clk1) sig0 ##1 sig1) within (sig0 ##1 sig1 ##1 sig0)",
+            "within"},
+           {"(@(posedge clk1) sig0 ##1 sig1) intersect (sig1 ##1 sig0)",
+            "intersect"},
+           {"(@(posedge clk1) sig0 ##1 sig1) and (sig1 ##1 sig0)", "and"},
+           {"(@(posedge clk1) sig0 ##1 sig1) or (sig1 ##1 sig0)", "or"}}) {
+    ElabFixture f;
+    Elaborate(ClockPlaces(body), f);
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "differently clocked sequence operands may be "
+                              "joined only by the single-delay (##1) or "
+                              "zero-delay (##0) operator, not by " +
+                                  op,
+                              4, "16.13.1"))
+        << body;
+  }
+}
+
+// §16.13.1 with Annex F.2: the same first operands written on clk0, the clock
+// in force, join their operators without a report.
+TEST(MulticlockSequenceLegality, AFirstOperandOnTheClockInForceIsLegal) {
+  for (const char* body :
+       {"(@(posedge clk0) sig0 ##1 sig1) within (sig0 ##1 sig1 ##1 sig0)",
+        "(@(posedge clk0) sig0 ##1 sig1) intersect (sig1 ##1 sig0)",
+        "(@(posedge clk0) sig0 ##1 sig1) and (sig1 ##1 sig0)",
+        "(@(posedge clk0) sig0 ##1 sig1) or (sig1 ##1 sig0)"}) {
+    ElabFixture f;
+    auto* design = ElaborateSrc(ClockPlaces(body), f);
+    EXPECT_NE(design, nullptr) << body;
+    EXPECT_FALSE(f.has_errors) << body;
+  }
 }
 
 }  // namespace
