@@ -278,6 +278,27 @@ TEST(TypenameConstEval, ASelectOfAPackedArrayFoldsToItsElementsWidth) {
   EXPECT_EQ(FoldedChars(design, "C"), "logic[7:0]");
 }
 
+// §20.6.1 with §7.4.4 and §7.4.1: a declaration naming a typedef that carries
+// the packed dimensions has them as its own, so the fold counts a select of
+// it in elements of the typedef's outermost dimension.
+TEST(TypenameConstEval, ASelectOfATypedefsPackedArrayFoldsToItsElementsWidth) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  typedef logic [3:0][7:0] w_t;\n"
+      "  w_t q;\n"
+      "  bit [3:0] n;\n"
+      "  localparam string A = $typename(q[1]);\n"
+      "  localparam string B = $typename(q[2:1]);\n"
+      "  localparam string C = $typename(q[1] + n);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_EQ(FoldedChars(design, "A"), "logic[7:0]");
+  EXPECT_EQ(FoldedChars(design, "B"), "logic[15:0]");
+  EXPECT_EQ(FoldedChars(design, "C"), "logic[7:0]");
+}
+
 // What the fold cannot resolve from the module's declarations it leaves to
 // the run rather than fold to a wrong name: a class type and a package's
 // type, which the module's typedef table does not hold, an enumeration

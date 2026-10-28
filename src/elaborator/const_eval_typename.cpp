@@ -38,9 +38,15 @@ const RtlirVariable* RegisteredVariable(std::string_view name) {
 
 // §7.4.1: the width of one element of the outermost packed dimension the
 // variable `var` was declared with, its width over that dimension's span; 1
-// where the declaration writes no packed dimension or its bounds do not fold.
+// where its type has no packed dimension or its bounds do not fold. §7.4.4: a
+// type written as a typedef's name alone has the dimensions the typedef
+// writes, followed through a chain of them.
 uint32_t PackedElementWidth(const RtlirVariable& var) {
   const DataType* type = var.written_type;
+  while (type != nullptr && type->kind == DataTypeKind::kNamed &&
+         type->scope_name.empty() && type->packed_dim_left == nullptr) {
+    type = RegisteredTypedef(type->type_name);
+  }
   if (type == nullptr || type->packed_dim_left == nullptr) return 1;
   ScopeMap scope = RegisteredModuleScope();
   std::optional<int64_t> left = ConstEvalInt(type->packed_dim_left, scope);
