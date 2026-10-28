@@ -91,7 +91,6 @@ void MarkDpi(VpiObject* tf, const ModuleItem& decl) {
 // declaration among `items` names, an export naming one its own scope
 // declares.
 void MarkDpiExports(VpiObject* scope, const std::vector<ModuleItem*>& items) {
-  if (scope == nullptr) return;
   for (const ModuleItem* item : items) {
     if (item->kind != ModuleItemKind::kDpiExport) continue;
     for (VpiObject* child : scope->children) {
