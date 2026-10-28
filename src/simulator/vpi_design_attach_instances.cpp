@@ -309,9 +309,11 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
     // §37.42: the calls the passes below make outside every procedure, held
     // until every task, function and class defn they may reach is made.
     std::vector<VpiDeferredCall> deferred;
+    // The typespecs are answered by AttachTypespecs below, which the passes
+    // after it build their expressions' casts with.
     const VpiAttachBuild kBuild{[this] { return AllocObject(); },
                                 VpiPoolKeeper(name_pool_), sim_ctx_->GetArena(),
-                                &deferred};
+                                &deferred, call_objects_.unit_typespecs};
     // The scopes the passes below hang a generate block's objects from are
     // the gen scopes this makes.
     AttachGenScopes(design, object_map_, kBuild);

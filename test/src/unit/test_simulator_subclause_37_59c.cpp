@@ -334,16 +334,19 @@ TEST_F(AssignedExpressionsOfARun, ACastFindsATypedefOfAPackageOrTheUnit) {
 }
 
 // A size cast is as wide as the constant its width is, an operation over a
-// parameter or a call of $bits on a variable among them (§11.2.1).
+// parameter, a call of $bits on a variable or a package's parameter written
+// through the package among them (§11.2.1).
 TEST_F(AssignedExpressionsOfARun, ASizeCastIsAsWideAsItsConstantWidth) {
-  Run("module top; localparam W = 3; logic [4:0] b; logic [7:0] x;\n"
+  Run("package pk; parameter W = 2; endpackage\n"
+      "module top; localparam W = 3; logic [4:0] b; logic [7:0] x;\n"
       "  logic [5:0] y;\n"
-      "  initial begin y = (W+1)'(x); y = ($bits(b))'(x); end\n"
+      "  initial begin y = (W+1)'(x); y = ($bits(b))'(x); y = pk::W'(x); end\n"
       "endmodule\n");
   const std::vector<vpiHandle> kRights = ProcedureRightSides();
-  EXPECT_EQ(CastTypespecKinds(kRights),
-            (std::vector<int>{vpiLogicTypespec, vpiLogicTypespec}));
-  EXPECT_EQ(PropertiesOf(vpiSize, kRights), (std::vector<int>{4, 5}));
+  EXPECT_EQ(
+      CastTypespecKinds(kRights),
+      (std::vector<int>{vpiLogicTypespec, vpiLogicTypespec, vpiLogicTypespec}));
+  EXPECT_EQ(PropertiesOf(vpiSize, kRights), (std::vector<int>{4, 5, 2}));
 }
 
 // A cast of an expression the model builds no object for, a logical

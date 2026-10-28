@@ -1,18 +1,17 @@
 #include <algorithm>
 #include <array>
+#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
 
 #include "common/types.h"
-#include "elaborator/rtlir_scopes.h"
 #include "parser/ast_expr.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/variable.h"
 #include "simulator/vpi_design_attach_assigns_internal.h"
 #include "simulator/vpi_design_attach_build.h"
-#include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_object.h"
@@ -40,11 +39,9 @@ constexpr std::array<std::pair<std::string_view, int>, 13> kKeywordTypespecs = {
      {"string", vpiStringTypespec}}};
 
 // The typespec of the typedef named `name` that `scope` declares, or of the
-// type a type parameter so named stands for (§6.20.3); null for none, or for
-// no scope.
-VpiObject* TypedefIn(const VpiObject* scope, std::string_view name) {
-  if (scope == nullptr) return nullptr;
-  for (VpiObject* child : scope->children) {
+// type a type parameter so named stands for (§6.20.3); null for none.
+VpiObject* TypedefIn(const VpiObject& scope, std::string_view name) {
+  for (VpiObject* child : scope.children) {
     if (!VpiIsTypespecType(child->type) || child->name != name) continue;
     return child->type == vpiTypeParameter ? child->param_typespec : child;
   }
@@ -62,17 +59,15 @@ VpiObject* TypedefVisible(std::string_view name, const AssignBuild& build) {
                                         : build.names.instance,
            build.names.objects, build.names.prefix);
        at != nullptr; at = VpiIsInstanceType(at->type) ? nullptr : at->parent) {
-    if (VpiObject* found = TypedefIn(at, name)) return found;
+    if (VpiObject* found = TypedefIn(*at, name)) return found;
   }
-  for (const RtlirImport& imported : build.names.imports) {
-    if (!imported.is_wildcard && imported.item_name != name) continue;
-    if (VpiObject* found = TypedefIn(
-            FindObjectForFlatName(build.names.objects, imported.package_name),
-            name)) {
-      return found;
-    }
+  const VpiObjectMap& kAnswered = build.names.unit_typespecs;
+  if (VpiObject* imported =
+          VpiImportedTypespec(name, build.names.imports, kAnswered)) {
+    return imported;
   }
-  return TypedefIn(FindObjectForFlatName(build.names.objects, "$unit"), name);
+  const auto kUnit = kAnswered.find(name);
+  return kUnit != kAnswered.end() ? kUnit->second : nullptr;
 }
 
 // §6.11 Table 6-8 with §37.25: the typespec kind of the built-in type a
@@ -160,9 +155,11 @@ bool IsTwoState(VpiObject& expr) {
 // type a keyword names; null where it names none of them.
 VpiObject* NamedTypespec(const Expr& cast, const AssignBuild& build) {
   if (cast.text.empty() && cast.rhs->kind == ExprKind::kMemberAccess) {
-    return TypedefIn(
-        FindObjectForFlatName(build.names.objects, cast.rhs->lhs->text),
-        cast.rhs->rhs->text);
+    const auto kScoped = build.names.unit_typespecs.find(
+        std::string(cast.rhs->lhs->text) +
+        "::" + std::string(cast.rhs->rhs->text));
+    return kScoped != build.names.unit_typespecs.end() ? kScoped->second
+                                                       : nullptr;
   }
   // The type is named as text or as an identifier, as the parser read it.
   const std::string_view kName = !cast.text.empty() ? cast.text

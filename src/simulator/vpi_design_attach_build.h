@@ -44,6 +44,10 @@ struct UdpDecl;
 struct VpiDeferredCall;
 struct VpiObject;
 
+// The objects VpiContext keyed by flat name, which a step finds a declaration's
+// object among.
+using VpiObjectMap = std::unordered_map<std::string_view, VpiObject*>;
+
 // What an attach step that adds objects to the VPI model builds with:
 // somewhere to allocate an object, a string to keep a name in for as long as
 // the model lives, and the arena a constant's value lives in. VpiContext
@@ -56,14 +60,20 @@ struct VpiAttachBuild {
   // is held until it can be shaped (VpiShapeDeferredCalls); null where such a
   // call is left as it is built.
   std::vector<VpiDeferredCall>* deferred_calls = nullptr;
+  // §37.25: the typespecs AttachTypespecs answered, the compilation unit's
+  // typedefs' by name and each package's under the package's name and "::",
+  // which a name an expression writes finds after its scopes' (§26.3); none
+  // for a step that builds no such expression.
+  const VpiObjectMap& unit_typespecs = NoTypespecs();
+
+  static const VpiObjectMap& NoTypespecs() {
+    static const VpiObjectMap kNone;
+    return kNone;
+  }
 };
 
 // What keeps a name for as long as the model lives, answering the kept copy.
 using VpiNameKeeper = std::function<std::string_view(std::string)>;
-
-// The objects VpiContext keyed by flat name, which a step finds a declaration's
-// object among.
-using VpiObjectMap = std::unordered_map<std::string_view, VpiObject*>;
 
 // An integer as the vpiIntConst constant a relation such as vpiIndex or
 // vpiLeftRange reaches.

@@ -48,6 +48,9 @@ struct AssignNames {
   // was declared in, whose declarations its names reach after the imports'
   // (UnitScopes::ScopeName); -1 for a design of one unit.
   int unit = -1;
+  // §37.25: the typespecs of the compilation unit's and the packages' typedefs
+  // (VpiAttachBuild::unit_typespecs), which a type a cast names may be.
+  const VpiObjectMap& unit_typespecs = VpiAttachBuild::NoTypespecs();
 
   static const GenBlockConsts& NoGenvars() {
     static const GenBlockConsts kNone;
