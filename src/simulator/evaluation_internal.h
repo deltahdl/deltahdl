@@ -56,10 +56,11 @@ Logic4Vec EvalExprInContext(const Expr* expr, SimContext& ctx, Arena& arena,
                             uint32_t context_width, bool unsigned_context);
 
 // §11.8.1's self-determined type of an expression as its form gives it, by
-// the classes of operator elaborator/operator_classes.h names. Defined in
-// evaluation_self_type.cpp.
+// the classes of operator elaborator/operator_classes.h names, and §11.3.4's
+// 2- or 4-state nature of it. Defined in evaluation_self_type.cpp.
 uint32_t SimSelfWidth(const Expr* expr, SimContext& ctx);
 bool SimSelfSigned(const Expr* expr, SimContext& ctx);
 bool SimSelfReal(const Expr* expr, SimContext& ctx);
+bool SimSelf4State(const Expr* expr, SimContext& ctx);
 
 }  // namespace delta

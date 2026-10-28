@@ -1,7 +1,9 @@
 // §11.6.1 and §11.8.1: the self-determined length and signedness of an
 // expression as its form gives them, which the context-determined evaluators
 // in evaluation.cpp and eval_ternary.cpp size and sign their operands by
-// (§11.8.2), by the classes of operator elaborator/operator_classes.h names.
+// (§11.8.2), by the classes of operator elaborator/operator_classes.h names;
+// and §11.3.4's 2- or 4-state nature of it, which a cast to a type reference
+// (§6.23) takes.
 
 #include <algorithm>
 #include <cstdint>
@@ -102,6 +104,30 @@ bool SimSelfReal(const Expr* expr, SimContext& ctx) {
              SimSelfReal(expr->false_expr, ctx);
     default:
       return false;
+  }
+}
+
+// §11.3.4: whether an expression's self-determined type is 4-state, as its
+// form says. An operator applied to 2-state operands only gives a 2-state
+// result, so a name is 4-state by its declared type, an operator and a
+// conditional where any operand they read is, the condition included, and any
+// other form, a literal among them, is 4-state.
+bool SimSelf4State(const Expr* expr, SimContext& ctx) {
+  switch (expr->kind) {
+    case ExprKind::kIdentifier: {
+      const Variable* var = ctx.FindVariable(expr->text);
+      return var == nullptr || var->is_4state;
+    }
+    case ExprKind::kUnary:
+      return SimSelf4State(expr->lhs, ctx);
+    case ExprKind::kBinary:
+      return SimSelf4State(expr->lhs, ctx) || SimSelf4State(expr->rhs, ctx);
+    case ExprKind::kTernary:
+      return SimSelf4State(expr->condition, ctx) ||
+             SimSelf4State(expr->true_expr, ctx) ||
+             SimSelf4State(expr->false_expr, ctx);
+    default:
+      return true;
   }
 }
 

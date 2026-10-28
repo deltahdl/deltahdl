@@ -23,6 +23,7 @@
 #include "simulator/eval_member_path.h"
 #include "simulator/eval_string.h"
 #include "simulator/evaluation.h"
+#include "simulator/evaluation_internal.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
@@ -294,9 +295,10 @@ static CastTarget ResolveCastTarget(std::string_view key, SimContext& ctx) {
 // `type(bit [11:0])'(v)` the data type written, `type(n)'(v)` the type n was
 // declared with, and a typedef's name the type it names. A data type written
 // holds its signing, the keyword's default (§6.11.3) or the `signed` or
-// `unsigned` written after it, so `type(int unsigned)` casts unsigned. False
-// where `ref` is no type reference or names nothing this resolves, the cast
-// then read as before.
+// `unsigned` written after it, so `type(int unsigned)` casts unsigned. Any
+// other expression, `type(n + n)'(v)`, stands for its self-determined type,
+// which its form gives without evaluating it. False where `ref` is no type
+// reference or names nothing this resolves, the cast then read as before.
 static bool TypeRefCastTarget(const Expr* ref, SimContext& ctx,
                               CastTarget& out) {
   if (ref == nullptr || ref->kind != ExprKind::kTypeRef) return false;
@@ -319,7 +321,13 @@ static bool TypeRefCastTarget(const Expr* ref, SimContext& ctx,
   std::string_view name;
   if (written != nullptr && written->scope_name.empty()) {
     name = written->type_name;
-  } else if (ref->lhs != nullptr && ref->lhs->kind == ExprKind::kIdentifier) {
+  } else if (ref->lhs != nullptr) {
+    if (ref->lhs->kind != ExprKind::kIdentifier) {
+      out.width = SimSelfWidth(ref->lhs, ctx);
+      out.is_4state = SimSelf4State(ref->lhs, ctx);
+      out.is_signed = SimSelfSigned(ref->lhs, ctx);
+      return out.width > 0;
+    }
     name = ref->lhs->text;
   }
   if (name.empty()) return false;

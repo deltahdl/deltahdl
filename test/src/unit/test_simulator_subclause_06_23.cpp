@@ -205,6 +205,52 @@ TEST(TypeOfExprCastSim, CastToATypeReferenceTakesTheReferencedType) {
   EXPECT_EQ(RunAndGet(kSrc, "g"), 0xBCFu);
 }
 
+// §6.23 with §11.6.1 and §11.8.1: a type reference to an operation is the
+// operation's self-determined type, which the expression's form gives without
+// evaluating it, so with `bit [3:0] n` the cast to `type(n + n)` keeps the low
+// four bits of 16'hABCF, 15, and with `byte s` the cast to `type(s + s)` makes
+// 16'h00F0 the signed -16.
+TEST(TypeOfExprCastSim, CastToATypeReferenceOfAnOperationTakesItsSizeAndSign) {
+  const std::string kSrc =
+      "module t;\n"
+      "  bit [3:0] n;\n"
+      "  byte s;\n"
+      "  int d, e;\n"
+      "  initial begin\n"
+      "    d = type(n + n)'(16'hABCF);\n"
+      "    e = type(s + s)'(16'h00F0);\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(kSrc, "d"), 15u);
+  EXPECT_EQ(RunAndGet(kSrc, "e"), 0xFFFFFFF0u);
+}
+
+// §6.23 with §11.3.4: an operation on 2-state operands only is 2-state, so a
+// cast to its type reads an x of the value as 0, while one 4-state operand, the
+// condition of a conditional among them, or a literal makes it 4-state and the
+// x stays. Each bit of r says whether the cast's result holds an unknown.
+TEST(TypeOfExprCastSim,
+     CastToATypeReferenceOfAnOperationIs2StateOnlyFrom2State) {
+  const std::string kSrc =
+      "module t;\n"
+      "  bit [3:0] n;\n"
+      "  bit c;\n"
+      "  logic l;\n"
+      "  logic [3:0] m;\n"
+      "  logic [15:0] v = 16'hABCx;\n"
+      "  bit [8:0] r;\n"
+      "  initial r = {$isunknown(type(n + n)'(v)), $isunknown(type(-n)'(v)),\n"
+      "               $isunknown(type(c ? n : n)'(v)),\n"
+      "               $isunknown(type(n + m)'(v)),\n"
+      "               $isunknown(type(m + n)'(v)),\n"
+      "               $isunknown(type(l ? n : n)'(v)),\n"
+      "               $isunknown(type(c ? m : n)'(v)),\n"
+      "               $isunknown(type(c ? n : m)'(v)),\n"
+      "               $isunknown(type(n + 1)'(v))};\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(kSrc, "r"), 0x3Fu);
+}
+
 // §6.23 with §6.24.1 and §6.11.3: a type reference to an integer atom type
 // written unsigned casts to that unsigned type, so -1 cast to `int unsigned`
 // compares above 0 and -1 cast to `byte unsigned` widens with zeros to 255,
