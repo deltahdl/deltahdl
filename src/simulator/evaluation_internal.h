@@ -10,6 +10,7 @@ namespace delta {
 class Arena;
 class SimContext;
 struct Expr;
+struct SelfType;
 
 // Operator-evaluation primitives shared between evaluation.cpp (expression-node
 // evaluators) and evaluation_ops.cpp (scalar/vector operator implementations).
@@ -62,5 +63,9 @@ uint32_t SimSelfWidth(const Expr* expr, SimContext& ctx);
 bool SimSelfSigned(const Expr* expr, SimContext& ctx);
 bool SimSelfReal(const Expr* expr, SimContext& ctx);
 bool SimSelf4State(const Expr* expr, SimContext& ctx);
+
+// §6.24.1: the type a cast gives its result, which those readers take for a
+// cast operand; unknown where nothing sizes it. Defined in eval_expr_cast.cpp.
+SelfType CastSelfType(const Expr* cast, SimContext& ctx);
 
 }  // namespace delta

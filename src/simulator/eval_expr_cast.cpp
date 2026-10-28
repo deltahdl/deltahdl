@@ -11,6 +11,7 @@
 #include "common/diagnostic.h"
 #include "common/types.h"
 #include "elaborator/type_eval.h"
+#include "elaborator/typename_writer.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_type.h"
 #include "parser/expr_substitute.h"
@@ -341,6 +342,34 @@ static bool TypeRefCastTarget(const Expr* ref, SimContext& ctx,
   }
   out = ResolveCastTarget(name, ctx);
   return true;
+}
+
+// §6.24.1: the type a cast gives its result, which a type reference to an
+// expression holding the cast takes (§6.23): its operand's type made signed or
+// unsigned, `unsigned'(s)`; the type a keyword, a typedef or a type reference
+// names, `byte'(s)`, `w_t'(v)` or `type(b)'(v)`; or a size cast's size with
+// its operand's signing and state, `8'(n)`. Unknown for a cast to a real, a
+// string or another type nothing here sizes.
+SelfType CastSelfType(const Expr* cast, SimContext& ctx) {
+  std::string_view name = cast->text;
+  if (name == "signed" || name == "unsigned") {
+    uint32_t width = SimSelfWidth(cast->lhs, ctx);
+    return {width, name == "signed", SimSelf4State(cast->lhs, ctx), width > 0};
+  }
+  CastTarget target;
+  std::string key = CastTypeKey(cast, ctx);
+  if (KeywordCastTarget(key, target) || ctx.FindTypeWidth(key) > 0) {
+    target = ResolveCastTarget(key, ctx);
+  } else if (!name.empty() || cast->rhs == nullptr ||
+             cast->rhs->kind == ExprKind::kTypeRef) {
+    if (!TypeRefCastTarget(cast->rhs, ctx, target)) return {};
+  } else {
+    auto width = static_cast<uint32_t>(
+        EvalExpr(cast->rhs, ctx, ctx.GetArena()).ToUint64());
+    return {width, SimSelfSigned(cast->lhs, ctx), SimSelf4State(cast->lhs, ctx),
+            width > 0};
+  }
+  return {target.width, target.is_signed, target.is_4state, true};
 }
 
 uint32_t ResolveCastWidth(std::string_view type_name, SimContext& ctx) {

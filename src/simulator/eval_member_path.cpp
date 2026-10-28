@@ -484,10 +484,7 @@ constexpr std::array kTwoStateMemberKinds = {
 
 static bool LayoutIsTwoState(const StructTypeInfo& layout, SimContext& ctx);
 
-// Whether the member `f` is of a 2-state type: a 2-state kind, written or
-// reached through a typedef name, or a packed aggregate every member of which
-// is.
-static bool MemberIsTwoState(const StructFieldInfo& f, SimContext& ctx) {
+bool MemberIsTwoState(const StructFieldInfo& f, SimContext& ctx) {
   if (f.nested != nullptr) return LayoutIsTwoState(*f.nested, ctx);
   DataTypeKind kind = f.type_kind == DataTypeKind::kNamed
                           ? ctx.FindTypeKind(f.type_name)

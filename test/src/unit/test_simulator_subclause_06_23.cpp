@@ -251,6 +251,188 @@ TEST(TypeOfExprCastSim,
   EXPECT_EQ(RunAndGet(kSrc, "r"), 0x3Fu);
 }
 
+// §6.23 with §11.5.1 and §11.8.1: a select in the expression a type reference
+// names is as wide as the bits or elements it selects -- eight for `a[7:0]`
+// and for an element `p[1]` of a packed array of bytes, six for `a[i +: 6]`
+// and `a[9 -: 6]` -- unsigned, and 2-state where the selected variable is; an
+// element of an unpacked array of bytes is a byte.
+TEST(TypeOfExprCastSim, CastToATypeReferenceReadsASelectsType) {
+  const std::string kSrc =
+      "module t;\n"
+      "  logic [15:0] a;\n"
+      "  logic [3:0][7:0] p;\n"
+      "  bit [7:0] b;\n"
+      "  bit [3:0] n;\n"
+      "  byte s;\n"
+      "  byte mem [4];\n"
+      "  int i = 2;\n"
+      "  logic [15:0] v = 16'hABCx;\n"
+      "  int d, e, f, g, h, j, k;\n"
+      "  bit u;\n"
+      "  initial begin\n"
+      "    d = type(a[7:0] + n)'(16'hABCF);\n"
+      "    e = type(a[11:4])'(16'h1234);\n"
+      "    f = type(a[i +: 6])'(16'h00FF);\n"
+      "    j = type(a[9 -: 6])'(16'h00FF);\n"
+      "    g = type(p[1] + n)'(16'hABCF);\n"
+      "    h = type(a[7:0] + s)'(16'h00F0);\n"
+      "    k = type(mem[0] + n)'(16'h00F0);\n"
+      "    u = $isunknown(type(b[3:0] + n)'(v));\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(kSrc, "d"), 0xCFu);
+  EXPECT_EQ(RunAndGet(kSrc, "e"), 0x34u);
+  EXPECT_EQ(RunAndGet(kSrc, "f"), 0x3Fu);
+  EXPECT_EQ(RunAndGet(kSrc, "j"), 0x3Fu);
+  EXPECT_EQ(RunAndGet(kSrc, "g"), 0xCFu);
+  EXPECT_EQ(RunAndGet(kSrc, "h"), 0xF0u);
+  EXPECT_EQ(RunAndGet(kSrc, "k"), 0xF0u);
+  EXPECT_EQ(RunAndGet(kSrc, "u"), 0u);
+}
+
+// §6.23 with §7.2: a member of a structure in the expression a type reference
+// names has its member's type, here eight unsigned 2-state bits.
+TEST(TypeOfExprCastSim, CastToATypeReferenceReadsAMembersType) {
+  const std::string kSrc =
+      "module t;\n"
+      "  typedef struct packed { bit [7:0] f; bit g; } st;\n"
+      "  st p;\n"
+      "  bit [3:0] n;\n"
+      "  byte s;\n"
+      "  logic [15:0] v = 16'hABCx;\n"
+      "  int d, e;\n"
+      "  bit u;\n"
+      "  initial begin\n"
+      "    d = type(n + p.f)'(16'hABCF);\n"
+      "    e = type(s + p.f)'(16'h00F0);\n"
+      "    u = $isunknown(type(n + p.f)'(v));\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(kSrc, "d"), 0xCFu);
+  EXPECT_EQ(RunAndGet(kSrc, "e"), 0xF0u);
+  EXPECT_EQ(RunAndGet(kSrc, "u"), 0u);
+}
+
+// §6.23 with §11.4.12: a concatenation in the expression a type reference
+// names is as wide as its operands together, and 2-state where they all are.
+TEST(TypeOfExprCastSim, CastToATypeReferenceReadsAConcatenationsType) {
+  const std::string kSrc =
+      "module t;\n"
+      "  bit [3:0] n;\n"
+      "  bit c;\n"
+      "  logic [15:0] v = 16'hABCx;\n"
+      "  int d;\n"
+      "  bit u;\n"
+      "  initial begin\n"
+      "    d = type(n + {n, n})'(16'hABCF);\n"
+      "    u = $isunknown(type(c + {c, c})'(v));\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(kSrc, "d"), 0xCFu);
+  EXPECT_EQ(RunAndGet(kSrc, "u"), 0u);
+}
+
+// §6.23 with §11.4.12.1: a replication in the expression a type reference
+// names is its count times as wide as its operands, and unsigned.
+TEST(TypeOfExprCastSim, CastToATypeReferenceReadsAReplicationsType) {
+  const std::string kSrc =
+      "module t;\n"
+      "  bit [3:0] n;\n"
+      "  byte s;\n"
+      "  int d, e;\n"
+      "  initial begin\n"
+      "    d = type(n + {2{n}})'(16'hABCF);\n"
+      "    e = type(s + {2{n}})'(16'h00F0);\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(kSrc, "d"), 0xCFu);
+  EXPECT_EQ(RunAndGet(kSrc, "e"), 0xF0u);
+}
+
+// §6.23 with §13.4: a function call in the expression a type reference names
+// has the function's return type, here a 2-state byte, and the function is
+// not called, so `calls` stays 0.
+TEST(TypeOfExprCastSim, CastToATypeReferenceReadsACallsReturnType) {
+  const std::string kSrc =
+      "module t;\n"
+      "  int calls;\n"
+      "  bit [3:0] n;\n"
+      "  logic [15:0] v = 16'hABCx;\n"
+      "  int d;\n"
+      "  bit u;\n"
+      "  function byte f(int x);\n"
+      "    calls++;\n"
+      "    return x;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    d = type(n + f(0))'(16'hABCF);\n"
+      "    u = $isunknown(type(n + f(0))'(v));\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(kSrc, "d"), 0xCFu);
+  EXPECT_EQ(RunAndGet(kSrc, "u"), 0u);
+  EXPECT_EQ(RunAndGet(kSrc, "calls"), 0u);
+}
+
+// §6.23 with §6.24.1: a cast in the expression a type reference names has its
+// casting type -- a byte, eight bits for a size cast, a typedef's type, the
+// type a type reference names -- and a signing cast makes its operand's type
+// signed or unsigned.
+TEST(TypeOfExprCastSim, CastToATypeReferenceReadsAnInnerCastsType) {
+  const std::string kSrc =
+      "module t;\n"
+      "  typedef logic [7:0] w_t;\n"
+      "  bit [3:0] n;\n"
+      "  bit [7:0] b;\n"
+      "  byte s;\n"
+      "  logic [15:0] v = 16'hABCx;\n"
+      "  int d, e, f, g, h, k;\n"
+      "  bit u;\n"
+      "  initial begin\n"
+      "    d = type(n + byte'(s))'(16'hABCF);\n"
+      "    e = type(n + 8'(n))'(16'hABCF);\n"
+      "    f = type(s + unsigned'(s))'(16'h00F0);\n"
+      "    g = type(n + w_t'(n))'(16'hABCF);\n"
+      "    h = type(n + signed'(b))'(16'hABCF);\n"
+      "    k = type(n + type(b)'(n))'(16'hABCF);\n"
+      "    u = $isunknown(type(n + byte'(s))'(v));\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(kSrc, "d"), 0xCFu);
+  EXPECT_EQ(RunAndGet(kSrc, "e"), 0xCFu);
+  EXPECT_EQ(RunAndGet(kSrc, "f"), 0xF0u);
+  EXPECT_EQ(RunAndGet(kSrc, "g"), 0xCFu);
+  EXPECT_EQ(RunAndGet(kSrc, "h"), 0xCFu);
+  EXPECT_EQ(RunAndGet(kSrc, "k"), 0xCFu);
+  EXPECT_EQ(RunAndGet(kSrc, "u"), 0u);
+}
+
+// §6.23 with §11.7 and §20.6.2: `$signed` and `$unsigned` in the expression a
+// type reference names are as wide and as 2- or 4-state as their argument,
+// signed or unsigned as each names, and `$bits` is a 32-bit integer.
+TEST(TypeOfExprCastSim, CastToATypeReferenceReadsASystemFunctionsType) {
+  const std::string kSrc =
+      "module t;\n"
+      "  bit [3:0] n;\n"
+      "  bit [7:0] b;\n"
+      "  logic [7:0] m;\n"
+      "  byte s;\n"
+      "  logic [15:0] v = 16'hABCx;\n"
+      "  int d, e, f;\n"
+      "  bit u;\n"
+      "  initial begin\n"
+      "    d = type(n + $unsigned(m))'(16'hABCF);\n"
+      "    e = type(s + $unsigned(s))'(16'h00F0);\n"
+      "    f = type(n + $bits(m))'(16'hABCF);\n"
+      "    u = $isunknown(type(n + $signed(b))'(v));\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(kSrc, "d"), 0xCFu);
+  EXPECT_EQ(RunAndGet(kSrc, "e"), 0xF0u);
+  EXPECT_EQ(RunAndGet(kSrc, "f"), 0xABCFu);
+  EXPECT_EQ(RunAndGet(kSrc, "u"), 0u);
+}
+
 // §6.23 with §6.24.1 and §6.11.3: a type reference to an integer atom type
 // written unsigned casts to that unsigned type, so -1 cast to `int unsigned`
 // compares above 0 and -1 cast to `byte unsigned` widens with zeros to 255,

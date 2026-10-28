@@ -444,9 +444,9 @@ TEST(EvalSteps, RealEqualityOperandPullsIntegerPartnerIntoRealCompare) {
 // beneath an unsigned one is extended by zero before its own operator runs:
 // through an operator of either width class, a unary minus and a
 // conditional's results. Operands that are all signed keep sign extension; a
-// comparison, a logical or reduction operator and a concatenation are
-// unsigned, a part-select and an enumeration name leave the value's own sign
-// to decide, and a real operand is converted with its sign.
+// comparison, a logical or reduction operator, a concatenation and a
+// part-select are unsigned, an enumeration name leaves the value's own sign to
+// decide, and a real operand is converted with its sign.
 TEST(ExpressionTypePropagationSim, UnsignedOperandPropagatesItsTypeDown) {
   SimFixture f;
   EXPECT_EQ(

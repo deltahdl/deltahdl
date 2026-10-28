@@ -111,6 +111,11 @@ QueueObject* ResolveStructDynMember(const Expr* access, SimContext& ctx,
 // access names no structure member.
 const StructFieldInfo* ResolveStructMember(const Expr* access, SimContext& ctx);
 
+// §7.2.1: whether the member `f` is of a 2-state type: a 2-state kind,
+// written or reached through a typedef name, or a packed aggregate every
+// member of which is.
+bool MemberIsTwoState(const StructFieldInfo& f, SimContext& ctx);
+
 // §7.3.2 (printed page 151): a tagged union holds the member's value beside a
 // tag naming the member, and §11.9 (printed 304) builds such a value with a
 // tagged union expression, `tagged M v`, whose `v` may be a §10.9.2 structure
