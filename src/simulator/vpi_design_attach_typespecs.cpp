@@ -738,16 +738,15 @@ std::unordered_map<std::string_view, std::vector<RtlirEnumMember>> ClassEnums(
 // `localparam type`, which the parser carries as a typedef, is a parameter of
 // the class (detail 7) instead.
 // The variable the property `name` of the class `defn` stands for stands as,
-// among the defn's children; null for none.
-VpiObject* PropertyObject(const VpiObject& defn, std::string_view name) {
-  const auto kFound =
-      std::ranges::find_if(defn.children, [name](const VpiObject* child) {
-        const bool kVariable = VpiIsVariablesType(child->type) ||
-                               child->type == vpiNamedEvent ||
-                               child->type == vpiNamedEventArray;
-        return kVariable && child->name == name;
-      });
-  return kFound == defn.children.end() ? nullptr : *kFound;
+// among the defn's children, where MakeMembers made one of a variables kind or
+// a named event or array of them for every property no parameter declares.
+VpiObject& PropertyObject(const VpiObject& defn, std::string_view name) {
+  return **std::ranges::find_if(defn.children, [name](const VpiObject* child) {
+    const bool kVariable = VpiIsVariablesType(child->type) ||
+                           child->type == vpiNamedEvent ||
+                           child->type == vpiNamedEventArray;
+    return kVariable && child->name == name;
+  });
 }
 
 // Whether `obj` reaches a typespec already.
@@ -810,11 +809,11 @@ void MakeClassTypespecs(const ClassDecl& decl, VpiObject* defn,
     if (member->kind != ClassMemberKind::kProperty || member->is_param) {
       continue;
     }
-    VpiObject* var = PropertyObject(*defn, member->name);
-    if (var == nullptr || ReachesATypespec(*var)) continue;
+    VpiObject& var = PropertyObject(*defn, member->name);
+    if (ReachesATypespec(var)) continue;
     if (VpiObject* typespec = maker.Of(member->data_type, member->unpacked_dims,
-                                       std::string_view{}, var)) {
-      var->children.push_back(typespec);
+                                       std::string_view{}, &var)) {
+      var.children.push_back(typespec);
     }
   }
 }
@@ -841,10 +840,8 @@ VpiObject* VpiNettypeTypespec(const DataType& type, const VpiObject& scope,
 
 VpiObject* VpiKeywordTypespec(const DataType& type, VpiObject* parent,
                               SimContext& ctx, const VpiAttachBuild& build) {
-  const int kKind = VpiTypespecKind(type.kind);
-  if (kKind == 0) return nullptr;
   VpiObject* typespec = build.alloc();
-  typespec->type = kKind;
+  typespec->type = VpiTypespecKind(type.kind);
   typespec->parent = parent;
   for (const PackedRange& dim : WrittenPackedDims(&type, ctx)) {
     typespec->children.push_back(VpiRangeObject(typespec, dim, build));

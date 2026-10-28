@@ -20,9 +20,9 @@ VpiObject* VpiNettypeTypespec(const DataType& type, const VpiObject& scope,
                               VpiObject* decl, SimContext& ctx,
                               const VpiAttachBuild& build);
 
-// §37.25: a typespec of the kind of the built-in type `type`, hung from
-// `parent`, reaching a range per packed dimension written over it, evaluated
-// through `ctx`; null for a kind no typespec stands for.
+// §37.25: a typespec of the kind of the built-in type `type`, a type written
+// with a keyword rather than a name, hung from `parent`, reaching a range per
+// packed dimension written over it, evaluated through `ctx`.
 VpiObject* VpiKeywordTypespec(const DataType& type, VpiObject* parent,
                               SimContext& ctx, const VpiAttachBuild& build);
 
