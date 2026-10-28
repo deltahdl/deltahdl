@@ -231,13 +231,21 @@ ModuleItem* FirstTopsOwnSubroutine(const std::string& path,
 // compilation-unit scope, so a bare callee `path` called in such a module's
 // instance `active` is the subroutine of the innermost enclosing instance that
 // declares it, run in that instance, the first top's own standing under its
-// name (FirstTopsOwnSubroutine). Answers true with `target` filled where an
+// name (FirstTopsOwnSubroutine). The instance's own subroutine of the name
+// comes first, and the key under its prefix holds it; where units are
+// separate the key may hold the unit's instead (EnterInstanceUnit), which the
+// enclosing modules come before. Answers true with `target` filled where an
 // enclosing instance declares it; false for a dotted path.
 bool TryEnclosingDeclSubroutine(const std::string& path,
                                 const std::string& active, SimContext& ctx,
                                 SubroutineTarget& target) {
   if (path.find('.') != std::string::npos) return false;
-  for (const std::string& scope : ctx.NestedDeclOuterScopes(active)) {
+  std::vector<std::string> scopes = ctx.NestedDeclOuterScopes(active);
+  const ModuleItem* own =
+      scopes.empty() ? nullptr : ctx.FindFunction(active + path);
+  if (own != nullptr && !UnitScopes::IsUnitScope(ctx.SubroutinePackage(own)))
+    return false;
+  for (const std::string& scope : scopes) {
     std::string key = scope.empty()
                           ? std::string(ctx.FirstTopModule()) + "." + path
                           : scope + path;
@@ -426,6 +434,7 @@ SubroutineTarget FindSubroutineTarget(const Expr* call, SimContext& ctx,
     target.inst_prefix = std::move(active);
     return target;
   }
+  if (TryEnclosingDeclSubroutine(path, active, ctx, target)) return target;
   // §23.6: the first node of a path may be the top of the hierarchy the path
   // is used from, so "u1.tk" written in instance "x." is "x.u1.tk" first,
   // and the lowerer registers each instance's subroutines under that
@@ -442,7 +451,6 @@ SubroutineTarget FindSubroutineTarget(const Expr* call, SimContext& ctx,
     ApplyGenBlockScope(relative, ctx, target);
     return target;
   }
-  if (TryEnclosingDeclSubroutine(path, active, ctx, target)) return target;
   if (is_hierarchical && ResolveUpwardModulePath(path, active, ctx, target)) {
     return target;
   }

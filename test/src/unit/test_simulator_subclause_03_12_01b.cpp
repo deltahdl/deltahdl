@@ -395,7 +395,8 @@ TEST_F(SeparateUnitsVpi, EachUnitsLetIsALetDeclOfItsOwnScope) {
 
 // §3.12.1 with §37.10 detail 10: a nettype a compilation unit declares is a
 // nettype decl of that unit's own scope, which a unit declaring nothing else
-// has too, so each unit reaches its own and none of another's.
+// has too, so each unit reaches its own and none of another's, and the third
+// unit, declaring no nettype, reaches none.
 TEST_F(SeparateUnitsVpi, EachUnitsNettypeIsANettypeDeclOfItsOwnScope) {
   RunUnits(
       {"nettype logic una;\n"
@@ -410,7 +411,28 @@ TEST_F(SeparateUnitsVpi, EachUnitsNettypeIsANettypeDeclOfItsOwnScope) {
     reached.push_back(NamesOf(vpiNetTypedef, pkg));
   }
   std::ranges::sort(reached);
-  EXPECT_EQ(reached, (std::vector<std::vector<std::string>>{{"una"}, {"unb"}}));
+  EXPECT_EQ(reached,
+            (std::vector<std::vector<std::string>>{{}, {"una"}, {"unb"}}));
+}
+
+// §3.12.1 (printed page 56): the PLI traverses every compilation unit, so of
+// three files each a unit, the third, whose compilation-unit scope declares
+// nothing, is reached as the other two are, a package with vpiUnit TRUE named
+// "$unit".
+TEST_F(SeparateUnitsVpi, AUnitDeclaringNothingIsReachedBesideTheOthers) {
+  RunUnits(
+      {"int g = 3;\n"
+       "module top; child c(); endmodule\n",
+       "int h = 4;\n"
+       "module child; endmodule\n",
+       "module other; endmodule\n"});
+  int units = 0;
+  for (vpiHandle pkg : ObjectsOf(vpiPackage, nullptr)) {
+    EXPECT_EQ(vpi_get(vpiUnit, pkg), 1);
+    EXPECT_STREQ(vpi_get_str(vpiName, pkg), "$unit");
+    ++units;
+  }
+  EXPECT_EQ(units, 3);
 }
 
 }  // namespace

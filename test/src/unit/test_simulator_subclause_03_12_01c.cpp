@@ -239,8 +239,9 @@ TEST(CompilationUnitSearchOrderSim, TheSearchClimbsEveryEnclosingDeclaration) {
             22u);
 }
 
-// The nearest allowed form: the nested module's own declaration of the name
-// is found before the enclosing module's and the unit's, so y is 3.
+// The nearest allowed form: the nested module's own declaration of the name,
+// a variable or a function, is found before the enclosing module's and the
+// unit's, so y is 3.
 TEST(CompilationUnitSearchOrderSim, ANestedModulesOwnVariableIsFoundBeforeAll) {
   EXPECT_EQ(RunAndGet("int x = 1;\n"
                       "module outer;\n"
@@ -249,6 +250,27 @@ TEST(CompilationUnitSearchOrderSim, ANestedModulesOwnVariableIsFoundBeforeAll) {
                       "    int x = 3;\n"
                       "    int y;\n"
                       "    initial y = x;\n"
+                      "  endmodule\n"
+                      "  inner i();\n"
+                      "endmodule\n",
+                      "i.y"),
+            3u);
+}
+
+TEST(CompilationUnitSearchOrderSim, ANestedModulesOwnFunctionIsFoundBeforeAll) {
+  EXPECT_EQ(RunAndGet("function int f();\n"
+                      "  return 1;\n"
+                      "endfunction\n"
+                      "module outer;\n"
+                      "  function int f();\n"
+                      "    return 2;\n"
+                      "  endfunction\n"
+                      "  module inner;\n"
+                      "    function int f();\n"
+                      "      return 3;\n"
+                      "    endfunction\n"
+                      "    int y;\n"
+                      "    initial y = f();\n"
                       "  endmodule\n"
                       "  inner i();\n"
                       "endmodule\n",

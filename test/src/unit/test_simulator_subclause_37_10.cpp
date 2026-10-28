@@ -498,26 +498,41 @@ constexpr const char* kPackageBesideTop =
     "package pkg; int pv = 8; endpackage\n"
     "module top; int x = pkg::pv; endmodule\n";
 
-// §37.10: a package is an instance of its own, reached from no scope.
+// §37.10: a package is an instance of its own, reached from no scope, as the
+// compilation unit beside it is (§3.12.1), its scope declaring nothing.
 TEST_F(InstanceObjectsOfARun, APackageIsReachedFromNoScope) {
   Run(kPackageBesideTop);
-  EXPECT_EQ(NamesOf(vpiPackage, nullptr), (std::vector<std::string>{"pkg"}));
+  EXPECT_EQ(NamesOf(vpiPackage, nullptr),
+            (std::vector<std::string>{"$unit", "pkg"}));
 }
 
 // Detail 5: its full name is its name followed by "::".
 TEST_F(InstanceObjectsOfARun, APackagesFullNameEndsInColons) {
   Run(kPackageBesideTop);
-  vpiHandle it = vpi_iterate(vpiPackage, nullptr);
-  ASSERT_NE(it, nullptr);
-  EXPECT_STREQ(vpi_get_str(vpiFullName, vpi_scan(it)), "pkg::");
+  vpiHandle pkg = Named(vpiPackage, nullptr, "pkg");
+  ASSERT_NE(pkg, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, pkg), "pkg::");
 }
 
 // Detail 5: a member's full name joins the package's to its own with "::".
 TEST_F(InstanceObjectsOfARun, APackageMembersFullNameUsesColons) {
   Run(kPackageBesideTop);
-  vpiHandle it = vpi_iterate(vpiPackage, nullptr);
-  ASSERT_NE(it, nullptr);
-  EXPECT_EQ(FullNameOfChild(vpi_scan(it), "pv"), "pkg::pv");
+  vpiHandle pkg = Named(vpiPackage, nullptr, "pkg");
+  ASSERT_NE(pkg, nullptr);
+  EXPECT_EQ(FullNameOfChild(pkg, "pv"), "pkg::pv");
+}
+
+// §3.12.1 (printed page 56): the PLI traverses every compilation unit, and a
+// design has one whether or not its scope declares anything. A design of one
+// module reaches its unit as the one package, vpiUnit TRUE, named "$unit" and
+// full-named "$unit::".
+TEST_F(InstanceObjectsOfARun, ACompilationUnitDeclaringNothingIsReached) {
+  Run("module top; endmodule\n");
+  std::vector<vpiHandle> reached = ObjectsOf(vpiPackage, nullptr);
+  ASSERT_EQ(reached.size(), 1u);
+  EXPECT_EQ(vpi_get(vpiUnit, reached[0]), 1);
+  EXPECT_STREQ(vpi_get_str(vpiName, reached[0]), "$unit");
+  EXPECT_STREQ(vpi_get_str(vpiFullName, reached[0]), "$unit::");
 }
 
 // The package is no part of the top that happens to be beside it.

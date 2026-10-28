@@ -1,4 +1,3 @@
-#include <algorithm>
 #include <cstddef>
 #include <string>
 #include <string_view>
@@ -112,15 +111,6 @@ void MakePackageScope(VpiObject* obj, std::string_view name) {
     member->full_name = kColons + std::string(member->name);
   }
   obj->full_name = kColons;
-}
-
-// Whether a compilation unit's `items` declare a let or a nettype, whose decls
-// the unit's scope holds.
-bool DeclaresScopedItems(const std::vector<ModuleItem*>& items) {
-  return std::ranges::any_of(items, [](const ModuleItem* item) {
-    return item->kind == ModuleItemKind::kLetDecl ||
-           item->kind == ModuleItemKind::kNettypeDecl;
-  });
 }
 
 // §37.10 detail 6: the objects of the compilation unit, which
@@ -247,37 +237,25 @@ void VpiContext::AttachPackages(const RtlirDesign* design) {
     // §37.3.7: the lifetime the package was declared with.
     obj->automatic = pkg->is_automatic;
   }
-  // §3.12.1: where each file is a unit of its own, each unit's data is keyed
-  // under its own scope name, "$unit#k", and each unit is a compilation-unit
-  // scope of its own, named and drawn as the one unit is below.
+  // §3.12.1 (printed page 56): the PLI traverses every compilation unit, so
+  // each is an object whatever its scope declares -- data, the lets whose
+  // scope it is (§37.12), the nettypes whose decls it holds (§37.10 detail
+  // 10), or nothing at all. Where each file is a unit of its own, each unit's
+  // data is keyed under its own scope name, "$unit#k", and each unit is a
+  // compilation-unit scope of its own, named and drawn as the one unit is.
   for (size_t k = 0; k < design->compilation_units.size(); ++k) {
-    // §37.12: a unit declaring lets is the scope of their let decls (§11.12),
-    // and one declaring nettypes of their nettype decls (§37.10 detail 10),
-    // whatever else it declares.
-    if (DeclaresScopedItems(design->compilation_units[k]->cu_items)) {
-      DesignObjectForFlatName(UnitScopes::ScopeName(static_cast<int>(k)));
-    }
-    auto own = object_map_.find(UnitScopes::ScopeName(static_cast<int>(k)));
-    if (own == object_map_.end()) continue;
-    own->second->name = kUnitScope;
-    MakePackageScope(own->second, kUnitScope);
-    MarkInCompilationUnit(own->second);
+    VpiObject* own =
+        DesignObjectForFlatName(UnitScopes::ScopeName(static_cast<int>(k)));
+    own->name = kUnitScope;
+    MakePackageScope(own, kUnitScope);
+    MarkInCompilationUnit(own);
   }
   if (!design->compilation_units.empty()) return;
   // The compilation unit's data is keyed the same way, under "$unit". It is
   // part of no module either, and detail 5 names its objects "$unit::name".
-  // §37.12: a unit declaring lets is the scope of their let decls (§11.12),
-  // and one declaring nettypes of their nettype decls (§37.10 detail 10),
-  // whatever else it declares.
-  if (!design->cu_let_decls.empty() ||
-      (design->compilation_unit != nullptr &&
-       DeclaresScopedItems(design->compilation_unit->cu_items))) {
-    DesignObjectForFlatName(kUnitScope);
-  }
-  auto unit = object_map_.find(kUnitScope);
-  if (unit == object_map_.end()) return;
-  MakePackageScope(unit->second, kUnitScope);
-  MarkInCompilationUnit(unit->second);
+  VpiObject* unit = DesignObjectForFlatName(kUnitScope);
+  MakePackageScope(unit, kUnitScope);
+  MarkInCompilationUnit(unit);
 }
 
 VpiCallBuild VpiContext::CallBuild() {
