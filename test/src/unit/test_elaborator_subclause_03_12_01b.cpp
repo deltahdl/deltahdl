@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
+
 #include "elaborator/rtlir.h"
 #include "elaborator/unit_scope_order.h"
 #include "fixture_elaborator.h"
@@ -600,6 +602,45 @@ TEST(CompilationUnitScopeOrder, ModulesOwnConstantsShadowLaterUnitConstants) {
              "  inner i();\n"
              "endmodule\n"
              "localparam int W = 8;\n"));
+}
+
+// A port of the module, ANSI or not, of a later unit parameter's name is what
+// the module's read of the name reaches, and so is an enumeration constant the
+// module declares of a later unit enumeration constant's name: the unit's,
+// written after the module, is no constant of the module at all, leaving the
+// module's own the one of its name there.
+TEST(CompilationUnitScopeOrder,
+     ModulesOwnPortAndEnumConstantShadowLaterUnitOnes) {
+  EXPECT_TRUE(
+      ElabOk("module m(input logic [31:0] W);\n"
+             "  int y;\n"
+             "  initial y = W;\n"
+             "endmodule\n"
+             "localparam int W = 8;\n"));
+  EXPECT_TRUE(
+      ElabOk("module m(W);\n"
+             "  input [31:0] W;\n"
+             "  int y;\n"
+             "  initial y = W;\n"
+             "endmodule\n"
+             "localparam int W = 8;\n"));
+  ElabFixture f;
+  RtlirDesign* design = ElaborateSrc(
+      "module m;\n"
+      "  typedef enum {GREEN} c_t;\n"
+      "  int y;\n"
+      "  initial y = GREEN;\n"
+      "endmodule\n"
+      "typedef enum {RED, GREEN} color_t;\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  const RtlirModule* m = FindModule(design, "m");
+  ASSERT_NE(m, nullptr);
+  EXPECT_EQ(std::ranges::count_if(
+                m->variables,
+                [](const RtlirVariable& v) { return v.name == "GREEN"; }),
+            1);
 }
 
 // ModuleDeclaresName, which the check above asks before it reports a read of a

@@ -1,4 +1,5 @@
 #include <cstdint>
+#include <format>
 #include <vector>
 
 #include "common/arena.h"
@@ -153,6 +154,22 @@ Expr* Parser::ParseSystemCall() {
     Expr* cast = TryParseIdentifierCast(UnitScopedTypeName(arena_, tok, name),
                                         &cast_handled);
     if (cast_handled) return cast;
+    return ParseNameTail(ParseSysRootTail(name));
+  }
+  // §3.12.1 (printed page 57): `$unit` selects a declaration of the
+  // compilation-unit scope only through `::`, and no hierarchical name reaches
+  // one, so a `.` after it heads nothing. Read on as the `::` form, the name
+  // and its tail are taken as that form takes them.
+  if (tok.text == "$unit" && Check(TokenKind::kDot)) {
+    Consume();
+    Expr* name = MakeSysScopePrefix(tok);
+    diag_.Error(
+        tok.loc,
+        std::format("'$unit.{}' names nothing: $unit selects a "
+                    "declaration of the compilation-unit scope only "
+                    "through '::', and no hierarchical name reaches one",
+                    name->text),
+        Subclause("3.12.1"));
     return ParseNameTail(ParseSysRootTail(name));
   }
   // §23.6 lets `$root` head a hierarchical name, and the name takes the tail

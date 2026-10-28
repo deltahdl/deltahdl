@@ -142,6 +142,20 @@ Expr* Parser::ParseUdpOutputInitialValue(bool declares_reg) {
   return nullptr;
 }
 
+// §3.13 (g): a primitive opens a port name space, in which each port is
+// declared once. Reports the declaration of `name` at `loc` where the
+// primitive has already declared an input of that name, or, where
+// `output_too`, its output; a second output is §29.3.1's report instead.
+static void ReportUdpPortRedeclared(DiagEngine& diag, const UdpDecl& udp,
+                                    std::string_view name, SourceLoc loc,
+                                    bool output_too) {
+  const bool kInput =
+      std::ranges::find(udp.input_names, name) != udp.input_names.end();
+  if (!kInput && !(output_too && name == udp.output_name)) return;
+  diag.Error(loc, std::format("duplicate port declaration for '{}'", name),
+             Subclause("3.13"));
+}
+
 void Parser::ParseUdpOutputDecl(UdpDecl* udp) {
   // Read into its own flag rather than off udp->is_sequential, which a
   // `reg q;` declared above this line has already set: A.5.2 puts the initial
@@ -151,6 +165,7 @@ void Parser::ParseUdpOutputDecl(UdpDecl* udp) {
   if (declares_reg) udp->is_sequential = true;
   RejectUdpPortDimension();
   auto id_tok = ExpectIdentifier(Subclause("29.3.2"));
+  ReportUdpPortRedeclared(diag_, *udp, id_tok.text, id_tok.loc, false);
 
   if (!udp->output_name.empty()) {
     diag_.Error(id_tok.loc, "UDP shall have exactly one output port",
@@ -209,7 +224,9 @@ void Parser::RejectUdpInitialValueOn(const char* declaration) {
 void Parser::ParseUdpInputDecl(UdpDecl* udp) {
   do {
     RejectUdpPortDimension();
-    udp->input_names.push_back(ExpectIdentifier(Subclause("29.3.2")).text);
+    const Token kId = ExpectIdentifier(Subclause("29.3.2"));
+    ReportUdpPortRedeclared(diag_, *udp, kId.text, kId.loc, true);
+    udp->input_names.push_back(kId.text);
     RejectUdpInitialValueOn("a UDP input declaration");
   } while (Match(TokenKind::kComma));
   Expect(TokenKind::kSemicolon, Subclause("29.3.2"));
@@ -718,6 +735,7 @@ UdpAnsiPortEntry Parser::ParseUdpAnsiPortEntry() {
 // the output port, which is not the same as whether it declared one.
 static bool PlaceUdpAnsiPortEntry(DiagEngine& diag, UdpDecl* udp,
                                   const UdpAnsiPortEntry& entry) {
+  ReportUdpPortRedeclared(diag, *udp, entry.name, entry.loc, true);
   bool is_output = entry.is_output;
   if (is_output && !udp->output_name.empty()) {
     diag.Error(entry.loc, "UDP shall have exactly one output port",

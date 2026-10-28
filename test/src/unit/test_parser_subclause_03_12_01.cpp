@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
 
 #include "common/arena.h"
@@ -858,6 +859,49 @@ TEST(IncompleteDeclarationAtEnd, ErrorBeforeTheEndIsNot) {
                             "    timeunit 10ns;\n"
                             "  end\n"
                             "endmodule\n"));
+}
+
+// §3.12.1 (printed page 57): `$unit` names the compilation-unit scope only
+// before the `::` that selects one of its declarations, and no hierarchical
+// name reaches a declaration of that scope, so `$unit.g` names nothing,
+// whether a module or a task or function of the unit writes it.
+TEST(UnitScopeName, DollarUnitBeforeADot) {
+  struct Written {
+    const char* src;
+    uint32_t line;
+  };
+  const Written kCases[] = {
+      {"int g;\n"
+       "module top;\n"
+       "  int y;\n"
+       "  initial y = $unit.g;\n"
+       "endmodule\n",
+       4},
+      {"int g;\n"
+       "function int f();\n"
+       "  return $unit.g;\n"
+       "endfunction\n",
+       3},
+  };
+  for (const Written& c : kCases) {
+    auto r = Parse(c.src);
+    EXPECT_TRUE(
+        ReportedError(r.diags, "'$unit.g' names nothing", c.line, "3.12.1"))
+        << c.src;
+  }
+}
+
+// The nearest allowed form: `$unit::g`, written in the same two places.
+TEST(UnitScopeName, DollarUnitBeforeAScopeResolution) {
+  EXPECT_TRUE(
+      ParseOk("int g;\n"
+              "module top;\n"
+              "  int y;\n"
+              "  initial y = $unit::g;\n"
+              "endmodule\n"
+              "function int f();\n"
+              "  return $unit::g;\n"
+              "endfunction\n"));
 }
 
 }  // namespace

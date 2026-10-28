@@ -449,6 +449,9 @@ std::string_view ModuleNameSpaceEntry(const ModuleItem* item) {
     case ModuleItemKind::kCovergroupDecl:
     case ModuleItemKind::kSequenceDecl:
     case ModuleItemKind::kPropertyDecl:
+    // §3.13 (e) with §6.20.5: a specparam the module's body declares is one
+    // of the parameters the module name space unifies.
+    case ModuleItemKind::kSpecparam:
       return item->name;
     case ModuleItemKind::kTypedef:
       return item->typedef_type.kind == DataTypeKind::kImplicit &&
@@ -848,7 +851,7 @@ bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
       return true;
     case ModuleItemKind::kSpecifyBlock:
       RegisterSpecifyBlockSpecparams(item, mod, typedefs_, specparam_names_,
-                                     const_names_);
+                                     const_names_, diag_);
       mod->specify_blocks.push_back(item);
       return true;
     case ModuleItemKind::kCovergroupDecl:

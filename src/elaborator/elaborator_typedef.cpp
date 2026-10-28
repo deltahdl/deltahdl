@@ -881,11 +881,14 @@ void RegisterImportedEnumLiterals(const ModuleDecl* decl, RtlirModule* mod,
 // §23.9 finds a module's locally visible identifiers, an explicit import's
 // among them, before the compilation-unit scope's declarations, so a literal
 // of a unit-scope enumeration that the module's explicit import names is not
-// declared in the module.
+// declared in the module. §3.12.1 has a reference name only what the unit has
+// already declared, so the literals are those of the unit's enumerations
+// written before the module; one written after leaves the module's own
+// constant of its name the only one there.
 void RegisterCuEnumLiterals(const ModuleDecl* decl, RtlirModule* mod,
                             const ImportedEnumCtx& ctx) {
-  EmitEnumLiteralsOfItems(ctx.unit->cu_items, mod, ctx,
-                          ExplicitImportNames(decl->items));
+  EmitEnumLiteralsOfItems(UnitItemsBefore(ctx.unit, decl->range.start), mod,
+                          ctx, ExplicitImportNames(decl->items));
 }
 
 void Elaborator::ReportUndeclaredTypeName(const ModuleItem* item) {

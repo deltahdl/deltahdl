@@ -3,6 +3,7 @@
 #include "common/types.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 #include "parser/ast_design.h"
 #include "parser/ast_module.h"
 
@@ -170,6 +171,121 @@ TEST(NameSpaceParsing, ModuleHeaderRecordSkipsPackageOfSameName) {
   ApplyModuleDirectives(r.cu, {record});
   EXPECT_FALSE(r.cu->packages[0]->has_directive_timescale);
   EXPECT_TRUE(r.cu->modules[0]->has_directive_timescale);
+}
+
+// §3.13 (g): an interface and a program each open a port name space, where a
+// non-ANSI port declared a second time is reported as a module's is.
+TEST(NameSpaceParsing, AnInterfacesNonAnsiPortDeclaredTwice) {
+  auto r = Parse(
+      "interface i(a);\n"
+      "  input a;\n"
+      "  input a;\n"
+      "endinterface\n");
+  EXPECT_TRUE(ReportedError(r.diags, "duplicate port declaration for 'a'", 3,
+                            "23.2.2.1"));
+}
+
+TEST(NameSpaceParsing, AProgramsNonAnsiPortDeclaredTwice) {
+  auto r = Parse(
+      "program p(a);\n"
+      "  input a;\n"
+      "  input a;\n"
+      "endprogram\n");
+  EXPECT_TRUE(ReportedError(r.diags, "duplicate port declaration for 'a'", 3,
+                            "23.2.2.1"));
+}
+
+// The nearest allowed form: each port of the list declared once.
+TEST(NameSpaceParsing, AnInterfacesAndAProgramsPortsDeclaredOnceEach) {
+  EXPECT_TRUE(
+      ParseOk("interface i(a, b);\n"
+              "  input a;\n"
+              "  input b;\n"
+              "endinterface\n"
+              "program p(a, b);\n"
+              "  input a;\n"
+              "  output b;\n"
+              "endprogram\n"));
+}
+
+// §3.13 (g): a primitive opens a port name space too, where an input declared
+// twice, in two declarations or one, an input named like the output, or the
+// output named like an input, is a port declared a second time.
+TEST(NameSpaceParsing, APrimitivesPortDeclaredTwice) {
+  const auto kInputTwice = Parse(
+      "primitive p(q, a);\n"
+      "  output q;\n"
+      "  input a;\n"
+      "  input a;\n"
+      "  table 0 : 1; 1 : 0; endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(ReportedError(kInputTwice.diags,
+                            "duplicate port declaration for 'a'", 4, "3.13"));
+  const auto kInOneList = Parse(
+      "primitive p(q, a);\n"
+      "  output q;\n"
+      "  input a, a;\n"
+      "  table 0 : 1; 1 : 0; endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(ReportedError(kInOneList.diags,
+                            "duplicate port declaration for 'a'", 3, "3.13"));
+  const auto kInputLikeOutput = Parse(
+      "primitive p(q, a);\n"
+      "  output q;\n"
+      "  input a;\n"
+      "  input q;\n"
+      "  table 0 : 1; 1 : 0; endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(ReportedError(kInputLikeOutput.diags,
+                            "duplicate port declaration for 'q'", 4, "3.13"));
+  const auto kOutputLikeInput = Parse(
+      "primitive p(q, a);\n"
+      "  input a;\n"
+      "  output a;\n"
+      "  output q;\n"
+      "  table 0 : 1; 1 : 0; endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(ReportedError(kOutputLikeInput.diags,
+                            "duplicate port declaration for 'a'", 3, "3.13"));
+}
+
+// The same in a primitive's ANSI header, whose entries declare its ports.
+TEST(NameSpaceParsing, AnAnsiPrimitivesPortDeclaredTwice) {
+  const auto kInputTwice = Parse(
+      "primitive p(output q,\n"
+      "            input a,\n"
+      "            input a);\n"
+      "  table 0 : 1; 1 : 0; endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(ReportedError(kInputTwice.diags,
+                            "duplicate port declaration for 'a'", 3, "3.13"));
+  const auto kInputLikeOutput = Parse(
+      "primitive p(output q,\n"
+      "            input q);\n"
+      "  table 0 : 1; 1 : 0; endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(ReportedError(kInputLikeOutput.diags,
+                            "duplicate port declaration for 'q'", 2, "3.13"));
+}
+
+// The nearest allowed forms: each port declared once, and a sequential
+// primitive's reg declaration of its output, which declares no second port.
+TEST(NameSpaceParsing, APrimitivesPortsDeclaredOnceEach) {
+  EXPECT_TRUE(
+      ParseOk("primitive p(q, a, b);\n"
+              "  output q;\n"
+              "  input a, b;\n"
+              "  table 0 0 : 1; 1 1 : 0; endtable\n"
+              "endprimitive\n"
+              "primitive s(q, a);\n"
+              "  output q;\n"
+              "  reg q;\n"
+              "  input a;\n"
+              "  table 0 : ? : 1; 1 : ? : 0; endtable\n"
+              "endprimitive\n"
+              "primitive n(output q, input a, input b);\n"
+              "  table 0 0 : 1; 1 1 : 0; endtable\n"
+              "endprimitive\n"));
 }
 
 }  // namespace

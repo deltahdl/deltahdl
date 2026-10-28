@@ -20,4 +20,18 @@ void ReportUnitHierNamesFromRoot(const CompilationUnit& unit,
                                  ProvidedNameCache& provided_cache,
                                  DiagEngine& diag);
 
+// §3.12.1 (printed page 57): no hierarchical reference reaches an identifier
+// the compilation-unit scope declares. Reports each hierarchical name of
+// names joined by `.` that the instances of `design` write in their procedural
+// blocks, continuous assignments, initializers and subroutines, or that the
+// tasks and functions of `unit` write, whose path ends at an instance that
+// does not declare the name the path gives next, where the unit declares it.
+// The path is read from $root when `$root.` heads it, and otherwise from the
+// enclosing module its first name names (§23.8) or from the top-level instance
+// of that name, a scope the referencing module declares under the name taking
+// the name from both.
+void ReportHierNamesReachingTheUnit(const CompilationUnit& unit,
+                                    const RtlirDesign& design,
+                                    DiagEngine& diag);
+
 }  // namespace delta

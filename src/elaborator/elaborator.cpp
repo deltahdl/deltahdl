@@ -584,10 +584,10 @@ RtlirDesign* Elaborator::ElaborateTops(
 
   for (auto* top : design->top_modules) {
     ValidateModportExportConflicts(top);
-
     CollectAllModules(top, design->all_modules);
   }
   ReportUnitHierNamesFromRoot(*unit_, *design, pkg_provided_names_, diag_);
+  ReportHierNamesReachingTheUnit(*unit_, *design, diag_);
   // §23.3.3.6: whether the design calls $sdf_annotate is known only now.
   WarnUwireNetsKeptApart(*design, diag_);
   // §23.3.3.7.1: every interconnect port connection is known only now.
