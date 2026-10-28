@@ -840,6 +840,20 @@ std::unordered_set<std::string_view> ExplicitImportNames(
   return names;
 }
 
+// §3.13 (e) with §23.9 and §26.3: the names `decl` makes locally visible that
+// keep an outer enumeration literal of the same name out of it, its explicit
+// imports and the enumeration constants it declares itself.
+std::unordered_set<std::string_view> ShadowingNames(const ModuleDecl* decl) {
+  auto names = ExplicitImportNames(decl->items);
+  for (const ModuleItem* item : decl->items) {
+    ForEachEnumTypeOfItem(item, [&](std::string_view, const DataType& type) {
+      for (const EnumMember& member : type.enum_members)
+        names.insert(member.name);
+    });
+  }
+  return names;
+}
+
 }  // namespace
 
 // The enumeration literals every wildcard import among `items` brings in, but
@@ -871,7 +885,7 @@ void RegisterImportedEnumLiterals(const ModuleDecl* decl, RtlirModule* mod,
                                   const ImportedEnumCtx& ctx) {
   const std::vector<ModuleItem*> kUnitBefore =
       UnitItemsBefore(ctx.unit, decl->range.start);
-  auto module_explicit = ExplicitImportNames(decl->items);
+  auto module_explicit = ShadowingNames(decl);
   auto unit_explicit = ExplicitImportNames(kUnitBefore);
   unit_explicit.insert(module_explicit.begin(), module_explicit.end());
   EmitWildcardImportEnumLiterals(kUnitBefore, mod, ctx, unit_explicit);
@@ -881,14 +895,13 @@ void RegisterImportedEnumLiterals(const ModuleDecl* decl, RtlirModule* mod,
 // §23.9 finds a module's locally visible identifiers, an explicit import's
 // among them, before the compilation-unit scope's declarations, so a literal
 // of a unit-scope enumeration that the module's explicit import names is not
-// declared in the module. §3.12.1 has a reference name only what the unit has
-// already declared, so the literals are those of the unit's enumerations
-// written before the module; one written after leaves the module's own
-// constant of its name the only one there.
+// declared in the module, nor one the module declares a constant of. §3.12.1
+// has a reference name only what the unit has already declared, so the
+// literals are those of the unit's enumerations written before the module.
 void RegisterCuEnumLiterals(const ModuleDecl* decl, RtlirModule* mod,
                             const ImportedEnumCtx& ctx) {
   EmitEnumLiteralsOfItems(UnitItemsBefore(ctx.unit, decl->range.start), mod,
-                          ctx, ExplicitImportNames(decl->items));
+                          ctx, ShadowingNames(decl));
 }
 
 void Elaborator::ReportUndeclaredTypeName(const ModuleItem* item) {

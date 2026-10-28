@@ -71,4 +71,70 @@ TEST(NameSpaceSimulation, BlockNameSpaceIsolatesLocalVariables) {
   EXPECT_EQ(v2->value.ToUint64(), 2u);
 }
 
+// §3.13 (e): a module's enumeration constant is a name of the module name
+// space, which a reference in the module searches before the compilation-unit
+// scope (§23.9) and before the candidates a wildcard import supplies (§26.3).
+// So a module may declare a constant named like one an enumeration of the unit
+// declares, or one a package it or the unit imports by wildcard declares, by a
+// typedef or by an enumeration variable, and its read yields its own value: 1,
+// where the outer GREEN is 2.
+TEST(NameSpaceSimulation, ModulesOwnEnumConstantNamedLikeAnOuterOne) {
+  const char* const kSources[] = {
+      "typedef enum {RED, BLUE, GREEN} color_t;\n"
+      "module top;\n"
+      "  typedef enum {A, GREEN} c_t;\n"
+      "  logic [31:0] y;\n"
+      "  initial y = GREEN;\n"
+      "endmodule\n",
+      "typedef enum {RED, BLUE, GREEN} color_t;\n"
+      "module top;\n"
+      "  enum {A, GREEN} v;\n"
+      "  logic [31:0] y;\n"
+      "  initial y = GREEN;\n"
+      "endmodule\n",
+      "package p;\n"
+      "  typedef enum {RED, BLUE, GREEN} color_t;\n"
+      "endpackage\n"
+      "module top;\n"
+      "  import p::*;\n"
+      "  typedef enum {A, GREEN} c_t;\n"
+      "  logic [31:0] y;\n"
+      "  initial y = GREEN;\n"
+      "endmodule\n",
+      "package p;\n"
+      "  typedef enum {RED, BLUE, GREEN} color_t;\n"
+      "endpackage\n"
+      "import p::*;\n"
+      "module top;\n"
+      "  typedef enum {A, GREEN} c_t;\n"
+      "  logic [31:0] y;\n"
+      "  initial y = GREEN;\n"
+      "endmodule\n",
+  };
+  for (const char* src : kSources) EXPECT_EQ(RunAndGet(src, "y"), 1u) << src;
+}
+
+// The nearest form the module does not declare: with no constant of its own
+// under the name, the read reaches the unit's or the imported package's GREEN.
+TEST(NameSpaceSimulation, OuterEnumConstantReadWhereTheModuleDeclaresNone) {
+  const char* const kSources[] = {
+      "typedef enum {RED, BLUE, GREEN} color_t;\n"
+      "module top;\n"
+      "  typedef enum {A, B} c_t;\n"
+      "  logic [31:0] y;\n"
+      "  initial y = GREEN;\n"
+      "endmodule\n",
+      "package p;\n"
+      "  typedef enum {RED, BLUE, GREEN} color_t;\n"
+      "endpackage\n"
+      "module top;\n"
+      "  import p::*;\n"
+      "  typedef enum {A, B} c_t;\n"
+      "  logic [31:0] y;\n"
+      "  initial y = GREEN;\n"
+      "endmodule\n",
+  };
+  for (const char* src : kSources) EXPECT_EQ(RunAndGet(src, "y"), 2u) << src;
+}
+
 }  // namespace
