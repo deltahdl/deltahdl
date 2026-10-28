@@ -57,6 +57,14 @@ TEST_F(VariablesOfARun, ATypedefNamedVariableIsTheKindItsTypedefNames) {
   EXPECT_EQ(vpi_get(vpiType, By("top.s")), vpiStructVar);
 }
 
+// Detail 19 with §6.14: a variable a module declares with the chandle type is a
+// chandle var, the kind §37.17 draws for that type, rather than the logic var
+// a variable of no box of its own carries.
+TEST_F(VariablesOfARun, AModulesChandleVariableIsAChandleVar) {
+  Run("module top; chandle h; endmodule\n");
+  EXPECT_EQ(vpi_get(vpiType, By("top.h")), vpiChandleVar);
+}
+
 // An element of an array of a built-in type other than logic is a variable of
 // that type, an int var of `int a[4]`, so the array is no memory; an element of
 // a logic array stays a reg (#6996).

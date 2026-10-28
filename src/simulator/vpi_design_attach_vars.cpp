@@ -1,5 +1,6 @@
 #include "simulator/vpi_design_attach_vars.h"
 
+#include <functional>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -123,8 +124,9 @@ void RecordAggregateFacts(VpiObject* obj, const std::string& key,
 void RecordVariableFacts(VpiObject* obj, const RtlirVariable& var,
                          const std::string& key, SimContext& ctx) {
   RecordAggregateFacts(obj, key, ctx);
-  // §37.26: whether the union was declared tagged or soft.
-  if (obj->type == vpiUnionVar && var.dtype != nullptr) {
+  // §37.26: whether the union was declared tagged or soft, which the union
+  // type the elaborator resolved for every union variable records.
+  if (obj->type == vpiUnionVar) {
     obj->tagged = var.dtype->is_tagged;
     obj->soft = var.dtype->is_soft;
   }
@@ -240,6 +242,19 @@ void RecordScopeVariableKinds(const DeclaringScope& scope,
   }
 }
 
+// Passes each variable `mod` declares to `visit` with the object it has in the
+// instance at `prefix`, passing over a variable with none.
+void ForEachVariableObject(
+    const RtlirModule& mod, const std::string& prefix,
+    const VpiObjectMap& objects,
+    const std::function<void(const RtlirVariable&, VpiObject&)>& visit) {
+  for (const RtlirVariable& var : mod.variables) {
+    VpiObject* obj =
+        FindObjectForFlatName(objects, VpiFlatName(prefix, var.name));
+    if (obj != nullptr) visit(var, *obj);
+  }
+}
+
 }  // namespace
 
 void VpiRecordDeclaredShape(VpiObject* var, const DataType& type) {
@@ -257,14 +272,14 @@ void VpiContext::AttachVariableFacts(const RtlirDesign* design) {
   // runs from VpiContext::Attach, which has set the run it reads by then.
   if (design == nullptr) return;
   SimContext& ctx = *sim_ctx_;
-  WalkInstancePaths(
-      design, [&](const RtlirModule* mod, const std::string& prefix) {
-        for (const RtlirVariable& var : mod->variables) {
-          const std::string kKey = VpiFlatName(prefix, var.name);
-          VpiHandle obj = FindObjectForFlatName(object_map_, kKey);
-          if (obj != nullptr) RecordVariableFacts(obj, var, kKey, ctx);
-        }
-      });
+  WalkInstancePaths(design, [&](const RtlirModule* mod,
+                                const std::string& prefix) {
+    ForEachVariableObject(*mod, prefix, object_map_,
+                          [&](const RtlirVariable& var, VpiObject& obj) {
+                            RecordVariableFacts(
+                                &obj, var, VpiFlatName(prefix, var.name), ctx);
+                          });
+  });
 }
 
 void AttachVariableInitializers(const RtlirDesign& design,
@@ -277,17 +292,16 @@ void AttachVariableInitializers(const RtlirDesign& design,
   WalkInstanceObjects(&design, objects,
                       [&](const RtlirModule* mod, const std::string& prefix,
                           const VpiObject* instance) {
-                        for (const RtlirVariable& var : mod->variables) {
-                          if (var.init_expr == nullptr) continue;
-                          VpiObject* obj = FindObjectForFlatName(
-                              objects, VpiFlatName(prefix, var.name));
-                          if (obj == nullptr) continue;
-                          obj->decl_facts.init_expr = VpiGenBlockExpression(
-                              var.init_expr,
-                              {objects, prefix, kNoGenBlocks, nullptr, nullptr,
-                               nullptr, mod, instance},
-                              ctx, build);
-                        }
+                        ForEachVariableObject(
+                            *mod, prefix, objects,
+                            [&](const RtlirVariable& var, VpiObject& obj) {
+                              if (var.init_expr == nullptr) return;
+                              obj.decl_facts.init_expr = VpiGenBlockExpression(
+                                  var.init_expr,
+                                  {objects, prefix, kNoGenBlocks, nullptr,
+                                   nullptr, nullptr, mod, instance},
+                                  ctx, build);
+                            });
                       });
 }
 
@@ -305,11 +319,9 @@ int VpiVariableObjectKind(const RtlirVariable& var, const RtlirDesign& design,
   }
   // §37.17 detail 1 with Table 36-10: an array of variables is one array var,
   // whether its unpacked dimension is fixed or a queue's, a dynamic array's or
-  // an associative array's.
-  if (var.num_unpacked_dims > 0 || var.is_queue || var.is_dynamic ||
-      var.is_assoc) {
-    return vpiRegArray;
-  }
+  // an associative array's, each of them counted among the dimensions the
+  // declaration writes, a typedef's included (AdoptTypedefArrayDims).
+  if (var.num_unpacked_dims > 0) return vpiRegArray;
   // A name declared through a typedef reports kNamed, so the flags the
   // elaborator resolved through the typedef answer first for the kinds that
   // have one.
