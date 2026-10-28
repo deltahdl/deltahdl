@@ -820,24 +820,6 @@ void MakeClassTypespecs(const ClassDecl& decl, VpiObject* defn,
 
 }  // namespace
 
-VpiObject* VpiNettypeTypespec(const DataType& type, const VpiObject& scope,
-                              VpiObject* decl, SimContext& ctx,
-                              const VpiAttachBuild& build) {
-  if (type.kind == DataTypeKind::kNamed) {
-    const auto kFound =
-        std::ranges::find_if(scope.children, [&type](const VpiObject* child) {
-          const bool kTyped =
-              VpiIsTypespecType(child->type) ||
-              (child->type == vpiNettypeDecl && !child->children.empty());
-          return kTyped && child->name == type.type_name;
-        });
-    if (kFound == scope.children.end()) return nullptr;
-    return (*kFound)->type == vpiNettypeDecl ? (*kFound)->children.front()
-                                             : *kFound;
-  }
-  return VpiKeywordTypespec(type, decl, ctx, build);
-}
-
 VpiObject* VpiKeywordTypespec(const DataType& type, VpiObject* parent,
                               SimContext& ctx, const VpiAttachBuild& build) {
   VpiObject* typespec = build.alloc();

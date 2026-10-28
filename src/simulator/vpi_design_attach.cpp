@@ -15,6 +15,7 @@
 #include "common/types.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_io_decl.h"
+#include "elaborator/rtlir_scopes.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -39,6 +40,7 @@
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers1.h"
+#include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_pool_keeper.h"
@@ -717,12 +719,44 @@ void PrefixFullNamesWithTop(VpiObject* obj, std::string_view top) {
   for (auto* child : obj->children) PrefixFullNamesWithTop(child, top);
 }
 
+// Where a nettype declaration stands: the scope declaring it, and the imports
+// of the module it is an instance of, none for a package or compilation unit.
+struct NettypeScope {
+  const VpiObject& scope;
+  const std::vector<RtlirImport>& imports;
+};
+
+// §37.23 (figure): the typespec of `type`, the type a nettype declaration
+// `decl` standing in `at` declares, no earlier nettype's name: of a type
+// written as a name, the typespec of the typedef or type parameter the scope
+// declares, or else one a package or the compilation unit declares, among the
+// typespecs `build` carries (§26.3, §3.12.1); of a type written with a keyword,
+// a typespec of its own over the packed ranges written, evaluated through
+// `ctx`. Null for a name none of them declares.
+VpiObject* NettypeTypespec(const DataType& type, const NettypeScope& at,
+                           VpiObject* decl, SimContext& ctx,
+                           const VpiAttachBuild& build) {
+  if (type.kind != DataTypeKind::kNamed) {
+    return VpiKeywordTypespec(type, decl, ctx, build);
+  }
+  for (VpiObject* child : at.scope.children) {
+    if (type.scope_name.empty() && VpiIsTypespecType(child->type) &&
+        child->name == type.type_name) {
+      return child;
+    }
+  }
+  return VpiPackageOrUnitTypespec(type.scope_name, type.type_name, at.imports,
+                                  build.unit_typespecs);
+}
+
 }  // namespace
 
 void VpiContext::MakeNettypeDecls(VpiHandle scope,
-                                  const std::vector<ModuleItem*>& items) {
+                                  const std::vector<ModuleItem*>& items,
+                                  const std::vector<RtlirImport>& imports) {
   const VpiAttachBuild kBuild{[this] { return AllocObject(); },
-                              VpiPoolKeeper(name_pool_), sim_ctx_->GetArena()};
+                              VpiPoolKeeper(name_pool_), sim_ctx_->GetArena(),
+                              nullptr, call_objects_.unit_typespecs};
   for (const ModuleItem* entry : items) {
     if (entry->kind != ModuleItemKind::kNettypeDecl) continue;
     const ModuleItem& item = *entry;
@@ -745,9 +779,13 @@ void VpiContext::MakeNettypeDecls(VpiHandle scope,
         decl->nettype_with = earlier->nettype_with;
       }
     }
-    // §37.23 (figure): the typespec of the type it declares.
-    if (VpiObject* typespec = VpiNettypeTypespec(item.typedef_type, *scope,
-                                                 decl, *sim_ctx_, kBuild)) {
+    // §37.23 (figure): the typespec of the type it declares, which an alias
+    // shares with the nettype it aliases, a typespec being all either holds.
+    if (decl->aliased != nullptr) {
+      decl->children = decl->aliased->children;
+    } else if (VpiObject* typespec =
+                   NettypeTypespec(item.typedef_type, {*scope, imports}, decl,
+                                   *sim_ctx_, kBuild)) {
       decl->children.push_back(typespec);
     }
     scope->children.push_back(decl);
@@ -781,11 +819,14 @@ void VpiContext::AttachNettypeDeclarations(const RtlirDesign* design) {
                       [&](const RtlirModule* mod, const std::string& /*prefix*/,
                           VpiObject* scope) {
                         MakeNettypeDecls(
-                            scope, ElementDeclNamed(*design, mod->name).items);
+                            scope, ElementDeclNamed(*design, mod->name).items,
+                            mod->imports);
                       });
   if (design == nullptr) return;
+  static const std::vector<RtlirImport> kNoImports;
   for (const PackageDecl* pkg : design->packages) {
-    MakeNettypeDecls(DesignObjectForFlatName(pkg->name), pkg->items);
+    MakeNettypeDecls(DesignObjectForFlatName(pkg->name), pkg->items,
+                     kNoImports);
   }
   // §3.12.1: the compilation unit's own nettypes are its scope's, each unit's
   // where every file is one, "$unit#k", and the one unit's, "$unit", where
@@ -798,7 +839,7 @@ void VpiContext::AttachNettypeDeclarations(const RtlirDesign* design) {
     auto scope = object_map_.find(
         UnitScopes::ScopeName(kOneUnit ? -1 : static_cast<int>(k)));
     if (scope != object_map_.end())
-      MakeNettypeDecls(scope->second, unit->cu_items);
+      MakeNettypeDecls(scope->second, unit->cu_items, kNoImports);
   }
 }
 

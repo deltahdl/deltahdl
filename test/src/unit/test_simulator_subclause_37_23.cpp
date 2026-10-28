@@ -192,5 +192,33 @@ TEST_F(NettypesOfARun, ANettypeReachesTheTypespecOfItsType) {
   EXPECT_STREQ(vpi_get_str(vpiName, of_nnt), "nib_t");
 }
 
+// ...and one written with a typedef its module does not declare finds it as a
+// name written there does: one the compilation unit declares (§3.12.1), one a
+// package declares, made visible by an import or named through the package
+// (§26.3), and for an alias of such a nettype, the typespec that one reaches
+// (#8263).
+TEST_F(NettypesOfARun, ANettypeOfAPackageOrUnitTypedefReachesItsTypespec) {
+  Run("typedef logic [5:0] unit_t;\n"
+      "package pk; typedef bit [2:0] pk_t; endpackage\n"
+      "module top; import pk::*;\n"
+      "  nettype unit_t a;\n"
+      "  nettype pk_t b;\n"
+      "  nettype pk::pk_t c;\n"
+      "  nettype a d;\n"
+      "endmodule\n");
+  vpiHandle top = By("top");
+  const auto kTypespecOf = [top](const char* nettype) {
+    return vpi_handle(vpiTypespec, Named(vpiNetTypedef, top, nettype));
+  };
+  vpiHandle of_a = kTypespecOf("a");
+  ASSERT_NE(of_a, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, of_a), "unit_t");
+  vpiHandle of_b = kTypespecOf("b");
+  ASSERT_NE(of_b, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, of_b), "pk_t");
+  EXPECT_EQ(VpiObjectOf(kTypespecOf("c")), VpiObjectOf(of_b));
+  EXPECT_EQ(VpiObjectOf(kTypespecOf("d")), VpiObjectOf(of_a));
+}
+
 }  // namespace
 }  // namespace delta

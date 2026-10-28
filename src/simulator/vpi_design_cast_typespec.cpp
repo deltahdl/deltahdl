@@ -7,6 +7,7 @@
 
 #include "common/packed_range.h"
 #include "common/types.h"
+#include "elaborator/rtlir_scopes.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_type.h"
 #include "simulator/sim_context.h"
@@ -76,13 +77,8 @@ VpiObject* TypedefVisible(std::string_view name, const AssignBuild& build) {
   for (const VpiObject* at : ScopesOutToInstance(build)) {
     if (VpiObject* found = TypedefIn(*at, name)) return found;
   }
-  const VpiObjectMap& answered = build.names.unit_typespecs;
-  if (VpiObject* imported =
-          VpiImportedTypespec(name, build.names.imports, answered)) {
-    return imported;
-  }
-  const auto kUnit = answered.find(name);
-  return kUnit != answered.end() ? kUnit->second : nullptr;
+  return VpiPackageOrUnitTypespec({}, name, build.names.imports,
+                                  build.names.unit_typespecs);
 }
 
 // §26.3 with §8.23: the typespec of the typedef `name` that a cast written
@@ -92,10 +88,10 @@ VpiObject* TypedefVisible(std::string_view name, const AssignBuild& build) {
 // around the cast declares holds; null for none.
 VpiObject* ScopedTypespec(std::string_view scope, std::string_view name,
                           const AssignBuild& build) {
-  const VpiObjectMap& answered = build.names.unit_typespecs;
-  const auto kPackaged =
-      answered.find(std::string(scope) + "::" + std::string(name));
-  if (kPackaged != answered.end()) return kPackaged->second;
+  if (VpiObject* packaged = VpiPackageOrUnitTypespec(
+          scope, name, {}, build.names.unit_typespecs)) {
+    return packaged;
+  }
   for (const VpiObject* at : ScopesOutToInstance(build)) {
     for (const VpiObject* child : at->children) {
       if (child->type == vpiClassDefn && child->name == scope) {
@@ -332,6 +328,22 @@ VpiObject* OperandTypespec(const Expr& cast, VpiObject& operand,
 }
 
 }  // namespace
+
+VpiObject* VpiPackageOrUnitTypespec(std::string_view package,
+                                    std::string_view name,
+                                    const std::vector<RtlirImport>& imports,
+                                    const VpiObjectMap& answered) {
+  if (!package.empty()) {
+    const auto kPackaged =
+        answered.find(std::string(package) + "::" + std::string(name));
+    return kPackaged != answered.end() ? kPackaged->second : nullptr;
+  }
+  if (VpiObject* imported = VpiImportedTypespec(name, imports, answered)) {
+    return imported;
+  }
+  const auto kUnit = answered.find(name);
+  return kUnit != answered.end() ? kUnit->second : nullptr;
+}
 
 VpiObject* VpiTypedCast(VpiObject* op, const Expr& cast,
                         const AssignBuild& build) {

@@ -180,6 +180,16 @@ VpiObject* VpiImportedTypespec(std::string_view name,
                                const std::vector<RtlirImport>& imports,
                                const VpiObjectMap& answered);
 
+// §26.3 with §3.12.1: the typespec of the typedef `name`, written through the
+// package `package` or bare where that is empty, that a scope importing
+// `imports` finds beyond the scopes around it, among those AttachTypespecs
+// answered, `answered`: the package's under its name and "::", or else one an
+// import makes visible, or else the compilation unit's; null for none.
+VpiObject* VpiPackageOrUnitTypespec(std::string_view package,
+                                    std::string_view name,
+                                    const std::vector<RtlirImport>& imports,
+                                    const VpiObjectMap& answered);
+
 // §37.28 details 1 and 2: make each value parameter a vpiParameter and each
 // type parameter a vpiTypeParameter, each saying whether it is a localparam,
 // and relate a type parameter to the typespec of the type it has, a typedef's
