@@ -34,6 +34,10 @@ constexpr const char* kLaterPackage =
 // The module the design is elaborated under, written last.
 constexpr const char* kTop = "module top; endmodule\n";
 
+// A function whose body names p's parameter.
+constexpr const char* kFunctionReadingK =
+    "  function int g(); return p::K; endfunction";
+
 // Whether elaborating `src` draws `message` at `line` under `subclause`.
 ::testing::AssertionResult ElabReports(const std::string& src,
                                        const char* message, uint32_t line,
@@ -74,8 +78,7 @@ TEST(PackageBeforeReference, EachFormInAModule) {
                                      "  p::t v;",
                                      "  parameter int Q = p::K;",
                                      "  int r; initial r = p::f();",
-                                     "  function int g(); return p::K; "
-                                     "endfunction",
+                                     kFunctionReadingK,
                                      "  if (1) begin : b int r = p::K; end",
                                  },
                                  "endmodule\n");
@@ -89,8 +92,7 @@ TEST(PackageBeforeReference, EachFormInAnInterface) {
                                      "  int r = p::K;",
                                      "  wire [31:0] w; assign w = p::K;",
                                      "  int r; initial r = p::f();",
-                                     "  function int g(); return p::K; "
-                                     "endfunction",
+                                     kFunctionReadingK,
                                  },
                                  "endinterface\n");
 }
@@ -102,8 +104,7 @@ TEST(PackageBeforeReference, EachFormInAProgram) {
                                      "  p::t v;",
                                      "  int r = p::K;",
                                      "  int r; initial r = p::f();",
-                                     "  function int g(); return p::K; "
-                                     "endfunction",
+                                     kFunctionReadingK,
                                  },
                                  "endprogram\n");
 }
@@ -112,8 +113,7 @@ TEST(PackageBeforeReference, EachFormInAChecker) {
   ExpectReportedBeforeThePackage("checker c;\n",
                                  {
                                      "  p::t v;",
-                                     "  function int g(); return p::K; "
-                                     "endfunction",
+                                     kFunctionReadingK,
                                  },
                                  "endchecker\n");
 }
@@ -125,8 +125,7 @@ TEST(PackageBeforeReference, EachFormInAnotherPackage) {
                                      "  localparam int Q = p::K;",
                                      "  p::t v;",
                                      "  int r = p::K;",
-                                     "  function int g(); return p::K; "
-                                     "endfunction",
+                                     kFunctionReadingK,
                                  },
                                  "endpackage\n");
 }
@@ -137,8 +136,7 @@ TEST(PackageBeforeReference, EachFormInAClass) {
                                      "  localparam int Q = p::K;",
                                      "  p::t v;",
                                      "  int r = p::K;",
-                                     "  function int g(); return p::K; "
-                                     "endfunction",
+                                     kFunctionReadingK,
                                  },
                                  "endclass\n");
 }
@@ -149,19 +147,19 @@ TEST(PackageBeforeReference, EachFormInTheCompilationUnit) {
                                      "localparam int Q = p::K;",
                                      "p::t v;",
                                      "int r = p::K;",
-                                     "function int g(); return p::K; "
-                                     "endfunction",
+                                     kFunctionReadingK,
                                  },
                                  "");
 }
 
-// §26.3 reports an import of the later package, as an import, and the scope
-// resolution operator in it draws no second report.
+// §26.3 reports an import of the later package by the module elaborated, as an
+// import, and the scope resolution operator in it draws no second report.
 TEST(PackageBeforeReference, AnImportIsReportedOnceAsAnImport) {
   for (const char* import : {"  import p::K;", "  import p::*;"}) {
-    std::string element = std::string("module m;\n") + import + "\nendmodule\n";
+    std::string element =
+        std::string("module top;\n") + import + "\nendmodule\n";
     ElabFixture f;
-    ElabOk(element + kPackageP + kTop, f);
+    ElabOk(element + kPackageP, f);
     EXPECT_TRUE(ReportedError(
         f.diag.Diagnostics(),
         "import from package 'p', which is declared after the scope importing "
@@ -170,7 +168,7 @@ TEST(PackageBeforeReference, AnImportIsReportedOnceAsAnImport) {
         << import;
     EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kLaterPackage, 2, "3.12"))
         << import;
-    EXPECT_TRUE(ElabOk(std::string(kPackageP) + element + kTop)) << import;
+    EXPECT_TRUE(ElabOk(std::string(kPackageP) + element)) << import;
   }
 }
 
