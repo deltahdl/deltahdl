@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <format>
 #include <string>
 
 #include "fixture_simulator.h"
@@ -103,6 +104,25 @@ struct UnbasedUnsizedForm {
   const char* bits;
 };
 
+// The design that writes `literal` as a four-bit variable's operand, as a
+// parameter's value and as an input port's connection, and prints all three
+// with %b once the port's value has reached the net it drives.
+std::string UnbasedUnsizedDesign(const char* literal) {
+  std::string src =
+      "module s(input logic [3:0] i, output logic [3:0] o);\n"
+      "  assign o = i;\n"
+      "endmodule\n"
+      "module t;\n"
+      "  parameter logic [3:0] P = ";
+  src += literal;
+  src += ";\n  logic [3:0] a;\n  wire [3:0] b;\n  s u(.i(";
+  src += literal;
+  src += "), .o(b));\n  initial begin\n    a = ";
+  src += literal;
+  src += ";\n    #1 $display(\"%b %b %b\", a, P, b);\n  end\nendmodule\n";
+  return src;
+}
+
 // Each of the six forms, written against its apostrophe, sets every bit of its
 // target to its own bit value: as an operand, as a parameter's value and as a
 // port's connection.
@@ -111,31 +131,10 @@ TEST(IntegerLiteralSim, EachUnbasedUnsizedFormFillsItsTarget) {
        {UnbasedUnsizedForm{"'0", "0000"}, UnbasedUnsizedForm{"'1", "1111"},
         UnbasedUnsizedForm{"'x", "xxxx"}, UnbasedUnsizedForm{"'X", "xxxx"},
         UnbasedUnsizedForm{"'z", "zzzz"}, UnbasedUnsizedForm{"'Z", "zzzz"}}) {
-    const std::string kLiteral = c.literal;
-    const std::string kBits = c.bits;
     SimFixture f;
-    std::string out = RunCapture(
-        "module s(input logic [3:0] i, output logic [3:0] o);\n"
-        "  assign o = i;\n"
-        "endmodule\n"
-        "module t;\n"
-        "  parameter logic [3:0] P = " +
-            kLiteral +
-            ";\n"
-            "  logic [3:0] a;\n"
-            "  wire [3:0] b;\n"
-            "  s u(.i(" +
-            kLiteral +
-            "), .o(b));\n"
-            "  initial begin\n"
-            "    a = " +
-            kLiteral +
-            ";\n"
-            "    #1 $display(\"%b %b %b\", a, P, b);\n"
-            "  end\n"
-            "endmodule\n",
-        f);
-    EXPECT_EQ(out, kBits + " " + kBits + " " + kBits + "\n") << kLiteral;
+    EXPECT_EQ(RunCapture(UnbasedUnsizedDesign(c.literal), f),
+              std::format("{0} {0} {0}\n", c.bits))
+        << c.literal;
   }
 }
 
