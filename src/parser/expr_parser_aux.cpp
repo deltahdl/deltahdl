@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <format>
 
 #include "common/diagnostic.h"
 #include "lexer/lexer.h"
@@ -372,6 +373,36 @@ Expr* Parser::ParseParameterizedScope(Expr* base) {
     base = MakeMemberAccess(base);
   }
   return base;
+}
+
+bool ReportUnaryOperatorAfterOperand(const Token& tok, DiagEngine& diag) {
+  switch (tok.kind) {
+    case TokenKind::kBang:
+    case TokenKind::kTilde:
+    case TokenKind::kTildeAmp:
+    case TokenKind::kTildePipe:
+      diag.Error(
+          tok.loc,
+          std::format("unary operator '{}' cannot follow an operand", tok.text),
+          Subclause("5.5"));
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool EndsExpression(const Token& tok) {
+  switch (tok.kind) {
+    case TokenKind::kSemicolon:
+    case TokenKind::kComma:
+    case TokenKind::kColon:
+    case TokenKind::kRParen:
+    case TokenKind::kRBracket:
+    case TokenKind::kRBrace:
+      return true;
+    default:
+      return tok.IsEof();
+  }
 }
 
 }  // namespace delta

@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
+#include <vector>
 
 #include "helpers_scheduler.h"
 
@@ -177,4 +179,61 @@ TEST(RealLiteralConstantSim, ShortrealCastNarrowsToSinglePrecision) {
       "endmodule\n",
       "e");
   EXPECT_EQ(v, 0u);
+}
+
+// One real literal and the binary64 bit pattern nearest its decimal value.
+struct NearestBinary64 {
+  const char* literal;
+  uint64_t bits;
+};
+
+// §5.7.2 makes a real literal an IEEE 754 double, whose value is the binary64
+// nearest the decimal it writes, ties to even: a decimal no binary64 holds
+// exactly in each literal form, a value halfway between two (2**53 + 1), the
+// subnormal range on both sides of half the smallest subnormal, and a value
+// past the largest finite double, which rounds to infinity.
+static std::vector<NearestBinary64> NearestBinary64Cases() {
+  return {{"0.1", 0x3FB999999999999AULL},
+          {"0.1_0", 0x3FB999999999999AULL},
+          {"1E-1", 0x3FB999999999999AULL},
+          {"100e-3", 0x3FB999999999999AULL},
+          {"1.30e-2", 0x3F8A9FBE76C8B439ULL},
+          {"1e-300", 0x01A56E1FC2F8F359ULL},
+          {"9007199254740993.0", 0x4340000000000000ULL},
+          {"9.007199254740993e15", 0x4340000000000000ULL},
+          {"4.9e-324", 0x0000000000000001ULL},
+          {"2.5e-324", 0x0000000000000001ULL},
+          {"2.4e-324", 0x0000000000000000ULL},
+          {"1e309", 0x7FF0000000000000ULL}};
+}
+
+// Each literal, assigned in a procedure, holds exactly its nearest binary64.
+TEST(RealLiteralConstantSim, ProceduralLiteralHoldsTheNearestBinary64) {
+  for (const NearestBinary64& c : NearestBinary64Cases()) {
+    std::string src = "module t;\n  real r;\n  initial r = ";
+    src += c.literal;
+    src += ";\nendmodule\n";
+    EXPECT_EQ(RunAndGet(src, "r"), c.bits) << c.literal;
+  }
+}
+
+// The same in a declaration's initializer.
+TEST(RealLiteralConstantSim, DeclarationLiteralHoldsTheNearestBinary64) {
+  for (const NearestBinary64& c : NearestBinary64Cases()) {
+    std::string src = "module t;\n  real r = ";
+    src += c.literal;
+    src += ";\nendmodule\n";
+    EXPECT_EQ(RunAndGet(src, "r"), c.bits) << c.literal;
+  }
+}
+
+// The same as a parameter's value, which the elaborator folds before the
+// variable reads it.
+TEST(RealLiteralConstantSim, ParameterLiteralHoldsTheNearestBinary64) {
+  for (const NearestBinary64& c : NearestBinary64Cases()) {
+    std::string src = "module t;\n  parameter real P = ";
+    src += c.literal;
+    src += ";\n  real r;\n  initial r = P;\nendmodule\n";
+    EXPECT_EQ(RunAndGet(src, "r"), c.bits) << c.literal;
+  }
 }

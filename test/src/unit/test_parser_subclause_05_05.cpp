@@ -1,5 +1,12 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <array>
+#include <cstddef>
+#include <string>
+#include <vector>
+
+#include "common/diagnostic.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
@@ -298,6 +305,81 @@ TEST(LexicalConventionParsing, ConditionalMissingConditionOperandFails) {
       "endmodule\n");
   // §11.2 owns the report; §5.5 states no rejection of its own.
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 2, "11.2"));
+}
+
+// The places an expression can be written, each holding `expr` on its second
+// line: a procedural and a continuous assignment, a module's and a package's
+// parameter, a function's return and a class property's initializer.
+std::vector<std::string> ExpressionPlaces(const std::string& expr) {
+  return {"module m;\n  initial x = " + expr + ";\nendmodule\n",
+          "module m;\n  assign x = " + expr + ";\nendmodule\n",
+          "module m;\n  localparam int P = " + expr + ";\nendmodule\n",
+          "package p;\n  localparam int P = " + expr + ";\nendpackage\n",
+          "module m;\n  function int f(int a, int b); return " + expr +
+              "; endfunction\nendmodule\n",
+          "class c;\n  int v = " + expr + ";\nendclass\n"};
+}
+
+// How many errors `diags` holds.
+size_t ErrorsIn(const std::vector<Diagnostic>& diags) {
+  return static_cast<size_t>(
+      std::ranges::count(diags, DiagSeverity::kError, &Diagnostic::severity));
+}
+
+// The operators A.8.6 makes unary only: none of them is a binary operator too.
+constexpr std::array<const char*, 4> kUnaryOnlyOperators = {"!", "~", "~&",
+                                                            "~|"};
+
+// §5.5: a unary operator stands to the left of its operand. One that has no
+// binary form, written after its operand or between two operands, is
+// reported under §5.5 at its line, once, wherever the expression stands; the
+// operand after it is read with it rather than reported again.
+TEST(LexicalConventionParsing, UnaryOnlyOperatorAfterAnOperandIsReported) {
+  for (const char* op : kUnaryOnlyOperators) {
+    const std::string kMessage =
+        std::string("unary operator '") + op + "' cannot follow an operand";
+    for (const std::string& expr :
+         {std::string("a ") + op, std::string("a ") + op + " b"}) {
+      for (const std::string& src : ExpressionPlaces(expr)) {
+        auto r = Parse(src);
+        EXPECT_TRUE(ReportedError(r.diags, kMessage, 2, "5.5")) << src;
+        EXPECT_EQ(ErrorsIn(r.diags), 1u) << src;
+      }
+    }
+  }
+}
+
+// The same operators to the left of their operand, and beside an operand of a
+// binary operator, are accepted in every one of those places, as is `~^`,
+// which is a binary operator as well as a unary one.
+TEST(LexicalConventionParsing, UnaryOnlyOperatorBeforeItsOperandIsAccepted) {
+  for (const char* op : kUnaryOnlyOperators) {
+    for (const std::string& expr :
+         {std::string(op) + " a", std::string("a & ") + op + "b"}) {
+      for (const std::string& src : ExpressionPlaces(expr)) {
+        EXPECT_TRUE(ParseOk(src)) << src;
+      }
+    }
+  }
+  for (const std::string& src : ExpressionPlaces("a ~^ b")) {
+    EXPECT_TRUE(ParseOk(src)) << src;
+  }
+}
+
+// The report stands alone however the expression around the misplaced operator
+// is closed: by a comma between arguments, the colon of a conditional
+// operator, or a closing parenthesis, bracket or brace.
+TEST(LexicalConventionParsing,
+     UnaryOnlyOperatorBeforeAClosingTokenIsOneReport) {
+  for (const char* expr : {"f(a !, b)", "c ? a ! : b", "(a ~)", "y[a ~&]",
+                           "{a ~|, b}", "{a ~|}"}) {
+    const std::string kSrc =
+        std::string("module m;\n  initial x = ") + expr + ";\nendmodule\n";
+    auto r = Parse(kSrc);
+    EXPECT_TRUE(ReportedError(r.diags, "cannot follow an operand", 2, "5.5"))
+        << expr;
+    EXPECT_EQ(ErrorsIn(r.diags), 1u) << expr;
+  }
 }
 
 }  // namespace
