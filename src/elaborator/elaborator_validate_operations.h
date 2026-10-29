@@ -118,6 +118,10 @@ class ElaboratorOperationRules : public ElaboratorData {
   // §6.23 with §13.4.1: the type a call of a function the module declares
   // returns, which a type reference to the call stands for without the call
   // being made; nullopt for any other expression, a method's call among them.
+  // The function is looked for first among those a ConstFuncRegistryGuard has
+  // installed, which while a queued generate construct is elaborated are its
+  // module's own, func_decls_ holding by then the enclosing module's; then in
+  // func_decls_, for a pass run once the guard is gone.
   std::optional<DataType> CalledFunctionType(const Expr* e) const;
   // §6.23: resolve one type-reference operand of a comparison to the concrete
   // data type it denotes: a net or variable of `mod` its declared type

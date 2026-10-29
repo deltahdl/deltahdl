@@ -15,6 +15,7 @@
 #include "common/diagnostic.h"
 #include "common/types.h"
 #include "elaborator/const_eval.h"
+#include "elaborator/const_eval_internal.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_class_typedef_specialization.h"
 #include "elaborator/elaborator_helpers.h"
@@ -321,6 +322,7 @@ std::optional<DataType> ElaboratorOperationRules::CalledFunctionType(
   if (e == nullptr || e->kind != ExprKind::kCall ||
       (e->lhs != nullptr && e->lhs->kind != ExprKind::kIdentifier))
     return std::nullopt;
+  if (const ModuleItem* fn = RegisteredConstFunc(e)) return fn->return_type;
   auto it = func_decls_.find(e->callee);
   if (it == func_decls_.end()) return std::nullopt;
   return it->second->return_type;
