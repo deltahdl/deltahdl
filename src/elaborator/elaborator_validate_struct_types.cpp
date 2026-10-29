@@ -26,6 +26,7 @@
 #include "elaborator/type_eval.h"
 #include "elaborator/type_site_lookup.h"
 #include "elaborator/unit_scope_order.h"
+#include "elaborator/unpacked_array_type.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
@@ -532,6 +533,11 @@ std::string_view Elaborator::ResolveTypeRef(DataType& dt, SourceLoc loc,
   const ModuleDecl* decl = module_decl_path_.back();
   const TypeRefScope kScope{mod, typedefs_, unit_, loc, arena_, decl};
   if (ResolveScopedTypeRef(dt, ref, kScope)) return {};
+  // §7.4.4: an unpacked array's element; TypeRefUnpackedDims has its dims.
+  if (std::optional<UnpackedArrayType> array = TypeRefValueArray(ref, mod)) {
+    AdoptReferencedType(dt, array->element);
+    return {};
+  }
   if (std::optional<DataType> returned = CalledFunctionType(ref)) {
     AdoptReferencedType(dt, *returned);
     return {};
@@ -543,8 +549,7 @@ std::string_view Elaborator::ResolveTypeRef(DataType& dt, SourceLoc loc,
   // A named constant of an enumeration stands for the enumeration's type. It
   // is looked up before the module's variables, which BuildEnumMembers gives
   // each constant one of to hold its value: matched there, the constant read
-  // var_types_, which records no such name, and took the implicit type's one
-  // bit.
+  // var_types_, which records no such name, and took the implicit one bit.
   std::string_view enumeration;
   if (const RtlirEnumMember* constant =
           EnumConstantNamed(mod, ref->text, enumeration)) {

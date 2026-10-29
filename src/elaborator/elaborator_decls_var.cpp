@@ -686,9 +686,15 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   ReportUndeclaredTypeName(item);
 
   // §6.23: a type reference to a constant of an enumeration no typedef names
-  // gives the declaration that enumeration (Elaborator::ResolveTypeRef).
+  // gives the declaration that enumeration (Elaborator::ResolveTypeRef), and
+  // one to an unpacked array its dimensions, inside those the declaration
+  // writes, as an array typedef's are (§7.4.4).
+  std::vector<Expr*> taken_dims =
+      TypeRefUnpackedDims(item->data_type.type_ref_expr, mod);
   std::string_view adopted_enumeration =
       ResolveTypeRef(item->data_type, item->loc, mod);
+  item->unpacked_dims.insert(item->unpacked_dims.end(), taken_dims.begin(),
+                             taken_dims.end());
   ResolveTypeRefIndexDims(
       item->unpacked_dims,
       [&](DataType& type) { ResolveTypeRef(type, item->loc, mod); }, arena_);

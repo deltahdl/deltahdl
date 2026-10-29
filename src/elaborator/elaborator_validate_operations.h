@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <string_view>
 #include <unordered_map>
@@ -10,7 +11,11 @@
 
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
+#include "elaborator/elaborator_class_typedef_specialization.h"
 #include "elaborator/elaborator_data.h"
+#include "elaborator/net_data_type.h"
+#include "elaborator/type_ref_walks.h"
+#include "elaborator/unpacked_array_type.h"
 #include "parser/ast_design.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
@@ -21,6 +26,7 @@ namespace delta {
 class Arena;
 class DiagEngine;
 struct Expr;
+struct ExprTypeScope;
 
 // The rules an expression has to keep, whatever statement or declaration it is
 // written in. Clause 11 states most of them -- §11.4.12 on concatenation and
@@ -115,23 +121,72 @@ class ElaboratorOperationRules : public ElaboratorData {
   void CheckTypeRefCompareOp(const Expr* expr);
   void WalkStmtsForTypeRefCompare(const Stmt* s);
 
-  // §6.23 with §13.4.1: the type a call of a function the module declares
-  // returns, which a type reference to the call stands for without the call
-  // being made; nullopt for any other expression, a method's call among them.
-  // The function is looked for first among those a ConstFuncRegistryGuard has
-  // installed, which while a queued generate construct is elaborated are its
-  // module's own, func_decls_ holding by then the enclosing module's; then in
-  // func_decls_, for a pass run once the guard is gone.
+  // §6.23 with §13.4.1: the type a call of a function returns, which a type
+  // reference to the call stands for without the call being made: a function
+  // or imported DPI function (§35.5.4) the module, a package called through
+  // `p::f()` (§26.3) or the compilation unit (§3.12.1) declares; nullopt for
+  // any other expression, a method's call among them. The function is looked
+  // for first among those a ConstFuncRegistryGuard has installed, which while
+  // a queued generate construct is elaborated are its module's own,
+  // func_decls_ holding by then the enclosing module's; then as
+  // BareNamedFunction finds one, for a pass run once the guard is gone.
   std::optional<DataType> CalledFunctionType(const Expr* e) const;
-  // §6.23: resolve one type-reference operand of a comparison to the concrete
-  // data type it denotes: a net or variable of `mod` its declared type
-  // (NetOrVariableType), a call of a function its return type
-  // (CalledFunctionType), any other expression its self-determined type
-  // (TypeRefExprType), then the typedef and type-parameter tables. Returns
-  // nullopt when the operand is not a type reference or names a type this pass
-  // cannot resolve, so the caller leaves it unfolded.
+  const ModuleItem* BareNamedFunction(std::string_view name) const;
+  // §8.10 with §8.23: the return type of the static method a call written
+  // through the class scope operator, `scoped` being `C::f` or `p::C::f`,
+  // names; nothing where the scope reaches no class or the class no method.
+  std::optional<DataType> ClassScopedCallType(const Expr* scoped) const;
+  // §8.4 with §6.18: the class, and the specialization of it, a handle of
+  // `type` refers to, each typedef naming it read through; nothing where
+  // `type` names no class.
+  std::optional<ClassSpecialization> ClassTypeOf(const DataType& type) const;
+  // §8.5, §8.6 and §8.13: the type of the member `name` of `handle`'s class or
+  // a class it extends, as a handle of that specialization reads it: a
+  // property's declared type and unpacked dimensions, or a function's return
+  // type. Nothing where the class has no such member, or one a parameterized
+  // base class declares. Values fold against `constants`.
+  std::optional<UnpackedArrayType> MemberTypeOf(
+      const ClassSpecialization& handle, std::string_view name,
+      const ScopeMap& constants) const;
+  // The same member of the class a handle of `handle` refers to.
+  std::optional<UnpackedArrayType> ClassMemberType(
+      const DataType& handle, std::string_view name,
+      const ScopeMap& constants) const;
+  // §6.22.1: whether `a` and `b` match once each name they are written with is
+  // read through, a class matching only the same specialization of itself
+  // (SameSpecialization); nothing where a name resolves to no type.
+  std::optional<bool> DataTypesMatch(const DataType& a, const DataType& b,
+                                     const ScopeMap& constants) const;
+  // §6.23 with §6.22.1: whether the types the type references `a` and `b`
+  // stand for in `mod` match; nothing where either does not resolve.
+  std::optional<bool> TypeRefsMatch(const Expr* a, const Expr* b,
+                                    const RtlirModule* mod) const;
+  // §6.23 with §7.4: resolve one type-reference operand of a comparison to
+  // the type it denotes, an unpacked array's element type with its unpacked
+  // dimensions: a value `mod` declares by the name written its declared type
+  // and dimensions, a type as written, a call of a function its return type
+  // (CalledFunctionType), and any other expression its self-determined type
+  // (TypeRefArrayType); then each typedef name read through, an array
+  // typedef's dimensions taken inside those already held (WithTypedefDims).
+  // Returns nullopt when the operand is not a type reference or names a type
+  // this pass cannot resolve, so the caller leaves it unfolded.
+  std::optional<UnpackedArrayType> ResolveTypeRefOperandArray(
+      const Expr* op, const RtlirModule* mod = nullptr) const;
+  // The same operand before its typedef names are read through.
+  std::optional<UnpackedArrayType> TypeRefOperandArray(
+      const Expr* op, const RtlirModule* mod) const;
+  // The operand ResolveTypeRefOperandArray gives, where it is of no unpacked
+  // array type, which a data type alone carries.
   std::optional<DataType> ResolveTypeRefOperandType(
       const Expr* op, const RtlirModule* mod = nullptr) const;
+  // The typedefs, their unpacked dimensions and the class names, which tell
+  // the kind of array an unpacked dimension makes.
+  TypeShapeTables ArrayTables() const;
+  // Hands `use` the scope an expression in a type reference is typed in, each
+  // name in it read as `mod` declares it where the reference stands.
+  void InExprTypeScope(
+      const RtlirModule& mod,
+      const std::function<void(const ExprTypeScope&)>& use) const;
   // §6.23: the self-determined type of the expression `expr` a type reference
   // names (ExprSelfType), each name in it read as `mod` declares it where the
   // reference stands: a net, variable or port, a value parameter, or an
@@ -139,6 +194,20 @@ class ElaboratorOperationRules : public ElaboratorData {
   // expression is of no type a data type alone carries.
   std::optional<DataType> TypeRefExprType(const Expr* expr,
                                           const RtlirModule* mod) const;
+  // §6.23 with §7.4: the same expression's type as ExprSelfArrayType gives
+  // it, an unpacked array's included.
+  std::optional<UnpackedArrayType> TypeRefArrayType(
+      const Expr* expr, const RtlirModule* mod) const;
+  // §6.23 with §7.4.4: the unpacked array type of the expression `ref` a
+  // declaration's type reference names, an array typedef's dimensions taken
+  // inside the value's, and its element type left as written; nothing where
+  // the expression is no unpacked array. TypeRefUnpackedDims gives its
+  // dimensions, which the declaration takes inside those it writes, and none
+  // for any other expression.
+  std::optional<UnpackedArrayType> TypeRefValueArray(
+      const Expr* ref, const RtlirModule* mod) const;
+  std::vector<Expr*> TypeRefUnpackedDims(const Expr* ref,
+                                         const RtlirModule* mod) const;
   // §6.23: fold a type-reference equality/inequality/case-equality comparison
   // to a constant 0/1 using §6.22.1 type matching, its operands resolved in
   // `mod`. Returns nullopt when `expr` is not such a comparison or an operand
@@ -159,14 +228,32 @@ class ElaboratorOperationRules : public ElaboratorData {
   void CheckTypeRefArgInner(const Expr* inner, SourceLoc loc);
   bool TypeRefArgUsesDynamicElement(const Expr* e) const;
   bool IsHierarchicalMemberAccess(const Expr* e) const;
-  bool NamesSelectableVariable(const Expr* root) const;
-  bool DeclaresSelectableType(const DataType& type) const;
+  bool NamesSelectableValue(const Expr* root) const;
+  bool NamesModuleValue(std::string_view name) const;
+  static bool DeclaresSelectableType(const DataType& type);
+  bool DeclaresSelectableValue(const std::vector<ModuleItem*>& items,
+                               std::string_view name) const;
+  bool ImportsSelectableValue(const std::vector<ModuleItem*>& items,
+                              std::string_view name) const;
+  const ModuleDecl* TypeRefModule() const;
   bool TypeRefArgHasMemberAccess(const Expr* e) const;
   // The variables the statements WalkStmtsForTypeRefArg is inside declare,
   // innermost last, each with whether a `.` after it selects a member of it
-  // rather than naming a scope (NamesSelectableVariable): a block's declaration
+  // rather than naming a scope (NamesSelectableValue): a block's declaration
   // hides a module's of the same name for the rest of the block (§6.21).
   std::vector<std::pair<std::string_view, bool>> type_ref_block_vars_;
+  // The module ValidateTypeRefArgs walks, whose ports and imports a name in a
+  // type reference may name a value by (TypeRefModule); null outside it.
+  const ModuleDecl* type_ref_module_ = nullptr;
+  // §6.21 with §6.23: the TypeRefResolver for the declarations a procedure
+  // writes, which resolves each through `resolve` with the names the
+  // procedure declares ahead of it innermost in type_ref_block_vars_, so that
+  // a `.` written after one selects a member of the procedure's value. It
+  // answers the unpacked dimensions an array value of `mod` the reference
+  // names gives the declaration (TypeRefUnpackedDims).
+  TypeRefResolver ResolverAmongLocals(
+      const RtlirModule* mod,
+      std::function<void(DataType&, SourceLoc)> resolve);
 
   // §11.9: each tagged union expression against the type its context gives
   // it. Defined in elaborator_validate_operations_tagged.cpp.

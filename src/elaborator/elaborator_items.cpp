@@ -595,9 +595,10 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
     return EvalConstTypeRefCompare(e, mod);
   });
   if (ElaborateDeclItem(item, mod)) return;
-  ResolveProceduralTypeRefs(
-      item, [&](DataType& dt, SourceLoc loc) { ResolveTypeRef(dt, loc, mod); },
-      arena_);
+  auto resolve = [&](DataType& dt, SourceLoc loc) {
+    ResolveTypeRef(dt, loc, mod);
+  };
+  ResolveProceduralTypeRefs(item, ResolverAmongLocals(mod, resolve), arena_);
   // §11.12's rules on a let's formals, for each let the item's procedure or
   // subroutine body declares.
   auto elaborate_let = [&](ModuleItem* let) { ElaborateLetFormals(let, mod); };
@@ -652,10 +653,11 @@ void Elaborator::ElaborateModuleClassDecl(ModuleItem* item, RtlirModule* mod) {
   ResolveClassMethodFormalTypes(item->class_decl, typedefs_, arena_);
   // §6.23: the type references the class writes, resolved against its own
   // properties and then the module's names.
-  ResolveClassTypeRefs(
-      *item->class_decl,
-      [&](DataType& dt, SourceLoc loc) { ResolveTypeRef(dt, loc, mod); },
-      arena_);
+  auto resolve = [&](DataType& dt, SourceLoc loc) {
+    ResolveTypeRef(dt, loc, mod);
+  };
+  ResolveClassTypeRefs(*item->class_decl, ResolverAmongLocals(mod, resolve),
+                       unit_, arena_);
   // §11.12's rules on a let's formals, for each let a method's body declares.
   auto elaborate_let = [&](ModuleItem* let) { ElaborateLetFormals(let, mod); };
   ForEachClassBodyItem(item->class_decl, [&](const ModuleItem* method) {

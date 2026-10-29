@@ -2,13 +2,14 @@
 
 #include <algorithm>
 #include <cstddef>
-#include <optional>
+#include <span>
 #include <string_view>
 #include <vector>
 
 #include "common/arena.h"
 #include "common/source_loc.h"
 #include "elaborator/assoc_index_type.h"
+#include "elaborator/elaborator_class_lookup.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "parser/ast_class.h"
@@ -22,21 +23,14 @@ namespace delta {
 
 namespace {
 
-// A name a procedure declares, with the type and unpacked dimensions it was
-// declared with.
-struct ProceduralLocal {
-  std::string_view name;
-  const DataType* type;
-  const std::vector<Expr*>* unpacked_dims;
-};
-
 // §6.23 with A.2.8: `var type(a) v;` among a block's items declares v with the
 // self-determined type of `a`, taken with the names in scope at the
 // declaration. A name the procedure declared earlier, in this block or one
 // enclosing it, or as a formal of the subroutine, hides the scope's around the
 // procedure, and v takes that declaration's type and unpacked dimensions; any
-// other reference is left to `resolve_outer`. `locals` holds the procedure's
-// names in declaration order.
+// other reference is left to `resolve_outer`. The dimensions taken stand
+// inside those v writes, as an array typedef's do (§7.4.4). `locals` holds the
+// procedure's names in declaration order.
 void ResolveLocalTypeRef(DataType& dt, std::vector<Expr*>& unpacked_dims,
                          SourceLoc loc,
                          const std::vector<ProceduralLocal>& locals,
@@ -47,12 +41,11 @@ void ResolveLocalTypeRef(DataType& dt, std::vector<Expr*>& unpacked_dims,
       locals.rbegin(), locals.rend(), [&](const ProceduralLocal& l) {
         return ref->kind == ExprKind::kIdentifier && l.name == ref->text;
       });
-  if (local == locals.rend()) {
-    resolve_outer(dt, loc);
-    return;
-  }
-  dt = *local->type;
-  if (unpacked_dims.empty()) unpacked_dims = *local->unpacked_dims;
+  const std::vector<Expr*> kTaken = local == locals.rend()
+                                        ? resolve_outer(dt, loc, locals)
+                                        : *local->unpacked_dims;
+  if (local != locals.rend()) dt = *local->type;
+  unpacked_dims.insert(unpacked_dims.end(), kTaken.begin(), kTaken.end());
 }
 
 // §6.23 with §12.7.1: the variables the header of `s`, where it is a for loop,
@@ -142,16 +135,42 @@ void ResolveTypeRefsInStmt(Stmt* s, std::vector<ProceduralLocal>& locals,
   locals.push_back({s->var_name, &s->var_decl_type, &s->var_unpacked_dims});
 }
 
-// The type of the property of `cls` the type reference `ref` names, nothing
-// where its argument names no property of the class.
-std::optional<DataType> PropertyTypeNamed(const ClassDecl& cls,
-                                          const Expr& ref) {
-  if (ref.kind != ExprKind::kIdentifier) return std::nullopt;
-  auto named = std::ranges::find_if(cls.members, [&](const ClassMember* m) {
-    return m->kind == ClassMemberKind::kProperty && m->name == ref.text;
-  });
-  if (named == cls.members.end()) return std::nullopt;
-  return (*named)->data_type;
+// The name of a property the type reference `ref` writes in a method: bare,
+// or selected of `this` (§8.11). Null for any other expression.
+const Expr* PropertyName(const Expr& ref) {
+  const Expr* name = &ref;
+  if (ref.kind == ExprKind::kMemberAccess && !ref.is_scope_resolution &&
+      ref.lhs != nullptr && ref.lhs->kind == ExprKind::kIdentifier &&
+      ref.lhs->text == "this") {
+    name = ref.rhs;
+  }
+  if (name == nullptr || name->kind != ExprKind::kIdentifier) return nullptr;
+  return name;
+}
+
+// §8.5 and §8.13: the property of `cls`, or of a class it extends, that the
+// type reference `ref` names; null where its argument names none, and where a
+// parameterized base class declares it, whose type the specialization `cls`
+// extends gives. Without `unit` the class's own properties alone are read.
+const ClassMember* PropertyNamed(const ClassDecl& cls, const Expr& ref,
+                                 const CompilationUnit* unit) {
+  const Expr* name = PropertyName(ref);
+  if (name == nullptr) return nullptr;
+  OwnedMember owned;
+  if (unit != nullptr) {
+    owned = FindMemberAndOwner(&cls, name->text, unit);
+  } else {
+    auto own = std::ranges::find_if(cls.members, [&](const ClassMember* m) {
+      return m->name == name->text;
+    });
+    if (own != cls.members.end()) owned = {*own, &cls};
+  }
+  if (owned.member == nullptr ||
+      owned.member->kind != ClassMemberKind::kProperty) {
+    return nullptr;
+  }
+  if (owned.owner != &cls && !owned.owner->params.empty()) return nullptr;
+  return owned.member;
 }
 
 // A.2.5 with §6.23: the associative indexes the declaration `item`, a
@@ -160,7 +179,7 @@ std::optional<DataType> PropertyTypeNamed(const ClassDecl& cls,
 void ResolveItemIndexTypeRefs(ModuleItem& item, const TypeRefResolver& resolve,
                               Arena& arena) {
   ResolveTypeRefIndexDims(
-      item.unpacked_dims, [&](DataType& type) { resolve(type, item.loc); },
+      item.unpacked_dims, [&](DataType& type) { resolve(type, item.loc, {}); },
       arena);
 }
 
@@ -170,15 +189,16 @@ void ResolveItemIndexTypeRefs(ModuleItem& item, const TypeRefResolver& resolve,
 // their lets' formals (§11.12) and their classes, with `resolve` resolving a
 // name none of them declares more closely.
 void ResolveScopeItemTypeRefs(const std::vector<ModuleItem*>& items,
-                              const TypeRefResolver& resolve, Arena& arena) {
+                              const TypeRefResolver& resolve,
+                              const CompilationUnit* unit, Arena& arena) {
   for (ModuleItem* item : items) {
     switch (item->kind) {
       case ModuleItemKind::kTypedef:
-        resolve(item->typedef_type, item->loc);
+        resolve(item->typedef_type, item->loc, {});
         ResolveItemIndexTypeRefs(*item, resolve, arena);
         break;
       case ModuleItemKind::kNettypeDecl:
-        resolve(item->typedef_type, item->loc);
+        resolve(item->typedef_type, item->loc, {});
         break;
       case ModuleItemKind::kVarDecl:
         ResolveItemIndexTypeRefs(*item, resolve, arena);
@@ -189,7 +209,7 @@ void ResolveScopeItemTypeRefs(const std::vector<ModuleItem*>& items,
         ResolveProceduralTypeRefs(item, resolve, arena);
         break;
       case ModuleItemKind::kClassDecl:
-        ResolveClassTypeRefs(*item->class_decl, resolve, arena);
+        ResolveClassTypeRefs(*item->class_decl, resolve, unit, arena);
         break;
       default:
         break;
@@ -218,23 +238,26 @@ void ResolveProceduralTypeRefs(ModuleItem* item,
 // none of the class's properties and is left to `resolve_outer`, which leaves
 // it as written for the method's evaluation to read.
 void ResolveClassTypeRefs(ClassDecl& cls, const TypeRefResolver& resolve_outer,
-                          Arena& arena) {
-  const TypeRefResolver kInClass = [&](DataType& dt, SourceLoc loc) {
+                          const CompilationUnit* unit, Arena& arena) {
+  const TypeRefResolver kInClass =
+      [&](DataType& dt, SourceLoc loc,
+          std::span<const ProceduralLocal> locals) -> std::vector<Expr*> {
     const Expr* ref = dt.type_ref_expr;
-    if (ref == nullptr) return;
-    if (std::optional<DataType> type = PropertyTypeNamed(cls, *ref)) {
-      AdoptReferencedType(dt, *type);
-      return;
+    if (ref == nullptr) return {};
+    if (const ClassMember* property = PropertyNamed(cls, *ref, unit)) {
+      AdoptReferencedType(dt, property->data_type);
+      return property->unpacked_dims;
     }
-    resolve_outer(dt, loc);
+    return resolve_outer(dt, loc, locals);
   };
   for (ClassMember* m : cls.members) {
     switch (m->kind) {
       case ClassMemberKind::kProperty:
-        kInClass(m->data_type, m->loc);
+        ResolveLocalTypeRef(m->data_type, m->unpacked_dims, m->loc, {},
+                            kInClass);
         ResolveTypeRefIndexDims(
-            m->unpacked_dims, [&](DataType& type) { kInClass(type, m->loc); },
-            arena);
+            m->unpacked_dims,
+            [&](DataType& type) { kInClass(type, m->loc, {}); }, arena);
         break;
       case ClassMemberKind::kMethod:
         ResolveProceduralTypeRefs(m->method, kInClass, arena);
@@ -243,7 +266,7 @@ void ResolveClassTypeRefs(ClassDecl& cls, const TypeRefResolver& resolve_outer,
         ResolveItemIndexTypeRefs(*m->typedef_item, kInClass, arena);
         break;
       case ClassMemberKind::kClassDecl:
-        ResolveClassTypeRefs(*m->nested_class, kInClass, arena);
+        ResolveClassTypeRefs(*m->nested_class, kInClass, unit, arena);
         break;
       default:
         break;
@@ -255,17 +278,22 @@ void ResolveUnitScopeTypeRefs(CompilationUnit* unit, Arena& arena) {
   for (const PackageDecl* pkg : unit->packages) {
     ResolveScopeItemTypeRefs(
         pkg->items,
-        [&](DataType& dt, SourceLoc) {
+        [&](DataType& dt, SourceLoc,
+            std::span<const ProceduralLocal>) -> std::vector<Expr*> {
           ResolveScopeTypeRef(dt, pkg->items, arena);
+          return {};
         },
-        arena);
+        unit, arena);
   }
-  const TypeRefResolver kInUnit = [&](DataType& dt, SourceLoc) {
+  const TypeRefResolver kInUnit =
+      [&](DataType& dt, SourceLoc,
+          std::span<const ProceduralLocal>) -> std::vector<Expr*> {
     ResolveScopeTypeRef(dt, unit->cu_items, arena);
+    return {};
   };
-  ResolveScopeItemTypeRefs(unit->cu_items, kInUnit, arena);
+  ResolveScopeItemTypeRefs(unit->cu_items, kInUnit, unit, arena);
   for (ClassDecl* cls : unit->classes) {
-    ResolveClassTypeRefs(*cls, kInUnit, arena);
+    ResolveClassTypeRefs(*cls, kInUnit, unit, arena);
   }
 }
 

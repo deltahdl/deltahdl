@@ -672,6 +672,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/net_data_type.cpp
     elaborator/net_or_variable_type.cpp
     elaborator/expression_self_type.cpp
+    elaborator/unpacked_array_type.cpp
     elaborator/simple_bit_vector.cpp
     elaborator/dollar_contexts.cpp
     elaborator/unpacked_dim_reads.cpp

@@ -1,22 +1,29 @@
 #include <algorithm>
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
+#include <vector>
 
 #include "common/arena.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/const_eval_internal.h"
+#include "elaborator/elaborator_class_lookup.h"
 #include "elaborator/elaborator_class_typedef_specialization.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_operations.h"
 #include "elaborator/expression_self_type.h"
+#include "elaborator/net_data_type.h"
 #include "elaborator/net_or_variable_type.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_enum_member.h"
 #include "elaborator/rtlir_scopes.h"
 #include "elaborator/type_eval.h"
+#include "elaborator/unpacked_array_type.h"
 #include "lexer/token.h"
+#include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -112,54 +119,214 @@ static std::optional<DataType> ThroughTypeNames(DataType dt,
   return dt;
 }
 
+// The function, or the imported DPI function (§35.5.4), named `name` among
+// `items`; an out-of-block class method (§8.24) is its class's.
+static const ModuleItem* FunctionAmong(const std::vector<ModuleItem*>& items,
+                                       std::string_view name) {
+  auto it = std::ranges::find_if(items, [&](const ModuleItem* item) {
+    if (item == nullptr || item->name != name) return false;
+    if (item->kind == ModuleItemKind::kDpiImport) return !item->dpi_is_task;
+    return item->kind == ModuleItemKind::kFunctionDecl &&
+           item->method_class.empty();
+  });
+  return it != items.end() ? *it : nullptr;
+}
+
+// §26.3: the package `scoped`, a `p::f` scope resolution, names, and the
+// function or imported DPI function it declares by the name after it.
+static const ModuleItem* PackageFunction(const Expr* scoped,
+                                         const CompilationUnit* unit) {
+  if (unit == nullptr || scoped == nullptr ||
+      scoped->kind != ExprKind::kMemberAccess || !scoped->is_scope_resolution ||
+      scoped->lhs == nullptr || scoped->lhs->kind != ExprKind::kIdentifier ||
+      scoped->rhs == nullptr || scoped->rhs->kind != ExprKind::kIdentifier) {
+    return nullptr;
+  }
+  auto pkg = std::ranges::find_if(unit->packages, [&](const PackageDecl* p) {
+    return p != nullptr && p->name == scoped->lhs->text;
+  });
+  if (pkg == unit->packages.end()) return nullptr;
+  return FunctionAmong((*pkg)->items, scoped->rhs->text);
+}
+
+// §13.4.1 with §26.3, §3.12.1 and §35.5.4: the function a call by a bare name
+// reaches: one the module declares or imports from a package, then an
+// imported DPI function the module declares, then a function or imported DPI
+// function of the compilation unit.
+const ModuleItem* ElaboratorOperationRules::BareNamedFunction(
+    std::string_view name) const {
+  auto it = func_decls_.find(name);
+  if (it != func_decls_.end()) return it->second;
+  if (!module_decl_path_.empty() && module_decl_path_.back() != nullptr) {
+    if (const ModuleItem* fn =
+            FunctionAmong(module_decl_path_.back()->items, name))
+      return fn;
+  }
+  return unit_ != nullptr ? FunctionAmong(unit_->cu_items, name) : nullptr;
+}
+
 std::optional<DataType> ElaboratorOperationRules::CalledFunctionType(
     const Expr* e) const {
-  if (e == nullptr || e->kind != ExprKind::kCall ||
-      (e->lhs != nullptr && e->lhs->kind != ExprKind::kIdentifier))
-    return std::nullopt;
+  if (e == nullptr || e->kind != ExprKind::kCall) return std::nullopt;
   if (const ModuleItem* fn = RegisteredConstFunc(e)) return fn->return_type;
-  auto it = func_decls_.find(e->callee);
-  if (it == func_decls_.end()) return std::nullopt;
-  return it->second->return_type;
+  const ModuleItem* fn = nullptr;
+  if (e->lhs == nullptr || e->lhs->kind == ExprKind::kIdentifier) {
+    fn = BareNamedFunction(e->callee);
+  } else {
+    fn = PackageFunction(e->lhs, unit_);
+  }
+  if (fn == nullptr) return ClassScopedCallType(e->lhs);
+  return fn->return_type;
+}
+
+// The arguments a class's unadorned name is written with: none, which makes
+// it the default specialization (§8.25).
+static const std::vector<DataType>& NoArguments() {
+  static const std::vector<DataType> kNone;
+  return kNone;
+}
+
+// §8.10 with §8.23: a static method called through the class scope operator,
+// `C::f()`, `p::C::f()` or `Outer::Inner::f()`, gives its return type.
+std::optional<DataType> ElaboratorOperationRules::ClassScopedCallType(
+    const Expr* scoped) const {
+  if (unit_ == nullptr || scoped == nullptr ||
+      scoped->kind != ExprKind::kMemberAccess || !scoped->is_scope_resolution ||
+      scoped->rhs == nullptr) {
+    return std::nullopt;
+  }
+  std::vector<const ClassDecl*> chain =
+      ClassChainOfScopePrefix(scoped->lhs, unit_);
+  if (chain.empty()) return std::nullopt;
+  std::optional<UnpackedArrayType> method = MemberTypeOf(
+      {chain.back(), &NoArguments()}, scoped->rhs->text, gen_const_scope_);
+  if (!method || !method->dims.empty()) return std::nullopt;
+  return std::move(method->element);
+}
+
+std::optional<ClassSpecialization> ElaboratorOperationRules::ClassTypeOf(
+    const DataType& type) const {
+  if (unit_ == nullptr) return std::nullopt;
+  const DataType* at = &type;
+  for (int names = 0; names < 16 && at->kind == DataTypeKind::kNamed; ++names) {
+    if (!at->scope_name.empty() || class_names_.contains(at->type_name)) {
+      const ClassDecl* cls = ClassOfDeclaredType(*at, {}, unit_);
+      if (cls == nullptr) return std::nullopt;
+      return ClassSpecialization{cls, &at->type_params};
+    }
+    auto named = typedefs_.find(at->type_name);
+    if (named == typedefs_.end()) return std::nullopt;
+    at = &named->second;
+  }
+  return std::nullopt;
+}
+
+std::optional<UnpackedArrayType> ElaboratorOperationRules::MemberTypeOf(
+    const ClassSpecialization& handle, std::string_view name,
+    const ScopeMap& constants) const {
+  OwnedMember owned = FindMemberAndOwner(handle.cls, name, unit_);
+  if (owned.member == nullptr) return std::nullopt;
+  const ClassMember& member = *owned.member;
+  SpecializedClassType written;
+  if (member.kind == ClassMemberKind::kProperty) {
+    written = {member.data_type, member.unpacked_dims};
+  } else if (member.kind == ClassMemberKind::kMethod &&
+             member.method != nullptr &&
+             member.method->kind == ModuleItemKind::kFunctionDecl) {
+    written = {member.method->return_type, {}};
+  } else {
+    return std::nullopt;
+  }
+  // §8.13: a member the class inherits is read in the class declaring it,
+  // whose own parameters the handle's specialization does not give.
+  if (owned.owner != handle.cls && !owned.owner->params.empty())
+    return std::nullopt;
+  const ClassSpecialization kOwner{
+      owned.owner, owned.owner == handle.cls ? handle.args : &NoArguments()};
+  std::optional<SpecializedClassType> typed =
+      SpecializedMemberType(kOwner, written, constants, typedefs_, arena_);
+  if (!typed) return std::nullopt;
+  return UnpackedArrayType{std::move(typed->type),
+                           std::move(typed->unpacked_dims)};
+}
+
+std::optional<UnpackedArrayType> ElaboratorOperationRules::ClassMemberType(
+    const DataType& handle, std::string_view name,
+    const ScopeMap& constants) const {
+  std::optional<ClassSpecialization> cls = ClassTypeOf(handle);
+  if (!cls) return std::nullopt;
+  return MemberTypeOf(*cls, name, constants);
+}
+
+std::optional<bool> ElaboratorOperationRules::DataTypesMatch(
+    const DataType& a, const DataType& b, const ScopeMap& constants) const {
+  std::optional<ClassSpecialization> class_a = ClassTypeOf(a);
+  std::optional<ClassSpecialization> class_b = ClassTypeOf(b);
+  if (class_a && class_b)
+    return SameSpecialization(*class_a, *class_b, constants, typedefs_);
+  if (class_a || class_b) {
+    // §6.22.1(d): a class matches no type but a class.
+    if (!ThroughTypeNames(class_a ? b : a, typedefs_, unit_, arena_))
+      return std::nullopt;
+    return false;
+  }
+  std::optional<DataType> type_a =
+      ThroughTypeNames(a, typedefs_, unit_, arena_);
+  std::optional<DataType> type_b =
+      ThroughTypeNames(b, typedefs_, unit_, arena_);
+  if (!type_a || !type_b) return std::nullopt;
+  return TypesMatch(*type_a, *type_b);
+}
+
+std::optional<UnpackedArrayType> ElaboratorOperationRules::TypeRefOperandArray(
+    const Expr* op, const RtlirModule* mod) const {
+  std::optional<DataType> written = TypeRefWrittenType(op);
+  // §6.23: a name the module declares a value by -- a net or variable, then a
+  // parameter or an enumeration's named constant -- is an expression,
+  // standing for the value's type, which a typedef or nettype names in turn.
+  if (written && mod != nullptr && IsBareName(*written)) {
+    std::optional<UnpackedArrayType> value;
+    InExprTypeScope(*mod, [&](const ExprTypeScope& scope) {
+      if (std::optional<DeclaredValue> declared =
+              scope.value_named(written->type_name)) {
+        value = ValueArrayType(*declared);
+      }
+    });
+    if (value) return value;
+  }
+  if (written) return UnpackedArrayType{std::move(*written), {}};
+  if (std::optional<DataType> returned = CalledFunctionType(op->lhs))
+    return UnpackedArrayType{std::move(*returned), {}};
+  return TypeRefArrayType(op->lhs, mod);
+}
+
+TypeShapeTables ElaboratorOperationRules::ArrayTables() const {
+  return TypeShapeTables{typedefs_, td_array_dims_, class_names_};
+}
+
+std::optional<UnpackedArrayType>
+ElaboratorOperationRules::ResolveTypeRefOperandArray(
+    const Expr* op, const RtlirModule* mod) const {
+  if (!op || op->kind != ExprKind::kTypeRef) return std::nullopt;
+  std::optional<UnpackedArrayType> written = TypeRefOperandArray(op, mod);
+  if (!written) return std::nullopt;
+  UnpackedArrayType array = WithTypedefDims(
+      written->element, std::move(written->dims), ArrayTables());
+  // §8.4: a class is a type of its own, which DataTypesMatch matches by the
+  // class and its specialization.
+  if (ClassTypeOf(array.element)) return array;
+  std::optional<DataType> element =
+      ThroughTypeNames(array.element, typedefs_, unit_, arena_);
+  if (!element) return std::nullopt;
+  array.element = std::move(*element);
+  return array;
 }
 
 std::optional<DataType> ElaboratorOperationRules::ResolveTypeRefOperandType(
     const Expr* op, const RtlirModule* mod) const {
-  if (!op || op->kind != ExprKind::kTypeRef) return std::nullopt;
-  std::optional<DataType> written = TypeRefWrittenType(op);
-  if (!written) written = CalledFunctionType(op->lhs);
-  if (!written) written = TypeRefExprType(op->lhs, mod);
-  if (!written) return std::nullopt;
-  DataType dt = *written;
-  // §6.23: a name the module declares a value by -- a net or variable, then a
-  // parameter or an enumeration's named constant -- is an expression,
-  // standing for the value's type, which a typedef or nettype names in turn.
-  if (mod != nullptr && IsBareName(dt)) {
-    std::string_view declared =
-        DeclaredScopedName(dt.type_name, gen_prefix_scopes_, declared_names_);
-    std::optional<DataType> value = NetOrVariableType(*mod, declared);
-    if (!value) value = TypeRefExprType(op->lhs, mod);
-    if (value) dt = *value;
-  }
-  return ThroughTypeNames(dt, typedefs_, unit_, arena_);
-}
-
-// §6.23 — a comparison of two type references is a constant expression whose
-// result is true exactly when the referenced types match per §6.22.1 (equality
-// forms yield that truth value; inequality forms its negation). Fold such a
-// comparison to 0/1 so it can drive an elaboration-time selection (e.g. a
-// generate-if). Returns nullopt when this is not a two-type-reference
-// comparison or either operand's type cannot be resolved.
-std::optional<int64_t> ElaboratorOperationRules::EvalConstTypeRefCompare(
-    const Expr* expr, const RtlirModule* mod) const {
-  if (!IsTypeRefComparison(expr)) return std::nullopt;
-  auto lhs_type = ResolveTypeRefOperandType(expr->lhs, mod);
-  auto rhs_type = ResolveTypeRefOperandType(expr->rhs, mod);
-  if (!lhs_type || !rhs_type) return std::nullopt;
-  bool matched = TypesMatch(*lhs_type, *rhs_type);
-  bool is_negated =
-      expr->op == TokenKind::kBangEq || expr->op == TokenKind::kBangEqEq;
-  return (matched != is_negated) ? 1 : 0;
+  std::optional<UnpackedArrayType> array = ResolveTypeRefOperandArray(op, mod);
+  if (!array || !array->dims.empty()) return std::nullopt;
+  return std::move(array->element);
 }
 
 // §6.20.2: the type a value parameter stands for: the one it is declared
@@ -220,7 +387,13 @@ static std::optional<DeclaredValue> ValueIn(std::string_view name,
                ParamVisibleFromScopes(p.gen_block_prefix, declarations.scopes);
       });
   if (param != lookup.mod.params.end()) {
-    return DeclaredValue{ParamValueType(*param, lookup.arena)};
+    // §7.4: a parameter may be an unpacked array, of fixed size.
+    DeclaredValue value{ParamValueType(*param, lookup.arena)};
+    if (param->unpacked_dims != nullptr) {
+      value.dims = *param->unpacked_dims;
+      value.unpacked_dims = static_cast<uint32_t>(value.dims.size());
+    }
+    return value;
   }
   if (std::optional<DataType> type =
           EnumConstantType(lookup.mod, name, lookup.typedefs)) {
@@ -248,20 +421,95 @@ static ScopeMap ConstantsIn(const RtlirModule& mod, const ScopeMap& generate) {
   return constants;
 }
 
-std::optional<DataType> ElaboratorOperationRules::TypeRefExprType(
-    const Expr* expr, const RtlirModule* mod) const {
-  if (expr == nullptr || mod == nullptr) return std::nullopt;
-  ScopeMap constants = ConstantsIn(*mod, gen_const_scope_);
+void ElaboratorOperationRules::InExprTypeScope(
+    const RtlirModule& mod,
+    const std::function<void(const ExprTypeScope&)>& use) const {
+  ScopeMap constants = ConstantsIn(mod, gen_const_scope_);
   ValueLookup lookup{
-      *mod, {gen_prefix_scopes_, declared_names_}, typedefs_, arena_};
+      mod, {gen_prefix_scopes_, declared_names_}, typedefs_, arena_};
+  const TypeShapeTables kTables = ArrayTables();
   ExprTypeScope scope{
       [&](std::string_view name) { return ValueIn(name, lookup); },
       [this](const Expr* call) { return CalledFunctionType(call); },
-      [&](const Expr* ref) { return ResolveTypeRefOperandType(ref, mod); },
+      [&](const Expr* ref) { return ResolveTypeRefOperandType(ref, &mod); },
       typedefs_,
       constants,
       arena_};
-  return ExprSelfType(expr, scope);
+  scope.array_tables = &kTables;
+  scope.class_member = [this, &constants](const DataType& handle,
+                                          std::string_view name) {
+    return ClassMemberType(handle, name, constants);
+  };
+  use(scope);
+}
+
+std::optional<DataType> ElaboratorOperationRules::TypeRefExprType(
+    const Expr* expr, const RtlirModule* mod) const {
+  if (expr == nullptr || mod == nullptr) return std::nullopt;
+  std::optional<DataType> type;
+  InExprTypeScope(*mod, [&](const ExprTypeScope& scope) {
+    type = ExprSelfType(expr, scope);
+  });
+  return type;
+}
+
+std::optional<UnpackedArrayType> ElaboratorOperationRules::TypeRefArrayType(
+    const Expr* expr, const RtlirModule* mod) const {
+  if (expr == nullptr || mod == nullptr) return std::nullopt;
+  std::optional<UnpackedArrayType> array;
+  InExprTypeScope(*mod, [&](const ExprTypeScope& scope) {
+    array = ExprSelfArrayType(expr, scope);
+  });
+  return array;
+}
+
+std::optional<UnpackedArrayType> ElaboratorOperationRules::TypeRefValueArray(
+    const Expr* ref, const RtlirModule* mod) const {
+  std::optional<UnpackedArrayType> array = TypeRefArrayType(ref, mod);
+  if (!array) return std::nullopt;
+  UnpackedArrayType whole =
+      WithTypedefDims(array->element, std::move(array->dims), ArrayTables());
+  if (whole.dims.empty()) return std::nullopt;
+  return whole;
+}
+
+std::vector<Expr*> ElaboratorOperationRules::TypeRefUnpackedDims(
+    const Expr* ref, const RtlirModule* mod) const {
+  std::optional<UnpackedArrayType> array = TypeRefValueArray(ref, mod);
+  if (!array) return {};
+  return std::move(array->dims);
+}
+
+// §6.23 — a comparison of two type references is a constant expression whose
+// result is true exactly when the referenced types match per §6.22.1 (equality
+// forms yield that truth value; inequality forms its negation). Fold such a
+// comparison to 0/1 so it can drive an elaboration-time selection (e.g. a
+// generate-if). Returns nullopt when this is not a two-type-reference
+// comparison or either operand's type cannot be resolved.
+std::optional<bool> ElaboratorOperationRules::TypeRefsMatch(
+    const Expr* a, const Expr* b, const RtlirModule* mod) const {
+  std::optional<UnpackedArrayType> type_a = ResolveTypeRefOperandArray(a, mod);
+  std::optional<UnpackedArrayType> type_b = ResolveTypeRefOperandArray(b, mod);
+  if (!type_a || !type_b) return std::nullopt;
+  // §7.4.2 and §8.25: a fixed-size dimension's bounds and a specialization's
+  // values fold against the module's constants and the generate constants in
+  // force.
+  const ScopeMap kConstants =
+      mod != nullptr ? ConstantsIn(*mod, gen_const_scope_) : gen_const_scope_;
+  return UnpackedArrayTypesMatch(*type_a, *type_b, ArrayTables(), kConstants,
+                                 [&](const DataType& x, const DataType& y) {
+                                   return DataTypesMatch(x, y, kConstants);
+                                 });
+}
+
+std::optional<int64_t> ElaboratorOperationRules::EvalConstTypeRefCompare(
+    const Expr* expr, const RtlirModule* mod) const {
+  if (!IsTypeRefComparison(expr)) return std::nullopt;
+  std::optional<bool> matched = TypeRefsMatch(expr->lhs, expr->rhs, mod);
+  if (!matched) return std::nullopt;
+  bool is_negated =
+      expr->op == TokenKind::kBangEq || expr->op == TokenKind::kBangEqEq;
+  return (*matched != is_negated) ? 1 : 0;
 }
 
 }  // namespace delta

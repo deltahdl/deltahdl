@@ -10,6 +10,7 @@
 namespace delta {
 
 class Arena;
+struct ClassDecl;
 struct CompilationUnit;
 struct Expr;
 struct ModuleItem;
@@ -58,5 +59,33 @@ void ResolveClassScopedFormalTypes(ModuleItem& item,
                                    const CompilationUnit* unit,
                                    const ScopeMap& module_scope,
                                    const TypedefMap& typedefs, Arena& arena);
+
+// A specialization of a class (§8.25): the class and the arguments it is
+// written with, none for the class's unadorned name, which is its default
+// specialization.
+struct ClassSpecialization {
+  const ClassDecl* cls = nullptr;
+  const std::vector<DataType>* args = nullptr;
+};
+
+// §6.22.1 with §8.25: whether `a` and `b` are one type: specializations of one
+// class in which each value parameter takes the same value and each type
+// parameter a matching type, a parameter left out taking its default. The
+// arguments are written in a scope of the values `module_scope` and the
+// typedefs `typedefs`. Nothing where either does not bind.
+std::optional<bool> SameSpecialization(const ClassSpecialization& a,
+                                       const ClassSpecialization& b,
+                                       const ScopeMap& module_scope,
+                                       const TypedefMap& typedefs);
+
+// §8.5 and §8.6 with §8.25: `written`, the type a member of `handle`'s class
+// declares and the unpacked dimensions it writes, as a handle of that
+// specialization reads it: a typedef of the class followed, each type
+// parameter replaced by its actual, and each dimension folded with the
+// specialization's values. Nothing where the specialization does not bind or
+// the type does not specialize.
+std::optional<SpecializedClassType> SpecializedMemberType(
+    const ClassSpecialization& handle, const SpecializedClassType& written,
+    const ScopeMap& module_scope, const TypedefMap& typedefs, Arena& arena);
 
 }  // namespace delta

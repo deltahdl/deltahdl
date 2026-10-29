@@ -19,10 +19,8 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/rtlir.h"
-#include "elaborator/type_eval.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
-#include "parser/ast_type.h"
 
 namespace delta {
 
@@ -166,21 +164,20 @@ void Elaborator::ElaborateGenerateCase(ModuleItem* item, RtlirModule* mod,
   // §6.23 (printed page 138): a type reference is a constant usable where a
   // generate case's selector stands, and its items' type references are
   // compared with it by §6.22.1's matching, as `==` compares two of them.
-  std::optional<DataType> selector_type =
-      ResolveTypeRefOperandType(item->gen_cond, mod);
+  const bool kTypeSelector =
+      ResolveTypeRefOperandArray(item->gen_cond, mod).has_value();
   std::optional<int64_t> selector;
-  if (!selector_type) selector = ConstEvalInt(item->gen_cond, scope);
-  if (!selector_type && !selector) {
+  if (!kTypeSelector) selector = ConstEvalInt(item->gen_cond, scope);
+  if (!kTypeSelector && !selector) {
     diag_.Error(item->loc, "generate-case selector is not constant",
                 Subclause("27.5"));
     return;
   }
-  if (!selector_type && !CaseItemsAreConstant(diag_, *item, scope)) return;
+  if (!kTypeSelector && !CaseItemsAreConstant(diag_, *item, scope)) return;
   auto matches = [&](const std::vector<Expr*>& patterns) {
-    if (!selector_type) return MatchesCasePattern(patterns, *selector, scope);
+    if (!kTypeSelector) return MatchesCasePattern(patterns, *selector, scope);
     return std::any_of(patterns.begin(), patterns.end(), [&](const Expr* p) {
-      auto type = ResolveTypeRefOperandType(p, mod);
-      return type && TypesMatch(*selector_type, *type);
+      return TypeRefsMatch(item->gen_cond, p, mod).value_or(false);
     });
   };
   // Hold the default alternative itself rather than its body, because the scope

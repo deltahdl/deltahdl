@@ -4,6 +4,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <format>
+#include <functional>
+#include <span>
 #include <string_view>
 #include <unordered_map>
 #include <utility>
@@ -16,11 +18,13 @@
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/type_eval.h"
+#include "elaborator/type_ref_walks.h"
 #include "lexer/token.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 
 namespace delta {
 
@@ -307,6 +311,21 @@ void ElaboratorOperationRules::ValidateTypeRefComparisons(
   }
 }
 
+// What a chain of `.` accesses and selects starts from: `a` of `a[1].b.c[2]`,
+// a `p::v` scope resolution, or the call or other expression the chain is
+// written on.
+static const Expr* MemberChainRoot(const Expr* e) {
+  while (true) {
+    if (e->kind == ExprKind::kMemberAccess && !e->is_scope_resolution) {
+      e = e->lhs;
+    } else if (e->kind == ExprKind::kSelect && e->base != nullptr) {
+      e = e->base;
+    } else {
+      return e;
+    }
+  }
+}
+
 // §6.23 — the expression supplied to the type operator shall not contain a
 // hierarchical reference or a reference to an element of a dynamic object.
 // A member-access subtree written with `.` is treated as a hierarchical
@@ -323,60 +342,166 @@ void ElaboratorOperationRules::ValidateTypeRefComparisons(
 // The descent into the children of a `::` node still runs, so `type(C::x.y)`
 // and any `::` node holding a `.` node below it remain errors.
 //
-// §7.2 with §6.23: nor is a `.` that selects a member of a variable, `p.f` of
-// a structure `p`, which names no scope (NamesSelectableVariable).
+// §7.2 with §6.23 and §23.6: nor is a `.` that selects a member of a value or
+// calls a built-in method of one, `p.f` of a structure `p` or `s.len()` of a
+// string `s`, which names no scope (NamesSelectableValue). The value is what
+// the chain of `.` accesses and selects the access ends is written on.
 bool ElaboratorOperationRules::IsHierarchicalMemberAccess(const Expr* e) const {
   if (e->kind != ExprKind::kMemberAccess || e->is_scope_resolution)
     return false;
-  const Expr* root = e->lhs;
-  while (root->kind == ExprKind::kMemberAccess && !root->is_scope_resolution)
-    root = root->lhs;
-  return !NamesSelectableVariable(root);
+  return !NamesSelectableValue(MemberChainRoot(e->lhs));
 }
 
-// The variable package `pkg` declares as `name`; null where it declares none.
-static const ModuleItem* PackageVariable(const CompilationUnit& unit,
-                                         std::string_view pkg,
-                                         std::string_view name) {
-  for (const PackageDecl* p : unit.packages) {
-    if (p->name != pkg) continue;
-    for (const ModuleItem* item : p->items) {
-      if (item->kind == ModuleItemKind::kVarDecl && item->name == name)
-        return item;
-    }
-  }
-  return nullptr;
+// The package `unit` declares as `name`; null where it declares none.
+static const PackageDecl* PackageNamed(const CompilationUnit& unit,
+                                       std::string_view name) {
+  auto it = std::ranges::find_if(unit.packages, [&](const PackageDecl* p) {
+    return p != nullptr && p->name == name;
+  });
+  return it != unit.packages.end() ? *it : nullptr;
+}
+
+// Whether `type` is an enumeration one of whose named constants is `name`
+// (§6.19).
+static bool EnumeratesConstant(const DataType& type, std::string_view name) {
+  return type.kind == DataTypeKind::kEnum &&
+         std::ranges::any_of(type.enum_members, [&](const EnumMember& m) {
+           return m.name == name;
+         });
+}
+
+// §6.20.3: whether the parameter `item` declares is a type parameter.
+static bool DeclaresTypeParameter(const ModuleItem& item) {
+  return item.data_type.kind == DataTypeKind::kVoid &&
+         item.typedef_type.kind != DataTypeKind::kImplicit;
 }
 
 // Whether a variable declared with `type` has members a `.` selects: any but
-// a class handle, whose property is an element of a dynamic object, and a
-// virtual interface, which stands for an instance.
-bool ElaboratorOperationRules::DeclaresSelectableType(
-    const DataType& type) const {
-  return type.kind != DataTypeKind::kVirtualInterface &&
-         (type.kind != DataTypeKind::kNamed ||
-          class_names_.count(type.type_name) == 0);
+// a virtual interface, which stands for an instance. A class handle's `.`
+// selects a property or a method of the class (§8.5, §8.6), a member of the
+// object rather than an element of it.
+bool ElaboratorOperationRules::DeclaresSelectableType(const DataType& type) {
+  return type.kind != DataTypeKind::kVirtualInterface;
 }
 
-// Whether `root`, what a chain of `.` accesses starts from, names a variable
-// whose members a `.` selects: one a package declares, written behind `::`
-// (§26.3); one a block around the type operator declares, the innermost
-// declaration of the name deciding; or one the module declares, a class
-// handle and a virtual interface excepted.
-bool ElaboratorOperationRules::NamesSelectableVariable(const Expr* root) const {
-  if (root->kind == ExprKind::kMemberAccess) {
-    const ModuleItem* var =
-        PackageVariable(*unit_, root->lhs->text, root->rhs->text);
-    return var != nullptr && DeclaresSelectableType(var->data_type);
+// Whether `items`, a package's or the compilation unit's declarations,
+// declare `name` as a value whose members a `.` selects: a variable or net of
+// a type DeclaresSelectableType accepts, a value parameter, or a named
+// constant of an enumeration a typedef or a declaration writes.
+bool ElaboratorOperationRules::DeclaresSelectableValue(
+    const std::vector<ModuleItem*>& items, std::string_view name) const {
+  return std::ranges::any_of(items, [&](const ModuleItem* item) {
+    if (item == nullptr) return false;
+    if (EnumeratesConstant(item->data_type, name) ||
+        EnumeratesConstant(item->typedef_type, name)) {
+      return true;
+    }
+    if (item->name != name) return false;
+    switch (item->kind) {
+      case ModuleItemKind::kVarDecl:
+      case ModuleItemKind::kNetDecl:
+        return DeclaresSelectableType(item->data_type);
+      case ModuleItemKind::kParamDecl:
+        return !DeclaresTypeParameter(*item);
+      default:
+        return false;
+    }
+  });
+}
+
+// §26.3: whether one of the imports among `items` makes `name` a value whose
+// members a `.` selects: an import of the name itself, or a wildcard import of
+// a package declaring it.
+bool ElaboratorOperationRules::ImportsSelectableValue(
+    const std::vector<ModuleItem*>& items, std::string_view name) const {
+  return std::ranges::any_of(items, [&](const ModuleItem* item) {
+    if (item == nullptr || item->kind != ModuleItemKind::kImportDecl)
+      return false;
+    const ImportItem& import = item->import_item;
+    if (!import.is_wildcard && import.item_name != name) return false;
+    const PackageDecl* pkg = PackageNamed(*unit_, import.package_name);
+    return pkg != nullptr && DeclaresSelectableValue(pkg->items, name);
+  });
+}
+
+// §23.2.2: whether `decl` has a port the body knows as `name` that carries a
+// value: one an interface port (§25.5), which stands for an instance, and one
+// whose name is external alone (§23.2.2.1) are not.
+static bool DeclaresDataPort(const ModuleDecl& decl, std::string_view name) {
+  return std::ranges::any_of(decl.ports, [&](const PortDecl& port) {
+    return port.name == name && !port.is_interface_port &&
+           !port.is_explicit_named && port.port_expr == nullptr;
+  });
+}
+
+// The module whose type references CheckTypeRefArgInner judges: the one
+// ValidateTypeRefArgs walks, or else the one being elaborated.
+const ModuleDecl* ElaboratorOperationRules::TypeRefModule() const {
+  if (type_ref_module_ != nullptr) return type_ref_module_;
+  return module_decl_path_.empty() ? nullptr : module_decl_path_.back();
+}
+
+// Whether the bare `name` names a value of the module whose members a `.`
+// selects: a variable or net it declares, a parameter, an enumeration's named
+// constant, a port carrying a value, or a value an import of the module or of
+// the compilation unit takes, or the unit declares (§3.12.1).
+bool ElaboratorOperationRules::NamesModuleValue(std::string_view name) const {
+  auto var = var_types_.find(name);
+  if (var != var_types_.end()) {
+    return var->second != DataTypeKind::kVirtualInterface &&
+           class_var_names_.count(name) == 0;
   }
+  if (const_names_.contains(name) || enum_member_names_.contains(name))
+    return true;
+  const ModuleDecl* decl = TypeRefModule();
+  if (decl != nullptr && (DeclaresDataPort(*decl, name) ||
+                          DeclaresSelectableValue(decl->items, name) ||
+                          ImportsSelectableValue(decl->items, name))) {
+    return true;
+  }
+  return ImportsSelectableValue(unit_->cu_items, name) ||
+         DeclaresSelectableValue(unit_->cu_items, name);
+}
+
+// Whether `root`, what a chain of `.` accesses and selects starts from, names
+// a value whose members a `.` selects, rather than a scope (§23.6): the value
+// of a call or of any expression but a name; a value a package declares,
+// written behind `::` (§26.3), or the compilation unit, behind `$unit::`
+// (§3.12.1); a variable a block around the type operator declares, the
+// innermost declaration of the name deciding; or a value of the module
+// (NamesModuleValue). A name `$root.` heads names a top-level instance.
+bool ElaboratorOperationRules::NamesSelectableValue(const Expr* root) const {
+  if (root->kind == ExprKind::kMemberAccess) {
+    const PackageDecl* pkg = PackageNamed(*unit_, root->lhs->text);
+    return pkg != nullptr &&
+           DeclaresSelectableValue(pkg->items, root->rhs->text);
+  }
+  if (root->kind != ExprKind::kIdentifier) return true;
+  if (root->scope_prefix == "$root") return false;
+  if (root->scope_prefix == "$unit")
+    return DeclaresSelectableValue(unit_->cu_items, root->text);
   for (auto decl = type_ref_block_vars_.rbegin();
        decl != type_ref_block_vars_.rend(); ++decl) {
     if (decl->first == root->text) return decl->second;
   }
-  auto it = var_types_.find(root->text);
-  return root->kind == ExprKind::kIdentifier && it != var_types_.end() &&
-         it->second != DataTypeKind::kVirtualInterface &&
-         class_var_names_.count(root->text) == 0;
+  return NamesModuleValue(root->text);
+}
+
+TypeRefResolver ElaboratorOperationRules::ResolverAmongLocals(
+    const RtlirModule* mod, std::function<void(DataType&, SourceLoc)> resolve) {
+  return [this, mod, resolve = std::move(resolve)](
+             DataType& dt, SourceLoc loc,
+             std::span<const ProceduralLocal> locals) {
+    const size_t kMark = type_ref_block_vars_.size();
+    for (const ProceduralLocal& local : locals) {
+      type_ref_block_vars_.emplace_back(local.name,
+                                        DeclaresSelectableType(*local.type));
+    }
+    std::vector<Expr*> taken = TypeRefUnpackedDims(dt.type_ref_expr, mod);
+    resolve(dt, loc);
+    type_ref_block_vars_.resize(kMark);
+    return taken;
+  };
 }
 
 bool ElaboratorOperationRules::TypeRefArgHasMemberAccess(const Expr* e) const {
@@ -523,6 +648,7 @@ void ElaboratorOperationRules::WalkItemExprsForTypeRefArg(
 }
 
 void ElaboratorOperationRules::ValidateTypeRefArgs(const ModuleDecl* decl) {
+  type_ref_module_ = decl;
   // The values of the parameters the header's parameter port list declares.
   for (const auto& param : decl->params) WalkExprForTypeRefArg(param.second);
   for (const auto* item : decl->items) {
@@ -535,6 +661,7 @@ void ElaboratorOperationRules::ValidateTypeRefArgs(const ModuleDecl* decl) {
     }
     WalkItemExprsForTypeRefArg(item);
   }
+  type_ref_module_ = nullptr;
 }
 
 static bool IsIllegalOnReal(TokenKind op) {

@@ -403,4 +403,30 @@ void ResolveClassScopedFormalTypes(ModuleItem& item,
   }
 }
 
+std::optional<bool> SameSpecialization(const ClassSpecialization& a,
+                                       const ClassSpecialization& b,
+                                       const ScopeMap& module_scope,
+                                       const TypedefMap& typedefs) {
+  if (a.cls != b.cls) return false;
+  auto bound_a = BindSpecialization(a.cls, *a.args, module_scope, typedefs);
+  auto bound_b = BindSpecialization(b.cls, *b.args, module_scope, typedefs);
+  if (!bound_a || !bound_b) return std::nullopt;
+  return std::ranges::all_of(a.cls->params, [&](const auto& param) {
+    const std::string_view kName = param.first;
+    if (a.cls->type_param_names.count(kName) != 0)
+      return TypesMatch(bound_a->types[kName], bound_b->types[kName]);
+    return bound_a->scope[kName] == bound_b->scope[kName];
+  });
+}
+
+std::optional<SpecializedClassType> SpecializedMemberType(
+    const ClassSpecialization& handle, const SpecializedClassType& written,
+    const ScopeMap& module_scope, const TypedefMap& typedefs, Arena& arena) {
+  auto bound =
+      BindSpecialization(handle.cls, *handle.args, module_scope, typedefs);
+  if (!bound) return std::nullopt;
+  return SpecializeType(written.type, written.unpacked_dims,
+                        {handle.cls, *bound, arena}, 0);
+}
+
 }  // namespace delta

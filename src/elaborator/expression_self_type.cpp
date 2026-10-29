@@ -1,10 +1,12 @@
 #include "elaborator/expression_self_type.h"
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -18,6 +20,7 @@
 #include "elaborator/system_function_types.h"
 #include "elaborator/type_eval.h"
 #include "elaborator/typename_writer.h"
+#include "elaborator/unpacked_array_type.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_type.h"
@@ -203,25 +206,60 @@ std::optional<DataType> PackedSelectType(const DataType& type,
   return PackedPart(*array, select, scope);
 }
 
+// The value of `type` under the unpacked dimensions `dims`, whose outermost
+// makes the kind of array it is.
+DeclaredValue UnderDims(DataType type, const std::vector<Expr*>& dims,
+                        const ExprTypeScope& scope) {
+  DeclaredValue value{std::move(type), static_cast<uint32_t>(dims.size())};
+  value.dims = dims;
+  if (!dims.empty() && scope.array_tables != nullptr)
+    value.outermost = UnpackedDimKind(dims.front(), *scope.array_tables);
+  return value;
+}
+
+// §7.4.5: an element of an unpacked array is of the array's dimensions after
+// the first, the outermost of which makes the kind of array it is in turn.
+void DropOutermostDim(DeclaredValue& value, const ExprTypeScope& scope) {
+  --value.unpacked_dims;
+  if (value.dims.empty()) return;
+  value.dims.erase(value.dims.begin());
+  if (value.dims.empty() || scope.array_tables == nullptr) return;
+  value.outermost = UnpackedDimKind(value.dims.front(), *scope.array_tables);
+  value.index_type = IndexDimType(value.dims.front());
+}
+
 // §7.4.2 with §11.5.1: a select of the value `select` writes its base. An
 // unpacked array's element is the array's type with one dimension fewer; a
-// slice of one is an unpacked array still, which no data type alone carries.
+// slice of one is an unpacked array still, of bounds §6.22.1(f) would match
+// it by that no clause states.
 std::optional<DeclaredValue> SelectedValue(const Expr* select,
                                            const ExprTypeScope& scope) {
   if (select->base == nullptr) return std::nullopt;
   std::optional<DeclaredValue> base = ValueOf(select->base, scope);
   // §6.23: an element of a dynamic object is no operand of a type reference.
-  if (!base || base->is_dynamic) return std::nullopt;
+  if (!base || base->outermost != UnpackedKind::kFixed) return std::nullopt;
   if (base->unpacked_dims == 0)
     return AsValue(PackedSelectType(base->type, select, scope));
   if (select->index_end != nullptr) return std::nullopt;
-  --base->unpacked_dims;
+  DropOutermostDim(*base, scope);
   return base;
 }
 
-// §7.2: the member a member select names, of the type it is declared with
-// and the unpacked dimensions it writes. Nothing for a package's or class's
-// scope resolution, and for a base that is no structure or union.
+// §8.5 and §8.6: the member `name` of the class a handle of `handle` refers
+// to, a property or a function's result.
+std::optional<DeclaredValue> ClassMemberValue(const DataType& handle,
+                                              std::string_view name,
+                                              const ExprTypeScope& scope) {
+  if (!scope.class_member) return std::nullopt;
+  std::optional<UnpackedArrayType> member = scope.class_member(handle, name);
+  if (!member) return std::nullopt;
+  return UnderDims(std::move(member->element), member->dims, scope);
+}
+
+// §7.2 and §8.5: the member a member select names, of the type it is
+// declared with and the unpacked dimensions it writes, a structure's or
+// union's or a class's through a handle. Nothing for a package's or class's
+// scope resolution, and for a base that is none of those.
 std::optional<DeclaredValue> MemberValue(const Expr* access,
                                          const ExprTypeScope& scope) {
   if (access->is_scope_resolution || access->rhs == nullptr) {
@@ -231,12 +269,213 @@ std::optional<DeclaredValue> MemberValue(const Expr* access,
   if (!base || base->unpacked_dims != 0) return std::nullopt;
   const DataType* aggregate = ResolvedAggregateType(
       base->type, scope.typedefs, scope.constants, scope.arena);
-  if (aggregate == nullptr) return std::nullopt;
+  if (aggregate == nullptr)
+    return ClassMemberValue(base->type, access->rhs->text, scope);
   auto member = std::ranges::find(aggregate->struct_members, access->rhs->text,
                                   &StructMember::name);
   if (member == aggregate->struct_members.end()) return std::nullopt;
-  return DeclaredValue{MemberWrittenType(*member),
-                       static_cast<uint32_t>(member->unpacked_dims.size())};
+  return UnderDims(MemberWrittenType(*member), member->unpacked_dims, scope);
+}
+
+// §6.16.1 to §6.16.10: the type each string method that gives a value gives,
+// by the name of the type.
+using TypeNameByMethod = std::pair<std::string_view, std::string_view>;
+constexpr std::array<TypeNameByMethod, 12> kStringMethodTypes = {
+    {{"len", "int"},
+     {"getc", "byte"},
+     {"toupper", "string"},
+     {"tolower", "string"},
+     {"compare", "int"},
+     {"icompare", "int"},
+     {"substr", "string"},
+     {"atoi", "integer"},
+     {"atohex", "integer"},
+     {"atooct", "integer"},
+     {"atobin", "integer"},
+     {"atoreal", "real"}}};
+
+// §6.19.5.1 to §6.19.5.4: the methods that give a value of the enumeration.
+constexpr std::array<std::string_view, 4> kEnumerationSteps = {"first", "last",
+                                                               "next", "prev"};
+
+// §7.9.1 to §7.9.7: the methods of an associative array that give an int.
+constexpr std::array<std::string_view, 7> kAssociativeIntMethods = {
+    "num", "size", "exists", "first", "last", "next", "prev"};
+
+// §7.12.1: the array locator methods that give a queue of the array's
+// elements, and those that give a queue of their indexes.
+constexpr std::array<std::string_view, 6> kElementLocators = {
+    "find", "find_first", "find_last", "min", "max", "unique"};
+constexpr std::array<std::string_view, 4> kIndexLocators = {
+    "find_index", "find_first_index", "find_last_index", "unique_index"};
+
+// §7.12.3: the array reduction methods.
+constexpr std::array<std::string_view, 5> kReductionMethods = {
+    "sum", "product", "and", "or", "xor"};
+
+std::optional<DataType> StringMethodType(std::string_view method) {
+  auto it =
+      std::ranges::find(kStringMethodTypes, method, &TypeNameByMethod::first);
+  if (it == kStringMethodTypes.end()) return std::nullopt;
+  return TypeNameToDataType(it->second);
+}
+
+std::optional<DataType> EnumerationMethodType(const DataType& enumeration,
+                                              std::string_view method) {
+  if (std::ranges::find(kEnumerationSteps, method) != kEnumerationSteps.end())
+    return enumeration;
+  if (method == "num") return TypeNameToDataType("int");
+  if (method == "name") return TypeNameToDataType("string");
+  return std::nullopt;
+}
+
+// §7.5.2, §7.10.2.1 and §7.9.1 to §7.9.7: whether `method` of an array whose
+// outermost dimension makes an array of kind `kind` gives an int.
+bool GivesAnInt(UnpackedKind kind, std::string_view method) {
+  if (kind == UnpackedKind::kAssociative) {
+    return std::ranges::find(kAssociativeIntMethods, method) !=
+           kAssociativeIntMethods.end();
+  }
+  return kind != UnpackedKind::kFixed && method == "size";
+}
+
+// §7.12: the iterator a with clause reads, named by the method's argument, or
+// item where the method is written with none.
+std::string_view IteratorName(const Expr* host) {
+  if (host->kind == ExprKind::kCall && !host->args.empty() &&
+      host->args.front() != nullptr &&
+      host->args.front()->kind == ExprKind::kIdentifier) {
+    return host->args.front()->text;
+  }
+  return "item";
+}
+
+// §7.12.3: the type of the with clause of `host`, a reduction of `array`, in
+// which the iterator stands for an element of the array, and its index method
+// gives an int, or an associative array's index type (§7.12.4).
+std::optional<DataType> WithClauseType(const Expr* host,
+                                       const DeclaredValue& array,
+                                       const ExprTypeScope& scope) {
+  const std::string_view kIterator = IteratorName(host);
+  const DeclaredValue kElement{array.type, array.unpacked_dims - 1};
+  ExprTypeScope within = scope;
+  within.value_named =
+      [&](std::string_view name) -> std::optional<DeclaredValue> {
+    if (name == kIterator) return kElement;
+    return scope.value_named(name);
+  };
+  within.iterator = kIterator;
+  within.iterator_index = array.outermost == UnpackedKind::kAssociative
+                              ? array.index_type
+                              : TypeNameToDataType("int");
+  return ExprSelfType(host->with_expr, within);
+}
+
+// §7.12.3: a reduction gives the array's element type, or the type of its with
+// clause's expression where one is written.
+std::optional<DataType> ReductionType(const Expr* host,
+                                      const DeclaredValue& array,
+                                      const ExprTypeScope& scope) {
+  if (host->with_expr != nullptr) return WithClauseType(host, array, scope);
+  if (array.unpacked_dims != 1) return std::nullopt;
+  return array.type;
+}
+
+std::optional<DataType> ArrayMethodType(const Expr* host,
+                                        std::string_view method,
+                                        const DeclaredValue& array,
+                                        const ExprTypeScope& scope) {
+  if (std::ranges::find(kReductionMethods, method) != kReductionMethods.end())
+    return ReductionType(host, array, scope);
+  if (GivesAnInt(array.outermost, method)) return TypeNameToDataType("int");
+  // §7.10.2.4 and §7.10.2.5: a queue's pop_front and pop_back give an
+  // element of the queue.
+  bool pops = method == "pop_front" || method == "pop_back";
+  if (!pops || array.outermost != UnpackedKind::kQueue ||
+      array.unpacked_dims != 1) {
+    return std::nullopt;
+  }
+  return array.type;
+}
+
+// Whether `receiver` names the iterator of the with clause `scope` reads.
+bool IsIterator(const Expr* receiver, const ExprTypeScope& scope) {
+  return !scope.iterator.empty() && receiver != nullptr &&
+         receiver->kind == ExprKind::kIdentifier &&
+         receiver->text == scope.iterator;
+}
+
+// The type a call of a built-in method gives, `host` being the call, or the
+// member access naming the method where the call leaves out its parentheses
+// (§5.13): by the method's name and the value it is called on, a string, an
+// enumeration or an array. Nothing for a method that gives no value, and for
+// a value it is no method of.
+std::optional<DataType> BuiltinMethodType(const Expr* host,
+                                          const ExprTypeScope& scope) {
+  const Expr* member = BuiltinMethodMember(host);
+  if (member == nullptr) return std::nullopt;
+  const std::string_view kMethod = member->rhs->text;
+  if (kMethod == "index" && IsIterator(member->lhs, scope))
+    return scope.iterator_index;
+  std::optional<DeclaredValue> receiver = ValueOf(member->lhs, scope);
+  if (!receiver) return std::nullopt;
+  if (receiver->unpacked_dims != 0)
+    return ArrayMethodType(host, kMethod, *receiver, scope);
+  DataTypeKind kind = ResolvedTypeKind(receiver->type, scope.typedefs);
+  if (kind == DataTypeKind::kString) return StringMethodType(kMethod);
+  if (kind == DataTypeKind::kEnum)
+    return EnumerationMethodType(receiver->type, kMethod);
+  return std::nullopt;
+}
+
+// §7.10: a queue, `[$]` its own dimension, outermost, of elements of
+// `element` under the dimensions `inner`, the `$` made in `arena`.
+UnpackedArrayType QueueOf(DataType element, std::span<Expr* const> inner,
+                          Arena& arena) {
+  auto* queue = arena.Create<Expr>();
+  queue->kind = ExprKind::kIdentifier;
+  queue->text = "$";
+  std::vector<Expr*> dims{queue};
+  dims.insert(dims.end(), inner.begin(), inner.end());
+  return UnpackedArrayType{std::move(element), std::move(dims)};
+}
+
+// §7.12.1: the queue an array locator method's call `host` gives, of the
+// array's elements or of an index of one: an int, or an associative array's
+// index type. Nothing where `host` calls no locator method, and for an array
+// whose dimensions, or whose index type, are not recorded.
+std::optional<UnpackedArrayType> LocatorType(const Expr* host,
+                                             const ExprTypeScope& scope) {
+  const Expr* member = BuiltinMethodMember(host);
+  if (member == nullptr) return std::nullopt;
+  const std::string_view kMethod = member->rhs->text;
+  const bool kElements =
+      std::ranges::find(kElementLocators, kMethod) != kElementLocators.end();
+  if (!kElements &&
+      std::ranges::find(kIndexLocators, kMethod) == kIndexLocators.end()) {
+    return std::nullopt;
+  }
+  std::optional<DeclaredValue> array = ValueOf(member->lhs, scope);
+  if (!array || array->unpacked_dims == 0 ||
+      array->dims.size() != array->unpacked_dims) {
+    return std::nullopt;
+  }
+  if (kElements) {
+    return QueueOf(array->type, std::span(array->dims).subspan(1), scope.arena);
+  }
+  if (array->outermost != UnpackedKind::kAssociative)
+    return QueueOf(TypeNameToDataType("int"), {}, scope.arena);
+  if (!array->index_type) return std::nullopt;
+  return QueueOf(*array->index_type, {}, scope.arena);
+}
+
+// A `.` selects a member of a structure or union, or else, without
+// parentheses, calls a built-in method.
+std::optional<DeclaredValue> MemberOrMethodValue(const Expr* access,
+                                                 const ExprTypeScope& scope) {
+  if (std::optional<DeclaredValue> member = MemberValue(access, scope))
+    return member;
+  return AsValue(BuiltinMethodType(access, scope));
 }
 
 std::optional<DeclaredValue> ValueOf(const Expr* expr,
@@ -249,10 +488,25 @@ std::optional<DeclaredValue> ValueOf(const Expr* expr,
     case ExprKind::kSelect:
       return SelectedValue(expr, scope);
     case ExprKind::kMemberAccess:
-      return MemberValue(expr, scope);
+      return MemberOrMethodValue(expr, scope);
     default:
       return AsValue(ExprSelfType(expr, scope));
   }
+}
+
+// A call of a built-in method, of a class's method through a handle (§8.6),
+// or of a function the scope declares.
+std::optional<DataType> CallType(const Expr* call, const ExprTypeScope& scope) {
+  if (std::optional<DataType> builtin = BuiltinMethodType(call, scope))
+    return builtin;
+  const Expr* method = call->lhs;
+  if (method != nullptr && method->kind == ExprKind::kMemberAccess &&
+      !method->is_scope_resolution) {
+    std::optional<DeclaredValue> result = MemberValue(method, scope);
+    if (!result || result->unpacked_dims != 0) return std::nullopt;
+    return std::move(result->type);
+  }
+  return scope.call_returns(call);
 }
 
 // A name, a select or a member: the value's type, nothing for an unpacked
@@ -483,6 +737,20 @@ DataType VectorType(uint32_t width, bool is_signed, bool four_state,
   return type;
 }
 
+std::optional<UnpackedArrayType> ValueArrayType(const DeclaredValue& value) {
+  if (value.dims.size() != value.unpacked_dims) return std::nullopt;
+  return UnpackedArrayType{value.type, value.dims};
+}
+
+std::optional<UnpackedArrayType> ExprSelfArrayType(const Expr* expr,
+                                                   const ExprTypeScope& scope) {
+  if (std::optional<UnpackedArrayType> located = LocatorType(expr, scope))
+    return located;
+  std::optional<DeclaredValue> value = ValueOf(expr, scope);
+  if (!value) return std::nullopt;
+  return ValueArrayType(*value);
+}
+
 std::optional<DataType> ExprSelfType(const Expr* expr,
                                      const ExprTypeScope& scope) {
   if (expr == nullptr) return std::nullopt;
@@ -492,7 +760,7 @@ std::optional<DataType> ExprSelfType(const Expr* expr,
     case ExprKind::kMemberAccess:
       return WholeValueType(expr, scope);
     case ExprKind::kCall:
-      return scope.call_returns(expr);
+      return CallType(expr, scope);
     case ExprKind::kCast:
       return CastType(expr, scope);
     case ExprKind::kSystemCall:

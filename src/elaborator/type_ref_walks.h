@@ -1,6 +1,9 @@
 #pragma once
 
 #include <functional>
+#include <span>
+#include <string_view>
+#include <vector>
 
 #include "common/source_loc.h"
 #include "parser/ast_type.h"
@@ -10,13 +13,28 @@ namespace delta {
 class Arena;
 struct ClassDecl;
 struct CompilationUnit;
+struct Expr;
 struct ModuleItem;
 
+// A name a procedure declares, with the type and unpacked dimensions it was
+// declared with.
+struct ProceduralLocal {
+  std::string_view name;
+  const DataType* type;
+  const std::vector<Expr*>* unpacked_dims;
+};
+
 // Resolves, in place, the type reference a declaration's type holds, written
-// at the given position, where its argument names nothing the procedure
+// at the given position, where its argument is no name the procedure
 // declares: a module's, a class's, a package's or the compilation unit's
-// resolution of the names it declares.
-using TypeRefResolver = std::function<void(DataType&, SourceLoc)>;
+// resolution of the names it declares. The names the procedure declares ahead
+// of the declaration, latest last, are given with it, empty for a declaration
+// no procedure writes, since a `.` written after one of them selects a member
+// of the procedure's value (§6.21). Answers the unpacked dimensions of the
+// array the reference names, which a declaration takes inside those it writes
+// (§7.4.4), and none where it names no unpacked array.
+using TypeRefResolver = std::function<std::vector<Expr*>(
+    DataType&, SourceLoc, std::span<const ProceduralLocal>)>;
 
 // §6.23 with A.2.7, A.2.8 and A.6.8: the type references of the subroutine or
 // procedural block `item`, resolved in place: its formals' types, the types of
@@ -35,11 +53,13 @@ void ResolveProceduralTypeRefs(ModuleItem* item,
 // resolved in place: its properties' types, the associative indexes its
 // properties and typedefs write as type references (A.2.5), whose types are
 // made in `arena`, those its methods write (ResolveProceduralTypeRefs), and
-// those of the classes nested in it. A name the class declares as a property is
-// the class's own, over the scope around it, which `resolve_outer` resolves any
-// other name in.
+// those of the classes nested in it. A name the class declares as a property,
+// or inherits as one from a class it extends that `unit` declares (§8.13),
+// written bare or selected of `this` (§8.11), is the class's own, over the
+// scope around it, and stands for the property's type and unpacked
+// dimensions; `resolve_outer` resolves any other name.
 void ResolveClassTypeRefs(ClassDecl& cls, const TypeRefResolver& resolve_outer,
-                          Arena& arena);
+                          const CompilationUnit* unit, Arena& arena);
 
 // §6.23 with §26.2 and §3.12.1: the type references a package or the
 // compilation unit writes outside its modules, resolved in place against the

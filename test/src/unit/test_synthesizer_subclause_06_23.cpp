@@ -37,8 +37,9 @@ TEST(TypeOperatorSynthesis, FoldedComparisonLowersToTheBitItStandsFor) {
 }
 
 // The case fails on a run that answers a netlist for this module. The
-// elaborator does not type a method call's type reference, so it leaves this
-// comparison unfolded, and each operand of the comparison reaches
+// elaborator gives a slice of an unpacked array no type, since the bounds its
+// type would match by (§6.22.1(f)) are not ones the standard states, so it
+// leaves this comparison unfolded, and each operand of the comparison reaches
 // `SynthLower::LowerExprBit` in src/synthesizer/synth_lower.cpp as an
 // `ExprKind::kTypeRef`, for which that function builds no node. A design that
 // wrote the operator got a netlist contributing constant zero at every bit of
@@ -48,17 +49,17 @@ TEST(TypeOperatorSynthesis, FoldedComparisonLowersToTheBitItStandsFor) {
 // declares.
 TEST(TypeOperatorSynthesis, TypeReferenceIsReportedRatherThanLoweredToZero) {
   SynthFixture f;
-  const auto* mod = ElaborateSrc(f,
-                                 "module m(output logic y);\n"
-                                 "  typedef enum logic [1:0] {A, B} e_t;\n"
-                                 "  e_t e;\n"
-                                 "  assign y = (type(e.next()) == type(e_t));\n"
-                                 "endmodule\n");
+  const auto* mod =
+      ElaborateSrc(f,
+                   "module m(output logic y);\n"
+                   "  logic [3:0] u [4];\n"
+                   "  assign y = (type(u[0:1]) == type(u[2:3]));\n"
+                   "endmodule\n");
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   EXPECT_EQ(synth.Lower(mod), nullptr);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "the type operator has no lowering", 4, "6.23"));
+                            "the type operator has no lowering", 3, "6.23"));
 }
 
 }  // namespace

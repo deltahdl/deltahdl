@@ -195,4 +195,45 @@ TEST(TypeOfThisClassSim, SpecializationPropertyHoldsItsOwnSpecialization) {
   EXPECT_EQ(RunAndGet(kSrc, "a"), 0x7FFu);
 }
 
+// §6.23 with §8.5, §8.11 and §8.13: in a method, a declaration written with a
+// type reference to a property, read through this or by its bare name, takes
+// the property's type and unpacked dimensions, a property the class inherits
+// included. probe() reads its own byte x and unpacked y; inherited() reads x
+// from its base and its own int z.
+TEST(TypeOfThisClassSim, DeclarationThroughThisTakesThePropertysType) {
+  const std::string kSrc =
+      "class B;\n"
+      "  byte x;\n"
+      "  logic [3:0] y [2];\n"
+      "  function int probe();\n"
+      "    var type(this.x) v;\n"
+      "    var type(this.y) w;\n"
+      "    var type(x) u;\n"
+      "    v = -1;\n"
+      "    return $bits(v) * 1000 + (v < 0) * 100 + $size(w) * 10 +\n"
+      "           $bits(u) / 8;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "class E extends B;\n"
+      "  int z;\n"
+      "  function int inherited();\n"
+      "    var type(this.x) v;\n"
+      "    var type(x) u;\n"
+      "    var type(this.z) w;\n"
+      "    return $bits(v) * 1000 + $bits(u) * 10 + $bits(w) / 32;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int p, i;\n"
+      "  E e;\n"
+      "  initial begin\n"
+      "    e = new;\n"
+      "    p = e.probe();\n"
+      "    i = e.inherited();\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(kSrc, "p"), 8121u);
+  EXPECT_EQ(RunAndGet(kSrc, "i"), 8081u);
+}
+
 }  // namespace
