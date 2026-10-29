@@ -23,6 +23,7 @@
 
 #include <cstdint>
 #include <format>
+#include <string>
 
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
@@ -119,20 +120,44 @@ TEST(NetDeclDriveStrength, EveryNetTypeIsHeldToTheRule) {
   }
 }
 
-// A vector declared with a drive strength is held to the rule like a scalar.
-TEST(NetDeclDriveStrength, VectorNetIsHeldToTheRule) {
-  ElabFixture f;
-  ElabOk(
-      "module m;\n"
-      "  tri (pull0, pull1) [7:0] v;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kStrengthNeedsAssignment, 2,
-                            "6.3.2"));
-  EXPECT_TRUE(
-      ElabOk("module m;\n"
-             "  tri (pull0, pull1) [7:0] v = 8'h5a;\n"
-             "endmodule\n"));
+// §10.3.4 applies a drive strength only to a scalar net other than supply0 and
+// supply1, so a vector net and a supply net carrying one are reported under
+// that rule whether or not an assignment follows. They are held to §6.3.2's
+// rule all the same: without the assignment it is reported beside §10.3.4's,
+// and with it §10.3.4's report stands alone.
+TEST(NetDeclDriveStrength, NetsNoStrengthAppliesToAreHeldToTheRule) {
+  struct Net {
+    const char* decl;
+    const char* strength_rule;
+  };
+  for (const Net& n : {
+           Net{"tri (pull0, pull1) [7:0] v", "applies only to scalar nets"},
+           Net{"supply0 (pull0, pull1) v",
+               "does not apply to supply0 or supply1 nets"},
+           Net{"supply1 (pull0, pull1) v",
+               "does not apply to supply0 or supply1 nets"},
+       }) {
+    const std::string kStrengthRule =
+        std::string("drive strength on continuous assignment ") +
+        n.strength_rule;
+    ElabFixture bare;
+    ElabOk(std::format("module m;\n  {};\nendmodule\n", n.decl), bare);
+    EXPECT_TRUE(ReportedError(bare.diag.Diagnostics(), kStrengthNeedsAssignment,
+                              2, "6.3.2"))
+        << n.decl;
+    EXPECT_TRUE(
+        ReportedError(bare.diag.Diagnostics(), kStrengthRule, 2, "10.3.4"))
+        << n.decl;
+    ElabFixture assigned;
+    ElabOk(std::format("module m;\n  {} = 1'b1;\nendmodule\n", n.decl),
+           assigned);
+    EXPECT_FALSE(ReportedError(assigned.diag.Diagnostics(),
+                               kStrengthNeedsAssignment, 2, "6.3.2"))
+        << n.decl;
+    EXPECT_TRUE(
+        ReportedError(assigned.diag.Diagnostics(), kStrengthRule, 2, "10.3.4"))
+        << n.decl;
+  }
 }
 
 // The declaration is held to the rule in an interface's body, a program's and
