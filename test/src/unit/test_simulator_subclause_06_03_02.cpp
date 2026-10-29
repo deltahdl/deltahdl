@@ -15,52 +15,50 @@ using namespace delta;
 
 namespace {
 
-// $typename names the data type alone. Each net carrying a strength is named
-// as the same net without one and as the type written out, and the signed
-// forms make the comparison one a fallback to plain `logic` would fail.
+// $typename names the data type alone, so each net carrying a strength names
+// the type the same net declared without one names. The vector pair is named
+// in full, a name no fallback to plain `logic` would give, and the signed pair
+// is compared with each other: #9006 has a signed net's name leave out signed.
 TEST(NetStrengthSim, TypenameLeavesOutTheStrength) {
   SimFixture f;
   std::string out = RunCapture(
       "module t;\n"
       "  logic a = 1'b1;\n"
-      "  wire (strong0, weak1) logic signed ws = a;\n"
-      "  wire logic signed ps = a;\n"
+      "  wire (strong0, weak1) w = a;\n"
+      "  wire p = a;\n"
       "  trireg (large) c;\n"
+      "  trireg c0;\n"
+      "  trireg (large) [3:0] v4;\n"
+      "  trireg [3:0] v5;\n"
       "  trireg (small) signed [3:0] cap2;\n"
       "  trireg signed [3:0] cap3;\n"
       "  initial begin\n"
-      "    $display(\"%0d\", $typename(ws) == $typename(ps));\n"
-      "    $display(\"%0d\", $typename(ws) == $typename(logic signed));\n"
-      "    $display(\"%0d\", $typename(c) == $typename(logic));\n"
+      "    $display(\"%s %s\", $typename(w), $typename(p));\n"
+      "    $display(\"%s %s\", $typename(c), $typename(c0));\n"
+      "    $display(\"%s %s\", $typename(v4), $typename(v5));\n"
       "    $display(\"%0d\", $typename(cap2) == $typename(cap3));\n"
-      "    $display(\"%0d\",\n"
-      "             $typename(cap2) == $typename(logic signed [3:0]));\n"
-      "    $display(\"%0d\", $typename(cap2) == $typename(logic [3:0]));\n"
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_EQ(out, "1\n1\n1\n1\n1\n0\n");
+  EXPECT_EQ(out, "logic logic\nlogic logic\nlogic[3:0] logic[3:0]\n1\n");
 }
 
-// A type comparison and $bits read the same data type: each net carrying a
-// strength matches the type written without one and holds its width, while
-// the unsigned type beside the signed trireg does not match it.
-TEST(NetStrengthSim, TypeComparisonAndBitsLeaveOutTheStrength) {
+// $bits counts the bits of the data type, and a strength adds none: each net
+// carrying one is as wide as the same net declared without it. #9007 holds
+// the type operator's comparisons of a net's type.
+TEST(NetStrengthSim, BitsLeaveOutTheStrength) {
   const std::string kSrc =
       "module t;\n"
       "  logic a = 1'b1;\n"
       "  wire (strong0, weak1) w = a;\n"
       "  trireg (large) c;\n"
       "  trireg (small) signed [3:0] cap2;\n"
+      "  trireg signed [3:0] cap3;\n"
       "  int r;\n"
-      "  initial begin\n"
-      "    r = {type(w) == type(logic), type(c) == type(logic),\n"
-      "         type(cap2) == type(logic signed [3:0]),\n"
-      "         type(cap2) == type(logic [3:0]),\n"
-      "         $bits(w) == 1, $bits(c) == 1, $bits(cap2) == 4};\n"
-      "  end\n"
+      "  initial r = {$bits(w) == 1, $bits(c) == 1, $bits(cap2) == 4,\n"
+      "               $bits(cap2) == $bits(cap3)};\n"
       "endmodule\n";
-  EXPECT_EQ(RunAndGet(kSrc, "r"), 0b1110111u);
+  EXPECT_EQ(RunAndGet(kSrc, "r"), 0b1111u);
 }
 
 // The weak 1 stays on the net's bit, where %v renders it, but a value read from
