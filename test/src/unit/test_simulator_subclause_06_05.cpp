@@ -174,4 +174,24 @@ TEST(StrengthLostOnAVariable, ValueConvertsToTheVariablesType) {
   EXPECT_EQ(out, "7.0 3 -3 bc 255 -1\n");
 }
 
+// An input port connected to an expression is continuously assigned it
+// (§23.3.3), so a variable port converts the value to its own type: an
+// integer expression into a real port, a real one into an int port rounded
+// with ties away from zero.
+TEST(StrengthLostOnAVariable, InputPortVariableConvertsTheConnectedValue) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module sub(input var real r, input var int i);\n"
+      "  initial #1 $display(\"%0.1f %0d\", r, i);\n"
+      "endmodule\n"
+      "module t;\n"
+      "  int k = 3;\n"
+      "  real h = 2.5;\n"
+      "  sub s(.r(k + 1), .i(h));\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(out, "4.0 3\n");
+}
+
 }  // namespace
