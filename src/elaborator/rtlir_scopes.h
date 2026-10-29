@@ -91,7 +91,7 @@ inline std::string_view DeclaredScopedName(
 // The two things DeclaredScopedName resolves a reference against: the
 // generate blocks the reference stands in, outermost first, and every name a
 // declaration of the module is recorded under.
-struct DeclaredNames {
+struct ScopedDeclarations {
   const GenBlockPrefixes& scopes;
   const std::unordered_set<std::string_view>& declared;
 };

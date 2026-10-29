@@ -227,7 +227,7 @@ static std::vector<size_t> OutputOrInoutTerminalIndices(GateKind kind,
 struct TerminalScope {
   const RtlirModule* mod;
   const ScopeMap& scope;
-  const DeclaredNames& names;
+  const ScopedDeclarations& names;
 };
 
 // §4.9.6 / §23.3.3: the elaboration-time bit width of a structural net
@@ -315,7 +315,7 @@ std::vector<size_t> PrimitiveDrivenTerminalIndices(const ModuleItem* item) {
 void ValidatePrimitiveOutputTerminalWidths(const ModuleItem* item,
                                            const RtlirModule* mod,
                                            const ScopeMap& scope,
-                                           const DeclaredNames& names,
+                                           const ScopedDeclarations& names,
                                            DiagEngine& diag) {
   // §4.9.6 states the rule this enforces for both kinds: primitive terminals,
   // UDP terminals among them, are not module ports, and a primitive's output

@@ -239,7 +239,7 @@ void ValidateItemDelaysNonNegative(const ModuleItem* item,
 void ValidatePrimitiveOutputTerminalWidths(const ModuleItem* item,
                                            const RtlirModule* mod,
                                            const ScopeMap& scope,
-                                           const DeclaredNames& names,
+                                           const ScopedDeclarations& names,
                                            DiagEngine& diag);
 
 // The indices of the terminals a gate or user-defined primitive instance
