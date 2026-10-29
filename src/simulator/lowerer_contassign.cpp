@@ -287,9 +287,11 @@ static void ApplyContAssignToVariable(const ContAssignParams& params,
                                 ctx, arena);
     };
   }
-  if (var->is_forced) return;
-  var->value = ResizeToWidth(driven_val, var->value.width, arena);
-  var->NotifyWatchers();
+  // §6.5 (printed page 91): the value converts to the variable's type as an
+  // assignment's does -- a real by §6.12.1, a 2-state variable taking 0 for an
+  // x or a z -- and the strength it was driven with is lost.
+  WriteVar(var, ConvertRealOnAssign(driven_val, params.lhs, *var, ctx, arena),
+           arena);
 }
 
 static void ApplyContAssignResult(const ContAssignParams& params,
