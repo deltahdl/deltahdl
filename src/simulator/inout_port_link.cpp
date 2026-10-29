@@ -1,21 +1,28 @@
 #include "simulator/inout_port_link.h"
 
+#include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
 
 #include "common/arena.h"
+#include "common/packed_range.h"
 #include "common/types.h"
+#include "parser/ast_expr.h"
 #include "simulator/evaluation.h"
 #include "simulator/interconnect_drive.h"
+#include "simulator/lowerer_child.h"
 #include "simulator/lowerer_contassign_driver.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
 #include "simulator/specify.h"
 #include "simulator/specify_sdf.h"
+#include "simulator/statement_assign.h"
 #include "simulator/variable.h"
 
 namespace delta {
@@ -36,6 +43,27 @@ struct ScratchNet {
   }
 };
 
+// Where `partial`, bits [outer_lo, outer_lo + width) of a link's outer net
+// joined to bits [inner_lo, inner_lo + width) of its inner one, none where the
+// width is zero; otherwise the two whole nets.
+struct LinkBits {
+  uint32_t outer_lo = 0;
+  uint32_t inner_lo = 0;
+  uint32_t width = 0;
+  bool partial = false;
+};
+
+// The driver a link holds on one net set, where `partial`, to drive only
+// `width` bits from `lo`, taking them from the bits from `src_lo` of what the
+// other net resolved to.
+void DriveOnly(ContAssignDriver& drv, bool partial, uint32_t lo,
+               uint32_t src_lo, uint32_t width) {
+  drv.partial = partial;
+  drv.lo = lo;
+  drv.src_lo = src_lo;
+  drv.width = width;
+}
+
 // One link: the driver it holds on each net, allocated when it first carries
 // something, and what each direction resolves.
 struct InoutPortLink {
@@ -50,7 +78,7 @@ struct InoutPortLink {
   // `inner`'s drivers but the link's own.
   ScratchNet toward_outer;
 
-  InoutPortLink(InoutPortLinkEnds e, Arena& arena)
+  InoutPortLink(InoutPortLinkEnds e, LinkBits bits, Arena& arena)
       : ends(std::move(e)),
         toward_inner(ends.outer, arena),
         toward_outer(ends.inner, arena) {
@@ -59,6 +87,8 @@ struct InoutPortLink {
     to_outer.source_port = ends.port;
     to_inner.net = &ends.inner;
     to_inner.origin = ends.outer_origin;
+    DriveOnly(to_outer, bits.partial, bits.outer_lo, bits.inner_lo, bits.width);
+    DriveOnly(to_inner, bits.partial, bits.inner_lo, bits.outer_lo, bits.width);
   }
 };
 
@@ -155,6 +185,50 @@ void CarryIn(const std::shared_ptr<InoutPortLink>& link, std::size_t slot,
       ctx, kArrive);
 }
 
+// Joins the bits `bits` names of the two nets of `ends`, each direction told of
+// every write to a driver of the net it carries from.
+void RegisterLink(InoutPortLinkEnds ends, LinkBits bits, SimContext& ctx) {
+  auto link =
+      std::make_shared<InoutPortLink>(std::move(ends), bits, ctx.GetArena());
+  link->ends.outer.driver_listeners.emplace_back(
+      [link, &ctx](std::size_t slot) { CarryIn(link, slot, ctx); });
+  link->ends.inner.driver_listeners.emplace_back(
+      [link, &ctx](std::size_t slot) { CarryOut(*link, slot, ctx); });
+}
+
+// One part of an inout port's connection: bits [lo, lo + width) of `net`,
+// which the parent holds under `name`.
+struct OuterPart {
+  Net* net;
+  std::string name;
+  PartSelectBits bits;
+};
+
+// Appends the parts `e` names, the most significant first: each part of a
+// concatenation in turn, and otherwise the net `e` names, all of it, or the
+// bits a select of it names (§11.5.1). False where a part is no net of the
+// parent.
+bool CollectOuterParts(const Expr* e, const InoutPortConnection& conn,
+                       SimContext& ctx, std::vector<OuterPart>& parts) {
+  if (e->kind == ExprKind::kConcatenation) {
+    return std::all_of(e->elements.begin(), e->elements.end(),
+                       [&](const Expr* part) {
+                         return CollectOuterParts(part, conn, ctx, parts);
+                       });
+  }
+  const Expr* object = e;
+  while (object->kind == ExprKind::kSelect) object = object->base;
+  std::string name =
+      GenBlockObjectKey(conn.outer_origin, conn.gen_blocks, object->text, ctx);
+  Net* net = ctx.FindNet(name);
+  if (net == nullptr) return false;
+  PartSelectBits bits{0, net->resolved->value.width, 0};
+  if (e != object)
+    bits = SelectStorageBits(*net->resolved, e, ctx, ctx.GetArena());
+  parts.push_back({net, std::move(name), bits});
+  return true;
+}
+
 }  // namespace
 
 void LinkInoutPortNets(InoutPortLinkEnds ends, SimContext& ctx) {
@@ -163,11 +237,34 @@ void LinkInoutPortNets(InoutPortLinkEnds ends, SimContext& ctx) {
   // net and two linked nets by the inner taking the outer's type.
   if (ends.inner.type == NetType::kInterconnect)
     ends.inner.type = ends.outer.type;
-  auto link = std::make_shared<InoutPortLink>(std::move(ends), ctx.GetArena());
-  link->ends.outer.driver_listeners.emplace_back(
-      [link, &ctx](std::size_t slot) { CarryIn(link, slot, ctx); });
-  link->ends.inner.driver_listeners.emplace_back(
-      [link, &ctx](std::size_t slot) { CarryOut(*link, slot, ctx); });
+  RegisterLink(std::move(ends), LinkBits{}, ctx);
+}
+
+void LinkInoutPortConnection(const InoutPortConnection& conn, SimContext& ctx) {
+  std::vector<OuterPart> parts;
+  if (!CollectOuterParts(&conn.connection, conn, ctx, parts)) return;
+  // §23.3.3 sizes a port connection like an assignment, so a connection
+  // narrower than the port leaves the port's high bits unjoined and one wider
+  // joins its low bits alone: each part takes the bits left above the parts
+  // after it, as many of its own as fit.
+  const int64_t kInnerWidth = conn.inner.resolved->value.width;
+  uint32_t inner_lo = 0;
+  for (auto it = parts.rbegin(); it != parts.rend(); ++it) {
+    const auto kWidth = static_cast<uint32_t>(
+        std::clamp<int64_t>(kInnerWidth - inner_lo, 0, it->bits.width));
+    RegisterLink({*it->net, conn.inner, conn.outer_origin, conn.inner_origin,
+                  conn.port, SdfHierName(it->name), SdfHierName(conn.port)},
+                 {it->bits.lo, inner_lo, kWidth, true}, ctx);
+    inner_lo += it->bits.width;
+  }
+}
+
+std::string SdfHierName(const std::string& dotted) {
+  std::string out = dotted;
+  for (char& c : out) {
+    if (c == '.') c = '/';
+  }
+  return out;
 }
 
 }  // namespace delta

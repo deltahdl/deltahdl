@@ -1,7 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <string>
+#include <utility>
+
 #include "common/types.h"
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "simulator/lowerer.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
@@ -233,6 +237,192 @@ TEST(PortConnectionSchedulingSim,
   lowerer.Lower(design);
   f.scheduler.Run();
   EXPECT_EQ(f.ctx.FindVariable("out_sig")->value.ToUint64() & 1u, 1u);
+}
+
+// The output of a design whose module `child` is `child` and whose module `top`
+// holds `top`, each side of an inout port displaying what it reads there.
+std::string RunAcrossInout(const std::string& child, const std::string& top) {
+  SimFixture f;
+  return RunCapture(child + "module top;\n" + top + "endmodule\n", f);
+}
+
+// The child of an inout port test that drives nothing and shows, at time 1,
+// what its port reads.
+constexpr const char* kReadingChild =
+    "module child(inout wire [3:0] p);\n"
+    "  initial #1 $display(\"in=%b\", p);\n"
+    "endmodule\n";
+
+// §4.9.6 (printed page 71): an inout port joins the local net and the outside
+// net in both directions. Outward is shown above; inward, a value driven on the
+// outside net is what the port's net reads inside the instance.
+TEST(PortConnectionSchedulingSim, InoutPortCarriesAnOutsideValueInward) {
+  std::string out = RunAcrossInout(kReadingChild,
+                                   "  wire [3:0] bus;\n"
+                                   "  assign bus = 4'b1001;\n"
+                                   "  child u(.p(bus));\n");
+  EXPECT_NE(out.find("in=1001"), std::string::npos) << out;
+}
+
+// §4.9.6: the drivers on the two sides of an inout port resolve as one network,
+// so both sides read the one resolved value: a strong 1 inside overcomes a weak
+// 0 outside, and against a strong 0 outside both sides read x.
+std::string RunInoutAgainst(const std::string& outside_drive) {
+  return RunAcrossInout(
+      "module child(inout wire p);\n"
+      "  assign p = 1'b1;\n"
+      "  initial #1 $display(\"in=%b\", p);\n"
+      "endmodule\n",
+      "  wire bus;\n" + outside_drive +
+          "  child u(.p(bus));\n"
+          "  initial #2 $display(\"out=%b\", bus);\n");
+}
+
+TEST(PortConnectionSchedulingSim, InoutPortSidesResolveAsOneNetwork) {
+  std::string weaker = RunInoutAgainst("  assign (weak0, weak1) bus = 1'b0;\n");
+  EXPECT_NE(weaker.find("in=1\nout=1"), std::string::npos) << weaker;
+  std::string equal = RunInoutAgainst("  assign bus = 1'b0;\n");
+  EXPECT_NE(equal.find("in=x\nout=x"), std::string::npos) << equal;
+}
+
+// §4.9.6: an inout port is like an always-enabled tran but reduces no strength
+// at all; a tran reduces supply to strong (§28.13) and a port does not. A drive
+// of `strength` on one side, inward or outward, therefore reads at that same
+// strength on both sides under %v.
+std::string StrengthAcrossInout(const std::string& strength, bool inward) {
+  std::string drive =
+      "  assign " + strength + (inward ? " bus" : " p") + " = 1'b1;\n";
+  return RunAcrossInout("module child(inout wire p);\n" +
+                            (inward ? std::string() : drive) +
+                            "  initial #1 $display(\"in=%v\", p);\n"
+                            "endmodule\n",
+                        "  wire bus;\n" + (inward ? drive : std::string()) +
+                            "  child u(.p(bus));\n"
+                            "  initial #2 $display(\"out=%v\", bus);\n");
+}
+
+TEST(PortConnectionSchedulingSim, InoutPortPassesEveryStrengthUnreduced) {
+  const std::pair<const char*, const char*> kDrives[] = {
+      {"(weak0, weak1)", "We1"},
+      {"(pull0, pull1)", "Pu1"},
+      {"(strong0, strong1)", "St1"},
+      {"(supply0, supply1)", "Su1"}};
+  for (const auto& [strength, shown] : kDrives) {
+    for (bool inward : {false, true}) {
+      std::string out = StrengthAcrossInout(strength, inward);
+      std::string both = std::string("in=") + shown + "\nout=" + shown;
+      EXPECT_NE(out.find(both), std::string::npos)
+          << strength << (inward ? " inward" : " outward") << ": " << out;
+    }
+  }
+}
+
+// §4.9.6 with §23.3.3.3 (printed page 747): an inout port may be connected to a
+// select of a net. Outward, the port's value lands on the bits the select names
+// and leaves the net's other bits to their own drivers; the bus's bit 0 is
+// driven apart and its bit 3 by nothing.
+TEST(PortConnectionSchedulingSim, InoutPortOnASelectDrivesOnlyItsBitsOutward) {
+  const char* const kChild =
+      "module child(inout wire [1:0] p);\n"
+      "  assign p = 2'b10;\n"
+      "endmodule\n";
+  const char* const kConnections[] = {"bus[2:1]", "bus[1 +: 2]", "bus[2 -: 2]"};
+  for (const char* connection : kConnections) {
+    std::string out =
+        RunAcrossInout(kChild, std::string("  wire [3:0] bus;\n"
+                                           "  assign bus[0] = 1'b1;\n"
+                                           "  child u(.p(") +
+                                   connection +
+                                   "));\n"
+                                   "  initial #1 $display(\"out=%b\", bus);\n");
+    EXPECT_NE(out.find("out=z101"), std::string::npos)
+        << connection << ": " << out;
+  }
+}
+
+// Inward, the port reads the bits the select names: bits 2 and 1 of 4'b0100,
+// where bits 1 and 0 would read 00.
+TEST(PortConnectionSchedulingSim, InoutPortOnASelectReadsItsBitsInward) {
+  const char* const kConnections[] = {"bus[2:1]", "bus[1 +: 2]", "bus[2 -: 2]"};
+  for (const char* connection : kConnections) {
+    std::string out = RunAcrossInout(
+        "module child(inout wire [1:0] p);\n"
+        "  initial #1 $display(\"in=%b\", p);\n"
+        "endmodule\n",
+        std::string("  wire [3:0] bus;\n"
+                    "  assign bus = 4'b0100;\n"
+                    "  child u(.p(") +
+            connection + "));\n");
+    EXPECT_NE(out.find("in=10"), std::string::npos)
+        << connection << ": " << out;
+  }
+}
+
+// A bit-select joins one bit, in both directions.
+TEST(PortConnectionSchedulingSim, InoutPortOnABitSelectJoinsThatBit) {
+  std::string outward = RunAcrossInout(
+      "module child(inout wire p);\n"
+      "  assign p = 1'b0;\n"
+      "endmodule\n",
+      "  wire [1:0] bus;\n"
+      "  assign bus[0] = 1'b1;\n"
+      "  child u(.p(bus[1]));\n"
+      "  initial #1 $display(\"out=%b\", bus);\n");
+  EXPECT_NE(outward.find("out=01"), std::string::npos) << outward;
+  std::string inward = RunAcrossInout(
+      "module child(inout wire p);\n"
+      "  initial #1 $display(\"in=%b\", p);\n"
+      "endmodule\n",
+      "  wire [1:0] bus;\n"
+      "  assign bus = 2'b10;\n"
+      "  child u(.p(bus[1]));\n");
+  EXPECT_NE(inward.find("in=1"), std::string::npos) << inward;
+}
+
+// §23.3.3.3: an inout port may be connected to a concatenation of nets. Each
+// part of the port joins the net its place in the concatenation names, the
+// first the most significant, in both directions; a select may be one of the
+// parts.
+TEST(PortConnectionSchedulingSim, InoutPortOnAConcatenationJoinsEachPart) {
+  std::string outward = RunAcrossInout(
+      "module child(inout wire [3:0] p);\n"
+      "  assign p = 4'b1001;\n"
+      "endmodule\n",
+      "  wire [1:0] hi;\n"
+      "  wire [2:0] lo;\n"
+      "  child u(.p({hi, lo[1:0]}));\n"
+      "  initial #1 $display(\"out=%b %b\", hi, lo);\n");
+  EXPECT_NE(outward.find("out=10 z01"), std::string::npos) << outward;
+  std::string inward = RunAcrossInout(kReadingChild,
+                                      "  wire [1:0] hi;\n"
+                                      "  wire [2:0] lo;\n"
+                                      "  assign hi = 2'b10;\n"
+                                      "  assign lo = 3'b101;\n"
+                                      "  child u(.p({hi, lo[1:0]}));\n");
+  EXPECT_NE(inward.find("in=1001"), std::string::npos) << inward;
+}
+
+// §23.3.3.3 forbids a variable anywhere in an inout port's connection, and the
+// elaborator reports one inside a concatenation as it does a bare one. The run
+// that follows the report links none of the connection's parts, rather than
+// stopping at the variable, which is no net to join.
+TEST(PortConnectionSchedulingSim,
+     InoutPortOnAConcatenationWithAVariableIsReported) {
+  SimFixture f;
+  RunCapture(
+      "module child(inout wire [1:0] p);\n"
+      "  assign p = 2'b10;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  wire w;\n"
+      "  logic v;\n"
+      "  child u(.p({w, v}));\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "variable 'v' cannot be connected to inout port "
+                            "'p'",
+                            7, "23.3.3.3"));
 }
 
 }  // namespace

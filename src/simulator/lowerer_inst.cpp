@@ -505,19 +505,6 @@ void Lowerer::AliasInterfacePortTo(const RtlirModuleInst& inst,
   }
 }
 
-// §32.4.4: a hierarchical name the way an SDF file writes it. The design spells
-// a path with `.` and SDF spells it with `/`, and the annotator matched the
-// entry's names against the second spelling (CollectInterconnectTopology in
-// src/simulator/specify_interconnect.cpp), so a name handed to it has to be in
-// that spelling too.
-static std::string SdfHierName(const std::string& dotted) {
-  std::string out = dotted;
-  for (char& c : out) {
-    if (c == '.') c = '/';
-  }
-  return out;
-}
-
 // The two halves of one §23.3.2 input port connection, as §32.4.4 names them:
 // the instance's port, which is the load an interconnect delay is annotated
 // onto, and the signal the parent connected to it, which is the source it is
@@ -750,11 +737,22 @@ static void JoinInoutPortBinding(const RtlirPortBinding& binding,
 // is an inout port's, since §23.3.3.2 connects a ref port to a variable alone
 // and §23.2.2.3 gives an inout port no variable type, so the port is the net
 // CreatePortVariable (lowerer_register.cpp) registered for it. The connection
-// is read where it is written, in the generate blocks around the instance.
+// is read where it is written, in the generate blocks around the instance. An
+// inout port on a select or a concatenation of nets (§23.3.3.3) cannot share
+// a net with them, so it is linked to the bits it names whatever `link` says.
 static void LinkOrJoinSharedPortBinding(const RtlirPortBinding& binding,
                                         const InoutJoinScope& scope,
                                         bool link) {
-  if (binding.connection->kind != ExprKind::kIdentifier) return;
+  std::string local =
+      scope.local_prefix + std::string(PortStorageName(binding));
+  if (binding.connection->kind != ExprKind::kIdentifier) {
+    if (binding.direction != Direction::kInout) return;
+    LinkInoutPortConnection(
+        {*binding.connection, *scope.ctx.FindNet(local), scope.parent_prefix,
+         scope.local_prefix, std::move(local), scope.inst.gen_block_prefixes},
+        scope.ctx);
+    return;
+  }
   std::string target =
       GenBlockObjectKey(scope.parent_prefix, scope.inst.gen_block_prefixes,
                         binding.connection->text, scope.ctx);
@@ -763,8 +761,6 @@ static void LinkOrJoinSharedPortBinding(const RtlirPortBinding& binding,
     JoinInoutPortBinding(binding, target, scope);
     return;
   }
-  std::string local =
-      scope.local_prefix + std::string(PortStorageName(binding));
   Net& inner = *scope.ctx.FindNet(local);
   std::string load = SdfHierName(local);
   std::string source = SdfHierName(target);

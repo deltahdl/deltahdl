@@ -634,4 +634,31 @@ void Elaborator::ValidateInstanceArrayPorts(
   }
 }
 
+void ReportVariableOnInout(const PortBindCtx& ctx, std::string_view name,
+                           std::string_view port_name, bool port_is_var) {
+  if (ctx.var_types.count(name) == 0 || ctx.net_names.count(name) != 0) return;
+  // §23.3.3.2 governs a port declared with a variable data type and §23.3.3.3
+  // a port declared with a net type, and both forbid a variable here, so the
+  // rule reported is the one whose opening sentence the port answers to.
+  ctx.diag.Error(ctx.item->loc,
+                 std::format("variable '{}' cannot be connected to inout port "
+                             "'{}'",
+                             name, port_name),
+                 port_is_var ? Subclause("23.3.3.2") : Subclause("23.3.3.3"));
+}
+
+void CheckInoutConnectionParts(const PortBindCtx& ctx, const Expr* conn_expr,
+                               const RtlirPort& port,
+                               std::string_view port_name) {
+  if (port.direction != Direction::kInout) return;
+  if (conn_expr->kind == ExprKind::kConcatenation) {
+    for (const Expr* part : conn_expr->elements)
+      CheckInoutConnectionParts(ctx, part, port, port_name);
+    return;
+  }
+  const Expr* object = conn_expr;
+  while (object->kind == ExprKind::kSelect) object = object->base;
+  ReportVariableOnInout(ctx, object->text, port_name, port.is_var);
+}
+
 }  // namespace delta

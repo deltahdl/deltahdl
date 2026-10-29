@@ -250,17 +250,8 @@ void CheckDirectionalConnectionLegality(const PortBindCtx& ctx,
   SourceLoc loc = ctx.item->loc;
   auto cn = conn.conn_name;
   auto pn = conn.port_name;
-  if (conn.direction == Direction::kInout && ctx.var_types.count(cn) &&
-      ctx.net_names.count(cn) == 0) {
-    // §23.3.3.2 governs a port declared with a variable data type and §23.3.3.3
-    // a port declared with a net type, and both forbid a variable here, so the
-    // rule reported is the one whose opening sentence the port answers to.
-    diag.Error(loc,
-               std::format("variable '{}' cannot be connected to "
-                           "inout port '{}'",
-                           cn, pn),
-               conn.is_var ? Subclause("23.3.3.2") : Subclause("23.3.3.3"));
-  }
+  if (conn.direction == Direction::kInout)
+    ReportVariableOnInout(ctx, cn, pn, conn.is_var);
   if (conn.direction == Direction::kRef && ctx.net_names.count(cn)) {
     diag.Error(loc,
                std::format("net '{}' cannot be connected to ref port "
@@ -661,17 +652,21 @@ static bool IllegalPatternPortConnection(const Expr* conn_expr,
          !IsPositionalLvaluePattern(conn_expr);
 }
 
-// Validates an identifier port connection: a non-interface port goes through
-// the net-type compatibility check. An interface port may be connected either
-// to a declared interface instance or to a higher-level interface port (a
-// hierarchical pass-down), so no instance-name check is enforced here.
+// Validates a connection to a non-interface port: an identifier goes through
+// the net-type compatibility check, and any other expression through the
+// inout rule on the variables it reaches (CheckInoutConnectionParts). An
+// interface port may be connected either to a declared interface instance or
+// to a higher-level interface port (a hierarchical pass-down), so no
+// instance-name check is enforced here.
 static void CheckExplicitIdentifierOrInterfacePort(const PortBindCtx& ctx,
                                                    const Expr* conn_expr,
                                                    const RtlirPort* port,
                                                    std::string_view port_name) {
-  if (!conn_expr || conn_expr->kind != ExprKind::kIdentifier || !port) return;
-  if (!port->is_interface_port) {
+  if (!conn_expr || !port || port->is_interface_port) return;
+  if (conn_expr->kind == ExprKind::kIdentifier) {
     CheckExplicitIdentifierConnection(ctx, conn_expr, *port, port_name);
+  } else {
+    CheckInoutConnectionParts(ctx, conn_expr, *port, port_name);
   }
 }
 

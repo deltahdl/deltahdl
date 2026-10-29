@@ -153,4 +153,22 @@ void ReportNonEquivalentImplicitConnection(DiagEngine& diag, SourceLoc loc,
                                            const RtlirPort& port,
                                            const RtlirModule* parent);
 
+// §23.3.3.3 (printed page 747) connects an inout port to a net or a
+// concatenation of nets and never to a variable, and §23.3.3.2 permits a
+// variable on neither side of one: `name`, connected to the inout port
+// `port_name`, is reported where the instantiating module declares it a
+// variable. `port_is_var` says whether the port was declared with a variable
+// data type. Defined in elaborator_port_binding_checks.cpp.
+void ReportVariableOnInout(const PortBindCtx& ctx, std::string_view name,
+                           std::string_view port_name, bool port_is_var);
+
+// The same rule for a connection that is no bare name: a select or a
+// concatenation reaches a variable as surely as its name does, so each part
+// of a concatenation is weighed in turn and a select by the object it selects
+// from. Nothing is reported for a port that is not an inout. Defined in
+// elaborator_port_binding_checks.cpp.
+void CheckInoutConnectionParts(const PortBindCtx& ctx, const Expr* conn_expr,
+                               const RtlirPort& port,
+                               std::string_view port_name);
+
 }  // namespace delta

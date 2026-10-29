@@ -1,6 +1,8 @@
 
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -249,6 +251,64 @@ TEST(PortConnectionRulesForNetsElaboration, InputNetPortConnectsPositionally) {
              "  logic [7:0] x;\n"
              "  child u(x);\n"
              "endmodule\n"));
+}
+
+// A design whose line 7 connects `connection` to the two-bit inout port `a` of
+// `child`, the parent having the nets `w` and `n` and the variables `v` and
+// `b`, the last one bit wide.
+std::string InoutConnectedTo(const std::string& connection) {
+  return "module child(inout wire [1:0] a);\n"
+         "endmodule\n"
+         "module top;\n"
+         "  wire [3:0] w, n;\n"
+         "  logic [3:0] v;\n"
+         "  logic b;\n"
+         "  child u(" +
+         connection +
+         ");\n"
+         "endmodule\n";
+}
+
+// §23.3.3.3 (printed page 747) connects an inout port to a net or a
+// concatenation of nets and never to a variable, and a select or a
+// concatenation reaches a variable as surely as its bare name does: each form
+// that names one is reported as the bare variable is, named or positional.
+TEST(PortConnectionRulesForNetsElaboration,
+     VariableReachedThroughASelectOrConcatenationOnInoutErrors) {
+  const char* const kConnections[] = {
+      ".a(v[1])",         ".a(v[2:1])",       ".a(v[1 +: 2])", ".a(v[3 -: 2])",
+      ".a({w[0], v[1]})", ".a({v[0], w[1]})", "{w[0], v[1]}"};
+  for (const char* connection : kConnections) {
+    ElabFixture f;
+    ElaborateSrc(InoutConnectedTo(connection), f);
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "variable 'v' cannot be connected to inout "
+                              "port 'a'",
+                              7, "23.3.3.3"))
+        << connection;
+  }
+}
+
+// A bare variable among a concatenation's parts is the variable itself.
+TEST(PortConnectionRulesForNetsElaboration,
+     BareVariableInAConcatenationOnInoutErrors) {
+  ElabFixture f;
+  ElaborateSrc(InoutConnectedTo(".a({b, w[0]})"), f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "variable 'b' cannot be connected to inout port "
+                            "'a'",
+                            7, "23.3.3.3"));
+}
+
+// The same forms reaching nets alone are what §23.3.3.3 permits.
+TEST(PortConnectionRulesForNetsElaboration,
+     NetReachedThroughASelectOrConcatenationOnInoutIsAccepted) {
+  const char* const kConnections[] = {".a(w[1])",         ".a(w[2:1])",
+                                      ".a(w[1 +: 2])",    ".a(w[3 -: 2])",
+                                      ".a({w[0], n[1]})", "{n[0], w[1]}"};
+  for (const char* connection : kConnections) {
+    EXPECT_TRUE(ElabOk(InoutConnectedTo(connection))) << connection;
+  }
 }
 
 }  // namespace

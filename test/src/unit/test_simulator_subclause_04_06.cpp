@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -152,4 +153,68 @@ TEST(DeterminismSim, SourceOrderPreservedAcrossSuspension) {
       "endmodule\n",
       "x");
   EXPECT_EQ(result, 0x123u);
+}
+
+namespace {
+
+// §4.6(b) (printed page 69): nonblocking updates are performed in the order
+// their statements were executed, not the order they are written in. A loop
+// that executes one nonblocking assignment three times, with the right-hand
+// side reading 5, 6 and 7 in turn, schedules three updates, and the last
+// execution's is performed last. Keeping one update per statement, or the
+// first, would leave 5.
+uint64_t RunNonblockingLoop(const std::string& loop) {
+  return RunAndGet(
+      "module t;\n"
+      "  logic [7:0] a, n;\n"
+      "  initial begin\n"
+      "    n = 8'd5;\n" +
+          loop +
+          "  end\n"
+          "endmodule\n",
+      "a");
+}
+
+}  // namespace
+
+TEST(DeterminismSim, NBAInAForLoopLeavesItsLastExecutionsValue) {
+  EXPECT_EQ(RunNonblockingLoop(
+                "    for (n = 8'd5; n < 8'd8; n = n + 8'd1) a <= n;\n"),
+            7u);
+}
+
+TEST(DeterminismSim, NBAInARepeatLoopLeavesItsLastExecutionsValue) {
+  EXPECT_EQ(RunNonblockingLoop("    repeat (3) begin\n"
+                               "      a <= n;\n"
+                               "      n = n + 8'd1;\n"
+                               "    end\n"),
+            7u);
+}
+
+TEST(DeterminismSim, NBAInAWhileLoopLeavesItsLastExecutionsValue) {
+  EXPECT_EQ(RunNonblockingLoop("    while (n < 8'd8) begin\n"
+                               "      a <= n;\n"
+                               "      n = n + 8'd1;\n"
+                               "    end\n"),
+            7u);
+}
+
+// §4.6(b): the task's nonblocking assignment is written after the procedure's
+// in the text, but the task is enabled first, so its update is executed and
+// performed first and the procedure's value remains. Ordering the updates by
+// their place in the source would leave 2.
+TEST(DeterminismSim, NBAOfATaskEnabledFirstIsPerformedFirst) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  initial begin\n"
+      "    set_two();\n"
+      "    a <= 8'd1;\n"
+      "  end\n"
+      "  task set_two;\n"
+      "    a <= 8'd2;\n"
+      "  endtask\n"
+      "endmodule\n",
+      "a");
+  EXPECT_EQ(result, 1u);
 }
