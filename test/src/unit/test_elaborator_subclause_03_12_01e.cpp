@@ -161,7 +161,7 @@ TEST(UnitNetReference, SeveralDriversOfTheUnitsVariable) {
       "endmodule\n",
       "variable 'v' is driven by more than one continuous assignment or "
       "primitive output",
-      5, "6.5"));
+      5, "10.3.2"));
 }
 
 // §6.6.2: the unit's uwire takes one driver, so a module's second continuous
@@ -188,7 +188,7 @@ TEST(UnitNetReference, TheUnitsUwire) {
 // task and a function, a nonblocking assignment, an interface's and a
 // program's initial procedure, and a module's generate block.
 TEST(UnitNetReference, ProceduralAssignmentToTheUnitsNet) {
-  const char* kMessage = "net 'w' cannot be the target of a procedural";
+  const char* const kMessage = "net 'w' cannot be the target of a procedural";
   const Written kCases[] = {
       {"wire w;\n"
        "module m;\n"
@@ -307,7 +307,7 @@ TEST(UnitNetReference, ProceduralAssignmentToTheUnitsVariable) {
 // §10.6.1: a procedural continuous assignment and a deassign take a variable,
 // and the unit's net is none; the unit's variable is accepted.
 TEST(UnitNetReference, AssignAndDeassignOfTheUnitsNet) {
-  const char* kMessage =
+  const char* const kMessage =
       "net 'w' cannot be the target of a procedural assign or deassign";
   EXPECT_TRUE(
       ElabReports("wire w;\n"

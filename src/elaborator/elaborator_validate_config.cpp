@@ -907,6 +907,20 @@ void Elaborator::ValidateAnonymousProgramNameSharing() {
   }
 }
 
+// §3.12.1 (printed page 56) gives the unit the items a package may hold, and
+// §26.2 (printed 807) keeps a net declaration assignment out of a package, so
+// out of the unit too; CheckUnitNettypeUses asks a user-defined nettype's net.
+static void ReportUnitNetInits(const CompilationUnit* unit, DiagEngine& diag) {
+  for (const auto* item : unit->cu_items) {
+    if (item->kind == ModuleItemKind::kNetDecl && item->init_expr) {
+      diag.Error(item->loc,
+                 "a net declaration with an implicit continuous assignment "
+                 "cannot stand in the compilation-unit scope",
+                 Subclause("3.12.1"));
+    }
+  }
+}
+
 void Elaborator::ValidatePackageItems() {
   for (const auto* pkg : unit_->packages) {
     for (const auto* item : pkg->items) {
@@ -920,7 +934,6 @@ void Elaborator::ValidatePackageItems() {
         diag_.Error(item->loc, "process is not allowed in a package",
                     Subclause("26.2"));
       }
-
       if (item->kind == ModuleItemKind::kVarDecl && item->is_automatic) {
         diag_.Error(item->loc,
                     "automatic lifetime is not allowed on package-level "
@@ -930,18 +943,7 @@ void Elaborator::ValidatePackageItems() {
     }
     ReportPackageSubroutineStaticInits(pkg, diag_);
   }
-  // §3.12.1 (printed page 56) gives the compilation-unit scope the items a
-  // package may hold, and §26.2 (printed 807) keeps the implicit continuous
-  // assignment of a net declaration out of a package, so the unit holds none
-  // either. A net of a user-defined nettype is asked by CheckUnitNettypeUses.
-  for (const auto* item : unit_->cu_items) {
-    if (item->kind == ModuleItemKind::kNetDecl && item->init_expr) {
-      diag_.Error(item->loc,
-                  "a net declaration with an implicit continuous assignment "
-                  "cannot stand in the compilation-unit scope",
-                  Subclause("3.12.1"));
-    }
-  }
+  ReportUnitNetInits(unit_, diag_);
 }
 
 }  // namespace delta
