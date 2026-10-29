@@ -159,6 +159,9 @@ bool IsConstantExpr(const Expr* expr, const ScopeMap& scope) {
       // constant that names no declaration. Asking `scope` about it would
       // answer no, because nothing puts $ in a ScopeMap and nothing should.
       if (expr->text == "$") return true;
+      // A.8.4 lists null among the constant primaries, and the parser keeps
+      // the keyword as an identifier of that text, which no declaration bears.
+      if (expr->text == "null") return true;
       return scope.count(expr->text) > 0;
     case ExprKind::kUnary:
       return IsConstantExpr(expr->lhs, scope);

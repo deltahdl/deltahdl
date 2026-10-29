@@ -3,8 +3,10 @@
 #include <cstdint>
 #include <string_view>
 
+#include "elaborator/const_eval.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
+#include "fixture_evaluator.h"
 #include "helpers_reported_error.h"
 
 using namespace delta;
@@ -90,6 +92,31 @@ TEST(PrimaryElaboration, NullPrimaryElaborates) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+}
+
+// A.8.4 lists null among the constant primaries, so it stands where a constant
+// expression is asked for: on its own, beside an undeclared name that is none,
+// and as a class-typed input port's default, which §23.2.2.4 asks to be a
+// constant expression, beside a $random default reported there.
+TEST(PrimaryElaboration, NullIsAConstantPrimary) {
+  EvalFixture e;
+  EXPECT_TRUE(IsConstantExpr(ParseExprFrom("null", e), {}));
+  EXPECT_FALSE(IsConstantExpr(ParseExprFrom("nil", e), {}));
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "endclass\n"
+      "module m(input C h = null, input int k = $random);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "default value of port 'h' is not a constant "
+                             "expression",
+                             3, "23.2.2.4"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "default value of port 'k' is not a constant "
+                            "expression",
+                            3, "23.2.2.4"));
 }
 
 // A.10 footnote 50 makes a constant let expression's body constant, with its
