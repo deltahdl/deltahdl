@@ -796,25 +796,30 @@ std::string ModuleDeclaring(std::string_view place,
       std::vformat(place, std::make_format_args(declaration, probe)));
 }
 
+// Whether `array`, declared with `[3]` after the name at `place`, is a shape
+// the simulator builds and answers the element query of: not a fixed array of
+// associative arrays (#9020), nor, in a procedure, a fixed array of
+// variable-size arrays (#9019).
+bool ProbesOwnDimension(const DeclarationPlace& place,
+                        const DeclaredArray& array) {
+  return array.element_size != nullptr &&
+         !(array.variable_size && place.in_procedure);
+}
+
 TEST(TypeOfExpressionDeclarationSim, DeclarationTakesAnUnpackedArrayType) {
   for (const DeclarationPlace& place : kDeclarationPlaces) {
     for (const DeclaredArray& array : kDeclaredArrays) {
-      for (bool own_dimension : {false, true}) {
-        if (own_dimension && (array.element_size == nullptr ||
-                              (array.variable_size && place.in_procedure))) {
-          continue;
-        }
-        const std::string kSrc = ModuleDeclaring(
-            place.text,
-            std::format("var type({}) d{};", array.operand,
-                        own_dimension ? " [3]" : ""),
-            own_dimension
-                ? std::format("n = $size(d) * 1000 + {};", array.element_size)
-                : array.probe);
-        SCOPED_TRACE(kSrc);
-        EXPECT_EQ(RunAndGet(kSrc, "n"),
-                  own_dimension ? 3000 + array.initial_size : array.expected);
-      }
+      const std::string kSrc = ModuleDeclaring(
+          place.text, std::format("var type({}) d;", array.operand),
+          array.probe);
+      SCOPED_TRACE(kSrc);
+      EXPECT_EQ(RunAndGet(kSrc, "n"), array.expected);
+      if (!ProbesOwnDimension(place, array)) continue;
+      const std::string kOwnSrc = ModuleDeclaring(
+          place.text, std::format("var type({}) d [3];", array.operand),
+          std::format("n = $size(d) * 1000 + {};", array.element_size));
+      SCOPED_TRACE(kOwnSrc);
+      EXPECT_EQ(RunAndGet(kOwnSrc, "n"), 3000 + array.initial_size);
     }
   }
 }

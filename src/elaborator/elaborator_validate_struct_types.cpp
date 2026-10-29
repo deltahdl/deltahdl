@@ -19,6 +19,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_class_lookup.h"
 #include "elaborator/elaborator_enum_constants.h"
+#include "elaborator/elaborator_helpers.h"
 #include "elaborator/net_or_variable_type.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_enum_member.h"
