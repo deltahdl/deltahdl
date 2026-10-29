@@ -133,7 +133,6 @@ void Elaborator::ValidateItemConstraints(const ModuleItem* item,
   ValidateChandleSensitivity(item);
   ValidateVirtualInterfaceContAssign(item);
   ValidateVirtualInterfaceSensitivity(item);
-  ValidateInterconnectContAssign(item);
   ValidateClassHandleContAssign(item);
 
   // §6.3.2.2's rule that a drive strength needs an assignment in the same

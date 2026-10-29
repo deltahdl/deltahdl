@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -100,9 +101,12 @@ bool IsLegalNettypeDataType(const DataType& dtype,
 // §6.6.7: reports the nettype declaration `nettype` at its location where the
 // data type it names is no legal nettype data type (IsLegalNettypeDataType),
 // wherever it is declared: among a module's, a package's or the unit's items,
-// in a block or a subroutine body, or in a class.
-void ReportIllegalNettypeDataType(const ModuleItem& nettype,
-                                  const TypeShapeTables& tables,
-                                  DiagEngine& diag);
+// in a block or a subroutine body, or in a class. A covergroup is a type of
+// its own (§19.3) that none of the clause's items names; where the caller
+// knows the covergroups the declaration sees, `names_covergroup` answers
+// whether a name is one of them.
+void ReportIllegalNettypeDataType(
+    const ModuleItem& nettype, const TypeShapeTables& tables, DiagEngine& diag,
+    const std::function<bool(std::string_view)>& names_covergroup = {});
 
 }  // namespace delta

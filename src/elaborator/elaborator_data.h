@@ -27,6 +27,7 @@
 #include "elaborator/rtlir_scopes.h"
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
+#include "elaborator/uwire_drivers.h"
 #include "parser/ast_design.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
@@ -320,15 +321,19 @@ class ElaboratorData {
   // declares; the nets among them, by which an alias in a block tells the
   // module's nets from its variables (§10.11 with §27.5); the variables its
   // continuous and its procedural assignments write, which §6.5's and
-  // §10.3.2's one-driver rules weigh a block's assignments against; and the
+  // §10.3.2's one-driver rules weigh a block's assignments against; the
   // variables declared with an initializer, which §10.3.2 bars a block's
-  // continuous assignment from.
+  // continuous assignment from; the bits of its uwire nets its drivers reach,
+  // which §6.6.2 weighs a block's drivers against; and its interconnects,
+  // which §6.6.8 keeps out of a block's expressions.
   struct ModuleScopeNames {
     std::unordered_set<std::string_view> declared;
     std::unordered_set<std::string_view> nets;
     std::unordered_map<std::string_view, SourceLoc> cont_targets;
     std::unordered_map<std::string_view, SourceLoc> proc_targets;
     std::unordered_set<std::string_view> initialized;
+    UwireDrivers uwire_drivers;
+    std::unordered_set<std::string_view> interconnects;
   };
   std::unordered_map<const RtlirModule*, ModuleScopeNames> module_scope_names_;
   // Exchanges the sets ModuleScopeNames keeps with the ones in force, which
@@ -340,6 +345,8 @@ class ElaboratorData {
     std::swap(cont_assign_targets_, names.cont_targets);
     std::swap(proc_assign_targets_, names.proc_targets);
     std::swap(var_init_names_, names.initialized);
+    std::swap(uwire_drivers_, names.uwire_drivers);
+    std::swap(interconnect_names_, names.interconnects);
   }
   // §27.4: genvar names of the loop generate constructs currently being
   // elaborated. Used to reject a nested loop generate construct that reuses an
@@ -348,6 +355,11 @@ class ElaboratorData {
   std::unordered_set<std::string_view> active_loop_genvars_;
   std::unordered_set<std::string_view> net_names_;
   std::unordered_map<std::string_view, SourceLoc> cont_assign_targets_;
+  // §6.6.2: the uwire nets of the scope being elaborated and what of each its
+  // drivers reach, and the same of every compilation unit's uwire nets, which
+  // drivers throughout the design reach.
+  UwireDrivers uwire_drivers_;
+  UnitUwireDrivers unit_uwire_drivers_;
   std::unordered_map<std::string_view, SourceLoc> proc_assign_targets_;
   std::unordered_map<std::string_view, DataTypeKind> var_types_;
   std::unordered_map<std::string_view, VarArrayInfo> var_array_info_;

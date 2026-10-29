@@ -21,27 +21,17 @@
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_attribute.h"
 #include "elaborator/rtlir_scopes.h"
-#include "elaborator/unit_scope_order.h"
+#include "elaborator/uwire_drivers.h"
 #include "lexer/token.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
-#include "parser/ast_type.h"
 
 namespace delta {
 
-// §3.12.1 with §6.6.2: whether the net of `name` that the compilation unit
-// declares before `loc`, which a reference the module does not declare
-// reaches, is a uwire.
-static bool UnitNetIsUwire(const CompilationUnit* unit, std::string_view name,
-                           SourceLoc loc) {
-  const ModuleItem* net = UnitNetBefore(unit, name, loc);
-  return net != nullptr && net->data_type.kind == DataTypeKind::kUwire;
-}
-
 // §6.10 and §10.3.2 for an element of a continuous assignment's target that is
-// a whole name: an undeclared one is an implicit net, a variable takes one
-// continuous assignment and no initializer, and a uwire net one driver.
+// a whole name: an undeclared one is an implicit net, and a variable takes one
+// continuous assignment and no initializer.
 //
 // §27.4 makes each generate block a scope of its own, and each iteration of a
 // loop generate construct a block, so the targets are told apart by the
@@ -54,26 +44,15 @@ void Elaborator::ValidateContAssignIdentLhs(std::string_view name,
   MaybeCreateImplicitNet(name, item->loc, mod);
   std::string_view declared =
       DeclaredScopedName(name, gen_prefix_scopes_, declared_names_);
-  if (!cont_assign_targets_.emplace(declared, item->loc).second) {
-    if (!NamesNet(name, item->loc)) {
-      // §6.5 states the rule in full: multiple continuous assignments to any
-      // term in the expansion of a variable's longest static prefix are an
-      // error. §10.3.2 restates it and refers back, so the report cites §6.5.
-      diag_.Error(item->loc,
-                  std::format("multiple continuous assignments to '{}'", name),
-                  Subclause("6.5"));
-    } else {
-      auto it = var_types_.find(name);
-      bool uwire = it != var_types_.end()
-                       ? it->second == DataTypeKind::kUwire
-                       : UnitNetIsUwire(unit_, name, item->loc);
-      if (uwire) {
-        diag_.Error(
-            item->loc,
-            std::format("uwire '{}' cannot have multiple drivers", name),
-            Subclause("6.6.2"));
-      }
-    }
+  // §6.5 states the rule in full: multiple continuous assignments to any term
+  // in the expansion of a variable's longest static prefix are an error.
+  // §10.3.2 restates it and refers back, so the report cites §6.5. A uwire
+  // net's drivers are counted by bit (UwireDrivers).
+  if (!cont_assign_targets_.emplace(declared, item->loc).second &&
+      !NamesNet(name, item->loc)) {
+    diag_.Error(item->loc,
+                std::format("multiple continuous assignments to '{}'", name),
+                Subclause("6.5"));
   }
 }
 
@@ -441,6 +420,14 @@ bool Elaborator::ValidateContAssignLeaf(ModuleItem* item, RtlirModule* mod,
   }
   if (leaf.expr->kind == ExprKind::kIdentifier)
     ValidateContAssignIdentLhs(leaf.root, item, mod);
+  RecordUwireTarget(uwire_drivers_, leaf.expr, item->loc,
+                    {mod,
+                     var_types_,
+                     unit_,
+                     unit_uwire_drivers_,
+                     {gen_prefix_scopes_, declared_names_},
+                     scope},
+                    diag_);
   // A name reached through a member access may be an instance's or an
   // interface's, which names no variable of this module, so only a name the
   // target writes directly or through selects is judged as a variable here.
@@ -634,6 +621,7 @@ static void ReportStreamTargetNets(
 }
 
 void Elaborator::ElaborateContAssign(ModuleItem* item, RtlirModule* mod) {
+  ValidateInterconnectContAssign(item);
   std::vector<ContTargetLeaf> leaves;
   if (!CollectContTargetLeaves(item->assign_lhs, leaves)) {
     diag_.Error(item->loc,

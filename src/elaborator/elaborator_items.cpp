@@ -25,6 +25,7 @@
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/global_clock_assertion_event.h"
 #include "elaborator/implication_operator_rules.h"
+#include "elaborator/interconnect_uses.h"
 #include "elaborator/procedural_checker_instance.h"
 #include "elaborator/procedural_concurrent_assertion.h"
 #include "elaborator/property_instance.h"
@@ -36,6 +37,7 @@
 #include "elaborator/type_eval.h"
 #include "elaborator/type_ref_walks.h"
 #include "elaborator/unit_scope_order.h"
+#include "elaborator/uwire_drivers.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
@@ -261,6 +263,7 @@ bool Elaborator::MaybeCreateImplicitNet(std::string_view name, SourceLoc loc,
   mod->nets.push_back(net);
   declared_names_.insert(scoped);
   net_names_.insert(name);
+  if (net.net_type == NetType::kUwire) uwire_drivers_.Declare(scoped);
   return true;
 }
 
@@ -503,6 +506,15 @@ void Elaborator::CheckPrimitiveTerminals(const ModuleItem* item,
       diag_);
   for (const auto& [name, value] : gen_const_scope_) scope[name] = value;
   ValidatePrimitiveDrivenTerminals(item, mod, scope, gen_prefix_scopes_, diag_);
+  ReportInterconnectInInstance(*item, interconnect_names_, diag_);
+  RecordUwirePrimitiveOutputs(uwire_drivers_, item,
+                              {mod,
+                               var_types_,
+                               unit_,
+                               unit_uwire_drivers_,
+                               {gen_prefix_scopes_, declared_names_},
+                               scope},
+                              diag_);
 }
 
 void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {

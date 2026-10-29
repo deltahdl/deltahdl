@@ -1,5 +1,7 @@
 #include "elaborator/declared_types.h"
 
+#include <functional>
+#include <string_view>
 #include <vector>
 
 #include "elaborator/aggregate_shape.h"
@@ -94,25 +96,30 @@ void ForEachUnitDeclaredType(const CompilationUnit* unit,
                              const DeclaredTypeVisit& visit) {
   for (const ModuleItem* item : unit->cu_items) {
     if (item->kind == ModuleItemKind::kVarDecl) VisitVariable(item, visit);
+    if (item->kind == ModuleItemKind::kNettypeDecl) VisitTypedef(item, visit);
     VisitInner(item, visit);
   }
   for (const ClassDecl* cls : unit->classes) VisitClass(cls, visit);
   for (const PackageDecl* pkg : unit->packages) {
     for (const ModuleItem* item : pkg->items) {
       if (item->kind == ModuleItemKind::kVarDecl) VisitVariable(item, visit);
-      if (item->kind == ModuleItemKind::kTypedef) VisitTypedef(item, visit);
+      if (item->kind == ModuleItemKind::kTypedef ||
+          item->kind == ModuleItemKind::kNettypeDecl)
+        VisitTypedef(item, visit);
       VisitInner(item, visit);
     }
   }
 }
 
-void CheckDeclaredTypeRules(const DeclaredType& declared,
-                            const AggregateShapeCtx& ctx) {
+void CheckDeclaredTypeRules(
+    const DeclaredType& declared, const AggregateShapeCtx& ctx,
+    const std::function<bool(std::string_view)>& names_covergroup) {
   CheckAggregateShape(declared.type, declared.loc, ctx);
   CheckRealAssocIndexTypes(declared.unpacked_dims, declared.loc,
                            ctx.tables.typedefs, ctx.diag);
   if (declared.nettype != nullptr) {
-    ReportIllegalNettypeDataType(*declared.nettype, ctx.tables, ctx.diag);
+    ReportIllegalNettypeDataType(*declared.nettype, ctx.tables, ctx.diag,
+                                 names_covergroup);
   }
 }
 

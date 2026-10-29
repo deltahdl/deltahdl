@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <string_view>
 #include <vector>
 
 #include "common/source_loc.h"
@@ -36,17 +37,19 @@ void ForEachInnerDeclaredType(const ModuleDecl* decl,
                               const DeclaredTypeVisit& visit);
 
 // The same for what no module's elaboration reaches: the compilation unit's
-// variables and classes, each package's variables and typedefs, and every
-// declaration inside the subroutines and classes of either. The compilation
-// unit's typedefs are judged on their own.
+// variables, nettypes and classes, each package's variables, typedefs and
+// nettypes, and every declaration inside the subroutines and classes of
+// either. The compilation unit's typedefs are judged on their own.
 void ForEachUnitDeclaredType(const CompilationUnit* unit,
                              const DeclaredTypeVisit& visit);
 
 // The rules on a declaration's type that hold wherever it is written: §7.2 to
 // §7.3.2 on a structure or union type (CheckAggregateShape), §7.8.5 on an
 // associative index type (CheckRealAssocIndexTypes) and, for a nettype's,
-// §6.6.7 on the data types a nettype may name (ReportIllegalNettypeDataType).
-void CheckDeclaredTypeRules(const DeclaredType& declared,
-                            const AggregateShapeCtx& ctx);
+// §6.6.7 on the data types a nettype may name (ReportIllegalNettypeDataType),
+// `names_covergroup` answering for the covergroups the declaration sees.
+void CheckDeclaredTypeRules(
+    const DeclaredType& declared, const AggregateShapeCtx& ctx,
+    const std::function<bool(std::string_view)>& names_covergroup = {});
 
 }  // namespace delta

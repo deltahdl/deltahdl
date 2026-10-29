@@ -281,6 +281,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/type_match.cpp
     elaborator/type_eval_named.cpp
     elaborator/type_eval_aggregate.cpp
+    elaborator/uwire_drivers.cpp
     elaborator/viewport_resolution.cpp
     elaborator/const_eval.cpp
     elaborator/const_eval_array_query.cpp
@@ -579,6 +580,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_port_binding_checks.cpp
     elaborator/sdf_annotate_calls.cpp
     elaborator/interconnect_merges.cpp
+    elaborator/interconnect_uses.cpp
     elaborator/elaborator_process.cpp
     elaborator/elaborator_process_validate.cpp
     elaborator/elaborator_resolve.cpp

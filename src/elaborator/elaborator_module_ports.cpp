@@ -24,6 +24,7 @@
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_io_decl.h"
 #include "elaborator/type_eval.h"
+#include "elaborator/uwire_drivers.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
@@ -686,12 +687,16 @@ static bool BodyDeclaresObject(const ModuleDecl* decl, std::string_view name) {
 static void RegisterPortNetNames(
     const ModuleDecl* decl, const PortDecl& port, const RtlirPort& rp,
     std::unordered_set<std::string_view>& interconnect_names,
-    std::unordered_set<std::string_view>& net_names) {
+    std::unordered_set<std::string_view>& net_names,
+    UwireDrivers& uwire_drivers) {
   if (port.name.empty()) return;
   if (port.data_type.is_interconnect) interconnect_names.insert(port.name);
   if (decl->decl_kind == ModuleDeclKind::kChecker || rp.is_var) return;
   if (decl->is_non_ansi_ports && BodyDeclaresObject(decl, port.name)) return;
   net_names.insert(port.name);
+  // §6.6.2: a uwire port takes one driver inside its module as any uwire
+  // net does.
+  if (rp.net_type == NetType::kUwire) uwire_drivers.Declare(port.name);
 }
 
 // §23.2.2.1 (printed page 733), Example 5: `renamed_concat(.a({b, c}), f,
@@ -851,7 +856,8 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
     if (port.port_expr != nullptr && rp.direction == Direction::kNone) {
       rp.direction = PortExprDirection(decl, port.port_expr);
     }
-    RegisterPortNetNames(decl, port, rp, interconnect_names_, net_names_);
+    RegisterPortNetNames(decl, port, rp, interconnect_names_, net_names_,
+                         uwire_drivers_);
     // §37.3.3: where the port declaration stands, which the port object
     // reports through vpiLineNo and vpiFile.
     rp.loc = port.loc;

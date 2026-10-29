@@ -464,8 +464,7 @@ void CheckInterconnectProcContAssign(
   if (!s) return;
   if (s->kind == StmtKind::kForce || s->kind == StmtKind::kRelease ||
       s->kind == StmtKind::kAssign || s->kind == StmtKind::kDeassign) {
-    auto name = ExprIdent(s->lhs);
-    if (!name.empty() && interconnect_names.count(name)) {
+    if (ExprUsesInterconnect(s->lhs, interconnect_names)) {
       diag.Error(s->range.start,
                  "interconnect net cannot be used in procedural "
                  "continuous assignment",

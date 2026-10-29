@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <string>
+
 #include "common/types.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
@@ -458,6 +461,221 @@ TEST(InterconnectElaboration, ForceOnAPlainNetInAForkIsAccepted) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.diag.HasErrors());
+}
+
+constexpr const char* kInContAssign =
+    "interconnect net cannot be used in continuous assignment";
+constexpr const char* kInProcContAssign =
+    "interconnect net cannot be used in procedural continuous assignment";
+constexpr const char* kInExpression =
+    "interconnect net cannot be used in expression";
+
+::testing::AssertionResult InterconnectUseReported(const std::string& src,
+                                                   const char* message,
+                                                   uint32_t line) {
+  ElabFixture f;
+  ElaborateSrc(src, f);
+  return ReportedError(f.diag.Diagnostics(), message, line, "6.6.8");
+}
+
+// §6.6.8 keeps an interconnect out of every continuous assignment, wherever
+// the target writes it: selected, as an element of a concatenation, or in a
+// select's index.
+TEST(InterconnectElaboration, ContAssignTargetSelectOrElementIsError) {
+  EXPECT_TRUE(
+      InterconnectUseReported("module t(input logic a);\n"
+                              "  interconnect [1:0] ic;\n"
+                              "  wire w;\n"
+                              "  assign ic[0] = a;\n"
+                              "endmodule\n",
+                              kInContAssign, 4));
+  EXPECT_TRUE(
+      InterconnectUseReported("module t(input logic [2:0] b);\n"
+                              "  interconnect [1:0] ic;\n"
+                              "  wire w;\n"
+                              "  assign {ic, w} = b;\n"
+                              "endmodule\n",
+                              kInContAssign, 4));
+  EXPECT_TRUE(
+      InterconnectUseReported("module t(input logic a);\n"
+                              "  interconnect [1:0] ic;\n"
+                              "  wire [3:0] w;\n"
+                              "  assign w[ic] = a;\n"
+                              "endmodule\n",
+                              kInContAssign, 4));
+  EXPECT_TRUE(
+      ElabOk("module t(input logic a);\n"
+             "  interconnect [1:0] ic;\n"
+             "  wire [3:0] w;\n"
+             "  assign w[1] = a;\n"
+             "endmodule\n"));
+}
+
+// A procedural continuous assignment is barred the same way, a selected
+// interconnect or one in a concatenation among them.
+TEST(InterconnectElaboration, ProcContAssignTargetSelectOrElementIsError) {
+  EXPECT_TRUE(
+      InterconnectUseReported("module t;\n"
+                              "  interconnect [1:0] ic;\n"
+                              "  wire w;\n"
+                              "  initial force ic[0] = 1'b1;\n"
+                              "endmodule\n",
+                              kInProcContAssign, 4));
+  EXPECT_TRUE(
+      InterconnectUseReported("module t;\n"
+                              "  interconnect [1:0] ic;\n"
+                              "  wire w;\n"
+                              "  initial release {ic, w};\n"
+                              "endmodule\n",
+                              kInProcContAssign, 4));
+}
+
+constexpr const char* kChild =
+    "module c(input wire a);\n"
+    "endmodule\n"
+    "module c2(input wire [1:0] a);\n"
+    "endmodule\n";
+
+// A port connection may be an interconnect only as a net_lvalue all of whose
+// nets are interconnects: an operator over one, a concatenation with a wire
+// and a parenthesized one are expressions, named or positional.
+TEST(InterconnectElaboration, PortConnectionExpressionIsError) {
+  const std::string kHead = std::string(kChild) +
+                            "module t;\n"
+                            "  interconnect ic, ic2;\n"
+                            "  wire w;\n";
+  for (const char* inst :
+       {"  c x(.a(~ic));\n", "  c x(.a(ic & w));\n", "  c x(~ic);\n",
+        "  c x(.a((ic)));\n", "  c2 x(.a({ic, w}));\n", "  c2 x({w, ic});\n"}) {
+    EXPECT_TRUE(
+        InterconnectUseReported(kHead + inst + "endmodule\n", kInExpression, 8))
+        << inst;
+  }
+  for (const char* inst : {"  c x(.a(ic));\n", "  c x(ic);\n",
+                           "  c2 x(.a({ic, ic2}));\n", "  c x(.a(~w));\n"}) {
+    EXPECT_TRUE(ElabOk(kHead + inst + "endmodule\n")) << inst;
+  }
+}
+
+// A select of an interconnect vector or array is a net_lvalue of interconnects
+// alone, as a port connection and as a terminal; a select whose index reads an
+// interconnect is not.
+TEST(InterconnectElaboration, SelectOfAnInterconnectConnects) {
+  const std::string kHead = std::string(kChild) +
+                            "module t(input logic x);\n"
+                            "  interconnect [1:0] icv;\n"
+                            "  interconnect ica [2];\n"
+                            "  wire [3:0] w;\n";
+  for (const char* inst : {"  c u(.a(icv[1]));\n", "  c u(.a(ica[0]));\n",
+                           "  c2 u(.a(icv[1:0]));\n", "  buf (icv[0], x);\n",
+                           "  buf (ica[1], x);\n"}) {
+    EXPECT_TRUE(ElabOk(kHead + inst + "endmodule\n")) << inst;
+  }
+  EXPECT_TRUE(InterconnectUseReported(kHead + "  c u(.a(w[icv]));\nendmodule\n",
+                                      kInExpression, 9));
+}
+
+// A gate's terminal is a connection too: an interconnect as a terminal is one,
+// and an expression over it is not.
+TEST(InterconnectElaboration, GateTerminalExpressionIsError) {
+  const std::string kHead =
+      "module t(input logic b);\n"
+      "  interconnect ic;\n"
+      "  wire o;\n";
+  EXPECT_TRUE(InterconnectUseReported(kHead + "  and (o, ~ic, b);\nendmodule\n",
+                                      kInExpression, 4));
+  EXPECT_TRUE(InterconnectUseReported(
+      kHead + "  and (o, ic | b, b);\nendmodule\n", kInExpression, 4));
+  EXPECT_TRUE(ElabOk(kHead + "  and (o, ic, b);\nendmodule\n"));
+}
+
+// A parameter value, a delay and an instance array's range are expressions
+// that connect nothing, where an interconnect has no place.
+TEST(InterconnectElaboration, ParameterDelayAndRangeAreExpressions) {
+  EXPECT_TRUE(
+      InterconnectUseReported("module c #(parameter P = 1) (input wire a);\n"
+                              "endmodule\n"
+                              "module t;\n"
+                              "  interconnect ic;\n"
+                              "  c #(.P(ic)) x(.a(ic));\n"
+                              "endmodule\n",
+                              kInExpression, 5));
+  EXPECT_TRUE(
+      InterconnectUseReported("module t(input logic b);\n"
+                              "  interconnect ic;\n"
+                              "  wire o;\n"
+                              "  buf #(ic) (o, b);\n"
+                              "endmodule\n",
+                              kInExpression, 4));
+  EXPECT_TRUE(
+      InterconnectUseReported("module t(input logic b);\n"
+                              "  interconnect ic;\n"
+                              "  wire o;\n"
+                              "  buf g[ic:0] (o, b);\n"
+                              "endmodule\n",
+                              kInExpression, 4));
+  EXPECT_TRUE(
+      ElabOk("module c #(parameter P = 1) (input wire a);\n"
+             "endmodule\n"
+             "module t;\n"
+             "  interconnect ic;\n"
+             "  c #(.P(2)) x(.a(ic));\n"
+             "endmodule\n"));
+}
+
+// The rule holds of an interconnect port inside the module declaring it, and
+// in an interface and a generate block, of an interconnect the block declares
+// and of one its module does.
+TEST(InterconnectElaboration, PortInterfaceAndGenerateBlockForms) {
+  EXPECT_TRUE(
+      InterconnectUseReported("module m(interconnect [1:0] p, input logic a);\n"
+                              "  assign p[0] = a;\n"
+                              "endmodule\n",
+                              kInContAssign, 2));
+  EXPECT_TRUE(InterconnectUseReported(std::string(kChild) +
+                                          "module m(interconnect p);\n"
+                                          "  c x(.a(~p));\n"
+                                          "endmodule\n",
+                                      kInExpression, 6));
+  EXPECT_TRUE(
+      InterconnectUseReported("interface i(input logic a);\n"
+                              "  interconnect [1:0] ic;\n"
+                              "  assign ic[0] = a;\n"
+                              "endinterface\n"
+                              "module t(input logic a);\n"
+                              "  i x(a);\n"
+                              "endmodule\n",
+                              kInContAssign, 3));
+  EXPECT_TRUE(
+      InterconnectUseReported("module t(input logic a);\n"
+                              "  interconnect [1:0] ic;\n"
+                              "  if (1) begin : g\n"
+                              "    assign ic[0] = a;\n"
+                              "  end\n"
+                              "endmodule\n",
+                              kInContAssign, 4));
+  EXPECT_TRUE(
+      InterconnectUseReported("module t(input logic a);\n"
+                              "  if (1) begin : g\n"
+                              "    interconnect ic;\n"
+                              "    assign ic = a;\n"
+                              "  end\n"
+                              "endmodule\n",
+                              kInContAssign, 4));
+  EXPECT_TRUE(InterconnectUseReported(std::string(kChild) +
+                                          "module t;\n"
+                                          "  interconnect ic;\n"
+                                          "  if (1) begin : g\n"
+                                          "    c x(.a(~ic));\n"
+                                          "  end\n"
+                                          "endmodule\n",
+                                      kInExpression, 8));
+  EXPECT_TRUE(ElabOk(std::string(kChild) + "module t;\n"
+                                           "  interconnect ic;\n"
+                                           "  if (1) begin : g\n"
+                                           "    c x(.a(ic));\n"
+                                           "  end\n"
+                                           "endmodule\n"));
 }
 
 }  // namespace

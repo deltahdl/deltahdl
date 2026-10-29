@@ -9,6 +9,7 @@
 #include "elaborator/aggregate_shape.h"
 #include "elaborator/class_property_cont_assign.h"
 #include "elaborator/const_eval.h"
+#include "elaborator/covergroup_variables.h"
 #include "elaborator/declared_types.h"
 #include "elaborator/default_pattern_values.h"
 #include "elaborator/dollar_contexts.h"
@@ -33,14 +34,16 @@ namespace delta {
 namespace {
 
 // The rules on a declaration's type that hold wherever it is written
-// (CheckDeclaredTypeRules), and §25.9's on the interface a virtual interface
-// type names (ValidateVirtualInterfaceType), `find_module` resolving the name,
-// on each declaration inside `decl` ForEachInnerDeclaredType visits.
+// (CheckDeclaredTypeRules), `names_covergroup` answering for the covergroups
+// the module sees, and §25.9's on the interface a virtual interface type names
+// (ValidateVirtualInterfaceType), `find_module` resolving the name, on each
+// declaration inside `decl` ForEachInnerDeclaredType visits.
 void CheckInnerDeclaredTypes(
     const ModuleDecl* decl, const AggregateShapeCtx& ctx,
-    const std::function<const ModuleDecl*(std::string_view)>& find_module) {
+    const std::function<const ModuleDecl*(std::string_view)>& find_module,
+    const std::function<bool(std::string_view)>& names_covergroup) {
   ForEachInnerDeclaredType(decl, [&](const DeclaredType& declared) {
-    CheckDeclaredTypeRules(declared, ctx);
+    CheckDeclaredTypeRules(declared, ctx, names_covergroup);
     ValidateVirtualInterfaceType(declared.type, declared.loc, find_module,
                                  ctx.diag);
   });
@@ -202,7 +205,10 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl,
   // from the module's scope, its nested declarations among it.
   CheckInnerDeclaredTypes(
       decl, {kShapeTables, &scope, diag_},
-      [this](std::string_view name) { return FindModuleInScope(name); });
+      [this](std::string_view name) { return FindModuleInScope(name); },
+      [this, mod](std::string_view name) {
+        return mod != nullptr && VisibleCovergroup(name, mod, unit_) != nullptr;
+      });
 }
 
 namespace {

@@ -25,10 +25,12 @@
 #include "elaborator/elaborator_module_inst_internal.h"
 #include "elaborator/elaborator_port_binding_internal.h"
 #include "elaborator/implication_operator_rules.h"
+#include "elaborator/interconnect_uses.h"
 #include "elaborator/property_instance.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
 #include "elaborator/type_eval.h"
+#include "elaborator/uwire_drivers.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -674,6 +676,7 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   std::string_view scoped_inst_name =
       item->inst_name.empty() ? item->inst_name : ScopedName(item->inst_name);
   DeclareInModuleNameSpace(item->inst_name, item->loc);
+  ReportInterconnectInInstance(*item, interconnect_names_, diag_);
   RtlirModuleInst inst;
   inst.module_name = item->inst_module;
   inst.inst_name = scoped_inst_name;
@@ -710,12 +713,17 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
                         {gen_block_path_, gen_loop_consts_, gen_prefix_scopes_},
                         interface_inst_types_);
   auto parent_scope = BuildParamScope(mod);
+  const UnitUwireCounts kUwireCounts =
+      CountUnitUwireDrivers(unit_uwire_drivers_);
   ElaborateChildInstance(inst, item, child_decl, mod, parent_scope);
   BindPorts(inst, item, mod, child_decl);
 
   std::vector<uint32_t> inst_dim_sizes;
   uint32_t total_instances =
       ComputeInstDimSizes(item, parent_scope, inst_dim_sizes);
+  if (total_instances > 1) {
+    RepeatUnitUwireDrivers(unit_uwire_drivers_, kUwireCounts, item->loc, diag_);
+  }
 
   if (!item->inst_dims.empty()) {
     ValidateInstanceArrayPorts(inst, item, mod, inst_dim_sizes,

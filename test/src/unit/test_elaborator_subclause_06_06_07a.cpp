@@ -758,4 +758,136 @@ TEST(NettypeElaboration, FixedArrayOfARealAndTwoStateStructDataTypeAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// Elaborates a module declaring `decls` and then a nettype `n` of `type`, and
+// answers whether it elaborated with no report.
+bool NettypeAccepted(const std::string& decls, const std::string& type) {
+  ElabFixture f;
+  Elaborate("module m;\n" + decls + "  nettype " + type + " n;\nendmodule\n",
+            f);
+  return !f.has_errors;
+}
+
+// Items a and b: a packed structure or union is integral, whether its members
+// are 4-state or 2-state, written inline or through a typedef.
+TEST(NettypeElaboration, PackedStructureAndUnionDataTypesAccepted) {
+  EXPECT_TRUE(NettypeAccepted("", "struct packed { logic [3:0] a; logic b; }"));
+  EXPECT_TRUE(NettypeAccepted("", "struct packed { bit [3:0] a; bit b; }"));
+  EXPECT_TRUE(NettypeAccepted(
+      "  typedef union packed { logic [3:0] a; logic [3:0] b; } u4_t;\n",
+      "u4_t"));
+  EXPECT_TRUE(NettypeAccepted(
+      "  typedef union packed { bit [3:0] a; bit [3:0] b; } u2_t;\n", "u2_t"));
+}
+
+// Items a and b take every integral type: a multidimensional packed array, an
+// enumeration, and the predefined integer types.
+TEST(NettypeElaboration, IntegralDataTypesAccepted) {
+  EXPECT_TRUE(NettypeAccepted("", "logic [1:0][3:0]"));
+  EXPECT_TRUE(NettypeAccepted("  typedef enum { A, B } e_t;\n", "e_t"));
+  EXPECT_TRUE(NettypeAccepted("", "enum bit [1:0] { X, Y }"));
+  for (const char* type :
+       {"int", "integer", "byte", "shortint", "longint", "time", "reg [7:0]"}) {
+    EXPECT_TRUE(NettypeAccepted("", type)) << type;
+  }
+}
+
+// Item d: an unpacked union is legal as an unpacked structure is, each member
+// having a legal type, and an unpacked array may have several fixed-size
+// dimensions.
+TEST(NettypeElaboration, UnpackedUnionAndMultidimensionalArrayAccepted) {
+  EXPECT_TRUE(NettypeAccepted(
+      "  typedef union { real r; bit [63:0] b; } ru_t;\n", "ru_t"));
+  EXPECT_TRUE(NettypeAccepted("", "union { real r; bit [63:0] b; }"));
+  EXPECT_TRUE(NettypeAccepted("  typedef real r23_t [2][3];\n", "r23_t"));
+  EXPECT_TRUE(NettypeAccepted("  typedef real r4_t [0:3];\n", "r4_t"));
+}
+
+// Item d asks for a fixed-size array, which an associative array is not,
+// whatever its index type.
+TEST(NettypeElaboration, AssociativeArrayDataTypeRejected) {
+  ExpectIllegalNettypeDataType("  typedef real bad_t[string];\n");
+  ExpectIllegalNettypeDataType("  typedef real bad_t[int];\n");
+  ExpectIllegalNettypeDataType("  typedef real bad_t[*];\n");
+  ExpectIllegalNettypeDataType(
+      "  typedef real fix_t[2];\n  typedef fix_t bad_t[int];\n");
+}
+
+// An unpacked union is judged member by member, as a structure is, and an
+// array element by element.
+TEST(NettypeElaboration, UnpackedUnionWithAnIllegalMemberRejected) {
+  ExpectIllegalNettypeDataType(
+      "  typedef union { real r; string s; } bad_t;\n");
+  ExpectIllegalNettypeDataType(
+      "  typedef union { real r; chandle c; } bad_t;\n");
+  ExpectIllegalNettypeDataType("  typedef string bad_t [4];\n");
+  ExpectIllegalNettypeDataType("  typedef event bad_t [2];\n");
+}
+
+// Item d applies at every level of nesting: a dynamic array two structures
+// down makes the outer structure illegal, and a fixed one there does not.
+TEST(NettypeElaboration, NestedDynamicArrayMemberRejected) {
+  ExpectIllegalNettypeDataType(
+      "  typedef struct { struct { int d[]; } inner; } bad_t;\n");
+  ExpectIllegalNettypeDataType(
+      "  typedef struct { int d[]; } in_t;\n"
+      "  typedef struct { in_t inner; } bad_t;\n");
+  EXPECT_TRUE(NettypeAccepted(
+      "  typedef struct { struct { int d[2]; } inner; } ok_t;\n", "ok_t"));
+}
+
+// A class of the std package, by its bare name or through the package, and a
+// covergroup are types none of items a to d names.
+TEST(NettypeElaboration, BuiltInClassAndCovergroupDataTypesRejected) {
+  for (const char* type :
+       {"mailbox", "semaphore", "std::semaphore", "std::mailbox"}) {
+    ElabFixture f;
+    const std::string kSrc =
+        "module m;\n  nettype " + std::string(type) + " n;\nendmodule\n";
+    Elaborate(kSrc, f);
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "data type of user-defined nettype 'n' is not a "
+                              "legal nettype data type",
+                              2, "6.6.7"))
+        << type;
+  }
+  ExpectIllegalNettypeDataType(
+      "  covergroup cg; endgroup\n"
+      "  typedef cg bad_t;\n");
+  ElabFixture f;
+  Elaborate(
+      "covergroup ucg; endgroup\n"
+      "module m;\n"
+      "  nettype ucg n;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "data type of user-defined nettype 'n' is not a "
+                            "legal nettype data type",
+                            3, "6.6.7"));
+}
+
+// A type parameter is judged as the type it stands for: its default where
+// nothing assigns it, and the type an instance gives it.
+TEST(NettypeElaboration, TypeParameterDataTypeJudgedAsItsType) {
+  ElabFixture f;
+  Elaborate(
+      "module m #(parameter type T = string) ();\n"
+      "  nettype T n;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "data type of user-defined nettype 'n' is not a "
+                            "legal nettype data type",
+                            2, "6.6.7"));
+  EXPECT_TRUE(
+      ElabOk("module c #(parameter type T = string) ();\n"
+             "  nettype T n;\n"
+             "endmodule\n"
+             "module m;\n"
+             "  c #(.T(real)) x();\n"
+             "endmodule\n"));
+  EXPECT_TRUE(NettypeAccepted("  parameter type P = real;\n", "P"));
+  ExpectIllegalNettypeDataType("  parameter type bad_t = chandle;\n");
+}
+
 }  // namespace

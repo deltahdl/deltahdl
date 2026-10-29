@@ -2,6 +2,8 @@
 
 #include <array>
 #include <format>
+#include <functional>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -12,6 +14,7 @@
 #include "elaborator/assoc_index_type.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/queue_dim.h"
+#include "elaborator/std_package.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -261,6 +264,16 @@ std::string NamedTypeKey(const DataType& type) {
   return NamedTypeKey(type.scope_name, type.type_name);
 }
 
+// §26.7 with §G.1: a class of the std package named through the package,
+// `std::semaphore`, which the class names hold by its bare name alone.
+static bool NamesStdClass(const DataType& type) {
+  if (type.scope_name != "std") return false;
+  std::optional<StdPackageMember> member =
+      StdPackageMemberNamed(type.type_name);
+  return member.has_value() &&
+         KindOfStdPackageMember(*member) == StdPackageMemberKind::kClass;
+}
+
 bool IsLegalNettypeDataType(const DataType& dtype,
                             const TypeShapeTables& tables) {
   // A name resolving to nothing ends the walk as a cyclic chain does, with
@@ -270,7 +283,8 @@ bool IsLegalNettypeDataType(const DataType& dtype,
     if (type->kind != DataTypeKind::kNamed)
       return IsLegalNettypeElement(*type, tables);
     const std::string kKey = NamedTypeKey(*type);
-    if (tables.class_names.count(kKey) != 0) return false;
+    if (tables.class_names.count(kKey) != 0 || NamesStdClass(*type))
+      return false;
     auto dims = tables.typedef_dims.find(kKey);
     if (dims != tables.typedef_dims.end() &&
         !AllFixedSize(dims->second, tables))
@@ -281,10 +295,25 @@ bool IsLegalNettypeDataType(const DataType& dtype,
   return true;
 }
 
-void ReportIllegalNettypeDataType(const ModuleItem& nettype,
-                                  const TypeShapeTables& tables,
-                                  DiagEngine& diag) {
-  if (IsLegalNettypeDataType(nettype.typedef_type, tables)) return;
+// §19.3: whether `dtype` names a covergroup, through the typedef names it is
+// written with: the name the chain ends in unresolved, which
+// `names_covergroup` answers for.
+static bool NamesCovergroup(
+    const DataType& dtype, const TypedefMap& typedefs,
+    const std::function<bool(std::string_view)>& names_covergroup) {
+  if (!names_covergroup) return false;
+  std::vector<std::string_view> names;
+  if (FollowTypedefs(dtype, typedefs, names) != nullptr || names.empty())
+    return false;
+  return names_covergroup(names.back());
+}
+
+void ReportIllegalNettypeDataType(
+    const ModuleItem& nettype, const TypeShapeTables& tables, DiagEngine& diag,
+    const std::function<bool(std::string_view)>& names_covergroup) {
+  if (IsLegalNettypeDataType(nettype.typedef_type, tables) &&
+      !NamesCovergroup(nettype.typedef_type, tables.typedefs, names_covergroup))
+    return;
   diag.Error(nettype.loc,
              std::format("data type of user-defined nettype '{}' is not a "
                          "legal nettype data type",

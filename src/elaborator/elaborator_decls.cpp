@@ -26,6 +26,7 @@
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_element_shape.h"
 #include "elaborator/type_eval.h"
+#include "elaborator/uwire_drivers.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 
@@ -378,18 +379,23 @@ static RtlirContAssign BuildNetDeclContAssign(const ModuleItem* item,
 }
 
 // §10.3.1: where a lowered net declaration assignment is emitted — the module
-// receiving the continuous assignment, the arena that allocates its LHS, and
-// the table recording continuous-assignment driver targets.
+// receiving the continuous assignment, the arena that allocates its LHS, the
+// table recording continuous-assignment driver targets, and the uwire nets
+// whose drivers §6.6.2 counts.
 struct NetDeclLowerSink {
   RtlirModule* mod;
   Arena& arena;
   std::unordered_map<std::string_view, SourceLoc>& cont_assign_targets;
+  UwireDrivers& uwire_drivers;
 };
 
 // §10.3.1: a net declaration assignment lowers to a continuous assignment of
-// the initializer to the net (illegal on interconnect nets).
+// the initializer to the net (illegal on interconnect nets). A uwire net is
+// entered among the nets whose drivers §6.6.2 counts whether or not its
+// declaration assigns it.
 static void LowerNetDeclAssignment(const ModuleItem* item, const RtlirNet& net,
                                    NetDeclLowerSink sink, DiagEngine& diag) {
+  if (net.net_type == NetType::kUwire) sink.uwire_drivers.Declare(net.name);
   if (!item->init_expr) return;
   if (item->data_type.is_interconnect) {
     diag.Error(
@@ -401,6 +407,9 @@ static void LowerNetDeclAssignment(const ModuleItem* item, const RtlirNet& net,
   // Under the net's own name, which carries the prefix of the generate block
   // declaring it, as Elaborator::ValidateContAssignIdentLhs keys a target.
   sink.cont_assign_targets.emplace(net.name, item->loc);
+  // §6.6.2: the assignment drives every bit of the net.
+  if (net.net_type == NetType::kUwire)
+    sink.uwire_drivers.Record(item->name, net.name, {}, item->loc, diag);
   sink.mod->assigns.push_back(BuildNetDeclContAssign(item, net, sink.arena));
 }
 
@@ -803,7 +812,8 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
 
   ValidateNetDriveStrength(item->data_type, net, diag_, item->loc);
 
-  LowerNetDeclAssignment(item, net, {mod, arena_, cont_assign_targets_}, diag_);
+  LowerNetDeclAssignment(
+      item, net, {mod, arena_, cont_assign_targets_, uwire_drivers_}, diag_);
 }
 
 // §6.19 with A.2.1.3: `enum {d, e} u, w;` gives its one enumeration to every

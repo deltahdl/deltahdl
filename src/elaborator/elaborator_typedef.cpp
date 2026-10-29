@@ -16,6 +16,7 @@
 #include "elaborator/aggregate_shape.h"
 #include "elaborator/assoc_index_type.h"
 #include "elaborator/const_eval.h"
+#include "elaborator/covergroup_variables.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_class_typedef_specialization.h"
 #include "elaborator/elaborator_enum_constants.h"
@@ -605,7 +606,10 @@ void Elaborator::ElaborateNettypeDecl(ModuleItem* item, RtlirModule* mod) {
   // §6.6.7 judges the data type a nettype names, typedef names and all, and
   // IsLegalNettypeDataType in net_data_type.cpp says which those are.
   ReportIllegalNettypeDataType(*item, {typedefs_, td_array_dims_, class_names_},
-                               diag_);
+                               diag_, [&](std::string_view name) {
+                                 return VisibleCovergroup(name, mod, unit_) !=
+                                        nullptr;
+                               });
   // §6.6.7 with §8.25: a nettype's data type may be a structure a
   // parameterized class declares, named through a typedef of a
   // specialization, `MyBaseT::S`; the nettype is of that type as the

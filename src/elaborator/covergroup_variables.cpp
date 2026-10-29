@@ -1,5 +1,6 @@
 #include "elaborator/covergroup_variables.h"
 
+#include <algorithm>
 #include <string_view>
 #include <vector>
 
@@ -109,6 +110,14 @@ const CovergroupDecl* VisibleCovergroup(std::string_view name,
   // §3.12.1: else one the compilation unit declares, outside every design
   // element, which every scope below it sees.
   return CovergroupNamed(unit->cu_items, name);
+}
+
+bool UnitDeclaresCovergroup(const CompilationUnit* unit,
+                            std::string_view name) {
+  if (CovergroupNamed(unit->cu_items, name) != nullptr) return true;
+  return std::ranges::any_of(unit->packages, [&](const PackageDecl* pkg) {
+    return CovergroupNamed(pkg->items, name) != nullptr;
+  });
 }
 
 void BindCovergroupVariable(const ModuleItem& item, RtlirVariable& var,

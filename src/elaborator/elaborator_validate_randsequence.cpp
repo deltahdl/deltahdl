@@ -16,6 +16,7 @@
 
 #include "common/diagnostic.h"
 #include "elaborator/aggregate_shape.h"
+#include "elaborator/covergroup_variables.h"
 #include "elaborator/declared_types.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_scope_rules_names.h"
@@ -312,7 +313,9 @@ void Elaborator::ValidatePerDeclarationRulesInUnitScopes() {
   const AggregateShapeCtx kShapeCtx{kShapeTables, nullptr, diag_};
   ForEachUnitDeclaredType(
       unit_, [this, &kShapeCtx](const DeclaredType& declared) {
-        CheckDeclaredTypeRules(declared, kShapeCtx);
+        CheckDeclaredTypeRules(declared, kShapeCtx, [this](std::string_view n) {
+          return UnitDeclaresCovergroup(unit_, n);
+        });
         ValidateVirtualInterfaceType(
             declared.type, declared.loc,
             [this](std::string_view name) { return FindModule(name); }, diag_);

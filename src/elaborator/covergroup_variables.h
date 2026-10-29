@@ -20,6 +20,11 @@ const CovergroupDecl* VisibleCovergroup(std::string_view name,
                                         const RtlirModule* mod,
                                         const CompilationUnit* unit);
 
+// Whether the compilation unit `unit` or one of its packages declares a
+// covergroup named `name`: what a declaration outside every module, a
+// package's or the unit's own, may reach by its scope or an import.
+bool UnitDeclaresCovergroup(const CompilationUnit* unit, std::string_view name);
+
 // §19.3: records in `var` the declaration of the covergroup its type names,
 // read among the covergroups `mod` declares and, by §26.3, those of the
 // packages of `unit` that the type's package scope or `mod`'s imports name.

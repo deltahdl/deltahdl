@@ -724,8 +724,9 @@ void Elaborator::ValidateGenericPortModportAccess(const ModuleDecl* child,
 void Elaborator::ValidateInterconnectContAssign(const ModuleItem* item) {
   if (item->kind != ModuleItemKind::kContAssign) return;
 
-  if (item->assign_lhs && item->assign_lhs->kind == ExprKind::kIdentifier &&
-      interconnect_names_.count(item->assign_lhs->text)) {
+  // §6.6.8 bars an interconnect from a continuous assignment wherever it is
+  // written in the target: whole, selected, or as an element.
+  if (ExprUsesInterconnect(item->assign_lhs, interconnect_names_)) {
     diag_.Error(item->loc,
                 "interconnect net cannot be used in continuous assignment",
                 Subclause("6.6.8"));

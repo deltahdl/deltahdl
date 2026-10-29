@@ -22,6 +22,7 @@
 #include "elaborator/sensitivity.h"
 #include "elaborator/time_literal_scale.h"
 #include "elaborator/unit_scope_switch.h"
+#include "elaborator/uwire_drivers.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -232,6 +233,7 @@ void Elaborator::ResetItemElaborationState() {
   dpi_import_names_.clear();
   net_names_.clear();
   cont_assign_targets_.clear();
+  uwire_drivers_.Clear();
   proc_assign_targets_.clear();
   var_types_.clear();
   var_array_info_.clear();
@@ -288,6 +290,7 @@ struct ItemElaborationStateSaver {
   decltype(Elaborator::dpi_import_names_) dpi_import_names;
   decltype(Elaborator::net_names_) net_names;
   decltype(Elaborator::cont_assign_targets_) cont_assign_targets;
+  decltype(Elaborator::uwire_drivers_) uwire_drivers;
   decltype(Elaborator::proc_assign_targets_) proc_assign_targets;
   decltype(Elaborator::var_types_) var_types;
   decltype(Elaborator::var_array_info_) var_array_info;
@@ -377,6 +380,7 @@ struct ItemElaborationStateSaver {
     dpi_import_names = std::move(e.dpi_import_names_);
     net_names = std::move(e.net_names_);
     cont_assign_targets = std::move(e.cont_assign_targets_);
+    uwire_drivers = std::move(e.uwire_drivers_);
     proc_assign_targets = std::move(e.proc_assign_targets_);
     var_types = std::move(e.var_types_);
     var_array_info = std::move(e.var_array_info_);
@@ -447,6 +451,7 @@ struct ItemElaborationStateSaver {
     e.dpi_import_names_ = std::move(dpi_import_names);
     e.net_names_ = std::move(net_names);
     e.cont_assign_targets_ = std::move(cont_assign_targets);
+    e.uwire_drivers_ = std::move(uwire_drivers);
     e.proc_assign_targets_ = std::move(proc_assign_targets);
     e.var_types_ = std::move(var_types);
     e.var_array_info_ = std::move(var_array_info);
@@ -649,8 +654,10 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   // generate constructs this module queued are elaborated after that, by
   // Elaborator::ProcessPendingGenerate, and §23.9 judges what they declare
   // against the scope they were written in, so keep the set here for them.
-  module_scope_names_[mod] = {declared_names_, net_names_, cont_assign_targets_,
-                              proc_assign_targets_, var_init_names_};
+  module_scope_names_[mod] = {declared_names_,      net_names_,
+                              cont_assign_targets_, proc_assign_targets_,
+                              var_init_names_,      uwire_drivers_,
+                              interconnect_names_};
   saved_item_state.Restore(*this);
   return mod;
 }
