@@ -93,7 +93,7 @@ void ReportPredicateOperator(const Expr* e, DiagEngine& diag);
 // §5.5: a unary operator stands to the left of its operand. Reports `tok`
 // where it is one of the operators A.8.6 makes unary only (!, ~, ~& and ~|),
 // met where an operand has just ended, and says whether it did. Defined in
-// expr_parser_aux.cpp, and called by Parser::ParseInfixBp.
+// expr_parser_aux.cpp, and called by Parser::TryParseSpecialInfix.
 bool ReportUnaryOperatorAfterOperand(const Token& tok, DiagEngine& diag);
 
 // Whether `tok` closes the expression before it rather than beginning an

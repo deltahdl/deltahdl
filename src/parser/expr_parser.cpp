@@ -159,6 +159,14 @@ static Expr* MakePredicateNode(Arena& arena, TokenKind op, Expr* lhs) {
 }
 
 Expr* Parser::TryParseSpecialInfix(Expr*& lhs, const Token& tok, int min_bp) {
+  // §5.5: a unary-only operator here follows its operand. It is read past,
+  // with the operand after it, and the left operand kept, so that the one
+  // report stands alone.
+  if (ReportUnaryOperatorAfterOperand(tok, diag_)) {
+    Consume();
+    if (!EndsExpression(CurrentToken())) ParseExprBp(min_bp);
+    return lhs;
+  }
   if (tok.kind == TokenKind::kQuestion && min_bp <= 1) {
     Consume();
     std::vector<Attribute> attrs = ParseAttributes();
@@ -233,13 +241,6 @@ Expr* Parser::ParseInfixBp(Expr* lhs, int min_bp) {
     }
 
     auto [lbp, rbp] = InfixBindingPower(tok.kind);
-    // §5.5: a unary-only operator here follows its operand. It is read past,
-    // with the operand after it, so that the one report stands alone.
-    if (lbp < 0 && ReportUnaryOperatorAfterOperand(tok, diag_)) {
-      Consume();
-      if (!EndsExpression(CurrentToken())) ParseExprBp(min_bp);
-      break;
-    }
     if (lbp < 0 || lbp < min_bp) break;
     // §16.12.7: inside a sequence body an implication operator ends the
     // operand, the antecedent, rather than joining it to the consequent.
