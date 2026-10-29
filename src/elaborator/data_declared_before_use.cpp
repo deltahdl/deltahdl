@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <format>
 #include <functional>
+#include <optional>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
@@ -16,6 +17,7 @@
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
+#include "elaborator/std_package.h"
 #include "elaborator/unit_scope_order.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
@@ -250,10 +252,12 @@ static bool UnitNamesAbove(const CompilationUnit& unit, std::string_view name,
 
 // Whether a wildcard import of the package `package_name` may make `name`
 // visible: the package declares an item of that name or exports anything, or
-// is none of the unit's, so what it supplies is not known here.
+// is none of the unit's, so what it supplies is not known here. The std
+// package, which every scope imports, holds the members §G.1 lists.
 static bool PackageMayProvide(const CompilationUnit& unit,
                               std::string_view package_name,
                               std::string_view name) {
+  if (package_name == "std") return StdPackageMemberNamed(name).has_value();
   auto pkg = std::ranges::find_if(unit.packages, [&](const PackageDecl* p) {
     return p->name == package_name;
   });
