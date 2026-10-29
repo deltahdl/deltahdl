@@ -732,39 +732,62 @@ TEST(TypeOfExpressionDeclarationSim, DeclarationTakesACallsType) {
 // procedural block, a function and a generate block; written with `[3]`
 // after the name, the declaration is three of the operand's array, the first
 // of which is as large as an array of the operand's type starts, empty where
-// that is variable in size.
+// that is variable in size. `element_size` reads the size of that first
+// array: $size(d, 2) where it is fixed-size (§20.7), and $size(d[0]) where it
+// is variable in size (§20.7.1). It is null for a fixed array of associative
+// arrays, whose element no array query yet describes (#9020).
+// `variable_size` marks an operand whose array is variable in size, which a
+// procedure does not yet build as the element of a fixed array (#9019).
 struct DeclaredArray {
   const char* operand;
   const char* probe;
   uint64_t expected;
   uint64_t initial_size;
+  const char* element_size;
+  bool variable_size;
 };
 
 constexpr std::array kDeclaredArrays = {
-    DeclaredArray{"u", "n = $size(d) * 10 + $bits(d[0]);", 24, 2},
-    DeclaredArray{"m[0]", "n = $size(d) * 100 + $bits(d[0]);", 332, 3},
-    DeclaredArray{"m", "n = $size(d) * 10 + $size(d[0]);", 23, 2},
-    DeclaredArray{"dyn", "d = new[3]; n = d.size();", 3, 0},
-    DeclaredArray{"que", "d.push_back(1); d.push_back(2); n = d.size();", 2, 0},
-    DeclaredArray{"aa", "d[\"a\"] = 1; d[\"b\"] = 2; n = d.num();", 2, 0},
+    DeclaredArray{"u", "n = $size(d) * 10 + $bits(d[0]);", 24, 2, "$size(d, 2)",
+                  false},
+    DeclaredArray{"m[0]", "n = $size(d) * 100 + $bits(d[0]);", 332, 3,
+                  "$size(d, 2)", false},
+    DeclaredArray{"m", "n = $size(d) * 10 + $size(d, 2);", 23, 2, "$size(d, 2)",
+                  false},
+    DeclaredArray{"dyn", "d = new[3]; n = d.size();", 3, 0, "$size(d[0])",
+                  true},
+    DeclaredArray{"que", "d.push_back(1); d.push_back(2); n = d.size();", 2, 0,
+                  "$size(d[0])", true},
+    DeclaredArray{"aa", "d[\"a\"] = 1; d[\"b\"] = 2; n = d.num();", 2, 0,
+                  nullptr, true},
     DeclaredArray{"arr.find with (item > 1)",
-                  "d.push_back(1); n = d.size() * 10 + $bits(d[0]);", 16, 0},
+                  "d.push_back(1); n = d.size() * 10 + $bits(d[0]);", 16, 0,
+                  "$size(d[0])", true},
     DeclaredArray{"arr.find_index with (item > 1)",
-                  "d.push_back(1); n = d.size() * 100 + $bits(d[0]);", 132, 0},
+                  "d.push_back(1); n = d.size() * 100 + $bits(d[0]);", 132, 0,
+                  "$size(d[0])", true},
 };
 
 // Where a declaration may stand: a module's items, a procedural block, a
-// function and a generate block, `{0}` the declaration and `{1}` the probe.
+// function and a generate block, `{0}` the declaration and `{1}` the probe,
+// and whether that is among a procedure's statements.
+struct DeclarationPlace {
+  const char* text;
+  bool in_procedure;
+};
+
 constexpr std::array kDeclarationPlaces = {
-    "  {0}\n  initial begin {1} end\n",
-    "  initial begin {0} {1} end\n",
-    "  function automatic void f(); {0} {1} endfunction\n"
-    "  initial f();\n",
-    "  if (1) begin : g {0} initial begin {1} end end\n",
+    DeclarationPlace{"  {0}\n  initial begin {1} end\n", false},
+    DeclarationPlace{"  initial begin {0} {1} end\n", true},
+    DeclarationPlace{"  function automatic void f(); {0} {1} endfunction\n"
+                     "  initial f();\n",
+                     true},
+    DeclarationPlace{"  if (1) begin : g {0} initial begin {1} end end\n",
+                     false},
 };
 
 // A module declaring the operands and an int n, with `declaration` and
-// `probe` written at `place`, one of kDeclarationPlaces.
+// `probe` written at `place`, the text of one of kDeclarationPlaces.
 std::string ModuleDeclaring(std::string_view place,
                             const std::string& declaration,
                             const std::string& probe) {
@@ -774,14 +797,20 @@ std::string ModuleDeclaring(std::string_view place,
 }
 
 TEST(TypeOfExpressionDeclarationSim, DeclarationTakesAnUnpackedArrayType) {
-  for (std::string_view place : kDeclarationPlaces) {
+  for (const DeclarationPlace& place : kDeclarationPlaces) {
     for (const DeclaredArray& array : kDeclaredArrays) {
       for (bool own_dimension : {false, true}) {
+        if (own_dimension && (array.element_size == nullptr ||
+                              (array.variable_size && place.in_procedure))) {
+          continue;
+        }
         const std::string kSrc = ModuleDeclaring(
-            place,
+            place.text,
             std::format("var type({}) d{};", array.operand,
                         own_dimension ? " [3]" : ""),
-            own_dimension ? "n = $size(d) * 1000 + $size(d[0]);" : array.probe);
+            own_dimension
+                ? std::format("n = $size(d) * 1000 + {};", array.element_size)
+                : array.probe);
         SCOPED_TRACE(kSrc);
         EXPECT_EQ(RunAndGet(kSrc, "n"),
                   own_dimension ? 3000 + array.initial_size : array.expected);
@@ -821,10 +850,11 @@ constexpr std::array kDeclaredClassValues = {
 };
 
 TEST(TypeOfExpressionDeclarationSim, DeclarationTakesAClassValuesType) {
-  for (std::string_view place : kDeclarationPlaces) {
+  for (const DeclarationPlace& place : kDeclarationPlaces) {
     for (const DeclaredClassValue& value : kDeclaredClassValues) {
       const std::string kSrc = ModuleDeclaring(
-          place, std::format("var type({}) d;", value.operand), value.probe);
+          place.text, std::format("var type({}) d;", value.operand),
+          value.probe);
       SCOPED_TRACE(kSrc);
       EXPECT_EQ(RunAndGet(kSrc, "n"), value.expected);
     }

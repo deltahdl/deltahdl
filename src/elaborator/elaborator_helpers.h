@@ -352,10 +352,11 @@ const ClassDecl* FindBaseClass(const ClassDecl* cls,
 std::vector<const ClassDecl*> AllClassDecls(const CompilationUnit* unit);
 
 // §6.23: takes onto `dt` the type its type reference stands for, `type`, in
-// place of the reference: the type's kind, signing, name and packed
-// dimensions. What the declaration itself says, a net type keyword or
-// `const`, stays as `dt` holds it. Defined in
-// elaborator_validate_struct_types.cpp.
+// place of the reference: the type's kind, signing, name, the package or
+// class scopes the name is written behind, the parameter values a class's
+// name is specialized with (§8.25), and packed dimensions. What the
+// declaration itself says, a net type keyword or `const`, stays as `dt` holds
+// it. Defined in type_ref_walks.cpp.
 void AdoptReferencedType(DataType& dt, const DataType& type);
 
 // §6.23 with §26.2 and §3.12.1: resolves in place the type reference `dt`

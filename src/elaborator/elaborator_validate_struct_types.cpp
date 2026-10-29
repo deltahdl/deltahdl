@@ -171,16 +171,6 @@ static void SetTypeRefPackedDims(DataType& dt, uint32_t width, Arena& arena) {
   dt.packed_dim_right = right;
 }
 
-void AdoptReferencedType(DataType& dt, const DataType& type) {
-  dt.kind = type.kind;
-  dt.is_signed = type.is_signed;
-  dt.type_name = type.type_name;
-  dt.packed_dim_left = type.packed_dim_left;
-  dt.packed_dim_right = type.packed_dim_right;
-  dt.extra_packed_dims = type.extra_packed_dims;
-  dt.type_ref_expr = nullptr;
-}
-
 // Takes onto `dt`, in place of its type reference, the logic vector of
 // `shape`'s width and signing.
 static void AdoptLogicVector(DataType& dt, ValueShape shape, Arena& arena) {

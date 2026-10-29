@@ -444,12 +444,12 @@ const ModuleDecl* ElaboratorOperationRules::TypeRefModule() const {
 // Whether the bare `name` names a value of the module whose members a `.`
 // selects: a variable or net it declares, a parameter, an enumeration's named
 // constant, a port carrying a value, or a value an import of the module or of
-// the compilation unit takes, or the unit declares (§3.12.1).
+// the compilation unit takes, or the unit declares (§3.12.1). A class handle
+// is one: its `.` selects a member of the object it refers to (§8.5, §8.6).
 bool ElaboratorOperationRules::NamesModuleValue(std::string_view name) const {
   auto var = var_types_.find(name);
   if (var != var_types_.end()) {
-    return var->second != DataTypeKind::kVirtualInterface &&
-           class_var_names_.count(name) == 0;
+    return var->second != DataTypeKind::kVirtualInterface;
   }
   if (const_names_.contains(name) || enum_member_names_.contains(name))
     return true;

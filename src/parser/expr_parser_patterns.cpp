@@ -23,8 +23,14 @@ Expr* Parser::ParseTypeRefExpr() {
   auto dtype = ParseDataType();
   // §6.24.1: a type keyword, a signing or a type name with a cast's apostrophe
   // after it opens a cast, `type(byte'(x))` or `type(signed'(v))`, which is
-  // the expression the reference names rather than a data type.
-  if (Check(TokenKind::kApostrophe) || Check(TokenKind::kApostropheLBrace)) {
+  // the expression the reference names rather than a data type. §8.10 and
+  // §8.23: a class's name and `::` with a parenthesis after the name it
+  // scopes call a static method, `type(C::f())`, an expression likewise.
+  bool calls_scoped_method = dtype.kind == DataTypeKind::kNamed &&
+                             !dtype.scope_name.empty() &&
+                             Check(TokenKind::kLParen);
+  if (Check(TokenKind::kApostrophe) || Check(TokenKind::kApostropheLBrace) ||
+      calls_scoped_method) {
     lexer_.RestorePos(saved);
     dtype = DataType{};
   }

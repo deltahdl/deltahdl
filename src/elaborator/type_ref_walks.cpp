@@ -219,6 +219,19 @@ void ResolveScopeItemTypeRefs(const std::vector<ModuleItem*>& items,
 
 }  // namespace
 
+void AdoptReferencedType(DataType& dt, const DataType& type) {
+  dt.kind = type.kind;
+  dt.is_signed = type.is_signed;
+  dt.type_name = type.type_name;
+  dt.scope_name = type.scope_name;
+  dt.outer_scope_names = type.outer_scope_names;
+  dt.type_params = type.type_params;
+  dt.packed_dim_left = type.packed_dim_left;
+  dt.packed_dim_right = type.packed_dim_right;
+  dt.extra_packed_dims = type.extra_packed_dims;
+  dt.type_ref_expr = nullptr;
+}
+
 // The procedures an item holds, an initial, final or always block's body and a
 // task's or function's, are walked with the subroutine's formals as the first
 // names in scope.
