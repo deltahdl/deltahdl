@@ -374,13 +374,20 @@ struct ItemElaborationStateSaver {
   } scope_maps;
 
   explicit ItemElaborationStateSaver(Elaborator& e)
-      : uwire_drivers(std::move(e.uwire_drivers_)),
-        scope_maps{e.typedefs_, e.cu_param_scope_, e.td_array_dims_} {
+      : scope_maps{e.typedefs_, e.cu_param_scope_, e.td_array_dims_} {
+    TakeObjectState(e);
+    TakePortAndDeclarationState(e);
+    e.ResetItemElaborationState();
+  }
+
+  // The names, types and shapes of the module's objects and what drives them.
+  void TakeObjectState(Elaborator& e) {
     forward_typedef_kinds = std::move(e.forward_typedef_kinds_);
     declared_names = std::move(e.declared_names_);
     dpi_import_names = std::move(e.dpi_import_names_);
     net_names = std::move(e.net_names_);
     cont_assign_targets = std::move(e.cont_assign_targets_);
+    uwire_drivers = std::move(e.uwire_drivers_);
     proc_assign_targets = std::move(e.proc_assign_targets_);
     var_types = std::move(e.var_types_);
     var_array_info = std::move(e.var_array_info_);
@@ -403,6 +410,11 @@ struct ItemElaborationStateSaver {
     var_select_shapes = std::move(e.var_select_shapes_);
     var_named_types = std::move(e.var_named_types_);
     alias_bit_pairs = std::move(e.alias_bit_pairs_);
+  }
+
+  // The module's ports, the instances it makes, and the subroutines, lets,
+  // sequences and properties it declares.
+  void TakePortAndDeclarationState(Elaborator& e) {
     non_ansi_complete_ports = std::move(e.non_ansi_complete_ports_);
     non_ansi_partial_ports = std::move(e.non_ansi_partial_ports_);
     non_ansi_signed_ports = std::move(e.non_ansi_signed_ports_);
@@ -424,7 +436,6 @@ struct ItemElaborationStateSaver {
     property_registry = std::move(e.property_registry_);
     func_decls = std::move(e.func_decls_);
     inference_funcs = std::move(e.inference_funcs_);
-    e.ResetItemElaborationState();
   }
 
   // Hands this module's typedefs, their dimensions and the compilation-unit
@@ -446,6 +457,12 @@ struct ItemElaborationStateSaver {
   }
 
   void Restore(Elaborator& e) {
+    PutBackObjectState(e);
+    PutBackPortAndDeclarationState(e);
+    RestoreScopeMaps(e);
+  }
+
+  void PutBackObjectState(Elaborator& e) {
     e.forward_typedef_kinds_ = std::move(forward_typedef_kinds);
     e.declared_names_ = std::move(declared_names);
     e.dpi_import_names_ = std::move(dpi_import_names);
@@ -474,6 +491,9 @@ struct ItemElaborationStateSaver {
     e.var_select_shapes_ = std::move(var_select_shapes);
     e.var_named_types_ = std::move(var_named_types);
     e.alias_bit_pairs_ = std::move(alias_bit_pairs);
+  }
+
+  void PutBackPortAndDeclarationState(Elaborator& e) {
     e.non_ansi_complete_ports_ = std::move(non_ansi_complete_ports);
     e.non_ansi_partial_ports_ = std::move(non_ansi_partial_ports);
     e.non_ansi_signed_ports_ = std::move(non_ansi_signed_ports);
@@ -495,7 +515,6 @@ struct ItemElaborationStateSaver {
     e.property_registry_ = std::move(property_registry);
     e.func_decls_ = std::move(func_decls);
     e.inference_funcs_ = std::move(inference_funcs);
-    RestoreScopeMaps(e);
   }
 };
 
