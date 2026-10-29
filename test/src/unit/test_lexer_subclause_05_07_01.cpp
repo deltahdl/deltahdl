@@ -381,4 +381,64 @@ TEST(IntegerLiteralLexing, FormfeedBetweenBaseAndDigits) {
   EXPECT_EQ(r.tokens[0].kind, TokenKind::kIntLiteral);
 }
 
+// §5.7.1 has the underscore legal anywhere in a number but as its first
+// character. The value of a based literal is a number of its own, so an
+// underscore right after the base format, or after the white space allowed
+// there, is the first character of that value and is reported, whatever the
+// base and with or without a size or a sign. The same literal without it draws
+// no report.
+TEST(IntegerLiteralLexing, UnderscoreFirstInABasedValueIsReported) {
+  for (const char* src :
+       {"8'h_F", "'h_F", "8'h _F", "8'd_5", "8'o_7", "4'sb_1", "'SH_a"}) {
+    EXPECT_TRUE(ReportedError(LexDiagnostics(src),
+                              "underscore cannot be first character of number "
+                              "value",
+                              1, "5.7.1"))
+        << src;
+  }
+  for (const char* src :
+       {"8'hF", "'hF", "8'h F", "8'd5", "8'o7", "4'sb1", "'SHa"}) {
+    EXPECT_TRUE(LexDiagnostics(src).empty()) << src;
+  }
+}
+
+// An underscore anywhere after the first character is legal: last in the
+// number, doubled, or in the size. Each such number is one token and draws no
+// report.
+TEST(IntegerLiteralLexing, TrailingDoubledAndSizeUnderscoresLexAsOneToken) {
+  for (const char* src : {"12_", "8'hF_", "4'b10_", "1__2", "8'b1__0",
+                          "'h1___F", "1_6'h12", "1__0_.2__5_", "2_5e0__1_"}) {
+    auto r = LexWithDiag(src);
+    EXPECT_FALSE(r.has_errors) << src;
+    ASSERT_EQ(r.tokens.size(), 2u) << src;
+    EXPECT_EQ(r.tokens[0].text, src) << src;
+  }
+}
+
+// Footnote 53 of Syntax 5-2 keeps white space from following the apostrophe of
+// an unbased unsized literal, blank, tab, newline or formfeed. The letter or
+// digit after it then begins no literal, and the apostrophe, which no token
+// begins with on its own here, is reported on its line.
+TEST(IntegerLiteralLexing,
+     WhiteSpaceAfterAnUnbasedUnsizedApostropheIsReported) {
+  for (const char* src :
+       {"' x", "' X", "' z", "' Z", "'\t1", "'\n1", "'\f0", "'\tx"}) {
+    EXPECT_TRUE(ReportedError(LexDiagnostics(src), "unexpected character '''",
+                              1, "5.2"))
+        << src;
+  }
+}
+
+// Written against the apostrophe, each of the six forms is one unbased
+// unsized literal token and draws no report.
+TEST(IntegerLiteralLexing, EachUnbasedUnsizedFormIsOneToken) {
+  for (const char* src : {"'0", "'1", "'x", "'X", "'z", "'Z"}) {
+    auto r = LexWithDiag(src);
+    EXPECT_FALSE(r.has_errors) << src;
+    ASSERT_EQ(r.tokens.size(), 2u) << src;
+    EXPECT_EQ(r.tokens[0].kind, TokenKind::kUnbasedUnsizedLiteral) << src;
+    EXPECT_EQ(r.tokens[0].text, src) << src;
+  }
+}
+
 }  // namespace

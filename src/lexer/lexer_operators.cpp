@@ -1,5 +1,6 @@
 #include <cctype>
 #include <cstdint>
+#include <format>
 #include <string>
 
 #include "common/diagnostic.h"
@@ -349,6 +350,18 @@ Token Lexer::LexAngleRight(SourceLoc loc, uint32_t start) {
   return MakeOp(TokenKind::kGtGt, loc, start);
 }
 
+// The report for a byte that begins no token: the character itself where it
+// prints, and otherwise its value, so that a control byte or one byte of a
+// multi-byte UTF-8 sequence is named legibly rather than written raw into the
+// message.
+static std::string UnexpectedCharacterMessage(char c) {
+  const auto kByte = static_cast<unsigned char>(c);
+  if (kByte >= 0x20 && kByte < 0x7F) {
+    return std::string("unexpected character '") + c + "'";
+  }
+  return std::format("unexpected character 0x{:02X}", kByte);
+}
+
 Token Lexer::LexOperator() {
   auto loc = MakeLoc();
   uint32_t start = pos_;
@@ -422,8 +435,7 @@ Token Lexer::LexOperator() {
       break;
   }
 
-  diag_.Error(loc, std::string("unexpected character '") + c + "'",
-              Subclause("5.2"));
+  diag_.Error(loc, UnexpectedCharacterMessage(c), Subclause("5.2"));
   Token tok;
   tok.kind = TokenKind::kError;
   tok.loc = loc;

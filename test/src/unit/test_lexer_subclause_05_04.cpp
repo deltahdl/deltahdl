@@ -320,4 +320,21 @@ TEST(LexicalConventionLexing, OneLineCommentMayEndTheText) {
   EXPECT_FALSE(result.has_errors);
 }
 
+// §5.4 with §5.9: inside a string literal, quoted or triple-quoted, `//`, `/*`
+// and `*/` are characters of the string and open or close no comment, so the
+// string ends at its own closing quote and the tokens after it are read.
+TEST(LexicalConventionLexing, CommentMarkersInsideAStringAreItsCharacters) {
+  for (const char* literal : {"\"/*\"", "\"*/\"", "\"a // b\"",
+                              "\"\"\"/* c\"\"\"", "\"\"\"x // y\"\"\""}) {
+    auto tokens = Lex(std::string("s = ") + literal + "; x");
+    ASSERT_EQ(tokens.size(), 6u) << literal;
+    EXPECT_EQ(tokens[2].kind, TokenKind::kStringLiteral) << literal;
+    EXPECT_EQ(tokens[2].text, literal) << literal;
+    EXPECT_EQ(tokens[3].kind, TokenKind::kSemicolon) << literal;
+    EXPECT_EQ(tokens[4].text, "x") << literal;
+    EXPECT_TRUE(LexDiagnostics(std::string("s = ") + literal + "; x").empty())
+        << literal;
+  }
+}
+
 }  // namespace

@@ -125,4 +125,33 @@ TEST(CommentPreprocessor, BlockOpenerInALineCommentOnADefineJoinsNoLine) {
   EXPECT_NE(out.find("module t; endmodule"), std::string::npos);
 }
 
+// §5.4 with §5.9: a `/*` inside a string literal opens no block comment, so the
+// declaration after the string on the same line reaches the output, and the
+// `*/` in the one-line comment that ends the line closes nothing. The same
+// holds for the string a macro's text holds and for a triple-quoted string.
+TEST(CommentPreprocessor, BlockOpenerInsideAStringOpensNoComment) {
+  for (const char* line : {"string s = \"/*\"; int x = 1; // */\n",
+                           "string s = `M; int x = 1; // */\n",
+                           "string s = \"\"\"/*\"\"\"; int x = 1; // */\n"}) {
+    PreprocFixture f;
+    auto out =
+        Preprocess(std::string("`define M \"/* m\"\n") + line + "int y;\n", f);
+    EXPECT_FALSE(f.diag.HasErrors()) << line;
+    EXPECT_NE(out.find("int x = 1;"), std::string::npos) << line << out;
+    EXPECT_NE(out.find("int y;"), std::string::npos) << line << out;
+  }
+}
+
+// The string keeps the comment markers as its characters: the text written
+// between the quotes reaches the output whole.
+TEST(CommentPreprocessor, CommentMarkersInsideAStringStayInIt) {
+  PreprocFixture f;
+  auto out = Preprocess(
+      "string a = \"/*\";\nstring b = \"*/\";\nstring c = \"a // b\";\n", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(out.find("\"/*\""), std::string::npos) << out;
+  EXPECT_NE(out.find("\"*/\""), std::string::npos) << out;
+  EXPECT_NE(out.find("\"a // b\""), std::string::npos) << out;
+}
+
 }  // namespace

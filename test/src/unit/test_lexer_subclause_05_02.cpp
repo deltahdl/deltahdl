@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <vector>
 
 #include "fixture_lexer.h"
 #include "helpers_reported_error.h"
@@ -346,9 +347,8 @@ TEST(LexicalConventionLexing, KeywordMarkerByteInUserSourceIsUnexpected) {
   std::string src = "a ";
   src += kKeywordMarker;
   src += " b";
-  EXPECT_TRUE(ReportedError(
-      LexDiagnostics(src),
-      std::string("unexpected character '") + kKeywordMarker + "'", 1, "5.2"));
+  EXPECT_TRUE(ReportedError(LexDiagnostics(src), "unexpected character 0x01", 1,
+                            "5.2"));
 }
 
 // What the report is worth, which the report alone does not say. The byte is
@@ -385,6 +385,51 @@ TEST(LexicalConventionLexing, BlockCommentSpanningMultipleLinesAsSeparator) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
   EXPECT_EQ(tokens[1].text, "b");
   EXPECT_EQ(tokens[2].kind, TokenKind::kEof);
+}
+
+// One byte no lexical token begins with, and the value the report names it by.
+struct ByteBeginningNoToken {
+  std::string bytes;
+  const char* reported;
+};
+
+// A NUL, a DEL, an ESC and the two bytes of a UTF-8 é: none is white space
+// (§5.3) and none begins any of §5.2's seven token types.
+std::vector<ByteBeginningNoToken> BytesBeginningNoToken() {
+  return {{std::string(1, '\0'), "0x00"},
+          {"\x7F", "0x7F"},
+          {"\x1B", "0x1B"},
+          {"\xC3\xA9", "0xC3"}};
+}
+
+// §5.2: a byte that begins none of the seven token types, standing between
+// two tokens, makes the text no stream of tokens and is reported on its line,
+// named by its value since it does not print. The text after it is still read,
+// so the identifier on the next line is lexed.
+TEST(LexicalConventionLexing, ByteBeginningNoTokenIsReportedByItsValue) {
+  for (const ByteBeginningNoToken& c : BytesBeginningNoToken()) {
+    const std::string kSrc = "a " + c.bytes + " b\nlast";
+    EXPECT_TRUE(ReportedError(LexDiagnostics(kSrc),
+                              std::string("unexpected character ") + c.reported,
+                              1, "5.2"))
+        << c.reported;
+    auto tokens = Lex(kSrc);
+    ASSERT_GE(tokens.size(), 2u) << c.reported;
+    EXPECT_EQ(tokens[tokens.size() - 2].text, "last") << c.reported;
+  }
+}
+
+// §5.4 and §5.9: inside a block comment, a one-line comment or a string
+// literal, the same byte is a character of that comment or string, so nothing
+// is reported.
+TEST(LexicalConventionLexing, ByteInsideACommentOrStringDrawsNoReport) {
+  for (const ByteBeginningNoToken& c : BytesBeginningNoToken()) {
+    for (const std::string& src :
+         {"a /* " + c.bytes + " */ b", "a // " + c.bytes + "\nb",
+          "a = \"" + c.bytes + "\";"}) {
+      EXPECT_TRUE(LexDiagnostics(src).empty()) << c.reported;
+    }
+  }
 }
 
 }  // namespace

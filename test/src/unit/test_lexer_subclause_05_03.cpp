@@ -38,10 +38,11 @@ TEST(LexicalConventionLexing, FormfeedIsWhitespace) {
 
 // §5.3 and A.9.4 make white space the space, tab, newline, formfeed and end
 // of file alone, so a vertical tab separates nothing. No token begins with
-// one, and §5.2 has it reported as a character outside every token.
+// one, and §5.2 has it reported as a character outside every token, named by
+// its value since it does not print.
 TEST(LexicalConventionLexing, VerticalTabIsNoWhitespace) {
   auto diags = LexDiagnostics("a\vb");
-  EXPECT_TRUE(ReportedError(diags, "unexpected character '\v'", 1, "5.2"));
+  EXPECT_TRUE(ReportedError(diags, "unexpected character 0x0B", 1, "5.2"));
 }
 
 // An escaped identifier runs to white space (§5.6.1), so a vertical tab, being

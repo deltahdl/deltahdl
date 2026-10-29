@@ -122,7 +122,7 @@ TEST(LexicalConventionParsing, StatementSpanningManyLines) {
 // token (§5.2), not a delimiter.
 TEST(LexicalConventionParsing, VerticalTabIsNoDelimiter) {
   auto r = Parse("module\vt;\nendmodule\n");
-  EXPECT_TRUE(ReportedError(r.diags, "unexpected character '\v'", 1, "5.2"));
+  EXPECT_TRUE(ReportedError(r.diags, "unexpected character 0x0B", 1, "5.2"));
 }
 
 TEST(LexicalConventionParsing, TabInsideStringPreservedInParse) {

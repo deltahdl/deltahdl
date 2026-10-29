@@ -1,5 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
+#include "fixture_simulator.h"
+#include "helpers_preprocess_and_get.h"
 #include "helpers_scheduler.h"
 
 using namespace delta;
@@ -125,4 +129,25 @@ TEST(CommentSim, CommentLineFollowedByBlock) {
       "endmodule\n",
       "result");
   EXPECT_EQ(result, 66u);
+}
+
+// §5.4 with §5.9: the comment markers in a string literal are characters of
+// the string, which shows them, and the declaration after the string on the
+// same line is made, which it would not be had the `/*` opened a comment
+// running to the `*/` at the end of the line. A macro's string and a
+// triple-quoted string read the same way.
+TEST(CommentSim, CommentMarkersInsideAStringAreItsCharacters) {
+  SimFixture f;
+  std::string out = PreprocessAndCapture(
+      "`define M \"/* m\"\n"
+      "module t;\n"
+      "  string s = \"/*\"; int x = 1; // */\n"
+      "  string u = \"*/\";\n"
+      "  string v = \"a // b\";\n"
+      "  string w = \"\"\"/* c\"\"\"; int y = 2; // */\n"
+      "  string m = `M;\n"
+      "  initial $display(\"%s|%s|%s|%s|%s|%0d|%0d\", s, u, v, w, m, x, y);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "/*|*/|a // b|/* c|/* m|1|2\n");
 }
