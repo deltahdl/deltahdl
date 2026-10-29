@@ -13,6 +13,7 @@
 #include "simulator/lowerer_register.h"
 #include "simulator/pattern_type_key.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
 #include "simulator/variable.h"
@@ -23,12 +24,15 @@ namespace {
 // §7.4.2: bundle for materializing the leaves of a fixed multidimensional
 // unpacked array, keeping the recursive walk within the parameter-count limit;
 // `in_place` writes each leaf already standing under its key rather than
-// creating one (InitArrayElements).
+// creating one (InitArrayElements). `layout` is the element structure's, by
+// which an item that is a structure pattern is packed (§10.9.2), or null for
+// an array whose elements are no structures.
 struct MultiDimArray {
   const RtlirVariable& var;
   SimContext& ctx;
   Arena& arena;
   bool in_place = false;
+  const StructTypeInfo* layout = nullptr;
 };
 }  // namespace
 
@@ -142,11 +146,15 @@ static void StoreMultiDimLeaf(const MultiDimArray& m, const std::string& name,
 }
 
 // Gives one leaf variable of the array the value of the pattern item that
-// reached it, or §6.8 Table 6-7's default when none did.
+// reached it, or §6.8 Table 6-7's default when none did. An item that is a
+// pattern for a structure element is packed by the element's layout, which
+// places each member's own pattern, a replication among them, in that member's
+// bits.
 static void CreateMultiDimLeaf(const MultiDimArray& m, const std::string& name,
                                const Expr* item) {
   if (item != nullptr) {
-    StoreMultiDimLeaf(m, name, EvalExpr(item, m.ctx, m.arena));
+    StoreMultiDimLeaf(m, name,
+                      EvalItemForLayout(item, m.layout, m.ctx, m.arena));
     return;
   }
   // §6.8, Table 6-7: nothing covered this leaf, so it keeps the default
@@ -280,8 +288,9 @@ static void CreateMultiDimLeaves(const MultiDimArray& m,
 
 void FillMultiDimLeaves(std::string_view name, const RtlirVariable& var,
                         SimContext& ctx, Arena& arena, bool in_place) {
-  CreateMultiDimLeaves(MultiDimArray{var, ctx, arena, in_place},
-                       std::string(name), 0, ArrayInitPattern(var.init_expr));
+  CreateMultiDimLeaves(
+      MultiDimArray{var, ctx, arena, in_place, ctx.GetVariableStructType(name)},
+      std::string(name), 0, ArrayInitPattern(var.init_expr));
 }
 
 }  // namespace delta

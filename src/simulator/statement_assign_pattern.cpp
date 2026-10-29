@@ -24,6 +24,7 @@
 #include "simulator/queue_bound.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
 
@@ -78,11 +79,13 @@ static Logic4Vec FindArrayKeyedValue(const Expr* rhs,
 namespace {
 // §7.4.2: bundle for distributing a (possibly nested) assignment pattern into a
 // fixed multidimensional unpacked array, keeping the recursive walk within the
-// parameter-count limit.
+// parameter-count limit. `layout` packs a leaf's structure pattern (§10.9.2),
+// null where the elements are no structures.
 struct PatternDist {
   const ArrayInfo& info;
   SimContext& ctx;
   Arena& arena;
+  const StructTypeInfo* layout;
 };
 }  // namespace
 
@@ -112,12 +115,13 @@ static const Expr* SelectDimElement(const Expr* pat, uint32_t idx, uint32_t pos,
   return DefaultKeyedItem(pat);
 }
 
-// Writes one scalar leaf element (resizing/defaulting to the element width).
+// Writes one leaf element, resized or defaulted to the element width; a
+// structure pattern is packed by the element's layout, as PatternItemAt does.
 static void WriteLeaf(const PatternDist& pd, const std::string& name,
                       const Expr* sub) {
   auto* elem = pd.ctx.FindVariable(name);
   if (!elem) return;
-  Logic4Vec val = sub ? EvalExpr(sub, pd.ctx, pd.arena)
+  Logic4Vec val = sub ? EvalItemForLayout(sub, pd.layout, pd.ctx, pd.arena)
                       : MakeLogic4VecVal(pd.arena, pd.info.elem_width, 0);
   // The leaf takes its own words for the reason DistributePatternToArray's
   // single-dimension store gives (§6.8/§10.9.1), and the same resize is what
@@ -228,8 +232,9 @@ Logic4Vec PatternItemAt(const Expr* rhs, const ArrayPatternTarget& target,
 void DistributePatternToArray(std::string_view arr_name, const ArrayInfo& info,
                               const Expr* rhs, SimContext& ctx, Arena& arena) {
   if (info.dim_sizes.size() > 1) {
-    DistributeDimPattern(PatternDist{info, ctx, arena}, std::string(arr_name),
-                         0, rhs);
+    DistributeDimPattern(
+        PatternDist{info, ctx, arena, StructLayoutOfName(arr_name, ctx)},
+        std::string(arr_name), 0, rhs);
     return;
   }
   // §10.9.2 with §7.4: the items for an array of structures are each packed by
