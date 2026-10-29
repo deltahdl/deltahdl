@@ -115,6 +115,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 - [Issues state the conclusion](issues-state-conclusions-not-the-trail.md) — a finding that settles a question replaces the options it ruled out; never append round after round.
 - [A question the rules answer is not a decision](a-question-the-rules-answer-is-not-a-decision.md) — 'needs decision' only when the reminders, the issue, its links and both standards (1800-2023 and 1800.2-2020, with the clauses citing, paralleling or named by the rule) leave the question open; order and priority never qualify; open and read the whole memory before applying the label, since this line is only its summary.
 - [Comments from other accounts are ignored](comments-from-other-accounts-are-ignored.md) — only `jdrowne` (the user, and Claude posting as them) counts on an issue; anyone else's comment never holds work, raises a decision or gets a reply.
+- [gh search returns at most 1000 issues](gh-search-returns-at-most-1000-issues.md) — list open issues with `--limit 10000` and no `--search`, filtering labels in jq; a search or a 1000 limit silently drops the oldest once more are open.
 
 ## Tasks
 
