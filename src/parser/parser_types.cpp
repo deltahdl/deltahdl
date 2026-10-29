@@ -314,10 +314,19 @@ void Parser::ParseNetStrength(DataType& dtype) {
   // non-trireg path and anything at all on the trireg one.
   if (!Check(TokenKind::kLParen)) return;
   auto saved = lexer_.SavePos();
+  SourceLoc drive_loc = CurrentLoc();
   Consume();
   if (IsStrengthToken(CurrentToken().kind)) {
     ParseDriveStrength(dtype.drive_strength0, dtype.drive_strength1);
     Expect(TokenKind::kRParen, Subclause("6.3.2.2"));
+    // Syntax 6-2 in §6.7 gives a drive strength to a net type keyword alone. A
+    // nettype's name, which ParseVarDeclList hands here as the one named type
+    // that ever arrives, takes none.
+    if (dtype.kind == DataTypeKind::kNamed) {
+      diag_.Error(drive_loc,
+                  "a net of a user-defined nettype takes no drive strength",
+                  Subclause("6.7"));
+    }
   } else {
     lexer_.RestorePos(saved);
   }
@@ -669,6 +678,15 @@ void Parser::ParseVarDeclList(std::vector<ModuleItem*>& items,
   // §6.7 states the net declaration and §6.8 the variable declaration, and this
   // list is one or the other according to the type that heads it.
   Subclause subclause(dtype.is_net ? "6.7" : "6.8");
+  if (nettype_named) {
+    // Syntax 6-2 in §6.7 gives a nettype's net no strength of either kind, so
+    // one written anyway is read here as a net type keyword's would be, for
+    // ParseNetStrength to report rather than the declarator to stop at. The
+    // strength read is dropped with the copy: the net carries none.
+    DataType as_net = dtype;
+    as_net.is_net = true;
+    ParseNetStrength(as_net);
+  }
   if (dtype.is_net || nettype_named) {
     ParseGateDelay(nd1, nd2, nd3);
     // §10.3.4 puts the drive strength before the delay on a net declaration as
