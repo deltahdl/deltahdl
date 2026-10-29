@@ -6,11 +6,8 @@
 
 #include <string>
 
-#include "elaborator/rtlir_scopes.h"
-
 namespace delta {
 
-struct Expr;
 struct Net;
 class SimContext;
 
@@ -46,28 +43,6 @@ struct InoutPortLinkEnds {
 //   driver standing for the port, so a delay annotated from the port to
 //   another load on `outer` is the one that load takes.
 void LinkInoutPortNets(InoutPortLinkEnds ends, SimContext& ctx);
-
-// §4.9.6 (printed page 71) with §23.3.3.3 (printed page 747): an inout port
-// connected to a select of a net or to a concatenation of nets, the connection
-// being `connection`, written in the parent whose prefix is `outer_origin`,
-// inside the generate blocks `gen_blocks`. `inner` is the port's own net, in
-// the instance whose prefix is `inner_origin`, and `port` its dotted name.
-struct InoutPortConnection {
-  const Expr& connection;
-  Net& inner;
-  std::string outer_origin;
-  std::string inner_origin;
-  std::string port;
-  const GenBlockPrefixes& gen_blocks;
-};
-
-// Such a connection cannot share one net with the port, so each part of it is
-// linked to the bits of `inner` its place gives, the last part the least
-// significant, as LinkInoutPortNets links two whole nets, the link driving and
-// reading only the bits of the two nets the part joins. A part that is no net
-// of the parent, which §23.3.3.3 forbids and the elaborator reports, links
-// nothing, and neither does the rest of the connection then.
-void LinkInoutPortConnection(const InoutPortConnection& conn, SimContext& ctx);
 
 // §32.4.4: a hierarchical name the way an SDF file writes it. The design spells
 // a path with `.` and SDF spells it with `/`, and the annotator matched the

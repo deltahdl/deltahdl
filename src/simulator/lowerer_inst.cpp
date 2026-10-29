@@ -739,7 +739,8 @@ static void JoinInoutPortBinding(const RtlirPortBinding& binding,
 // CreatePortVariable (lowerer_register.cpp) registered for it. The connection
 // is read where it is written, in the generate blocks around the instance. An
 // inout port on a select or a concatenation of nets (§23.3.3.3) cannot share
-// a net with them, so it is linked to the bits it names whatever `link` says.
+// a net with them, so its bits are joined to the bits it names whatever `link`
+// says.
 static void LinkOrJoinSharedPortBinding(const RtlirPortBinding& binding,
                                         const InoutJoinScope& scope,
                                         bool link) {
@@ -747,10 +748,9 @@ static void LinkOrJoinSharedPortBinding(const RtlirPortBinding& binding,
       scope.local_prefix + std::string(PortStorageName(binding));
   if (binding.connection->kind != ExprKind::kIdentifier) {
     if (binding.direction != Direction::kInout) return;
-    LinkInoutPortConnection(
-        {*binding.connection, *scope.ctx.FindNet(local), scope.parent_prefix,
-         scope.local_prefix, std::move(local), scope.inst.gen_block_prefixes},
-        scope.ctx);
+    JoinInoutPortBits(*binding.connection, *scope.ctx.FindNet(local),
+                      scope.parent_prefix, scope.inst.gen_block_prefixes,
+                      scope.ctx, scope.arena);
     return;
   }
   std::string target =

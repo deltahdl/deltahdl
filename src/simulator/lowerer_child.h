@@ -8,7 +8,10 @@
 
 namespace delta {
 
+class Arena;
 class SimContext;
+struct Expr;
+struct Net;
 struct RtlirModule;
 
 // Defined in lowerer.cpp and shared with the child-module lowering split out
@@ -38,6 +41,18 @@ std::string CoverageScopeOfInstanceKey(const std::string& key,
 std::string GenBlockObjectKey(const std::string& inst_prefix,
                               const GenBlockPrefixes& gen_blocks,
                               std::string_view name, SimContext& ctx);
+
+// §4.9.6 with §23.3.3.3: joins `port_net`, an inout port's net, to the bits of
+// the nets `connection` names -- a select or a concatenation of nets, read
+// under the instance `inst_prefix` names inside `gen_blocks` -- as §10.11's
+// alias joins bits, the least significant first. The joined bits then resolve
+// as one network from every source on either side, and no strength is reduced
+// across the join. Nothing is joined where `connection` names anything but
+// bits of nets, which §23.3.3.3 reports.
+void JoinInoutPortBits(const Expr& connection, Net& port_net,
+                       const std::string& inst_prefix,
+                       const GenBlockPrefixes& gen_blocks, SimContext& ctx,
+                       Arena& arena);
 
 }  // namespace delta
 

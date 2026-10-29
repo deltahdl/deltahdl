@@ -239,14 +239,27 @@ static std::map<std::pair<Net*, Net*>, AliasBitMap> JoinedBitMaps(
   return maps;
 }
 
+// Joins the bits standing at one position of every operand of `operands` by
+// a link that always conducts and carries a bit map (SwitchLink::bit_map),
+// made between every two nets sharing a position so that no map is followed
+// across another net: each net then resolves from its own drivers and those
+// of the bits joined to it. Bits of one net joined to each other are left
+// apart.
+static void JoinOperandBits(const std::vector<std::vector<AliasBit>>& operands,
+                            Arena& arena) {
+  auto* join = arena.Create<BidirSwitchState>();
+  join->state = BidirSwitchState::kOn;
+  join->is_alias = true;
+  for (auto& [nets, pairs] : JoinedBitMaps(operands)) {
+    nets.first->switch_links.push_back(
+        {nets.second, join, arena.Create<AliasBitMap>(std::move(pairs))});
+  }
+}
+
 // §10.11: an alias whose operands list bits rather than whole nets, `alias
 // {A[7:0], A[15:8], A[23:16], A[31:24]} = B;` of §10.11's byte_swap, joins
 // the bits standing at one position of every operand, each operand being as
-// wide as the others. The join is a link that always conducts and carries a
-// bit map (SwitchLink::bit_map), made between every two nets sharing a
-// position so that no map is followed across another net: each net then
-// resolves from its own drivers and those of the bits joined to it. Bits of
-// one net joined to each other are left apart.
+// wide as the others (JoinOperandBits).
 static void LowerBitAlias(const RtlirAlias& alias, const std::string& prefix,
                           SimContext& ctx, Arena& arena) {
   const AliasScope kScope{prefix, alias.gen_block_prefixes};
@@ -256,13 +269,33 @@ static void LowerBitAlias(const RtlirAlias& alias, const std::string& prefix,
     if (!AppendAliasBits(e, kScope, ctx, arena, operands.back())) return;
     if (operands.back().size() != operands.front().size()) return;
   }
-  auto* join = arena.Create<BidirSwitchState>();
-  join->state = BidirSwitchState::kOn;
-  join->is_alias = true;
-  for (auto& [nets, pairs] : JoinedBitMaps(operands)) {
-    nets.first->switch_links.push_back(
-        {nets.second, join, arena.Create<AliasBitMap>(std::move(pairs))});
+  JoinOperandBits(operands, arena);
+}
+
+void JoinInoutPortBits(const Expr& connection, Net& port_net,
+                       const std::string& inst_prefix,
+                       const GenBlockPrefixes& gen_blocks, SimContext& ctx,
+                       Arena& arena) {
+  std::vector<AliasBit> outside;
+  if (!AppendAliasBits(&connection, AliasScope{inst_prefix, gen_blocks}, ctx,
+                       arena, outside)) {
+    return;
   }
+  std::vector<AliasBit> inside;
+  for (uint32_t off = port_net.resolved->value.width; off-- > 0;)
+    inside.push_back({&port_net, off});
+  // §23.3.3 sizes a port connection as an assignment is sized: the least
+  // significant bits of the two sides meet, and the bits of the wider side
+  // above the narrower one's width are joined to nothing.
+  const auto kJoined =
+      static_cast<std::ptrdiff_t>(std::min(inside.size(), outside.size()));
+  inside.erase(inside.begin(), inside.end() - kJoined);
+  outside.erase(outside.begin(), outside.end() - kJoined);
+  JoinOperandBits({std::move(inside), std::move(outside)}, arena);
+  // A source that never writes a driver -- a tri0, tri1 or supply net's own,
+  // or a trireg's charge -- reaches the other side only through a resolution
+  // of the joined bits, which nothing else starts before a driver moves.
+  port_net.Resolve(arena, &ctx.GetScheduler());
 }
 
 // §10.11 (printed page 268): the same nets may appear in several alias

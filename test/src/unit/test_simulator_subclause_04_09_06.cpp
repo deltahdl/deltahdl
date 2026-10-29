@@ -425,4 +425,101 @@ TEST(PortConnectionSchedulingSim,
                             7, "23.3.3.3"));
 }
 
+// One source of the bit an inout port joins, and the strength §4.9.6 has both
+// sides read it at: the port's net type, what the child holds besides its
+// port, the declaration of the top's one-bit `bus`, and what the top holds.
+struct JoinedBitSource {
+  const char* kind;
+  const char* port;
+  const char* child_items;
+  const char* bus;
+  const char* top_items;
+  const char* shown;
+};
+
+// The run of `source` with the port connected to `connection`, the child
+// showing at time 2 how its port reads and the top at time 3 how `bus` does.
+std::string RunJoinedBit(const JoinedBitSource& source,
+                         const std::string& connection) {
+  return RunAcrossInout(std::string("primitive ubuf(output o, input i);\n"
+                                    "  table\n"
+                                    "    0 : 0;\n"
+                                    "    1 : 1;\n"
+                                    "  endtable\n"
+                                    "endprimitive\n"
+                                    "module child(inout ") +
+                            source.port + " p);\n" + source.child_items +
+                            "  initial #2 $display(\"in=%v\", p);\n"
+                            "endmodule\n",
+                        std::string("  ") + source.bus + "\n" +
+                            source.top_items + "  child u(.p(" + connection +
+                            "));\n"
+                            "  initial #3 $display(\"out=%v\", bus[1]);\n");
+}
+
+// §4.9.6 joins the port's net and the bits it is connected to as one network,
+// so every kind of source either side has reaches the other at its own
+// strength: a UDP output, a tran carrying another net's value, the source a
+// tri0, tri1, supply0 or supply1 net supplies itself, a trireg's held charge,
+// and the x a delayed continuous assignment holds its net at before its delay
+// elapses. Each is shown driving the top's bit and driving the port, through a
+// select and through a concatenation.
+TEST(PortConnectionSchedulingSim, InoutPortOnSelectsJoinsEveryKindOfSource) {
+  const char* const kHold =
+      "  logic en;\n"
+      "  initial begin\n"
+      "    en = 1'b1;\n"
+      "    #1 en = 1'b0;\n"
+      "  end\n";
+  const std::string kChargeIn =
+      std::string(kHold) + "  assign bus = en ? 1'b1 : 1'bz;\n";
+  const std::string kChargeOut =
+      std::string(kHold) + "  assign p = en ? 1'b1 : 1'bz;\n";
+  const char* const kUdpIn =
+      "  logic s;\n"
+      "  initial s = 1'b1;\n"
+      "  ubuf g(bus, s);\n";
+  const char* const kUdpOut =
+      "  logic s;\n"
+      "  initial s = 1'b1;\n"
+      "  ubuf g(p, s);\n";
+  const char* const kTranIn =
+      "  wire o;\n"
+      "  assign o = 1'b1;\n"
+      "  tran t(bus, o);\n";
+  const char* const kTranOut =
+      "  wire o;\n"
+      "  assign o = 1'b1;\n"
+      "  tran t(p, o);\n";
+  const JoinedBitSource kSources[] = {
+      {"udp in", "wire", "", "wire [1:1] bus;", kUdpIn, "St1"},
+      {"udp out", "wire", kUdpOut, "wire [1:1] bus;", "", "St1"},
+      {"tran in", "wire", "", "wire [1:1] bus;", kTranIn, "St1"},
+      {"tran out", "wire", kTranOut, "wire [1:1] bus;", "", "St1"},
+      {"tri1 in", "wire", "", "tri1 [1:1] bus;", "", "Pu1"},
+      {"tri1 out", "tri1", "", "wire [1:1] bus;", "", "Pu1"},
+      {"tri0 in", "wire", "", "tri0 [1:1] bus;", "", "Pu0"},
+      {"tri0 out", "tri0", "", "wire [1:1] bus;", "", "Pu0"},
+      {"supply1 in", "wire", "", "supply1 [1:1] bus;", "", "Su1"},
+      {"supply1 out", "supply1", "", "wire [1:1] bus;", "", "Su1"},
+      {"supply0 in", "wire", "", "supply0 [1:1] bus;", "", "Su0"},
+      {"supply0 out", "supply0", "", "wire [1:1] bus;", "", "Su0"},
+      {"trireg in", "wire", "", "trireg [1:1] bus;", kChargeIn.c_str(), "Me1"},
+      {"trireg out", "trireg", kChargeOut.c_str(), "wire [1:1] bus;", "",
+       "Me1"},
+      {"preset x in", "wire", "", "wire [1:1] bus;",
+       "  assign #5 bus = 1'b1;\n", "StX"},
+      {"preset x out", "wire", "  assign #5 p = 1'b1;\n", "wire [1:1] bus;", "",
+       "StX"}};
+  for (const JoinedBitSource& source : kSources) {
+    for (const char* connection : {"bus[1]", "{bus[1]}"}) {
+      std::string out = RunJoinedBit(source, connection);
+      std::string both =
+          std::string("in=") + source.shown + "\nout=" + source.shown;
+      EXPECT_NE(out.find(both), std::string::npos)
+          << source.kind << " through " << connection << ": " << out;
+    }
+  }
+}
+
 }  // namespace
