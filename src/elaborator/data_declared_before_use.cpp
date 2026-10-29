@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <format>
+#include <functional>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
@@ -13,6 +14,8 @@
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_scope_rules_names.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "elaborator/rtlir.h"
+#include "elaborator/rtlir_scopes.h"
 #include "elaborator/unit_scope_order.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
@@ -23,6 +26,9 @@
 namespace delta {
 
 namespace {
+
+// Whether a scope enclosing the one walked makes `name` visible at `use`.
+using OuterScopes = std::function<bool(std::string_view name, SourceLoc use)>;
 
 // Where one scope first declares each name it declares as data.
 using Declarations = std::unordered_map<std::string_view, SourceLoc>;
@@ -86,8 +92,9 @@ void CollectTargets(const Stmt* s,
 }
 
 // The reads an item makes outside any statement: a data declaration's value,
-// a declaration's dimensions, a continuous assignment's expression, and a
-// generate construct's condition and case item expressions.
+// a declaration's dimensions, a continuous assignment's expression, an always
+// construct's event control, and a generate construct's condition and case
+// item expressions.
 void CollectItemReads(const ModuleItem& item, std::vector<const Expr*>& out) {
   if (item.kind == ModuleItemKind::kContAssign)
     CollectBareIdents(item.assign_rhs, out);
@@ -101,6 +108,10 @@ void CollectItemReads(const ModuleItem& item, std::vector<const Expr*>& out) {
     CollectBareIdents(right, out);
   }
   for (const Expr* dim : item.unpacked_dims) CollectBareIdents(dim, out);
+  for (const EventExpr& ev : item.sensitivity) {
+    CollectBareIdents(ev.signal, out);
+    CollectBareIdents(ev.iff_condition, out);
+  }
   for (const auto& case_item : item.gen_case_items)
     for (const Expr* pattern : case_item.patterns)
       CollectBareIdents(pattern, out);
@@ -222,10 +233,9 @@ class UseBeforeDeclaration {
 
 }  // namespace
 
-void ReportDataUsedAboveItsDeclaration(const std::vector<ModuleItem*>& items,
-                                       const CompilationUnit& unit,
-                                       const OuterScopes& outer,
-                                       DiagEngine& diag) {
+static void ReportDataUsedAboveItsDeclaration(
+    const std::vector<ModuleItem*>& items, const CompilationUnit& unit,
+    const OuterScopes& outer, DiagEngine& diag) {
   UseBeforeDeclaration(unit, outer, diag).Scope(items);
 }
 
@@ -238,15 +248,54 @@ static bool UnitNamesAbove(const CompilationUnit& unit, std::string_view name,
   });
 }
 
+// Whether a wildcard import of the package `package_name` may make `name`
+// visible: the package declares an item of that name or exports anything, or
+// is none of the unit's, so what it supplies is not known here.
+static bool PackageMayProvide(const CompilationUnit& unit,
+                              std::string_view package_name,
+                              std::string_view name) {
+  auto pkg = std::ranges::find_if(unit.packages, [&](const PackageDecl* p) {
+    return p->name == package_name;
+  });
+  if (pkg == unit.packages.end()) return true;
+  return std::ranges::any_of((*pkg)->items, [&](const ModuleItem* item) {
+    return item->name == name || item->kind == ModuleItemKind::kExportDecl;
+  });
+}
+
 // Whether an import among `items` may make `name` visible: one naming it, or a
-// wildcard import, which may.
-static bool ImportReaches(const std::vector<ModuleItem*>& items,
+// wildcard import of a package that may supply it.
+static bool ImportReaches(const CompilationUnit& unit,
+                          const std::vector<ModuleItem*>& items,
                           std::string_view name) {
   return std::ranges::any_of(items, [&](const ModuleItem* item) {
-    return item->kind == ModuleItemKind::kImportDecl &&
-           (item->import_item.is_wildcard ||
-            item->import_item.item_name == name);
+    const ImportItem& import_decl = item->import_item;
+    if (item->kind != ModuleItemKind::kImportDecl) return false;
+    if (import_decl.is_wildcard)
+      return PackageMayProvide(unit, import_decl.package_name, name);
+    return import_decl.item_name == name;
   });
+}
+
+void ReportDataUsedAboveItsDeclaration(
+    const ModuleDecl& decl, const RtlirModule& mod, const CompilationUnit& unit,
+    const std::function<bool(std::string_view)>& enclosing, DiagEngine& diag) {
+  ReportDataUsedAboveItsDeclaration(
+      decl.items, unit,
+      [&](std::string_view n, SourceLoc use) {
+        auto supplies = [&](const RtlirImport& import_decl) {
+          return import_decl.is_wildcard
+                     ? PackageMayProvide(unit, import_decl.package_name, n)
+                     : import_decl.item_name == n;
+        };
+        return std::ranges::any_of(
+                   decl.ports,
+                   [&](const PortDecl& p) { return p.name == n; }) ||
+               std::ranges::any_of(mod.imports, supplies) ||
+               ImportReaches(unit, unit.cu_items, n) ||
+               UnitNamesAbove(unit, n, use) || enclosing(n);
+      },
+      diag);
 }
 
 void ReportDataUsedAboveItsDeclaration(const CompilationUnit& unit,
@@ -255,23 +304,17 @@ void ReportDataUsedAboveItsDeclaration(const CompilationUnit& unit,
     ReportDataUsedAboveItsDeclaration(
         pkg->items, unit,
         [&](std::string_view n, SourceLoc) {
-          return ImportReaches(pkg->items, n);
+          return ImportReaches(unit, pkg->items, n);
         },
         diag);
   }
   const OuterScopes kUnitScope = [&](std::string_view n, SourceLoc use) {
-    return ImportReaches(unit.cu_items, n) || UnitNamesAbove(unit, n, use);
+    return ImportReaches(unit, unit.cu_items, n) ||
+           UnitNamesAbove(unit, n, use);
   };
   ReportDataUsedAboveItsDeclaration(unit.cu_items, unit, kUnitScope, diag);
   UseBeforeDeclaration classes(unit, kUnitScope, diag);
   for (const ClassDecl* cls : unit.classes) classes.ClassBody(*cls);
-}
-
-bool NamedOutsideTheElement(const ModuleDecl* decl, const CompilationUnit* unit,
-                            std::string_view name, SourceLoc use) {
-  return std::ranges::any_of(
-             decl->ports, [&](const PortDecl& p) { return p.name == name; }) ||
-         UnitNamesAbove(*unit, name, use);
 }
 
 }  // namespace delta

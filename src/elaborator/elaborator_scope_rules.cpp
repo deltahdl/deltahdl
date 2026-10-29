@@ -747,14 +747,8 @@ void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
   };
   ReportUnitScopedReferences(decl->items, unit_, diag_);
   ReportDataUsedAboveItsDeclaration(
-      decl->items, *unit_,
-      [&](std::string_view n, SourceLoc at) {
-        return NamedOutsideTheElement(decl, unit_, n, at) ||
-               explicit_imported.count(n) != 0 || IsNameInEnclosingScope(n) ||
-               AnyPackageProvidesName(unit_, pkg_provided_names_,
-                                      wildcard_packages, n);
-      },
-      diag_);
+      *decl, *mod, *unit_,
+      [this](std::string_view n) { return IsNameInEnclosingScope(n); }, diag_);
 
   // §19.6 makes a cross item a coverpoint of its covergroup or a variable, and
   // the variables it may name are the ones a bare read may: the module's

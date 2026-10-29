@@ -338,6 +338,9 @@ UdpDecl* Elaborator::FindUdpForInstance(const ModuleItem* item) {
 }
 
 void Elaborator::ElaborateUdpInst(ModuleItem* item, RtlirModule* mod) {
+  // §6.5 and §10.3.2: the output terminal is a continuous writer of what it
+  // names, as a gate's is, whatever the rest of the instance comes to.
+  RecordGateOutputDrivers(item);
   // §29.8 reads the terminal count off the primitive's own port list, so it is
   // answered once for the instantiation rather than once per element of an
   // array: every element of an expanded array carries the terminal list written

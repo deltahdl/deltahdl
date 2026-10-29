@@ -295,10 +295,12 @@ TEST(DeclaredBeforeUse, UnitDeclarationAboveTheUseIsTheOneUsed) {
              "endmodule\n"));
 }
 
-// A name a package imports, by a wildcard or by name, is visible in it from
-// the import on, so a use below the import reaches it rather than the
-// package's own declaration further down. §26.3 rules on that later
-// declaration; it is no use above a declaration.
+// A name an import makes visible, by a wildcard or by name, is visible from
+// the import on, so a use below the import reaches it rather than the scope's
+// own declaration further down; §26.3 rules on that later declaration. So is
+// a name a wildcard import of a package the unit does not hold may supply. A
+// wildcard import of a package declaring no such name supplies nothing, and
+// the use stands above the declaration.
 TEST(DeclaredBeforeUse, ImportedNameIsNoUseAboveTheLocalDeclaration) {
   ElabFixture f;
   ElaborateSrc(
@@ -315,16 +317,28 @@ TEST(DeclaredBeforeUse, ImportedNameIsNoUseAboveTheLocalDeclaration) {
       "endpackage\n"
       "package r;\n"
       "  import q::y;\n"
+      "  import elsewhere::*;\n"
       "  function int g();\n"
-      "    return y;\n"
+      "    return y + v;\n"
       "  endfunction\n"
       "  int y;\n"
+      "  int v;\n"
       "endpackage\n"
       "module t;\n"
+      "  import q::y;\n"
+      "  import q::*;\n"
+      "  int z;\n"
+      "  initial z = y;\n"
+      "  initial z = w;\n"
+      "  int y;\n"
+      "  int w;\n"
       "endmodule\n",
       f);
   EXPECT_FALSE(UsedBeforeDeclared(f, "x", 8));
-  EXPECT_FALSE(UsedBeforeDeclared(f, "y", 15));
+  EXPECT_FALSE(UsedBeforeDeclared(f, "y", 16));
+  EXPECT_FALSE(UsedBeforeDeclared(f, "v", 16));
+  EXPECT_FALSE(UsedBeforeDeclared(f, "y", 25));
+  EXPECT_TRUE(UsedBeforeDeclared(f, "w", 26));
 }
 
 // A non-ANSI port's direction declaration declares the port, so a use below it

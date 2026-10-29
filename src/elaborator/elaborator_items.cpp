@@ -656,7 +656,6 @@ bool Elaborator::ElaborateDeclItem(ModuleItem* item, RtlirModule* mod) {
       // widths rule rejects is reported rather than expanded.
       CheckPrimitiveTerminals(item, mod);
       ElaborateUdpInst(item, mod);
-      RecordGateOutputDrivers(item);
       ResolveInterconnectPrimitiveTerminals(item->gate_terminals, mod);
       return true;
     case ModuleItemKind::kSpecparam:
