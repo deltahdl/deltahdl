@@ -38,6 +38,7 @@
 #include "elaborator/type_ref_walks.h"
 #include "elaborator/unit_scope_order.h"
 #include "elaborator/uwire_drivers.h"
+#include "lexer/token.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
@@ -45,6 +46,7 @@
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 #include "parser/override_specifier_placement.h"
+#include "parser/parser_token_skips.h"
 
 namespace delta {
 
@@ -424,9 +426,43 @@ void FoldTypeRefComparesInExpr(Expr* e, const TypeRefCompareFolder& fold) {
   for (Expr* arg : e->args) FoldTypeRefComparesInExpr(arg, fold);
 }
 
+// Whether `e` writes an assignment operator, `(a = b)` or `(a += b)`.
+bool WritesAnAssignment(const Expr* e) {
+  if (e == nullptr) return false;
+  if (e->kind == ExprKind::kBinary &&
+      (e->op == TokenKind::kEq || IsCompoundAssignOp(e->op)))
+    return true;
+  for (const Expr* sub :
+       {e->lhs, e->rhs, e->condition, e->true_expr, e->false_expr}) {
+    if (WritesAnAssignment(sub)) return true;
+  }
+  for (const Expr* elem : e->elements) {
+    if (WritesAnAssignment(elem)) return true;
+  }
+  for (const Expr* arg : e->args) {
+    if (WritesAnAssignment(arg)) return true;
+  }
+  return false;
+}
+
+// §11.3.6 (printed page 275): `fold` where an assignment operator is barred,
+// outside a procedural statement and in a procedural continuous assignment. A
+// comparison whose operand writes one is left whole for that rule's report.
+TypeRefCompareFolder BarringAssignments(const TypeRefCompareFolder& fold) {
+  return [&fold](const Expr* e) -> std::optional<int64_t> {
+    if (WritesAnAssignment(e)) return std::nullopt;
+    return fold(e);
+  };
+}
+
 void FoldTypeRefComparesInStmt(Stmt* s, const TypeRefCompareFolder& fold) {
   if (s == nullptr) return;
-  for (Expr* e : {s->rhs, s->lhs, s->expr, s->condition, s->assert_expr}) {
+  // §10.6: assign and force are the procedural continuous assignments.
+  bool is_continuous =
+      s->kind == StmtKind::kAssign || s->kind == StmtKind::kForce;
+  FoldTypeRefComparesInExpr(s->rhs,
+                            is_continuous ? BarringAssignments(fold) : fold);
+  for (Expr* e : {s->lhs, s->expr, s->condition, s->assert_expr}) {
     FoldTypeRefComparesInExpr(e, fold);
   }
   ForEachChildStmt(
@@ -446,8 +482,9 @@ void FoldItemTypeRefCompares(ModuleItem* item,
       item->kind != ModuleItemKind::kNetDecl &&
       item->kind != ModuleItemKind::kVarDecl)
     return;
-  FoldTypeRefComparesInExpr(item->assign_rhs, fold);
-  FoldTypeRefComparesInExpr(item->init_expr, fold);
+  TypeRefCompareFolder outside_procedures = BarringAssignments(fold);
+  FoldTypeRefComparesInExpr(item->assign_rhs, outside_procedures);
+  FoldTypeRefComparesInExpr(item->init_expr, outside_procedures);
 }
 
 // §3.13 (e) (printed page 58): the module name space unifies, beside the nets,

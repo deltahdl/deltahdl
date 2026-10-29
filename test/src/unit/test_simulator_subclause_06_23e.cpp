@@ -3,8 +3,10 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <format>
 #include <span>
 #include <string>
+#include <string_view>
 
 #include "helpers_scheduler.h"
 
@@ -217,6 +219,9 @@ constexpr std::array kParametersAndConstants = {
 struct ComparisonGroup {
   const char* name;
   std::span<const Comparison> comparisons;
+  // §11.3.6 (printed page 275): an assignment operator stands only in an
+  // expression within a procedural statement, a type reference's included.
+  bool procedural_only = false;
 };
 
 constexpr std::array kGroups = {
@@ -228,7 +233,8 @@ constexpr std::array kGroups = {
     ComparisonGroup{"concatenations and conditionals",
                     kConcatenationsAndConditionals},
     ComparisonGroup{"casts", kCasts},
-    ComparisonGroup{"increments and assignments", kIncrementsAndAssignments},
+    ComparisonGroup{"increments and assignments", kIncrementsAndAssignments,
+                    true},
     ComparisonGroup{"system functions", kSystemFunctions},
     ComparisonGroup{"literals", kLiterals},
     ComparisonGroup{"real operands", kRealOperands},
@@ -238,44 +244,50 @@ constexpr std::array kGroups = {
 // Where §6.23 lets a comparison of type references stand: a procedural if's
 // condition, a continuous assignment's right-hand side, a generate if's
 // condition (§27.5) and a localparam's value (§6.20.4).
-enum class Place { kProceduralIf, kContinuousAssignment, kGenerateIf, kParam };
+enum class Place : std::uint8_t {
+  kProceduralIf,
+  kContinuousAssignment,
+  kGenerateIf,
+  kParam
+};
 
 // A module declaring the operands and writing each comparison of `group` at
 // `place`, the k-th setting the bit of r k places below its most significant.
 std::string ModuleComparing(std::span<const Comparison> group, Place place) {
   const size_t kCount = group.size();
-  std::string src = "module t;\n" + std::string(kOperands) + "  bit [" +
-                    std::to_string(kCount - 1) + ":0] r;\n";
+  std::string src =
+      std::format("module t;\n{}  bit [{}:0] r;\n", kOperands, kCount - 1);
   std::string listed;
   std::string body;
   for (size_t k = 0; k < kCount; ++k) {
-    const std::string kText = group[k].text;
-    const std::string kTag = std::to_string(k);
-    const std::string kBit = "r[" + std::to_string(kCount - 1 - k) + "]";
-    const std::string kSeparator = k == 0 ? "" : ", ";
+    const std::string_view kText = group[k].text;
+    const std::string kBit = std::format("r[{}]", kCount - 1 - k);
+    const std::string_view kSeparator = k == 0 ? "" : ", ";
     switch (place) {
       case Place::kProceduralIf:
-        body += "    if (" + kText + ") " + kBit + " = 1'b1;\n";
+        body += std::format("    if ({}) {} = 1'b1;\n", kText, kBit);
         break;
       case Place::kContinuousAssignment:
-        listed += kSeparator + kText;
+        listed += std::format("{}{}", kSeparator, kText);
         break;
       case Place::kGenerateIf:
-        src += "  if (" + kText + ") begin : g" + kTag + " initial " + kBit +
-               " = 1'b1; end\n  else begin : h" + kTag + " initial " + kBit +
-               " = 1'b0; end\n";
+        src += std::format(
+            "  if ({0}) begin : g{1} initial {2} = 1'b1; end\n"
+            "  else begin : h{1} initial {2} = 1'b0; end\n",
+            kText, k, kBit);
         break;
       default:
-        src += "  localparam bit L" + kTag + " = " + kText + ";\n";
-        listed += kSeparator + "L" + kTag;
+        src += std::format("  localparam bit L{} = {};\n", k, kText);
+        listed += std::format("{}L{}", kSeparator, k);
         break;
     }
   }
   if (place == Place::kProceduralIf)
-    src += "  initial begin\n" + body + "  end\n";
+    src += std::format("  initial begin\n{}  end\n", body);
   if (place == Place::kContinuousAssignment)
-    src += "  assign r = {" + listed + "};\n";
-  if (place == Place::kParam) src += "  initial r = {" + listed + "};\n";
+    src += std::format("  assign r = {{{}}};\n", listed);
+  if (place == Place::kParam)
+    src += std::format("  initial r = {{{}}};\n", listed);
   return src + "endmodule\n";
 }
 
@@ -291,6 +303,7 @@ uint64_t ExpectedBits(std::span<const Comparison> group) {
 
 void ExpectEveryGroupAt(Place place) {
   for (const ComparisonGroup& group : kGroups) {
+    if (group.procedural_only && place != Place::kProceduralIf) continue;
     SCOPED_TRACE(group.name);
     EXPECT_EQ(RunAndGet(ModuleComparing(group.comparisons, place), "r"),
               ExpectedBits(group.comparisons));

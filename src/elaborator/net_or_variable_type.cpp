@@ -53,7 +53,8 @@ std::optional<DeclaredValue> NetOrVariableValue(const RtlirModule& mod,
   if (var != mod.variables.end()) {
     if (var->written_type == nullptr) return std::nullopt;
     return DeclaredValue{OfLogicWhereImplicit(*var->written_type),
-                         UnpackedDimCount(*var)};
+                         UnpackedDimCount(*var),
+                         var->is_dynamic || var->is_queue || var->is_assoc};
   }
   // A port the module records no net or variable for is kept as a port alone,
   // and is of the type its declaration writes. An interface port is of no data

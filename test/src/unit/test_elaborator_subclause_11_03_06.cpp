@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
@@ -263,6 +264,54 @@ TEST(AssignInExprElaboration, AssignmentOutsideProceduralStatementReported) {
                               line, "11.3.6"));
   }
   EXPECT_EQ(f.diag.ErrorCount(), 2u);
+}
+
+// §11.3.6 with §6.23: the expression a type reference names is an expression
+// still, though it is not evaluated, so an assignment operator in it is barred
+// wherever one in any other expression is. The elaborator folds a comparison of
+// two type references to the bit it stands for, and these show that the fold
+// leaves the assignment in it for this rule to report.
+void ExpectTypeReferenceAssignmentReported(const std::string& line) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic a, b, c;\n" +
+          line + "\nendmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment operator within expression is "
+                            "illegal in this context",
+                            3, "11.3.6"));
+}
+
+TEST(AssignInExprElaboration, AssignmentInATypeReferenceOfAContinuousAssign) {
+  ExpectTypeReferenceAssignmentReported(
+      "  assign c = type((a = b)) == type(logic);");
+}
+
+TEST(AssignInExprElaboration, AssignmentInATypeReferenceOfAnInitializer) {
+  ExpectTypeReferenceAssignmentReported(
+      "  logic d = type((a += 1)) == type(logic);");
+}
+
+TEST(AssignInExprElaboration, AssignmentInATypeReferenceOfANetInitializer) {
+  ExpectTypeReferenceAssignmentReported(
+      "  wire w = type((a = b)) != type(bit);");
+}
+
+TEST(AssignInExprElaboration,
+     AssignmentInATypeReferenceOfAProceduralContinuousAssign) {
+  ExpectTypeReferenceAssignmentReported(
+      "  initial assign c = type((a = b)) == type(logic);");
+}
+
+// Within a procedural statement the same type reference is allowed.
+TEST(AssignInExprElaboration, AssignmentInATypeReferenceOfABlockingAssign) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  logic a, b, c;\n"
+             "  initial c = type((a = b)) == type(logic);\n"
+             "endmodule\n"));
 }
 
 }  // namespace

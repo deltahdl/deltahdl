@@ -600,6 +600,13 @@ static bool ExprContainsHierRef(const Expr* e, const CompilationUnit* unit) {
   // §26.3 reports, and §6.20.4 reports the initializer that is not a constant
   // expression as a result.
 
+  // §6.23 holds the operand of a type reference to a rule of its own, which
+  // tells a member of a structure the module declares, `type(p.f)`, from a
+  // hierarchical name and reports only the latter (CheckTypeRefArgInner, run
+  // over parameter values and declaration ranges by ValidateTypeRefArgs), so a
+  // dotted name there is not judged by its spelling here.
+  if (e->kind == ExprKind::kTypeRef) return false;
+
   // §13.5: a method call is written `expression.method(...)`, and the parser
   // records it as a kCall whose callee is the kMemberAccess naming the method.
   // The dot in that node separates an expression from the method invoked on it

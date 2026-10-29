@@ -14,12 +14,15 @@ namespace delta {
 
 struct Expr;
 
-// A value a name stands for: the data type its declaration writes, and the
+// A value a name stands for: the data type its declaration writes, the
 // number of unpacked dimensions the declaration writes after the name, which
-// the data type does not carry.
+// the data type does not carry, and whether one of them is a dynamic array's,
+// a queue's or an associative array's, making each element a select reaches
+// through it an element of a dynamic object.
 struct DeclaredValue {
   DataType type;
   uint32_t unpacked_dims = 0;
+  bool is_dynamic = false;
 };
 
 // What ExprSelfType reads the names an expression writes against.
@@ -77,8 +80,9 @@ DataType VectorType(uint32_t width, bool is_signed, bool four_state,
 //   bit, and a concatenation and a replication are unsigned (§11.4.12).
 // The type made for an operation is a VectorType.
 // Nothing for an expression whose type no data type alone carries -- an
-// unpacked array, or a value of a class -- and for one written with a name
-// the scope does not resolve, a method's call among them.
+// unpacked array, or a value of a class -- for an element of a dynamic object,
+// which §6.23 forbids the expression to reference, and for one written with a
+// name the scope does not resolve, a method's call among them.
 std::optional<DataType> ExprSelfType(const Expr* expr,
                                      const ExprTypeScope& scope);
 

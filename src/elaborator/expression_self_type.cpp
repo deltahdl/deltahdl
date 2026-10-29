@@ -210,7 +210,8 @@ std::optional<DeclaredValue> SelectedValue(const Expr* select,
                                            const ExprTypeScope& scope) {
   if (select->base == nullptr) return std::nullopt;
   std::optional<DeclaredValue> base = ValueOf(select->base, scope);
-  if (!base) return std::nullopt;
+  // §6.23: an element of a dynamic object is no operand of a type reference.
+  if (!base || base->is_dynamic) return std::nullopt;
   if (base->unpacked_dims == 0)
     return AsValue(PackedSelectType(base->type, select, scope));
   if (select->index_end != nullptr) return std::nullopt;

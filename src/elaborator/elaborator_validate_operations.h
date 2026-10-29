@@ -153,6 +153,7 @@ class ElaboratorOperationRules : public ElaboratorData {
   };
 
   void ValidateTypeRefArgs(const ModuleDecl* decl);
+  void WalkItemExprsForTypeRefArg(const ModuleItem* item);
   void WalkExprForTypeRefArg(const Expr* expr);
   void WalkStmtsForTypeRefArg(const Stmt* s);
   void CheckTypeRefArgInner(const Expr* inner, SourceLoc loc);

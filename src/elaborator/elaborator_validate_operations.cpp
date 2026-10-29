@@ -15,7 +15,6 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/elaborator_validate_internal.h"
-#include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "lexer/token.h"
 #include "parser/ast_design.h"
@@ -498,7 +497,34 @@ void ElaboratorOperationRules::WalkStmtsForTypeRefArg(const Stmt* s) {
   }
 }
 
+// The expressions `item` writes outside any statement: a continuous
+// assignment's right-hand side, a parameter's value (§6.20.2) and the ranges of
+// a net or variable declaration (§11.2.1), the last two of which leave the
+// operand of a type reference in them to this rule (ExprContainsHierRef).
+void ElaboratorOperationRules::WalkItemExprsForTypeRefArg(
+    const ModuleItem* item) {
+  if (item->kind == ModuleItemKind::kContAssign) {
+    WalkExprForTypeRefArg(item->assign_rhs);
+  }
+  if (item->kind == ModuleItemKind::kParamDecl) {
+    WalkExprForTypeRefArg(item->init_expr);
+  }
+  if (item->kind != ModuleItemKind::kNetDecl &&
+      item->kind != ModuleItemKind::kVarDecl) {
+    return;
+  }
+  WalkExprForTypeRefArg(item->data_type.packed_dim_left);
+  WalkExprForTypeRefArg(item->data_type.packed_dim_right);
+  for (const auto& [left, right] : item->data_type.extra_packed_dims) {
+    WalkExprForTypeRefArg(left);
+    WalkExprForTypeRefArg(right);
+  }
+  for (const Expr* dim : item->unpacked_dims) WalkExprForTypeRefArg(dim);
+}
+
 void ElaboratorOperationRules::ValidateTypeRefArgs(const ModuleDecl* decl) {
+  // The values of the parameters the header's parameter port list declares.
+  for (const auto& param : decl->params) WalkExprForTypeRefArg(param.second);
   for (const auto* item : decl->items) {
     if (item->data_type.type_ref_expr) {
       CheckTypeRefArgInner(item->data_type.type_ref_expr, item->loc);
@@ -507,9 +533,7 @@ void ElaboratorOperationRules::ValidateTypeRefArgs(const ModuleDecl* decl) {
     if (is_proc && item->body) {
       WalkStmtsForTypeRefArg(item->body);
     }
-    if (item->kind == ModuleItemKind::kContAssign && item->assign_rhs) {
-      WalkExprForTypeRefArg(item->assign_rhs);
-    }
+    WalkItemExprsForTypeRefArg(item);
   }
 }
 
