@@ -328,6 +328,19 @@ static bool CreatePortArrayElements(std::string_view name,
   return true;
 }
 
+// §6.12: a port of a real type holds a real, to which an assignment,
+// continuous or procedural, converts what it writes (§6.12.1), as it does for
+// a real variable declared in the body.
+static void MarkRealPort(std::string_view name, const RtlirPort& port,
+                         Variable& v, SimContext& ctx) {
+  if (port.type_kind != DataTypeKind::kReal &&
+      port.type_kind != DataTypeKind::kShortreal &&
+      port.type_kind != DataTypeKind::kRealtime)
+    return;
+  v.is_real = true;
+  ctx.RegisterRealVariable(name);
+}
+
 void CreatePortVariable(std::string_view name, const RtlirPort& port,
                         SimContext& ctx, Arena& arena) {
   // §21.7.4.3.1: an extended VCD port record takes its state characters from
@@ -383,15 +396,7 @@ void CreatePortVariable(std::string_view name, const RtlirPort& port,
     v->value = init;
   }
   if (port.is_signed) v->is_signed = true;
-  // §6.12: a port of a real type holds a real, to which an assignment,
-  // continuous or procedural, converts what it writes (§6.12.1), as it does
-  // for a real variable declared in the body.
-  if (port.type_kind == DataTypeKind::kReal ||
-      port.type_kind == DataTypeKind::kShortreal ||
-      port.type_kind == DataTypeKind::kRealtime) {
-    v->is_real = true;
-    ctx.RegisterRealVariable(name);
-  }
+  MarkRealPort(name, port, *v, ctx);
   // §6.16: a port of type string holds a string, read and written as a
   // string variable declared in the body is.
   if (port.type_kind == DataTypeKind::kString) ctx.RegisterStringVariable(name);
