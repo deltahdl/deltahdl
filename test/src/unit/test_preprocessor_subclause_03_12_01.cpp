@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 #include <unistd.h>
 
+#include <algorithm>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -10,9 +12,14 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "common/types.h"
+#include "elaborator/elaborator.h"
+#include "elaborator/rtlir.h"
+#include "fixture_elaborator.h"
 #include "fixture_parser.h"
 #include "fixture_preprocessor.h"
 #include "helpers_reported_error.h"
+#include "helpers_rtlir_lookup.h"
+#include "helpers_separate_units.h"
 #include "lexer/lexer.h"
 #include "parser/ast_module.h"
 #include "parser/parser.h"
@@ -397,6 +404,229 @@ TEST(CompilationUnitPreprocessing, NewUnitResetsDirectivesButKeepsPrecision) {
   EXPECT_FALSE(pp.InCelldefine());
   EXPECT_TRUE(pp.HasGlobalPrecision());
   EXPECT_EQ(pp.GlobalPrecision(), TimeUnit::kPs);
+}
+
+// §3.12.1 with §22.7: a directive applies to all the text after it in its
+// compilation unit, so a `timescale the first file read governs a module the
+// second file of the unit declares, while a module of the next unit takes
+// none.
+TEST(CompilationUnitPreprocessing, TimescaleReachesTheUnitsLaterFile) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessFile("`timescale 1ns/1ps\nmodule a; endmodule\n", f, pp);
+  PreprocessFile("module m;\n  initial #1;\nendmodule\n", f, pp);
+  pp.BeginCompilationUnit();
+  PreprocessFile("module z; endmodule\n", f, pp);
+  EXPECT_FALSE(f.diag.HasErrors());
+  const auto& list = pp.ModuleDirectivesList();
+  ASSERT_EQ(list.size(), 3u);
+  EXPECT_EQ(list[1].module, "m");
+  EXPECT_TRUE(list[1].has_timescale);
+  EXPECT_EQ(list[1].timescale.unit, TimeUnit::kNs);
+  EXPECT_EQ(list[1].timescale.precision, TimeUnit::kPs);
+  EXPECT_EQ(list[2].module, "z");
+  EXPECT_FALSE(list[2].has_timescale);
+}
+
+// The directive records of module a, declared after `directive` in one
+// compilation unit, and of module b, declared in the next unit.
+static std::vector<ModuleDirectives> RecordsAcrossUnits(
+    const std::string& directive, PreprocFixture& f) {
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessFile(directive + "\nmodule a; endmodule\n", f, pp);
+  pp.BeginCompilationUnit();
+  PreprocessFile("module b; endmodule\n", f, pp);
+  return pp.ModuleDirectivesList();
+}
+
+// §3.12.1 with §22.9: a directive of one compilation unit does not affect
+// another, so the next unit's module leaves its unconnected input ports
+// unpulled, while the module after `unconnected_drive in its own unit pulls
+// them.
+TEST(CompilationUnitPreprocessing, UnconnectedDriveStaysInItsUnit) {
+  PreprocFixture f;
+  auto list = RecordsAcrossUnits("`unconnected_drive pull1", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  ASSERT_EQ(list.size(), 2u);
+  EXPECT_EQ(list[0].unconnected_drive, NetType::kTri1);
+  EXPECT_EQ(list[1].unconnected_drive, NetType::kWire);
+}
+
+// §3.12.1 with Annex E.2: the next unit's trireg nets keep the infinite decay
+// time, while those of the module after `default_decay_time in its own unit
+// take the time it names.
+TEST(CompilationUnitPreprocessing, DefaultDecayTimeStaysInItsUnit) {
+  PreprocFixture f;
+  auto list = RecordsAcrossUnits("`default_decay_time 100", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  ASSERT_EQ(list.size(), 2u);
+  EXPECT_FALSE(list[0].decay_infinite);
+  EXPECT_EQ(list[0].decay_ticks, 100u);
+  EXPECT_TRUE(list[1].decay_infinite);
+  EXPECT_EQ(list[1].decay_ticks, 0u);
+}
+
+// §3.12.1 with Annex E.3: the next unit's trireg nets keep the default charge
+// strength, while those of the module after `default_trireg_strength in its
+// own unit take the strength it names.
+TEST(CompilationUnitPreprocessing, DefaultTriregStrengthStaysInItsUnit) {
+  PreprocFixture f;
+  auto list = RecordsAcrossUnits("`default_trireg_strength 30", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  ASSERT_EQ(list.size(), 2u);
+  EXPECT_TRUE(list[0].has_strength);
+  EXPECT_EQ(list[0].strength, 30u);
+  EXPECT_FALSE(list[1].has_strength);
+}
+
+// §3.12.1 with Annex E.4 to E.7: the next unit's module keeps the delays as
+// written, while the module after each delay mode directive in its own unit
+// takes that directive's mode.
+TEST(CompilationUnitPreprocessing, DelayModeStaysInItsUnit) {
+  struct Mode {
+    const char* directive;
+    DelayModeDirective mode;
+  };
+  const Mode kModes[] = {
+      {"`delay_mode_distributed", DelayModeDirective::kDistributed},
+      {"`delay_mode_path", DelayModeDirective::kPath},
+      {"`delay_mode_unit", DelayModeDirective::kUnit},
+      {"`delay_mode_zero", DelayModeDirective::kZero},
+  };
+  for (const auto& written : kModes) {
+    PreprocFixture f;
+    auto list = RecordsAcrossUnits(written.directive, f);
+    EXPECT_FALSE(f.diag.HasErrors()) << written.directive;
+    ASSERT_EQ(list.size(), 2u) << written.directive;
+    EXPECT_EQ(list[0].delay_mode, written.mode) << written.directive;
+    EXPECT_EQ(list[1].delay_mode, DelayModeDirective::kNone)
+        << written.directive;
+  }
+}
+
+// A directory of this process's own holding the header h.svh with `text`.
+static fs::path WriteHeader(const std::string& text) {
+  fs::path dir = fs::temp_directory_path() /
+                 ("delta_test_cu_header_" + std::to_string(getpid()));
+  fs::create_directories(dir);
+  std::ofstream(dir / "h.svh") << text;
+  return dir;
+}
+
+// Preprocesses `srcs` with one preprocessor as the files of a run that makes
+// each file a compilation unit of its own, each file standing in `dir` so that
+// a quoted `include finds the header written there, and gives back each
+// unit's text.
+static std::vector<std::string> PreprocessUnits(
+    const fs::path& dir, const std::vector<std::string>& srcs, ElabFixture& f) {
+  Preprocessor pp(f.mgr, f.diag, {});
+  std::vector<std::string> texts;
+  for (const auto& src : srcs) {
+    if (!texts.empty()) pp.BeginCompilationUnit();
+    auto path = dir / ("unit" + std::to_string(texts.size()) + ".sv");
+    texts.push_back(pp.Preprocess(f.mgr.AddFile(path.string(), src)));
+  }
+  return texts;
+}
+
+// Elaborates the units `texts` hold together, under the top module top.
+static RtlirDesign* ElaborateTexts(const std::vector<std::string>& texts,
+                                   ElabFixture& f) {
+  Elaborator elab(f.arena, f.diag,
+                  ParseUnitsApart(texts, f.mgr, f.arena, f.diag));
+  auto* design = elab.Elaborate("top");
+  f.has_errors = f.diag.HasErrors();
+  return design;
+}
+
+// §3.12.1: the text an `include reads joins the compilation unit of the file
+// that includes it, so where each file is a unit of its own, a typedef the
+// header declares is no type a module of the other unit can name.
+TEST(CompilationUnitPreprocessing, HeaderOfOneUnitStaysOutOfAnother) {
+  fs::path dir = WriteHeader("typedef logic [3:0] t;\n");
+  ElabFixture f;
+  ElaborateTexts(PreprocessUnits(dir,
+                                 {"`include \"h.svh\"\n"
+                                  "module a; endmodule\n",
+                                  "module top;\n"
+                                  "  t v;\n"
+                                  "endmodule\n"},
+                                 f),
+                 f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "declaration of type 't' does not precede", 2,
+                            "6.18"));
+  fs::remove_all(dir);
+}
+
+// §3.12.1: the nearest allowed form, a module of the including file's own
+// unit, reads the header's typedef as a type of four bits.
+TEST(CompilationUnitPreprocessing, HeaderDeclaresInTheIncludingUnit) {
+  fs::path dir = WriteHeader("typedef logic [3:0] t;\n");
+  ElabFixture f;
+  auto* design = ElaborateTexts(PreprocessUnits(dir,
+                                                {"`include \"h.svh\"\n"
+                                                 "module top;\n"
+                                                 "  t v;\n"
+                                                 "endmodule\n",
+                                                 "module b; endmodule\n"},
+                                                f),
+                                f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* v = FindVar(design, "top", "v");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->width, 4u);
+  fs::remove_all(dir);
+}
+
+// §3.12.1 with §3.13: a header two units include declares its variable in
+// each unit's scope once, so neither unit holds a redeclaration and each
+// unit's module reads its own.
+TEST(CompilationUnitPreprocessing, HeaderOfTwoUnitsDeclaresInEachOnce) {
+  fs::path dir = WriteHeader("int g;\n");
+  ElabFixture f;
+  auto* design = ElaborateTexts(PreprocessUnits(dir,
+                                                {"`include \"h.svh\"\n"
+                                                 "module top;\n"
+                                                 "  int x;\n"
+                                                 "  initial x = g;\n"
+                                                 "  child c();\n"
+                                                 "endmodule\n",
+                                                 "`include \"h.svh\"\n"
+                                                 "module child;\n"
+                                                 "  int y;\n"
+                                                 "  initial y = g;\n"
+                                                 "endmodule\n"},
+                                                f),
+                                f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  fs::remove_all(dir);
+}
+
+// §3.13: the nearest forbidden form, the header included twice by one unit,
+// declares its variable twice in that unit's scope, and the second is the
+// redeclaration.
+TEST(CompilationUnitPreprocessing, HeaderIncludedTwiceByOneUnitRedeclares) {
+  fs::path dir = WriteHeader("int g;\n");
+  ElabFixture f;
+  auto texts = PreprocessUnits(dir,
+                               {"`include \"h.svh\"\n"
+                                "`include \"h.svh\"\n"
+                                "module top; endmodule\n"},
+                               f);
+  ASSERT_EQ(texts.size(), 1u);
+  const std::string& text = texts[0];
+  auto second = text.rfind("int g;");
+  ASSERT_NE(second, std::string::npos);
+  auto line = static_cast<uint32_t>(
+      1 + std::count(text.begin(), text.begin() + second, '\n'));
+  ElaborateTexts(texts, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "redeclaration of 'g' in compilation-unit scope",
+                            line, "3.13"));
+  fs::remove_all(dir);
 }
 
 // §3.12.1 with §22.11.1: a protect pragma keyword one unit wrote is back at its

@@ -1,11 +1,13 @@
 #include <gtest/gtest.h>
 
+#include <string>
 #include <vector>
 
 #include "fixture_parser.h"
 #include "fixture_preprocessor.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
+#include "preprocessor/preprocessor.h"
 
 using namespace delta;
 
@@ -143,6 +145,40 @@ TEST(NameSpacePreprocessing, TextMacroLaterDefinitionOverridesEarlier) {
       f);
   EXPECT_NE(out.find("[8-1:0]"), std::string::npos);
   EXPECT_EQ(out.find("[4-1:0]"), std::string::npos);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §3.13(d): macros are defined in the order the text is read, so a use
+// standing between two definitions of one name expands to the first, and a
+// use after the second expands to the second.
+TEST(NameSpacePreprocessing, UseBetweenTwoDefinitionsTakesTheEarlier) {
+  PreprocFixture f;
+  auto out = Preprocess(
+      "`define V 1\n"
+      "localparam A = `V;\n"
+      "`define V 2\n"
+      "localparam B = `V;\n",
+      f);
+  EXPECT_NE(out.find("A = 1;"), std::string::npos);
+  EXPECT_NE(out.find("B = 2;"), std::string::npos);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §3.13(d): the text macro name space is global within the compilation unit,
+// whose input files are read in order, so a redefinition in a later file holds
+// for the files after it, while that file's own text before the redefinition
+// still reads the earlier definition.
+TEST(NameSpacePreprocessing, RedefinitionInALaterFileHoldsForTheFilesAfter) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  pp.Preprocess(f.mgr.AddFile("a.sv", "`define V 1\n"));
+  auto b = pp.Preprocess(f.mgr.AddFile("b.sv",
+                                       "localparam A = `V;\n"
+                                       "`define V 2\n"));
+  auto c = pp.Preprocess(f.mgr.AddFile("c.sv", "localparam P = `V;\n"));
+  EXPECT_NE(b.find("A = 1;"), std::string::npos);
+  EXPECT_NE(c.find("P = 2;"), std::string::npos);
+  EXPECT_EQ(c.find("P = 1;"), std::string::npos);
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
