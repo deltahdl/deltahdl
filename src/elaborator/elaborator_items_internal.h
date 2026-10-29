@@ -263,4 +263,10 @@ void CheckCheckerBodyItemRules(const ModuleItem* item, const ModuleDecl* decl,
 std::vector<ModuleItem*> TimingCheckDelayedSignalItems(const ModuleDecl* decl,
                                                        Arena& arena);
 
+// §6.3.2 (printed page 89): a net declared with a drive strength and no
+// declaration assignment is reported. Defined in elaborator_decls.cpp, and
+// called for the nets of the unit and each package as well as each module's.
+void ValidateDriveStrengthHasAssignment(const ModuleItem* item,
+                                        DiagEngine& diag);
+
 }  // namespace delta

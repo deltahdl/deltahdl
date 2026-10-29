@@ -333,8 +333,8 @@ static void ValidateNetDriveStrength(const DataType& dtype, const RtlirNet& net,
 // it. §27.5 leaves an unselected generate block unelaborated, so a declaration
 // there is never reached, which is the right answer: it declares no net for the
 // rule to speak about.
-static void ValidateDriveStrengthHasAssignment(const ModuleItem* item,
-                                               DiagEngine& diag) {
+void ValidateDriveStrengthHasAssignment(const ModuleItem* item,
+                                        DiagEngine& diag) {
   if ((item->data_type.drive_strength0 != 0 ||
        item->data_type.drive_strength1 != 0) &&
       item->init_expr == nullptr) {

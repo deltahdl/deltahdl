@@ -907,29 +907,26 @@ void Elaborator::ValidateAnonymousProgramNameSharing() {
   }
 }
 
-// §3.12.1 (printed page 56) gives the unit the items a package may hold, and
-// §26.2 (printed 807) keeps a net declaration assignment out of a package, so
-// out of the unit too; CheckUnitNettypeUses asks a user-defined nettype's net.
-static void ReportUnitNetInits(const CompilationUnit* unit, DiagEngine& diag) {
-  for (const auto* item : unit->cu_items) {
-    if (item->kind == ModuleItemKind::kNetDecl && item->init_expr) {
-      diag.Error(item->loc,
-                 "a net declaration with an implicit continuous assignment "
-                 "cannot stand in the compilation-unit scope",
-                 Subclause("3.12.1"));
-    }
+// §3.12.1 and §26.2 keep a net declaration assignment out of the unit and a
+// package, whose nets ElaborateNetDecl never reaches, so §6.3.2's drive
+// strength rule, which asks a strength for one, is applied here as well.
+static void ReportScopeNets(const std::vector<ModuleItem*>& items,
+                            const std::string& init_rule, Subclause subclause,
+                            DiagEngine& diag) {
+  for (const auto* item : items) {
+    if (item->kind != ModuleItemKind::kNetDecl) continue;
+    ValidateDriveStrengthHasAssignment(item, diag);
+    if (item->init_expr) diag.Error(item->loc, init_rule, subclause);
   }
 }
 
 void Elaborator::ValidatePackageItems() {
   for (const auto* pkg : unit_->packages) {
-    for (const auto* item : pkg->items) {
-      if (item->kind == ModuleItemKind::kNetDecl && item->init_expr) {
-        diag_.Error(item->loc,
+    ReportScopeNets(pkg->items,
                     "net declaration with implicit continuous assignment is "
                     "not allowed in a package",
-                    Subclause("26.2"));
-      }
+                    Subclause("26.2"), diag_);
+    for (const auto* item : pkg->items) {
       if (IsProceduralItemKind(item->kind)) {
         diag_.Error(item->loc, "process is not allowed in a package",
                     Subclause("26.2"));
@@ -943,7 +940,10 @@ void Elaborator::ValidatePackageItems() {
     }
     ReportPackageSubroutineStaticInits(pkg, diag_);
   }
-  ReportUnitNetInits(unit_, diag_);
+  ReportScopeNets(unit_->cu_items,
+                  "a net declaration with an implicit continuous assignment "
+                  "cannot stand in the compilation-unit scope",
+                  Subclause("3.12.1"), diag_);
 }
 
 }  // namespace delta
