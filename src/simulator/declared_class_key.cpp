@@ -78,13 +78,13 @@ std::string_view DeclaredClassKeyInScope(const DataType& type,
   return !nested.empty() ? nested : DeclaredClassKey(type, ctx, arena);
 }
 
-const DataType& TypeOfThisNamed(const DataType& type, const ClassTypeInfo* cls,
+const DataType* TypeOfThisNamed(const DataType* type, const ClassTypeInfo* cls,
                                 SimContext& ctx) {
-  if (cls == nullptr || !IsTypeOfThis(type)) return type;
+  if (cls == nullptr || !IsTypeOfThis(*type)) return type;
   auto* named = ctx.GetArena().Create<DataType>();
   named->kind = DataTypeKind::kNamed;
   named->type_name = cls->name;
-  return *named;
+  return named;
 }
 
 }  // namespace delta

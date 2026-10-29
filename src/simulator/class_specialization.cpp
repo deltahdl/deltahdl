@@ -567,7 +567,7 @@ void SizeValueParamProperties(ClassTypeInfo* spec, const ParamValues& values,
           FoldPropertyDimension(member->unpacked_dims[0], scope, ctx, arena);
       if (dim.size > 0) prop.array_size = dim.size;
     }
-    const DataType& type = TypeOfThisNamed(member->data_type, spec, ctx);
+    const DataType& type = *TypeOfThisNamed(&member->data_type, spec, ctx);
     if (SizeClassTypedefProperty(prop, type, spec, scope, ctx)) continue;
     uint32_t width = EvalTypeWidth(type, {}, scope);
     if (width == 0) continue;

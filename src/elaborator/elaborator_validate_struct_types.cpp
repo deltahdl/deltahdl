@@ -460,6 +460,41 @@ static void ResolveNamedTypeRef(DataType& dt, std::string_view name,
   }
 }
 
+// §6.23: the type a net or variable `name` of `mod` stands for where no
+// declaration records the data type it is declared with: a variable's recorded
+// kind, as wide as the variable where that kind is a vector's, or the logic
+// vector of a net's width. False, leaving `dt` untouched, where `mod` holds no
+// value of that name.
+static bool AdoptRecordedValueType(
+    DataType& dt, std::string_view name, const RtlirModule& mod,
+    std::unordered_map<std::string_view, DataTypeKind>& var_types,
+    Arena& arena) {
+  for (const auto& v : mod.variables) {
+    if (v.name != name) continue;
+    dt.kind = var_types[name];
+    dt.is_signed = v.is_signed;
+    if (dt.kind == DataTypeKind::kLogic || dt.kind == DataTypeKind::kBit ||
+        dt.kind == DataTypeKind::kReg) {
+      SetTypeRefPackedDims(dt, v.width, arena);
+    }
+    dt.type_ref_expr = nullptr;
+    return true;
+  }
+  // §6.23: type(net) yields the net's underlying data type (a logic vector of
+  // the net's width); the net-ness of the declared object comes separately from
+  // its own net keyword, not from the type_reference.
+  for (const auto& n : mod.nets) {
+    if (n.name != name) continue;
+    AdoptLogicVector(dt, {n.width, n.is_signed}, arena);
+    return true;
+  }
+  auto it = var_types.find(name);
+  if (it == var_types.end()) return false;
+  dt.kind = it->second;
+  dt.type_ref_expr = nullptr;
+  return true;
+}
+
 // §6.23: resolves the type reference `dt` holds, if any, written at `loc` in
 // `mod`, to the type it stands for, in place. Answers the key
 // RtlirModule::enum_types holds an enumeration under where the reference
@@ -505,29 +540,7 @@ std::string_view Elaborator::ResolveTypeRef(DataType& dt, SourceLoc loc,
     AdoptReferencedType(dt, *declared);
     return {};
   }
-  for (const auto& v : mod->variables) {
-    if (v.name != ref->text) continue;
-    dt.kind = var_types_[ref->text];
-    dt.is_signed = v.is_signed;
-    if (dt.kind == DataTypeKind::kLogic || dt.kind == DataTypeKind::kBit ||
-        dt.kind == DataTypeKind::kReg) {
-      SetTypeRefPackedDims(dt, v.width, arena_);
-    }
-    dt.type_ref_expr = nullptr;
-    return {};
-  }
-  // §6.23: type(net) yields the net's underlying data type (a logic vector of
-  // the net's width); the net-ness of the declared object comes separately from
-  // its own net keyword, not from the type_reference.
-  for (const auto& n : mod->nets) {
-    if (n.name != ref->text) continue;
-    AdoptLogicVector(dt, {n.width, n.is_signed}, arena_);
-    return {};
-  }
-  auto it = var_types_.find(ref->text);
-  if (it != var_types_.end()) {
-    dt.kind = it->second;
-    dt.type_ref_expr = nullptr;
+  if (AdoptRecordedValueType(dt, ref->text, *mod, var_types_, arena_)) {
     return {};
   }
   ResolveNamedTypeRef(dt, ref->text, kScope);

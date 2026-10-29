@@ -51,10 +51,10 @@ std::string_view DeclaredClassKeyInScope(const DataType& type,
                                          SimContext& ctx, Arena& arena);
 
 // §6.23 with §8.11: `type(this)` written in a class stands for the class
-// itself. `type` as the class `cls` reads it: a type naming `cls`, made in the
-// run's arena, where `type` is `type(this)` and `cls` is a class, and `type`
+// itself. `*type` as the class `cls` reads it: a type naming `cls`, made in the
+// run's arena, where `*type` is `type(this)` and `cls` is a class, and `type`
 // itself for any other type or where `cls` is null.
-const DataType& TypeOfThisNamed(const DataType& type, const ClassTypeInfo* cls,
+const DataType* TypeOfThisNamed(const DataType* type, const ClassTypeInfo* cls,
                                 SimContext& ctx);
 
 }  // namespace delta

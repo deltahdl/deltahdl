@@ -88,7 +88,7 @@ Variable* CreateMethodReturnVariable(ClassMethodTarget target,
   // does; read as written, the type was implicit and the variable one bit,
   // which kept the low bit of the handle the body returned.
   const DataType& type =
-      TypeOfThisNamed(method->return_type, ctx.CurrentMethodClass(), ctx);
+      *TypeOfThisNamed(&method->return_type, ctx.CurrentMethodClass(), ctx);
   // §6.11.3: a method's return type decides the signedness of the variable
   // that holds its result, exactly as a plain function's does in
   // EvalFunctionCall.

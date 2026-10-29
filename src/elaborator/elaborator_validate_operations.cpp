@@ -289,8 +289,31 @@ static std::optional<DataType> TypeRefWrittenType(const Expr* op) {
 // value rather than a type.
 static bool IsBareName(const DataType& dt) {
   return dt.kind == DataTypeKind::kNamed && dt.scope_name.empty() &&
-         dt.packed_dim_left == nullptr && dt.extra_packed_dims.empty() &&
-         dt.unpacked_dims.empty();
+         dt.packed_dim_left == nullptr && dt.extra_packed_dims.empty();
+}
+
+// The type `dt` stands for once each name it is written by is read through:
+// a built-in type keyword, a typedef, or a package's or class's typedef behind
+// its scope. Nothing where a name resolves to none of them.
+static std::optional<DataType> ThroughTypeNames(DataType dt,
+                                                const TypedefMap& typedefs,
+                                                const CompilationUnit* unit,
+                                                Arena& arena) {
+  for (int depth = 0; depth < 16 && dt.kind == DataTypeKind::kNamed; ++depth) {
+    if (!dt.scope_name.empty()) {
+      auto scoped = ScopedTypeRefType(dt, typedefs, unit, arena);
+      if (!scoped) break;
+      dt = *scoped;
+      continue;
+    }
+    DataType builtin = TypeNameToDataType(dt.type_name);
+    if (builtin.kind != DataTypeKind::kNamed) return builtin;
+    auto it = typedefs.find(dt.type_name);
+    if (it == typedefs.end()) break;
+    dt = it->second;
+  }
+  if (dt.kind == DataTypeKind::kNamed) return std::nullopt;
+  return dt;
 }
 
 std::optional<DataType> ElaboratorOperationRules::CalledFunctionType(
@@ -318,24 +341,7 @@ std::optional<DataType> ElaboratorOperationRules::ResolveTypeRefOperandType(
     if (std::optional<DataType> value = NetOrVariableType(*mod, declared))
       dt = *value;
   }
-  for (int depth = 0; depth < 16 && dt.kind == DataTypeKind::kNamed; ++depth) {
-    if (!dt.scope_name.empty()) {
-      auto scoped = ScopedTypeRefType(dt, typedefs_, unit_, arena_);
-      if (!scoped) break;
-      dt = *scoped;
-      continue;
-    }
-    DataType builtin = TypeNameToDataType(dt.type_name);
-    if (builtin.kind != DataTypeKind::kNamed) {
-      dt = builtin;
-      break;
-    }
-    auto it = typedefs_.find(dt.type_name);
-    if (it == typedefs_.end()) break;
-    dt = it->second;
-  }
-  if (dt.kind == DataTypeKind::kNamed) return std::nullopt;
-  return dt;
+  return ThroughTypeNames(dt, typedefs_, unit_, arena_);
 }
 
 // §6.23 — a comparison of two type references is a constant expression whose

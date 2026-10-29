@@ -487,7 +487,7 @@ static void CollectClassMembers(ClassTypeInfo* info, const ClassDecl* cls,
   for (auto* member : cls->members) {
     if (member->kind == ClassMemberKind::kProperty) {
       // §6.23 with §8.11: type(this) declares a handle of the class itself.
-      const DataType& type = TypeOfThisNamed(member->data_type, info, ctx);
+      const DataType& type = *TypeOfThisNamed(&member->data_type, info, ctx);
       info->properties.push_back(
           PropertyRecord(member, type, params,
                          PropertyTypeKey(type, *info, *cls, params, ctx), ctx));

@@ -135,7 +135,7 @@ static void RegisterValueArgClassType(const FunctionArg& param,
   // the running method belongs to, as one declared with its name is; without
   // the class recorded, a method called through the formal ran nothing.
   const DataType& dt =
-      TypeOfThisNamed(param.data_type, ctx.CurrentMethodClass(), ctx);
+      *TypeOfThisNamed(&param.data_type, ctx.CurrentMethodClass(), ctx);
   if (!dt.type_name.empty() && ctx.FindClassType(dt.type_name))
     ctx.SetVariableClassType(param.name, dt.type_name);
 }
