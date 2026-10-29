@@ -16,6 +16,7 @@
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_primitives.h"
+#include "elaborator/rtlir_scopes.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_gate_type.h"
@@ -221,6 +222,14 @@ static std::vector<size_t> OutputOrInoutTerminalIndices(GateKind kind,
   }
 }
 
+// Where a terminal is measured: the module, the constants its selects may
+// fold, and the declarations its names may bind (§23.9).
+struct TerminalScope {
+  const RtlirModule* mod;
+  const ScopeMap& scope;
+  const DeclaredNames& names;
+};
+
 // §4.9.6 / §23.3.3: the elaboration-time bit width of a structural net
 // expression when it is used as a primitive (gate/switch) output or inout
 // terminal. A plain net identifier reports its declared width; a bit-select of
@@ -230,8 +239,8 @@ static std::vector<size_t> OutputOrInoutTerminalIndices(GateKind kind,
 // be pinned down at elaboration (non-constant select bounds, or an expression
 // outside the structural-net-expression grammar), so the 1-bit rule is left
 // unenforced for that terminal rather than risk a false rejection.
-static uint32_t StructuralNetExprWidth(const Expr* t, const RtlirModule* mod,
-                                       const ScopeMap& scope);
+static uint32_t StructuralNetExprWidth(const Expr* t,
+                                       const TerminalScope& where);
 
 // §28.3.1: the width a select contributes to a structural net expression. A
 // bare bit-select is one bit; an indexed part-select carries its own constant
@@ -253,27 +262,31 @@ static uint32_t StructuralSelectWidth(const Expr* t, const ScopeMap& scope) {
 
 // A concatenation is as wide as its parts together; an unmeasured part means
 // the whole is unknown.
-static uint32_t StructuralConcatWidth(const Expr* t, const RtlirModule* mod,
-                                      const ScopeMap& scope) {
+static uint32_t StructuralConcatWidth(const Expr* t,
+                                      const TerminalScope& where) {
   uint32_t total = 0;
   for (const auto* e : t->elements) {
-    uint32_t w = StructuralNetExprWidth(e, mod, scope);
+    uint32_t w = StructuralNetExprWidth(e, where);
     if (w == 0) return 0;
     total += w;
   }
   return total;
 }
 
-static uint32_t StructuralNetExprWidth(const Expr* t, const RtlirModule* mod,
-                                       const ScopeMap& scope) {
+static uint32_t StructuralNetExprWidth(const Expr* t,
+                                       const TerminalScope& where) {
   if (!t) return 0;
   switch (t->kind) {
     case ExprKind::kIdentifier:
-      return LookupLhsWidth(t, mod);
+      // §23.9: the innermost generate block declaring the name holds the net
+      // the terminal names, recorded under the block's prefix.
+      return LookupNameWidth(
+          DeclaredScopedName(t->text, where.names.scopes, where.names.declared),
+          where.mod);
     case ExprKind::kSelect:
-      return StructuralSelectWidth(t, scope);
+      return StructuralSelectWidth(t, where.scope);
     case ExprKind::kConcatenation:
-      return StructuralConcatWidth(t, mod, scope);
+      return StructuralConcatWidth(t, where);
     default:
       return 0;
   }
@@ -302,6 +315,7 @@ std::vector<size_t> PrimitiveDrivenTerminalIndices(const ModuleItem* item) {
 void ValidatePrimitiveOutputTerminalWidths(const ModuleItem* item,
                                            const RtlirModule* mod,
                                            const ScopeMap& scope,
+                                           const DeclaredNames& names,
                                            DiagEngine& diag) {
   // §4.9.6 states the rule this enforces for both kinds: primitive terminals,
   // UDP terminals among them, are not module ports, and a primitive's output
@@ -328,7 +342,7 @@ void ValidatePrimitiveOutputTerminalWidths(const ModuleItem* item,
   for (size_t i : PrimitiveDrivenTerminalIndices(item)) {
     auto* t = terms[i];
     if (!t) continue;
-    uint32_t w = StructuralNetExprWidth(t, mod, scope);
+    uint32_t w = StructuralNetExprWidth(t, {mod, scope, names});
     if (w == 0 || w == 1) continue;
     // A primitive instance is told about its output terminal alone, because
     // §29.3.1 permits a UDP no inout terminal and exactly one output. A gate

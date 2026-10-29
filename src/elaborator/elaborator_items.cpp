@@ -498,7 +498,9 @@ void Elaborator::CheckPrimitiveTerminals(const ModuleItem* item,
     CheckGateInstanceArrayTerminalWidths(item, mod, scope, interconnect_names_,
                                          diag_);
   }
-  ValidatePrimitiveOutputTerminalWidths(item, mod, scope, diag_);
+  ValidatePrimitiveOutputTerminalWidths(
+      item, mod, scope, DeclaredNames{gen_prefix_scopes_, declared_names_},
+      diag_);
   for (const auto& [name, value] : gen_const_scope_) scope[name] = value;
   ValidatePrimitiveDrivenTerminals(item, mod, scope, gen_prefix_scopes_, diag_);
 }

@@ -88,6 +88,14 @@ inline std::string_view DeclaredScopedName(
   return name;
 }
 
+// The two things DeclaredScopedName resolves a reference against: the
+// generate blocks the reference stands in, outermost first, and every name a
+// declaration of the module is recorded under.
+struct DeclaredNames {
+  const GenBlockPrefixes& scopes;
+  const std::unordered_set<std::string_view>& declared;
+};
+
 // §23.6: one step of a hierarchical path name, which Syntax 23-7 writes as
 // `identifier constant_bit_select`. §23.6 forms such a name by joining the
 // names of the modules, module instances, generate blocks, tasks, functions,

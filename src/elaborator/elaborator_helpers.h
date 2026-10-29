@@ -83,6 +83,11 @@ std::string_view LhsSignalName(const Expr* lhs);
 
 uint32_t LookupLhsWidth(const Expr* lhs, const RtlirModule* mod);
 
+// The declared width of the variable, net or port of `mod` recorded under
+// `name`, a generate block's declaration under its prefixed name
+// (DeclaredScopedName); 0 where `mod` records none.
+uint32_t LookupNameWidth(std::string_view name, const RtlirModule* mod);
+
 // The declared type and width of the signal named `name`, whether its
 // declaration wrote an unpacked dimension, which makes a select of it name an
 // element (§7.4.6), and whether it is signed (§11.8.1). A port contributes
@@ -228,9 +233,13 @@ bool ItemCarriesDelay(const ModuleItem* item);
 void ValidateItemDelaysNonNegative(const ModuleItem* item,
                                    const ScopeMap& scope, DiagEngine& diag);
 
+// §4.9.6: reports a primitive instance's output or inout terminal wider than
+// one bit. `names` places the instance among the module's generate blocks, so
+// a terminal naming a block's own net is measured as that net.
 void ValidatePrimitiveOutputTerminalWidths(const ModuleItem* item,
                                            const RtlirModule* mod,
                                            const ScopeMap& scope,
+                                           const DeclaredNames& names,
                                            DiagEngine& diag);
 
 // The indices of the terminals a gate or user-defined primitive instance
