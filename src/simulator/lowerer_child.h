@@ -8,7 +8,6 @@
 
 namespace delta {
 
-class Arena;
 class SimContext;
 struct Expr;
 struct Net;
@@ -51,8 +50,7 @@ std::string GenBlockObjectKey(const std::string& inst_prefix,
 // bits of nets, which §23.3.3.3 reports.
 void JoinInoutPortBits(const Expr& connection, Net& port_net,
                        const std::string& inst_prefix,
-                       const GenBlockPrefixes& gen_blocks, SimContext& ctx,
-                       Arena& arena);
+                       const GenBlockPrefixes& gen_blocks, SimContext& ctx);
 
 }  // namespace delta
 

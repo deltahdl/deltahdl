@@ -305,20 +305,6 @@ std::optional<BitPairs> ComposeBits(const std::optional<BitPairs>& bits,
   return composed;
 }
 
-bool IsAliasBitLink(const SwitchLink* link) {
-  return link != nullptr && link->bit_map != nullptr && link->sw->is_alias;
-}
-
-// §10.11: a link joining the bits of an alias maps the bits of the member it
-// belongs to alone, so it is followed from the member and no further;
-// LowerBitAlias links every net sharing a bit with the member to it directly.
-// §28.8: a switch joining single bits is followed on across every switch after
-// it, as a switch joining nets whole is, the bits it joins carried along.
-bool FollowsFrom(const SwitchLink& link, const Reached& from, size_t i) {
-  if (IsAliasBitLink(from.link)) return false;
-  return !IsAliasBitLink(&link) || i == 0;
-}
-
 // Whether a way back to the member joins each bit to itself alone, which is
 // the member's own sources and nothing a switch carries to it.
 bool JoinsBitsToThemselves(const BitPairs& bits) {
@@ -343,11 +329,20 @@ void ReachAcross(std::vector<Reached>& reached, size_t i,
   if (!seen) reached.push_back({link.other, i, &link, std::move(bits)});
 }
 
+// §28.8: every conducting link is followed on from every net reached, the bits
+// a link joining single bits joins carried along (ComposeBits) -- a switch's
+// with a bit-select terminal, and those of §10.11's alias of bits and of an
+// inout port on a select or a concatenation of nets (§4.9.6), each of which
+// joins its nets as one network, so a switch beyond one reaches across it.
+// LowerBitAlias links every two nets sharing a bit directly, so a way across
+// two of its links brings only bits a direct link brings too, at the same
+// strength, and a built-in net type resolves two equal drivers as it resolves
+// one.
 std::vector<Reached> ReachAcrossConducting(Net& member) {
   std::vector<Reached> reached{{&member, 0, nullptr, std::nullopt}};
   for (size_t i = 0; i < reached.size(); ++i) {
     for (const SwitchLink& link : reached[i].net->switch_links) {
-      if (!LinkConducts(link) || !FollowsFrom(link, reached[i], i)) continue;
+      if (!LinkConducts(link)) continue;
       ReachAcross(reached, i, link, member);
     }
   }

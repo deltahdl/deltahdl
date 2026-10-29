@@ -750,7 +750,7 @@ static void LinkOrJoinSharedPortBinding(const RtlirPortBinding& binding,
     if (binding.direction != Direction::kInout) return;
     JoinInoutPortBits(*binding.connection, *scope.ctx.FindNet(local),
                       scope.parent_prefix, scope.inst.gen_block_prefixes,
-                      scope.ctx, scope.arena);
+                      scope.ctx);
     return;
   }
   std::string target =

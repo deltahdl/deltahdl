@@ -274,8 +274,8 @@ static void LowerBitAlias(const RtlirAlias& alias, const std::string& prefix,
 
 void JoinInoutPortBits(const Expr& connection, Net& port_net,
                        const std::string& inst_prefix,
-                       const GenBlockPrefixes& gen_blocks, SimContext& ctx,
-                       Arena& arena) {
+                       const GenBlockPrefixes& gen_blocks, SimContext& ctx) {
+  Arena& arena = ctx.GetArena();
   std::vector<AliasBit> outside;
   if (!AppendAliasBits(&connection, AliasScope{inst_prefix, gen_blocks}, ctx,
                        arena, outside)) {
