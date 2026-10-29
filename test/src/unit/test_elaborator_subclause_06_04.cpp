@@ -10,6 +10,8 @@
 
 #include <gtest/gtest.h>
 
+#include <format>
+
 #include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
@@ -497,6 +499,63 @@ TEST(SingularAggregateTypes, VirtualInterfaceIsSingular) {
   dt.kind = DataTypeKind::kVirtualInterface;
   EXPECT_TRUE(IsSingularType(dt));
   EXPECT_FALSE(IsAggregateType(dt));
+}
+
+// §6.4 gives a class no variables of its own type, only handles, and a handle
+// is singular, so an input port typed by a class takes a default value under
+// §23.2.2.4. Each way a port can name the class is accepted: a class of the
+// compilation unit, one named through its package, a typedef of a class, an
+// interface class and a specialization of a parameterized class.
+TEST(SingularAggregateTypes, ClassHandlePortDefaultAccepted) {
+  constexpr const char* kClasses =
+      "package p;\n"
+      "  class PC;\n"
+      "  endclass\n"
+      "endpackage\n"
+      "class C;\n"
+      "endclass\n"
+      "typedef C c_t;\n"
+      "interface class IC;\n"
+      "endclass\n"
+      "class P #(int N = 1);\n"
+      "endclass\n";
+  for (const char* port : {"C h", "p::PC h", "c_t h", "IC h", "P #(8) h"}) {
+    EXPECT_TRUE(ElabOk(std::format("{}module t(input {} = null);\nendmodule\n",
+                                   kClasses, port)))
+        << port;
+  }
+}
+
+// An interface's and a program's ANSI ports take a default as a module's do,
+// and a class handle there is as singular.
+TEST(SingularAggregateTypes, ClassHandlePortDefaultAcceptedOnEveryHeader) {
+  EXPECT_TRUE(
+      ElabOk("class C;\n"
+             "endclass\n"
+             "interface i(input C h = null);\n"
+             "endinterface\n"
+             "program q(input C h = null);\n"
+             "endprogram\n"
+             "module t;\n"
+             "  i u();\n"
+             "  q v();\n"
+             "endmodule\n"));
+}
+
+// An unpacked array of handles is an unpacked array, so it is aggregate however
+// singular its elements are, and its default is reported beside the handle's
+// own accepted above.
+TEST(SingularAggregateTypes, UnpackedArrayOfClassHandlesPortDefaultRejected) {
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "endclass\n"
+      "module t(input C hs [2] = '{null, null});\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "default value on non-singular port 'hs'", 3,
+                            "23.2.2.4"));
 }
 
 }  // namespace
