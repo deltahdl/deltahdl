@@ -27,7 +27,7 @@ struct DeclaredValue {
   DataType type;
   uint32_t unpacked_dims = 0;
   UnpackedKind outermost = UnpackedKind::kFixed;
-  std::optional<DataType> index_type;
+  std::optional<DataType> index_type = {};
   std::vector<Expr*> dims = {};
 };
 

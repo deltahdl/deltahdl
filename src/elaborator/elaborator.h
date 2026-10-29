@@ -204,7 +204,6 @@ class Elaborator : public ElaboratorClassRules {
   // the two it is turns on whether the name is a module, which the parser does
   // not know and this does.
   void ReportUndeclaredTypeName(const ModuleItem* item);
-
   RtlirModule* ElaborateModule(const ModuleDecl* decl, const ParamList& params);
 
   // §6.20.2: resolves each parameter of `decl`'s parameter port list against
@@ -247,6 +246,7 @@ class Elaborator : public ElaboratorClassRules {
   bool ElaborateUserNettypeNet(ModuleItem* item, RtlirModule* mod);
 
   void ElaborateVarDecl(ModuleItem* item, RtlirModule* mod);
+  std::string_view ResolveVarDeclTypeRefs(ModuleItem* item, RtlirModule* mod);
   // §23.2.2.1: a non-ANSI port declared with no net or variable type takes the
   // kind of its body declaration (a variable where `net_type` is kNone), and
   // `signed` on either makes both signed. Returns the declaration's
