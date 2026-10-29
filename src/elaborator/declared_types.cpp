@@ -92,22 +92,25 @@ void ForEachInnerDeclaredType(const ModuleDecl* decl,
   for (const ModuleItem* item : decl->items) VisitInner(item, visit);
 }
 
+// An item of the compilation unit or of a package: a variable, a nettype, a
+// typedef where `typedefs` asks for one, and what the item declares within.
+static void VisitScopeItem(const ModuleItem* item, bool typedefs,
+                           const DeclaredTypeVisit& visit) {
+  if (item->kind == ModuleItemKind::kVarDecl) VisitVariable(item, visit);
+  if (item->kind == ModuleItemKind::kNettypeDecl ||
+      (typedefs && item->kind == ModuleItemKind::kTypedef))
+    VisitTypedef(item, visit);
+  VisitInner(item, visit);
+}
+
 void ForEachUnitDeclaredType(const CompilationUnit* unit,
                              const DeclaredTypeVisit& visit) {
-  for (const ModuleItem* item : unit->cu_items) {
-    if (item->kind == ModuleItemKind::kVarDecl) VisitVariable(item, visit);
-    if (item->kind == ModuleItemKind::kNettypeDecl) VisitTypedef(item, visit);
-    VisitInner(item, visit);
-  }
+  for (const ModuleItem* item : unit->cu_items)
+    VisitScopeItem(item, /*typedefs=*/false, visit);
   for (const ClassDecl* cls : unit->classes) VisitClass(cls, visit);
   for (const PackageDecl* pkg : unit->packages) {
-    for (const ModuleItem* item : pkg->items) {
-      if (item->kind == ModuleItemKind::kVarDecl) VisitVariable(item, visit);
-      if (item->kind == ModuleItemKind::kTypedef ||
-          item->kind == ModuleItemKind::kNettypeDecl)
-        VisitTypedef(item, visit);
-      VisitInner(item, visit);
-    }
+    for (const ModuleItem* item : pkg->items)
+      VisitScopeItem(item, /*typedefs=*/true, visit);
   }
 }
 

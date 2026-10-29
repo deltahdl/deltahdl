@@ -249,6 +249,22 @@ bool Parser::TryInterfacePortTypedef(ModuleItem* item) {
   return true;
 }
 
+DataType ParserDataDeclHelpers::ReadDeclaredTypeOfAName(Parser& p) {
+  if (p.Check(TokenKind::kKwEnum)) return p.ParseEnumType();
+  DataType dtype;
+  if (p.Check(TokenKind::kKwStruct) || p.Check(TokenKind::kKwUnion)) {
+    // A.2.2.1 lets packed dimensions follow the body, making the type a packed
+    // array of the structure or union (§7.4.1).
+    dtype = p.ParseStructOrUnionType();
+    p.ParsePackedDims(dtype);
+  } else if (!ReadTypeReference(p, dtype)) {
+    // A.2.2.1 counts a type_reference among the data types, so §6.23's
+    // `typedef type(x) t;` names the type of x, which the elaborator resolves.
+    dtype = p.ParseDeclaredDataType();
+  }
+  return dtype;
+}
+
 ModuleItem* Parser::ParseTypedef() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kTypedef;
@@ -269,19 +285,7 @@ ModuleItem* Parser::ParseTypedef() {
   // missing semicolon under §6.18, and `r` then recorded as a forward typedef
   // no definition resolves. The forward forms above are already settled by
   // the time this is reached, so `typedef T;` stays a forward typedef.
-  if (Check(TokenKind::kKwEnum)) {
-    item->typedef_type = ParseEnumType();
-  } else if (Check(TokenKind::kKwStruct) || Check(TokenKind::kKwUnion)) {
-    // A.2.2.1 lets packed dimensions follow the body, making the typedef a
-    // packed array of the structure or union (§7.4.1).
-    item->typedef_type = ParseStructOrUnionType();
-    ParsePackedDims(item->typedef_type);
-  } else if (!ParserDataDeclHelpers::ReadTypeReference(*this,
-                                                       item->typedef_type)) {
-    // A.2.2.1 counts a type_reference among the data types, so §6.23's
-    // `typedef type(x) t;` names the type of x, which the elaborator resolves.
-    item->typedef_type = ParseDeclaredDataType();
-  }
+  item->typedef_type = ParserDataDeclHelpers::ReadDeclaredTypeOfAName(*this);
 
   item->name = Expect(TokenKind::kIdentifier, Subclause("6.18")).text;
   ParseUnpackedDims(item->unpacked_dims);
@@ -319,11 +323,11 @@ ModuleItem* Parser::ParseNettypeDecl() {
   Expect(TokenKind::kKwNettype, Subclause("6.6.7"));
   // A.2.2.1's data_type and A.2.1.3's second form, which renames a nettype, may
   // each name the type through a package, `P::T`, whose name is no type the
-  // parser knows; ParseDeclaredDataType reads such a scoped name as a data
-  // declaration's type is read. A.2.2.1 counts a type_reference among the
-  // data types, so `nettype type(x) nt;` names the type of x (§6.23).
-  if (!ParserDataDeclHelpers::ReadTypeReference(*this, item->typedef_type))
-    item->typedef_type = ParseDeclaredDataType();
+  // parser knows, and the data_type may write an enumeration, a structure or a
+  // union out in full, as a typedef's may (§6.6.7 admits packed and unpacked
+  // aggregates alike). A.2.2.1 counts a type_reference among the data types,
+  // so `nettype type(x) nt;` names the type of x (§6.23).
+  item->typedef_type = ParserDataDeclHelpers::ReadDeclaredTypeOfAName(*this);
   item->name = Expect(TokenKind::kIdentifier, Subclause("6.6.7")).text;
 
   // §6.6.7 / A.2.1.3: a nettype declaration requires an explicit data type

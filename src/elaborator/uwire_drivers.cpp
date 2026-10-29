@@ -20,7 +20,6 @@
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
 #include "elaborator/unit_scope_order.h"
-#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_gate_type.h"
 #include "parser/ast_module.h"
@@ -78,8 +77,9 @@ static std::vector<std::pair<std::string_view, UwirePath>> DriversSince(
 }
 
 void RepeatUnitUwireDrivers(UnitUwireDrivers& units,
-                            const UnitUwireCounts& counts, SourceLoc loc,
-                            DiagEngine& diag) {
+                            const UnitUwireCounts& counts, uint32_t elements,
+                            SourceLoc loc, DiagEngine& diag) {
+  if (elements <= 1) return;
   static const std::unordered_map<std::string_view, size_t> kNone;
   for (auto& [unit, drivers] : units) {
     auto unit_counts = counts.find(unit);

@@ -666,6 +666,13 @@ static bool BodyDeclaresObject(const ModuleDecl* decl, std::string_view name) {
                      });
 }
 
+// The sets RegisterPortNetNames enters a port's name in.
+struct PortNetNameSets {
+  std::unordered_set<std::string_view>& interconnects;
+  std::unordered_set<std::string_view>& nets;
+  UwireDrivers& uwire_drivers;
+};
+
 // §6.6.8: an interconnect port is a typeless/generic net, exactly like a
 // local interconnect declaration. Register its name so the assignment- and
 // expression-use checks -- which reject procedural/continuous/expression uses
@@ -684,19 +691,17 @@ static bool BodyDeclaresObject(const ModuleDecl* decl, std::string_view name) {
 // that declaration's object (§23.2.2.1), which registers itself if it is a
 // net, so only a non-ANSI port the body leaves undeclared registers here; a
 // checker's formal is §17.2's and no net.
-static void RegisterPortNetNames(
-    const ModuleDecl* decl, const PortDecl& port, const RtlirPort& rp,
-    std::unordered_set<std::string_view>& interconnect_names,
-    std::unordered_set<std::string_view>& net_names,
-    UwireDrivers& uwire_drivers) {
+//
+// §6.6.2: a uwire port takes one driver inside its module as any uwire net
+// does, so it is entered among the nets whose drivers are counted.
+static void RegisterPortNetNames(const ModuleDecl* decl, const PortDecl& port,
+                                 const RtlirPort& rp, PortNetNameSets sets) {
   if (port.name.empty()) return;
-  if (port.data_type.is_interconnect) interconnect_names.insert(port.name);
+  if (port.data_type.is_interconnect) sets.interconnects.insert(port.name);
   if (decl->decl_kind == ModuleDeclKind::kChecker || rp.is_var) return;
   if (decl->is_non_ansi_ports && BodyDeclaresObject(decl, port.name)) return;
-  net_names.insert(port.name);
-  // §6.6.2: a uwire port takes one driver inside its module as any uwire
-  // net does.
-  if (rp.net_type == NetType::kUwire) uwire_drivers.Declare(port.name);
+  sets.nets.insert(port.name);
+  if (rp.net_type == NetType::kUwire) sets.uwire_drivers.Declare(port.name);
 }
 
 // §23.2.2.1 (printed page 733), Example 5: `renamed_concat(.a({b, c}), f,
@@ -856,8 +861,8 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
     if (port.port_expr != nullptr && rp.direction == Direction::kNone) {
       rp.direction = PortExprDirection(decl, port.port_expr);
     }
-    RegisterPortNetNames(decl, port, rp, interconnect_names_, net_names_,
-                         uwire_drivers_);
+    RegisterPortNetNames(decl, port, rp,
+                         {interconnect_names_, net_names_, uwire_drivers_});
     // §37.3.3: where the port declaration stands, which the port object
     // reports through vpiLineNo and vpiFile.
     rp.loc = port.loc;

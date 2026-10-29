@@ -254,7 +254,7 @@ TEST(UwireElaboration, MultipleContinuousAssignmentsNames6_6_2) {
 ::testing::AssertionResult UwireReported(const std::string& src,
                                          std::string_view name, uint32_t line) {
   ElabFixture f;
-  ElaborateSrc(src, f);
+  ElaborateWithPreprocessor(src, f);
   return ReportedError(
       f.diag.Diagnostics(),
       std::format("uwire '{}' cannot have multiple drivers", name), line,

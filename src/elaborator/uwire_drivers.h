@@ -71,12 +71,13 @@ using UnitUwireCounts =
 UnitUwireCounts CountUnitUwireDrivers(const UnitUwireDrivers& units);
 
 // §23.3.2: each element of an array of module instances is an instance of
-// its own, elaborated once for all of them, so each driver of a compilation
-// unit's uwire net recorded among `units` since `counts` is recorded again
-// for the elements after the first, standing at the instantiation `loc`.
+// its own, elaborated once for all of them, so where the instantiation at
+// `loc` makes more than one of its `elements`, each driver of a compilation
+// unit's uwire net recorded among `units` since `counts` is recorded again for
+// the elements after the first, standing at `loc`.
 void RepeatUnitUwireDrivers(UnitUwireDrivers& units,
-                            const UnitUwireCounts& counts, SourceLoc loc,
-                            DiagEngine& diag);
+                            const UnitUwireCounts& counts, uint32_t elements,
+                            SourceLoc loc, DiagEngine& diag);
 
 // Where a driver's target names its net: the scope's module, the types of its
 // variables and nets, the compilation unit around it with that unit's drivers,

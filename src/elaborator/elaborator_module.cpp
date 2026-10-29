@@ -374,13 +374,13 @@ struct ItemElaborationStateSaver {
   } scope_maps;
 
   explicit ItemElaborationStateSaver(Elaborator& e)
-      : scope_maps{e.typedefs_, e.cu_param_scope_, e.td_array_dims_} {
+      : uwire_drivers(std::move(e.uwire_drivers_)),
+        scope_maps{e.typedefs_, e.cu_param_scope_, e.td_array_dims_} {
     forward_typedef_kinds = std::move(e.forward_typedef_kinds_);
     declared_names = std::move(e.declared_names_);
     dpi_import_names = std::move(e.dpi_import_names_);
     net_names = std::move(e.net_names_);
     cont_assign_targets = std::move(e.cont_assign_targets_);
-    uwire_drivers = std::move(e.uwire_drivers_);
     proc_assign_targets = std::move(e.proc_assign_targets_);
     var_types = std::move(e.var_types_);
     var_array_info = std::move(e.var_array_info_);

@@ -69,6 +69,12 @@ struct ParserDataDeclHelpers {
   // and an implicit type without it is reported under §6.8.
   static DataType ReadClassPropertyType(Parser& p);
 
+  // A.2.1.3: reads the data_type a type_declaration or a nettype_declaration
+  // gives the name it declares, which A.2.2.1 lets be an enumeration, a
+  // structure or a union written out in full, a type_reference, or any other
+  // data type, a name reached through a package or a class among them.
+  static DataType ReadDeclaredTypeOfAName(Parser& p);
+
   // §6.23 with A.2.2.1: reads a type_reference, `type ( expression )`, into
   // `dtype` where the `type` keyword stands at the current token, and answers
   // whether it did. The argument is read as an expression whether it names a

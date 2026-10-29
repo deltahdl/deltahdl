@@ -11,6 +11,7 @@
 // continue and return together with §18.17.6's exemption from two of them.
 
 #include <format>
+#include <functional>
 #include <string_view>
 #include <vector>
 
@@ -26,6 +27,7 @@
 #include "elaborator/nettype_uses.h"
 #include "elaborator/return_value_fit.h"
 #include "elaborator/virtual_interface_target.h"
+#include "parser/ast_design.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
@@ -226,6 +228,16 @@ void CheckRandsequenceNames(const Stmt* s, const ReturnCtx& outer,
   });
 }
 
+// §19.3: the covergroups a declaration of the compilation unit `unit` or of
+// one of its packages sees (UnitDeclaresCovergroup), in the form
+// CheckDeclaredTypeRules asks for them.
+std::function<bool(std::string_view)> UnitCovergroups(
+    const CompilationUnit* unit) {
+  return [unit](std::string_view name) {
+    return UnitDeclaresCovergroup(unit, name);
+  };
+}
+
 }  // namespace
 
 void Elaborator::ValidateRandsequenceProductionNames(const ModuleDecl* decl) {
@@ -313,9 +325,7 @@ void Elaborator::ValidatePerDeclarationRulesInUnitScopes() {
   const AggregateShapeCtx kShapeCtx{kShapeTables, nullptr, diag_};
   ForEachUnitDeclaredType(
       unit_, [this, &kShapeCtx](const DeclaredType& declared) {
-        CheckDeclaredTypeRules(declared, kShapeCtx, [this](std::string_view n) {
-          return UnitDeclaresCovergroup(unit_, n);
-        });
+        CheckDeclaredTypeRules(declared, kShapeCtx, UnitCovergroups(unit_));
         ValidateVirtualInterfaceType(
             declared.type, declared.loc,
             [this](std::string_view name) { return FindModule(name); }, diag_);

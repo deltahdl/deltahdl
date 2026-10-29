@@ -23,7 +23,6 @@
 #include "elaborator/rtlir_scopes.h"
 #include "elaborator/uwire_drivers.h"
 #include "lexer/token.h"
-#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 

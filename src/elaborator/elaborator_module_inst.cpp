@@ -721,9 +721,8 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   std::vector<uint32_t> inst_dim_sizes;
   uint32_t total_instances =
       ComputeInstDimSizes(item, parent_scope, inst_dim_sizes);
-  if (total_instances > 1) {
-    RepeatUnitUwireDrivers(unit_uwire_drivers_, kUwireCounts, item->loc, diag_);
-  }
+  RepeatUnitUwireDrivers(unit_uwire_drivers_, kUwireCounts, total_instances,
+                         item->loc, diag_);
 
   if (!item->inst_dims.empty()) {
     ValidateInstanceArrayPorts(inst, item, mod, inst_dim_sizes,
