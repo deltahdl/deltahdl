@@ -296,27 +296,34 @@ TEST(StructLiteralSim, ReplicatedPatternFillsEachMember) {
 // members, its inner braces removed, and for an array of structures the nested
 // braces follow the array's two dimensions and then the structure. Each of the
 // six structures gets `a` and the four elements `b, c, b, c`, in a procedural
-// assignment and in a declaration's initializer.
+// assignment and in a declaration's initializer. Each structure is copied out
+// whole before its member is read, which the elements of an array member
+// reached through an array element (#8975) do not yet allow directly.
 TEST(StructLiteralSim, NestedReplicationFillsAnArrayOfStructures) {
   SimFixture f;
   std::string out = RunCapture(
       "module t;\n"
       "  typedef struct {int a, b[4];} ab_t;\n"
       "  int a, b, c;\n"
+      "  ab_t e;\n"
       "  ab_t v1[1:0] [2:0];\n"
       "  ab_t w1[1:0] [2:0] = '{2{'{3{'{8,'{2{1,2}}}}}}};\n"
       "  initial begin\n"
       "    a = 5; b = 6; c = 7;\n"
       "    v1 = '{2{'{3{'{a,'{2{b,c}}}}}}};\n"
       "    for (int i = 0; i < 2; i++)\n"
-      "      for (int j = 0; j < 3; j++)\n"
-      "        $write(\"%0d:%0d%0d%0d%0d \", v1[i][j].a, v1[i][j].b[0],\n"
-      "               v1[i][j].b[1], v1[i][j].b[2], v1[i][j].b[3]);\n"
+      "      for (int j = 0; j < 3; j++) begin\n"
+      "        e = v1[i][j];\n"
+      "        $write(\"%0d:%0d%0d%0d%0d \", e.a, e.b[0], e.b[1], e.b[2],\n"
+      "               e.b[3]);\n"
+      "      end\n"
       "    $display(\"\");\n"
       "    for (int i = 0; i < 2; i++)\n"
-      "      for (int j = 0; j < 3; j++)\n"
-      "        $write(\"%0d:%0d%0d%0d%0d \", w1[i][j].a, w1[i][j].b[0],\n"
-      "               w1[i][j].b[1], w1[i][j].b[2], w1[i][j].b[3]);\n"
+      "      for (int j = 0; j < 3; j++) begin\n"
+      "        e = w1[i][j];\n"
+      "        $write(\"%0d:%0d%0d%0d%0d \", e.a, e.b[0], e.b[1], e.b[2],\n"
+      "               e.b[3]);\n"
+      "      end\n"
       "    $display(\"\");\n"
       "  end\n"
       "endmodule\n",
@@ -324,6 +331,39 @@ TEST(StructLiteralSim, NestedReplicationFillsAnArrayOfStructures) {
   EXPECT_EQ(out,
             "5:6767 5:6767 5:6767 5:6767 5:6767 5:6767 \n"
             "8:1212 8:1212 8:1212 8:1212 8:1212 8:1212 \n");
+}
+
+// The nested braces of a multidimensional array of structures give each
+// structure its members by the structure's own types, so a byte member takes
+// its item's low eight bits and a shortint member its low sixteen, as they
+// would in a structure assigned alone, in a procedural assignment and in a
+// declaration's initializer.
+TEST(StructLiteralSim, NestedBracesFillNarrowMembersOfAMultidimensionalArray) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  typedef struct {byte x; shortint y;} s_t;\n"
+      "  s_t e;\n"
+      "  s_t m[0:1] [0:1];\n"
+      "  s_t d[0:1] [0:1] = '{'{'{1, 2}, '{3, 4}}, '{'{5, 6}, '{7, 8}}};\n"
+      "  initial begin\n"
+      "    m = '{'{'{1, 2}, '{3, 4}}, '{'{5, 6}, '{7, 8}}};\n"
+      "    for (int i = 0; i < 2; i++)\n"
+      "      for (int j = 0; j < 2; j++) begin\n"
+      "        e = m[i][j];\n"
+      "        $write(\"%0d,%0d \", e.x, e.y);\n"
+      "      end\n"
+      "    $display(\"\");\n"
+      "    for (int i = 0; i < 2; i++)\n"
+      "      for (int j = 0; j < 2; j++) begin\n"
+      "        e = d[i][j];\n"
+      "        $write(\"%0d,%0d \", e.x, e.y);\n"
+      "      end\n"
+      "    $display(\"\");\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1,2 3,4 5,6 7,8 \n1,2 3,4 5,6 7,8 \n");
 }
 
 // A replication filling an unpacked array member of one structure gives the
