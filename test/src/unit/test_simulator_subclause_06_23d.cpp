@@ -76,8 +76,9 @@ TEST(TypeOfThisClassSim, DerivedClassIsNotItsBase) {
       "endclass\n"
       "module t;\n"
       "  int r, s;\n"
+      "  D d;\n"
       "  initial begin\n"
-      "    D d = new;\n"
+      "    d = new;\n"
       "    r = d.in_derived();\n"
       "    s = d.in_base();\n"
       "  end\n"
@@ -104,9 +105,11 @@ TEST(TypeOfThisClassSim, SpecializationMatchesItselfOnly) {
       "endclass\n"
       "module t;\n"
       "  int b, i;\n"
+      "  registry #(byte) rb;\n"
+      "  registry #(int) ri;\n"
       "  initial begin\n"
-      "    registry #(byte) rb = new;\n"
-      "    registry #(int) ri = new;\n"
+      "    rb = new;\n"
+      "    ri = new;\n"
       "    b = rb.check();\n"
       "    i = ri.check();\n"
       "  end\n"
@@ -140,11 +143,12 @@ TEST(TypeOfThisClassSim, PropertyAndFormalHoldHandlesOfTheClass) {
       "endclass\n"
       "module t;\n"
       "  int a, b, c, d, e, same;\n"
+      "  node x, y, z, g;\n"
       "  initial begin\n"
-      "    node x = new(1);\n"
-      "    node y = new(2);\n"
-      "    node z = new(3);\n"
-      "    node g = new(7);\n"
+      "    x = new(1);\n"
+      "    y = new(2);\n"
+      "    z = new(3);\n"
+      "    g = new(7);\n"
       "    d = y.link(z);\n"
       "    e = x.link(y);\n"
       "    a = x.next.val;\n"
@@ -164,11 +168,11 @@ TEST(TypeOfThisClassSim, PropertyAndFormalHoldHandlesOfTheClass) {
 
 // §6.23 with §8.25: in a specialization, a property declared type(this) is a
 // handle of that specialization, so the `new` grow() assigns to it makes a
-// cell #(12), whose twelve-bit v keeps 12'h7FF where the default
+// ring #(12), whose twelve-bit v keeps 12'h7FF where the default
 // specialization's four bits kept 4'hF.
 TEST(TypeOfThisClassSim, SpecializationPropertyHoldsItsOwnSpecialization) {
   const std::string kSrc =
-      "class cell #(int W = 4);\n"
+      "class ring #(int W = 4);\n"
       "  bit [W-1:0] v;\n"
       "  var type(this) next;\n"
       "  function new(bit [W-1:0] x);\n"
@@ -180,7 +184,7 @@ TEST(TypeOfThisClassSim, SpecializationPropertyHoldsItsOwnSpecialization) {
       "endclass\n"
       "module t;\n"
       "  int a;\n"
-      "  cell #(12) c, h;\n"
+      "  ring #(12) c, h;\n"
       "  initial begin\n"
       "    c = new(12'h7FE);\n"
       "    c.grow();\n"

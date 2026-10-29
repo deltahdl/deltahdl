@@ -45,10 +45,17 @@ std::optional<DataType> NetOrVariableType(const RtlirModule& mod,
   auto var = std::ranges::find_if(mod.variables, [&](const RtlirVariable& v) {
     return v.name == declared && !v.is_enum_constant;
   });
-  if (var == mod.variables.end() || var->written_type == nullptr ||
-      HasUnpackedShape(*var))
-    return std::nullopt;
-  return OfLogicWhereImplicit(*var->written_type);
+  if (var != mod.variables.end()) {
+    if (var->written_type == nullptr || HasUnpackedShape(*var))
+      return std::nullopt;
+    return OfLogicWhereImplicit(*var->written_type);
+  }
+  // A port the module records no net or variable for is kept as a port alone,
+  // and is of the type its declaration writes. An interface port is of no data
+  // type.
+  auto port = std::ranges::find(mod.ports, declared, &RtlirPort::name);
+  if (port == mod.ports.end() || port->is_interface_port) return std::nullopt;
+  return PortNetType(declared, mod.decl);
 }
 
 }  // namespace delta

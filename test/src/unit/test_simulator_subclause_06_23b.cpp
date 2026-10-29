@@ -284,7 +284,9 @@ TEST(TypeOperandUnevaluatedSim, QueueMethodRemovesNoElement) {
 // §6.23 with §6.22.1: a comparison of a type reference to a function's call
 // with another type reference matches the type the function returns, a typedef
 // it is declared with read through, in a procedural statement, a continuous
-// assignment and a parameter's value, and never calls the function.
+// assignment, a parameter's value and a generate condition, and never calls
+// the function, which the constant contexts therefore do not hold to §13.4.3's
+// rules for a constant function: f reads count, a module variable.
 TEST(TypeOperandUnevaluatedSim, ComparisonTypesACallWithoutRunningIt) {
   const std::string kSrc =
       "module t;\n"
@@ -300,8 +302,13 @@ TEST(TypeOperandUnevaluatedSim, ComparisonTypesACallWithoutRunningIt) {
       "  endfunction\n"
       "  localparam bit P = type(f()) == type(int);\n"
       "  logic a;\n"
-      "  int r = 0, p = P;\n"
+      "  int r = 0, p = P, gsel;\n"
       "  assign a = type(f()) == type(int);\n"
+      "  if (type(f()) == type(int)) begin : g_int\n"
+      "    initial gsel = 1;\n"
+      "  end else begin : g_other\n"
+      "    initial gsel = 2;\n"
+      "  end\n"
       "  initial begin\n"
       "    if (type(f()) == type(int)) r = r | 1;\n"
       "    if (type(f()) != type(byte)) r = r | 2;\n"
@@ -315,6 +322,7 @@ TEST(TypeOperandUnevaluatedSim, ComparisonTypesACallWithoutRunningIt) {
   EXPECT_EQ(RunAndGet(kSrc, "r"), 0b0111011u);
   EXPECT_EQ(RunAndGet(kSrc, "a"), 1u);
   EXPECT_EQ(RunAndGet(kSrc, "p"), 1u);
+  EXPECT_EQ(RunAndGet(kSrc, "gsel"), 1u);
   EXPECT_EQ(RunAndGet(kSrc, "count"), 0u);
 }
 

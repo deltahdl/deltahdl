@@ -561,9 +561,15 @@ static void ValidateConstFuncCallNode(const Expr* expr, SourceLoc loc,
   CheckConstFuncCallArgs(expr, loc, ctx);
 }
 
+// §6.23 (printed page 138): the expression a type reference names is not
+// evaluated, and A.2.2.1's type_reference takes an expression rather than a
+// constant_expression, so a function called in it is not called in the
+// constant context: it makes no constant function call (§13.4.3, printed page
+// 345, one evaluated at elaboration time) and is held to none of that clause's
+// rules.
 static void ValidateConstantFuncCallsInExpr(const Expr* expr, SourceLoc loc,
                                             const ConstFuncCallCtx& ctx) {
-  if (!expr) return;
+  if (!expr || expr->kind == ExprKind::kTypeRef) return;
   if (expr->kind == ExprKind::kCall && !expr->callee.empty()) {
     ValidateConstFuncCallNode(expr, loc, ctx);
   }

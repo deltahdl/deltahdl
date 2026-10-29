@@ -236,6 +236,9 @@ TEST(TypeOperatorSim, TypeOpParameterTypeDefault) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
+// §6.23 with §6.19.3: type(c) is c's enumeration, so the variable it declares
+// takes the enumeration's own constant BLUE, whose value is 2, as c would; an
+// integer assigned to it without a cast is refused.
 TEST(TypeOperatorSim, TypeOpEnumType) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -245,7 +248,7 @@ TEST(TypeOperatorSim, TypeOpEnumType) {
       "  var type(c) result;\n"
       "  initial begin\n"
       "    c = GREEN;\n"
-      "    result = 2;\n"
+      "    result = BLUE;\n"
       "  end\n"
       "endmodule\n",
       f, "result");
@@ -253,6 +256,24 @@ TEST(TypeOperatorSim, TypeOpEnumType) {
 
   EXPECT_EQ(var->value.width, 32u);
   EXPECT_EQ(var->value.ToUint64(), 2u);
+}
+
+// §6.23 with §6.19.3: a variable a type reference to an enumeration variable
+// declares is of the enumeration, so the integer 2 assigned to it needs a cast.
+TEST(TypeOperatorSim, AVariableOfAnEnumerationVariablesTypeIsStrict) {
+  SimFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  typedef enum {RED, GREEN, BLUE} color_t;\n"
+      "  color_t c;\n"
+      "  var type(c) result;\n"
+      "  initial result = 2;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "integer assigned to enum variable without cast", 5,
+                            "6.19.3"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
 TEST(TypeOperatorSim, TypeOpIntOverflow) {
