@@ -1,0 +1,3 @@
+test/src/e2e/compile_time_elaboration_error_not_simulated.sv:7:11: error: undeclared identifier 'undeclared_x' (§23.9)
+    initial undeclared_x = 1;
+            ^
