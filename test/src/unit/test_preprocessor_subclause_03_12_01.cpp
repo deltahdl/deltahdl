@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "common/arena.h"
@@ -617,11 +618,12 @@ TEST(CompilationUnitPreprocessing, HeaderIncludedTwiceByOneUnitRedeclares) {
                                 "module top; endmodule\n"},
                                f);
   ASSERT_EQ(texts.size(), 1u);
-  const std::string& text = texts[0];
+  std::string_view text = texts[0];
   auto second = text.rfind("int g;");
-  ASSERT_NE(second, std::string::npos);
-  auto line = static_cast<uint32_t>(
-      1 + std::count(text.begin(), text.begin() + second, '\n'));
+  ASSERT_NE(second, std::string_view::npos);
+  std::string_view before = text.substr(0, second);
+  auto line =
+      static_cast<uint32_t>(1 + std::count(before.begin(), before.end(), '\n'));
   ElaborateTexts(texts, f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "redeclaration of 'g' in compilation-unit scope",
