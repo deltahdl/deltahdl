@@ -4,26 +4,18 @@
 #include <cstddef>
 #include <cstdint>
 #include <format>
-#include <optional>
-#include <string>
 #include <string_view>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
-#include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/types.h"
 #include "elaborator/const_eval.h"
-#include "elaborator/const_eval_internal.h"
 #include "elaborator/elaborator.h"
-#include "elaborator/elaborator_class_typedef_specialization.h"
-#include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/elaborator_validate_internal.h"
-#include "elaborator/net_or_variable_type.h"
 #include "elaborator/rtlir.h"
-#include "elaborator/rtlir_scopes.h"
 #include "elaborator/type_eval.h"
 #include "lexer/token.h"
 #include "parser/ast_design.h"
@@ -224,144 +216,6 @@ void ElaboratorOperationRules::CheckTypeRefCompareOp(const Expr* expr) {
               "type reference may be compared only with another type "
               "reference",
               Subclause("6.23"));
-}
-
-// §6.23 — a type_reference used in a comparison denotes a data type. Its inner
-// operand parses either as a data type (a built-in keyword, kept in `text`) or,
-// for a user name, as an identifier expression (kept in `lhs`). Map that to the
-// concrete DataType, following the typedef/type-parameter tables so that a type
-// parameter such as `parameter type T = int` compares as its bound type. A name
-// that never resolves to a built-in or a table entry (for instance a plain
-// variable used as `type(v)`) is left unresolved so the caller does not fold
-// it.
-// §6.23 with §26.3, §8.23 and §6.25: the type a scope-qualified name in a type
-// reference stands for. A typedef of a parameterized class is specialized,
-// with arguments folded outside any module's scope; a package's or class's
-// typedef is read under its "scope::name" key, or from a class the key misses,
-// one declared inside a module. Nothing where the name resolves to none, or to
-// a type carrying unpacked dimensions, which a data type alone does not hold.
-static std::optional<DataType> ScopedTypeRefType(const DataType& dt,
-                                                 const TypedefMap& typedefs,
-                                                 const CompilationUnit* unit,
-                                                 Arena& arena) {
-  if (auto spec = SpecializeClassScopedType(dt, unit, {}, typedefs, arena)) {
-    if (!spec->unpacked_dims.empty()) return std::nullopt;
-    return spec->type;
-  }
-  auto it = typedefs.find(std::string(dt.scope_name) +
-                          "::" + std::string(dt.type_name));
-  if (it != typedefs.end()) return it->second;
-  const DataType* in_class =
-      FindClassScopedTypedefType(dt.scope_name, dt.type_name, unit);
-  if (in_class != nullptr) return *in_class;
-  return std::nullopt;
-}
-
-// Whether `e` is a scope resolution of one identifier by another, `p::t_s`.
-static bool IsScopedTypeName(const Expr* e) {
-  return e != nullptr && e->kind == ExprKind::kMemberAccess &&
-         e->is_scope_resolution && e->lhs != nullptr &&
-         e->lhs->kind == ExprKind::kIdentifier && e->rhs != nullptr &&
-         e->rhs->kind == ExprKind::kIdentifier;
-}
-
-// The data type a type reference names as written, before any name in it is
-// resolved: the one the parser read, or a name standing alone or behind a
-// package's scope. Nothing for a type reference to an expression.
-static std::optional<DataType> TypeRefWrittenType(const Expr* op) {
-  if (op->type_value != nullptr) {
-    // The data type the parser read, packed dimensions and signing included:
-    // `type(bit[12:0])` is a 13-bit vector, where its name alone is `bit`.
-    return *op->type_value;
-  }
-  if (!op->text.empty()) return TypeNameToDataType(op->text);
-  if (op->lhs && op->lhs->kind == ExprKind::kIdentifier)
-    return TypeNameToDataType(op->lhs->text);
-  if (!IsScopedTypeName(op->lhs)) return std::nullopt;
-  // `type(p::t_s)` with p a package reads as a scope resolution expression.
-  DataType dt;
-  dt.kind = DataTypeKind::kNamed;
-  dt.scope_name = op->lhs->lhs->text;
-  dt.type_name = op->lhs->rhs->text;
-  return dt;
-}
-
-// Whether the type a type reference writes is a name alone, which may name a
-// value rather than a type.
-static bool IsBareName(const DataType& dt) {
-  return dt.kind == DataTypeKind::kNamed && dt.scope_name.empty() &&
-         dt.packed_dim_left == nullptr && dt.extra_packed_dims.empty();
-}
-
-// The type `dt` stands for once each name it is written by is read through:
-// a built-in type keyword, a typedef, or a package's or class's typedef behind
-// its scope. Nothing where a name resolves to none of them.
-static std::optional<DataType> ThroughTypeNames(DataType dt,
-                                                const TypedefMap& typedefs,
-                                                const CompilationUnit* unit,
-                                                Arena& arena) {
-  for (int depth = 0; depth < 16 && dt.kind == DataTypeKind::kNamed; ++depth) {
-    if (!dt.scope_name.empty()) {
-      auto scoped = ScopedTypeRefType(dt, typedefs, unit, arena);
-      if (!scoped) break;
-      dt = *scoped;
-      continue;
-    }
-    DataType builtin = TypeNameToDataType(dt.type_name);
-    if (builtin.kind != DataTypeKind::kNamed) return builtin;
-    auto it = typedefs.find(dt.type_name);
-    if (it == typedefs.end()) break;
-    dt = it->second;
-  }
-  if (dt.kind == DataTypeKind::kNamed) return std::nullopt;
-  return dt;
-}
-
-std::optional<DataType> ElaboratorOperationRules::CalledFunctionType(
-    const Expr* e) const {
-  if (e == nullptr || e->kind != ExprKind::kCall ||
-      (e->lhs != nullptr && e->lhs->kind != ExprKind::kIdentifier))
-    return std::nullopt;
-  if (const ModuleItem* fn = RegisteredConstFunc(e)) return fn->return_type;
-  auto it = func_decls_.find(e->callee);
-  if (it == func_decls_.end()) return std::nullopt;
-  return it->second->return_type;
-}
-
-std::optional<DataType> ElaboratorOperationRules::ResolveTypeRefOperandType(
-    const Expr* op, const RtlirModule* mod) const {
-  if (!op || op->kind != ExprKind::kTypeRef) return std::nullopt;
-  std::optional<DataType> written = TypeRefWrittenType(op);
-  if (!written) written = CalledFunctionType(op->lhs);
-  if (!written) return std::nullopt;
-  DataType dt = *written;
-  // §6.23: a name the module declares a net or variable by is an expression,
-  // standing for the value's type, which a typedef or nettype names in turn.
-  if (mod != nullptr && IsBareName(dt)) {
-    std::string_view declared =
-        DeclaredScopedName(dt.type_name, gen_prefix_scopes_, declared_names_);
-    if (std::optional<DataType> value = NetOrVariableType(*mod, declared))
-      dt = *value;
-  }
-  return ThroughTypeNames(dt, typedefs_, unit_, arena_);
-}
-
-// §6.23 — a comparison of two type references is a constant expression whose
-// result is true exactly when the referenced types match per §6.22.1 (equality
-// forms yield that truth value; inequality forms its negation). Fold such a
-// comparison to 0/1 so it can drive an elaboration-time selection (e.g. a
-// generate-if). Returns nullopt when this is not a two-type-reference
-// comparison or either operand's type cannot be resolved.
-std::optional<int64_t> ElaboratorOperationRules::EvalConstTypeRefCompare(
-    const Expr* expr, const RtlirModule* mod) const {
-  if (!IsTypeRefComparison(expr)) return std::nullopt;
-  auto lhs_type = ResolveTypeRefOperandType(expr->lhs, mod);
-  auto rhs_type = ResolveTypeRefOperandType(expr->rhs, mod);
-  if (!lhs_type || !rhs_type) return std::nullopt;
-  bool matched = TypesMatch(*lhs_type, *rhs_type);
-  bool is_negated =
-      expr->op == TokenKind::kBangEq || expr->op == TokenKind::kBangEqEq;
-  return (matched != is_negated) ? 1 : 0;
 }
 
 static bool IsTypeRef(const Expr* e) {

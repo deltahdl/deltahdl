@@ -19,7 +19,15 @@ Expr* Parser::ParseTypeRefExpr() {
   ref->kind = ExprKind::kTypeRef;
   ref->range.start = loc;
 
+  auto saved = lexer_.SavePos();
   auto dtype = ParseDataType();
+  // §6.24.1: a type keyword, a signing or a type name with a cast's apostrophe
+  // after it opens a cast, `type(byte'(x))` or `type(signed'(v))`, which is
+  // the expression the reference names rather than a data type.
+  if (Check(TokenKind::kApostrophe) || Check(TokenKind::kApostropheLBrace)) {
+    lexer_.RestorePos(saved);
+    dtype = DataType{};
+  }
   if (dtype.kind != DataTypeKind::kImplicit) {
     ref->text = dtype.type_name;
     // §8.23 lists the type operator among the contexts in which a class scope

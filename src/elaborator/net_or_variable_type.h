@@ -3,6 +3,7 @@
 #include <optional>
 #include <string_view>
 
+#include "elaborator/expression_self_type.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast_type.h"
 
@@ -18,5 +19,14 @@ namespace delta {
 // dimension, which the written type does not carry.
 std::optional<DataType> NetOrVariableType(const RtlirModule& mod,
                                           std::string_view declared);
+
+// §7.4.2 with §6.23: the same value with the number of unpacked dimensions it
+// is declared with, which a select of it addresses first; a dynamic array, a
+// queue and an associative array count one where the declaration's count is
+// not recorded. Nothing where `mod` records no net, variable or port of the
+// name, and where the name is an enumeration's named constant or an interface
+// port.
+std::optional<DeclaredValue> NetOrVariableValue(const RtlirModule& mod,
+                                                std::string_view declared);
 
 }  // namespace delta

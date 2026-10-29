@@ -27,6 +27,19 @@ const DataType* MemberOwnType(const StructMember& m,
   return FollowTypedefs(*named, typedefs, names);
 }
 
+DataType MemberWrittenType(const StructMember& m) {
+  if (m.nested_type != nullptr) return *m.nested_type;
+  DataType type;
+  type.kind = m.type_kind;
+  type.is_signed = m.is_signed;
+  type.packed_dim_left = m.packed_dim_left;
+  type.packed_dim_right = m.packed_dim_right;
+  type.extra_packed_dims = m.extra_packed_dims;
+  type.type_name = m.type_name;
+  type.scope_name = m.scope_name;
+  return type;
+}
+
 // The kind of the type a member is written with, through a typedef name. A
 // name that resolves to nothing keeps the kind written, `kNamed`.
 static DataTypeKind MemberKind(const StructMember& m,

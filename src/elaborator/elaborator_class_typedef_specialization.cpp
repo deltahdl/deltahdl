@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "common/arena.h"
+#include "elaborator/aggregate_shape.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator_class_lookup.h"
 #include "elaborator/elaborator_helpers.h"
@@ -235,22 +236,6 @@ std::optional<SpecializedClassType> SpecializeType(
     const DataType& type, const std::vector<Expr*>& unpacked_dims,
     const SpecializationCtx& ctx, int hops);
 
-// A member's type, whole where the parser kept it, an inline aggregate or
-// enumeration, and otherwise rebuilt from the kind, signing, packed dimensions
-// and name the member records.
-DataType MemberType(const StructMember& m) {
-  if (m.nested_type != nullptr) return *m.nested_type;
-  DataType type;
-  type.kind = m.type_kind;
-  type.is_signed = m.is_signed;
-  type.packed_dim_left = m.packed_dim_left;
-  type.packed_dim_right = m.packed_dim_right;
-  type.extra_packed_dims = m.extra_packed_dims;
-  type.type_name = m.type_name;
-  type.scope_name = m.scope_name;
-  return type;
-}
-
 // Writes a specialized type back into its member, keeping the whole type for
 // an aggregate or enumeration as the parser does for an inline one.
 void SetMemberType(StructMember& m, const SpecializedClassType& spec,
@@ -276,7 +261,8 @@ void SetMemberType(StructMember& m, const SpecializedClassType& spec,
 // specialize.
 bool SpecializeMembers(DataType& type, const SpecializationCtx& ctx, int hops) {
   for (StructMember& m : type.struct_members) {
-    auto spec = SpecializeType(MemberType(m), m.unpacked_dims, ctx, hops);
+    auto spec =
+        SpecializeType(MemberWrittenType(m), m.unpacked_dims, ctx, hops);
     if (!spec) return false;
     SetMemberType(m, *spec, ctx.arena);
   }

@@ -46,6 +46,12 @@ void CheckAggregateShape(const DataType& dtype, SourceLoc loc,
 const DataType* MemberOwnType(const StructMember& m,
                               const TypedefMap& typedefs);
 
+// §7.2: the type the structure or union member `m` is written with: whole
+// where the parser kept it, an aggregate or enumeration written in place, and
+// otherwise rebuilt from the kind, signing, packed dimensions and name the
+// member records, a typedef name left as written.
+DataType MemberWrittenType(const StructMember& m);
+
 // Whether `type` is an unpacked structure or union: one written without
 // `packed`, and for a union without `soft` either. False for null.
 bool IsUnpackedAggregate(const DataType* type);

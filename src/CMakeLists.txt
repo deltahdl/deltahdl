@@ -266,6 +266,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_validate_class_bodies.cpp
     elaborator/elaborator_validate_class_consts.cpp
     elaborator/elaborator_validate_operations.cpp
+    elaborator/elaborator_type_ref_operand.cpp
     elaborator/elaborator_validate_cast_ops.cpp
     elaborator/elaborator_validate_const_assign.cpp
     elaborator/elaborator_validate_timescale.cpp
@@ -670,6 +671,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/queue_dim.cpp
     elaborator/net_data_type.cpp
     elaborator/net_or_variable_type.cpp
+    elaborator/expression_self_type.cpp
     elaborator/simple_bit_vector.cpp
     elaborator/dollar_contexts.cpp
     elaborator/unpacked_dim_reads.cpp

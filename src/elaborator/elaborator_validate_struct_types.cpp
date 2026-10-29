@@ -189,6 +189,28 @@ static void AdoptLogicVector(DataType& dt, ValueShape shape, Arena& arena) {
   dt.type_ref_expr = nullptr;
 }
 
+// §6.23: takes onto `dt`, in place of its type reference, the self-determined
+// type `type` of the expression the reference names: a structure, union or
+// enumeration whole, keeping the declaration's own `const`, and any other type
+// as AdoptReferencedType takes it. A logic bit where the expression is of no
+// type a data type alone carries.
+static void AdoptExpressionType(DataType& dt,
+                                const std::optional<DataType>& type,
+                                Arena& arena) {
+  if (!type) {
+    AdoptLogicVector(dt, {}, arena);
+    return;
+  }
+  if (type->struct_members.empty() && type->enum_members.empty()) {
+    AdoptReferencedType(dt, *type);
+    return;
+  }
+  bool is_const = dt.is_const;
+  dt = *type;
+  dt.is_const = is_const;
+  dt.type_ref_expr = nullptr;
+}
+
 // The item of `items` written `name`, or null where none is.
 static const ModuleItem* ItemNamed(std::span<ModuleItem* const> items,
                                    std::string_view name) {
@@ -515,10 +537,7 @@ std::string_view Elaborator::ResolveTypeRef(DataType& dt, SourceLoc loc,
     return {};
   }
   if (ref->kind != ExprKind::kIdentifier) {
-    AdoptLogicVector(dt,
-                     {InferTypeRefExprWidth(ref, ShapesIn(mod)),
-                      InferTypeRefExprSigned(ref, ShapesIn(mod))},
-                     arena_);
+    AdoptExpressionType(dt, TypeRefExprType(ref, mod), arena_);
     return {};
   }
   // A named constant of an enumeration stands for the enumeration's type. It

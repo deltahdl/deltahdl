@@ -126,11 +126,19 @@ class ElaboratorOperationRules : public ElaboratorData {
   // §6.23: resolve one type-reference operand of a comparison to the concrete
   // data type it denotes: a net or variable of `mod` its declared type
   // (NetOrVariableType), a call of a function its return type
-  // (CalledFunctionType), then the typedef and type-parameter tables. Returns
+  // (CalledFunctionType), any other expression its self-determined type
+  // (TypeRefExprType), then the typedef and type-parameter tables. Returns
   // nullopt when the operand is not a type reference or names a type this pass
   // cannot resolve, so the caller leaves it unfolded.
   std::optional<DataType> ResolveTypeRefOperandType(
       const Expr* op, const RtlirModule* mod = nullptr) const;
+  // §6.23: the self-determined type of the expression `expr` a type reference
+  // names (ExprSelfType), each name in it read as `mod` declares it where the
+  // reference stands: a net, variable or port, a value parameter, or an
+  // enumeration's named constant. Nothing where `mod` is null or the
+  // expression is of no type a data type alone carries.
+  std::optional<DataType> TypeRefExprType(const Expr* expr,
+                                          const RtlirModule* mod) const;
   // §6.23: fold a type-reference equality/inequality/case-equality comparison
   // to a constant 0/1 using §6.22.1 type matching, its operands resolved in
   // `mod`. Returns nullopt when `expr` is not such a comparison or an operand
