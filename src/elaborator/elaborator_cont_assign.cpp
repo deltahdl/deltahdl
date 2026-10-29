@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <format>
+#include <span>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
@@ -532,6 +533,13 @@ void Elaborator::ValidateGeneratedItem(const ModuleItem* item) {
   if (!IsProceduralItemKind(item->kind)) return;
   std::unordered_map<std::string_view, SourceLoc> targets;
   CollectProcTargets({}, {item->body}, targets);
+  // §6.5 counts a procedural assign as a procedural assignment too. One
+  // naming a net is §10.6.1's to report, so it joins the variables alone.
+  std::unordered_map<std::string_view, SourceLoc> assigned;
+  CollectProcContAssignTargets({}, {item->body}, assigned);
+  for (const auto& [name, loc] : assigned) {
+    if (!NamesNet(name, loc)) targets.emplace(name, loc);
+  }
   for (const auto& [name, loc] : targets) {
     if (NamesNet(name, loc)) {
       diag_.Error(loc,
@@ -554,17 +562,23 @@ void Elaborator::ValidateGeneratedItem(const ModuleItem* item) {
   }
 }
 
+// An n-output gate drives every terminal but its last (§28.4); every other
+// gate, and a UDP instance (§29.3), drives its first.
+std::span<Expr* const> PrimitiveOutputTerminals(const ModuleItem* item) {
+  const std::vector<Expr*>& terminals = item->gate_terminals;
+  if (terminals.empty()) return {};
+  bool n_output =
+      item->kind == ModuleItemKind::kGateInst &&
+      (item->gate_kind == GateKind::kBuf || item->gate_kind == GateKind::kNot);
+  return {terminals.data(), n_output ? terminals.size() - 1 : 1};
+}
+
 // §10.3.2 (printed page 249): a variable may be driven by one primitive
 // output as by one continuous assignment, and one so driven takes neither an
-// initializer nor a procedural assignment. An n-output gate drives every
-// terminal but its last (§28.4); every other primitive drives its first.
+// initializer nor a procedural assignment.
 void Elaborator::RecordGateOutputDrivers(const ModuleItem* item) {
-  size_t count = item->gate_terminals.size();
-  bool n_output =
-      item->gate_kind == GateKind::kBuf || item->gate_kind == GateKind::kNot;
-  size_t outputs = std::min<size_t>(count, n_output ? count - 1 : 1);
-  for (size_t i = 0; i < outputs; ++i) {
-    std::string_view name = ExprIdent(item->gate_terminals[i]);
+  for (const Expr* terminal : PrimitiveOutputTerminals(item)) {
+    std::string_view name = ExprIdent(terminal);
     if (name.empty() || NamesNet(name, item->loc)) continue;
     std::string_view declared =
         DeclaredScopedName(name, gen_prefix_scopes_, declared_names_);

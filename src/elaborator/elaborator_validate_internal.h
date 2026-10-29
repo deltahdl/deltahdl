@@ -618,6 +618,15 @@ void CheckPcontDynamicArrayTarget(
 void CollectProcTargets(const std::vector<FunctionArg>& formals,
                         const std::vector<Stmt*>& body,
                         std::unordered_map<std::string_view, SourceLoc>& out);
+// §6.5 (printed page 91): the variables a procedural assign statement in
+// `body` writes, which the rule counts as procedurally assigned beside those
+// CollectProcTargets records. Defined in elaborator_validate.cpp.
+void CollectProcContAssignTargets(
+    const std::vector<FunctionArg>& formals, const std::vector<Stmt*>& body,
+    std::unordered_map<std::string_view, SourceLoc>& out);
+// §6.5 and §10.3.2: the terminals a gate or UDP instance drives, each a
+// continuous writer of what it names. Defined in elaborator_cont_assign.cpp.
+std::span<Expr* const> PrimitiveOutputTerminals(const ModuleItem* item);
 // §10.6.1: reports each net of `net_names` a procedural assign or deassign in
 // `body` names as its target, passing by a name `body` itself declares.
 void ReportProcContAssignNets(

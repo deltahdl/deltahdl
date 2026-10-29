@@ -79,6 +79,9 @@ void Elaborator::ValidateSubroutineBodyTargets(const ModuleItem* item,
   const std::unordered_set<std::string_view> kNetNames = NetNamesAt(item->loc);
   ReportProcContAssignNets(item->func_args, item->func_body_stmts, kNetNames,
                            diag_);
+  // §6.5 counts a procedural assign as a procedural assignment as well; one
+  // naming a net was reported just above, under §10.6.1.
+  CollectProcContAssignTargets(item->func_args, item->func_body_stmts, targets);
   for (const auto& [name, loc] : targets)
     if (!NamesNet(name, loc)) proc_assign_targets_.emplace(name, loc);
   const ForceLhsNames kForceNames{kNetNames, nettype_net_names_, mod, typedefs_,
@@ -95,6 +98,14 @@ void Elaborator::ValidateItemConstraints(const ModuleItem* item,
   bool is_proc = IsProceduralItemKind(item->kind);
   if (is_proc && item->body) {
     CollectProcTargets({}, {item->body}, proc_assign_targets_);
+    // §6.5 counts a procedural assign as a procedural assignment as well. One
+    // naming a net is §10.6.1's to report, so the variables alone join.
+    std::unordered_map<std::string_view, SourceLoc> assigned;
+    CollectProcContAssignTargets({}, {item->body}, assigned);
+    std::erase_if(assigned, [this](const auto& target) {
+      return NamesNet(target.first, target.second);
+    });
+    proc_assign_targets_.merge(assigned);
     CollectForceReleaseTargets(item->body, force_release_targets_);
 
     CheckInterconnectProcContAssign(item->body, interconnect_names_, diag_);

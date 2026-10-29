@@ -295,4 +295,205 @@ TEST(NetsAndVariables, AnIterationsVariableTakesNoMixtureOfAssignments) {
                              "6.5"));
 }
 
+// §6.5's own example of a structure: a continuous assignment to abc.C,
+// primitive outputs on abc.A[0] to abc.A[3] and a procedural write to abc.B,
+// each covering terms of abc that no other writer covers.
+constexpr const char* kAbcExampleHead =
+    "module m(input logic clk, input logic sel);\n"
+    "  struct {\n"
+    "    bit [7:0] A;\n"
+    "    bit [7:0] B;\n"
+    "    byte C;\n"
+    "  } abc;\n"
+    "  assign abc.C = sel ? 8'hBE : 8'hEF;\n"
+    "  not (abc.A[0], abc.B[0]),\n"
+    "      (abc.A[1], abc.B[1]),\n"
+    "      (abc.A[2], abc.B[2]),\n"
+    "      (abc.A[3], abc.B[3]);\n"
+    "  always @(posedge clk) abc.B <= abc.B + 1;\n";
+
+TEST(NetsAndVariables, SectionsStructExampleIsAccepted) {
+  EXPECT_TRUE(ElabOk(std::string(kAbcExampleHead) + "endmodule\n"));
+}
+
+// Its two illegal additions. A second continuous assignment to abc.C is
+// reported. A procedural write to abc.A[7:3] is reported against the primitive
+// output on abc.A[3], which its part-select overlaps, and against none of the
+// outputs on abc.A[0] to abc.A[2], which it does not.
+TEST(NetsAndVariables, SectionsStructExampleAdditionsAreReported) {
+  ElabFixture second;
+  ElabOk(std::string(kAbcExampleHead) +
+             "  assign abc.C = sel ? 8'hDE : 8'hED;\n"
+             "endmodule\n",
+         second);
+  EXPECT_TRUE(ReportedError(
+      second.diag.Diagnostics(),
+      "multiple continuous assignments drive overlapping element 'abc.C'", 13,
+      "6.5"));
+  ElabFixture mixed;
+  ElabOk(std::string(kAbcExampleHead) +
+             "  always @(posedge clk) abc.A[7:3] <= !abc.B[7:3];\n"
+             "endmodule\n",
+         mixed);
+  EXPECT_TRUE(ReportedError(mixed.diag.Diagnostics(),
+                            "element 'abc.A[3]' has both a continuous "
+                            "assignment and a procedural assignment",
+                            8, "10.3.2"));
+  EXPECT_FALSE(ReportedError(mixed.diag.Diagnostics(),
+                             "element 'abc.A[2]' has both a continuous "
+                             "assignment and a procedural assignment",
+                             8, "10.3.2"));
+}
+
+constexpr const char* kInverterUdp =
+    "primitive inv(output o, input i);\n"
+    "  table\n"
+    "    0 : 1;\n"
+    "    1 : 0;\n"
+    "  endtable\n"
+    "endprimitive\n";
+
+// A UDP's output terminal writes a variable as a gate's does. The UDP is a
+// continuous writer whether it drives the whole variable or one bit of it, so
+// a procedural write to the same terms, or a second primitive output on them,
+// is reported. A procedural write to another bit is accepted.
+TEST(NetsAndVariables, UdpOutputIsAContinuousWriterOfAVariable) {
+  ElabFixture whole;
+  ElabOk(std::string(kInverterUdp) +
+             "module m;\n"
+             "  logic a, w;\n"
+             "  inv u(w, a);\n"
+             "  initial w = 1'b0;\n"
+             "endmodule\n",
+         whole);
+  EXPECT_TRUE(ReportedError(whole.diag.Diagnostics(),
+                            "variable 'w' has both continuous and procedural "
+                            "assignments",
+                            9, "6.5"));
+  ElabFixture twice;
+  ElabOk(std::string(kInverterUdp) +
+             "module m;\n"
+             "  logic a, w;\n"
+             "  inv u1(w, a);\n"
+             "  inv u2(w, a);\n"
+             "endmodule\n",
+         twice);
+  EXPECT_TRUE(ReportedError(twice.diag.Diagnostics(),
+                            "variable 'w' is driven by more than one "
+                            "continuous assignment or primitive output",
+                            10, "10.3.2"));
+  ElabFixture bit;
+  ElabOk(std::string(kInverterUdp) +
+             "module m;\n"
+             "  logic a;\n"
+             "  logic [1:0] v;\n"
+             "  inv u(v[0], a);\n"
+             "  initial v[0] = 1'b0;\n"
+             "endmodule\n",
+         bit);
+  EXPECT_TRUE(ReportedError(bit.diag.Diagnostics(),
+                            "element 'v[0]' has both a continuous assignment "
+                            "and a procedural assignment",
+                            10, "10.3.2"));
+  EXPECT_TRUE(ElabOk(std::string(kInverterUdp) + "module m;\n"
+                                                 "  logic a;\n"
+                                                 "  logic [1:0] v;\n"
+                                                 "  inv u(v[0], a);\n"
+                                                 "  initial v[1] = 1'b0;\n"
+                                                 "endmodule\n"));
+}
+
+// §6.5 counts a procedural assign statement (§10.6.1) as a procedural
+// assignment. Beside a continuous assignment to the same variable it is
+// reported, whether it stands in an initial procedure, in a generate block or
+// in a task, and whether the continuous assignment writes the whole variable
+// or a member of it. Standing alone it is accepted.
+TEST(NetsAndVariables, ProceduralAssignIsAProceduralWriter) {
+  ElabFixture module_level;
+  ElabOk(
+      "module m;\n"
+      "  logic a, b, v;\n"
+      "  initial assign v = a;\n"
+      "  assign v = b;\n"
+      "endmodule\n",
+      module_level);
+  EXPECT_TRUE(ReportedError(module_level.diag.Diagnostics(),
+                            "variable 'v' has both continuous and procedural "
+                            "assignments",
+                            4, "6.5"));
+  ElabFixture generated;
+  ElabOk(
+      "module m;\n"
+      "  logic a, b, v;\n"
+      "  assign v = b;\n"
+      "  if (1) begin : g\n"
+      "    initial assign v = a;\n"
+      "  end\n"
+      "endmodule\n",
+      generated);
+  EXPECT_TRUE(ReportedError(generated.diag.Diagnostics(),
+                            "variable 'v' has both continuous and procedural "
+                            "assignments",
+                            5, "6.5"));
+  ElabFixture in_task;
+  ElabOk(
+      "module m;\n"
+      "  logic a, b, v;\n"
+      "  task t;\n"
+      "    assign v = a;\n"
+      "  endtask\n"
+      "  assign v = b;\n"
+      "endmodule\n",
+      in_task);
+  EXPECT_TRUE(ReportedError(in_task.diag.Diagnostics(),
+                            "variable 'v' has both continuous and procedural "
+                            "assignments",
+                            6, "6.5"));
+  ElabFixture member;
+  ElabOk(
+      "module m;\n"
+      "  struct packed { logic p; logic q; } s;\n"
+      "  assign s.p = 1'b0;\n"
+      "  initial assign s = 2'b00;\n"
+      "endmodule\n",
+      member);
+  EXPECT_TRUE(ReportedError(member.diag.Diagnostics(),
+                            "element 's.p' has both a continuous assignment "
+                            "and a procedural assignment",
+                            3, "10.3.2"));
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  logic a, v;\n"
+             "  initial assign v = a;\n"
+             "endmodule\n"));
+}
+
+// §6.5 makes a force statement neither a continuous nor a procedural
+// assignment, so it adds no writer: beside one continuous assignment, beside
+// one to a bit of the variable, and beside procedural writes, it is accepted.
+TEST(NetsAndVariables, ForceIsNoWriterUnderTheRule) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  logic a, b, v;\n"
+             "  assign v = b;\n"
+             "  initial force v = a;\n"
+             "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  logic b;\n"
+             "  logic [1:0] v;\n"
+             "  assign v[0] = b;\n"
+             "  initial force v = 2'b00;\n"
+             "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  logic a, v;\n"
+             "  initial begin\n"
+             "    v = 1'b0;\n"
+             "    assign v = a;\n"
+             "    force v = a;\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
 }  // namespace

@@ -129,6 +129,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     parser/precompiled_library.cpp
     parser/single_pass_compile.cpp
     parser/assertion_control_task.cpp
+    elaborator/data_declared_before_use.cpp
     elaborator/elaborator.cpp
     elaborator/elaborator_class_params.cpp
     elaborator/elaborator_extern_modules.cpp

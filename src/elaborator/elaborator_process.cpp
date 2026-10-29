@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <format>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <unordered_set>
@@ -221,8 +222,12 @@ static void CollectLhsPrefixesInScope(const Stmt* stmt,
                                       const ScopeMap& scope,
                                       std::vector<std::string_view>& locals) {
   if (!stmt) return;
+  // §6.5 (printed page 91) counts a procedural assign statement as a
+  // procedural assignment beside the blocking and nonblocking ones; a force
+  // statement it counts as neither.
   if (stmt->kind == StmtKind::kBlockingAssign ||
-      stmt->kind == StmtKind::kNonblockingAssign) {
+      stmt->kind == StmtKind::kNonblockingAssign ||
+      stmt->kind == StmtKind::kAssign) {
     if (stmt->lhs) {
       // §11.5.3: an indexing select stays inside the longest static prefix only
       // when its index is a constant expression. The module parameter scope is
@@ -430,6 +435,19 @@ static ProcInfo MakeProcInfo(const ModuleItem* item, const FuncMap* func_map,
   return info;
 }
 
+// §6.5 (printed page 90): the targets an item writes as a continuous
+// assignment does -- a continuous assignment's left-hand side, or each output
+// terminal of a gate or UDP instance -- with nothing for any other item.
+static std::vector<const Expr*> ContinuousTargets(const ModuleItem* item) {
+  if (item->kind == ModuleItemKind::kContAssign && item->assign_lhs)
+    return {item->assign_lhs};
+  if (item->kind != ModuleItemKind::kGateInst &&
+      item->kind != ModuleItemKind::kUdpInst)
+    return {};
+  std::span<Expr* const> outputs = PrimitiveOutputTerminals(item);
+  return {outputs.begin(), outputs.end()};
+}
+
 static void CollectProcessLhsInfo(const ModuleDecl* decl,
                                   const ProcessDriverSets& drivers,
                                   const FuncMap* func_map,
@@ -440,8 +458,8 @@ static void CollectProcessLhsInfo(const ModuleDecl* decl,
         item->kind == ModuleItemKind::kAlwaysFFBlock) {
       drivers.procs.push_back(MakeProcInfo(item, func_map, scope));
     }
-    if (item->kind == ModuleItemKind::kContAssign && item->assign_lhs) {
-      std::string prefix = LongestStaticPrefix(item->assign_lhs, scope);
+    for (const Expr* target : ContinuousTargets(item)) {
+      std::string prefix = LongestStaticPrefix(target, scope);
       if (!prefix.empty()) drivers.cont_assign_lhs.insert(std::move(prefix));
     }
     // §9.2.2.2: no other process may assign the variables an always_comb
@@ -593,8 +611,8 @@ static void CollectAggregateDriverTargets(
     const std::unordered_set<std::string>& nets, std::vector<ContTarget>& conts,
     std::unordered_set<std::string>& proc_prefixes) {
   for (const auto* item : decl->items) {
-    if (item->kind == ModuleItemKind::kContAssign && item->assign_lhs) {
-      std::string prefix = LongestStaticPrefix(item->assign_lhs, scope);
+    for (const Expr* target : ContinuousTargets(item)) {
+      std::string prefix = LongestStaticPrefix(target, scope);
       if (prefix.empty() ||
           nets.contains(prefix.substr(0, prefix.find_first_of(".[")))) {
         continue;

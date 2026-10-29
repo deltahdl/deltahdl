@@ -410,6 +410,14 @@ void CollectProcTargets(const std::vector<FunctionArg>& formals,
       [&out](std::string_view name, SourceLoc loc) { out.emplace(name, loc); });
 }
 
+void CollectProcContAssignTargets(
+    const std::vector<FunctionArg>& formals, const std::vector<Stmt*>& body,
+    std::unordered_map<std::string_view, SourceLoc>& out) {
+  ForEachBodyTarget(
+      formals, body, {StmtKind::kAssign},
+      [&out](std::string_view name, SourceLoc loc) { out.emplace(name, loc); });
+}
+
 // §10.6.1 (printed page 257) bounds an `assign` statement's target to a
 // variable or a concatenation of variables, and A.6.2 (printed page 1198)
 // writes a `deassign`'s target as a variable_lvalue; only force and release

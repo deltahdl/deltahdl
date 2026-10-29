@@ -15,6 +15,7 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
+#include "elaborator/data_declared_before_use.h"
 #include "elaborator/elaborator_child_type_params.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_node_attributes.h"
@@ -81,10 +82,9 @@ void CollectItemInstantiations(const ModuleItem* item,
 
 // §23.3.1: the top-level modules of a compilation unit are the modules present
 // in the source but not instantiated by any other module, and §24.3 has a
-// top-level program that is not explicitly instantiated implicitly
-// instantiated once, under its declaration name. Returns the modules in source
-// order and the programs after them; used when no explicit top module is
-// named.
+// top-level program that is not explicitly instantiated implicitly instantiated
+// once, under its declaration name. Returns the modules in source order and the
+// programs after them; used when no explicit top module is named.
 //
 // An interface or checker nothing instantiates is elaborated by no run and so
 // validated by none: §23.3.1 and §24.3 say that of modules and programs alone,
@@ -414,7 +414,6 @@ void Elaborator::RunPreElaborationValidations() {
   ValidateConfigHierarchicalRules();
 
   ValidateConfigLocalparams();
-
   ValidateConfigParamOverrides();
 
   UnitScopeTables::ForEachUnit(
@@ -423,6 +422,7 @@ void Elaborator::RunPreElaborationValidations() {
   ValidateAnonymousProgramHierRefs();
 
   ValidatePackageItems();
+  ReportDataUsedAboveItsDeclaration(*unit_, diag_);
   ReportReferencesBeforePackages(unit_, diag_);
   ValidatePackageReferences();
 

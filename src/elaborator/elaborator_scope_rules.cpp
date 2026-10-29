@@ -17,6 +17,7 @@
 #include "elaborator/class_method_reads.h"
 #include "elaborator/covergroup_rules.h"
 #include "elaborator/covergroup_variables.h"
+#include "elaborator/data_declared_before_use.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_call_targets.h"
 #include "elaborator/elaborator_enclosing_subroutines.h"
@@ -156,12 +157,11 @@ void CollectScopeWalk(const Stmt* s, ScopeWalk& out) {
   // while the loop's own sub-statements are walked and are dropped afterwards
   // so they do not leak outward. The push brackets the whole descent rather
   // than Stmt::for_inits, Stmt::for_steps and Stmt::for_body alone, because
-  // PushTypedForInitVars pushes nothing unless Stmt::for_inits holds
-  // something, which A.6.8 admits on a for-loop statement alone, and a
-  // for-loop statement holds its sub-statements in those three members and no
-  // other. §12.7.3's foreach loop variables are bracketed the same way:
-  // Stmt::foreach_vars is filled on a foreach statement alone, whose one
-  // sub-statement is its body.
+  // PushTypedForInitVars pushes nothing unless Stmt::for_inits holds something,
+  // which A.6.8 admits on a for-loop statement alone, and a for-loop statement
+  // holds its sub-statements in those three members and no other. §12.7.3's
+  // foreach loop variables are bracketed the same way: Stmt::foreach_vars is
+  // filled on a foreach statement alone, whose one sub-statement is its body.
   //
   // §12.6 declares each pattern identifier a variable, in scope in the true
   // arm of the if whose predicate binds it and the statement of the case item
@@ -585,11 +585,10 @@ void ReportUnprovidedPackageMember(const Expr* ref, Provided provided,
 
 // §26.3: a scope-resolution prefix `base::` shall name a package (or a class /
 // type, for static-member and type-scope access). `known` accepts those base
-// names; "std" is the always-available built-in package, its members Annex
-// G's. Any other base is an
-// unresolved package or scope. A base that is known is then asked for the
-// member, which `provided` answers for a package of the unit and accepts for
-// every other base.
+// names; "std" is the always-available built-in package, its members Annex G's.
+// Any other base is an unresolved package or scope. A base that is known is
+// then asked for the member, which `provided` answers for a package of the unit
+// and accepts for every other base.
 template <typename Pred, typename Provided>
 void ReportUnknownScopeBases(const ModuleDecl* decl, Pred known,
                              Provided provided, DiagEngine& diag) {
@@ -747,6 +746,15 @@ void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
                                   n);
   };
   ReportUnitScopedReferences(decl->items, unit_, diag_);
+  ReportDataUsedAboveItsDeclaration(
+      decl->items, *unit_,
+      [&](std::string_view n, SourceLoc at) {
+        return NamedOutsideTheElement(decl, unit_, n, at) ||
+               explicit_imported.count(n) != 0 || IsNameInEnclosingScope(n) ||
+               AnyPackageProvidesName(unit_, pkg_provided_names_,
+                                      wildcard_packages, n);
+      },
+      diag_);
 
   // §19.6 makes a cross item a coverpoint of its covergroup or a variable, and
   // the variables it may name are the ones a bare read may: the module's
