@@ -276,4 +276,14 @@ TEST(StructLiteralElaboration, FlatLiteralForTypedefArrayOfStructsRejected) {
                             4, "5.10"));
 }
 
+// A replication inside a structure literal fills its member: two copies of two
+// values fill a four-element array member, and the literal elaborates without
+// a report.
+TEST(StructLiteralElaboration, ReplicationFillingAnArrayMemberAccepted) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  struct { int a; int b[4]; } s = '{1, '{2{2, 3}}};\n"
+             "endmodule\n"));
+}
+
 }  // namespace

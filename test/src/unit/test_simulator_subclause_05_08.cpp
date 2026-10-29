@@ -221,4 +221,100 @@ TEST(TimeLiteralSimulation, NestedHeaderParameterTakesItsOwnElementUnit) {
       "0.500\n");
 }
 
+// §5.8 with §3.14.2.3: an interface that declares its own unit scales its
+// literals to it, not to the unit of the module that instantiates it.
+TEST(TimeLiteralSimulation, ScaledToTheInterfaceUnit) {
+  SimFixture f;
+  EXPECT_EQ(PreprocessAndCapture("interface i;\n"
+                                 "  timeunit 1us;\n"
+                                 "  initial $display(\"%0.3f\", 250ns);\n"
+                                 "endinterface\n"
+                                 "module t;\n"
+                                 "  timeunit 1ns;\n"
+                                 "  i u();\n"
+                                 "endmodule\n",
+                                 f),
+            "0.250\n");
+}
+
+// The same for a program.
+TEST(TimeLiteralSimulation, ScaledToTheProgramUnit) {
+  SimFixture f;
+  EXPECT_EQ(PreprocessAndCapture("program p;\n"
+                                 "  timeunit 1us;\n"
+                                 "  initial $display(\"%0.3f\", 250ns);\n"
+                                 "endprogram\n"
+                                 "module t;\n"
+                                 "  timeunit 1ns;\n"
+                                 "  p u();\n"
+                                 "endmodule\n",
+                                 f),
+            "0.250\n");
+}
+
+// A nested module that declares its own unit takes it rather than the unit
+// of the module around it.
+TEST(TimeLiteralSimulation, ScaledToTheNestedModulesOwnUnit) {
+  SimFixture f;
+  EXPECT_EQ(PreprocessAndCapture("module top;\n"
+                                 "  timeunit 1ns;\n"
+                                 "  module inner;\n"
+                                 "    timeunit 1us;\n"
+                                 "    initial $display(\"%0.3f\", 250ns);\n"
+                                 "  endmodule\n"
+                                 "  inner i();\n"
+                                 "endmodule\n",
+                                 f),
+            "0.250\n");
+}
+
+// A class's method takes the unit of the scope the class is declared in, here
+// its package's, whatever the unit of the module that calls it.
+TEST(TimeLiteralSimulation, ClassMethodScaledToItsPackageUnit) {
+  SimFixture f;
+  EXPECT_EQ(PreprocessAndCapture("package p;\n"
+                                 "  timeunit 1us;\n"
+                                 "  class c;\n"
+                                 "    static function realtime f();\n"
+                                 "      return 250ns;\n"
+                                 "    endfunction\n"
+                                 "  endclass\n"
+                                 "endpackage\n"
+                                 "module t;\n"
+                                 "  timeunit 1ns;\n"
+                                 "  initial $display(\"%0.3f\", p::c::f());\n"
+                                 "endmodule\n",
+                                 f),
+            "0.250\n");
+}
+
+// A checker declares no unit of its own and takes that of the scope it is
+// declared in, not of the one it is instantiated in: the compilation unit's
+// 1 us for one declared there, and the module's 1 us for one declared inside
+// a module, though the compilation unit's is 1 ns.
+TEST(TimeLiteralSimulation, CheckerScaledToTheScopeItIsDeclaredIn) {
+  EXPECT_DOUBLE_EQ(RunAndGetReal("timeunit 1us;\n"
+                                 "checker chk;\n"
+                                 "  realtime r;\n"
+                                 "  assign r = 250ns;\n"
+                                 "endchecker\n"
+                                 "module t;\n"
+                                 "  timeunit 1ns;\n"
+                                 "  chk u();\n"
+                                 "endmodule\n",
+                                 "u.r"),
+                   0.25);
+  EXPECT_DOUBLE_EQ(RunAndGetReal("timeunit 1ns;\n"
+                                 "module t;\n"
+                                 "  timeunit 1us;\n"
+                                 "  checker chk;\n"
+                                 "    realtime r;\n"
+                                 "    assign r = 250ns;\n"
+                                 "  endchecker\n"
+                                 "  chk u();\n"
+                                 "endmodule\n",
+                                 "u.r"),
+                   0.25);
+}
+
 }  // namespace

@@ -395,4 +395,130 @@ TEST(LexicalConventionSim, CastStringToUnpackedByteArrayTypeLeftJustified) {
   EXPECT_EQ(f.ctx.FindVariable("c[2]")->value.ToUint64(), 0u);
 }
 
+// §5.9: a string literal assigned to an integral type is right-justified. A
+// range that does not end at zero holds the last character in its lowest
+// eight bits and the first in its highest, here exactly twelve characters.
+TEST(LexicalConventionSim, StringLiteralFillsARangeNotEndingAtZero) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  bit [8*12:1] stringvar = \"Hello world\\n\";\n"
+                       "  initial $display(\"%h %h\", stringvar[8:1],\n"
+                       "                   stringvar[96:89]);\n"
+                       "endmodule\n",
+                       f),
+            "0a 48\n");
+}
+
+// A multidimensional packed array with 8-bit elements holds one character in
+// each element, the first character in the leftmost element and the last in
+// the rightmost, in a declaration's initializer and in a procedural
+// assignment.
+TEST(LexicalConventionSim, StringLiteralFillsAPackedArrayOfBytes) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  bit [0:11] [7:0] stringvar = \"Hello world\\n\";\n"
+                       "  bit [0:11] [7:0] p;\n"
+                       "  initial begin\n"
+                       "    p = \"Hello world\\n\";\n"
+                       "    $display(\"%h %h %h %h %s\", stringvar[0],\n"
+                       "             stringvar[11], p[0], p[11], p[6]);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "48 0a 48 0a w\n");
+}
+
+// Fewer characters than elements leave the leftmost elements zero, the
+// literal being right-justified as for any packed target.
+TEST(LexicalConventionSim, ShortStringLiteralZeroFillsTheLeftElements) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  bit [0:11] [7:0] hi = \"Hi\";\n"
+                       "  initial $display(\"%h %h %h %h\", hi[0], hi[9],\n"
+                       "                   hi[10], hi[11]);\n"
+                       "endmodule\n",
+                       f),
+            "00 00 48 69\n");
+}
+
+// More characters than elements drop the leftmost characters.
+TEST(LexicalConventionSim, LongStringLiteralDropsTheLeftCharacters) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  bit [0:1] [7:0] two = \"abc\";\n"
+                       "  initial $display(\"%h %h\", two[0], two[1]);\n"
+                       "endmodule\n",
+                       f),
+            "62 63\n");
+}
+
+// A width that is no multiple of eight keeps the literal's low bits: twelve
+// of "AB"'s sixteen, which cuts the first character in half.
+TEST(LexicalConventionSim, StringLiteralInAWidthNotAMultipleOfEight) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  bit [11:0] x = \"AB\";\n"
+                       "  bit [19:0] y = \"AB\";\n"
+                       "  initial $display(\"%h %h\", x, y);\n"
+                       "endmodule\n",
+                       f),
+            "142 04142\n");
+}
+
+// §5.9's Example 6: a string variable takes a triple-quoted literal spanning
+// several lines, and every newline written inside the quotes is a character
+// of it, the one after the opening quotes and the one before the closing
+// quotes included. A single and a double quote inside are characters too.
+TEST(LexicalConventionSim, MultiLineTripleQuotedLiteralKeepsEveryNewline) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  string s;\n"
+                       "  initial begin\n"
+                       "    s = \"\"\"\n"
+                       "one 'a' \"b\"\n"
+                       "two\n"
+                       "\"\"\";\n"
+                       "    $display(\"%s|%0d\", s, s.len());\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "\none 'a' \"b\"\ntwo\n|17\n");
+}
+
+// The same literal in a string variable's declaration, beside one whose line
+// ends in a backslash: the backslash and the newline after it are dropped, as
+// in a quoted literal.
+TEST(LexicalConventionSim, TripleQuotedLiteralInAStringDeclaration) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  string s = \"\"\"a\n"
+                 "b\"\"\";\n"
+                 "  string j = \"\"\"x\\\n"
+                 "y\"\"\";\n"
+                 "  initial $display(\"%0d %0d %s\", s.len(), j.len(), j);\n"
+                 "endmodule\n",
+                 f),
+      "3 2 xy\n");
+}
+
+// §5.9 with §6.16: a quoted literal assigned to a string variable, or written
+// beside a string operand, is converted to a string, so a concatenation with
+// one is a string and a comparison with one compares the characters.
+TEST(LexicalConventionSim, StringLiteralBesideAStringOperandIsAString) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  string s, t;\n"
+                 "  initial begin\n"
+                 "    s = \"abc\";\n"
+                 "    t = {s, \"x\"};\n"
+                 "    $display(\"%s %0d %0d %0d %0d\", t, t.len(),\n"
+                 "             s == \"abc\", \"abd\" == s, s != \"abd\");\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "abcx 4 1 0 1\n");
+}
+
 }  // namespace

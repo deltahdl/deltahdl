@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
@@ -288,6 +290,54 @@ TEST(StructLiteralSim, ReplicatedPatternFillsEachMember) {
   ASSERT_NE(s, nullptr);
   EXPECT_EQ(s->value.ToUint64(), 0x010101u);
   EXPECT_EQ(f.ctx.FindVariable("p")->value.ToUint64(), 0x020202u);
+}
+
+// §5.10's own example: a replication sets the values of the exact number of
+// members, its inner braces removed, and for an array of structures the nested
+// braces follow the array's two dimensions and then the structure. Each of the
+// six structures gets `a` and the four elements `b, c, b, c`.
+TEST(StructLiteralSim, NestedReplicationFillsAnArrayOfStructures) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  typedef struct {int a, b[4];} ab_t;\n"
+      "  int a, b, c;\n"
+      "  ab_t v1[1:0] [2:0];\n"
+      "  initial begin\n"
+      "    a = 5; b = 6; c = 7;\n"
+      "    v1 = '{2{'{3{'{a,'{2{b,c}}}}}}};\n"
+      "    for (int i = 0; i < 2; i++)\n"
+      "      for (int j = 0; j < 3; j++)\n"
+      "        $write(\"%0d:%0d%0d%0d%0d \", v1[i][j].a, v1[i][j].b[0],\n"
+      "               v1[i][j].b[1], v1[i][j].b[2], v1[i][j].b[3]);\n"
+      "    $display(\"\");\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "5:6767 5:6767 5:6767 5:6767 5:6767 5:6767 \n");
+}
+
+// A replication filling an unpacked array member of one structure gives the
+// same structure as the member's elements written out, in a declaration's
+// initializer and in a procedural assignment.
+TEST(StructLiteralSim, ReplicationFillsAnArrayMember) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  typedef struct {int a, b[4];} ab_t;\n"
+      "  ab_t r = '{1, '{2{3, 4}}};\n"
+      "  ab_t p, w;\n"
+      "  initial begin\n"
+      "    p = '{1, '{2{3, 4}}};\n"
+      "    w = '{1, '{3, 4, 3, 4}};\n"
+      "    $display(\"%0d:%0d%0d%0d%0d %0d:%0d%0d%0d%0d %0d:%0d%0d%0d%0d\",\n"
+      "             r.a, r.b[0], r.b[1], r.b[2], r.b[3], p.a, p.b[0],\n"
+      "             p.b[1], p.b[2], p.b[3], w.a, w.b[0], w.b[1], w.b[2],\n"
+      "             w.b[3]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1:3434 1:3434 1:3434\n");
 }
 
 }  // namespace
