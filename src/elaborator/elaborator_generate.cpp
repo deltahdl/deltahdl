@@ -82,7 +82,8 @@ void Elaborator::ProcessPendingGenerate(const PendingGenerate& pg) {
   // for a module's own items, so the same is installed here over the scope put
   // back above. aggregate_typedef_names_ is never taken back between modules,
   // so it already holds this scope's unpacked aggregate names.
-  TypedefRegistryGuard typedef_guard(&typedefs_, &aggregate_typedef_names_);
+  TypedefRegistryGuard typedef_guard(&typedefs_, &aggregate_typedef_names_,
+                                     &type_ref_compare_);
   // §8.25.1: the same for a constant expression that reads a specialization's
   // parameter through the scope resolution operator, as in `localparam W =
   // C#(4)::p`. The registry is built from the compilation unit rather than

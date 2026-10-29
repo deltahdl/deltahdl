@@ -699,7 +699,8 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   // single width and are left to the run. The table is consulted at each fold
   // as the module is, so a typedef declared earlier in this item list is
   // visible to a call written later in it.
-  TypedefRegistryGuard typedef_guard(&typedefs_, &aggregate_typedef_names_);
+  TypedefRegistryGuard typedef_guard(&typedefs_, &aggregate_typedef_names_,
+                                     &type_ref_compare_);
   // §23.9: this runs while the module is being elaborated, so a UDP instance
   // written in a generate block reads that block's parameters as well as the
   // module's, and gen_prefix_scopes_ is already where the instance stands.

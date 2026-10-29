@@ -20,6 +20,9 @@
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "elaborator/net_or_variable_type.h"
+#include "elaborator/rtlir.h"
+#include "elaborator/rtlir_scopes.h"
 #include "elaborator/type_eval.h"
 #include "lexer/token.h"
 #include "parser/ast_design.h"
@@ -282,12 +285,39 @@ static std::optional<DataType> TypeRefWrittenType(const Expr* op) {
   return dt;
 }
 
+// Whether the type a type reference writes is a name alone, which may name a
+// value rather than a type.
+static bool IsBareName(const DataType& dt) {
+  return dt.kind == DataTypeKind::kNamed && dt.scope_name.empty() &&
+         dt.packed_dim_left == nullptr && dt.extra_packed_dims.empty() &&
+         dt.unpacked_dims.empty();
+}
+
+std::optional<DataType> ElaboratorOperationRules::CalledFunctionType(
+    const Expr* e) const {
+  if (e == nullptr || e->kind != ExprKind::kCall ||
+      (e->lhs != nullptr && e->lhs->kind != ExprKind::kIdentifier))
+    return std::nullopt;
+  auto it = func_decls_.find(e->callee);
+  if (it == func_decls_.end()) return std::nullopt;
+  return it->second->return_type;
+}
+
 std::optional<DataType> ElaboratorOperationRules::ResolveTypeRefOperandType(
-    const Expr* op) const {
+    const Expr* op, const RtlirModule* mod) const {
   if (!op || op->kind != ExprKind::kTypeRef) return std::nullopt;
   std::optional<DataType> written = TypeRefWrittenType(op);
+  if (!written) written = CalledFunctionType(op->lhs);
   if (!written) return std::nullopt;
   DataType dt = *written;
+  // §6.23: a name the module declares a net or variable by is an expression,
+  // standing for the value's type, which a typedef or nettype names in turn.
+  if (mod != nullptr && IsBareName(dt)) {
+    std::string_view declared =
+        DeclaredScopedName(dt.type_name, gen_prefix_scopes_, declared_names_);
+    if (std::optional<DataType> value = NetOrVariableType(*mod, declared))
+      dt = *value;
+  }
   for (int depth = 0; depth < 16 && dt.kind == DataTypeKind::kNamed; ++depth) {
     if (!dt.scope_name.empty()) {
       auto scoped = ScopedTypeRefType(dt, typedefs_, unit_, arena_);
@@ -315,16 +345,10 @@ std::optional<DataType> ElaboratorOperationRules::ResolveTypeRefOperandType(
 // generate-if). Returns nullopt when this is not a two-type-reference
 // comparison or either operand's type cannot be resolved.
 std::optional<int64_t> ElaboratorOperationRules::EvalConstTypeRefCompare(
-    const Expr* expr) const {
-  if (!expr || expr->kind != ExprKind::kBinary) return std::nullopt;
-  bool is_equality =
-      expr->op == TokenKind::kEqEq || expr->op == TokenKind::kBangEq ||
-      expr->op == TokenKind::kEqEqEq || expr->op == TokenKind::kBangEqEq;
-  if (!is_equality) return std::nullopt;
-  if (!expr->lhs || expr->lhs->kind != ExprKind::kTypeRef) return std::nullopt;
-  if (!expr->rhs || expr->rhs->kind != ExprKind::kTypeRef) return std::nullopt;
-  auto lhs_type = ResolveTypeRefOperandType(expr->lhs);
-  auto rhs_type = ResolveTypeRefOperandType(expr->rhs);
+    const Expr* expr, const RtlirModule* mod) const {
+  if (!IsTypeRefComparison(expr)) return std::nullopt;
+  auto lhs_type = ResolveTypeRefOperandType(expr->lhs, mod);
+  auto rhs_type = ResolveTypeRefOperandType(expr->rhs, mod);
   if (!lhs_type || !rhs_type) return std::nullopt;
   bool matched = TypesMatch(*lhs_type, *rhs_type);
   bool is_negated =

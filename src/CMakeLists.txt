@@ -338,6 +338,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/eval_class_new.cpp
     simulator/eval_class_params.cpp
     simulator/eval_function.cpp
+    simulator/eval_method_return.cpp
     simulator/eval_null_handle.cpp
     simulator/eval_function_ref_checks.cpp
     simulator/eval_function_hier.cpp
@@ -668,6 +669,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_validate_cast_operand.cpp
     elaborator/queue_dim.cpp
     elaborator/net_data_type.cpp
+    elaborator/net_or_variable_type.cpp
     elaborator/simple_bit_vector.cpp
     elaborator/dollar_contexts.cpp
     elaborator/unpacked_dim_reads.cpp

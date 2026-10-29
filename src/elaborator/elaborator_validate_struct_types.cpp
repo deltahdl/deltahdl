@@ -19,6 +19,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_class_lookup.h"
 #include "elaborator/elaborator_enum_constants.h"
+#include "elaborator/net_or_variable_type.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_enum_member.h"
 #include "elaborator/rtlir_scopes.h"
@@ -474,6 +475,10 @@ std::string_view Elaborator::ResolveTypeRef(DataType& dt, SourceLoc loc,
   const ModuleDecl* decl = module_decl_path_.back();
   const TypeRefScope kScope{mod, typedefs_, unit_, loc, arena_, decl};
   if (ResolveScopedTypeRef(dt, ref, kScope)) return {};
+  if (std::optional<DataType> returned = CalledFunctionType(ref)) {
+    AdoptReferencedType(dt, *returned);
+    return {};
+  }
   if (ref->kind != ExprKind::kIdentifier) {
     AdoptLogicVector(dt,
                      {InferTypeRefExprWidth(ref, ShapesIn(mod)),
@@ -490,6 +495,15 @@ std::string_view Elaborator::ResolveTypeRef(DataType& dt, SourceLoc loc,
   if (const RtlirEnumMember* constant =
           EnumConstantNamed(mod, ref->text, enumeration)) {
     return AdoptEnumerationType(dt, *constant, enumeration, kScope);
+  }
+  // §6.23 with §6.22.1 (f): a net or variable stands for the type it is
+  // declared with, range and all, which one rebuilt from its width as
+  // [width-1:0] is not where the declaration writes [0:3].
+  if (std::optional<DataType> declared = NetOrVariableType(
+          *mod,
+          DeclaredScopedName(ref->text, gen_prefix_scopes_, declared_names_))) {
+    AdoptReferencedType(dt, *declared);
+    return {};
   }
   for (const auto& v : mod->variables) {
     if (v.name != ref->text) continue;

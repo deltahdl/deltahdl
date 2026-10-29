@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -125,13 +126,24 @@ class ParamRangeRegistryGuard {
 // it that stand for an unpacked aggregate -- a queue, a dynamic, an
 // associative or a fixed-size unpacked array, whose dimensions the table does
 // not carry -- so that such a name is left to the run rather than sized as
-// one element. Both pointers are borrowed; the guard restores the previously
-// active pair on destruction.
+// one element.
+//
+// §6.23 (printed page 138) makes a comparison of two type references a
+// constant expression, true where the types match (§6.22.1), and those types
+// are the scope's as well: a typedef the table holds, or a net or variable of
+// the module being elaborated. The guard installs with the table what answers
+// such a comparison against them, `compare`, which is handed the comparison
+// and the module a live ParamRangeRegistryGuard installed, and answers its
+// value or nothing where it cannot tell an operand's type. The pointers are
+// borrowed; the guard restores the previously active three on destruction.
+using TypeRefComparer =
+    std::function<std::optional<int64_t>(const Expr*, const RtlirModule*)>;
 class TypedefRegistryGuard {
  public:
   TypedefRegistryGuard(
       const std::unordered_map<std::string_view, DataType>* typedefs,
-      const std::unordered_set<std::string_view>* aggregate_names);
+      const std::unordered_set<std::string_view>* aggregate_names,
+      const TypeRefComparer* compare = nullptr);
   ~TypedefRegistryGuard();
   TypedefRegistryGuard(const TypedefRegistryGuard&) = delete;
   TypedefRegistryGuard& operator=(const TypedefRegistryGuard&) = delete;
@@ -139,7 +151,12 @@ class TypedefRegistryGuard {
  private:
   const std::unordered_map<std::string_view, DataType>* prev_;
   const std::unordered_set<std::string_view>* prev_aggregate_names_;
+  const TypeRefComparer* prev_compare_;
 };
+
+// §6.23 (printed page 138): whether `expr` compares two type references by an
+// equality or a case equality operator, which is a constant expression.
+bool IsTypeRefComparison(const Expr* expr);
 
 // §23.9 lists generate blocks among the elements that open a new scope, so
 // which of the registered module's parameters an expression may name depends on

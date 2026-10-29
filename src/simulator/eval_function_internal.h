@@ -403,6 +403,14 @@ struct ClassMethodTarget {
 void ExecClassMethod(ClassMethodTarget target, const Expr* expr,
                      SimContext& ctx, Arena& arena, Logic4Vec& out);
 
+// §13.4.1: the implicit variable named for the class method `target.method`
+// that holds the value a call of it returns, created in the running frame
+// with the method's return type -- its width, folded against the constants
+// of `target.param_cls` or of the class declaring the method, its signedness,
+// whether it holds unknowns and whether it is real. Defined in
+// eval_method_return.cpp.
+Variable* CreateMethodReturnVariable(ClassMethodTarget target, SimContext& ctx);
+
 // 8.10/8.9: a static-method call has no `this`, so it runs in class scope
 // (target.param_cls is the scope class) and unqualified static-member access
 // targets the single shared slot. Defined in eval_static_method.cpp.

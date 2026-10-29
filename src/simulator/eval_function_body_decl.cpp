@@ -396,16 +396,11 @@ static void ExecFuncVarDeclStatic(const Stmt* stmt, std::string_view func_name,
 // is returned as it is.
 static const Stmt* DeclOfThisTypeRef(const Stmt* stmt, SimContext& ctx,
                                      Arena& arena) {
-  const Expr* ref = stmt->var_decl_type.type_ref_expr;
-  if (ref == nullptr || ref->kind != ExprKind::kIdentifier ||
-      ref->text != "this")
-    return stmt;
-  const ClassTypeInfo* cls = ctx.CurrentMethodClass();
-  if (cls == nullptr) return stmt;
+  const DataType& type =
+      TypeOfThisNamed(stmt->var_decl_type, ctx.CurrentMethodClass(), ctx);
+  if (&type == &stmt->var_decl_type) return stmt;
   auto* copy = arena.Create<Stmt>(*stmt);
-  copy->var_decl_type = DataType{};
-  copy->var_decl_type.kind = DataTypeKind::kNamed;
-  copy->var_decl_type.type_name = cls->name;
+  copy->var_decl_type = type;
   return copy;
 }
 

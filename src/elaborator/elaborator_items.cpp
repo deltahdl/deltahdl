@@ -406,9 +406,7 @@ using TypeRefCompareFolder = std::function<std::optional<int64_t>(const Expr*)>;
 // was 0.
 void FoldTypeRefComparesInExpr(Expr* e, const TypeRefCompareFolder& fold) {
   if (e == nullptr) return;
-  if (e->kind == ExprKind::kBinary && e->lhs != nullptr && e->rhs != nullptr &&
-      e->lhs->kind == ExprKind::kTypeRef &&
-      e->rhs->kind == ExprKind::kTypeRef) {
+  if (IsTypeRefComparison(e)) {
     if (std::optional<int64_t> matched = fold(e)) {
       e->kind = ExprKind::kIntegerLiteral;
       e->int_val = static_cast<uint64_t>(*matched);
@@ -433,6 +431,23 @@ void FoldTypeRefComparesInStmt(Stmt* s, const TypeRefCompareFolder& fold) {
   }
   ForEachChildStmt(
       s, [&](Stmt* const& sub) { FoldTypeRefComparesInStmt(sub, fold); });
+}
+
+// The comparisons of type references `item` writes where a value is read while
+// the design runs: its procedure's or subroutine's statements, a continuous
+// assignment's right-hand side and a net's or variable's initializer. A
+// parameter's value is folded by constant evaluation (TypedefRegistryGuard),
+// and a let's body stands for its formals' actuals, which are not yet known.
+void FoldItemTypeRefCompares(ModuleItem* item,
+                             const TypeRefCompareFolder& fold) {
+  FoldTypeRefComparesInStmt(item->body, fold);
+  for (auto* s : item->func_body_stmts) FoldTypeRefComparesInStmt(s, fold);
+  if (item->kind != ModuleItemKind::kContAssign &&
+      item->kind != ModuleItemKind::kNetDecl &&
+      item->kind != ModuleItemKind::kVarDecl)
+    return;
+  FoldTypeRefComparesInExpr(item->assign_rhs, fold);
+  FoldTypeRefComparesInExpr(item->init_expr, fold);
 }
 
 // §3.13 (e) (printed page 58): the module name space unifies, beside the nets,
@@ -539,15 +554,13 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
   // A.8.6: the item's ordinary expressions join no operands under a property
   // operator.
   ReportItemImplicationOperators(*item, diag_);
+  FoldItemTypeRefCompares(item, [this, mod](const Expr* e) {
+    return EvalConstTypeRefCompare(e, mod);
+  });
   if (ElaborateDeclItem(item, mod)) return;
   ResolveProceduralTypeRefs(
       item, [&](DataType& dt, SourceLoc loc) { ResolveTypeRef(dt, loc, mod); },
       arena_);
-  TypeRefCompareFolder fold = [this](const Expr* e) {
-    return EvalConstTypeRefCompare(e);
-  };
-  FoldTypeRefComparesInStmt(item->body, fold);
-  for (auto* s : item->func_body_stmts) FoldTypeRefComparesInStmt(s, fold);
   // §11.12's rules on a let's formals, for each let the item's procedure or
   // subroutine body declares.
   auto elaborate_let = [&](ModuleItem* let) { ElaborateLetFormals(let, mod); };

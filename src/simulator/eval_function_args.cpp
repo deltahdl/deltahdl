@@ -14,6 +14,7 @@
 #include "simulator/assoc_element.h"
 #include "simulator/assoc_index.h"
 #include "simulator/class_object.h"
+#include "simulator/declared_class_key.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_array_class_queue.h"
 #include "simulator/eval_call_result.h"
@@ -130,7 +131,11 @@ int ResolveArgIndex(const ModuleItem* func, const Expr* expr,
 // `remake(b, 62)` while `ref int cnt` beside it counted.
 static void RegisterValueArgClassType(const FunctionArg& param,
                                       SimContext& ctx) {
-  const auto& dt = param.data_type;
+  // §6.23 with §8.11: a formal declared type(this) is a handle of the class
+  // the running method belongs to, as one declared with its name is; without
+  // the class recorded, a method called through the formal ran nothing.
+  const DataType& dt =
+      TypeOfThisNamed(param.data_type, ctx.CurrentMethodClass(), ctx);
   if (!dt.type_name.empty() && ctx.FindClassType(dt.type_name))
     ctx.SetVariableClassType(param.name, dt.type_name);
 }

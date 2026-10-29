@@ -18,6 +18,7 @@
 #include "simulator/class_object.h"
 #include "simulator/class_specialization.h"
 #include "simulator/class_typedef_layout.h"
+#include "simulator/declared_class_key.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_class_array.h"
 #include "simulator/eval_class_params.h"
@@ -248,8 +249,7 @@ static void BindStaticInitValueParams(const ClassTypeInfo* info,
 // value parameters are bound, so `static const int W = size` holds 4 under
 // `V #(4)` and 8 under `V #(8)`. The generic class's copy is evaluated with
 // nothing bound -- the class declaration names no actuals -- so the name
-// `size` read nothing and the one shared copy held 0 for every
-// specialization.
+// `size` read nothing and the one shared copy held 0 for every specialization.
 //
 // §8.25 also makes the storage the specialization's own from the start: it is
 // copied from the generic class (SpecializationOf in class_specialization.cpp)
@@ -445,15 +445,15 @@ static bool LayoutHas4StateMember(const StructTypeInfo& layout) {
   return false;
 }
 
-// The record of the property `member` declares: its width, folded against
-// the class's parameters `params` or taken from the layout a structure's
-// typedef name stands for, with the 32-bit carrier for a type neither sizes,
-// and the facts of its declaration a write and a read consult.
+// The record of the property `member` declares, of the type `type` its class
+// reads: its width, folded against the class's parameters `params` or taken
+// from the layout a structure's typedef name stands for, with the 32-bit
+// carrier for a type neither sizes, and the facts a write and a read consult.
 static ClassTypeInfo::PropertyInfo PropertyRecord(const ClassMember* member,
+                                                  const DataType& type,
                                                   const ScopeMap& params,
                                                   std::string_view type_key,
                                                   SimContext& ctx) {
-  const DataType& type = member->data_type;
   uint32_t w = EvalTypeWidth(type, {}, params);
   const StructTypeInfo* layout =
       w == 0 ? StructPropertyLayout(type, type_key, ctx) : nullptr;
@@ -486,9 +486,11 @@ static void CollectClassMembers(ClassTypeInfo* info, const ClassDecl* cls,
   TypedefRegistryGuard type_param_guard(&type_params, nullptr);
   for (auto* member : cls->members) {
     if (member->kind == ClassMemberKind::kProperty) {
-      info->properties.push_back(PropertyRecord(
-          member, params,
-          PropertyTypeKey(member->data_type, *info, *cls, params, ctx), ctx));
+      // §6.23 with §8.11: type(this) declares a handle of the class itself.
+      const DataType& type = TypeOfThisNamed(member->data_type, info, ctx);
+      info->properties.push_back(
+          PropertyRecord(member, type, params,
+                         PropertyTypeKey(type, *info, *cls, params, ctx), ctx));
     } else if (member->kind == ClassMemberKind::kMethod && member->method) {
       std::string name(member->method->name);
       info->methods[name] = member->method;
@@ -604,8 +606,8 @@ static void MakeParamArraysStatic(ClassTypeInfo* info, const ClassDecl* cls,
     port->init_expr = pexpr;
     port->is_static = true;
     info->properties.push_back(PropertyRecord(
-        port, scope, PropertyTypeKey(port->data_type, *info, *cls, scope, ctx),
-        ctx));
+        port, port->data_type, scope,
+        PropertyTypeKey(port->data_type, *info, *cls, scope, ctx), ctx));
     ShapeArrayProperty(&info->properties.back(), dims->second, scope, ctx,
                        arena);
   }

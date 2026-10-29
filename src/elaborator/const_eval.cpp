@@ -715,6 +715,10 @@ static std::optional<ConstVal> FoldDecidedByFirstOperand(
 std::optional<ConstVal> ConstEvalBinaryFull(const Expr* expr,
                                             const ScopeMap& scope,
                                             FoldContext ctx) {
+  // §6.23 (printed page 138): a comparison of two type references stands for
+  // whether the types match, its operands being types rather than values.
+  if (auto matched = RegisteredTypeRefCompare(expr))
+    return ConstVal{*matched, 1, false};
   if (auto decided = FoldDecidedByFirstOperand(expr, scope)) return decided;
   // §11.8.2 (printed pages 302-303): each operand is folded in the context
   // the expression propagates to it -- FoldBinaryOperands says which take

@@ -14,7 +14,9 @@
 #include "lexer/token.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_type.h"
 #include "simulator/class_object.h"
+#include "simulator/class_specialization.h"
 #include "simulator/clocking.h"
 #include "simulator/eval_array_compare.h"
 #include "simulator/eval_function_args_scoped.h"
@@ -640,8 +642,19 @@ static TypeRefRuntimeId ResolveTypeRefRuntimeId(const Expr* op,
     // what `type(C)` does, while `type(this)` arrives through the expression
     // branch above. Both denote the same class, so both have to say so; asking
     // the same question of each is what lets the two forms compare equal.
-    id.is_class = ctx.FindClassType(op->text) != nullptr;
+    ClassTypeInfo* cls = ctx.FindClassType(op->text);
+    id.is_class = cls != nullptr;
     id.resolved = true;
+    // §8.25: a class written with parameter values, `type(registry #(byte))`,
+    // is the specialization they name, the class itself where they equal its
+    // defaults, and is held under the key type(this) gives in its methods;
+    // asked by the bare name, every specialization matched every other.
+    if (cls != nullptr && op->type_value != nullptr &&
+        !op->type_value->type_params.empty()) {
+      id.name = SpecializationOf(cls, op->type_value->type_params, ctx,
+                                 ctx.GetArena())
+                    ->name;
+    }
   }
   return id;
 }

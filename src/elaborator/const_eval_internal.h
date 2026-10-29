@@ -378,6 +378,12 @@ ScopeMap RegisteredModuleScope();
 const DataType* RegisteredTypedef(std::string_view name);
 uint32_t RegisteredTypeWidth(const DataType& type, const ScopeMap& scope);
 
+// §6.23: the value of the comparison of two type references `expr`, as the
+// comparer a live TypedefRegistryGuard installed answers it; nothing where
+// `expr` is no such comparison, no comparer is live or it cannot tell.
+// Defined in const_eval_bits.cpp.
+std::optional<int64_t> RegisteredTypeRefCompare(const Expr* expr);
+
 // §20.7: the answer of an array query function whose argument has the
 // dimensions its declaration fixes -- a data type, a parameter array or a
 // variable of the registered module -- in a constant expression; empty where

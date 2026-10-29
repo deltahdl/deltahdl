@@ -166,6 +166,10 @@ bool IsConstantExpr(const Expr* expr, const ScopeMap& scope) {
     case ExprKind::kUnary:
       return IsConstantExpr(expr->lhs, scope);
     case ExprKind::kBinary:
+      // §6.23 (printed page 138): a comparison of two type references is a
+      // constant expression, whatever its operands name, since neither is
+      // evaluated.
+      if (IsTypeRefComparison(expr)) return true;
       return IsConstantExpr(expr->lhs, scope) &&
              IsConstantExpr(expr->rhs, scope);
     case ExprKind::kTernary:

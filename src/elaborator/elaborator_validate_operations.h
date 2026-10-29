@@ -115,15 +115,30 @@ class ElaboratorOperationRules : public ElaboratorData {
   void CheckTypeRefCompareOp(const Expr* expr);
   void WalkStmtsForTypeRefCompare(const Stmt* s);
 
+  // §6.23 with §13.4.1: the type a call of a function the module declares
+  // returns, which a type reference to the call stands for without the call
+  // being made; nullopt for any other expression, a method's call among them.
+  std::optional<DataType> CalledFunctionType(const Expr* e) const;
   // §6.23: resolve one type-reference operand of a comparison to the concrete
-  // data type it denotes, following the typedef/type-parameter tables. Returns
+  // data type it denotes: a net or variable of `mod` its declared type
+  // (NetOrVariableType), a call of a function its return type
+  // (CalledFunctionType), then the typedef and type-parameter tables. Returns
   // nullopt when the operand is not a type reference or names a type this pass
-  // cannot resolve (e.g. a plain variable), so the caller leaves it unfolded.
-  std::optional<DataType> ResolveTypeRefOperandType(const Expr* op) const;
+  // cannot resolve, so the caller leaves it unfolded.
+  std::optional<DataType> ResolveTypeRefOperandType(
+      const Expr* op, const RtlirModule* mod = nullptr) const;
   // §6.23: fold a type-reference equality/inequality/case-equality comparison
-  // to a constant 0/1 using §6.22.1 type matching. Returns nullopt when `expr`
-  // is not such a comparison or an operand cannot be resolved.
-  std::optional<int64_t> EvalConstTypeRefCompare(const Expr* expr) const;
+  // to a constant 0/1 using §6.22.1 type matching, its operands resolved in
+  // `mod`. Returns nullopt when `expr` is not such a comparison or an operand
+  // cannot be resolved.
+  std::optional<int64_t> EvalConstTypeRefCompare(
+      const Expr* expr, const RtlirModule* mod = nullptr) const;
+  // What constant evaluation asks a comparison of two type references through
+  // (TypedefRegistryGuard), answered as EvalConstTypeRefCompare answers it.
+  TypeRefComparer type_ref_compare_ = [this](const Expr* expr,
+                                             const RtlirModule* mod) {
+    return EvalConstTypeRefCompare(expr, mod);
+  };
 
   void ValidateTypeRefArgs(const ModuleDecl* decl);
   void WalkExprForTypeRefArg(const Expr* expr);

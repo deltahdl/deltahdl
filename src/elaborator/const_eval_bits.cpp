@@ -36,18 +36,41 @@ namespace delta {
 static const TypedefMap* g_typedefs = nullptr;
 static const std::unordered_set<std::string_view>* g_aggregate_typedef_names =
     nullptr;
+// §6.23: what answers a comparison of two type references against the same
+// scope, installed with the table. Null unless a guard installed one.
+static const TypeRefComparer* g_type_ref_compare = nullptr;
 
 TypedefRegistryGuard::TypedefRegistryGuard(
     const TypedefMap* typedefs,
-    const std::unordered_set<std::string_view>* aggregate_names)
-    : prev_(g_typedefs), prev_aggregate_names_(g_aggregate_typedef_names) {
+    const std::unordered_set<std::string_view>* aggregate_names,
+    const TypeRefComparer* compare)
+    : prev_(g_typedefs),
+      prev_aggregate_names_(g_aggregate_typedef_names),
+      prev_compare_(g_type_ref_compare) {
   g_typedefs = typedefs;
   g_aggregate_typedef_names = aggregate_names;
+  g_type_ref_compare = compare;
 }
 
 TypedefRegistryGuard::~TypedefRegistryGuard() {
   g_typedefs = prev_;
   g_aggregate_typedef_names = prev_aggregate_names_;
+  g_type_ref_compare = prev_compare_;
+}
+
+bool IsTypeRefComparison(const Expr* expr) {
+  if (expr == nullptr || expr->kind != ExprKind::kBinary) return false;
+  if (expr->op != TokenKind::kEqEq && expr->op != TokenKind::kBangEq &&
+      expr->op != TokenKind::kEqEqEq && expr->op != TokenKind::kBangEqEq)
+    return false;
+  return expr->lhs != nullptr && expr->lhs->kind == ExprKind::kTypeRef &&
+         expr->rhs != nullptr && expr->rhs->kind == ExprKind::kTypeRef;
+}
+
+std::optional<int64_t> RegisteredTypeRefCompare(const Expr* expr) {
+  if (g_type_ref_compare == nullptr || !IsTypeRefComparison(expr))
+    return std::nullopt;
+  return (*g_type_ref_compare)(expr, RegisteredModule());
 }
 
 const DataType* RegisteredTypedef(std::string_view name) {

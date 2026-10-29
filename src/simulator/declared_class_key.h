@@ -40,6 +40,7 @@ std::string_view DeclaredClassKey(const DataType& type, SimContext& ctx,
 // spelling where the declaration wrote one the run holds a class by, else the
 // class of `type`'s bare name nested in `declaring` or in a class enclosing
 // it, innermost first, else the bare name; empty where none names a class.
+// §6.23 with §8.11: a declaration `type(this)` names `declaring` itself.
 // The nested probe goes ahead of the bare one so that the key answered is
 // the one the class is registered under whichever scope later reads it:
 // SimContext::FindClassType resolves a bare nested name through the running
@@ -48,5 +49,12 @@ std::string_view DeclaredClassKey(const DataType& type, SimContext& ctx,
 std::string_view DeclaredClassKeyInScope(const DataType& type,
                                          const ClassTypeInfo* declaring,
                                          SimContext& ctx, Arena& arena);
+
+// §6.23 with §8.11: `type(this)` written in a class stands for the class
+// itself. `type` as the class `cls` reads it: a type naming `cls`, made in the
+// run's arena, where `type` is `type(this)` and `cls` is a class, and `type`
+// itself for any other type or where `cls` is null.
+const DataType& TypeOfThisNamed(const DataType& type, const ClassTypeInfo* cls,
+                                SimContext& ctx);
 
 }  // namespace delta

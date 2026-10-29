@@ -84,7 +84,7 @@ void Elaborator::ElaborateGenerateIf(ModuleItem* item, RtlirModule* mod,
   // may gate a generate-if. Fold it here (via §6.22.1 type matching) before the
   // ordinary integer const-eval, which does not understand type-reference
   // operands.
-  auto cond = EvalConstTypeRefCompare(item->gen_cond);
+  auto cond = EvalConstTypeRefCompare(item->gen_cond, mod);
   if (!cond) cond = ConstEvalInt(item->gen_cond, scope);
   if (!cond) {
     diag_.Error(item->loc, "generate-if condition is not constant",
@@ -167,7 +167,7 @@ void Elaborator::ElaborateGenerateCase(ModuleItem* item, RtlirModule* mod,
   // generate case's selector stands, and its items' type references are
   // compared with it by §6.22.1's matching, as `==` compares two of them.
   std::optional<DataType> selector_type =
-      ResolveTypeRefOperandType(item->gen_cond);
+      ResolveTypeRefOperandType(item->gen_cond, mod);
   std::optional<int64_t> selector;
   if (!selector_type) selector = ConstEvalInt(item->gen_cond, scope);
   if (!selector_type && !selector) {
@@ -179,7 +179,7 @@ void Elaborator::ElaborateGenerateCase(ModuleItem* item, RtlirModule* mod,
   auto matches = [&](const std::vector<Expr*>& patterns) {
     if (!selector_type) return MatchesCasePattern(patterns, *selector, scope);
     return std::any_of(patterns.begin(), patterns.end(), [&](const Expr* p) {
-      auto type = ResolveTypeRefOperandType(p);
+      auto type = ResolveTypeRefOperandType(p, mod);
       return type && TypesMatch(*selector_type, *type);
     });
   };

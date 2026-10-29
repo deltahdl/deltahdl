@@ -560,7 +560,8 @@ void Elaborator::RegisterCuScopeItems() {
   // typedef name is converted to the type the name stands for, which the fold
   // (FoldDeclaredParamValue) reads from the table this installs, as a
   // module's items read it under Elaborator::ElaborateItems.
-  TypedefRegistryGuard typedef_guard(&typedefs_, &aggregate_typedef_names_);
+  TypedefRegistryGuard typedef_guard(&typedefs_, &aggregate_typedef_names_,
+                                     &type_ref_compare_);
   CuScope cu_scope{cu_scope_names_,
                    typedefs_,
                    aggregate_typedef_names_,

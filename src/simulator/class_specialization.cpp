@@ -20,6 +20,7 @@
 #include "simulator/class_object.h"
 #include "simulator/class_specialization_key.h"
 #include "simulator/class_typedef_layout.h"
+#include "simulator/declared_class_key.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_class_params.h"
 #include "simulator/eval_class_scope_types.h"
@@ -543,7 +544,8 @@ void SizeBaseTypedefProperties(ClassTypeInfo* spec, SimContext& ctx) {
 // specialization's (§8.25.1), so `logic [W-1:0] v` stayed 8 bits under
 // `C #(16)`. Each property the class declares is folded again with the
 // specialization's own values; one whose type does not fold -- a name, a type
-// parameter, which SizeTypeParamProperties sizes -- is left as it was.
+// parameter, which SizeTypeParamProperties sizes, or `type(this)`, which names
+// the class (§6.23 with §8.11) -- is left as it was.
 //
 // §7.4.2 with §8.25: a fixed unpacked dimension naming one, `int g[N]`, is
 // folded again the same way, so `Box #(string, 6)` holds six elements where
@@ -565,9 +567,9 @@ void SizeValueParamProperties(ClassTypeInfo* spec, const ParamValues& values,
           FoldPropertyDimension(member->unpacked_dims[0], scope, ctx, arena);
       if (dim.size > 0) prop.array_size = dim.size;
     }
-    if (SizeClassTypedefProperty(prop, member->data_type, spec, scope, ctx))
-      continue;
-    uint32_t width = EvalTypeWidth(member->data_type, {}, scope);
+    const DataType& type = TypeOfThisNamed(member->data_type, spec, ctx);
+    if (SizeClassTypedefProperty(prop, type, spec, scope, ctx)) continue;
+    uint32_t width = EvalTypeWidth(type, {}, scope);
     if (width == 0) continue;
     prop.width = width;
     prop.width_is_declared = true;

@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <filesystem>
 #include <string>
+#include <system_error>
 
 #include "helpers_scheduler.h"
 
@@ -158,6 +160,162 @@ TEST(TypeOfExprCastSim, CastToATypeReferenceReadsGetCoverageAsReal) {
       "  initial a = type(n + $get_coverage())'(i) / 2;\n"
       "endmodule\n";
   EXPECT_DOUBLE_EQ(RunAndGetReal(kSrc, "a"), 2.5);
+}
+
+// §6.23: the expression a type reference names is not evaluated, so a function
+// called in it, in a declaration's type or a cast's, never runs, and the
+// declaration takes the type the function returns: v is an int, not the one
+// bit a type no rule gave would leave it.
+TEST(TypeOperandUnevaluatedSim, CalledFunctionNeverRuns) {
+  const std::string kSrc =
+      "module t;\n"
+      "  int count = 0;\n"
+      "  function int f();\n"
+      "    count++;\n"
+      "    return 1;\n"
+      "  endfunction\n"
+      "  var type(f()) v;\n"
+      "  initial v = type(f())'(16'hABCF);\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(kSrc, "count"), 0u);
+  EXPECT_EQ(RunAndGet(kSrc, "v"), 0xABCFu);
+}
+
+// §6.23: an increment or a decrement, before or after its operand, and an
+// assignment or an operator assignment in the expression a type reference
+// names are not carried out, so the variable each would change keeps its
+// value.
+TEST(TypeOperandUnevaluatedSim, IncrementsAndAssignmentsLeaveTheirOperands) {
+  const std::string kSrc =
+      "module t;\n"
+      "  int i = 5, j = 5, k = 5, m = 5, x = 1, y = 1;\n"
+      "  int d;\n"
+      "  initial begin\n"
+      "    d = type(i++)'(16'hABCF);\n"
+      "    d = type(++j)'(16'hABCF);\n"
+      "    d = type(k--)'(16'hABCF);\n"
+      "    d = type(--m)'(16'hABCF);\n"
+      "    d = type((x = 3))'(16'hABCF);\n"
+      "    d = type((y += 2))'(16'hABCF);\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(kSrc, "i"), 5u);
+  EXPECT_EQ(RunAndGet(kSrc, "j"), 5u);
+  EXPECT_EQ(RunAndGet(kSrc, "k"), 5u);
+  EXPECT_EQ(RunAndGet(kSrc, "m"), 5u);
+  EXPECT_EQ(RunAndGet(kSrc, "x"), 1u);
+  EXPECT_EQ(RunAndGet(kSrc, "y"), 1u);
+}
+
+// §6.23 with §18.13.1: `$urandom` in the expression a type reference names is
+// not called, so the draw after it is the one the reseeded sequence gives
+// second, as y is, and not its third.
+TEST(TypeOperandUnevaluatedSim, UrandomIsNotDrawn) {
+  const std::string kSrc =
+      "module t;\n"
+      "  int unsigned x, y, a, c;\n"
+      "  int d;\n"
+      "  initial begin\n"
+      "    x = $urandom(5);\n"
+      "    y = $urandom;\n"
+      "    a = $urandom(5);\n"
+      "    d = type($urandom)'(16'h00F0);\n"
+      "    d = type($urandom_range(7))'(16'h00F0);\n"
+      "    c = $urandom;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(kSrc, "c"), RunAndGet(kSrc, "y"));
+}
+
+// §6.23 with §20.14: `$random` and `$dist_uniform` in the expression a type
+// reference names are not called, so neither writes back the seed variable
+// it is given.
+TEST(TypeOperandUnevaluatedSim, RandomFunctionsLeaveTheirSeeds) {
+  const std::string kSrc =
+      "module t;\n"
+      "  int s = 7, u = 7;\n"
+      "  int d;\n"
+      "  initial begin\n"
+      "    d = type($random(s))'(16'h00F0);\n"
+      "    d = type($dist_uniform(u, 0, 9))'(16'h00F0);\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(kSrc, "s"), 7u);
+  EXPECT_EQ(RunAndGet(kSrc, "u"), 7u);
+}
+
+// §6.23 with §21.3.1: `$fopen` in the expression a type reference names is not
+// called, so the file it names for writing is never created.
+TEST(TypeOperandUnevaluatedSim, FopenOpensNoFile) {
+  namespace fs = std::filesystem;
+  const std::string kPath =
+      (fs::temp_directory_path() / "deltahdl_type_operand_fopen").string();
+  std::error_code ec;
+  fs::remove(kPath, ec);
+  const std::string kSrc =
+      "module t;\n"
+      "  int d;\n"
+      "  initial d = type($fopen(\"" +
+      kPath +
+      "\", \"w\"))'(16'h00F0);\n"
+      "endmodule\n";
+  RunAndGet(kSrc, "d");
+  EXPECT_FALSE(fs::exists(kPath));
+  fs::remove(kPath, ec);
+}
+
+// §6.23 with §7.10.2: a queue method that removes an element, called in the
+// expression a type reference names, does not run, so the queue keeps its
+// size.
+TEST(TypeOperandUnevaluatedSim, QueueMethodRemovesNoElement) {
+  const std::string kSrc =
+      "module t;\n"
+      "  int q[$] = '{1, 2, 3};\n"
+      "  int d, n;\n"
+      "  initial begin\n"
+      "    d = type(q.pop_front())'(16'h00F0);\n"
+      "    d = type(q.pop_back())'(16'h00F0);\n"
+      "    n = q.size();\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(kSrc, "n"), 3u);
+}
+
+// §6.23 with §6.22.1: a comparison of a type reference to a function's call
+// with another type reference matches the type the function returns, a typedef
+// it is declared with read through, in a procedural statement, a continuous
+// assignment and a parameter's value, and never calls the function.
+TEST(TypeOperandUnevaluatedSim, ComparisonTypesACallWithoutRunningIt) {
+  const std::string kSrc =
+      "module t;\n"
+      "  typedef logic [3:0] nib_t;\n"
+      "  int count = 0;\n"
+      "  function int f();\n"
+      "    count++;\n"
+      "    return 1;\n"
+      "  endfunction\n"
+      "  function nib_t g();\n"
+      "    count++;\n"
+      "    return 1;\n"
+      "  endfunction\n"
+      "  localparam bit P = type(f()) == type(int);\n"
+      "  logic a;\n"
+      "  int r = 0, p = P;\n"
+      "  assign a = type(f()) == type(int);\n"
+      "  initial begin\n"
+      "    if (type(f()) == type(int)) r = r | 1;\n"
+      "    if (type(f()) != type(byte)) r = r | 2;\n"
+      "    if (type(f()) == type(byte)) r = r | 4;\n"
+      "    if (type(f()) === type(int)) r = r | 8;\n"
+      "    if (type(g()) == type(logic [3:0])) r = r | 16;\n"
+      "    if (type(g()) == type(nib_t)) r = r | 32;\n"
+      "    if (type(g()) == type(bit [3:0])) r = r | 64;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(kSrc, "r"), 0b0111011u);
+  EXPECT_EQ(RunAndGet(kSrc, "a"), 1u);
+  EXPECT_EQ(RunAndGet(kSrc, "p"), 1u);
+  EXPECT_EQ(RunAndGet(kSrc, "count"), 0u);
 }
 
 }  // namespace
