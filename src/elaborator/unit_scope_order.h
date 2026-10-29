@@ -63,4 +63,11 @@ std::vector<ModuleItem*> UnitItemsBefore(const CompilationUnit* unit,
 void ReportUnitScopedReferences(const std::vector<ModuleItem*>& items,
                                 const CompilationUnit* unit, DiagEngine& diag);
 
+// §3.12 (printed page 55): the compilation of a package precedes the
+// references to it, and the order of a design's text is the order it is
+// compiled in. Reports each scope prefix `unit` recorded that names one of its
+// packages declared after the prefix.
+void ReportReferencesBeforePackages(const CompilationUnit* unit,
+                                    DiagEngine& diag);
+
 }  // namespace delta

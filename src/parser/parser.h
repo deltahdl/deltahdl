@@ -22,6 +22,7 @@
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 #include "parser/param_port_list.h"
+#include "parser/scope_prefix_record.h"
 #include "parser/scope_type_names.h"
 #include "parser/udp_ansi_port_entry.h"
 
@@ -858,6 +859,7 @@ class Parser {
   // §16.13.6: see RecordTriggeredRead.
   std::unordered_set<std::string_view> triggered_names_;
   std::vector<TimeLiteralSite> time_literals_;  // §5.8: see MakeLiteral.
+  ScopePrefixRecord scope_prefixes_;            // §3.12: see Consume.
   std::unordered_set<std::string_view> known_types_;
   std::unordered_set<std::string_view> known_nettypes_;
   std::unordered_set<std::string_view> known_udps_;
@@ -894,7 +896,6 @@ class Parser {
   // program in it, which FilterAnonymousProgramItems in parser.cpp holds to
   // A.1.11's anonymous_program_item.
   bool InPackageBody() const;
-
   int generate_block_depth_ = 0;
   bool InGenerateBlock() const { return generate_block_depth_ > 0; }
   bool in_generate_region_ = false;
@@ -934,7 +935,6 @@ class Parser {
   // being parsed. Leaving a packed range unspecified is a relaxation granted to
   // those formals alone, so the "[]" packed form is recognized only here.
   bool in_dpi_import_formals_ = false;
-
   int class_body_depth_ = 0;
   int package_body_depth_ = 0;
   bool in_cu_scope_param_ = false;

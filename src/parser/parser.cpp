@@ -21,6 +21,7 @@
 #include "parser/parser_fsm.h"
 #include "parser/parser_token_skips.h"
 #include "parser/parser_type_name_scope.h"
+#include "parser/scope_prefix_record.h"
 #include "parser/scope_type_names.h"
 
 namespace delta {
@@ -171,7 +172,13 @@ bool Parser::Check(TokenKind kind) {
 bool Parser::AtEnd() { return Check(TokenKind::kEof); }
 SourceLoc Parser::CurrentLoc() { return CurrentToken().loc; }
 
-Token Parser::Consume() { return lexer_.Next(); }
+// §3.12: every token passes here, so here the prefixes of scoped names are
+// recorded, for the elaborator to report one naming a package declared later.
+Token Parser::Consume() {
+  Token tok = lexer_.Next();
+  scope_prefixes_.Read(tok, known_types_);
+  return tok;
+}
 
 bool Parser::Match(TokenKind kind) {
   if (!Check(kind)) {
@@ -303,6 +310,7 @@ CompilationUnit* Parser::Parse() {
   DefaultLibraryToWork(unit->configs);
   unit->triggered_names = std::move(triggered_names_);
   unit->time_literals = std::move(time_literals_);
+  unit->scope_prefixes = scope_prefixes_.Take();
   unit->dotted_escaped_names = lexer_.DottedEscapedNames();
   BindFsmPragmas(lexer_, *unit);
   return unit;

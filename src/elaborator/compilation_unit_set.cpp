@@ -38,6 +38,7 @@ void AppendUnitScope(const CompilationUnit& from, CompilationUnit& to) {
   Append(to.checkers, from.checkers);
   Append(to.bind_directives, from.bind_directives);
   Append(to.external_constraints, from.external_constraints);
+  Append(to.scope_prefixes, from.scope_prefixes);
   to.triggered_names.insert(from.triggered_names.begin(),
                             from.triggered_names.end());
   to.dotted_escaped_names.insert(from.dotted_escaped_names.begin(),

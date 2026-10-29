@@ -4,6 +4,7 @@
 #include "lexer/token.h"
 #include "parser/ast_module.h"
 #include "parser/parser.h"
+#include "parser/scope_prefix_record.h"
 #include "parser/scope_type_names.h"
 
 namespace delta {
@@ -66,9 +67,10 @@ ModuleItem* Parser::ParseImportItem() {
     }
     return item;
   }
-  item->import_item.package_name =
-      Expect(TokenKind::kIdentifier, Subclause("26.3")).text;
+  const Token kPackage = Expect(TokenKind::kIdentifier, Subclause("26.3"));
+  item->import_item.package_name = kPackage.text;
   Expect(TokenKind::kColonColon, Subclause("26.3"));
+  scope_prefixes_.Forget(kPackage.loc);
   if (Match(TokenKind::kStar)) {
     item->import_item.is_wildcard = true;
   } else {
@@ -143,9 +145,10 @@ void Parser::ParseExportDecl(std::vector<ModuleItem*>& items) {
     Expect(TokenKind::kSemicolon, Subclause("26.6"));
     return;
   }
-  item->import_item.package_name =
-      Expect(TokenKind::kIdentifier, Subclause("26.6")).text;
+  const Token kPackage = Expect(TokenKind::kIdentifier, Subclause("26.6"));
+  item->import_item.package_name = kPackage.text;
   Expect(TokenKind::kColonColon, Subclause("26.6"));
+  scope_prefixes_.Forget(kPackage.loc);
   if (Match(TokenKind::kStar)) {
     item->import_item.is_wildcard = true;
   } else {
@@ -158,9 +161,11 @@ void Parser::ParseExportDecl(std::vector<ModuleItem*>& items) {
     auto* next = arena_.Create<ModuleItem>();
     next->kind = ModuleItemKind::kExportDecl;
     next->loc = loc;
-    next->import_item.package_name =
-        Expect(TokenKind::kIdentifier, Subclause("26.6")).text;
+    const Token kNextPackage =
+        Expect(TokenKind::kIdentifier, Subclause("26.6"));
+    next->import_item.package_name = kNextPackage.text;
     Expect(TokenKind::kColonColon, Subclause("26.6"));
+    scope_prefixes_.Forget(kNextPackage.loc);
     if (Match(TokenKind::kStar)) {
       next->import_item.is_wildcard = true;
     } else {

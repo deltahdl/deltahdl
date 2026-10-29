@@ -196,4 +196,23 @@ void ReportUnitScopedReferences(const std::vector<ModuleItem*>& items,
   for (const auto* ref : refs) CheckUnitScopedName(ref, unit, diag);
 }
 
+void ReportReferencesBeforePackages(const CompilationUnit* unit,
+                                    DiagEngine& diag) {
+  for (const ScopePrefix& prefix : unit->scope_prefixes) {
+    for (const PackageDecl* pkg : unit->packages) {
+      if (pkg->name != prefix.name ||
+          PrecedesInText(pkg->range.start, prefix.loc)) {
+        continue;
+      }
+      diag.Error(prefix.loc,
+                 std::format("reference to package '{}', which is declared "
+                             "after the reference; a package must be compiled "
+                             "before any reference to it",
+                             prefix.name),
+                 Subclause("3.12"));
+      break;
+    }
+  }
+}
+
 }  // namespace delta

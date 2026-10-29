@@ -63,6 +63,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     lexer/keywords.cpp
     lexer/lexer.cpp
     parser/parser.cpp
+    parser/scope_prefix_record.cpp
     parser/parser_bind.cpp
     parser/parser_block_item_decl.cpp
     parser/parser_headers.cpp

@@ -26,6 +26,7 @@
 #include "elaborator/sdf_annotate_calls.h"
 #include "elaborator/time_literal_scale.h"
 #include "elaborator/unit_hier_names_from_root.h"
+#include "elaborator/unit_scope_order.h"
 #include "elaborator/unit_scope_switch.h"
 #include "elaborator/viewport_resolution.h"
 #include "parser/ast_design.h"
@@ -410,7 +411,6 @@ void Elaborator::RunPreElaborationValidations() {
   ValidateConfigCellClauses();
 
   ValidateConfigPackageBinding();
-
   ValidateConfigHierarchicalRules();
 
   ValidateConfigLocalparams();
@@ -423,7 +423,7 @@ void Elaborator::RunPreElaborationValidations() {
   ValidateAnonymousProgramHierRefs();
 
   ValidatePackageItems();
-
+  ReportReferencesBeforePackages(unit_, diag_);
   ValidatePackageReferences();
 
   ValidatePackageExports();

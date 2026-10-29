@@ -153,6 +153,15 @@ struct TimeLiteralSite {
   const PackageDecl* package = nullptr;
 };
 
+// §3.12 (printed page 55): an identifier written before a scope resolution
+// operator and after none, the package or class a scoped name starts from, and
+// where it stands. A package's compilation is to precede every reference to
+// it, so a prefix naming a package declared after it is reported.
+struct ScopePrefix {
+  std::string_view name;
+  SourceLoc loc;
+};
+
 struct CompilationUnit {
   std::vector<ModuleDecl*> modules;
   std::vector<PackageDecl*> packages;
@@ -248,6 +257,11 @@ struct CompilationUnit {
     return modules.empty() && programs.empty() && packages.empty() &&
            cu_items.empty() && classes.empty();
   }
+
+  // Each prefix the unit's source wrote, but for the package name of an import
+  // or export declaration, which §26.3's own check reads, and for a name the
+  // parser knew as a type where it stood, a class's scope being no package's.
+  std::vector<ScopePrefix> scope_prefixes;
 };
 
 // §22.10: applies the cell-module tag. The preprocessor decides which modules
@@ -447,6 +461,9 @@ inline void AppendCompilationUnitDeclarations(CompilationUnit& target,
   target.external_constraints.insert(target.external_constraints.end(),
                                      src.external_constraints.begin(),
                                      src.external_constraints.end());
+  target.scope_prefixes.insert(target.scope_prefixes.end(),
+                               src.scope_prefixes.begin(),
+                               src.scope_prefixes.end());
   // §5.8: and so do the time literals written outside every design element.
   for (const TimeLiteralSite& site : src.time_literals) {
     if (site.module == nullptr && site.package == nullptr) {
