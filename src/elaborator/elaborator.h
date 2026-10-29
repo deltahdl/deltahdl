@@ -530,11 +530,12 @@ class Elaborator : public ElaboratorClassRules {
 
   void RecomputeDependentParams(RtlirModule* mod);
   void RefoldChildOverrides(RtlirModule* mod, const ScopeMap& mod_scope);
-
   bool MaybeCreateImplicitNet(std::string_view name, SourceLoc loc,
                               RtlirModule* mod);
   // Whether an explicit or implicit net or variable of the module declares it.
   bool DeclaresNetOrVariable(std::string_view name) const;
+  bool NamesNet(std::string_view name, SourceLoc loc) const;
+  std::unordered_set<std::string_view> NetNamesAt(SourceLoc loc) const;
   // §3.13 (e) and (g): enters `name`, which a declaration other than a net or
   // a variable declares at `loc`, in the module name space.
   void DeclareInModuleNameSpace(std::string_view name, SourceLoc loc);

@@ -76,12 +76,13 @@ void Elaborator::ValidateSubroutineBodyTargets(const ModuleItem* item,
   std::unordered_map<std::string_view, SourceLoc> targets;
   CollectProcTargets(item->func_args, item->func_body_stmts, targets);
   ReportProceduralNetTargets(targets);
-  ReportProcContAssignNets(item->func_args, item->func_body_stmts, net_names_,
+  const std::unordered_set<std::string_view> kNetNames = NetNamesAt(item->loc);
+  ReportProcContAssignNets(item->func_args, item->func_body_stmts, kNetNames,
                            diag_);
   for (const auto& [name, loc] : targets)
-    if (net_names_.count(name) == 0) proc_assign_targets_.emplace(name, loc);
-  const ForceLhsNames kForceNames{net_names_, nettype_net_names_, mod,
-                                  typedefs_, scope};
+    if (!NamesNet(name, loc)) proc_assign_targets_.emplace(name, loc);
+  const ForceLhsNames kForceNames{kNetNames, nettype_net_names_, mod, typedefs_,
+                                  scope};
   for (const Stmt* s : item->func_body_stmts) {
     CheckForceLhs(s, kForceNames, diag_);
     WalkStmtsForLhsPatternKeys(s, diag_);
@@ -99,10 +100,12 @@ void Elaborator::ValidateItemConstraints(const ModuleItem* item,
     CheckInterconnectProcContAssign(item->body, interconnect_names_, diag_);
     CheckInterconnectProceduralRead(item->body, interconnect_names_, diag_);
     CheckProceduralAssignLhs(item->body, diag_);
-    ReportProcContAssignNets({}, {item->body}, net_names_, diag_);
+    const std::unordered_set<std::string_view> kNetNames =
+        NetNamesAt(item->loc);
+    ReportProcContAssignNets({}, {item->body}, kNetNames, diag_);
 
     CheckForceLhs(item->body,
-                  {net_names_, nettype_net_names_, mod, typedefs_, scope},
+                  {kNetNames, nettype_net_names_, mod, typedefs_, scope},
                   diag_);
 
     CheckBlockQueueBounds(item->body, scope, diag_);
@@ -325,7 +328,7 @@ void Elaborator::ValidateProceduralNetAssign() {
 void Elaborator::ReportProceduralNetTargets(
     const std::unordered_map<std::string_view, SourceLoc>& targets) {
   for (const auto& [name, loc] : targets) {
-    if (net_names_.count(name) != 0) {
+    if (NamesNet(name, loc)) {
       diag_.Error(loc,
                   std::format("net '{}' cannot be the target of a "
                               "procedural assignment",

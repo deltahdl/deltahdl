@@ -20,12 +20,23 @@
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_attribute.h"
 #include "elaborator/rtlir_scopes.h"
+#include "elaborator/unit_scope_order.h"
 #include "lexer/token.h"
+#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
 
 namespace delta {
+
+// §3.12.1 with §6.6.2: whether the net of `name` that the compilation unit
+// declares before `loc`, which a reference the module does not declare
+// reaches, is a uwire.
+static bool UnitNetIsUwire(const CompilationUnit* unit, std::string_view name,
+                           SourceLoc loc) {
+  const ModuleItem* net = UnitNetBefore(unit, name, loc);
+  return net != nullptr && net->data_type.kind == DataTypeKind::kUwire;
+}
 
 // §6.10 and §10.3.2 for an element of a continuous assignment's target that is
 // a whole name: an undeclared one is an implicit net, a variable takes one
@@ -43,7 +54,7 @@ void Elaborator::ValidateContAssignIdentLhs(std::string_view name,
   std::string_view declared =
       DeclaredScopedName(name, gen_prefix_scopes_, declared_names_);
   if (!cont_assign_targets_.emplace(declared, item->loc).second) {
-    if (net_names_.count(name) == 0) {
+    if (!NamesNet(name, item->loc)) {
       // §6.5 states the rule in full: multiple continuous assignments to any
       // term in the expansion of a variable's longest static prefix are an
       // error. §10.3.2 restates it and refers back, so the report cites §6.5.
@@ -52,7 +63,10 @@ void Elaborator::ValidateContAssignIdentLhs(std::string_view name,
                   Subclause("6.5"));
     } else {
       auto it = var_types_.find(name);
-      if (it != var_types_.end() && it->second == DataTypeKind::kUwire) {
+      bool uwire = it != var_types_.end()
+                       ? it->second == DataTypeKind::kUwire
+                       : UnitNetIsUwire(unit_, name, item->loc);
+      if (uwire) {
         diag_.Error(
             item->loc,
             std::format("uwire '{}' cannot have multiple drivers", name),
@@ -429,7 +443,7 @@ bool Elaborator::ValidateContAssignLeaf(ModuleItem* item, RtlirModule* mod,
   // A name reached through a member access may be an instance's or an
   // interface's, which names no variable of this module, so only a name the
   // target writes directly or through selects is judged as a variable here.
-  bool is_net = net_names_.count(leaf.root) != 0;
+  bool is_net = NamesNet(leaf.root, item->loc);
   bool is_var = !is_net && !leaf.has_member;
   if (is_var) ValidateContAssignVarLeaf(item, leaf.root);
   // §10.3.2: an assignment to a net of a user-defined nettype drives the whole
@@ -519,7 +533,7 @@ void Elaborator::ValidateGeneratedItem(const ModuleItem* item) {
   std::unordered_map<std::string_view, SourceLoc> targets;
   CollectProcTargets({}, {item->body}, targets);
   for (const auto& [name, loc] : targets) {
-    if (net_names_.count(name) != 0) {
+    if (NamesNet(name, loc)) {
       diag_.Error(loc,
                   std::format("net '{}' cannot be the target of a "
                               "procedural assignment",
@@ -551,7 +565,7 @@ void Elaborator::RecordGateOutputDrivers(const ModuleItem* item) {
   size_t outputs = std::min<size_t>(count, n_output ? count - 1 : 1);
   for (size_t i = 0; i < outputs; ++i) {
     std::string_view name = ExprIdent(item->gate_terminals[i]);
-    if (name.empty() || net_names_.count(name) != 0) continue;
+    if (name.empty() || NamesNet(name, item->loc)) continue;
     std::string_view declared =
         DeclaredScopedName(name, gen_prefix_scopes_, declared_names_);
     if (!cont_assign_targets_.emplace(declared, item->loc).second) {
@@ -618,7 +632,8 @@ void Elaborator::ElaborateContAssign(ModuleItem* item, RtlirModule* mod) {
   // an assignment to one takes A.6.1's variable form.
   bool streaming = item->assign_lhs->kind == ExprKind::kStreamingConcat;
   if (streaming)
-    ReportStreamTargetNets(item->assign_lhs, net_names_, item->loc, diag_);
+    ReportStreamTargetNets(item->assign_lhs, NetNamesAt(item->loc), item->loc,
+                           diag_);
   // A net reached through a member access of another scope's name is that
   // scope's, whose declaration this module does not hold, so its strength goes
   // unjudged.

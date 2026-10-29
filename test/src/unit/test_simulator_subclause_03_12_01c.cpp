@@ -424,6 +424,20 @@ TEST(CompilationUnitSearchOrderSim, TheUnitsNetResolvesByItsNetType) {
             1u);
 }
 
+// Two continuous assignments of one module drive the unit's wand, which
+// resolves them as it resolves two instances' drivers.
+TEST(CompilationUnitSearchOrderSim, OneModulesTwoDriversOfTheUnitsWand) {
+  EXPECT_EQ(RunAndGet("wand w;\n"
+                      "module top;\n"
+                      "  logic y;\n"
+                      "  assign w = 1'b1;\n"
+                      "  assign w = 1'b0;\n"
+                      "  initial #1 y = (w === 1'b0);\n"
+                      "endmodule\n",
+                      "y"),
+            1u);
+}
+
 // A pulled net of the unit holds its pull with nothing driving it (§6.6.5):
 // the unit's tri1 reads 1 where a wire would read z.
 TEST(CompilationUnitSearchOrderSim, TheUnitsTri1ReadsOneUndriven) {

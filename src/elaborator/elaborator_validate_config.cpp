@@ -930,6 +930,18 @@ void Elaborator::ValidatePackageItems() {
     }
     ReportPackageSubroutineStaticInits(pkg, diag_);
   }
+  // §3.12.1 (printed page 56) gives the compilation-unit scope the items a
+  // package may hold, and §26.2 (printed 807) keeps the implicit continuous
+  // assignment of a net declaration out of a package, so the unit holds none
+  // either. A net of a user-defined nettype is asked by CheckUnitNettypeUses.
+  for (const auto* item : unit_->cu_items) {
+    if (item->kind == ModuleItemKind::kNetDecl && item->init_expr) {
+      diag_.Error(item->loc,
+                  "a net declaration with an implicit continuous assignment "
+                  "cannot stand in the compilation-unit scope",
+                  Subclause("3.12.1"));
+    }
+  }
 }
 
 }  // namespace delta

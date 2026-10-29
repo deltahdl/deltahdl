@@ -391,4 +391,39 @@ TEST(SeparateCompilationUnits, AnotherUnitsParameterIsUnresolved) {
                             "23.9"));
 }
 
+// §3.12.1 with §26.2: where each file is a compilation unit of its own, a net
+// declaration assignment outside every design element is reported in the unit
+// that holds it.
+TEST(SeparateCompilationUnits, AUnitsNetDeclarationAssignmentIsReported) {
+  ElabFixture f;
+  ElaborateUnits({"module top;\n"
+                  "  child c();\n"
+                  "endmodule\n",
+                  "wire w = 1'b1;\n"
+                  "module child; endmodule\n"},
+                 f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a net declaration with an implicit continuous "
+                            "assignment cannot stand in the compilation-unit "
+                            "scope",
+                            1, "3.12.1"));
+}
+
+// §3.12.1 with §10.4: a module's reference reaches the net of its own unit,
+// which a procedural assignment cannot write, where each file is a unit.
+TEST(SeparateCompilationUnits, ProceduralAssignmentToItsOwnUnitsNet) {
+  ElabFixture f;
+  ElaborateUnits({"module top;\n"
+                  "  child c();\n"
+                  "endmodule\n",
+                  "wire w;\n"
+                  "module child;\n"
+                  "  initial w = 1'b1;\n"
+                  "endmodule\n"},
+                 f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "net 'w' cannot be the target of a procedural", 3,
+                            "10.4"));
+}
+
 }  // namespace

@@ -24,6 +24,11 @@ bool PrecedesInText(SourceLoc a, SourceLoc b);
 bool UnitDeclaresData(const CompilationUnit* unit, std::string_view name,
                       SourceLoc reference);
 
+// §3.12.1 with §6.7: the net declaration of `name` the compilation-unit scope
+// writes before `reference`, or null where it writes none there.
+const ModuleItem* UnitNetBefore(const CompilationUnit* unit,
+                                std::string_view name, SourceLoc reference);
+
 // §3.12.1 (printed pages 56-57): a reference searches only the portion of the
 // compilation-unit scope written before it. Whether the unit declares `name`
 // as a variable or a net after `reference` and declares nothing of that name

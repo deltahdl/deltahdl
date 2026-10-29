@@ -1,14 +1,19 @@
 #include <string>
 #include <string_view>
+#include <unordered_set>
 #include <vector>
 
 #include "common/arena.h"
+#include "common/source_loc.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
 #include "elaborator/type_eval.h"
+#include "elaborator/unit_scope_order.h"
+#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 
 namespace delta {
 
@@ -116,6 +121,31 @@ bool Elaborator::ContainsDollarSubexpr(const Expr* e) const {
 // answer for every net or variable the module has declared so far.
 bool Elaborator::DeclaresNetOrVariable(std::string_view name) const {
   return var_types_.count(name) != 0 || net_names_.count(name) != 0;
+}
+
+// §3.12.1 (printed page 56): a name neither the module nor a module enclosing
+// it (§23.4) declares, as a variable, a port, a parameter or any other item,
+// reaches the part of the compilation-unit scope written before the reference
+// at `loc`, so it names the net the unit declares there, which every rule
+// asking whether an assignment's target is a net counts among the module's.
+bool Elaborator::NamesNet(std::string_view name, SourceLoc loc) const {
+  if (net_names_.count(name) != 0) return true;
+  if (var_types_.count(name) != 0) return false;
+  for (const ModuleDecl* decl : module_decl_path_) {
+    if (ModuleDeclaresName(decl, name)) return false;
+  }
+  return UnitNetBefore(unit_, name, loc) != nullptr;
+}
+
+// The module's nets with the unit's a reference at `loc` reaches (NamesNet),
+// for the checks that ask a set rather than one name.
+std::unordered_set<std::string_view> Elaborator::NetNamesAt(
+    SourceLoc loc) const {
+  std::unordered_set<std::string_view> names = net_names_;
+  for (const ModuleItem* item : unit_->cu_items) {
+    if (NamesNet(item->name, loc)) names.insert(item->name);
+  }
+  return names;
 }
 
 std::string_view Elaborator::ScopedName(std::string_view base) {

@@ -40,6 +40,17 @@ bool UnitDeclaresData(const CompilationUnit* unit, std::string_view name,
   return false;
 }
 
+const ModuleItem* UnitNetBefore(const CompilationUnit* unit,
+                                std::string_view name, SourceLoc reference) {
+  for (const ModuleItem* item : unit->cu_items) {
+    if (item->kind == ModuleItemKind::kNetDecl && item->name == name &&
+        PrecedesInText(item->loc, reference)) {
+      return item;
+    }
+  }
+  return nullptr;
+}
+
 bool UnitDataDeclaredOnlyAfter(const CompilationUnit* unit,
                                std::string_view name, SourceLoc reference) {
   bool declared_after = false;

@@ -344,13 +344,23 @@ static void CheckScopeItems(const std::vector<ModuleItem*>& items,
 // (§6.6.7) as much as one of a built-in net type. The parser makes the first a
 // variable declaration, which ValidatePackageItems does not ask of a net's
 // initializer, so it is asked here, where the package's nettypes are known.
-static void ReportPackageNettypeNetInits(const std::vector<ModuleItem*>& items,
-                                         const NettypeScan& scan) {
+// §3.12.1 (printed 56) gives the compilation-unit scope the items a package
+// may hold, so `in_unit` asks the same of the unit's items.
+static void ReportNettypeNetInits(const std::vector<ModuleItem*>& items,
+                                  const NettypeScan& scan, bool in_unit) {
   for (const ModuleItem* item : items) {
-    if (item->kind == ModuleItemKind::kVarDecl &&
-        !WrittenAsDataDeclaration(item) && item->init_expr != nullptr &&
-        IsNettype(item->data_type, scan) &&
-        !NamesClassNettype(item->data_type, scan)) {
+    if (item->kind != ModuleItemKind::kVarDecl ||
+        WrittenAsDataDeclaration(item) || item->init_expr == nullptr ||
+        !IsNettype(item->data_type, scan) ||
+        NamesClassNettype(item->data_type, scan)) {
+      continue;
+    }
+    if (in_unit) {
+      scan.diag.Error(item->loc,
+                      "a net declaration with an implicit continuous "
+                      "assignment cannot stand in the compilation-unit scope",
+                      Subclause("3.12.1"));
+    } else {
       scan.diag.Error(item->loc,
                       "net declaration with implicit continuous assignment is "
                       "not allowed in a package",
@@ -368,13 +378,14 @@ void CheckUnitNettypeUses(const CompilationUnit* unit,
       UnitClassScopedNettypes(*unit);
   const NettypeScan kUnitScan{kUnitNettypes, scoped, kClassKeys, diag};
   CheckScopeItems(unit->cu_items, kUnitScan);
+  ReportNettypeNetInits(unit->cu_items, kUnitScan, /*in_unit=*/true);
   for (const ClassDecl* cls : unit->classes) CheckClass(cls, kUnitScan);
   for (const PackageDecl* pkg : unit->packages) {
     const std::unordered_set<std::string_view> kPackageNettypes =
         DeclaredNettypes(pkg->items);
     const NettypeScan kPackageScan{kPackageNettypes, scoped, kClassKeys, diag};
     CheckScopeItems(pkg->items, kPackageScan);
-    ReportPackageNettypeNetInits(pkg->items, kPackageScan);
+    ReportNettypeNetInits(pkg->items, kPackageScan, /*in_unit=*/false);
   }
 }
 
