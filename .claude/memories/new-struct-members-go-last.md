@@ -14,4 +14,4 @@ Tests and test helpers under `test/` and `lib/cpp/` build AST structs such as `F
 
 **Why:** such a list names neither the struct nor its members, so a search for the struct's name misses it, and so does a pattern keyed on one argument shape.
 
-**How to apply:** add the member at the end of the struct, after the members the lists name, with a default member initializer; clang does not report a positional list that leaves out a member with one. Before adding any member, grep `test/` and `lib/` for the first member's literal opening a brace list (for `FunctionArg`, `\{Direction::k`) to see how far the lists reach. See [[verifying-through-ci]].
+**How to apply:** add the member at the end of the struct, after the members the lists name, with a default member initializer; clang does not report a positional list that leaves out a member with one. Before adding any member, grep `test/` and `lib/` for the first member's literal opening a brace list (for `FunctionArg`, `\{Direction::k`) to see how far the lists reach.

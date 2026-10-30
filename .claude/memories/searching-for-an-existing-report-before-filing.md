@@ -14,4 +14,4 @@ Before filing an issue that says deltahdl does not report something, search the 
 
 **Why:** fixing a rule that is already reported adds a second diagnostic for one construct, which breaks the existing tests of the first and costs a red run and a revert.
 
-**How to apply:** for every candidate "not reported" finding, grep for the rule's key words and for an existing test of the shape before filing; if a report exists, record it as conforming in the reconciliation issue instead. See [[verifying-through-ci]].
+**How to apply:** for every candidate "not reported" finding, grep for the rule's key words and for an existing test of the shape before filing; if a report exists, record it as conforming in the reconciliation issue instead.

@@ -14,4 +14,4 @@ When a script swaps out a whole function body, find the old body's end by search
 
 **Why:** that search left the tail of the old body after the new one twice in a row (`CallResultClass`, then `MemberIndexKind`). Each time, build-coverage-lib and a clang-tidy shard refused the file as statements outside any function, and each cost a red run and a push of its own to repair.
 
-**How to apply:** before pushing a scripted replacement, also count the file's braces (an awk depth count ending at 0 is not enough on its own) and read the lines just after the new function's closing brace. Local builds are not run here ([[verifying-through-ci]]), so the read is the check.
+**How to apply:** before pushing a scripted replacement, also count the file's braces (an awk depth count ending at 0 is not enough on its own) and read the lines just after the new function's closing brace.

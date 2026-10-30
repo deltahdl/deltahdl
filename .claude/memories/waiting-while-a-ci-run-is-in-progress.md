@@ -16,4 +16,4 @@ While any CI run for a pushed commit is in progress -- any workflow under .githu
 
 A comment-only edit does not depend on what a run finds, so it may be prepared in the working tree while a run is in progress. It is still committed and pushed only after the run lands.
 
-**How to apply:** After a push, arm the monitor and stop. Read the run when it completes, then act. The same goes for a run that a later push will cancel: wait for the new run rather than working under it. See [[verifying-through-ci]] and [[watching-a-run-in-the-background]].
+**How to apply:** After a push, arm the monitor and stop. Read the run when it completes, then act. The same goes for a run that a later push will cancel: wait for the new run rather than working under it. See [[watching-a-run-in-the-background]].

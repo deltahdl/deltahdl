@@ -14,4 +14,4 @@ metadata:
 
 **Why:** such a fixture failed some cases in one CI run and all of them in the next with no relevant code change, which looked like a defect in the code under test.
 
-**How to apply:** prefer calling `Run` in each `TEST_F`; where a shared `SetUp` is wanted, open it with `VpiDesignRun::SetUp();`. Related: [[verifying-through-ci]].
+**How to apply:** prefer calling `Run` in each `TEST_F`; where a shared `SetUp` is wanted, open it with `VpiDesignRun::SetUp();`.

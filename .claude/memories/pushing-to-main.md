@@ -16,4 +16,4 @@ A requested change is finished when it is committed and pushed, so commit and pu
 
 **Why:** This repository has no pull-request cycle: work is pushed to `main`, and `git log --merges` on `main` is empty.
 
-**How to apply:** Use commits as the unit when breaking work down, and think in commit ordering rather than branch-and-merge. Two consequences follow: a closing keyword in a commit title fires the moment it is pushed, and CI is the only review buffer there is. See [issue-closing-keywords-fire-on-push](issue-closing-keywords-fire-on-push.md) and [verifying-through-ci](verifying-through-ci.md).
+**How to apply:** Use commits as the unit when breaking work down, and think in commit ordering rather than branch-and-merge. Two consequences follow: a closing keyword in a commit title fires the moment it is pushed, and CI is the only review buffer there is. See [issue-closing-keywords-fire-on-push](issue-closing-keywords-fire-on-push.md).

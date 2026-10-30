@@ -74,7 +74,6 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 
 ## Verification
 
-- [Verifying through CI](verifying-through-ci.md) — keep local work to what CI has no way to perform; a build, a test binary or a probe of a defect is replaced by pushing and reading the run.
 - [A rule conforms only when tests show it](a-rule-conforms-only-when-tests-show-it.md) — checking a clause, a case conforms only when a test in the tree exercises it and asserts the standard's outcome; reading src/ never settles it, an untested case is filed, and the tests and open issues are the only record of conformance.
 - [Reading a CI run](reading-a-ci-run.md) — `gh run list --limit 1` before pushing, `gh run view --log-failed` after.
 - [Per-line coverage from CI artifacts](per-line-coverage-from-ci-artifacts.md) — the coverage log counts misses per file; read the missed lines from the run's coverage-simulator and profdata-unit-shard artifacts with a local llvm-cov.
@@ -87,7 +86,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 - [Long-running commands in the background](long-running-commands-in-the-background.md) — anything over about a minute (a `gh` sweep, a CI watch) runs with `run_in_background: true`, then the turn ends; a foreground command holds back every cron reminder.
 - [Waiting while a CI run is in progress](waiting-while-a-ci-run-is-in-progress.md) — while any CI run of any workflow is in progress, only wait: no diagnosis, edits or commits until it lands, except preparing comment-only edits.
 - [Fixing a red run after a push](fixing-a-red-run.md) — when a push's own run goes red, the pushing session fixes it, caused or inherited, in a push of its own before the next batch; a run red only on `assert-coverage` is already filed and does not hold the next batch.
-- [Gate limits live in tracked files](gate-limits-live-in-tracked-files.md) — read the linter config or workflow threshold rather than running the gate.
+- [Gate limits live in tracked files](gate-limits-live-in-tracked-files.md) — a gate takes its limit from a tracked linter config or workflow threshold, not a tool default; read it there.
 - [Read the sv-tests log first](reading-the-sv-tests-log-first.md) — deltahdl's own output is already under every FAIL line.
 - [Fetching an sv-tests file](fetching-an-sv-tests-file.md) — `gh api` against `chipsalliance/sv-tests`, piped through `base64 -d`.
 - [sv-tests is a suite](sv-tests-is-a-suite-not-a-corpus.md) — write suite, revision, deltahdl and evaluate; never corpus, runner, score or the tool.

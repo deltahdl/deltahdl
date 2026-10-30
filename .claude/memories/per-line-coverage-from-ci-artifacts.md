@@ -28,9 +28,7 @@ guessing which branch went unrun:
 3. Read those line numbers against `git show <sha>:<path>`, the source as the
    run built it.
 
-Homebrew's `/opt/homebrew/opt/llvm/bin` tools read the Linux objects. This is
-reading CI's output, not a local build, so it sits within
-[[verifying-through-ci]].
+Homebrew's `/opt/homebrew/opt/llvm/bin` tools read the Linux objects.
 
 **Why:** a guess at the missed line cost a whole CI round more than once; the
 report gives a count, and two plausible branches can share a file.

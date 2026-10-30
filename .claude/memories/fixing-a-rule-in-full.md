@@ -26,5 +26,5 @@ Write a test for each case and make deltahdl pass all of them in the same commit
 - For each forbidden form, write one test that it is reported, per [[naming-the-report-in-a-rejection-test]], and one that the nearest allowed form is accepted without a report.
 - Add a case found while fixing to the fix, never to a new issue ([[solving-what-a-session-finds]]).
 - Choose inputs that tell correct code from incorrect ([[discriminating-test-inputs]]).
-- Push the tests with the fix and let the run say which pass ([[verifying-through-ci]]).
+- Push the tests with the fix and let the run say which pass.
 - An issue about deltahdl itself, such as a coverage gap, has no rule behind it; fix the problem it names.
