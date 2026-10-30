@@ -119,30 +119,54 @@ Variable* ClassEventVariable(const Expr* expr, SimContext& ctx, Arena& arena) {
   return obj != nullptr ? OnObject(obj, expr->rhs->text, arena) : nullptr;
 }
 
-Variable* EventArrayElement(const Expr* expr, SimContext& ctx, Arena& arena) {
-  if (expr == nullptr || expr->kind != ExprKind::kSelect ||
-      expr->index_end != nullptr || expr->index == nullptr ||
-      expr->base == nullptr || expr->base->kind != ExprKind::kIdentifier) {
-    return nullptr;
+// The text one index of an element's name spells: a string key quoted, any
+// other value its number, as the declaration named the element.
+static std::string EventIndexText(const Logic4Vec& index) {
+  return index.is_string ? "\"" + Logic4VecToString(index) + "\""
+                         : std::to_string(index.ToUint64());
+}
+
+// The name of the element a chain of single-index selects names, `grid[1][0]`
+// of `grid[j][k]`, each index evaluated now, and the identifier at its root;
+// false where the chain holds a range select or roots in anything else.
+static bool EventElementKey(const Expr* expr, SimContext& ctx, Arena& arena,
+                            std::string& key, const Expr*& root) {
+  if (expr == nullptr) return false;
+  if (expr->kind == ExprKind::kIdentifier) {
+    key = std::string(expr->text);
+    root = expr;
+    return true;
   }
-  Variable* base = ctx.FindVariable(expr->base->text);
+  if (expr->kind != ExprKind::kSelect || expr->index_end != nullptr ||
+      expr->index == nullptr ||
+      !EventElementKey(expr->base, ctx, arena, key, root)) {
+    return false;
+  }
+  key += "[" + EventIndexText(EvalExpr(expr->index, ctx, arena)) + "]";
+  return true;
+}
+
+Variable* EventArrayElement(const Expr* expr, SimContext& ctx, Arena& arena) {
+  if (expr == nullptr || expr->kind != ExprKind::kSelect) return nullptr;
+  std::string key;
+  const Expr* root = nullptr;
+  if (!EventElementKey(expr, ctx, arena, key, root)) return nullptr;
+  Variable* base = ctx.FindVariable(root->text);
   if (base == nullptr || !base->is_event) return nullptr;
-  Logic4Vec index = EvalExpr(expr->index, ctx, arena);
-  if (const QueueObject* q = ctx.FindQueue(expr->base->text)) {
+  bool one_index = expr->base == root;
+  if (const QueueObject* q = ctx.FindQueue(root->text)) {
+    if (!one_index) return nullptr;
+    Logic4Vec index = EvalExpr(expr->index, ctx, arena);
     uint64_t i = index.ToUint64();
     if (!q->holds_events || !index.IsKnown() || i >= q->elements.size()) {
       return nullptr;
     }
     return ctx.EventOfIdentity(q->elements[i].ToUint64());
   }
-  std::string key = std::string(expr->base->text) + "[" +
-                    (index.is_string ? "\"" + Logic4VecToString(index) + "\""
-                                     : std::to_string(index.ToUint64())) +
-                    "]";
   if (Variable* elem = ctx.FindVariable(key)) {
     return elem->is_event ? elem : nullptr;
   }
-  if (ctx.FindAssocArray(expr->base->text) == nullptr) return nullptr;
+  if (!one_index || ctx.FindAssocArray(root->text) == nullptr) return nullptr;
   auto* stored =
       arena.Create<std::string>(ctx.ActiveInstancePrefix() + std::move(key));
   Variable* elem = ctx.CreateVariable(*stored, 1);

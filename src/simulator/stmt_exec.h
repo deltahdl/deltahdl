@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "common/types.h"
 #include "simulator/exec_task.h"
 
 namespace delta {
@@ -58,6 +59,10 @@ void ExecEventTriggerInFunction(const Stmt* stmt, SimContext& ctx,
 // the time step it was triggered in (§15.5.3), and every process waiting on it
 // resumes.
 void TriggerEvent(Variable* var, SimContext& ctx);
+
+// TriggerEvent with the region the woken processes resume in named, as the
+// update event of `->>` names the one of the process that issued it.
+void TriggerEventIn(Variable* var, SimContext& ctx, Region region);
 
 bool IsTimeControlStatement(StmtKind kind);
 

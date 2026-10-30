@@ -384,4 +384,160 @@ TEST(NamedEventSim, EventArrayElementsAreEventsOfTheirOwn) {
   EXPECT_EQ(var->value.ToUint64(), 24u);
 }
 
+// §15.5.1: changing the index of a named event array in an event control
+// expression makes no event occur. Each waiter's index moves while it waits
+// -- by a blocking write, by either index of a two-dimensional array, and by a
+// nonblocking write -- and no element is ever triggered, so none of them runs.
+TEST(NamedEventSim, ChangingAnEventArrayIndexMakesNoEventOccur) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  event ev[2];\n"
+      "  event grid[2][2];\n"
+      "  int i, j, k, n, hits;\n"
+      "  initial begin @(ev[i]); hits += 1; end\n"
+      "  initial begin @(grid[j][k]); hits += 10; end\n"
+      "  initial begin @(ev[n]); hits += 100; end\n"
+      "  initial begin #1 i = 1; #1 j = 1; #1 k = 1; #1 n <= 1; end\n"
+      "  initial #10 $finish;\n"
+      "endmodule\n",
+      f, "hits");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+}
+
+// §15.5.1: the nearest allowed form beside the one above -- the element the
+// index names is triggered, at 2 in the one-dimensional array and at 3 in the
+// two-dimensional one, and each waiter runs: 2 and 3, read as 23.
+TEST(NamedEventSim, TriggeringTheIndexedEventArrayElementWakesTheWaiter) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  event ev[2];\n"
+      "  event grid[2][2];\n"
+      "  int i = 1, j = 1, k = 0, a, b, r;\n"
+      "  initial begin @(ev[i]); a = $time; end\n"
+      "  initial begin @(grid[j][k]); b = $time; end\n"
+      "  initial begin #2 -> ev[1]; #1 -> grid[1][0]; end\n"
+      "  initial #10 r = a * 10 + b;\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 23u);
+}
+
+// §15.5 with §7.4: a leaf of a multidimensional array of events is a named
+// event of its own. A blocking trigger with variable indices wakes an event
+// control on the same leaf at 1, another with constant indices wakes a wait on
+// the triggered state of its leaf at 2, and the leaf beside it, never
+// triggered, wakes nothing: 1 and 2, read as 12.
+TEST(NamedEventSim, MultidimensionalEventArrayLeavesAreEvents) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  event grid[2][3];\n"
+      "  int j = 1, k = 2, a, b, c, r;\n"
+      "  initial begin @(grid[1][2]); a = $time; end\n"
+      "  initial begin #2 wait (grid[0][1].triggered); b = $time; end\n"
+      "  initial begin @(grid[1][1]); c = 9; end\n"
+      "  initial begin #1 -> grid[j][k]; #1 -> grid[0][1]; end\n"
+      "  initial #10 r = a * 10 + b + c;\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 12u);
+}
+
+// §15.5.1: the target of ->> is an event identifier with a nonrange select,
+// so a nonblocking trigger fires an element of an array of events as it fires
+// a declared event. Each waiter below wakes at 2 on the update event of its
+// own element -- a variable index into one dimension, constant indices into
+// two, a string key of an associative array and a position of a queue of
+// events -- and each adds its weight once: 1 + 10 + 100 + 1000.
+TEST(EventTriggerSimulator, NonblockingTriggerFiresAnEventArrayElement) {
+  LowerFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  event one[2];\n"
+      "  event grid[2][2];\n"
+      "  event m[string];\n"
+      "  event q[$];\n"
+      "  event e;\n"
+      "  int i = 1, hits;\n"
+      "  initial q.push_back(e);\n"
+      "  initial begin @(one[1]); hits += $time == 2 ? 1 : 0; end\n"
+      "  initial begin @(grid[1][0]); hits += $time == 2 ? 10 : 0; end\n"
+      "  initial begin @(m[\"k\"]); hits += $time == 2 ? 100 : 0; end\n"
+      "  initial begin @(e); hits += $time == 2 ? 1000 : 0; end\n"
+      "  initial begin\n"
+      "    #2 ->> one[i];\n"
+      "    ->> grid[1][0];\n"
+      "    ->> m[\"k\"];\n"
+      "    ->> q[0];\n"
+      "  end\n"
+      "  initial #10 $finish;\n"
+      "endmodule\n",
+      f, "hits");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1111u);
+}
+
+// §15.5.1 with §15.5.3: the update event of ->> on an element of an array of
+// events gives the element its triggered state, so a wait on it begun in the
+// same time step, before the nonblocking assignment region, resumes at 3.
+TEST(EventTriggerSimulator,
+     NonblockingTriggerOfAnElementSetsItsTriggeredState) {
+  LowerFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  event one[2];\n"
+      "  int t1;\n"
+      "  initial begin #3 wait (one[1].triggered); t1 = $time; end\n"
+      "  initial #3 ->> one[1];\n"
+      "  initial #10 $finish;\n"
+      "endmodule\n",
+      f, "t1");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 3u);
+}
+
+// §15.5.1: a class event property named through a handle is a target of ->>
+// as of ->, and its waiter resumes at 4 on the update event.
+TEST(EventTriggerSimulator, NonblockingTriggerFiresAClassEventProperty) {
+  LowerFixture f;
+  auto* var = RunAndFindVar(
+      "class C;\n"
+      "  event ev;\n"
+      "endclass\n"
+      "module t;\n"
+      "  C h = new;\n"
+      "  int t1;\n"
+      "  initial begin @(h.ev); t1 = $time; end\n"
+      "  initial #4 ->> h.ev;\n"
+      "  initial #10 $finish;\n"
+      "endmodule\n",
+      f, "t1");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 4u);
+}
+
+// §15.5.1 with §9.4.2.3: an update event of ->> that a waiter's iff refuses
+// leaves the waiter blocked on the event, and the next one, at 2 with the
+// condition true, wakes it, as a trigger by -> would.
+TEST(EventTriggerSimulator, NonblockingTriggerKeepsAWaiterItsIffRefuses) {
+  LowerFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  event ev;\n"
+      "  bit en;\n"
+      "  int t1 = -1;\n"
+      "  initial begin @(ev iff en); t1 = $time; end\n"
+      "  initial begin #1 ->> ev; #1 en = 1; ->> ev; end\n"
+      "  initial #10 $finish;\n"
+      "endmodule\n",
+      f, "t1");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 2u);
+}
+
 }  // namespace

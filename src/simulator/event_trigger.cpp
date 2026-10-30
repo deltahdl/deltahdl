@@ -9,6 +9,11 @@
 namespace delta {
 
 void TriggerEvent(Variable* var, SimContext& ctx) {
+  TriggerEventIn(var, ctx,
+                 ctx.IsReactiveContext() ? Region::kReactive : Region::kActive);
+}
+
+void TriggerEventIn(Variable* var, SimContext& ctx, Region region) {
   // §15.5.3: the event itself records the step, which a class's event
   // property, found by no name, is read by (TryClassEventTriggered).
   var->triggered_ticks = ctx.CurrentTime().ticks;
@@ -16,7 +21,6 @@ void TriggerEvent(Variable* var, SimContext& ctx) {
   auto pending = std::move(var->watchers);
   var->watchers.clear();
   auto& sched = ctx.GetScheduler();
-  auto region = ctx.IsReactiveContext() ? Region::kReactive : Region::kActive;
   // A watcher answers false when this trigger does not wake it -- its process
   // is suspended (§9.7) or its `iff` does not hold (§9.4.2.3) -- and it stays
   // armed for the next trigger, as Variable::NotifyWatchers keeps it.

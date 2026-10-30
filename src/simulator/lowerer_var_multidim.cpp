@@ -106,6 +106,9 @@ static Variable* NewMultiDimLeaf(const MultiDimArray& m,
   elem->is_4state = m.var.is_4state;
   elem->is_signed = m.var.is_signed;
   elem->is_string = m.var.is_string;
+  // §15.5 with §7.4: a leaf of an array of events is a named event, which
+  // `-> grid[1][0]` triggers and `@grid[1][0]` waits on (EventArrayElement).
+  elem->is_event = m.var.is_event;
   return elem;
 }
 

@@ -131,16 +131,8 @@ static void ScheduleNbEventTrigger(Variable* var, std::string_view event_name,
   auto& sched = ctx.GetScheduler();
   auto* nba_event = sched.GetEventPool().Acquire();
   nba_event->callback = [var, event_name, reactive, &ctx]() {
-    ctx.SetEventTriggered(event_name);
-    auto pending = std::move(var->watchers);
-    var->watchers.clear();
-    auto& s = ctx.GetScheduler();
-    auto wake_region = reactive ? Region::kReactive : Region::kActive;
-    for (auto& cb : pending) {
-      auto* ev = s.GetEventPool().Acquire();
-      ev->callback = std::move(cb);
-      s.ScheduleEvent(ctx.CurrentTime(), wake_region, ev);
-    }
+    if (!event_name.empty()) ctx.SetEventTriggered(event_name);
+    TriggerEventIn(var, ctx, reactive ? Region::kReactive : Region::kActive);
   };
   sched.ScheduleEvent(time, reactive ? Region::kReNBA : Region::kNBA,
                       nba_event);
@@ -159,12 +151,12 @@ static SimCoroutine NbEventTriggerEventCoroutine(const Stmt* stmt,
 
 static StmtResult ExecNbEventTriggerImpl(const Stmt* stmt, SimContext& ctx,
                                          Arena& arena) {
+  // §15.5.1: the target is an event identifier with a nonrange select, so it
+  // is resolved as the one of `->` is: a declared or hierarchically named
+  // event, a class event property, or an element of an array of events.
   auto event_name = ResolveEventTargetName(stmt->expr, ctx);
-  if (event_name.empty()) return StmtResult::kDone;
-  auto* var = ctx.FindVariable(event_name);
-  if (!var) return StmtResult::kDone;
-
-  if (var->is_null_event) return StmtResult::kDone;
+  auto* var = TriggerTargetEvent(stmt->expr, event_name, ctx);
+  if (!var || var->is_null_event) return StmtResult::kDone;
 
   bool reactive = ctx.IsReactiveContext();
 

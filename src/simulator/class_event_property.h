@@ -29,7 +29,8 @@ Variable* ClassEventVariable(const Expr* expr, SimContext& ctx, Arena& arena);
 // index spells, one event for each key, which every trigger and wait of that
 // key then reaches. A queue of events holds each event by its identity
 // (EventIdentityOf), and its element is that event. Null where `expr` is no
-// select of an array of events. Resolved by no name, `-> arr[1]` triggered
+// select of an array of events, or a chain of them, `grid[j][k]`, naming a
+// leaf of a multidimensional one. Resolved by no name, `-> arr[1]` triggered
 // nothing and `@arr[1]` waited for a change of value.
 Variable* EventArrayElement(const Expr* expr, SimContext& ctx, Arena& arena);
 
