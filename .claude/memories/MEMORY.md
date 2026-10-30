@@ -17,7 +17,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 - [A revert does not reopen](a-revert-does-not-reopen.md) — reopen by hand with `gh issue reopen` after reverting the commit that closed it.
 - [The form of an issue reference](closing-keyword-form.md) — write `Closes #N` to close, `Refs #N` or `See #N` to mention.
 - [No CI-skip directives](no-ci-skip-in-commit-messages.md) — never suppress a run from a commit message; the `on:` triggers already decide.
-- [The length of a commit subject](commit-subject-length.md) — state the whole change in the subject; leave the body unwrapped.
+- [The length of a commit subject](commit-subject-length.md) — a short subject naming the change, the detail in an unwrapped body.
 - [Sharing code a change mirrors](sharing-code-a-change-mirrors.md) — when a change makes two parallel bodies or two tests equal, share them before pushing; CPD refuses 100 identical tokens.
 - [No comments or docstrings in the Python trees](no-comments-or-docstrings-in-python.md) — `assert-no-comments` refuses both under lib/python, scripts, their tests and scripts.yml; the why goes in the commit message.
 - [The module's own terms](module-terms-in-descriptions.md) — write about module M so a reader who has never heard of its callers understands it.

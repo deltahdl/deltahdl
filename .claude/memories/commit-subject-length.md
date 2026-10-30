@@ -1,14 +1,14 @@
 ---
 name: commit-subject-length
-description: Write the commit subject at the length that states the change, and leave the body unwrapped.
+description: Keep the commit subject short, about 72 characters, naming the change; put the detail in a body left unwrapped.
 metadata:
   type: feedback
 ---
 
 # The length of a commit subject
 
-Write the subject at the length that states the change, and leave the body unwrapped.
+Keep the subject short, about 72 characters, naming what the change does, and put the detail in the body, left unwrapped.
 
-**Why:** A subject truncated to a conventional width states less than the change it names, and a body hard-wrapped at a column re-wraps badly wherever it is read. The general form of this is [prose-length-over-column-fitting](prose-length-over-column-fitting.md).
+**Why:** GitHub, `git log --oneline` and most other views cut a subject at about that width, so a paragraph-long subject is truncated exactly where it is read most, while the body has room for the whole change. A body hard-wrapped at a column re-wraps badly wherever it is read ([prose-length-over-column-fitting](prose-length-over-column-fitting.md)).
 
-**How to apply:** Say the whole change in the subject and stop there; do not pad it to a width and do not cut it to one. Put the closing keywords on their own lines below, per [one-closing-keyword-per-issue](one-closing-keyword-per-issue.md).
+**How to apply:** Write a subject naming the change, then a blank line and a body saying what changed and why. Put the closing keywords on their own lines below, per [one-closing-keyword-per-issue](one-closing-keyword-per-issue.md).
