@@ -6,6 +6,7 @@ static PLI_INT32 calltf(PLI_BYTE8* ud) {
   vpiHandle v = by_name("top.v", 0), ev;
   s_vpi_value val;
   s_vpi_time t;
+  int cancel_err;
   val.format = vpiIntVal;
   t.type = vpiSimTime; t.high = 0;
   val.value.integer = 5;
@@ -16,7 +17,10 @@ static PLI_INT32 calltf(PLI_BYTE8* ud) {
   ev = vpi_put_value(v, &val, &t, vpiTransportDelay | vpiReturnEvent);
   vpi_printf("event=%s type=%s scheduled=%d\n", ev ? "handle" : "null", str_of(vpiType, ev), vpi_get(vpiScheduled, ev));
   vpi_put_value(ev, 0, 0, vpiCancelEvent);
-  vpi_printf("after cancel scheduled=%d err=%d\n", vpi_get(vpiScheduled, ev), vpi_chk_error(0) > 0);
+  /* Read before vpi_get asks vpiScheduled: every VPI call resets the error
+   * status, and C leaves the order of a call's arguments unspecified. */
+  cancel_err = vpi_chk_error(0) > 0;
+  vpi_printf("after cancel scheduled=%d err=%d\n", vpi_get(vpiScheduled, ev), cancel_err);
   return 0;
 }
 static void startup(void) { reg_task("$probe", calltf, 0); }
