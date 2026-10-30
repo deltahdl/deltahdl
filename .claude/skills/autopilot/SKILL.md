@@ -5,13 +5,12 @@ description: Start, restart or stop the standing reminders, with or without the 
 
 # Autopilot
 
-## The four standing reminders
+## The three standing reminders
 
 Every `start` form creates these.
 
 | Cron | Prompt |
 | --- | --- |
-| `0,15,30,45 * * * *` | `REMINDER: Keep the task list current with TaskCreate and TaskUpdate: add a task when it arises, mark each one as it starts and finishes, rewrite or remove one whose shape changed or that turned out unneeded, and delete finished ones, so the list says what is left to do.` |
 | `2,17,32,47 * * * *` | `REMINDER: ~/IEEE 1800-2023.pdf is the source of truth. sv-tests was written against ~/IEEE 1800-2017.pdf, so its tags and file names carry 2017 clause numbers: read the 2017 edition only to learn what such a number meant there, resolve it to the 2023 clause, and let no 2017 number, wording or rule reach deltahdl's code, reports or tests. The UVM standard is ~/IEEE 1800.2-2020.pdf.` |
 | `8,23,38,53 * * * *` | `REMINDER: A case of the rule an issue in hand documents is part of that issue's fix, never a new issue. Fix anything else you find on the spot when that is quicker and safer than filing it, and file the rest as issues: one per rule of a standard that deltahdl breaks or leaves untested, listing every case of it and labelled with both the standard it falls under (IEEE 1800-2023, IEEE 1800.2-2020 or IEEE 1735-2023) and its clause in that standard (§N or Annex X), creating the clause label first when the repository has none; or one per problem with deltahdl itself, such as a coverage gap, with neither label.` |
 | `12,27,42,57 * * * *` | `REMINDER: Fix the rule, not the example. Before fixing an issue of a standard, list every case of the rule it documents: each form the rule allows and each form it forbids, written in every place the standard lets that form appear (a module, interface, program, checker, package, class, generate block, task or function, or the compilation unit, as applies) and with every kind of operand or type the rule names. Write a test for each case, one showing a forbidden form reported beside one showing the nearest allowed form accepted without a report, and make deltahdl pass every one of them in the same commit.` |
@@ -60,7 +59,7 @@ And these:
 
 Any form but `reminders-only` may be followed by `--skip-label <label>`, once per label, quoted when it holds a space. Each puts `map(select(all(.labels[]; .name != "<label>"))) |` and a space at the very start of the loop command's `--jq` program, adding `labels` to its `--json` fields where they are missing (the `bysubclause` form), and appends to that reminder, after a space, `An issue labelled '<label>' is left to a person, whatever else it carries.` Two labels give `map(select(all(.labels[]; .name != "needs decision"))) | map(select(all(.labels[]; .name != "blocked"))) |` and a space before the program. The label is never left out through a `--search` term: GitHub's search returns at most 1000 issues, so a search listing drops every open issue older than the newest 1000, where `--limit 10000` without one pages through them all.
 
-For any form but `reminders-only`, run the loop's `gh issue list` command once; if it names no issue, create the four standing reminders only.
+For any form but `reminders-only`, run the loop's `gh issue list` command once; if it names no issue, create the three standing reminders only.
 
 Call `CronList`. A job on one of the form's cron slots whose prompt differs from that slot's reminder is a stale version of it: `CronDelete` it. Then `CronCreate` with `recurring: true` each reminder of the form whose prompt is not already scheduled, substituting the number for `{X}` or the label for `{L}`. Then begin solving the command's first issue.
 
@@ -68,7 +67,7 @@ Call `CronList`. A job on one of the form's cron slots whose prompt differs from
 
 `restart` takes the forms `start` takes, with the same shorthands and the same `--skip-label` flags, and leaves scheduled exactly the reminders of the form it names, whatever was scheduled before.
 
-For any form but `reminders-only`, run the loop's `gh issue list` command once; if it names no issue, the form's reminders are the four standing reminders only.
+For any form but `reminders-only`, run the loop's `gh issue list` command once; if it names no issue, the form's reminders are the three standing reminders only.
 
 Call `CronList`. `CronDelete` every job that is not one of the form's reminders: a job on a slot the form does not use, a job whose prompt differs from its slot's reminder, and every job but one on a slot that holds more than one. Then `CronCreate` with `recurring: true` each reminder of the form whose prompt is not scheduled after those deletions, substituting the number for `{X}` or the label for `{L}`. Then, for any form but `reminders-only`, begin solving the command's first issue.
 
@@ -76,7 +75,7 @@ Call `CronList`. `CronDelete` every job that is not one of the form's reminders:
 
 An issue titled `Reconcile deltahdl against <section> of IEEE 1800-2023 (<title>)` stands for one section of the standard's table of contents, read to two levels. Its body defines rules and cases and says what reconciling the section means: every rule the section states is listed with every case of it, and each case is shown by a test under `test/` that asserts the standard's outcome, or held by the open issue of its rule until a test does. A loop works every open Reconcile issue of a clause before any other issue of that clause, since the reading files the clause's issues and rewrites the ones already open. A Reconcile issue is worked by reading and filing, and it closes without a commit.
 
-The clause's open Reconcile issues are worked one at a time, in section order. Each step below is a task written with TaskCreate before it starts and marked with TaskUpdate as it starts and finishes:
+The clause's open Reconcile issues are worked one at a time, in section order, each through these steps:
 
 1. **List.** Read the section the issue names, every page of it, one page per Read call, and list every rule it states and every case of each. A rule is a requirement the text states: a syntax production or a restriction on it, a "shall" or "shall not", a result a tool could get observably wrong (a value, type, width, order, elaboration outcome, or VPI object, relation or property), a required error report, or a permission a tool must accept. A rule the section only refers to belongs to the clause or annex that states it, and each case of it is marked with that clause. A case is one form the rule allows or forbids, with the nearest allowed form beside each forbidden one, in each place it can be written where its handling could differ, with each kind of operand or type the rule names where the outcome could differ, and in each way of naming the construct where that matters. Write the list to `<scratchpad>/reconcile/N_rules.md`, `<scratchpad>` being the session's scratchpad directory and `N` the issue's number, so that the list outlives the context it was read in.
 2. **Find.** For each case, search the whole of `test/` for the test that shows it, by the construct's source text, its diagnostic's words and its subclause, and open the test to see that it exercises that exact case and asserts the outcome the standard gives. Record the test beside the case, or record none, and note a test that asserts an outcome the standard does not give.
