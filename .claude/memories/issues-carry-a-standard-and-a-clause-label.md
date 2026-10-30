@@ -29,5 +29,4 @@ within its standard.
 clause has no label yet, such as a clause number past the highest one
 IEEE 1800-2023 has, create it first with `gh label create` and the same form
 of description. When bringing an issue up to date, add whichever of the two is
-missing. The batch rule in [[grouping-issues-into-a-push]] reads the matter
-from the two labels together.
+missing.

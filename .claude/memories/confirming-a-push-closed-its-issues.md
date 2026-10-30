@@ -11,4 +11,4 @@ GitHub can push a commit to `main` without acting on any of its `Closes #N` line
 
 **Why:** An issue left open after its fix landed looks unsolved, so a later loop takes it up again and works on code that already satisfies it ([[issue-closing-keywords-fire-on-push]]).
 
-**How to apply:** Once a push's runs are clean, check that every issue its message closes is closed. Close any still open with `gh issue close N --reason completed`, commenting which commit solved it. Keep a batch's message to one paragraph per issue ([[grouping-issues-into-a-push]]) rather than a subject that joins dozens of clauses.
+**How to apply:** Once a push's runs are clean, check that every issue its message closes is closed. Close any still open with `gh issue close N --reason completed`, commenting which commit solved it. Keep a message that closes several issues to one paragraph per issue rather than a subject that joins dozens of clauses.

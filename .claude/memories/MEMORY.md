@@ -7,9 +7,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 ## Commits and pushes
 
 - [Pushing to main](pushing-to-main.md) — commit straight to `main` and push a finished change without asking; there are no pull requests here.
-- [One commit is a whole body of work](one-commit-is-a-whole-body-of-work.md) — a push holds a matter solved end to end, or a batch of issues of one matter solved in full, never one step of either.
-- [Grouping issues into one push](grouping-issues-into-a-push.md) — every open issue of one clause and one `src/` subsystem, bounded by the matter and never by a count, solved uncommitted and committed once; every comment-only issue is one batch whatever its clause; CI, build, shared-fixture and red-run fixes go alone.
-- [Draining the push queue first](draining-the-push-queue-first.md) — while commits sit unpushed, take no new issue; squash them in queue order, never by file-disjointness, and push until none are left.
+- [Draining the push queue first](draining-the-push-queue-first.md) — push what sits committed but unpushed before starting new work.
 - [Staging explicit paths](git-add-explicit-paths.md) — never `git add -A` or `git add .`; name every path.
 - [git add stages nothing when one pathspec misses](git-add-all-or-nothing-pathspecs.md) — never name a removed path to `git add`; it then stages none of them.
 - [Reading the index back](reading-the-index-before-committing.md) — `git status --porcelain` between staging and committing, every time.
@@ -84,8 +82,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 - [Watching a run in the background](watching-a-run-in-the-background.md) — a background shell or a Monitor, never a foreground `gh run watch`, and `--interval 60`: the 3-second default trips the rate limit.
 - [Force-cancelling a hung run](force-cancelling-a-hung-run.md) — a job hung in a step ignores a plain cancel and cannot be deleted while in progress; `gh run cancel --force`, then `gh run rerun --failed`.
 - [Long-running commands in the background](long-running-commands-in-the-background.md) — anything over about a minute (a `gh` sweep, a CI watch) runs with `run_in_background: true`, then the turn ends; a foreground command holds back every cron reminder.
-- [Waiting while a CI run is in progress](waiting-while-a-ci-run-is-in-progress.md) — while any CI run of any workflow is in progress, only wait: no diagnosis, edits or commits until it lands, except preparing comment-only edits.
-- [Fixing a red run after a push](fixing-a-red-run.md) — when a push's own run goes red, the pushing session fixes it, caused or inherited, in a push of its own before the next batch; a run red only on `assert-coverage` is already filed and does not hold the next batch.
+- [Fixing a red run after a push](fixing-a-red-run.md) — when a push's own run goes red, the pushing session fixes it, caused or inherited, in a push of its own before the next piece of work; a run red only on `assert-coverage` is already filed and holds nothing up.
 - [Gate limits live in tracked files](gate-limits-live-in-tracked-files.md) — a gate takes its limit from a tracked linter config or workflow threshold, not a tool default; read it there.
 - [Read the sv-tests log first](reading-the-sv-tests-log-first.md) — deltahdl's own output is already under every FAIL line.
 - [Fetching an sv-tests file](fetching-an-sv-tests-file.md) — `gh api` against `chipsalliance/sv-tests`, piped through `base64 -d`.
@@ -101,7 +98,6 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 
 ## Issues
 
-- [Solve what the session finds](solving-what-a-session-finds.md) — a case of the rule in hand joins that fix; file anything else as issues of one rule or one problem each; solve one now only if the work in hand cannot go on without it.
 - [What does not get filed](what-does-not-get-filed.md) — a case of a rule the commit in hand fixes joins the fix; a case of a rule an open issue documents joins that issue.
 - [Searching for an existing report before filing](searching-for-an-existing-report-before-filing.md) — grep all of src/ and test/ for the rule's own words before filing "not reported"; a neighbouring clause or another subsystem may already report it.
 - [One indivisible problem per issue](one-indivisible-problem-per-issue.md) — an issue of a standard holds one rule with every case of it listed, anything else one defect with one fix; two rules are split, cases of one rule merged.
@@ -115,10 +111,6 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 - [A question the rules answer is not a decision](a-question-the-rules-answer-is-not-a-decision.md) — 'needs decision' only when the reminders, the issue, its links and both standards (1800-2023 and 1800.2-2020, with the clauses citing, paralleling or named by the rule) leave the question open; order and priority never qualify; open and read the whole memory before applying the label, since this line is only its summary.
 - [Comments from other accounts are ignored](comments-from-other-accounts-are-ignored.md) — only `jdrowne` (the user, and Claude posting as them) counts on an issue; anyone else's comment never holds work, raises a decision or gets a reply.
 - [gh search returns at most 1000 issues](gh-search-returns-at-most-1000-issues.md) — list open issues with `--limit 10000` and no `--search`, filtering labels in jq; a search or a 1000 limit silently drops the oldest once more are open.
-
-## Tasks
-
-- [One action per task](one-action-per-task.md) — a subject naming several actions is divisible by construction, and so is an umbrella verb like "Solve #N"; count the steps it commits to and split by action.
 
 ## The notes themselves
 

@@ -5,19 +5,16 @@ description: Start, restart or stop the standing reminders, with or without the 
 
 # Autopilot
 
-## The nine standing reminders
+## The six standing reminders
 
 Every `start` form creates these.
 
 | Cron | Prompt |
 | --- | --- |
-| `0,15,30,45 * * * *` | `REMINDER: Work through a set of indivisible tasks, written down with TaskCreate before the work starts and marked with TaskUpdate as each one starts and finishes.` |
+| `0,15,30,45 * * * *` | `REMINDER: Work through a set of tasks, written down with TaskCreate before the work starts and marked with TaskUpdate as each one starts and finishes.` |
 | `2,17,32,47 * * * *` | `REMINDER: ~/IEEE 1800-2023.pdf is the source of truth. sv-tests was written against ~/IEEE 1800-2017.pdf, so its tags and file names carry 2017 clause numbers: read the 2017 edition only to learn what such a number meant there, resolve it to the 2023 clause, and let no 2017 number, wording or rule reach deltahdl's code, reports or tests. The UVM standard is ~/IEEE 1800.2-2020.pdf.` |
-| `3,18,33,48 * * * *` | `REMINDER: Let every push carry exactly one commit, and let that commit hold a whole body of work: a matter solved end to end or carried out in full, or a batch of every open issue of one matter (one clause of one standard fixed in one subsystem under src/), bounded by the matter and never by a count.` |
 | `6,21,36,51 * * * *` | `REMINDER: Keep the task list itself current, not only the marks on it: a task that arises is added the moment it does, a task that turns out unneeded is removed, and a task whose shape changed is rewritten, so that the list always says what is left to do.` |
-| `7,22,37,52 * * * *` | `REMINDER: While any CI run for a pushed commit is in progress, only wait: no diagnosis, edits or commits.` |
-| `8,23,38,53 * * * *` | `REMINDER: A case of the rule an issue in hand documents is part of that issue's fix, never a new issue. File anything else you find as issues: one per rule of a standard that deltahdl breaks or leaves untested, listing every case of it and labelled with both the standard it falls under (IEEE 1800-2023, IEEE 1800.2-2020 or IEEE 1735-2023) and its clause in that standard (§N or Annex X), creating the clause label first when the repository has none; or one per problem with deltahdl itself, such as a coverage gap, with neither label. Solve one now only if the work in hand cannot move forward without it; otherwise move on.` |
-| `9,24,39,54 * * * *` | `REMINDER: Ensure every task on the list is indivisible, whether it was written with TaskCreate or rewritten with TaskUpdate: read each subject as written and count the actions it names; a subject naming more than one action is divisible, whatever single purpose those actions serve, and is split into one task per action.` |
+| `8,23,38,53 * * * *` | `REMINDER: A case of the rule an issue in hand documents is part of that issue's fix, never a new issue. Fix anything else you find on the spot when that is quicker and safer than filing it, and file the rest as issues: one per rule of a standard that deltahdl breaks or leaves untested, listing every case of it and labelled with both the standard it falls under (IEEE 1800-2023, IEEE 1800.2-2020 or IEEE 1735-2023) and its clause in that standard (§N or Annex X), creating the clause label first when the repository has none; or one per problem with deltahdl itself, such as a coverage gap, with neither label.` |
 | `10,25,40,55 * * * *` | `REMINDER: Prune completed tasks off the Claude Code structured task list: set every task marked completed to the status deleted with TaskUpdate, so that the list holds only the tasks still open.` |
 | `12,27,42,57 * * * *` | `REMINDER: Fix the rule, not the example. Before fixing an issue of a standard, list every case of the rule it documents: each form the rule allows and each form it forbids, written in every place the standard lets that form appear (a module, interface, program, checker, package, class, generate block, task or function, or the compilation unit, as applies) and with every kind of operand or type the rule names. Write a test for each case, one showing a forbidden form reported beside one showing the nearest allowed form accepted without a report, and make deltahdl pass every one of them in the same commit.` |
 
@@ -30,25 +27,25 @@ On `1,16,31,46 * * * *`, by form:
 `start bysubclause`:
 
 ```text
-REMINDER: Run gh issue list --state open --limit 10000 --json number,title --jq 'map(select(.title | test("^Satisfy IEEE 1800-2023 §([A-Z]|[0-9]+)(\\.[0-9]+)*$")) | .subclause = (.title | ltrimstr("Satisfy IEEE 1800-2023 §"))) | sort_by((.subclause | split(".") | map(tonumber? // .)), .number) | (first.subclause // "" | split(".") | first) as $c | map(select(.subclause | split(".") | first == $c)) | .[] | "§\(.subclause) #\(.number)"' for the lowest subclause with an open issue tracking it, followed by the other open subclauses of its clause, each with its issue's number. Solve the first of them whatever its number, together with those of the rest whose fixes land in its subsystem under src/, as one batch pushed as one commit; when they close, the same command names the next. The open issues the command does not name are not this loop's work.
+REMINDER: Run gh issue list --state open --limit 10000 --json number,title --jq 'map(select(.title | test("^Satisfy IEEE 1800-2023 §([A-Z]|[0-9]+)(\\.[0-9]+)*$")) | .subclause = (.title | ltrimstr("Satisfy IEEE 1800-2023 §"))) | sort_by((.subclause | split(".") | map(tonumber? // .)), .number) | (first.subclause // "" | split(".") | first) as $c | map(select(.subclause | split(".") | first == $c)) | .[] | "§\(.subclause) #\(.number)"' for the lowest subclause with an open issue tracking it, followed by the other open subclauses of its clause, each with its issue's number. Solve the first of them whatever its number, taking any of the rest alongside it where that makes sense, and commit and push each piece of work once it stands on its own; when they close, the same command names the next. The open issues the command does not name are not this loop's work.
 ```
 
 `start byclause`:
 
 ```text
-REMINDER: Run gh issue list --state open --limit 10000 --json number,title,labels --jq 'map({number, title, labels: [.labels[].name]}) as $all | first(("IEEE 1800-2023", "IEEE 1800.2-2020", "IEEE 1735-2023") as $s | ($all | map(select(.labels | index([$s])))) as $std | ($std | map(.labels[] | select(test("^§[0-9]+$")) | ltrimstr("§") | tonumber) | min | if . then "§\(.)" else null end) as $c | ($std | map(.labels[] | select(test("^Annex [A-Z]$"))) | min) as $a | ($c // $a) as $l | select($l) | {standard: $s, label: $l, issues: ($std | map(select(.labels | index([$l]))))}) // null' for the open issues of the first standard, in the order IEEE 1800-2023, IEEE 1800.2-2020, IEEE 1735-2023, whose issues carry a clause label, and of the lowest numbered clause that labels one of them, or, when none carries the label of a numbered clause, of the first annex in letter order that labels one; work every Reconcile issue in the list first, as the autopilot skill's section on Reconcile issues says, then take one of the rest, together with every other issue in the list of its matter (that standard's clause or annex, fixed in its subsystem under src/), as one batch fixed test first and pushed as one commit, and run the same command again when they close. The open issues the command does not list are not this loop's work.
+REMINDER: Run gh issue list --state open --limit 10000 --json number,title,labels --jq 'map({number, title, labels: [.labels[].name]}) as $all | first(("IEEE 1800-2023", "IEEE 1800.2-2020", "IEEE 1735-2023") as $s | ($all | map(select(.labels | index([$s])))) as $std | ($std | map(.labels[] | select(test("^§[0-9]+$")) | ltrimstr("§") | tonumber) | min | if . then "§\(.)" else null end) as $c | ($std | map(.labels[] | select(test("^Annex [A-Z]$"))) | min) as $a | ($c // $a) as $l | select($l) | {standard: $s, label: $l, issues: ($std | map(select(.labels | index([$l]))))}) // null' for the open issues of the first standard, in the order IEEE 1800-2023, IEEE 1800.2-2020, IEEE 1735-2023, whose issues carry a clause label, and of the lowest numbered clause that labels one of them, or, when none carries the label of a numbered clause, of the first annex in letter order that labels one; work every Reconcile issue in the list first, as the autopilot skill's section on Reconcile issues says, then solve the rest test first, taking related issues together where that makes sense and committing and pushing each piece of work once it stands on its own, and run the same command again when they close. The open issues the command does not list are not this loop's work.
 ```
 
 `start byissuefloor <issue-number>`:
 
 ```text
-REMINDER: Run gh issue list --state open --limit 10000 --json number,title,labels --jq 'map(select(.number > {X}) | {number, title, labels: [.labels[].name]})' for the open issues above #{X}; work every Reconcile issue in the list first, as the autopilot skill's section on Reconcile issues says, then take one of the rest, together with every other issue in the list of its matter (its standard label and clause label, fixed in its subsystem under src/), as one batch fixed test first and pushed as one commit, and run the same command again when they close. The issues at or below #{X} are a person's to take rather than this loop's.
+REMINDER: Run gh issue list --state open --limit 10000 --json number,title,labels --jq 'map(select(.number > {X}) | {number, title, labels: [.labels[].name]})' for the open issues above #{X}; work every Reconcile issue in the list first, as the autopilot skill's section on Reconcile issues says, then solve the rest test first, taking related issues together where that makes sense and committing and pushing each piece of work once it stands on its own, and run the same command again when they close. The issues at or below #{X} are a person's to take rather than this loop's.
 ```
 
 `start bylabel <label>`:
 
 ```text
-REMINDER: Run gh issue list --state open --label '{L}' --limit 10000 --json number,title,labels --jq 'map({number, title, labels: [.labels[].name]})' for the open issues labelled '{L}'; work every Reconcile issue in the list first, as the autopilot skill's section on Reconcile issues says, then take one of the rest, together with every other issue in the list of its matter (its standard and clause, fixed in its subsystem under src/), as one batch fixed test first and pushed as one commit, and run the same command again when they close. The open issues without the label '{L}' are not this loop's work.
+REMINDER: Run gh issue list --state open --label '{L}' --limit 10000 --json number,title,labels --jq 'map({number, title, labels: [.labels[].name]})' for the open issues labelled '{L}'; work every Reconcile issue in the list first, as the autopilot skill's section on Reconcile issues says, then solve the rest test first, taking related issues together where that makes sense and committing and pushing each piece of work once it stands on its own, and run the same command again when they close. The open issues without the label '{L}' are not this loop's work.
 ```
 
 And these:
@@ -65,17 +62,17 @@ And these:
 
 Any form but `reminders-only` may be followed by `--skip-label <label>`, once per label, quoted when it holds a space. Each puts `map(select(all(.labels[]; .name != "<label>"))) |` and a space at the very start of the loop command's `--jq` program, adding `labels` to its `--json` fields where they are missing (the `bysubclause` form), and appends to that reminder, after a space, `An issue labelled '<label>' is left to a person, whatever else it carries.` Two labels give `map(select(all(.labels[]; .name != "needs decision"))) | map(select(all(.labels[]; .name != "blocked"))) |` and a space before the program. The label is never left out through a `--search` term: GitHub's search returns at most 1000 issues, so a search listing drops every open issue older than the newest 1000, where `--limit 10000` without one pages through them all.
 
-For any form but `reminders-only`, run the loop's `gh issue list` command once; if it names no issue, create the nine standing reminders only.
+For any form but `reminders-only`, run the loop's `gh issue list` command once; if it names no issue, create the six standing reminders only.
 
-Call `CronList`. A job on one of the form's cron slots whose prompt differs from that slot's reminder is a stale version of it: `CronDelete` it. Then `CronCreate` with `recurring: true` each reminder of the form whose prompt is not already scheduled, substituting the number for `{X}` or the label for `{L}`. Then begin solving the batch the command's first issue seeds.
+Call `CronList`. A job on one of the form's cron slots whose prompt differs from that slot's reminder is a stale version of it: `CronDelete` it. Then `CronCreate` with `recurring: true` each reminder of the form whose prompt is not already scheduled, substituting the number for `{X}` or the label for `{L}`. Then begin solving the command's first issue.
 
 ## Restart
 
 `restart` takes the forms `start` takes, with the same shorthands and the same `--skip-label` flags, and leaves scheduled exactly the reminders of the form it names, whatever was scheduled before.
 
-For any form but `reminders-only`, run the loop's `gh issue list` command once; if it names no issue, the form's reminders are the nine standing reminders only.
+For any form but `reminders-only`, run the loop's `gh issue list` command once; if it names no issue, the form's reminders are the six standing reminders only.
 
-Call `CronList`. `CronDelete` every job that is not one of the form's reminders: a job on a slot the form does not use, a job whose prompt differs from its slot's reminder, and every job but one on a slot that holds more than one. Then `CronCreate` with `recurring: true` each reminder of the form whose prompt is not scheduled after those deletions, substituting the number for `{X}` or the label for `{L}`. Then, for any form but `reminders-only`, begin solving the batch the command's first issue seeds.
+Call `CronList`. `CronDelete` every job that is not one of the form's reminders: a job on a slot the form does not use, a job whose prompt differs from its slot's reminder, and every job but one on a slot that holds more than one. Then `CronCreate` with `recurring: true` each reminder of the form whose prompt is not scheduled after those deletions, substituting the number for `{X}` or the label for `{L}`. Then, for any form but `reminders-only`, begin solving the command's first issue.
 
 ## Reconcile issues
 
@@ -89,11 +86,11 @@ The clause's open Reconcile issues are worked one at a time, in section order. E
 4. **Record.** Add the `## Rules` section of step 5 to the Reconcile issue's body through a guarded rewrite, per `.claude/memories/guarding-an-issue-body-rewrite.md`. A rule names its tests only when every case of it names one, and otherwise names its issue.
 5. **Close** the Reconcile issue.
 
-Then the clause's other issues are taken in batches, as below.
+Then the clause's other issues are taken, as below.
 
-## Batches
+## Other issues
 
-A loop takes a batch, not a single issue: the issue its command names first, with every open issue it lists of the same matter, meaning the same clause of the same standard, read from its standard label and its clause label, fixed in the same subsystem under `src/`. A Reconcile issue never joins a batch. Each issue in the batch is fixed for every case of its rule, per `.claude/memories/fixing-a-rule-in-full.md`, not only for the example it gives, and test first: each case's test is written before the code that makes it pass. The batch is solved in the working tree and pushed as one commit with one `Closes #N` line per issue. `.claude/memories/grouping-issues-into-a-push.md` gives the rule in full: why the matter bounds the batch rather than a count, which changes go in a push of their own, and how a red run is traced back to an issue.
+A Reconcile issue is never solved alongside other issues. Each other issue is fixed for every case of its rule, per `.claude/memories/fixing-a-rule-in-full.md`, not only for the example it gives, and test first: each case's test is written before the code that makes it pass. Related issues may be solved together. Each piece of work is committed and pushed once it stands on its own, with one `Closes #N` line per issue it solves.
 
 ## Stop
 

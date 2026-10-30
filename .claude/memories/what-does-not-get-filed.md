@@ -18,4 +18,4 @@ A case of a rule an open issue already documents. It is added to that issue's li
 
 **Why:** A second issue over one rule gives one piece of work two entries. Closing either leaves the other claiming there is something left, or leaves the rule half-fixed under a closed issue.
 
-**How to apply:** Before filing anything, whether a finding of research per [research-lives-in-issues](research-lives-in-issues.md) or one the user asked to have tracked, ask whether the change in hand already reaches it, and search the tracker for an open issue of its rule. Everything else is filed, per [solving-what-a-session-finds](solving-what-a-session-finds.md).
+**How to apply:** Before filing anything, whether a finding of research per [research-lives-in-issues](research-lives-in-issues.md) or one the user asked to have tracked, ask whether the change in hand already reaches it, and search the tracker for an open issue of its rule. Everything else is fixed on the spot when that is quicker and safer than filing it, and filed otherwise.

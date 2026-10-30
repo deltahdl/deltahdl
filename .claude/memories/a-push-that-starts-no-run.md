@@ -20,8 +20,8 @@ same paths started one.
 **Why:** The workflow's own trigger list holds `workflow_dispatch` beside
 `push`, so a run can be started by hand on main, and it runs the commit at
 main's head with the same jobs a push would have started. Waiting longer
-gets nothing, and pushing again to provoke a run would need a commit that is
-no body of work, which [[one-commit-is-a-whole-body-of-work]] rules out.
+gets nothing, and pushing again to provoke a run would need an empty commit
+that changes nothing.
 
 **How to apply:** When a watcher finds no run for a pushed commit after
 several minutes, check the commit's check suites; at 0, run

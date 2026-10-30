@@ -24,7 +24,7 @@ Write a test for each case and make deltahdl pass all of them in the same commit
 
 - Draw the list from the clause itself, per [[lrm-source-of-truth]]; the cases the issue names are a start, not the whole.
 - For each forbidden form, write one test that it is reported, per [[naming-the-report-in-a-rejection-test]], and one that the nearest allowed form is accepted without a report.
-- Add a case found while fixing to the fix, never to a new issue ([[solving-what-a-session-finds]]).
+- Add a case found while fixing to the fix, never to a new issue.
 - Choose inputs that tell correct code from incorrect ([[discriminating-test-inputs]]).
 - Push the tests with the fix and let the run say which pass.
 - An issue about deltahdl itself, such as a coverage gap, has no rule behind it; fix the problem it names.
