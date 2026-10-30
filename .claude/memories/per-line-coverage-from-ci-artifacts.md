@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: reference
   originSessionId: db1b45f3-3ddb-419c-ae00-cf0b0b977fee
-  modified: 2026-10-19T20:49:49.957Z
+  modified: 2026-10-29T18:55:38.802Z
 ---
 
 # Per-line coverage from CI artifacts
@@ -28,7 +28,12 @@ guessing which branch went unrun:
 3. Read those line numbers against `git show <sha>:<path>`, the source as the
    run built it.
 
-Homebrew's `/opt/homebrew/opt/llvm/bin` tools read the Linux objects.
+Use the Homebrew LLVM of the major CI ran, `/opt/homebrew/opt/llvm@<major>/bin`
+(the assert-coverage log prints `major: N`), which reads the Linux objects.
+A newer major refuses the raw profiles of an older one, since each major
+writes its own raw format version, and the merge then ends "no profile can
+be merged"; the default `llvm` formula floats ahead of CI's
+[[unpinned-ci-toolchain]].
 
 **Why:** a guess at the missed line cost a whole CI round more than once; the
 report gives a count, and two plausible branches can share a file.
