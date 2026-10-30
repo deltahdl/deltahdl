@@ -76,7 +76,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 
 - [A rule conforms only when tests show it](a-rule-conforms-only-when-tests-show-it.md) — checking a clause, a case conforms only when a test in the tree exercises it and asserts the standard's outcome; reading src/ never settles it, an untested case is filed, and the tests and open issues are the only record of conformance.
 - [Reading a CI run](reading-a-ci-run.md) — `gh run list --limit 1` before pushing, `gh run view --log-failed` after.
-- [Per-line coverage from CI artifacts](per-line-coverage-from-ci-artifacts.md) — the coverage log counts misses per file; read the missed lines from the run's coverage-simulator and profile artifacts with the local llvm@<major> of the major CI ran; a newer llvm refuses its raw profiles.
+- [Per-line coverage from CI artifacts](per-line-coverage-from-ci-artifacts.md) — the coverage log counts misses per file; read the missed lines from the run's coverage-simulator and profile artifacts with the local `llvm@<major>` of the major CI ran; a newer llvm refuses its raw profiles.
 - [Fetching a failed job's log](fetching-a-failed-job-log.md) — when `--log-failed` breaks off or comes back empty, fetch each failed job through `gh api --allow-escape-sequences .../actions/jobs/<id>/logs`.
 - [gh run list --commit takes a full SHA](gh-run-list-commit-takes-a-full-sha.md) — pass `$(git rev-parse HEAD)`; a short SHA lists no run, and a watcher waiting on it never ends.
 - [A push that starts no run](a-push-that-starts-no-run.md) — a pushed commit with no check suite gets its run from `gh workflow run deltahdl.yml --ref main`; waiting brings none.
