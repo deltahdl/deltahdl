@@ -32,9 +32,15 @@ inline DpiSymbolLookup LookupIn(const std::map<std::string, void*>& functions) {
 }
 
 // The directory under the test's temporary directory a binding builds its
-// calls in.
+// calls in, one for each test: ctest runs every test in a process of its own,
+// several at once, and tests sharing `name` overwrote each other's library
+// while another loaded it.
 inline std::filesystem::path CallBuildDir(const std::string& name) {
-  return std::filesystem::path(::testing::TempDir()) / name;
+  std::filesystem::path dir =
+      std::filesystem::path(::testing::TempDir()) / name;
+  const auto* test = ::testing::UnitTest::GetInstance()->current_test_info();
+  if (test == nullptr) return dir;
+  return dir / (std::string(test->test_suite_name()) + "." + test->name());
 }
 
 // Elaborates and lowers `src`, binds the imports it declares to `functions`
