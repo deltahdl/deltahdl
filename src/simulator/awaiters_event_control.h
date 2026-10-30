@@ -27,6 +27,7 @@
 #include "common/types.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
+#include "simulator/class_event_property.h"
 #include "simulator/class_object.h"
 #include "simulator/clocking.h"
 #include "simulator/evaluation.h"
@@ -422,6 +423,7 @@ struct EventAwaiter {
                               ResumeTarget{ctx, proc, true}, consumed);
         continue;
       }
+      if (AttachTriggeredWatcher(ev, h, proc, consumed)) continue;
       if (ev.signal->kind != ExprKind::kIdentifier &&
           ev.signal->kind != ExprKind::kMemberAccess) {
         AttachCompoundWatchers(ev, h, proc, consumed);
@@ -783,6 +785,47 @@ struct EventAwaiter {
                                EdgeSpec{edge, iff_cond},
                                ResumeTarget{*ctx_ptr, proc});
     });
+  }
+
+  // §15.5.3 with §9.4.2 and §13.5.5: the named event whose `triggered` method
+  // the operand calls, written `e.triggered` or `e.triggered()`, else null. The
+  // prefix may be a name, a hierarchical name or a class's event property.
+  static Variable* TriggeredMethodEvent(const Expr* signal, SimContext& ctx) {
+    const Expr* access = signal->kind == ExprKind::kCall ? signal->lhs : signal;
+    if (access == nullptr || access->kind != ExprKind::kMemberAccess ||
+        access->is_scope_resolution || access->lhs == nullptr ||
+        MemberAccessField(access) != "triggered") {
+      return nullptr;
+    }
+    Variable* event = ResolveSignalToVariable(access->lhs, ctx);
+    if (event == nullptr)
+      event = ClassEventVariable(access->lhs, ctx, ctx.GetArena());
+    return event != nullptr && event->is_event ? event : nullptr;
+  }
+
+  // §15.5.3: an operand calling `triggered` is reevaluated when its event is
+  // triggered, the change of its operand, and never as the triggered state
+  // lapses when time advances, which changes no operand. The watcher is armed
+  // on the event itself: `e.triggered` names no variable, and descending into
+  // `s.e.triggered` would arm on the handle `s`, which a trigger never writes.
+  bool AttachTriggeredWatcher(const EventExpr& ev, std::coroutine_handle<> h,
+                              Process* proc,
+                              const std::shared_ptr<bool>& consumed) {
+    Variable* event = TriggeredMethodEvent(ev.signal, ctx);
+    if (event == nullptr) return false;
+    auto prev = std::make_shared<Logic4Snapshot>();
+    prev->Capture(EvalExpr(ev.signal, ctx, ctx.GetArena()));
+    auto* ctx_ptr = &ctx;
+    const Expr* signal = ev.signal;
+    const Expr* iff_cond = ev.iff_condition;
+    Edge edge = ev.edge;
+    event->AddWatcher(
+        [h, prev, consumed, signal, edge, iff_cond, ctx_ptr, proc]() mutable {
+          return EvalCompoundWatcher(h, CompoundOperand{prev, consumed, signal},
+                                     EdgeSpec{edge, iff_cond},
+                                     ResumeTarget{*ctx_ptr, proc});
+        });
+    return true;
   }
 
   void AttachCompoundWatchers(const EventExpr& ev, std::coroutine_handle<> h,
