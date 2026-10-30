@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -166,6 +168,107 @@ TEST(DefaultClockingElab, NestedModuleNamesEnclosingClockingBlock) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "default clocking \"nosuch\" does not name", 9,
                             "14.12"));
+}
+
+// The design-element keywords §14.12 limits to one default clocking apiece
+// beside a module, and the source of one such element holding two clocking
+// blocks and then `first` and `second` on lines 4 and 5, instantiated by a
+// top module.
+const char* const kDefaultScopes[] = {"interface", "program", "checker"};
+
+static std::string ScopeWithDefaults(const std::string& kind,
+                                     const std::string& first,
+                                     const std::string& second) {
+  return kind + " s(input logic clk);\n" +
+         "  clocking c1 @(posedge clk); endclocking\n"
+         "  clocking c2 @(negedge clk); endclocking\n"
+         "  " +
+         first + "\n  " + second + "\nend" + kind +
+         "\n"
+         "module top; logic clk; s u(clk); endmodule\n";
+}
+
+static void ExpectSecondDefaultReported(const std::string& first,
+                                        const std::string& second) {
+  for (const char* kind : kDefaultScopes) {
+    SCOPED_TRACE(kind);
+    ElabFixture f;
+    auto* design =
+        ElaborateSrc(ScopeWithDefaults(kind, first, second), f, "top");
+    ASSERT_NE(design, nullptr);
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "only one default clocking block is allowed per "
+                              "scope",
+                              5, "14.12"));
+  }
+}
+
+// §14.12: an interface, a program and a checker each specify one default
+// clocking at most, so a second inline default clocking block in any of them
+// is reported at the second.
+TEST(DefaultClockingElab, SecondInlineDefaultInEachScopeIsReported) {
+  ExpectSecondDefaultReported(
+      "default clocking d1 @(posedge clk); endclocking",
+      "default clocking d2 @(negedge clk); endclocking");
+}
+
+// §14.12: the same with the second default named by a statement after an
+// inline one.
+TEST(DefaultClockingElab, InlineThenNamedDefaultInEachScopeIsReported) {
+  ExpectSecondDefaultReported("default clocking d1 @(posedge clk); endclocking",
+                              "default clocking c1;");
+}
+
+// §14.12: the same with both defaults named by statements.
+TEST(DefaultClockingElab, TwoNamedDefaultsInEachScopeAreReported) {
+  ExpectSecondDefaultReported("default clocking c1;", "default clocking c2;");
+}
+
+// §14.12: the nearest allowed form beside the three above -- one default in
+// each scope, by either way of writing it, is accepted without a report.
+TEST(DefaultClockingElab, OneDefaultInEachScopeIsAccepted) {
+  for (const char* kind : kDefaultScopes) {
+    for (const char* only : {"default clocking d1 @(posedge clk); endclocking",
+                             "default clocking c1;"}) {
+      SCOPED_TRACE(std::string(kind) + ": " + only);
+      ElabFixture f;
+      auto* design = ElaborateSrc(ScopeWithDefaults(kind, only, ""), f, "top");
+      ASSERT_NE(design, nullptr);
+      EXPECT_FALSE(f.has_errors);
+    }
+  }
+}
+
+// §14.12: the limit is one default per design element, so defaults in
+// different elements -- an interface and a program, a module and the module
+// nested inside it, a checker and the module instantiating it -- are accepted
+// without a report.
+TEST(DefaultClockingElab, DefaultsInDifferentElementsAreAccepted) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "interface i(input logic clk);\n"
+      "  default clocking di @(posedge clk); endclocking\n"
+      "endinterface\n"
+      "program p(input logic clk);\n"
+      "  default clocking dp @(posedge clk); endclocking\n"
+      "endprogram\n"
+      "checker c(input logic clk);\n"
+      "  default clocking dc @(posedge clk); endclocking\n"
+      "endchecker\n"
+      "module top;\n"
+      "  logic clk;\n"
+      "  default clocking dt @(posedge clk); endclocking\n"
+      "  module inner;\n"
+      "    default clocking dn @(negedge clk); endclocking\n"
+      "  endmodule\n"
+      "  inner n();\n"
+      "  i ui(clk);\n"
+      "  p up(clk);\n"
+      "  c uc(clk);\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
 }
 
 }  // namespace
