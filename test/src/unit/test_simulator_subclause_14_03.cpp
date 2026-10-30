@@ -469,4 +469,32 @@ TEST(ClockingBlockSim, LoopGenerateInstancesDeclareTheirOwnClockingBlocks) {
             "in0:20 in1:21 out:20\n$finish at time 7\n");
 }
 
+// §14.3: the iff of a clocking event names the signals of the block's own
+// instance whoever writes the clock. A program drives the clock of a top
+// module's block: at 10 the module's en is 0 and no clocking event occurs,
+// and at 20, en being 1, one does. Evaluated in the program's scope, the
+// condition found no en and the block never fired.
+TEST(ClockingBlockSim,
+     ClockIffReadsTheBlocksInstanceWhenAProgramDrivesTheClock) {
+  SimFixture f;
+  std::string out = RunCaptureAllTops(
+      "module m;\n"
+      "  logic clk = 0, en = 0;\n"
+      "  clocking cb @(posedge clk iff en);\n"
+      "  endclocking\n"
+      "endmodule\n"
+      "program p;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      forever begin @(m.cb); $display(\"event %0t\", $time); end\n"
+      "    join_none\n"
+      "    #10 m.clk = 1;\n"
+      "    #5 m.clk = 0;\n"
+      "    #5 m.en = 1; m.clk = 1;\n"
+      "    #5 $finish;\n"
+      "  end\n"
+      "endprogram\n",
+      f);
+  EXPECT_EQ(out, "event 20\n$finish at time 25\n");
+}
 }  // namespace

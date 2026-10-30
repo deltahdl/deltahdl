@@ -101,11 +101,17 @@ static std::string_view ClockvarPath(const ClockingSignal& sig) {
 // `@(posedge top.clk)` and `output d = top.d`, which reaches nothing joined to
 // the prefix, so it is resolved as a reference written in that instance is,
 // SimContext::FindVariable walking the path from there, `$root` and a top
-// module's name at its head included.
+// module's name at its head included. The joined name is a full one, read
+// from the root whatever process ran last: a clocking event processed in the
+// Observed region after a program wrote a signal ran with the program
+// current, and the bare name of a top module's signal reached nothing in it.
 static Variable* FindInBlockInstance(std::string_view inst_prefix,
                                      std::string_view path, SimContext& ctx) {
-  if (auto* var = ctx.FindVariable(ClockingSignalName(inst_prefix, path))) {
-    return var;
+  {
+    InstancePrefixOverride at_root(ctx.InstancePrefixOverride(), "");
+    if (auto* var = ctx.FindVariable(ClockingSignalName(inst_prefix, path))) {
+      return var;
+    }
   }
   if (path.find('.') == std::string_view::npos) return nullptr;
   InstancePrefixOverride in_block(ctx.InstancePrefixOverride(), inst_prefix);
@@ -151,7 +157,11 @@ const ClockingBlock* ClockingManager::FindInScope(std::string_view name,
     }
   }
   if (const auto* block = Find(kInstPrefix + std::string(name))) return block;
-  return Find(name);
+  if (const auto* block = Find(name)) return block;
+  // §23.6: a path headed by a top-level module's name, `t.u.cb`, or `m.cb` of
+  // a top m, is read from that top, whose own blocks are keyed under no
+  // prefix.
+  return Find(ctx.RootedStorageKey(name));
 }
 
 SimTime ClockingManager::GetInputSkew(std::string_view block_name,
@@ -209,9 +219,6 @@ struct ClockWatch {
 // variables, so it is evaluated from that instance.
 static bool ClockIffHolds(const ClockWatch& watch, SimContext& ctx) {
   if (watch.iff == nullptr) return true;
-  if (watch.inst_prefix.empty()) {
-    return EvalExpr(watch.iff, ctx, ctx.GetArena()).IsTruthy();
-  }
   InstancePrefixOverride in_block(ctx.InstancePrefixOverride(),
                                   watch.inst_prefix);
   return EvalExpr(watch.iff, ctx, ctx.GetArena()).IsTruthy();
@@ -221,7 +228,6 @@ static bool ClockIffHolds(const ClockWatch& watch, SimContext& ctx) {
 // name is that instance's own signal.
 static Logic4Vec EvalInBlockInstance(std::string_view inst_prefix,
                                      const Expr* expr, SimContext& ctx) {
-  if (inst_prefix.empty()) return EvalExpr(expr, ctx, ctx.GetArena());
   InstancePrefixOverride in_block(ctx.InstancePrefixOverride(), inst_prefix);
   return EvalExpr(expr, ctx, ctx.GetArena());
 }

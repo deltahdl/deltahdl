@@ -286,4 +286,174 @@ TEST(ClockingSampleSim, ClockvarKeepsUnknownBitsAndEveryWord) {
             "$finish at time 6\n");
 }
 
+// §14.13: an explicit #0 input is sampled in the Observed region of its
+// clocking event's time step and not again when the Reactive region's writes
+// run the Active, NBA and Observed regions over without a new clocking event.
+// A program writes an input, an inout clockvar's signal and a 1step input
+// after the event, and its write of v wakes a module process whose
+// nonblocking assignment writes a fourth input; once that has run, every
+// clockvar still reads what the event sampled, 0.
+TEST(ClockingSampleSim, ZeroSkewInputKeepsItsSampleThroughReactiveWrites) {
+  SimFixture f;
+  std::string out = RunCaptureAllTops(
+      "module m;\n"
+      "  logic clk = 0, v = 0, w = 0, u = 0, n = 0;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input #0 v, n;\n"
+      "    input #0 output w;\n"
+      "    input #1step u;\n"
+      "  endclocking\n"
+      "  always @(v) n <= v;\n"
+      "  initial #10 clk = 1;\n"
+      "endmodule\n"
+      "program p;\n"
+      "  initial begin\n"
+      "    @(m.cb);\n"
+      "    m.v = 1; m.w = 1; m.u = 1;\n"
+      "    wait (m.n == 1);\n"
+      "    $display(\"%b%b%b%b %0t\", m.cb.v, m.cb.w, m.cb.n, m.cb.u, $time);\n"
+      "  end\n"
+      "endprogram\n",
+      f);
+  EXPECT_EQ(out, "0000 10\n");
+}
+
+// §14.13: the nearest contrast to the one above -- the program's writes make
+// a new clocking event in the same time step, so the #0 input is sampled
+// again and reads the 1 written, while the 1step input still reads the value
+// from before the time step, 0. The new event was processed with the program
+// current, and the #0 input, named from that scope, sampled nothing.
+TEST(ClockingSampleSim, ZeroSkewInputResamplesOnANewEventInTheTimeStep) {
+  SimFixture f;
+  std::string out = RunCaptureAllTops(
+      "module m;\n"
+      "  logic clk = 0, v = 0, u = 0;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input #0 v;\n"
+      "    input #1step u;\n"
+      "  endclocking\n"
+      "  initial #10 clk = 1;\n"
+      "endmodule\n"
+      "program p;\n"
+      "  initial begin\n"
+      "    @(m.cb);\n"
+      "    m.v = 1; m.u = 1;\n"
+      "    fork\n"
+      "      begin @(m.cb); $display(\"%b%b %0t\", m.cb.v, m.cb.u, $time); "
+      "end\n"
+      "      begin m.clk = 0; #0 m.clk = 1; end\n"
+      "    join\n"
+      "  end\n"
+      "endprogram\n",
+      f);
+  EXPECT_EQ(out, "10 10\n");
+}
+
+// §14.13 with §23.6: a clockvar read through a path is the block's latest
+// sample whichever way the path is written -- headed by a top module's name,
+// `t.cb.v` of the top's own block and `t.u.cb.v` of its instance's, or
+// downward from the reader, `u.cb.v` -- and from a module or a program. Read
+// through a path from the root, the block was not found and the read gave the
+// value before the first clocking event.
+TEST(ClockingSampleSim, ClockvarReadThroughAnyPathIsTheLatestSample) {
+  SimFixture f;
+  std::string out = RunCaptureAllTops(
+      "module c;\n"
+      "  logic clk = 0, v = 0;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input v;\n"
+      "  endclocking\n"
+      "  initial begin #10 clk = 1; #5 v = 1; #5 clk = 0; #10 clk = 1; end\n"
+      "endmodule\n"
+      "module t;\n"
+      "  logic clk = 0, v = 0;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input v;\n"
+      "  endclocking\n"
+      "  initial begin #10 clk = 1; #5 v = 1; #5 clk = 0; #10 clk = 1; end\n"
+      "  c u();\n"
+      "  initial #31 $display(\"%b%b%b\", t.cb.v, t.u.cb.v, u.cb.v);\n"
+      "endmodule\n"
+      "program p;\n"
+      "  initial #32 $display(\"%b%b\", t.cb.v, t.u.cb.v);\n"
+      "endprogram\n",
+      f);
+  EXPECT_EQ(out, "111\n11\n");
+}
+
+// §14.13 with §14.15 and §23.6: an event control and a wait on a clockvar
+// named through a path from the root are told of the block's samples, and a
+// wait on the block's event wakes at the event, all at 20 when the program's
+// write of the clock makes it.
+TEST(ClockingSampleSim, WaitsOnAClockvarPathFromTheRootWakeAtTheSample) {
+  SimFixture f;
+  std::string out = RunCaptureAllTops(
+      "module m;\n"
+      "  logic clk = 0, v = 0;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input v;\n"
+      "  endclocking\n"
+      "endmodule\n"
+      "program p;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      begin @(m.cb.v); $display(\"event control %0t\", $time); end\n"
+      "      begin wait (m.cb.v == 1); $display(\"wait %0t\", $time); end\n"
+      "    join_none\n"
+      "    #15 m.v = 1;\n"
+      "    #5 m.clk = 1;\n"
+      "    #5 $finish;\n"
+      "  end\n"
+      "endprogram\n",
+      f);
+  EXPECT_EQ(out, "event control 20\nwait 20\n$finish at time 25\n");
+}
+
+// §14.13: the same two answers for a block declared in an interface instance
+// and for one declared in a program, whose inputs name a module's signals.
+// Each #0 input keeps its sample through the program's writes, read by the
+// #0 control as 0, and is sampled again on the new clocking event the
+// program's writes make, reading 1 beside the 1step input's 0.
+TEST(ClockingSampleSim, ZeroSkewInputRuleHoldsInAnInterfaceAndAProgram) {
+  SimFixture f;
+  std::string out = RunCaptureAllTops(
+      "interface bus;\n"
+      "  logic clk = 0, v = 0, u = 0;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input #0 v;\n"
+      "    input #1step u;\n"
+      "  endclocking\n"
+      "  initial #10 clk = 1;\n"
+      "endinterface\n"
+      "module t;\n"
+      "  bus b();\n"
+      "  logic clk = 0, v = 0, u = 0;\n"
+      "  initial #20 clk = 1;\n"
+      "endmodule\n"
+      "program p;\n"
+      "  clocking pb @(posedge t.clk);\n"
+      "    input #0 v = t.v;\n"
+      "    input #1step u = t.u;\n"
+      "  endclocking\n"
+      "  initial begin\n"
+      "    @(t.b.cb);\n"
+      "    t.b.v = 1; t.b.u = 1;\n"
+      "    #0 $display(\"%b%b\", t.b.cb.v, t.b.cb.u);\n"
+      "    fork\n"
+      "      begin @(t.b.cb); $display(\"%b%b\", t.b.cb.v, t.b.cb.u); end\n"
+      "      begin t.b.clk = 0; #0 t.b.clk = 1; end\n"
+      "    join\n"
+      "    @(pb);\n"
+      "    t.v = 1; t.u = 1;\n"
+      "    #0 $display(\"%b%b\", pb.v, pb.u);\n"
+      "    fork\n"
+      "      begin @(pb); $display(\"%b%b %0t\", pb.v, pb.u, $time); end\n"
+      "      begin t.clk = 0; #0 t.clk = 1; end\n"
+      "    join\n"
+      "  end\n"
+      "endprogram\n",
+      f);
+  EXPECT_EQ(out, "00\n10\n00\n10 20\n");
+}
+
 }  // namespace

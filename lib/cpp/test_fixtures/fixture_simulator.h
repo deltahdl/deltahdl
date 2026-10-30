@@ -172,13 +172,26 @@ inline Variable* RunAndFindVar(const std::string& src, SimFixture& f,
 // stdout. A source that does not elaborate produces no run and so no output,
 // which a test reads as the empty string. The fixture is caller-owned, so its
 // diagnostics stay inspectable afterwards.
-inline std::string RunCapture(const std::string& src, SimFixture& f) {
+inline std::string RunCaptureDesign(
+    RtlirDesign* (*elaborate)(const std::string&, SimFixture&),
+    const std::string& src, SimFixture& f) {
   std::ostringstream captured;
   std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
-  auto* design = ElaborateSrc(src, f);
+  auto* design = elaborate(src, f);
   if (design != nullptr) LowerAndRun(design, f);
   std::cout.rdbuf(old_buf);
   return captured.str();
+}
+
+inline std::string RunCapture(const std::string& src, SimFixture& f) {
+  return RunCaptureDesign(ElaborateSrc, src, f);
+}
+
+// RunCapture with every uninstantiated module and program a top
+// (ElaborateSrcAllTops), for a case whose program or parallel hierarchy
+// ElaborateSrc's choice of one top would leave unelaborated.
+inline std::string RunCaptureAllTops(const std::string& src, SimFixture& f) {
+  return RunCaptureDesign(ElaborateSrcAllTops, src, f);
 }
 
 // The first diagnostic at or after position `from` whose message contains
