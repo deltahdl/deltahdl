@@ -146,6 +146,30 @@ static bool EventElementKey(const Expr* expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
+// The event at the position a one-index select `q[i]` names in the queue of
+// events `q`, held there by its identity; null where the queue holds no events
+// or the index is unknown or past its end.
+static Variable* QueueEventElement(const QueueObject& q, const Expr* select,
+                                   SimContext& ctx, Arena& arena) {
+  Logic4Vec index = EvalExpr(select->index, ctx, arena);
+  uint64_t i = index.ToUint64();
+  if (!q.holds_events || !index.IsKnown() || i >= q.elements.size()) {
+    return nullptr;
+  }
+  return ctx.EventOfIdentity(q.elements[i].ToUint64());
+}
+
+// The event of an associative array's element under `key`, made on its first
+// reference so that every trigger and wait of that key reaches one event.
+static Variable* NewAssocEventElement(std::string key, SimContext& ctx,
+                                      Arena& arena) {
+  auto* stored =
+      arena.Create<std::string>(ctx.ActiveInstancePrefix() + std::move(key));
+  Variable* elem = ctx.CreateVariable(*stored, 1);
+  elem->is_event = true;
+  return elem;
+}
+
 Variable* EventArrayElement(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr == nullptr || expr->kind != ExprKind::kSelect) return nullptr;
   std::string key;
@@ -155,23 +179,13 @@ Variable* EventArrayElement(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (base == nullptr || !base->is_event) return nullptr;
   bool one_index = expr->base == root;
   if (const QueueObject* q = ctx.FindQueue(root->text)) {
-    if (!one_index) return nullptr;
-    Logic4Vec index = EvalExpr(expr->index, ctx, arena);
-    uint64_t i = index.ToUint64();
-    if (!q->holds_events || !index.IsKnown() || i >= q->elements.size()) {
-      return nullptr;
-    }
-    return ctx.EventOfIdentity(q->elements[i].ToUint64());
+    return one_index ? QueueEventElement(*q, expr, ctx, arena) : nullptr;
   }
   if (Variable* elem = ctx.FindVariable(key)) {
     return elem->is_event ? elem : nullptr;
   }
   if (!one_index || ctx.FindAssocArray(root->text) == nullptr) return nullptr;
-  auto* stored =
-      arena.Create<std::string>(ctx.ActiveInstancePrefix() + std::move(key));
-  Variable* elem = ctx.CreateVariable(*stored, 1);
-  elem->is_event = true;
-  return elem;
+  return NewAssocEventElement(std::move(key), ctx, arena);
 }
 
 Logic4Vec EventIdentityOf(const Expr* expr, SimContext& ctx, Arena& arena) {
