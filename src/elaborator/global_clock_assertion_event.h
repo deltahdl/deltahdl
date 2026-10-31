@@ -63,6 +63,25 @@ bool SubstituteGlobalClockLeadingEvent(
 Stmt* SubstituteGlobalClockEventControls(
     Stmt* stmt, const std::vector<EventExpr>& global_event, Arena& arena);
 
+// §14.14: $global_clock in an actual argument of a checker instance resolves
+// where the actual is substituted, which is inside the checker, so a clocking
+// event $global_clock written in a sequence or property actual,
+// `@($global_clock) a`, waits on the checker's effective global clocking's
+// event `global_event`. Returns `actual` itself where its tree writes no such
+// event, or `global_event` is empty; otherwise a copy whose tree is its own,
+// rewritten as SubstituteGlobalClockLeadingEvent rewrites a leading clock.
+Expr* SubstituteGlobalClockInActual(Expr* actual,
+                                    const std::vector<EventExpr>& global_event,
+                                    Arena& arena);
+
+// §14.14: $global_clock in an actual argument of a sequence or property
+// instance resolves where the instance is used, so the instance `call`, a
+// whole assertion spec, waits on the event `global_event` of the scope that
+// asserts it. Returns `call` itself where no actual writes such an event;
+// otherwise a copy whose actuals SubstituteGlobalClockInActual rewrote.
+Expr* SubstituteGlobalClockInInstanceActuals(
+    Expr* call, const std::vector<EventExpr>& global_event, Arena& arena);
+
 // §14.14 lookup rule b): a $global_clock reference in a scope that declares no
 // global clocking of its own resolves against the declaration of the nearest
 // enclosing instance, the result being that declaration's event expression.

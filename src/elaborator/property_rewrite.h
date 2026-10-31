@@ -45,6 +45,11 @@ class PropertyRegistry {
   // of the scope take the name over an import.
   void RegisterAs(std::string_view name, const ModuleItem* decl);
 
+  // §23.9: `decl`, declared in a generate block, registered under its name
+  // for the block's items, over a declaration of the enclosing scope of that
+  // name.
+  void RegisterShadowing(const ModuleItem* decl);
+
   const ModuleItem* Find(std::string_view name) const;
 
   // §16.8 and §16.12: the names of the declarations `decl` depends on, the

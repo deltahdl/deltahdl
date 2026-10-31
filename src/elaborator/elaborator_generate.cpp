@@ -496,6 +496,18 @@ void Elaborator::ElaborateGenerateItems(const std::vector<ModuleItem*>& items,
   if (Expr* own = DeclaredDefaultDisableIff(items)) {
     mod->default_disable_iff = own;
   }
+  // §16.8 and §16.12 with §23.9: a property or sequence a generate block
+  // declares is named by the block's assertions, wherever it stands among
+  // the items; the enclosing scope's registry is put back after them.
+  std::optional<PropertyRegistry> enclosing_registry;
+  for (const ModuleItem* item : items) {
+    if (item->kind != ModuleItemKind::kPropertyDecl &&
+        item->kind != ModuleItemKind::kSequenceDecl) {
+      continue;
+    }
+    if (!enclosing_registry) enclosing_registry = property_registry_;
+    property_registry_.RegisterShadowing(item);
+  }
   for (auto* item : items) {
     switch (item->kind) {
       case ModuleItemKind::kGenerateIf:
@@ -551,6 +563,7 @@ void Elaborator::ElaborateGenerateItems(const std::vector<ModuleItem*>& items,
                            forward_typedef_kinds_, td_array_dims_);
   gen_prefix_scopes_ = std::move(entry_prefix_scopes);
   mod->default_disable_iff = enclosing_default_disable_iff;
+  if (enclosing_registry) property_registry_ = std::move(*enclosing_registry);
   gen_const_scope_ = saved_gen_const_scope;
 }
 

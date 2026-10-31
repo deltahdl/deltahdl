@@ -411,10 +411,23 @@ Expr* ParserPropertySpecHelpers::TryParsePropertyInstance(Parser& p) {
   auto saved = p.lexer_.SavePos();
   p.diag_.PushSuppress();
   Token name = p.Consume();
+  std::string_view callee = name.text;
+  // §16.12 with §26.3: the name of a property or sequence declared in a
+  // package, written with the package's, `pk::pr`.
+  if (p.Match(TokenKind::kColonColon)) {
+    if (!p.Check(TokenKind::kIdentifier)) {
+      p.diag_.PopSuppress();
+      p.lexer_.RestorePos(saved);
+      return nullptr;
+    }
+    Token member = p.Consume();
+    callee = *p.arena_.Create<std::string>(std::string(name.text) +
+                                           "::" + std::string(member.text));
+  }
   auto* call = p.arena_.Create<Expr>();
   call->kind = ExprKind::kCall;
-  call->callee = name.text;
-  call->text = name.text;
+  call->callee = callee;
+  call->text = callee;
   call->range.start = name.loc;
   bool plain = true;
   bool ok =
@@ -601,11 +614,18 @@ PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyAbort(Parser& p) {
 // §16.13.2: `@(event_list)` before an operand, the clock the operand is
 // evaluated on from its nearest tick; the operand it reads is the term
 // after it, a sequence with the clock on its operands where the term is
-// one.
+// one. A.6.5's clocking_event also writes the clock as a name after `@`
+// with no parentheses, `@clk`, and §14.14 and §16.5.2 write `@$global_clock`
+// so.
 PropertyExprNode* ParserPropertySpecHelpers::ParseClockedTerm(Parser& p) {
-  if (!p.Match(TokenKind::kLParen)) return nullptr;
-  std::vector<EventExpr> clock = p.ParseEventList();
-  if (!p.Match(TokenKind::kRParen) || clock.empty()) return nullptr;
+  std::vector<EventExpr> clock;
+  if (p.Match(TokenKind::kLParen)) {
+    clock = p.ParseEventList();
+    if (!p.Match(TokenKind::kRParen)) return nullptr;
+  } else {
+    clock.push_back(p.ParseNamedClockingEvent());
+  }
+  if (clock.empty() || clock[0].signal == nullptr) return nullptr;
   auto* operand = ParsePropertyTerm(p);
   if (operand != nullptr && operand->clock.empty()) operand->clock = clock;
   return operand;

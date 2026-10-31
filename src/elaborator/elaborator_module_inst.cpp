@@ -717,6 +717,7 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
       CountUnitUwireDrivers(unit_uwire_drivers_);
   ElaborateChildInstance(inst, item, child_decl, mod, parent_scope);
   BindPorts(inst, item, mod, child_decl);
+  BindCheckerTreeActuals(inst);
 
   std::vector<uint32_t> inst_dim_sizes;
   uint32_t total_instances =
@@ -803,6 +804,18 @@ void Elaborator::ElaborateChildInstance(RtlirModuleInst& inst,
   nested_module_decls_ = std::move(saved_nested);
   MarkConfigLockedParams(inst, config_locked);
   if (delegated != nullptr) LeaveDelegatedConfig();
+}
+
+// §17.3 with §14.14: a checker's sequence and property actuals are bound as
+// the checker's elaboration resolved them, $global_clock among their clocks
+// being its effective global clocking's event.
+void Elaborator::BindCheckerTreeActuals(RtlirModuleInst& inst) {
+  auto found = checker_tree_actuals_.find(inst.resolved);
+  if (found == checker_tree_actuals_.end()) return;
+  for (RtlirPortBinding& binding : inst.port_bindings) {
+    auto actual = found->second.find(binding.port_name);
+    if (actual != found->second.end()) binding.connection = actual->second;
+  }
 }
 
 void Elaborator::CheckInstancePorts(RtlirModuleInst& inst,

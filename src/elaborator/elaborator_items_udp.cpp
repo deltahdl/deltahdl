@@ -444,7 +444,8 @@ bool ImportsName(const std::vector<ModuleItem*>& items, std::string_view pkg,
   return false;
 }
 
-// §16.8 and §16.12 with §26.3: the named sequences and properties declared in
+// §16.8 and §16.12 with §26.3: the named sequences and properties the
+// compilation unit declares are reached by their names, and those declared in
 // a package are reached from the module through the package scope,
 // "pk::name", and by their bare names where the module or the compilation
 // unit imports them; the module's own declarations, registered first, keep
@@ -453,6 +454,9 @@ void RegisterPackageAssertionDecls(const ModuleDecl* decl,
                                    const CompilationUnit* unit,
                                    PropertyRegistry& registry, Arena& arena) {
   if (unit == nullptr) return;
+  // §3.12.1: what the compilation unit declares outside every design element
+  // is visible throughout it, a property or sequence among them.
+  for (const ModuleItem* item : unit->cu_items) registry.Register(item);
   for (const PackageDecl* pkg : unit->packages) {
     for (const ModuleItem* item : pkg->items) {
       if (item->kind != ModuleItemKind::kPropertyDecl &&

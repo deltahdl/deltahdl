@@ -9,6 +9,7 @@
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
 #include "lexer/token.h"
+#include "parser/ast_design.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
 
@@ -332,6 +333,60 @@ TEST(CoverStatementParsing, AnElseArmInProceduralCodeIsReported) {
                               line, "16.14.3"));
   }
   EXPECT_EQ(r.diags.size(), 2u);
+}
+
+// A.2.10 with A.9.3: a property_instance and a sequence_instance name their
+// declaration by a ps_or_hierarchical identifier, a package scope among its
+// forms, and either stands alone as the whole property_spec. So each
+// statement kind below takes the package's instance, called positionally,
+// by name or with no list, as its spec, recorded as the instance of
+// "pk::name"; so does a named property's body and an expect statement. A
+// package instance with an operator after it, or after a clocking event, is
+// a property expression rather than one instance.
+TEST(PropertyInstanceSpecParsing, APackageScopedInstanceStandsAlone) {
+  auto r = Parse(
+      "package pk;\n"
+      "  bit clk;\n"
+      "  sequence s(a); @(posedge clk) a; endsequence\n"
+      "  property q(a); @(posedge clk) a; endproperty\n"
+      "  property q0; @(posedge clk) 1; endproperty\n"
+      "endpackage\n"
+      "module m;\n"
+      "  logic a, x;\n"
+      "  property r; pk::q(a); endproperty\n"
+      "  assert property (pk::q(a));\n"
+      "  assert property (pk::q(a)) else $error;\n"
+      "  assert property (pk::s(a));\n"
+      "  assume property (pk::q(a));\n"
+      "  cover property (pk::q(a));\n"
+      "  cover sequence (pk::s(a));\n"
+      "  restrict property (pk::q(a));\n"
+      "  assert property (pk::q0);\n"
+      "  assert property (pk::q(.a(x)));\n"
+      "  assert property (pk::q(a) and pk::q(a));\n"
+      "  assert property (@(posedge a) pk::q(a));\n"
+      "  initial expect (pk::q(a));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  std::vector<std::string_view> names;
+  for (const ModuleItem* item : r.cu->modules[0]->items) {
+    switch (item->kind) {
+      case ModuleItemKind::kAssertProperty:
+      case ModuleItemKind::kAssumeProperty:
+      case ModuleItemKind::kCoverProperty:
+      case ModuleItemKind::kCoverSequence:
+      case ModuleItemKind::kRestrictProperty:
+        names.push_back(item->prop_instance_name);
+        break;
+      default:
+        break;
+    }
+  }
+  EXPECT_EQ(names, (std::vector<std::string_view>{
+                       "pk::q", "pk::q", "pk::s", "pk::q", "pk::q", "pk::s",
+                       "pk::q", "pk::q0", "pk::q", "", ""}));
 }
 
 }  // namespace

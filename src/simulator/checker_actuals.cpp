@@ -98,6 +98,19 @@ Expr* ActualInInstantiatingScope(Expr* actual, const std::string& parent_prefix,
   return copy;
 }
 
+std::vector<EventExpr> ClockInInstantiatingScope(
+    const std::vector<EventExpr>& clock, const std::string& parent_prefix,
+    Arena& arena) {
+  std::unordered_set<std::string_view> locals;
+  const Qualifying kQ{parent_prefix, locals, arena};
+  std::vector<EventExpr> out = clock;
+  for (EventExpr& ev : out) {
+    ev.signal = Qualified(ev.signal, kQ);
+    ev.iff_condition = Qualified(ev.iff_condition, kQ);
+  }
+  return out;
+}
+
 Expr* ProceduralActualInInstantiatingScope(
     Expr* actual, const std::string& parent_prefix,
     const std::vector<std::string_view>& locals, Arena& arena) {

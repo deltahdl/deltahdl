@@ -351,6 +351,11 @@ struct Stmt {
   bool var_is_param = false;
 
   ModuleItem* decl_item = nullptr;
+  // §16.16 (d) with §17.3: the leading clock of this assertion of a checker
+  // was taken from the sequence or property actual one of the checker's
+  // formals is bound to, so its names stand in the scope instantiating the
+  // checker rather than in the checker.
+  bool assert_clock_from_actual = false;
 };
 
 // The subroutine call an expression statement consists of, or nullptr where

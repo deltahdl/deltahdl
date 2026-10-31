@@ -850,6 +850,16 @@ static void RecordCheckerActuals(const RtlirModuleInst& inst,
 
 const std::vector<EventExpr>& Lowerer::ClockOf(const RtlirProcess& proc) {
   if (!lowering_checker_) return proc.sensitivity;
+  auto parent = checker_parent_prefixes_.find(inst_prefix_);
+  if (proc.body != nullptr && proc.body->assert_clock_from_actual &&
+      parent != checker_parent_prefixes_.end()) {
+    // The statement keeps the leading clock its property is evaluated
+    // under, and the copy the elaborator made of it is this instance's.
+    proc.body->assert_clock = ClockInInstantiatingScope(proc.body->assert_clock,
+                                                        parent->second, arena_);
+    return *arena_.Create<std::vector<EventExpr>>(
+        ClockInInstantiatingScope(proc.sensitivity, parent->second, arena_));
+  }
   return *arena_.Create<std::vector<EventExpr>>(SubstituteClock(
       proc.sensitivity, CheckerTreeActuals(inst_prefix_, ctx_), arena_));
 }
@@ -879,6 +889,9 @@ void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
   std::string inst_seg = std::string(inst.inst_name) + ".";
   RecordCheckerActuals(inst, inst_prefix_, inst_prefix_ + inst_seg, ctx_,
                        arena_);
+  if (inst.resolved != nullptr && inst.resolved->is_checker) {
+    checker_parent_prefixes_[inst_prefix_ + inst_seg] = inst_prefix_;
+  }
   RecordCheckerActualSampleScope(inst);
   RecordProceduralCheckerActuals(inst, inst_prefix_ + inst_seg);
   std::unordered_map<std::string_view, std::string_view> inout_joins;

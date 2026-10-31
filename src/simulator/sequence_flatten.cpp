@@ -430,6 +430,20 @@ struct SubstitutedOperand {
   std::vector<EventExpr> clock;
 };
 
+// §16.7: a clocked boolean actual standing as an operand, `@(posedge clk)
+// a`, is a sequence of one operand read on the clock it writes, so the
+// boolean takes the operand's place and its clock the operand's clock.
+void ReadClockedBooleanActual(Expr*& operand, std::vector<EventExpr>& clock) {
+  const PropertyExprNode* tree =
+      operand != nullptr ? ActualTree(operand) : nullptr;
+  if (tree == nullptr || tree->kind != PropertyExprNode::Kind::kBoolean ||
+      tree->boolean == nullptr || tree->clock.empty()) {
+    return;
+  }
+  operand = tree->boolean;
+  clock = tree->clock;
+}
+
 // The substituted operand appended to `out` as it stands.
 void AppendOperand(SubstitutedOperand sub, LinearSequence& out) {
   out.operands.push_back(sub.operand);
@@ -527,6 +541,7 @@ bool AppendInstanceOperand(const Expansion& x, size_t j, LinearSequence& out) {
     return ExpandInstance({bound, operand, delay, repetition, clock, items},
                           ctx, arena, out, x.depth + 1);
   }
+  ReadClockedBooleanActual(operand, clock);
   AppendOperand({operand, delay, std::move(items), repetition, clock}, out);
   return true;
 }
@@ -839,6 +854,7 @@ SubstitutedOperand SubstituteOperand(const LinearSequence& body, size_t j,
 void AppendSubstitutedOperand(SubstitutedOperand sub, SimContext& ctx,
                               Arena& arena, LinearSequence& out) {
   size_t first = out.operands.size();
+  ReadClockedBooleanActual(sub.operand, sub.clock);
   if (const ModuleItem* inner = SequenceActual(sub.operand)) {
     ExpandInstance(
         {inner, sub.operand, sub.delay, sub.repetition, sub.clock, sub.items},

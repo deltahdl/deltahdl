@@ -22,6 +22,14 @@ namespace delta {
 Expr* ActualInInstantiatingScope(Expr* actual, const std::string& parent_prefix,
                                  Arena& arena);
 
+// §16.16 (d) with §17.3: the clock `clock` an assertion of a checker took
+// from a sequence or property actual, with every simple name standing in
+// the scope instantiating the checker, `parent_prefix`, as
+// ActualInInstantiatingScope has the actual's.
+std::vector<EventExpr> ClockInInstantiatingScope(
+    const std::vector<EventExpr>& clock, const std::string& parent_prefix,
+    Arena& arena);
+
 // §17.3 with §16.14.6.1: the actual `actual` a procedural checker instance
 // binds to a formal, as the checker's assertions read it in the formal's
 // place where it holds a const cast or reads one of `locals`, the variables

@@ -659,6 +659,23 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
       module_global_clocking_event_;
   module_global_clocking_event_ = EnterGlobalClockingChain(
       global_clocking_scopes_, own_gclk, current_inst_path_, arena_);
+  // §14.14: $global_clock in a checker's sequence or property actual is the
+  // checker's effective global clocking's event, its names written as the
+  // scope instantiating the checker reaches them, since the actual's names
+  // stand there (§17.3).
+  if (decl->decl_kind == ModuleDeclKind::kChecker &&
+      !global_clocking_scopes_.empty()) {
+    const GlobalClockingScope& nearest = global_clocking_scopes_.back();
+    std::string_view path = current_inst_path_;
+    size_t last_dot = path.rfind('.');
+    std::string_view parent =
+        path.substr(0, last_dot == std::string_view::npos ? 0 : last_dot);
+    const std::vector<EventExpr>* in_parent = EffectiveGlobalClockingEvent(
+        nearest.events, nearest.inst_path, parent, arena_);
+    for (auto& [formal, actual] : checker_tree_actuals_[mod]) {
+      actual = SubstituteGlobalClockInActual(actual, *in_parent, arena_);
+    }
+  }
 
   ElaborateItems(decl, mod);
   module_decl_path_.pop_back();

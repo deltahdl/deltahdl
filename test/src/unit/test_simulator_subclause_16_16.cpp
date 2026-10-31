@@ -332,4 +332,165 @@ TEST(ClockResolutionRun, AnInterfacePropertyOfEachBodyShapeReadsTheInstance) {
             "9: ifc=3 mod=3\n10: ifc=0 mod=0\n");
 }
 
+// §16.16 (d) with §F.4.1: an instance whose body is a formal given an actual
+// that opens with its clocking event runs on that event. clk rises at 5, 15,
+// 25 and 35 before the run ends at 42, so each assertion on posedge clk
+// passes four times, the one on `@clk`, either edge, eight times, and the
+// one in an initial procedure, attempted once, once; so does the instance
+// given pc(a), an instance of a property declared on posedge clk, four
+// times. Each assertion had been reported as unclocked.
+TEST(ClockedActualRun, AClockedActualClocksTheInstance) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module m;\n"
+      "  logic clk = 0, a = 1;\n"
+      "  int ns, np, nu, nq, ne, ni, nc;\n"
+      "  always #5 clk = ~clk;\n"
+      "  property ps(sequence s); s; endproperty\n"
+      "  property pp(property p); p; endproperty\n"
+      "  property pu(u); u; endproperty\n"
+      "  sequence qs(sequence s); s; endsequence\n"
+      "  property pc(x); @(posedge clk) x; endproperty\n"
+      "  assert property (ps(@(posedge clk) a)) ns++;\n"
+      "  assert property (pp(@(posedge clk) a |-> a)) np++;\n"
+      "  assert property (pu(@(posedge clk) a)) nu++;\n"
+      "  cover property (qs(@(posedge clk) a)) nq++;\n"
+      "  assert property (ps(@clk a)) ne++;\n"
+      "  initial assert property (qs(@(posedge clk) a)) ni++;\n"
+      "  assert property (pp(pc(a))) nc++;\n"
+      "  initial #42 begin\n"
+      "    $display(\"%0d %0d %0d %0d %0d %0d %0d\", ns, np, nu, nq, ne, ni,\n"
+      "             nc);\n"
+      "    $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_NE(out.find("4 4 4 4 8 1 4\n"), std::string::npos) << out;
+}
+
+// §16.16 (d) with §17.3 and §14.14: a checker asserting, assuming and
+// covering its formals runs on the clock of each actual its instance gives:
+// c1's on posedge fast, rising four times by 42, and c2's on
+// `@($global_clock)` and `@$global_clock`, which resolve in the checker to
+// its own global clocking on posedge slow, rising twice.
+TEST(ClockedActualRun, ACheckerFormalRunsOnItsActualsClock) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "checker chk(property p, sequence s, logic cclk);\n"
+      "  int na, nm, nc;\n"
+      "  global clocking @(posedge cclk); endclocking\n"
+      "  assert property (p) na++;\n"
+      "  assume property (p) nm++;\n"
+      "  cover property (s) nc++;\n"
+      "endchecker\n"
+      "module m;\n"
+      "  logic fast = 0, slow = 0, a = 1;\n"
+      "  always #5 fast = ~fast;\n"
+      "  always #10 slow = ~slow;\n"
+      "  global clocking @(posedge fast); endclocking\n"
+      "  chk c1(@(posedge fast) a, @(posedge fast) a, slow);\n"
+      "  chk c2(@($global_clock) a, @$global_clock a, slow);\n"
+      "  initial #42 begin\n"
+      "    $display(\"%0d %0d %0d\", c1.na, c1.nm, c1.nc);\n"
+      "    $display(\"%0d %0d %0d\", c2.na, c2.nm, c2.nc);\n"
+      "    $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_NE(out.find("4 4 4\n2 2 2\n"), std::string::npos) << out;
+}
+
+// §16.16 (f) with §16.16.1: each instance below runs on negedge clk, the one
+// clock its body determines through s2. a and b follow clk, so each samples 1
+// at a negedge, at 10, 20, 30 and 40 before the run ends at 42, and 0 at a
+// posedge: s2, a ##1 b, matches from 10, 20 and 30, and would match from
+// none on posedge clk. So `not s2` and `not pg` fail three times; `s2 and
+// s2`, `s2 or s2`, the aborts, pg's instance, `s2 ##0 b`, `(s2)`, `s2 |-> a`
+// and s2 alone pass or match three times; and `s2 ##1 b` and `s2 |=> a`,
+// one tick longer, twice. Each instance had been reported as unclocked.
+TEST(DeterminedClockRun, ABodyRunsOnTheClockItDetermines) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module m;\n"
+      "  logic clk = 0;\n"
+      "  wire a = clk, b = clk;\n"
+      "  int n[13];\n"
+      "  always #5 clk = ~clk;\n"
+      "  sequence s2; @(negedge clk) a ##1 b; endsequence\n"
+      "  property p2; not s2; endproperty\n"
+      "  property pe; s2 and s2; endproperty\n"
+      "  property po; s2 or s2; endproperty\n"
+      "  property pa; accept_on(1'b0) s2; endproperty\n"
+      "  property pr; reject_on(1'b0) s2; endproperty\n"
+      "  property pg; s2; endproperty\n"
+      "  property pi; pg; endproperty\n"
+      "  property pn; not pg; endproperty\n"
+      "  sequence sk; s2 ##1 b; endsequence\n"
+      "  sequence sz; s2 ##0 b; endsequence\n"
+      "  sequence sp; (s2); endsequence\n"
+      "  property pm; s2 |-> a; endproperty\n"
+      "  property pd; s2 |=> a; endproperty\n"
+      "  assert property (p2) else n[0]++;\n"
+      "  assert property (pe) n[1]++;\n"
+      "  assert property (po) n[2]++;\n"
+      "  assert property (pa) n[3]++;\n"
+      "  assert property (pr) n[4]++;\n"
+      "  assert property (pi) n[5]++;\n"
+      "  assert property (pn) else n[6]++;\n"
+      "  cover property (sk) n[7]++;\n"
+      "  cover property (sz) n[8]++;\n"
+      "  cover property (sp) n[9]++;\n"
+      "  assert property (pm) n[10]++;\n"
+      "  assert property (pd) n[11]++;\n"
+      "  assert property (s2) n[12]++;\n"
+      "  initial #42 begin\n"
+      "    foreach (n[i]) $write(\"%0d \", n[i]);\n"
+      "    $display;\n"
+      "    $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_NE(out.find("3 3 3 3 3 3 3 2 3 3 3 2 3 \n"), std::string::npos) << out;
+}
+
+// §16.16 (f) with §23.9, §3.12.1 and §26.3: an instance runs on the clock of
+// the declaration its place reaches: one a generate if block or a generate
+// for block declares, on negedge clk, at 10, 20, 30 and 40; the compilation
+// unit's, given posedge clk, at 5, 15, 25 and 35; and a package's, named
+// `pk::pr(a, clk)` and `pk::pq`, likewise four times. a and b are 1 at every
+// tick, so each passes four times.
+TEST(DeterminedClockRun, AnInstanceRunsOnTheClockItsScopeDeclares) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "property cuq(x, c); @(posedge c) x; endproperty\n"
+      "package pk;\n"
+      "  bit pk_clk;\n"
+      "  property pq; @(posedge pk_clk) 1; endproperty\n"
+      "  property pr(x, c); @(posedge c) x; endproperty\n"
+      "endpackage\n"
+      "module m;\n"
+      "  logic clk = 0, a = 1;\n"
+      "  int ni, nf, nc, np, nq;\n"
+      "  always #5 clk = ~clk;\n"
+      "  always #5 pk::pk_clk = ~pk::pk_clk;\n"
+      "  if (1) begin : gi\n"
+      "    property pgi; @(negedge clk) a; endproperty\n"
+      "    assert property (pgi) ni++;\n"
+      "  end\n"
+      "  for (genvar k = 0; k < 1; k++) begin : gf\n"
+      "    sequence sgf; @(negedge clk) a; endsequence\n"
+      "    cover property (sgf) nf++;\n"
+      "  end\n"
+      "  assert property (cuq(a, clk)) nc++;\n"
+      "  assert property (pk::pr(a, clk)) np++;\n"
+      "  assert property (pk::pq) nq++;\n"
+      "  initial #42 begin\n"
+      "    $display(\"%0d %0d %0d %0d %0d\", ni, nf, nc, np, nq);\n"
+      "    $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_NE(out.find("4 4 4 4 4\n"), std::string::npos) << out;
+}
+
 }  // namespace

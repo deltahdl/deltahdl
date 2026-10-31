@@ -2,6 +2,7 @@
 
 #include <vector>
 
+#include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 
 namespace delta {
@@ -24,6 +25,19 @@ class PropertyRegistry;
 std::vector<EventExpr> SemanticLeadingClocks(
     const PropertyExprNode* node, const std::vector<EventExpr>& outer,
     const PropertyRegistry& registry);
+
+// §16.16 (f): the unique leading clocking event the property `node`
+// determines on its own, with no clock flowing in: its set of semantic
+// leading clocks where that holds one clock and no inherited one, `not s2`
+// over a sequence s2 clocked on negedge clk being on negedge clk; empty
+// where the set holds the inherited clock or more than one.
+std::vector<EventExpr> DeterminedLeadingClock(const PropertyExprNode* node,
+                                              const PropertyRegistry& registry);
+
+// DeterminedLeadingClock for the body of the named sequence `seq`,
+// `s2 ##1 b` being on s2's clock.
+std::vector<EventExpr> DeterminedSequenceClock(
+    const ModuleItem* seq, const PropertyRegistry& registry);
 
 // §16.16 (e): whether the property's semantic leading clock is unique, the
 // set holding one clock, which an assertion statement whose maximal

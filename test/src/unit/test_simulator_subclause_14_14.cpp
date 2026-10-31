@@ -479,4 +479,109 @@ TEST(GlobalClockingSim, GlobalClockInATaskBodyNamesTheDeclaringScopesEvent) {
                    {{"another_module.tk_at", 6u}, {"another_module.t_at", 6u}});
 }
 
+// §14.14: $global_clock in a property declaration resolves where the
+// property is instantiated, so pk's p, asserted in s1 and in s2, runs on each
+// one's own global clocking: posedge fast, rising at 5, 15, 25 and 35 before
+// the run ends at 42, and posedge slow, rising at 10 and 30. own, which
+// declares q beside its own global clocking on posedge slow and asserts it
+// there, runs on that clocking.
+TEST(GlobalClockingSim, ADeclaredGlobalClockResolvesWhereTheInstanceIs) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "package pk;\n"
+      "  property p(x); @($global_clock) x; endproperty\n"
+      "endpackage\n"
+      "module sub(input logic c);\n"
+      "  import pk::*;\n"
+      "  int n;\n"
+      "  global clocking @(posedge c); endclocking\n"
+      "  assert property (p(1'b1)) n++;\n"
+      "endmodule\n"
+      "module own(input logic c);\n"
+      "  int n;\n"
+      "  global clocking @(posedge c); endclocking\n"
+      "  property q(x); @($global_clock) x; endproperty\n"
+      "  assert property (q(1'b1)) n++;\n"
+      "endmodule\n"
+      "module m;\n"
+      "  logic fast = 0, slow = 0;\n"
+      "  always #5 fast = ~fast;\n"
+      "  always #10 slow = ~slow;\n"
+      "  global clocking @(posedge fast); endclocking\n"
+      "  sub s1(fast);\n"
+      "  sub s2(slow);\n"
+      "  own o(slow);\n"
+      "  initial #42 begin\n"
+      "    $display(\"%0d %0d %0d\", s1.n, s2.n, o.n);\n"
+      "    $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_NE(out.find("4 2 2\n"), std::string::npos) << out;
+}
+
+// §14.14: $global_clock in an actual argument of a property or sequence
+// instance resolves where the instance is asserted, so in s1 each assertion
+// runs on posedge fast, four times by 42, and in s2 on posedge slow, twice;
+// the one in an initial procedure is attempted once in each. Each
+// instance's actual had waited on $global_clock itself, which never came.
+TEST(GlobalClockingSim, AGlobalClockInAnInstanceActualResolvesAtTheAssertion) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module sub(input logic c);\n"
+      "  logic a = 1;\n"
+      "  int k, j, u, w;\n"
+      "  global clocking @(posedge c); endclocking\n"
+      "  property r(sequence s); s; endproperty\n"
+      "  sequence q(sequence s); s; endsequence\n"
+      "  assert property (r(@$global_clock a)) k++;\n"
+      "  cover property (q(@($global_clock) a)) j++;\n"
+      "  assume property (r(@($global_clock) a)) u++;\n"
+      "  initial assert property (q(@$global_clock a)) w++;\n"
+      "endmodule\n"
+      "module m;\n"
+      "  logic fast = 0, slow = 0;\n"
+      "  always #5 fast = ~fast;\n"
+      "  always #10 slow = ~slow;\n"
+      "  sub s1(fast);\n"
+      "  sub s2(slow);\n"
+      "  initial #42 begin\n"
+      "    $display(\"%0d %0d %0d %0d\", s1.k, s1.j, s1.u, s1.w);\n"
+      "    $display(\"%0d %0d %0d %0d\", s2.k, s2.j, s2.u, s2.w);\n"
+      "    $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_NE(out.find("4 4 4 1\n2 2 2 1\n"), std::string::npos) << out;
+}
+
+// §14.14 (the clause's my_checker example): $global_clock in an actual
+// argument of a checker instance resolves where the actual is substituted,
+// inside the checker, so c's cover runs on the checker's global clocking,
+// posedge slow, rising at 10 and 30, where only the attempt from 10 succeeds,
+// at 30, before the run ends at 42; on m's, posedge fast, rising at 5, 15, 25
+// and 35, the attempts from 5, 15 and 25 would all succeed.
+TEST(GlobalClockingSim, AGlobalClockInACheckerActualResolvesInTheChecker) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "checker chk(sequence s, logic cclk);\n"
+      "  int n;\n"
+      "  global clocking @(posedge cclk); endclocking\n"
+      "  cover property (s) n++;\n"
+      "endchecker\n"
+      "module m;\n"
+      "  logic fast = 0, slow = 0, a = 1;\n"
+      "  always #5 fast = ~fast;\n"
+      "  always #10 slow = ~slow;\n"
+      "  global clocking @(posedge fast); endclocking\n"
+      "  chk c(@$global_clock a [*1:$] ##1 a, slow);\n"
+      "  initial #42 begin\n"
+      "    $display(\"n=%0d\", c.n);\n"
+      "    $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_NE(out.find("n=1\n"), std::string::npos) << out;
+}
+
 }  // namespace

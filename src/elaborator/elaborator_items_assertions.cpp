@@ -270,6 +270,7 @@ void GiveSequenceProperty(Stmt* stmt, Expr* instance, Arena& arena) {
 // property_spec, `assert property (mult_s)`, is the sequential property the
 // sequence is, evaluated on the clock the sequence is declared with.
 bool SubstituteSequenceInstance(ModuleItem* item, const ModuleItem* decl,
+                                const PropertyRegistry& registry,
                                 Arena& arena) {
   // §16.16: a sequence declared with no clock leaves the statement its
   // clock to determine, the default clocking's or none.
@@ -279,7 +280,8 @@ bool SubstituteSequenceInstance(ModuleItem* item, const ModuleItem* decl,
   stmt->is_concurrent_clocked = true;
   stmt->assert_pass_stmt = item->assert_pass_stmt;
   stmt->assert_fail_stmt = item->assert_fail_stmt;
-  item->sensitivity = SequenceInstanceClock(decl, item->assert_expr, arena);
+  item->sensitivity =
+      SequenceInstanceClock(decl, item->assert_expr, registry, arena);
   item->body = stmt;
   return true;
 }
@@ -342,6 +344,26 @@ void SubstituteBooleanSpec(ModuleItem* item, Arena& arena) {
 // Parser::WarnUnevaluatedConcurrentAssertion states, when the name is no
 // property's or the body is not that form; the parser left the report to here
 // because it could not tell the two apart.
+// §16.12 with §26.3: an instance written by its package-qualified name,
+// `pk::pq` or `pk::pr(a, clk)`, which the parser left the scope resolution
+// it reads as since a package's variable reads the same, is made, once its
+// declaration is found, the instance named by the key the registry holds it
+// under, as the instance of a declaration in the scope is.
+void NameInstanceByKey(ModuleItem* item, Arena& arena) {
+  Expr* instance = item->assert_expr;
+  if (instance == nullptr) return;
+  if (instance->kind == ExprKind::kCall && instance->callee.empty()) {
+    instance->callee = item->prop_instance_name;
+    return;
+  }
+  if (instance->kind != ExprKind::kMemberAccess) return;
+  auto* name = arena.Create<Expr>();
+  name->kind = ExprKind::kIdentifier;
+  name->text = item->prop_instance_name;
+  name->range = instance->range;
+  item->assert_expr = name;
+}
+
 void SubstitutePropertyInstance(ModuleItem* item, Arena& arena,
                                 const PropertyRegistry& registry,
                                 const InferredAtInstance& inferred,
@@ -349,6 +371,7 @@ void SubstitutePropertyInstance(ModuleItem* item, Arena& arena,
   if (item->prop_instance_name.empty() || item->body != nullptr) return;
   const ModuleItem* decl = registry.Find(item->prop_instance_name);
   std::string name(item->prop_instance_name);
+  if (decl != nullptr) NameInstanceByKey(item, arena);
   // §16.14.7: the instance is the top-level property expression of the
   // assertion statement, so the inferred functions among the defaults are
   // replaced by what is inferred at the statement, the default clocking and
@@ -360,7 +383,7 @@ void SubstitutePropertyInstance(ModuleItem* item, Arena& arena,
     item->prop_instance_name = {};
   }
   if (decl != nullptr && decl->kind == ModuleItemKind::kSequenceDecl) {
-    SubstituteSequenceInstance(item, decl, arena);
+    SubstituteSequenceInstance(item, decl, registry, arena);
     return;
   }
   if (decl == nullptr || decl->kind != ModuleItemKind::kPropertyDecl) {
@@ -368,12 +391,6 @@ void SubstitutePropertyInstance(ModuleItem* item, Arena& arena,
     return;
   }
   if (!PropertyInstanceIsEvaluated(item, decl, diag)) return;
-  // §16.13.3 and §16.13.4: a property declared with no clock whose body is
-  // a sequence declared with one is on that clock, `mult_p2` being
-  // `mult_s`.
-  const std::vector<EventExpr>& clock = decl->prop_clock.empty()
-                                            ? FlowedBodyClock(decl, registry)
-                                            : decl->prop_clock;
   // §16.12 and §16.8: the actual arguments of the instance are bound to the
   // formals by position, and §F.4.1's rewriting substitutes each for the
   // references to its formal in the clock, the disable condition and the
@@ -404,7 +421,12 @@ void SubstitutePropertyInstance(ModuleItem* item, Arena& arena,
   stmt->is_concurrent_clocked = true;
   stmt->assert_pass_stmt = item->assert_pass_stmt;
   stmt->assert_fail_stmt = item->assert_fail_stmt;
-  item->sensitivity = SubstituteClockEvents(clock, actuals, arena);
+  // §16.13.3, §16.13.4 and §16.16: the clock the property is declared with
+  // or that flows into its body, `mult_p2` being on `mult_s`'s; the leading
+  // clock once its formals stand replaced by their actuals,
+  // `r(@(posedge clk) a)` on posedge clk; or the one §16.16.1 determines
+  // from its body, `not s2` on s2's.
+  item->sensitivity = PropertyInstanceClock(decl, actuals, registry, arena);
   item->body = stmt;
 }
 
@@ -610,6 +632,17 @@ void Elaborator::ElaboratePropertyDeclItem(ModuleItem* item, RtlirModule* mod) {
   ValidateClockingBlock(item, mod);
 }
 
+// §16.16 (f): the report on a concurrent assertion statement at `loc` for
+// which no leading clocking event is written, inferred or determined.
+static void ReportNoLeadingClock(SourceLoc loc, DiagEngine& diag) {
+  diag.Error(loc,
+             "concurrent assertion has no leading clocking event: none is "
+             "written, no default clocking is in scope and the property "
+             "is no instance of a sequence or property declared with a "
+             "unique leading clocking event",
+             Subclause("16.16"));
+}
+
 // §16.16: the leading clocking event of a static concurrent assertion
 // statement: (d) the one its spec opens with, or the one the instance its
 // maximal property is determines, its declaration's or the one flowing into
@@ -629,12 +662,7 @@ void Elaborator::ResolveStaticAssertionClock(
         item->body->assert_clock_inferred;
   }
   if (item->sensitivity.empty()) {
-    diag_.Error(item->loc,
-                "concurrent assertion has no leading clocking event: none is "
-                "written, no default clocking is in scope and the property "
-                "is no instance of a sequence or property declared with a "
-                "unique leading clocking event",
-                Subclause("16.16"));
+    ReportNoLeadingClock(item->loc, diag_);
     item->body = nullptr;
     return;
   }
@@ -657,22 +685,42 @@ void Elaborator::ResolveStaticAssertionClock(
 static ModuleItem* CheckerInstanceAssertion(
     ModuleItem* item, const RtlirModule* mod,
     const std::unordered_map<const RtlirModule*, ActualsByFormal>& trees,
-    Arena& arena) {
+    const PropertyRegistry& registry, Arena& arena) {
   auto found = trees.find(mod);
   if (found == trees.end() || found->second.empty()) return item;
   const ActualsByFormal& actuals = found->second;
   auto* copy = arena.Create<ModuleItem>(*item);
   const Stmt* stmt = item->body;
-  bool names_formal = stmt != nullptr && stmt->assert_property == nullptr &&
-                      stmt->assert_sequence == nullptr &&
-                      stmt->assert_expr != nullptr &&
-                      stmt->assert_expr->kind == ExprKind::kIdentifier &&
-                      actuals.contains(stmt->assert_expr->text);
-  if (!names_formal) return copy;
-  auto* body = arena.Create<Stmt>(*stmt);
-  body->assert_property = arena.Create<PropertyExprNode>();
-  body->assert_property->boolean = body->assert_expr;
-  copy->body = body;
+  // The parser leaves a spec that is one name, `assert property (p)`, an
+  // instance of the property it may name, with no body yet.
+  const Expr* spec = stmt != nullptr ? stmt->assert_expr : item->assert_expr;
+  bool names_formal = (stmt == nullptr || (stmt->assert_property == nullptr &&
+                                           stmt->assert_sequence == nullptr)) &&
+                      spec != nullptr && spec->kind == ExprKind::kIdentifier &&
+                      actuals.contains(spec->text);
+  if (names_formal) {
+    if (stmt == nullptr) {
+      copy->prop_instance_name = {};
+      SubstituteBooleanSpec(copy, arena);
+    } else {
+      copy->body = arena.Create<Stmt>(*stmt);
+    }
+    copy->body->assert_property = arena.Create<PropertyExprNode>();
+    copy->body->assert_property->boolean = copy->body->assert_expr;
+  }
+  // §16.16 (d) with §F.4.1: a property that is such a formal, or opens with
+  // one, is on the clock its actual opens with, `@(posedge clk) a` or
+  // `@($global_clock) a`, where the assertion writes none.
+  if (copy->sensitivity.empty() && copy->body != nullptr) {
+    copy->sensitivity = FormalOpeningClock(copy->body->assert_property, actuals,
+                                           registry, arena);
+    if (!copy->sensitivity.empty()) {
+      if (copy->body == item->body) {
+        copy->body = arena.Create<Stmt>(*item->body);
+      }
+      copy->body->assert_clock_from_actual = true;
+    }
+  }
   return copy;
 }
 
@@ -709,7 +757,30 @@ static void ElaborateRestrictPropertyItem(ModuleItem* item,
     body->assert_clock_inferred = !kInferred.clock.empty();
     body->assert_clock_from_default_clocking = body->assert_clock_inferred;
   }
+  // §16.16 (f) holds every concurrent assertion statement of §16.14, a
+  // restrict property among them, to having a leading clocking event.
+  if (item->sensitivity.empty()) ReportNoLeadingClock(item->loc, diag);
   if (body->assert_clock.empty()) body->assert_clock = item->sensitivity;
+}
+
+// §14.14: the assertion `item`, an instance whose actuals write
+// $global_clock, with each such actual waiting on `global_event`, the event
+// of this instance of the module. The item is shared by every instance, and
+// §14.14 rule b) can give two of them different events, so the rewrite is
+// made on a copy, made before SubstitutePropertyInstance gives it a body.
+static ModuleItem* GlobalClockInstanceActuals(
+    ModuleItem* item, const std::vector<EventExpr>* global_event,
+    Arena& arena) {
+  if (global_event == nullptr || item->body != nullptr ||
+      item->prop_instance_name.empty()) {
+    return item;
+  }
+  Expr* call = SubstituteGlobalClockInInstanceActuals(item->assert_expr,
+                                                      *global_event, arena);
+  if (call == item->assert_expr) return item;
+  auto* copy = arena.Create<ModuleItem>(*item);
+  copy->assert_expr = call;
+  return copy;
 }
 
 // §16.5.2 and §14.14: the leading clock of the assertion `item` that `mod`
@@ -731,7 +802,10 @@ static void RecordGlobalLeadingClock(const ModuleItem* item, RtlirModule* mod,
 
 void Elaborator::ElaborateAssertPropertyItem(ModuleItem* item,
                                              RtlirModule* mod) {
-  item = CheckerInstanceAssertion(item, mod, checker_tree_actuals_, arena_);
+  item = CheckerInstanceAssertion(item, mod, checker_tree_actuals_,
+                                  property_registry_, arena_);
+  item =
+      GlobalClockInstanceActuals(item, module_global_clocking_event_, arena_);
   InferredAtInstance inferred = InferredAt(mod);
   SubstitutePropertyInstance(item, arena_, property_registry_, inferred, diag_);
   PromotePropertyInstanceBoolean(item, arena_, property_registry_, inferred);

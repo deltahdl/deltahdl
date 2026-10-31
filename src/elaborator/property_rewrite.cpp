@@ -138,6 +138,11 @@ std::vector<std::string_view> PropertyRegistry::DependencyRefs(
   return refs;
 }
 
+void PropertyRegistry::RegisterShadowing(const ModuleItem* decl) {
+  by_name_.erase(decl->name);
+  Register(decl);
+}
+
 void PropertyRegistry::RegisterAs(std::string_view name,
                                   const ModuleItem* decl) {
   by_name_.emplace(name, decl);

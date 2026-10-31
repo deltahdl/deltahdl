@@ -249,10 +249,7 @@ void SubstitutePropertyBody(Stmt* stmt, const ModuleItem* decl,
         SubstituteFormals(decl->prop_disable_iff, actuals, arena);
   }
   if (!stmt->assert_clock.empty()) return;
-  const std::vector<EventExpr>& clock = decl->prop_clock.empty()
-                                            ? FlowedBodyClock(decl, registry)
-                                            : decl->prop_clock;
-  stmt->assert_clock = SubstituteClockEvents(clock, actuals, arena);
+  stmt->assert_clock = PropertyInstanceClock(decl, actuals, registry, arena);
 }
 
 // §16.12.1 and §16.13.4, for a statement in procedural code: the body of
@@ -288,7 +285,8 @@ void SubstituteInstance(Stmt* stmt, const PropertyRegistry& registry,
     stmt->assert_property->kind = PropertyExprNode::Kind::kSequence;
     stmt->assert_property->sequence = SequenceInstanceBody(instance, arena);
     if (stmt->assert_clock.empty()) {
-      stmt->assert_clock = SequenceInstanceClock(seq, instance, arena);
+      stmt->assert_clock =
+          SequenceInstanceClock(seq, instance, registry, arena);
     }
     return;
   }

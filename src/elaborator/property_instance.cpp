@@ -11,12 +11,42 @@
 #include "common/source_loc.h"
 #include "elaborator/property_rewrite.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/semantic_leading_clocks.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 #include "parser/expr_substitute.h"
 
 namespace delta {
+
+namespace {
+
+// The clock the actual `operand` names brings, where `operand` is a formal's
+// bare name; empty otherwise.
+std::vector<EventExpr> BareFormalActualClock(const Expr* operand,
+                                             const ActualsByFormal& actuals,
+                                             const PropertyRegistry& registry,
+                                             Arena& arena) {
+  if (operand == nullptr || operand->kind != ExprKind::kIdentifier) return {};
+  auto found = actuals.find(operand->text);
+  if (found == actuals.end()) return {};
+  return ActualLeadingClock(found->second, registry, arena);
+}
+
+// The clock the actual of a formal brings where the chain `body` opens with
+// that formal under no clocking event of its own, `s ##1 a`; empty
+// otherwise.
+std::vector<EventExpr> OpeningFormalActualClock(
+    const SeqLinearBody& body, const ActualsByFormal& actuals,
+    const PropertyRegistry& registry, Arena& arena) {
+  if (body.operands.empty() ||
+      (!body.clocks.empty() && !body.clocks[0].empty())) {
+    return {};
+  }
+  return BareFormalActualClock(body.operands[0], actuals, registry, arena);
+}
+
+}  // namespace
 
 namespace {
 
@@ -77,12 +107,84 @@ std::vector<EventExpr> SubstituteClockEvents(
 
 std::vector<EventExpr> SequenceInstanceClock(const ModuleItem* seq,
                                              const Expr* instance,
+                                             const PropertyRegistry& registry,
                                              Arena& arena) {
+  ActualsByFormal actuals = BindActualsWithDefaults(
+      seq->prop_formals, seq->prop_formal_defaults, instance);
+  // §16.16 (d) with §F.4.1: a sequence whose body is a formal alone is on
+  // the clock its actual opens with.
+  if (seq->seq_clock.empty()) {
+    std::vector<EventExpr> clock =
+        OpeningFormalActualClock(seq->seq_linear, actuals, registry, arena);
+    if (!clock.empty()) return clock;
+    // §16.16 (f) with §16.16.1: a body opening with an instance of a
+    // clocked sequence, `s2 ##1 b`, is on that sequence's clock.
+    return SubstituteClockEvents(DeterminedSequenceClock(seq, registry),
+                                 actuals, arena);
+  }
+  return SubstituteClockEvents(seq->seq_clock, actuals, arena);
+}
+
+// §16.16 (d): the leading clock an actual that is an instance of a named
+// sequence or property brings, `p2(a, b, c)` of a property declared with
+// `@($global_clock)`: the clock the declaration gives the instance, its
+// formals replaced by the instance's actuals; empty for an actual naming no
+// such declaration, or one declared with no clock.
+static std::vector<EventExpr> InstanceActualClock(
+    const Expr* actual, const PropertyRegistry& registry, Arena& arena) {
+  const ModuleItem* decl = registry.FindInstance(actual);
+  if (decl == nullptr) return {};
+  if (decl->kind == ModuleItemKind::kSequenceDecl) {
+    return SequenceInstanceClock(decl, actual, registry, arena);
+  }
+  if (decl->kind != ModuleItemKind::kPropertyDecl) return {};
+  ActualsByFormal actuals = BindActualsWithDefaults(
+      decl->prop_formals, decl->prop_formal_defaults, actual);
+  return PropertyInstanceClock(decl, actuals, registry, arena);
+}
+
+std::vector<EventExpr> PropertyInstanceClock(const ModuleItem* decl,
+                                             const ActualsByFormal& actuals,
+                                             const PropertyRegistry& registry,
+                                             Arena& arena) {
+  const std::vector<EventExpr>& clock = decl->prop_clock.empty()
+                                            ? FlowedBodyClock(decl, registry)
+                                            : decl->prop_clock;
+  if (!clock.empty()) return SubstituteClockEvents(clock, actuals, arena);
+  std::vector<EventExpr> from_actual =
+      FormalOpeningClock(decl->prop_body_tree, actuals, registry, arena);
+  if (!from_actual.empty()) return from_actual;
   return SubstituteClockEvents(
-      seq->seq_clock,
-      BindActualsWithDefaults(seq->prop_formals, seq->prop_formal_defaults,
-                              instance),
-      arena);
+      DeterminedLeadingClock(decl->prop_body_tree, registry), actuals, arena);
+}
+
+std::vector<EventExpr> ActualLeadingClock(const Expr* actual,
+                                          const PropertyRegistry& registry,
+                                          Arena& arena) {
+  if (actual == nullptr) return {};
+  if (actual->property_actual == nullptr) {
+    return InstanceActualClock(actual, registry, arena);
+  }
+  const PropertyExprNode* tree = actual->property_actual;
+  if (!tree->clock.empty()) return tree->clock;
+  std::vector<EventExpr> clocks = SemanticLeadingClocks(tree, {}, registry);
+  if (clocks.size() != 1) return {};
+  return clocks;
+}
+
+std::vector<EventExpr> FormalOpeningClock(const PropertyExprNode* body,
+                                          const ActualsByFormal& actuals,
+                                          const PropertyRegistry& registry,
+                                          Arena& arena) {
+  if (body == nullptr || !body->clock.empty()) return {};
+  if (body->kind == PropertyExprNode::Kind::kBoolean) {
+    return BareFormalActualClock(body->boolean, actuals, registry, arena);
+  }
+  bool opens = body->kind == PropertyExprNode::Kind::kSequence ||
+               body->kind == PropertyExprNode::Kind::kImplication;
+  if (!opens || body->sequence == nullptr) return {};
+  return OpeningFormalActualClock(body->sequence->seq_linear, actuals, registry,
+                                  arena);
 }
 
 // The declaration `operand` instantiates where it names one of `kind`, an

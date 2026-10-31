@@ -44,7 +44,38 @@ std::vector<EventExpr> SubstituteClockEvents(
 // replaced by the instance's actual.
 std::vector<EventExpr> SequenceInstanceClock(const ModuleItem* seq,
                                              const Expr* instance,
+                                             const PropertyRegistry& registry,
                                              Arena& arena);
+
+// §16.16 (d) and (f): the leading clock the named property `decl` gives its
+// instance, whose actuals are `actuals`: the clock it is declared with or
+// that flows into its body (§16.13.3), else the clock the actual of a formal
+// its body is or opens with brings, else the unique leading clock its body
+// determines (§16.16.1), each with the actuals in the formals' places; empty
+// where none is determined.
+std::vector<EventExpr> PropertyInstanceClock(const ModuleItem* decl,
+                                             const ActualsByFormal& actuals,
+                                             const PropertyRegistry& registry,
+                                             Arena& arena);
+
+// §16.16 (d) with §F.4.1: the leading clock a sequence or property actual
+// brings to the formal it replaces, `@(posedge clk) a` bringing posedge clk:
+// the clocking event it opens with, else its semantic leading clock where it
+// has one alone (§16.16.1), or, for an instance of a named sequence or
+// property, the clock its declaration gives it; empty for an actual that
+// writes none, or two.
+std::vector<EventExpr> ActualLeadingClock(const Expr* actual,
+                                          const PropertyRegistry& registry,
+                                          Arena& arena);
+
+// The clock the actual of a formal brings where the property `tree` is that
+// formal alone, the body of `property r(sequence s); s; endproperty`
+// instantiated as `r(@(posedge clk) a)`, or opens with it, `s ##1 b` or
+// `s |-> b`; empty otherwise.
+std::vector<EventExpr> FormalOpeningClock(const PropertyExprNode* tree,
+                                          const ActualsByFormal& actuals,
+                                          const PropertyRegistry& registry,
+                                          Arena& arena);
 
 // The declaration `operand` instantiates where it names one of `kind`, an
 // identifier or a call naming a sequence or a property; nullptr otherwise.

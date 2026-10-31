@@ -47,15 +47,48 @@ std::vector<EventExpr> Clocks(const PropertyExprNode* node,
                               const std::vector<EventExpr>& outer,
                               const PropertyRegistry& registry, int depth);
 
-// The semantic leading clock of a sequence: the clock its first operand is
-// written under, else inherited.
-std::vector<EventExpr> SequenceClocks(const ModuleItem* seq,
-                                      const std::vector<EventExpr>& outer) {
-  if (seq != nullptr && !seq->seq_linear.clocks.empty() &&
-      !seq->seq_linear.clocks[0].empty()) {
-    return Inherited(seq->seq_linear.clocks[0]);
+std::vector<EventExpr> InstanceClocks(const Expr* instance,
+                                      const std::vector<EventExpr>& outer,
+                                      const PropertyRegistry& registry,
+                                      int depth);
+
+// The semantic leading clocks of a chain: the clock its first operand is
+// written under, else that of the named sequence the operand instantiates,
+// `s2 ##1 b` beginning where s2 does (§16.16.1's `m1 ##1 m2`), else
+// inherited; joined by those of the chains of an `and` or an `or` it is the
+// first operand of, `(@(posedge c1) a) and (@(posedge c2) b)` having two; a
+// chain writing no clock of its own takes the first chain's.
+std::vector<EventExpr> ChainClocks(const SeqLinearBody& body,
+                                   const std::vector<EventExpr>& outer,
+                                   const PropertyRegistry& registry,
+                                   int depth) {
+  std::vector<EventExpr> set;
+  if (!body.clocks.empty() && !body.clocks[0].empty()) {
+    set = Inherited(body.clocks[0]);
+  } else if (!body.operands.empty() && depth < 4 &&
+             InstantiatedDecl(body.operands[0], ModuleItemKind::kSequenceDecl,
+                              registry) != nullptr) {
+    set = InstanceClocks(body.operands[0], outer, registry, depth + 1);
+  } else {
+    set = Inherited(outer);
   }
-  return Inherited(outer);
+  for (const auto* chains : {&body.conjuncts, &body.alternatives}) {
+    for (const SeqLinearBody& chain : *chains) {
+      AddAll(set, ChainClocks(chain, set, registry, depth));
+    }
+  }
+  return set;
+}
+
+// The semantic leading clock of a sequence: its own clock, else that of
+// the chain it is.
+std::vector<EventExpr> SequenceClocks(const ModuleItem* seq,
+                                      const std::vector<EventExpr>& outer,
+                                      const PropertyRegistry& registry,
+                                      int depth) {
+  if (seq == nullptr) return Inherited(outer);
+  if (!seq->seq_clock.empty()) return Inherited(seq->seq_clock);
+  return ChainClocks(seq->seq_linear, outer, registry, depth);
 }
 
 // An instance of a named property or sequence: the declaration's body, the
@@ -66,10 +99,7 @@ std::vector<EventExpr> InstanceClocks(const Expr* instance,
                                       int depth) {
   const ModuleItem* seq =
       InstantiatedDecl(instance, ModuleItemKind::kSequenceDecl, registry);
-  if (seq != nullptr) {
-    return seq->seq_clock.empty() ? SequenceClocks(seq, outer)
-                                  : Inherited(seq->seq_clock);
-  }
+  if (seq != nullptr) return SequenceClocks(seq, outer, registry, depth);
   const ModuleItem* decl =
       InstantiatedDecl(instance, ModuleItemKind::kPropertyDecl, registry);
   if (decl == nullptr || depth >= 4) return Inherited(outer);
@@ -90,7 +120,7 @@ std::vector<EventExpr> Clocks(const PropertyExprNode* node,
   std::vector<EventExpr> set;
   switch (node->kind) {
     case PropertyExprNode::Kind::kSequence:
-      return SequenceClocks(node->sequence, incoming);
+      return SequenceClocks(node->sequence, incoming, registry, depth);
     case PropertyExprNode::Kind::kBoolean:
       return InstanceClocks(node->boolean, incoming, registry, depth);
     case PropertyExprNode::Kind::kNot:
@@ -103,7 +133,7 @@ std::vector<EventExpr> Clocks(const PropertyExprNode* node,
       }
       return set;
     case PropertyExprNode::Kind::kImplication:
-      return SequenceClocks(node->sequence, incoming);
+      return SequenceClocks(node->sequence, incoming, registry, depth);
     case PropertyExprNode::Kind::kAbort:
       if (node->synchronous || node->operands.empty()) {
         return Inherited(incoming);
@@ -154,6 +184,43 @@ std::vector<EventExpr> SemanticLeadingClocks(
     const PropertyExprNode* node, const std::vector<EventExpr>& outer,
     const PropertyRegistry& registry) {
   return Clocks(node, outer, registry, 0);
+}
+
+// The clock standing for the inherited one while DeterminedLeadingClock
+// asks whether a property names any: an event on a name no source declares.
+static const EventExpr& InheritedPlaceholder() {
+  static const Expr kName = [] {
+    Expr name;
+    name.kind = ExprKind::kIdentifier;
+    name.text = "$inherited";
+    return name;
+  }();
+  static const EventExpr kEvent = [] {
+    EventExpr ev;
+    ev.signal = const_cast<Expr*>(&kName);
+    return ev;
+  }();
+  return kEvent;
+}
+
+std::vector<EventExpr> DeterminedLeadingClock(
+    const PropertyExprNode* node, const PropertyRegistry& registry) {
+  std::vector<EventExpr> set =
+      Clocks(node, {InheritedPlaceholder()}, registry, 0);
+  if (set.size() != 1 || set[0].signal == InheritedPlaceholder().signal) {
+    return {};
+  }
+  return set;
+}
+
+std::vector<EventExpr> DeterminedSequenceClock(
+    const ModuleItem* seq, const PropertyRegistry& registry) {
+  std::vector<EventExpr> set =
+      SequenceClocks(seq, {InheritedPlaceholder()}, registry, 0);
+  if (set.size() != 1 || set[0].signal == InheritedPlaceholder().signal) {
+    return {};
+  }
+  return set;
 }
 
 bool HasUniqueSemanticLeadingClock(const PropertyExprNode* node,

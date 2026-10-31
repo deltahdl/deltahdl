@@ -7,6 +7,7 @@
 #include "common/arena.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 
 namespace delta {
@@ -204,6 +205,41 @@ const std::vector<EventExpr>* EffectiveGlobalClockingEvent(
   return qualified;
 }
 
+// §14.14: a concurrent assertion in procedural code whose spec is an instance
+// waits on `global_event` where an actual of the instance writes
+// $global_clock, as the assertion's own clock does. The instance is the root
+// SubstituteInstance in procedural_concurrent_assertion.cpp gave the
+// statement: a property instance as the root's boolean, a sequence instance
+// as the one operand of the root's sequence.
+static void SubstituteGlobalClockInAssertionInstance(
+    CloneOnWriteStmt& owner, const std::vector<EventExpr>& global_event) {
+  const PropertyExprNode* root = owner.original->assert_property;
+  if (root == nullptr) return;
+  if (root->boolean != nullptr) {
+    Expr* call = SubstituteGlobalClockInInstanceActuals(
+        root->boolean, global_event, owner.arena);
+    if (call == root->boolean) return;
+    auto* copy = owner.arena.Create<PropertyExprNode>(*root);
+    copy->boolean = call;
+    Stmt* stmt = owner.Mutable();
+    if (stmt->assert_instance == root->boolean) stmt->assert_instance = call;
+    stmt->assert_property = copy;
+    return;
+  }
+  if (root->sequence == nullptr ||
+      root->sequence->seq_linear.operands.size() != 1) {
+    return;
+  }
+  Expr* operand = root->sequence->seq_linear.operands.front();
+  Expr* call = SubstituteGlobalClockInInstanceActuals(operand, global_event,
+                                                      owner.arena);
+  if (call == operand) return;
+  auto* copy = owner.arena.Create<PropertyExprNode>(*root);
+  copy->sequence = owner.arena.Create<ModuleItem>(*root->sequence);
+  copy->sequence->seq_linear.operands.front() = call;
+  owner.Mutable()->assert_property = copy;
+}
+
 Stmt* SubstituteGlobalClockEventControls(
     Stmt* stmt, const std::vector<EventExpr>& global_event, Arena& arena) {
   // An empty `global_event` substitutes nothing, so the whole walk is skipped
@@ -222,8 +258,95 @@ Stmt* SubstituteGlobalClockEventControls(
     SubstituteGlobalClockLeadingEvent(owner.Mutable()->assert_clock,
                                       global_event);
   }
+  SubstituteGlobalClockInAssertionInstance(owner, global_event);
   SubstituteGlobalClockInSubStmts(owner, global_event);
   return owner.current;
+}
+
+namespace {
+
+bool ChainNamesGlobalClock(const SeqLinearBody& body) {
+  for (const auto& clock : body.clocks) {
+    if (IsGlobalClockLeadingEvent(clock)) return true;
+  }
+  for (const auto* chains :
+       {&body.intersects, &body.conjuncts, &body.alternatives}) {
+    for (const SeqLinearBody& chain : *chains) {
+      if (ChainNamesGlobalClock(chain)) return true;
+    }
+  }
+  return false;
+}
+
+bool TreeNamesGlobalClock(const PropertyExprNode* node) {
+  if (node == nullptr) return false;
+  if (IsGlobalClockLeadingEvent(node->clock)) return true;
+  if (node->sequence != nullptr &&
+      (IsGlobalClockLeadingEvent(node->sequence->seq_clock) ||
+       ChainNamesGlobalClock(node->sequence->seq_linear))) {
+    return true;
+  }
+  for (const PropertyExprNode* operand : node->operands) {
+    if (TreeNamesGlobalClock(operand)) return true;
+  }
+  return false;
+}
+
+void SubstituteInChain(SeqLinearBody& body,
+                       const std::vector<EventExpr>& global_event) {
+  for (auto& clock : body.clocks) {
+    SubstituteGlobalClockLeadingEvent(clock, global_event);
+  }
+  for (auto* chains : {&body.intersects, &body.conjuncts, &body.alternatives}) {
+    for (SeqLinearBody& chain : *chains) SubstituteInChain(chain, global_event);
+  }
+}
+
+PropertyExprNode* SubstitutedTree(const PropertyExprNode* node,
+                                  const std::vector<EventExpr>& global_event,
+                                  Arena& arena) {
+  auto* copy = arena.Create<PropertyExprNode>(*node);
+  SubstituteGlobalClockLeadingEvent(copy->clock, global_event);
+  if (node->sequence != nullptr) {
+    copy->sequence = arena.Create<ModuleItem>(*node->sequence);
+    SubstituteGlobalClockLeadingEvent(copy->sequence->seq_clock, global_event);
+    SubstituteInChain(copy->sequence->seq_linear, global_event);
+  }
+  for (PropertyExprNode*& operand : copy->operands) {
+    operand = SubstitutedTree(operand, global_event, arena);
+  }
+  return copy;
+}
+
+}  // namespace
+
+Expr* SubstituteGlobalClockInActual(Expr* actual,
+                                    const std::vector<EventExpr>& global_event,
+                                    Arena& arena) {
+  if (actual == nullptr || global_event.empty() ||
+      !TreeNamesGlobalClock(actual->property_actual)) {
+    return actual;
+  }
+  auto* copy = arena.Create<Expr>(*actual);
+  copy->property_actual =
+      SubstitutedTree(actual->property_actual, global_event, arena);
+  return copy;
+}
+
+Expr* SubstituteGlobalClockInInstanceActuals(
+    Expr* call, const std::vector<EventExpr>& global_event, Arena& arena) {
+  if (call == nullptr || call->kind != ExprKind::kCall) return call;
+  std::vector<Expr*> args = call->args;
+  bool rewritten = false;
+  for (Expr*& arg : args) {
+    Expr* substituted = SubstituteGlobalClockInActual(arg, global_event, arena);
+    rewritten = rewritten || substituted != arg;
+    arg = substituted;
+  }
+  if (!rewritten) return call;
+  auto* copy = arena.Create<Expr>(*call);
+  copy->args = std::move(args);
+  return copy;
 }
 
 }  // namespace delta

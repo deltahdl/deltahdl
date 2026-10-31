@@ -471,6 +471,9 @@ class Lowerer {
   // §17.3: the actuals RecordProceduralCheckerActuals recorded, under the
   // prefix of their procedural checker instance.
   std::unordered_map<std::string, ActualsByFormal> procedural_checker_actuals_;
+  // §17.3: the prefix of the scope instantiating each checker instance, under
+  // the instance's own prefix.
+  std::unordered_map<std::string, std::string> checker_parent_prefixes_;
   // §17.3: the static assertions kept by KeepProceduralCheckerAssertion,
   // under the prefix of their procedural checker instance.
   std::unordered_map<std::string,

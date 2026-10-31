@@ -9,6 +9,7 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
+#include "parser/expr_substitute.h"
 #include "parser/parser.h"
 #include "parser/parser_property_grammar.h"
 #include "parser/parser_property_spec_internal.h"
@@ -540,15 +541,28 @@ bool Parser::TryParsePropertyInstanceSpec(ModuleItem* item) {
   if (instance == nullptr) instance = ParseExpr();
   diag_.PopSuppress();
   instance = QualifiedInstanceName(instance, arena_);
+  // §16.12 with §26.3: a property or sequence declared in a package is
+  // instantiated by its package-qualified name, `pk::pq` or `pk::pr(a, clk)`,
+  // which the registry keys the declaration under.
+  bool is_scoped =
+      instance != nullptr &&
+      (instance->kind == ExprKind::kMemberAccess ||
+       (instance->kind == ExprKind::kCall && instance->callee.empty())) &&
+      !InstanceDeclName(instance).empty();
   bool is_instance = instance != nullptr && Check(TokenKind::kRParen) &&
                      (instance->kind == ExprKind::kIdentifier ||
-                      instance->kind == ExprKind::kCall);
+                      instance->kind == ExprKind::kCall || is_scoped);
   if (!is_instance) {
     lexer_.RestorePos(saved);
     return false;
   }
-  item->prop_instance_name =
-      instance->kind == ExprKind::kCall ? instance->callee : instance->text;
+  if (is_scoped) {
+    item->prop_instance_name =
+        *arena_.Create<std::string>(InstanceDeclName(instance));
+  } else {
+    item->prop_instance_name =
+        instance->kind == ExprKind::kCall ? instance->callee : instance->text;
+  }
   item->assert_expr = instance;
   return true;
 }
