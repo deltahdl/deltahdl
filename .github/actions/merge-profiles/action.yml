@@ -66,16 +66,19 @@ runs:
         fi
         # --failure-mode=any is llvm-profdata's default, named so that a
         # change of default cannot make a corrupt input a warning.
+        # Its diagnostics stream to the log as they come, through tee, and are
+        # kept for the annotations below.
         log=$(mktemp)
+        echo "Merging ${#files[@]} profiles into ${INPUT_OUTPUT}"
         start=${SECONDS}
         if llvm-profdata merge -sparse --failure-mode=any "${files[@]}" \
-          -o "${INPUT_OUTPUT}" 2> "${log}"; then
+          -o "${INPUT_OUTPUT}" 2> >(tee "${log}" >&2); then
           status=0
         else
           status=$?
         fi
+        wait $!
         seconds=$(( SECONDS - start ))
-        cat "${log}" >&2
         # Every diagnostic becomes an annotation. GitHub keeps ten of each
         # kind per step, so a count comes first and survives the cap.
         awk -v out="${INPUT_OUTPUT}" '
