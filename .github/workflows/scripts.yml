@@ -2,6 +2,8 @@
 concurrency:
   cancel-in-progress: true
   group: scripts-${{ github.head_ref || github.ref_name }}
+env:
+  PYTHONUNBUFFERED: "1"
 jobs:
   assert-every-dataclass-field-is-read:
     runs-on: ubuntu-latest
