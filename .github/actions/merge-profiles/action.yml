@@ -1,7 +1,7 @@
 ---
 description: >-
   Merge LLVM instrumentation profiles into one indexed .profdata with
-  llvm-profdata merge -sparse, listing every input with its size, and say so
+  llvm-profdata merge -sparse, one input at a time with a line for each, and say so
   in an annotation whenever the merge is not clean. llvm-profdata reports on standard error alone, where a warning
   on a step that goes on to succeed is read by nobody, and it passes some
   inputs without a word at all. Each such case is named here and either fails
@@ -49,19 +49,14 @@ runs:
         if [ "${unmatched}" -ne 0 ]; then
           exit 1
         fi
-        # llvm-profdata names none of its inputs, so each one is listed here
-        # with its size before the merge reads it.
-        # It also merges an empty .profraw without a word, so a process that
-        # left its profile empty would drop its counters unannounced.
+        # llvm-profdata merges an empty .profraw without a word, so a process
+        # that left its profile empty would drop its counters unannounced.
         # It annotates rather than fails: the process's own verdict belongs to
         # the test that ran it, and whether counters were lost is what the
         # 100% gate in assert-coverage decides.
         empty=()
         for file in "${files[@]}"; do
-          size=$(wc -c < "${file}")
-          size=$(( size ))
-          echo "Input ${file}: ${size} bytes"
-          if [ "${size}" -eq 0 ]; then
+          if [ ! -s "${file}" ]; then
             empty+=( "${file}" )
           fi
         done
@@ -71,20 +66,42 @@ runs:
             "${#files[@]} profiles are empty and contribute no counters," \
             "${empty[0]} among them; the step log lists them all"
         fi
+        # One llvm-profdata merge names none of its inputs and reports only
+        # when it ends, so each input is merged by a call of its own into the
+        # profile built so far, and each call is announced as it starts.
         # --failure-mode=any is llvm-profdata's default, named so that a
         # change of default cannot make a corrupt input a warning.
         # Its diagnostics stream to the log as they come, through tee, and are
         # kept for the annotations below.
         log=$(mktemp)
-        echo "Merging ${#files[@]} profiles into ${INPUT_OUTPUT}"
+        partial=$(mktemp)
+        rm -f "${INPUT_OUTPUT}"
         start=${SECONDS}
-        if llvm-profdata merge -sparse --failure-mode=any "${files[@]}" \
-          -o "${INPUT_OUTPUT}" 2> >(tee "${log}" >&2); then
-          status=0
-        else
-          status=$?
-        fi
-        wait $!
+        status=0
+        count=0
+        for file in "${files[@]}"; do
+          count=$(( count + 1 ))
+          size=$(wc -c < "${file}")
+          echo "Merging ${count}/${#files[@]} ${file} ($(( size )) bytes)" \
+            "into ${INPUT_OUTPUT}"
+          accumulated=()
+          if [ -e "${INPUT_OUTPUT}" ]; then
+            accumulated=( "${INPUT_OUTPUT}" )
+          fi
+          if llvm-profdata merge -sparse --failure-mode=any \
+            "${accumulated[@]}" "${file}" -o "${partial}" \
+            2> >(tee -a "${log}" >&2); then
+            wait $!
+            mv "${partial}" "${INPUT_OUTPUT}"
+          else
+            status=$?
+            wait $!
+            echo "::error title=llvm-profdata merge::exited ${status}" \
+              "merging ${file}, profile ${count} of ${#files[@]}, into" \
+              "${INPUT_OUTPUT}"
+            break
+          fi
+        done
         seconds=$(( SECONDS - start ))
         # Every diagnostic becomes an annotation. GitHub keeps ten of each
         # kind per step, so a count comes first and survives the cap.
@@ -103,8 +120,6 @@ runs:
               printf "::error title=llvm-profdata merge::%s\n", esc(e[i])
           }' "${log}"
         if [ "${status}" -ne 0 ]; then
-          echo "::error title=llvm-profdata merge::exited ${status} merging" \
-            "${#files[@]} profiles into ${INPUT_OUTPUT}"
           exit "${status}"
         fi
         if [ ! -s "${INPUT_OUTPUT}" ]; then
