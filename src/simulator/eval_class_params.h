@@ -156,4 +156,17 @@ TypedefMap TypeParamTypes(const ClassDecl* decl,
                           const std::vector<DataType>& actuals,
                           const SimContext& ctx);
 
+// §6.18 with §8.25 and §6.20.3: the type a class property declared through a
+// name stands for where `cls` gives the name its meaning -- a typedef of the
+// class, a body `localparam type` (carried as one), or a type parameter bound
+// by `type_params` (TypeParamTypes), and through any of them a type selected
+// through a type parameter bound to a class, `typedef C::T C_t;` with C bound
+// to X reaching X's T -- followed to a built-in type or a name the class leaves
+// to the enclosing scope. `type` itself where it is no name, writes packed
+// dimensions of its own, is not a name the class gives a meaning, or reaches a
+// structure, union or enumeration, which have layouts of their own. Defined in
+// class_property_type.cpp.
+DataType ClassPropertyType(const DataType& type, const ClassDecl* cls,
+                           const TypedefMap& type_params);
+
 }  // namespace delta

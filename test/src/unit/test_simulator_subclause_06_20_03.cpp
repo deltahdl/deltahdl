@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <string>
 
 #include "fixture_simulator.h"
@@ -198,6 +199,74 @@ TEST(TypeParameterSim, ArrayOfABlockTypeParamHasElementsOfItsType) {
                        "endmodule\n",
                        f),
             "16 -1\n");
+}
+
+// §6.20.3: the clause's own example, written at compilation-unit scope. P's
+// type parameter C is bound to the class X, and C::T selects X's int through it
+// in a type parameter assignment, so a P_X object's y is a 32-bit int: a value
+// wider than 32 bits keeps only its low 32.
+TEST(TypeParameterSim, ClassTypeSelectedThroughTypeParamAssignment) {
+  EXPECT_EQ(RunAndGet("class P #(type C);\n"
+                      "  localparam type C_t = C::T;\n"
+                      "  C_t y;\n"
+                      "endclass\n"
+                      "class X;\n"
+                      "  typedef int T;\n"
+                      "endclass\n"
+                      "typedef P#(X) P_X;\n"
+                      "module t;\n"
+                      "  bit [63:0] r;\n"
+                      "  P_X o;\n"
+                      "  initial begin\n"
+                      "    o = new;\n"
+                      "    o.y = 40'h12_3456_789A;\n"
+                      "    r = {$bits(o.y), o.y};\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            (uint64_t{32} << 32) | 0x3456789Au);
+}
+
+// §6.20.3 with §6.18: a class property declared through a name the class gives
+// its meaning to is as wide as the type the name reaches -- a typedef of the
+// class, a body `localparam type`, a type selected through a type parameter
+// bound to a class, under the default specialization and under one naming the
+// class, and a compilation-unit typedef or a class's typedef named directly.
+// Each reaches byte, so a 40-bit value written to y keeps its low 8 bits, and
+// r holds the 32-bit $bits(o.y) above those 8 bits.
+TEST(TypeParameterSim, PropertyDeclaredThroughAClassTypeNameIsItsWidth) {
+  struct Form {
+    const char* classes;
+    const char* type;
+  };
+  const Form kForms[] = {
+      {"class P; typedef byte I; I y; endclass", "P"},
+      {"class P; localparam type I = byte; I y; endclass", "P"},
+      {"class P; typedef X::T I; I y; endclass", "P"},
+      {"class P; localparam type I = X::T; I y; endclass", "P"},
+      {"class P; X::T y; endclass", "P"},
+      {"typedef byte U; class P; U y; endclass", "P"},
+      {"class P #(type C = X); typedef C::T I; I y; endclass", "P"},
+      {"class P #(type C = int); typedef C::T I; I y; endclass", "P #(X)"},
+      {"class P #(type C = int); localparam type I = C::T; I y; endclass",
+       "P #(.C(X))"},
+  };
+  for (const Form& form : kForms) {
+    SCOPED_TRACE(form.classes);
+    const std::string kSrc =
+        std::string("class X; typedef byte T; endclass\n") + form.classes +
+        "\nmodule t;\n"
+        "  bit [63:0] r;\n  " +
+        form.type +
+        " o;\n"
+        "  initial begin\n"
+        "    o = new;\n"
+        "    o.y = 40'h12_3456_789A;\n"
+        "    r = {$bits(o.y), o.y};\n"
+        "  end\n"
+        "endmodule\n";
+    EXPECT_EQ(RunAndGet(kSrc, "r"), (uint64_t{8} << 8) | 0x9Au);
+  }
 }
 
 }  // namespace

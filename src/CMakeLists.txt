@@ -282,6 +282,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/type_eval.cpp
     elaborator/type_match.cpp
     elaborator/type_eval_named.cpp
+    elaborator/type_param_scope_prefix.cpp
     elaborator/type_eval_aggregate.cpp
     elaborator/uwire_drivers.cpp
     elaborator/viewport_resolution.cpp
@@ -761,6 +762,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/evaluation_ops.cpp
     simulator/evaluation_self_type.cpp
     simulator/wide_arith.cpp
+    simulator/class_property_type.cpp
     simulator/class_specialization.cpp
     simulator/class_specialization_key.cpp
     simulator/class_typedef_layout.cpp

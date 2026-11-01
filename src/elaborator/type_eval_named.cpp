@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_set>
@@ -41,6 +42,26 @@ std::string TypeChainKey(const DataType& type) {
          "::" + std::string(type.type_name);
 }
 
+// §6.20.3: `dtype`, a name behind a single scope prefix, with the prefix
+// replaced by the class name the scope binds it to, where `typedefs` holds the
+// prefix as a type parameter or typedef naming another type by a bare name.
+// Nothing for a prefix bound to anything else, a chain of prefixes, or a prefix
+// that names itself.
+std::optional<DataType> ThroughBoundPrefix(const DataType& dtype,
+                                           const TypedefMap& typedefs) {
+  if (dtype.scope_name.empty() || !dtype.outer_scope_names.empty())
+    return std::nullopt;
+  auto bound = typedefs.find(dtype.scope_name);
+  if (bound == typedefs.end()) return std::nullopt;
+  const DataType& cls = bound->second;
+  if (cls.kind != DataTypeKind::kNamed || !cls.scope_name.empty() ||
+      !cls.type_params.empty() || cls.type_name == dtype.scope_name)
+    return std::nullopt;
+  DataType through = dtype;
+  through.scope_name = cls.type_name;
+  return through;
+}
+
 // The type a named type denotes, or null when no declaration matches it. A
 // name behind a scope prefix selects that scope's declaration and never the
 // unqualified one: §8.23 (printed page 200) has the class scope resolution
@@ -52,14 +73,22 @@ std::string TypeChainKey(const DataType& type) {
 // (TypeChainKey), and misses rather than falling back to a bare name, which
 // would size the object wrongly. Keyed by its last prefix alone,
 // `Outer::Inner::s` took the typedef of the compilation unit's own class Inner.
+//
+// §6.20.3 with §8.23: a type parameter bound to a class may prefix the class
+// scope resolution operator, and `T::inner` then names the typedef of the class
+// the instance binds T to. The binding is the scope's entry for T, a class
+// name standing alone, so the name is looked up as that class's.
 const DataType* FindNamedType(const DataType& dtype,
                               const TypedefMap& typedefs) {
   if (dtype.kind != DataTypeKind::kNamed) return nullptr;
   if (!dtype.scope_name.empty()) {
     auto qit = typedefs.find(TypeChainKey(dtype));
+    if (qit != typedefs.end()) return &qit->second;
+    if (std::optional<DataType> through = ThroughBoundPrefix(dtype, typedefs))
+      return FindNamedType(*through, typedefs);
     // §9.7 with §G.6: process::state is declared by the built-in process
     // class, which no declaration of the design holds.
-    return (qit != typedefs.end()) ? &qit->second : StdClassEnumType(dtype);
+    return StdClassEnumType(dtype);
   }
   auto it = typedefs.find(dtype.type_name);
   return (it != typedefs.end()) ? &it->second : nullptr;

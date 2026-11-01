@@ -457,7 +457,7 @@ static ClassTypeInfo::PropertyInfo PropertyRecord(const ClassMember* member,
   uint32_t w = EvalTypeWidth(type, {}, params);
   const StructTypeInfo* layout =
       w == 0 ? StructPropertyLayout(type, type_key, ctx) : nullptr;
-  if (layout != nullptr) w = layout->total_width;
+  if (w == 0) w = layout ? layout->total_width : DeclaredTypeWidth(type, ctx);
   bool sized = w != 0;
   bool four_state = layout != nullptr ? LayoutHas4StateMember(*layout)
                                       : Is4stateType(type, {});
@@ -488,9 +488,9 @@ static void CollectClassMembers(ClassTypeInfo* info, const ClassDecl* cls,
     if (member->kind == ClassMemberKind::kProperty) {
       // §6.23 with §8.11: type(this) declares a handle of the class itself.
       const DataType& type = *TypeOfThisNamed(&member->data_type, info, ctx);
-      info->properties.push_back(
-          PropertyRecord(member, type, params,
-                         PropertyTypeKey(type, *info, *cls, params, ctx), ctx));
+      info->properties.push_back(PropertyRecord(
+          member, ClassPropertyType(type, cls, type_params), params,
+          PropertyTypeKey(type, *info, *cls, params, ctx), ctx));
     } else if (member->kind == ClassMemberKind::kMethod && member->method) {
       std::string name(member->method->name);
       info->methods[name] = member->method;

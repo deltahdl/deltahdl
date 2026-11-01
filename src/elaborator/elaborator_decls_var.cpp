@@ -32,6 +32,7 @@
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
 #include "elaborator/type_eval.h"
+#include "elaborator/type_param_scope_prefix.h"
 #include "elaborator/virtual_interface_target.h"
 #include "lexer/token.h"
 #include "parser/ast_design.h"
@@ -704,6 +705,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   if (item->is_genvar) return;
 
   ReportUndeclaredTypeName(item);
+  ReportSpecializationPrefixNotAClass(item->data_type, item->loc, unit_, diag_);
 
   std::string_view adopted_enumeration = ResolveVarDeclTypeRefs(item, mod);
 

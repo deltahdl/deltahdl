@@ -160,10 +160,6 @@ class ElaboratorClassRules : public ElaboratorOperationRules {
   // `class P#(type C)`.
   void ValidateRestrictedScopePrefixInClasses();
 
-  // §6.20.3: a type parameter used as a class scope resolution prefix shall
-  // resolve to a class.
-  void ValidateTypeParamScopePrefixResolvesToClass(const ModuleDecl* decl);
-
   void ValidateInterfaceClassRules();
 
   void ValidateForwardClassTypedefs();

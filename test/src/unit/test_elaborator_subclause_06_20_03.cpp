@@ -1,7 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
+#include "helpers_rtlir_lookup.h"
 
 using namespace delta;
 
@@ -458,6 +461,255 @@ TEST(TypeParameterElab, OrdinaryClassScopePrefixInVarDeclOk) {
              "module m;\n"
              "  Cfg::my_type x;\n"
              "endmodule\n"));
+}
+
+// §6.20.3 with §6.18: a typedef declaration is one of the three places a type
+// parameter may prefix the class scope resolution operator, so a type selected
+// through a type parameter bound to a class is accepted there, in a module and
+// in a parameterized class alike, and names the class's own type.
+TEST(TypeParameterElab, ClassBoundTypeParamPrefixInTypedefOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class K;\n"
+      "  typedef byte inner;\n"
+      "endclass\n"
+      "class P #(type C = K);\n"
+      "  typedef C::inner t;\n"
+      "  t z;\n"
+      "endclass\n"
+      "module m #(parameter type T = K);\n"
+      "  typedef T::inner my_t;\n"
+      "  my_t v;\n"
+      "  P #(K) p;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const RtlirVariable* v = FindVar(design, "m", "v");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->width, 8u);
+}
+
+// §6.20.3 with §6.23: the type operator is another of the three places, so
+// `type(T::inner)` with T bound to a class declares a variable of the class's
+// type.
+TEST(TypeParameterElab, ClassBoundTypeParamPrefixInTypeOperatorOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class K;\n"
+      "  typedef byte inner;\n"
+      "endclass\n"
+      "module m #(parameter type T = K);\n"
+      "  var type(T::inner) w;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const RtlirVariable* w = FindVar(design, "m", "w");
+  ASSERT_NE(w, nullptr);
+  EXPECT_EQ(w->width, 8u);
+}
+
+// §6.20.3: a type parameter assignment is the third place, and there too the
+// prefix must resolve to a class; T bound to int does not, so it is reported.
+TEST(TypeParameterElab, IntBoundTypeParamPrefixInTypeParamAssignmentIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m #(parameter type T = int);\n"
+      "  localparam type U = T::x;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "type parameter 'T' used as a class scope "
+                            "resolution prefix does not resolve to a class",
+                            2, "6.20.3"));
+}
+
+// §6.20.3: the nearest allowed form, the same assignment with T bound to a
+// class, is accepted and gives U the class's type.
+TEST(TypeParameterElab, ClassBoundTypeParamPrefixInTypeParamAssignmentOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class K;\n"
+      "  typedef byte x;\n"
+      "endclass\n"
+      "module m #(parameter type T = K);\n"
+      "  localparam type U = T::x;\n"
+      "  U u;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const RtlirVariable* u = FindVar(design, "m", "u");
+  ASSERT_NE(u, nullptr);
+  EXPECT_EQ(u->width, 8u);
+}
+
+// §6.20.3: the type operator, the remaining place a type parameter may prefix
+// the operator, reports the prefix where it is bound to int.
+TEST(TypeParameterElab, IntBoundTypeParamPrefixInTypeOperatorIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m #(parameter type T = int);\n"
+      "  var type(T::x) w;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "type parameter 'T' used as a class scope "
+                            "resolution prefix does not resolve to a class",
+                            2, "6.20.3"));
+}
+
+// §6.20.3: what the prefix resolves to is the type the instance binds the
+// parameter to. An override naming a class makes a default of int no error,
+// and an override naming int makes a default naming a class one.
+TEST(TypeParameterElab, OverrideDecidesWhetherThePrefixIsAClass) {
+  const char* kModules =
+      "class K;\n"
+      "  typedef byte inner;\n"
+      "endclass\n"
+      "module c #(parameter type T = int);\n"
+      "  typedef T::inner my_t;\n"
+      "endmodule\n"
+      "module d #(parameter type T = K);\n"
+      "  typedef T::inner my_t;\n"
+      "endmodule\n";
+  EXPECT_TRUE(ElabOk(std::string(kModules) +
+                     "module top; c #(K) u(); d v(); endmodule\n"));
+  ElabFixture f;
+  ElaborateSrc(std::string(kModules) +
+                   "module top; c #(K) u(); d #(int) v(); endmodule\n",
+               f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "type parameter 'T' used as a class scope "
+                            "resolution prefix does not resolve to a class",
+                            8, "6.20.3"));
+}
+
+// §6.20.3 inside a class: a specialization binds the class's type parameter,
+// and where the class's body selects a type through it -- a typedef or a body
+// `localparam type` -- the specialization is reported when it binds the
+// parameter to a type that is not a class. Each place a specialization is
+// written is checked: a module's variable and typedef, a compilation-unit
+// typedef, another class's property, and the default specialization `P` alone.
+// The same forms binding the class X are accepted.
+TEST(TypeParameterElab, SpecializationBindingANonClassPrefixIsError) {
+  struct Form {
+    const char* where;
+    const char* items;
+    int line;
+  };
+  const Form kForms[] = {
+      {"module variable", "module t; P #(@) o; endmodule\n", 8},
+      {"module typedef", "module t; typedef P #(@) p_t; endmodule\n", 8},
+      {"unit typedef", "typedef P #(.C(@)) p_t;\nmodule t; endmodule\n", 8},
+      {"class property", "class Q; P #(@) p; endclass\nmodule t; endmodule\n",
+       8},
+  };
+  const std::string kClasses =
+      "class X;\n"
+      "  typedef byte T;\n"
+      "endclass\n"
+      "class P #(type C = X);\n"
+      "  typedef C::T I;\n"
+      "  localparam type J = C::T;\n";
+  for (const Form& form : kForms) {
+    SCOPED_TRACE(form.where);
+    std::string bad = form.items;
+    std::string good = form.items;
+    bad.replace(bad.find('@'), 1, "int");
+    good.replace(good.find('@'), 1, "X");
+    EXPECT_TRUE(ElabOk(kClasses + "endclass\n" + good));
+    ElabFixture f;
+    ElaborateSrc(kClasses + "endclass\n" + bad, f);
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "type parameter 'C' used as a class scope "
+                              "resolution prefix does not resolve to a class",
+                              form.line, "6.20.3"));
+  }
+}
+
+// §6.20.3 with §8.25.1: `P` alone is the default specialization, binding the
+// parameter's default, so a default of int is reported and one of X is not.
+TEST(TypeParameterElab, DefaultSpecializationBindingANonClassPrefixIsError) {
+  const std::string kBody =
+      "  localparam type J = C::T;\n"
+      "endclass\n"
+      "module t; P o; endmodule\n";
+  EXPECT_TRUE(
+      ElabOk("class X; typedef byte T; endclass\n"
+             "class P #(type C = X);\n" +
+             kBody));
+  ElabFixture f;
+  ElaborateSrc(
+      "class X; typedef byte T; endclass\n"
+      "class P #(type C = int);\n" +
+          kBody,
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "type parameter 'C' used as a class scope "
+                            "resolution prefix does not resolve to a class",
+                            5, "6.20.3"));
+}
+
+// §6.20.3 in every place a type parameter can be declared and used: an
+// interface (§25.3), a program (§24.3), a generate block (§27), a function and
+// a task body (§13), and a package's local type parameter (§26.2), each with
+// the three uses the clause permits -- a typedef, a type parameter assignment
+// and the type operator. With the parameter bound to int each use is reported;
+// with it bound to the class K the same use is accepted.
+TEST(TypeParameterElab, TypeParamPrefixInEveryPlaceMustResolveToAClass) {
+  struct Place {
+    const char* where;
+    const char* text;
+  };
+  const Place kPlaces[] = {
+      {"interface",
+       "interface c #(parameter type T = @);\n  #\nendinterface\n"
+       "module top; c u(); endmodule\n"},
+      {"program",
+       "program c #(parameter type T = @);\n  #\nendprogram\n"
+       "module top; c u(); endmodule\n"},
+      {"generate block",
+       "module c #(parameter type T = @);\n  if (1) begin : g #\n  end\n"
+       "endmodule\nmodule top; c u(); endmodule\n"},
+      {"function body",
+       "module c #(parameter type T = @);\n"
+       "  function automatic void f(); #\n  endfunction\n"
+       "endmodule\nmodule top; c u(); endmodule\n"},
+      {"task body",
+       "module c #(parameter type T = @);\n"
+       "  task automatic k(); #\n  endtask\n"
+       "endmodule\nmodule top; c u(); endmodule\n"},
+      {"package",
+       "package pk;\n  localparam type T = @; #\nendpackage\n"
+       "module top; import pk::*; endmodule\n"},
+  };
+  const char* const kUses[] = {"typedef T::inner my_t;",
+                               "localparam type U = T::inner;",
+                               "var type(T::inner) w;"};
+  const std::string kClass =
+      "class K;\n"
+      "  typedef byte inner;\n"
+      "endclass\n";
+  for (const Place& place : kPlaces) {
+    for (const char* use : kUses) {
+      SCOPED_TRACE(std::string(place.where) + ": " + use);
+      std::string text = place.text;
+      text.replace(text.find('#'), 1, use);
+      std::string good = kClass + text;
+      std::string bad = good;
+      good.replace(good.find('@'), 1, "K");
+      bad.replace(bad.find('@'), 1, "int");
+      EXPECT_TRUE(ElabOk(good));
+      ElabFixture f;
+      ElaborateSrc(bad, f);
+      EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                                "type parameter 'T' used as a class scope "
+                                "resolution prefix does not resolve to a class",
+                                5, "6.20.3"));
+    }
+  }
 }
 
 }  // namespace

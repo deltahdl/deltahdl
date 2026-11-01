@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -182,6 +183,13 @@ std::string TypeChainKey(const DataType& type);
 // take the layout from a different type.
 const DataType* FindNamedType(const DataType& dtype,
                               const TypedefMap& typedefs);
+
+// §6.20.3: `dtype` with its single scope prefix replaced by the class name
+// `typedefs` binds that prefix to, a type parameter `T` bound to class K
+// turning `T::inner` into `K::inner`; nothing where the prefix is bound to no
+// bare type name. Defined with FindNamedType in type_eval_named.cpp.
+std::optional<DataType> ThroughBoundPrefix(const DataType& dtype,
+                                           const TypedefMap& typedefs);
 
 // §6.18 with §23.9: enters the typedef `name`, declared with `type`, into
 // `typedefs`. A typedef writing its own bare name as its type names the type

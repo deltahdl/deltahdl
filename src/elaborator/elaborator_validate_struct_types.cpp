@@ -25,6 +25,7 @@
 #include "elaborator/rtlir_enum_member.h"
 #include "elaborator/rtlir_scopes.h"
 #include "elaborator/type_eval.h"
+#include "elaborator/type_param_scope_prefix.h"
 #include "elaborator/type_site_lookup.h"
 #include "elaborator/unit_scope_order.h"
 #include "elaborator/unpacked_array_type.h"
@@ -431,6 +432,12 @@ static bool ResolveScopedTypeRef(DataType& dt, const Expr* ref,
     AdoptReferencedType(dt, *resolved);
     return true;
   }
+  // §6.20.3: or a type parameter bound to a class names that class's typedef.
+  if (const DataType* bound =
+          TypeRefThroughBoundPrefix(prefix, ref->rhs->text, scope.typedefs)) {
+    AdoptReferencedType(dt, *bound);
+    return true;
+  }
   const PackageDecl* pkg = PackageDeclaring(
       scope.unit, ref->rhs->text,
       [&](std::string_view package) { return package == prefix; });
@@ -523,6 +530,8 @@ std::string_view Elaborator::ResolveTypeRef(DataType& dt, SourceLoc loc,
   CheckTypeRefArgInner(ref, loc);
   const ModuleDecl* decl = module_decl_path_.back();
   const TypeRefScope kScope{mod, typedefs_, unit_, loc, arena_, decl};
+  ReportTypeRefPrefixNotAClass(ref, loc, {mod->params, typedefs_, class_names_},
+                               diag_);
   if (ResolveScopedTypeRef(dt, ref, kScope)) return {};
   // §7.4.4: an unpacked array's element; TypeRefUnpackedDims has its dims.
   if (std::optional<UnpackedArrayType> array = TypeRefValueArray(ref, mod)) {

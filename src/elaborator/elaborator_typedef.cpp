@@ -33,6 +33,7 @@
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_enum_member.h"
 #include "elaborator/type_eval.h"
+#include "elaborator/type_param_scope_prefix.h"
 #include "elaborator/unit_scope_order.h"
 #include "elaborator/virtual_interface_target.h"
 #include "lexer/token.h"
@@ -462,6 +463,10 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
   // below judges and records that type. Unresolved, the type is implicit, the
   // mark of a forward typedef.
   ResolveTypeRef(item->typedef_type, item->loc, mod);
+  ReportTypeParamPrefixNotAClass(item->typedef_type.scope_name, item->loc,
+                                 {mod->params, typedefs_, class_names_}, diag_);
+  ReportSpecializationPrefixNotAClass(item->typedef_type, item->loc, unit_,
+                                      diag_);
   // A.2.5 with §6.23: `typedef int t [type(k)];` is an associative array type
   // indexed by the type of k. The dimension is resolved here, ahead of the
   // record below that every variable `t x;` takes its dimensions from.

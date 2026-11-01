@@ -28,6 +28,7 @@
 #include "elaborator/rtlir.h"
 #include "elaborator/simple_bit_vector.h"
 #include "elaborator/type_eval.h"
+#include "elaborator/type_param_scope_prefix.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
@@ -494,6 +495,11 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
   }
 
   CheckTypeParamNotSetToValue(item, diag_);
+  if (is_type) {
+    ReportTypeParamPrefixNotAClass(item->typedef_type.scope_name, item->loc,
+                                   {mod->params, typedefs_, class_names_},
+                                   diag_);
+  }
 
   RtlirParamDecl pd;
   pd.name = item->name;
