@@ -778,9 +778,10 @@ jobs:
           fail=0
           for f in $(find src -name '*.cpp' -o -name '*.h')
           do
-            if tr '\n' ' ' < "$f" \
-              | grep -qE '(\.|->)(Error|Warning)\([^,;)]*(\{\}|SourceLoc\(\)) *,'
+            if matches=$(tr '\n' ' ' < "$f" \
+              | grep -oE '(\.|->)(Error|Warning)\([^,;)]*(\{\}|SourceLoc\(\)) *,')
             then
+              printf "%s\n" "$matches"
               echo "::error file=$f,line=1::$f reports a diagnostic at an" \
                 "empty location; pass the position of the construct the" \
                 "report is about, which an Expr and a Stmt carry in" \
@@ -1811,7 +1812,7 @@ jobs:
           # codes at Modules/ExternalProject/download.cmake.in:103 and no HTTP
           # status at all.
           if [ ! -f "${archive}" ]; then
-            curl --fail --location --silent --show-error \
+            curl --fail --location --show-error \
               --retry 8 --retry-all-errors --retry-delay 5 \
               --retry-max-time 600 --output "${archive}" \
               "https://github.com/google/googletest/archive/refs/tags/${TAG}.tar.gz"
@@ -1863,10 +1864,10 @@ jobs:
           != 'true'
         name: Clone sv-tests
         run: |
-          git clone --depth 1 \
+          git clone --progress --depth 1 \
             https://github.com/chipsalliance/sv-tests.git \
             third_party/sv-tests
-          git -C third_party/sv-tests submodule update --init --depth 1 \
+          git -C third_party/sv-tests submodule update --init --progress --depth 1 \
             third_party/tests/uvm third_party/tests/uvm-1.2
       - if: >-
           steps.sv-tests-lookup.outputs.cache-hit
@@ -1968,9 +1969,9 @@ jobs:
           xargs -r -P "$(nproc)" -n 1 sh -c '
             out=$(clang-include-cleaner -p build/headers --print=changes "$0" 2>&1)
             status=$?
+            printf "%s\n" "$out"
             if [ -n "$out" ] || [ "$status" -ne 0 ]; then
               echo "::error file=$0::$0: includes do not match uses"
-              echo "$out"
               exit 1
             fi
             echo "$0: includes match uses"' < "$RUNNER_TEMP/headers"
@@ -2174,10 +2175,11 @@ jobs:
           # the API call that actually went wrong.
           ver=""
           for attempt in 1 2 3 4 5; do
-            resp=$(curl -fsSL \
+            resp=$(curl -fSL \
               -H "Authorization: Bearer ${GH_TOKEN}" \
               -H "X-GitHub-Api-Version: 2022-11-28" \
               https://api.github.com/repos/pmd/pmd/releases/latest) &&
+              echo "${resp}" &&
               ver=$(echo "${resp}" | jq -r .tag_name |
                 sed 's#pmd_releases/##')
             if echo "${ver}" | grep -qE '^[0-9]+\.[0-9]+'; then break; fi
@@ -2201,7 +2203,7 @@ jobs:
           if [ ! -d "pmd-bin-$PMD_VER" ]; then
             PMD="pmd-dist-$PMD_VER-bin.zip"
             URL=https://github.com/pmd/pmd/releases
-            wget --no-verbose "$URL/download/pmd_releases%2F$PMD_VER/$PMD"
+            wget --progress=dot:giga "$URL/download/pmd_releases%2F$PMD_VER/$PMD"
             unzip "$PMD"
           fi
           echo "$PWD/pmd-bin-$PMD_VER/bin" >> "$GITHUB_PATH"
@@ -2235,10 +2237,11 @@ jobs:
           # the API call that actually went wrong.
           ver=""
           for attempt in 1 2 3 4 5; do
-            resp=$(curl -fsSL \
+            resp=$(curl -fSL \
               -H "Authorization: Bearer ${GH_TOKEN}" \
               -H "X-GitHub-Api-Version: 2022-11-28" \
               https://api.github.com/repos/pmd/pmd/releases/latest) &&
+              echo "${resp}" &&
               ver=$(echo "${resp}" | jq -r .tag_name |
                 sed 's#pmd_releases/##')
             if echo "${ver}" | grep -qE '^[0-9]+\.[0-9]+'; then break; fi
@@ -2262,7 +2265,7 @@ jobs:
           if [ ! -d "pmd-bin-$PMD_VER" ]; then
             PMD="pmd-dist-$PMD_VER-bin.zip"
             URL=https://github.com/pmd/pmd/releases
-            wget --no-verbose "$URL/download/pmd_releases%2F$PMD_VER/$PMD"
+            wget --progress=dot:giga "$URL/download/pmd_releases%2F$PMD_VER/$PMD"
             unzip "$PMD"
           fi
           echo "$PWD/pmd-bin-$PMD_VER/bin" >> "$GITHUB_PATH"
@@ -2336,6 +2339,7 @@ jobs:
         run: |
           expected=$(cat test/src/e2e/hello.expected)
           actual=$(ulimit -v 786432 && build/src/deltahdl test/src/e2e/hello.sv 2>&1)
+          printf "%s\n" "$actual"
           if [ "$actual" != "$expected" ]; then
             printf 'expected:\n%s\ngot:\n%s\n' "$expected" "$actual"
             exit 1
@@ -2782,7 +2786,7 @@ jobs:
           -exec chmod +x {} +
       - name: Unit tests
         run: >-
-          ctest --test-dir build --output-on-failure
+          ctest --test-dir build --verbose
           --label-exclude e2e --timeout 60
           --exclude-regex '_NOT_BUILT'
     strategy:
@@ -3078,7 +3082,7 @@ jobs:
         run: df -h /
       - name: Unit tests
         run: >-
-          ctest --test-dir build --output-on-failure
+          ctest --test-dir build --verbose
           --label-exclude e2e --timeout 60
           --exclude-regex '_NOT_BUILT'
       - if: always()
@@ -3142,7 +3146,7 @@ jobs:
           find build/test -maxdepth 1 -type f -name 'test_*'
           -exec chmod +x {} +
       - name: Unit tests
-        run: ctest --test-dir build --output-on-failure --label-exclude e2e --timeout 60
+        run: ctest --test-dir build --verbose --label-exclude e2e --timeout 60
   unit-test-tsan:
     env:
       TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1
@@ -3162,7 +3166,7 @@ jobs:
           -exec chmod +x {} +
       - name: Unit tests
         run: >-
-          ctest --test-dir build --output-on-failure
+          ctest --test-dir build --verbose
           --label-exclude e2e --timeout 60
           --exclude-regex '_NOT_BUILT'
     strategy:
@@ -3186,7 +3190,7 @@ jobs:
           -exec chmod +x {} +
       - name: Unit tests
         run: >-
-          ctest --test-dir build --output-on-failure
+          ctest --test-dir build --verbose
           --label-exclude e2e --timeout 60
           --exclude-regex '_NOT_BUILT'
     strategy:
@@ -3210,7 +3214,7 @@ jobs:
           -exec chmod +x {} +
       - name: Unit tests
         run: >-
-          ctest --test-dir build --output-on-failure
+          ctest --test-dir build --verbose
           --label-exclude e2e --timeout 60
           --exclude-regex '_NOT_BUILT'
     strategy:

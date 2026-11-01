@@ -21,7 +21,6 @@ jobs:
           --no-config
           --no-duplicate-keys
           --continue
-          --quiet
   yamllint:
     runs-on: ubuntu-latest
     steps:

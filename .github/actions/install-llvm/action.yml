@@ -68,10 +68,11 @@ runs:
           # fails, the loop never reaches its second attempt, and the job sits
           # in this step until the runner's six-hour limit kills it.
           for attempt in 1 2 3 4 5; do
-            resp=$(curl -fsSL --connect-timeout 10 --max-time 60 \
+            resp=$(curl -fSL --connect-timeout 10 --max-time 60 \
               -H "Authorization: Bearer ${GH_TOKEN}" \
               -H "X-GitHub-Api-Version: 2022-11-28" \
               https://api.github.com/repos/llvm/llvm-project/releases/latest) &&
+              echo "${resp}" &&
               major=$(echo "${resp}" |
                 jq -r .tag_name | sed -E 's/^llvmorg-([0-9]+).*/\1/')
             if echo "${major}" | grep -qE '^[0-9]+$'; then break; fi
@@ -88,8 +89,9 @@ runs:
             # STABLE (never trunk).
             echo "::warning::releases API discovery failed; falling back to" \
               "apt.llvm.org repo listing"
-            major=$(curl -fsSL --connect-timeout 10 --max-time 60 \
+            major=$(curl -fSL --connect-timeout 10 --max-time 60 \
               "http://apt.llvm.org/${VERSION_CODENAME}/dists/" |
+              tee /dev/stderr |
               grep -oE "llvm-toolchain-${VERSION_CODENAME}-[0-9]+" |
               sed -E 's/.*-([0-9]+)$/\1/' | sort -n | tail -1)
           fi
@@ -150,13 +152,13 @@ runs:
           echo "::error::'$*' failed after 5 attempts"
           return 1
         }
-        retry wget -qO /tmp/llvm-snapshot.gpg.key \
+        retry wget --progress=dot:giga -O /tmp/llvm-snapshot.gpg.key \
           --timeout=30 --tries=1 \
           https://apt.llvm.org/llvm-snapshot.gpg.key
         sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc \
-          </tmp/llvm-snapshot.gpg.key >/dev/null
+          </tmp/llvm-snapshot.gpg.key
         echo "deb http://apt.llvm.org/${VERSION_CODENAME}/ llvm-toolchain-${VERSION_CODENAME}-${major} main" |
-          sudo tee /etc/apt/sources.list.d/llvm.list >/dev/null
+          sudo tee /etc/apt/sources.list.d/llvm.list
         # Acquire::*::Timeout gives apt its own bound on a mirror that has gone
         # quiet, so one stalled file fails that file rather than the whole
         # attempt. Without it the only bound is the `timeout` around the
