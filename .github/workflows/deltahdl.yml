@@ -1161,8 +1161,8 @@ jobs:
       - uses: actions/checkout@v5
       - name: Install LLVM
         uses: ./.github/actions/install-llvm
-      - name: Install ccache
-        run: sudo apt-get install -y ccache
+      - name: Install ccache and Ninja
+        run: sudo apt-get install -y ccache ninja-build
       - name: Restore ccache
         uses: actions/cache@v5
         with:
@@ -1195,7 +1195,7 @@ jobs:
       # size ccache has to store (see the comment above its Build step).
       - name: Build
         run: |
-          cmake -B build \
+          cmake -B build -G Ninja \
             -DCMAKE_CXX_COMPILER=clang++ \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_C_COMPILER=clang \
@@ -1524,8 +1524,8 @@ jobs:
       - uses: actions/checkout@v5
       - name: Install LLVM
         uses: ./.github/actions/install-llvm
-      - name: Install ccache
-        run: sudo apt-get install -y ccache
+      - name: Install ccache and Ninja
+        run: sudo apt-get install -y ccache ninja-build
       - name: Restore ccache
         uses: actions/cache@v5
         with:
@@ -1558,7 +1558,7 @@ jobs:
       # size ccache has to store (see the comment above its Build step).
       - name: Build
         run: |
-          cmake -B build \
+          cmake -B build -G Ninja \
             -DCMAKE_CXX_COMPILER=clang++ \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_C_COMPILER=clang \
@@ -1613,8 +1613,8 @@ jobs:
       - uses: actions/checkout@v5
       - name: Install LLVM
         uses: ./.github/actions/install-llvm
-      - name: Install ccache
-        run: sudo apt-get install -y ccache
+      - name: Install ccache and Ninja
+        run: sudo apt-get install -y ccache ninja-build
       - name: Restore ccache
         uses: actions/cache@v5
         with:
@@ -1643,7 +1643,7 @@ jobs:
           tag: ${{ needs.cache-googletest.outputs.tag }}
       - name: Build
         run: |
-          cmake -B build \
+          cmake -B build -G Ninja \
             -DCMAKE_CXX_COMPILER=clang++ \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_C_COMPILER=clang \
@@ -1695,8 +1695,8 @@ jobs:
       - uses: actions/checkout@v5
       - name: Install GCC
         uses: ./.github/actions/install-gcc
-      - name: Install ccache
-        run: sudo apt-get install -y ccache
+      - name: Install ccache and Ninja
+        run: sudo apt-get install -y ccache ninja-build
       - name: Restore ccache
         uses: actions/cache@v5
         with:
@@ -1725,7 +1725,7 @@ jobs:
           tag: ${{ needs.cache-googletest.outputs.tag }}
       - name: Build
         run: |
-          cmake -B build \
+          cmake -B build -G Ninja \
             -DCMAKE_CXX_COMPILER=g++ \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_C_COMPILER=gcc \
