@@ -135,6 +135,8 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_extern_modules.cpp
     elaborator/elaborator_type_facts.cpp
     elaborator/elaborator_items.cpp
+    elaborator/subroutine_instance_copy.cpp
+    elaborator/type_ref_compare_fold.cpp
     elaborator/elaborator_node_attributes.cpp
     elaborator/constant_scope.cpp
     elaborator/implication_operator_rules.cpp
@@ -278,6 +280,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_validate_enum_assign.cpp
     elaborator/elaborator_validate_types.cpp
     elaborator/elaborator_validate_struct_types.cpp
+    elaborator/scope_value_type.cpp
     elaborator/type_ref_walks.cpp
     elaborator/type_eval.cpp
     elaborator/type_match.cpp

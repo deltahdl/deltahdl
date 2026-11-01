@@ -9,7 +9,6 @@
 #include <utility>
 #include <vector>
 
-#include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "common/types.h"
@@ -23,7 +22,6 @@
 #include "elaborator/elaborator_items_params.h"
 #include "elaborator/elaborator_node_attributes.h"
 #include "elaborator/elaborator_validate_internal.h"
-#include "elaborator/global_clock_assertion_event.h"
 #include "elaborator/implication_operator_rules.h"
 #include "elaborator/interconnect_uses.h"
 #include "elaborator/procedural_checker_instance.h"
@@ -34,12 +32,13 @@
 #include "elaborator/rtlir_checker_site.h"
 #include "elaborator/rtlir_scopes.h"
 #include "elaborator/sensitivity.h"
+#include "elaborator/subroutine_instance_copy.h"
 #include "elaborator/type_eval.h"
 #include "elaborator/type_param_scope_prefix.h"
+#include "elaborator/type_ref_compare_fold.h"
 #include "elaborator/type_ref_walks.h"
 #include "elaborator/unit_scope_order.h"
 #include "elaborator/uwire_drivers.h"
-#include "lexer/token.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
@@ -47,37 +46,8 @@
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 #include "parser/override_specifier_placement.h"
-#include "parser/parser_token_skips.h"
 
 namespace delta {
-
-// §14.14 (printed pages 363-366): `$global_clock` names the global clocking
-// event of the scope it is written in, a subroutine's body among them, so an
-// event control naming it in a task, `@($global_clock)`, waits on the event of
-// the declaration effective where the task is declared -- the substitution a
-// process body takes (BuildProcessBody in elaborator_process.cpp). Left as it
-// was, the event control evaluated `$global_clock` as a call and the run
-// reported no such system function. The rewrite is made on a copy of the
-// declaration, as a process's is, because the one declaration the parser built
-// serves every instance of the module; the declaration itself is kept where
-// its body names no `$global_clock`.
-static ModuleItem* WithGlobalClockSubstituted(
-    ModuleItem* item, const std::vector<EventExpr>* global_event,
-    Arena& arena) {
-  if (global_event == nullptr) return item;
-  std::vector<Stmt*> body;
-  bool rewritten = false;
-  for (Stmt* s : item->func_body_stmts) {
-    Stmt* substituted =
-        SubstituteGlobalClockEventControls(s, *global_event, arena);
-    rewritten |= substituted != s;
-    body.push_back(substituted);
-  }
-  if (!rewritten) return item;
-  auto* copy = arena.Create<ModuleItem>(*item);
-  copy->func_body_stmts = std::move(body);
-  return copy;
-}
 
 uint32_t SpecparamWidth(const DataType& type, const Expr* init,
                         const TypedefMap& typedefs) {
@@ -397,88 +367,6 @@ void CreateImplicitNetsForTerminals(const std::vector<Expr*>& terminals,
 
 bool HasInstanceArrayRange(const ModuleItem* item) {  // §28.3.6
   return item->inst_range_left != nullptr && item->inst_range_right != nullptr;
-}
-
-using TypeRefCompareFolder = std::function<std::optional<int64_t>(const Expr*)>;
-
-// §6.23: a comparison of two type references is a constant expression, true
-// exactly when the types match by §6.22.1, which only the elaborator's type
-// tables can judge. Each one a procedure writes is handed to `fold`, which
-// keeps its answer for the instance being elaborated, so the procedure reads
-// its value; compared at run time by the names alone, `type(node) ==
-// type(bit)` under `typedef bit node` was 0. The expression itself is left as
-// written: every instance of the module shares it, and §6.20.3 lets each bind
-// parameters that give the comparison another answer.
-void FoldTypeRefComparesInExpr(Expr* e, const TypeRefCompareFolder& fold) {
-  if (e == nullptr) return;
-  if (IsTypeRefComparison(e) && fold(e).has_value()) return;
-  for (Expr* sub :
-       {e->lhs, e->rhs, e->condition, e->true_expr, e->false_expr}) {
-    FoldTypeRefComparesInExpr(sub, fold);
-  }
-  for (Expr* elem : e->elements) FoldTypeRefComparesInExpr(elem, fold);
-  for (Expr* arg : e->args) FoldTypeRefComparesInExpr(arg, fold);
-}
-
-// Whether `e` writes an assignment operator, `(a = b)` or `(a += b)`.
-bool WritesAnAssignment(const Expr* e) {
-  if (e == nullptr) return false;
-  if (e->kind == ExprKind::kBinary &&
-      (e->op == TokenKind::kEq || IsCompoundAssignOp(e->op)))
-    return true;
-  for (const Expr* sub :
-       {e->lhs, e->rhs, e->condition, e->true_expr, e->false_expr}) {
-    if (WritesAnAssignment(sub)) return true;
-  }
-  for (const Expr* elem : e->elements) {
-    if (WritesAnAssignment(elem)) return true;
-  }
-  for (const Expr* arg : e->args) {
-    if (WritesAnAssignment(arg)) return true;
-  }
-  return false;
-}
-
-// §11.3.6 (printed page 275): `fold` where an assignment operator is barred,
-// outside a procedural statement and in a procedural continuous assignment. A
-// comparison whose operand writes one is left whole for that rule's report.
-TypeRefCompareFolder BarringAssignments(const TypeRefCompareFolder& fold) {
-  return [&fold](const Expr* e) -> std::optional<int64_t> {
-    if (WritesAnAssignment(e)) return std::nullopt;
-    return fold(e);
-  };
-}
-
-void FoldTypeRefComparesInStmt(Stmt* s, const TypeRefCompareFolder& fold) {
-  if (s == nullptr) return;
-  // §10.6: assign and force are the procedural continuous assignments.
-  bool is_continuous =
-      s->kind == StmtKind::kAssign || s->kind == StmtKind::kForce;
-  FoldTypeRefComparesInExpr(s->rhs,
-                            is_continuous ? BarringAssignments(fold) : fold);
-  for (Expr* e : {s->lhs, s->expr, s->condition, s->assert_expr}) {
-    FoldTypeRefComparesInExpr(e, fold);
-  }
-  ForEachChildStmt(
-      s, [&](Stmt* const& sub) { FoldTypeRefComparesInStmt(sub, fold); });
-}
-
-// The comparisons of type references `item` writes where a value is read while
-// the design runs: its procedure's or subroutine's statements, a continuous
-// assignment's right-hand side and a net's or variable's initializer. A
-// parameter's value is folded by constant evaluation (TypedefRegistryGuard),
-// and a let's body stands for its formals' actuals, which are not yet known.
-void FoldItemTypeRefCompares(ModuleItem* item,
-                             const TypeRefCompareFolder& fold) {
-  FoldTypeRefComparesInStmt(item->body, fold);
-  for (auto* s : item->func_body_stmts) FoldTypeRefComparesInStmt(s, fold);
-  if (item->kind != ModuleItemKind::kContAssign &&
-      item->kind != ModuleItemKind::kNetDecl &&
-      item->kind != ModuleItemKind::kVarDecl)
-    return;
-  TypeRefCompareFolder outside_procedures = BarringAssignments(fold);
-  FoldTypeRefComparesInExpr(item->assign_rhs, outside_procedures);
-  FoldTypeRefComparesInExpr(item->init_expr, outside_procedures);
 }
 
 // §3.13 (e) (printed page 58): the module name space unifies, beside the nets,
