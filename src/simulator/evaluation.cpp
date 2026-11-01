@@ -660,6 +660,10 @@ static TypeRefRuntimeId ResolveTypeRefRuntimeId(const Expr* op,
   return id;
 }
 
+static bool IsTypeRef(const Expr* operand) {
+  return operand != nullptr && operand->kind == ExprKind::kTypeRef;
+}
+
 // §6.23 — evaluate a comparison of two type references to a one-bit result:
 // true exactly when the referenced types match (equality forms) or do not
 // (inequality forms). Returns false, leaving `out` untouched, when `expr` is
@@ -670,8 +674,7 @@ static bool TryTypeRefComparison(const Expr* expr, SimContext& ctx,
   bool is_neq =
       expr->op == TokenKind::kBangEq || expr->op == TokenKind::kBangEqEq;
   if (!is_eq && !is_neq) return false;
-  if (!expr->lhs || expr->lhs->kind != ExprKind::kTypeRef) return false;
-  if (!expr->rhs || expr->rhs->kind != ExprKind::kTypeRef) return false;
+  if (!IsTypeRef(expr->lhs) || !IsTypeRef(expr->rhs)) return false;
   // §6.20.3: the elaborator judged the comparison against the types of the
   // instance it stands in, by §6.22.1's matching, which the names below
   // cannot answer.

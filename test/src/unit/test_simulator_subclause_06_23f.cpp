@@ -100,10 +100,10 @@ TEST(TypeRefCompareInstanceSim, InterfaceProgramAndTaskCompareTheirOwnTypes) {
       "  m #(byte) m1(); m #(int) m2();\n"
       "endmodule\n",
       kCompare);
-  for (const char* kInst : {"i", "p", "m"}) {
-    SCOPED_TRACE(kInst);
-    EXPECT_EQ(RunAndGet(kSrc, std::format("{}1.r", kInst).c_str()), 0b0101u);
-    EXPECT_EQ(RunAndGet(kSrc, std::format("{}2.r", kInst).c_str()), 0b1010u);
+  for (const char* inst : {"i", "p", "m"}) {
+    SCOPED_TRACE(inst);
+    EXPECT_EQ(RunAndGet(kSrc, std::format("{}1.r", inst).c_str()), 0b0101u);
+    EXPECT_EQ(RunAndGet(kSrc, std::format("{}2.r", inst).c_str()), 0b1010u);
   }
 }
 
