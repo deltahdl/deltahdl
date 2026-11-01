@@ -117,7 +117,7 @@ jobs:
           github.ref_name == 'main'
           && github.event_name == 'push'
         name: Upload pages artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: coverage-html/
       # DO NOT add continue-on-error here. If Pages deployment fails,
@@ -127,7 +127,7 @@ jobs:
           github.ref_name == 'main'
           && github.event_name == 'push'
         name: Publish to GitHub Pages
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
   # A unit test runs only if it has a TEST(...) block and test/CMakeLists.txt
   # registers it, and registration is by hand. This job holds both ends of that
   # together, so adding a test and deleting one both have to touch the file and
