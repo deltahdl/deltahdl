@@ -64,10 +64,12 @@ void ReportSpecializationPrefixNotAClass(const DataType& written, SourceLoc loc,
 // of the procedure or subroutine `item` declares, and each type operator its
 // declarations write: a prefix naming a type parameter the body declares is
 // judged by the type that declaration gives it, and one naming the instance's
-// by `scope`.
-void ReportProcedurePrefixesNotAClass(const ModuleItem& item,
-                                      const TypeParamPrefixScope& scope,
-                                      DiagEngine& diag);
+// by `scope`. Where `item` declares a checker, the same for the checker's
+// items, its type operators included, since the checker is elaborated as an
+// instance of its own that does not see the parameters of `scope`.
+void ReportItemPrefixesNotAClass(const ModuleItem& item,
+                                 const TypeParamPrefixScope& scope,
+                                 DiagEngine& diag);
 
 // The same for each package and the compilation unit, whose own type
 // parameters no instance overrides: the prefixes their typedefs, type

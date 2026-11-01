@@ -593,9 +593,9 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
     }
     return holds;
   });
+  ReportItemPrefixesNotAClass(*item, {mod->params, typedefs_, class_names_},
+                              diag_);
   if (ElaborateDeclItem(item, mod)) return;
-  ReportProcedurePrefixesNotAClass(
-      *item, {mod->params, typedefs_, class_names_}, diag_);
   auto resolve = [&](DataType& dt, SourceLoc loc) {
     ResolveTypeRef(dt, loc, mod);
   };

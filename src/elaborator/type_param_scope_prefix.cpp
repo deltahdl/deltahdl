@@ -81,10 +81,14 @@ using LocalTypeNames = std::vector<LocalTypeName>;
 
 // What a walk over a scope's items reports against: the instance's scope for
 // a prefix the items do not declare themselves, none in a package or the
-// compilation unit, whose type parameters are all their own.
+// compilation unit, whose type parameters are all their own. A type operator
+// naming the instance's parameter is judged against it only where
+// `outer_type_refs`: in a checker the instance declares, which is elaborated
+// as an instance of its own that does not see the parameter.
 struct PrefixWalk {
   const TypeParamPrefixScope* outer;
   DiagEngine& diag;
+  bool outer_type_refs = false;
 };
 
 const LocalTypeName* FindLocal(const LocalTypeNames& locals,
@@ -138,11 +142,11 @@ std::string_view TypeRefPrefix(const DataType& type) {
 }
 
 // The type operator `type` writes. An instance's own type parameter is judged
-// where the reference is resolved (ReportTypeRefPrefixNotAClass), so only the
-// scope's own names are judged here.
+// where the reference is resolved (ReportTypeRefPrefixNotAClass), so outside a
+// checker only the scope's own names are judged here.
 void JudgeTypeRef(const DataType& type, SourceLoc loc,
                   const LocalTypeNames& locals, const PrefixWalk& walk) {
-  JudgePrefix(TypeRefPrefix(type), loc, locals, walk, /*outer_too=*/false);
+  JudgePrefix(TypeRefPrefix(type), loc, locals, walk, walk.outer_type_refs);
 }
 
 // A typedef or a type parameter `item` declares, judged and then entered among
@@ -186,7 +190,13 @@ void WalkProcedure(const ModuleItem& item, const LocalTypeNames& locals,
   for (Stmt* s : item.func_body_stmts) WalkStmt(s, inner, walk);
 }
 
-// A package's or the compilation unit's items, in order.
+bool DeclaresChecker(const ModuleItem& item) {
+  return item.kind == ModuleItemKind::kNestedModuleDecl &&
+         item.nested_module_decl != nullptr &&
+         item.nested_module_decl->decl_kind == ModuleDeclKind::kChecker;
+}
+
+// A package's, the compilation unit's or a checker's items, in order.
 void WalkScopeItems(const std::vector<ModuleItem*>& items,
                     const PrefixWalk& walk) {
   LocalTypeNames locals;
@@ -200,15 +210,22 @@ void WalkScopeItems(const std::vector<ModuleItem*>& items,
     } else if (item->kind == ModuleItemKind::kFunctionDecl ||
                item->kind == ModuleItemKind::kTaskDecl) {
       WalkProcedure(*item, locals, walk);
+    } else if (DeclaresChecker(*item)) {
+      WalkScopeItems(item->nested_module_decl->items, walk);
     }
   }
 }
 
 }  // namespace
 
-void ReportProcedurePrefixesNotAClass(const ModuleItem& item,
-                                      const TypeParamPrefixScope& scope,
-                                      DiagEngine& diag) {
+void ReportItemPrefixesNotAClass(const ModuleItem& item,
+                                 const TypeParamPrefixScope& scope,
+                                 DiagEngine& diag) {
+  if (DeclaresChecker(item)) {
+    WalkScopeItems(item.nested_module_decl->items,
+                   {&scope, diag, /*outer_type_refs=*/true});
+    return;
+  }
   WalkProcedure(item, {}, {&scope, diag});
 }
 
