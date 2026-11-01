@@ -24,7 +24,7 @@ name: Fetch googletest
 runs:
   steps:
     - name: Restore the googletest archive
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         fail-on-cache-miss: true
         key: googletest-${{ inputs.tag }}

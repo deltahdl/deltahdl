@@ -41,7 +41,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Download simulator
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: coverage-simulator
           path: build/src/
@@ -50,23 +50,23 @@ jobs:
       # directory and keep the shard number in their names, so nothing
       # collides under merge-multiple.
       - name: Download unit profdata
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           merge-multiple: true
           path: profdata/unit/
           pattern: profdata-unit-shard-*
       - name: Download e2e profraw
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: profraw-e2e
           path: profraw/e2e/
       - name: Download sv-tests profraw
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: profraw-sv-tests
           path: profraw/sv-tests/
       - name: Download supplemental integration profraw
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: profraw-supplemental-integration
           path: profraw/supplemental-integration/
@@ -1225,7 +1225,7 @@ jobs:
       - name: Slim build output
         run: find build -name '*.o' -delete
       - name: Upload build
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: build-asan-ubsan-shard-${{ matrix.shard }}
           path: build/
@@ -1415,7 +1415,7 @@ jobs:
       - name: Pack the build tree
         run: tar -C build -cf build.tar .
       - name: Upload build
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: build-coverage-lib
           path: build.tar
@@ -1433,7 +1433,7 @@ jobs:
       # will not start without it and llvm-cov has nothing to report from
       # without it either.
       - name: Upload simulator
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-simulator
           path: |
@@ -1503,7 +1503,7 @@ jobs:
       - name: Slim build output
         run: find build -name '*.o' -delete
       - name: Upload build
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: build-macos-26-arm64-clang
           path: build/
@@ -1588,7 +1588,7 @@ jobs:
       - name: Slim build output
         run: find build -name '*.o' -delete
       - name: Upload build
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: build-tsan-shard-${{ matrix.shard }}
           path: build/
@@ -1670,7 +1670,7 @@ jobs:
       - name: Slim build output
         run: find build -name '*.o' -delete
       - name: Upload build
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: build-ubuntu-24-04-x86-64-clang-shard-${{ matrix.shard }}
           path: build/
@@ -1752,7 +1752,7 @@ jobs:
       - name: Slim build output
         run: find build -name '*.o' -delete
       - name: Upload build
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: build-ubuntu-24-04-x86-64-gcc-shard-${{ matrix.shard }}
           path: build/
@@ -1849,7 +1849,7 @@ jobs:
           >> "$GITHUB_OUTPUT"
       - id: sv-tests-lookup
         name: Look up sv-tests cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           key: sv-tests-with-libraries-${{ steps.sv-tests-ref.outputs.sha }}
           lookup-only: true
@@ -1868,7 +1868,7 @@ jobs:
           steps.sv-tests-lookup.outputs.cache-hit
           != 'true'
         name: Save sv-tests cache
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           key: sv-tests-with-libraries-${{ steps.sv-tests-ref.outputs.sha }}
           path: third_party/sv-tests
@@ -2294,7 +2294,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Download build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build-asan-ubsan-shard-0
           path: build/
@@ -2311,7 +2311,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Download simulator
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: coverage-simulator
           path: build/src/
@@ -2337,7 +2337,7 @@ jobs:
             exit 1
           fi
       - name: Upload profraw
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: profraw-e2e
           path: profraw/
@@ -2349,7 +2349,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Download build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build-macos-26-arm64-clang
           path: build/
@@ -2366,7 +2366,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Download build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build-tsan-shard-0
           path: build/
@@ -2381,7 +2381,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Download build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build-ubuntu-24-04-x86-64-clang-shard-0
           path: build/
@@ -2396,7 +2396,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Download build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build-ubuntu-24-04-x86-64-gcc-shard-0
           path: build/
@@ -2424,13 +2424,13 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Restore sv-tests cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           fail-on-cache-miss: true
           key: sv-tests-with-libraries-${{ needs.cache-sv-tests.outputs.sv-tests-sha }}
           path: third_party/sv-tests
       - name: Download build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build-asan-ubsan-shard-0
           path: build/
@@ -2448,13 +2448,13 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Restore sv-tests cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           fail-on-cache-miss: true
           key: sv-tests-with-libraries-${{ needs.cache-sv-tests.outputs.sv-tests-sha }}
           path: third_party/sv-tests
       - name: Download build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build-macos-26-arm64-clang
           path: build/
@@ -2474,13 +2474,13 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Restore sv-tests cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           fail-on-cache-miss: true
           key: sv-tests-with-libraries-${{ needs.cache-sv-tests.outputs.sv-tests-sha }}
           path: third_party/sv-tests
       - name: Download build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build-tsan-shard-0
           path: build/
@@ -2498,13 +2498,13 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Restore sv-tests cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           fail-on-cache-miss: true
           key: sv-tests-with-libraries-${{ needs.cache-sv-tests.outputs.sv-tests-sha }}
           path: third_party/sv-tests
       - name: Download build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build-ubuntu-24-04-x86-64-clang-shard-0
           path: build/
@@ -2522,13 +2522,13 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Restore sv-tests cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           fail-on-cache-miss: true
           key: sv-tests-with-libraries-${{ needs.cache-sv-tests.outputs.sv-tests-sha }}
           path: third_party/sv-tests
       - name: Download build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build-ubuntu-24-04-x86-64-gcc-shard-0
           path: build/
@@ -2655,12 +2655,12 @@ jobs:
         with:
           fetch-depth: 0
       - name: Download Ubuntu build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build-ubuntu-24-04-x86-64-gcc-shard-0
           path: ubuntu-build/
       - name: Download macOS build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build-macos-26-arm64-clang
           path: macos-build/
@@ -2707,7 +2707,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Download simulator
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: coverage-simulator
           path: build/src/
@@ -2716,7 +2716,7 @@ jobs:
       - name: Integration tests
         run: PYTHONPATH=.:scripts python3 -m run_integration_tests
       - name: Upload profraw
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: profraw-supplemental-integration
           path: profraw/
@@ -2738,13 +2738,13 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Restore sv-tests cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           fail-on-cache-miss: true
           key: sv-tests-with-libraries-${{ needs.cache-sv-tests.outputs.sv-tests-sha }}
           path: third_party/sv-tests
       - name: Download simulator
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: coverage-simulator
           path: build/src/
@@ -2753,7 +2753,7 @@ jobs:
       - name: Run sv-tests
         run: PYTHONPATH=.:scripts python3 -m run_sv_tests
       - name: Upload profraw
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: profraw-sv-tests
           path: profraw/
@@ -2768,7 +2768,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Download build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build-asan-ubsan-shard-${{ matrix.shard }}
           path: build/
@@ -2902,7 +2902,7 @@ jobs:
       - name: Install ccache and Ninja
         run: sudo apt-get install -y ccache ninja-build
       - name: Download prebuilt library
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build-coverage-lib
           path: .
@@ -3113,7 +3113,7 @@ jobs:
             -o unit-shard-${{ matrix.shard }}.profdata
           ls -l unit-shard-${{ matrix.shard }}.profdata
       - name: Upload profdata
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: profdata-unit-shard-${{ matrix.shard }}
           path: unit-shard-${{ matrix.shard }}.profdata
@@ -3129,7 +3129,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Download build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build-macos-26-arm64-clang
           path: build/
@@ -3148,7 +3148,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Download build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build-tsan-shard-${{ matrix.shard }}
           path: build/
@@ -3172,7 +3172,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Download build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build-ubuntu-24-04-x86-64-clang-shard-${{ matrix.shard }}
           path: build/
@@ -3196,7 +3196,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Download build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build-ubuntu-24-04-x86-64-gcc-shard-${{ matrix.shard }}
           path: build/
