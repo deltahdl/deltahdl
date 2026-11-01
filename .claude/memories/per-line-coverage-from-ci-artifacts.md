@@ -33,7 +33,8 @@ Use the Homebrew LLVM of the major CI ran, `/opt/homebrew/opt/llvm@<major>/bin`
 A newer major refuses the raw profiles of an older one, since each major
 writes its own raw format version, and the merge then ends "no profile can
 be merged"; the default `llvm` formula floats ahead of CI's
-[[unpinned-ci-toolchain]].
+[[unpinned-ci-toolchain]]. This is reading CI's output, not a local build, so
+it sits within [[verifying-through-ci]].
 
 **Why:** a guess at the missed line cost a whole CI round more than once; the
 report gives a count, and two plausible branches can share a file.
