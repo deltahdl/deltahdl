@@ -244,7 +244,7 @@ void Elaborator::ElaborateGenerateBlockItem(ModuleItem* item,
   size_t first_assertion_item = mod->assertion_item_decls.size();
   size_t first_alias = mod->aliases.size();
   ElaborateItem(item, mod);
-  ValidateGeneratedItem(item);
+  ValidateGeneratedItem(item, *mod);
   // §27.4 with §13.4 and §23.6: a subroutine the block declares is a member
   // of this instance's scope, reached from outside by the instance's
   // hierarchical name, and ElaborateItem has just put the one shared
@@ -390,6 +390,51 @@ static void RestoreEnclosingTypedefs(const EnclosingTypedefs& taken,
   }
 }
 
+// §27.5 makes a generate block a scope of its own, and §23.9 lets a name the
+// block declares hide one the enclosing scope declares, for the block's items
+// and no further. The variable tables are flat, keyed by the simple name, so
+// the enclosing scope's entries for the names the block declares are set
+// aside while the block's walk writes its own, and the block's are erased and
+// the enclosing ones put back when the walk leaves it. A sibling block then
+// reads the enclosing scope's again.
+template <typename Table>
+class ShadowedEntries {
+ public:
+  ShadowedEntries(Table& table, const std::vector<std::string_view>& names)
+      : table_(table), names_(names) {
+    for (std::string_view name : names_) {
+      auto node = table_.extract(name);
+      if (!node.empty()) taken_.insert(std::move(node));
+    }
+  }
+  ShadowedEntries(const ShadowedEntries&) = delete;
+  ShadowedEntries& operator=(const ShadowedEntries&) = delete;
+  ~ShadowedEntries() {
+    for (std::string_view name : names_) table_.erase(name);
+    table_.merge(taken_);
+  }
+
+ private:
+  Table& table_;
+  const std::vector<std::string_view>& names_;
+  Table taken_;
+};
+
+// The names the variable, net and parameter declarations among `items`
+// declare.
+static std::vector<std::string_view> DeclaredDataNames(
+    const std::vector<ModuleItem*>& items) {
+  std::vector<std::string_view> names;
+  for (const auto* item : items) {
+    if (item->kind == ModuleItemKind::kVarDecl ||
+        item->kind == ModuleItemKind::kNetDecl ||
+        item->kind == ModuleItemKind::kParamDecl) {
+      names.push_back(item->name);
+    }
+  }
+  return names;
+}
+
 // §27.2 allows every other module item, other generate constructs included, in
 // a generate block once port declarations, specify blocks and specparam
 // declarations are excluded, so a function may be declared among these items.
@@ -497,6 +542,14 @@ void Elaborator::ElaborateGenerateItems(const std::vector<ModuleItem*>& items,
     mod->default_disable_iff = own;
   }
   BlockDeclarationShadow block_declarations(&property_registry_, items);
+  const std::vector<std::string_view> kDataNames = DeclaredDataNames(items);
+  ShadowedEntries var_types(var_types_, kDataNames);
+  ShadowedEntries class_var_types(class_var_types_, kDataNames);
+  ShadowedEntries class_vars(class_var_names_, kDataNames);
+  ShadowedEntries scalar_vars(scalar_var_names_, kDataNames);
+  ShadowedEntries real_vars(real_var_names_, kDataNames);
+  ShadowedEntries real_params(real_param_names_, kDataNames);
+  ShadowedEntries select_shapes(var_select_shapes_, kDataNames);
   for (auto* item : items) {
     switch (item->kind) {
       case ModuleItemKind::kGenerateIf:

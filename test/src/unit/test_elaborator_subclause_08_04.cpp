@@ -3,6 +3,7 @@
 #include <initializer_list>
 
 #include "fixture_elaborator.h"
+#include "helpers_generate_block_items.h"
 #include "helpers_reported_error.h"
 
 using namespace delta;
@@ -883,6 +884,18 @@ TEST(ClassObjectElaboration, AParenthesizedCompoundAssignmentToAHandle) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "operator is not allowed on class object handles",
                             4, "8.4"));
+}
+
+// §27.2 makes a generate block a collection of module items, so a class
+// handle is kept out of a continuous assignment inside one, and a comparison
+// of it with null stays allowed there.
+TEST(ClassObjectElaboration,
+     ClassHandleInContAssignInsideGenerateBlocksIsRejected) {
+  EXPECT_TRUE(RejectedInsideGenerateBlocks(
+      {"class C; endclass ", "C h; wire w;", "assign w = h;"},
+      "class object handle cannot be used in continuous assignment", "10.3"));
+  EXPECT_TRUE(AcceptedInsideGenerateBlocks(
+      {"class C; endclass ", "C h; wire w;", "assign w = (h == null);"}));
 }
 
 }  // namespace

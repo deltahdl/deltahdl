@@ -83,7 +83,7 @@ void Elaborator::ValidateSubroutineBodyTargets(const ModuleItem* item,
   // naming a net was reported just above, under §10.6.1.
   CollectProcContAssignTargets(item->func_args, item->func_body_stmts, targets);
   for (const auto& [name, loc] : targets)
-    if (!NamesNet(name, loc)) proc_assign_targets_.emplace(name, loc);
+    if (!NamesNet(name, loc)) RecordProcTarget(name, loc);
   const ForceLhsNames kForceNames{kNetNames, nettype_net_names_, mod, typedefs_,
                                   scope};
   for (const Stmt* s : item->func_body_stmts) {
@@ -95,8 +95,7 @@ void Elaborator::ValidateSubroutineBodyTargets(const ModuleItem* item,
 void Elaborator::ValidateItemConstraints(const ModuleItem* item,
                                          const RtlirModule& mod,
                                          const ScopeMap& scope) {
-  bool is_proc = IsProceduralItemKind(item->kind);
-  if (is_proc && item->body) {
+  if (IsProceduralItemKind(item->kind) && item->body) {
     CollectProcTargets({}, {item->body}, proc_assign_targets_);
     // §6.5 counts a procedural assign as a procedural assignment as well. One
     // naming a net is §10.6.1's to report, so the variables alone join.
@@ -107,7 +106,19 @@ void Elaborator::ValidateItemConstraints(const ModuleItem* item,
     });
     proc_assign_targets_.merge(assigned);
     CollectForceReleaseTargets(item->body, force_release_targets_);
+  }
+  CheckHighzStrengthPair(item, diag_);
+  ValidateItemRules(item, mod, scope);
+}
 
+// The rules of an item that hold wherever it is written, among the module's
+// own items or inside a generate block (§27.2). `scope` holds the constants a
+// reference at the item can name.
+void Elaborator::ValidateItemRules(const ModuleItem* item,
+                                   const RtlirModule& mod,
+                                   const ScopeMap& scope) {
+  bool is_proc = IsProceduralItemKind(item->kind);
+  if (is_proc && item->body) {
     CheckInterconnectProcContAssign(item->body, interconnect_names_, diag_);
     CheckInterconnectProceduralRead(item->body, interconnect_names_, diag_);
     CheckProceduralAssignLhs(item->body, diag_);
@@ -136,12 +147,9 @@ void Elaborator::ValidateItemConstraints(const ModuleItem* item,
   ValidateClassHandleContAssign(item);
 
   // §6.3.2.2's rule that a drive strength needs an assignment in the same
-  // statement is not checked here. This walk reaches the module's own items and
-  // stops, so a net declared inside a generate block escaped it; the rule now
-  // sits in ElaborateNetDecl, which every elaborated net declaration passes
-  // through.
+  // statement is not checked here but in ElaborateNetDecl, which every
+  // elaborated net declaration passes through.
 
-  CheckHighzStrengthPair(item, diag_);
   const SelectOperands kOperands{real_var_names_, real_param_names_,
                                  var_select_shapes_};
   if (item->kind == ModuleItemKind::kContAssign) {
@@ -168,6 +176,19 @@ void Elaborator::ValidateItemConstraints(const ModuleItem* item,
 // makes a force statement neither a continuous nor a procedural assignment,
 // which is why CollectProcTargets counts only StmtKind::kBlockingAssign and
 // StmtKind::kNonblockingAssign.
+// The report of §10.6.2 against a force or release at `loc` applied to the
+// variable `name`. A generate block can make the variable mixed after the force
+// was weighed, and a force once reported is not reported again.
+void ReportForceOverMixture(std::string_view name, SourceLoc loc,
+                            DiagEngine& diag) {
+  diag.ErrorOnce(loc,
+                 std::format("force or release applied to variable '{}', "
+                             "which is assigned by a mixture of continuous "
+                             "and procedural assignments",
+                             name),
+                 Subclause("10.6.2"));
+}
+
 static void ReportForceOverMixedAssignments(
     const std::unordered_map<std::string_view, SourceLoc>& force_targets,
     const std::unordered_map<std::string_view, SourceLoc>& cont_targets,
@@ -175,12 +196,7 @@ static void ReportForceOverMixedAssignments(
     DiagEngine& diag) {
   for (const auto& [name, loc] : force_targets) {
     if (cont_targets.count(name) != 0 && proc_targets.count(name) != 0) {
-      diag.Error(loc,
-                 std::format("force or release applied to variable '{}', which "
-                             "is assigned by a mixture of continuous and "
-                             "procedural assignments",
-                             name),
-                 Subclause("10.6.2"));
+      ReportForceOverMixture(name, loc, diag);
     }
   }
 }

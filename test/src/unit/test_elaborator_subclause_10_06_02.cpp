@@ -6,6 +6,7 @@
 #include <utility>
 
 #include "fixture_elaborator.h"
+#include "helpers_generate_block_items.h"
 #include "helpers_reported_error.h"
 
 using namespace delta;
@@ -523,6 +524,106 @@ TEST(ForceReleaseElaboration, ForceOfAConstantIsReported) {
   }
   EXPECT_FALSE(
       ReportedError(f.diag.Diagnostics(), "force of constant", 11, "10.6.2"));
+}
+
+// §27.2 makes a generate block a collection of module items, so a select of
+// a variable is no force target inside one, and the whole variable is.
+TEST(ForceReleaseElaboration, ForceLhsInsideGenerateBlocksIsChecked) {
+  EXPECT_TRUE(RejectedInsideGenerateBlocks(
+      {"", "logic [3:0] v;", "initial force v[0] = 1;"},
+      "bit-select or part-select of a variable is not a legal force LHS",
+      "10.6.2"));
+  EXPECT_TRUE(AcceptedInsideGenerateBlocks(
+      {"", "logic [3:0] v;", "initial force v = 1;"}));
+}
+
+// §27.2 makes a generate block a collection of module items, so a force or a
+// release is barred over a variable the module's items and the block's mix
+// continuous and procedural assignments to, whichever comes first, of the
+// module's variable and of the block's own; over one only procedurally
+// assigned it stays allowed.
+TEST(ForceReleaseElaboration,
+     ForceOverMixedAssignmentsInsideGenerateBlocksIsRejected) {
+  {
+    ElabFixture f;
+    ElaborateSrc(
+        "module m;\n"
+        "  logic v;\n"
+        "  assign v = 1;\n"
+        "  if (1) begin : g\n"
+        "    initial v = 0;\n"
+        "    initial force v = 1;\n"
+        "  end\n"
+        "endmodule\n",
+        f);
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "force or release applied to variable 'v', which is assigned by a "
+        "mixture of continuous and procedural assignments",
+        6, "10.6.2"));
+  }
+  {
+    ElabFixture f;
+    ElaborateSrc(
+        "module m;\n"
+        "  logic v;\n"
+        "  assign v = 1;\n"
+        "  if (1) begin : g\n"
+        "    initial release v;\n"
+        "    initial v = 0;\n"
+        "  end\n"
+        "endmodule\n",
+        f);
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "force or release applied to variable 'v', which is assigned by a "
+        "mixture of continuous and procedural assignments",
+        5, "10.6.2"));
+  }
+  {
+    ElabFixture f;
+    ElaborateSrc(
+        "module m;\n"
+        "  logic v;\n"
+        "  assign v = 1;\n"
+        "  initial force v = 1;\n"
+        "  if (1) begin : g\n"
+        "    initial v = 0;\n"
+        "  end\n"
+        "endmodule\n",
+        f);
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "force or release applied to variable 'v', which is assigned by a "
+        "mixture of continuous and procedural assignments",
+        4, "10.6.2"));
+  }
+  {
+    ElabFixture f;
+    ElaborateSrc(
+        "module m;\n"
+        "  if (1) begin : g\n"
+        "    logic v;\n"
+        "    initial force v = 1;\n"
+        "    initial v = 0;\n"
+        "    assign v = 1;\n"
+        "  end\n"
+        "endmodule\n",
+        f);
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "force or release applied to variable 'v', which is assigned by a "
+        "mixture of continuous and procedural assignments",
+        4, "10.6.2"));
+  }
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  logic v;\n"
+             "  if (1) begin : g\n"
+             "    initial v = 0;\n"
+             "    initial force v = 1;\n"
+             "  end\n"
+             "endmodule\n"));
 }
 
 }  // namespace

@@ -6,6 +6,7 @@
 #include <utility>
 
 #include "fixture_elaborator.h"
+#include "helpers_generate_block_items.h"
 #include "helpers_reported_error.h"
 
 using namespace delta;
@@ -378,6 +379,25 @@ TEST(ProceduralAssignDeassignElaboration, NetTargetOfAssignOrDeassignIsError) {
                                "assign or deassign",
                                line, "10.6.1"));
   }
+}
+
+// §27.2 makes a generate block a collection of module items, so a net and a
+// select are no target of a procedural assign or deassign inside one, and a
+// whole variable is.
+TEST(ProceduralAssignDeassignElaboration, TargetInsideGenerateBlocksIsChecked) {
+  EXPECT_TRUE(RejectedInsideGenerateBlocks(
+      {"", "wire w;", "initial assign w = 1;"},
+      "net 'w' cannot be the target of a procedural assign or deassign",
+      "10.6.1"));
+  EXPECT_TRUE(RejectedInsideGenerateBlocks(
+      {"", "wire w;", "initial deassign w;"},
+      "net 'w' cannot be the target of a procedural assign or deassign",
+      "10.6.1"));
+  EXPECT_TRUE(RejectedInsideGenerateBlocks(
+      {"", "logic [3:0] v;", "initial assign v[0] = 1;"},
+      "bit-select or part-select in procedural assign LHS", "10.6.1"));
+  EXPECT_TRUE(AcceptedInsideGenerateBlocks(
+      {"", "logic [3:0] v;", "initial assign v = 1;"}));
 }
 
 }  // namespace

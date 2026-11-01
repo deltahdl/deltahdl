@@ -324,8 +324,13 @@ class ElaboratorData {
   // §10.3.2's one-driver rules weigh a block's assignments against; the
   // variables declared with an initializer, which §10.3.2 bars a block's
   // continuous assignment from; the bits of its uwire nets its drivers reach,
-  // which §6.6.2 weighs a block's drivers against; and its interconnects,
-  // which §6.6.8 keeps out of a block's expressions.
+  // which §6.6.2 weighs a block's drivers against; its interconnects, which
+  // §6.6.8 keeps out of a block's expressions; the variables its forces and
+  // releases are applied to, which §10.6.2 bars a block's assignments from
+  // making a variable of mixed continuous and procedural assignments; and the
+  // types of its variables and parameters, by which a block's items are held
+  // to the rules a module's own items are held to (§6.12, §6.14, §8, §11.5.1,
+  // §25.9).
   struct ModuleScopeNames {
     std::unordered_set<std::string_view> declared;
     std::unordered_set<std::string_view> nets;
@@ -334,6 +339,14 @@ class ElaboratorData {
     std::unordered_set<std::string_view> initialized;
     UwireDrivers uwire_drivers;
     std::unordered_set<std::string_view> interconnects;
+    std::unordered_map<std::string_view, SourceLoc> force_targets;
+    std::unordered_map<std::string_view, DataTypeKind> var_types;
+    std::unordered_map<std::string_view, std::string_view> class_var_types;
+    std::unordered_set<std::string_view> scalar_vars;
+    std::unordered_set<std::string_view> real_vars;
+    std::unordered_set<std::string_view> real_params;
+    std::unordered_map<std::string_view, VarSelectShape> select_shapes;
+    std::unordered_set<std::string_view> class_vars;
   };
   std::unordered_map<const RtlirModule*, ModuleScopeNames> module_scope_names_;
   // Exchanges the sets ModuleScopeNames keeps with the ones in force, which
@@ -347,6 +360,14 @@ class ElaboratorData {
     std::swap(var_init_names_, names.initialized);
     std::swap(uwire_drivers_, names.uwire_drivers);
     std::swap(interconnect_names_, names.interconnects);
+    std::swap(force_release_targets_, names.force_targets);
+    std::swap(var_types_, names.var_types);
+    std::swap(class_var_types_, names.class_var_types);
+    std::swap(scalar_var_names_, names.scalar_vars);
+    std::swap(real_var_names_, names.real_vars);
+    std::swap(real_param_names_, names.real_params);
+    std::swap(var_select_shapes_, names.select_shapes);
+    std::swap(class_var_names_, names.class_vars);
   }
   // §27.4: genvar names of the loop generate constructs currently being
   // elaborated. Used to reject a nested loop generate construct that reuses an

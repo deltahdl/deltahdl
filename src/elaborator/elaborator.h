@@ -259,7 +259,10 @@ class Elaborator : public ElaboratorClassRules {
                                std::string_view typedef_name,
                                RtlirVariable& var);
   void ElaborateContAssign(ModuleItem* item, RtlirModule* mod);
-  void ValidateGeneratedItem(const ModuleItem* item);
+  void ValidateGeneratedItem(const ModuleItem* item, const RtlirModule& mod);
+  void RecordProcTarget(std::string_view name, SourceLoc loc);
+  void ReportForcesOverMixture(std::string_view declared,
+                               std::string_view name);
   void ValidateSubroutineBodyTargets(const ModuleItem* item,
                                      const RtlirModule& mod,
                                      const ScopeMap& scope);
@@ -633,6 +636,8 @@ class Elaborator : public ElaboratorClassRules {
   void ValidateEdgeOnReal(const ModuleItem* item);
   void ValidateItemConstraints(const ModuleItem* item, const RtlirModule& mod,
                                const ScopeMap& scope);
+  void ValidateItemRules(const ModuleItem* item, const RtlirModule& mod,
+                         const ScopeMap& scope);
 
   void ValidateDeferredAssertionActions(const ModuleDecl* decl);
   void WalkStmtsForDeferredActions(

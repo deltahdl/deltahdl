@@ -3,6 +3,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
+#include "helpers_generate_block_items.h"
 #include "helpers_reported_error.h"
 
 using namespace delta;
@@ -83,6 +84,36 @@ TEST(QueueDeclarationElaboration, ParameterNonPositiveBoundEmitsError) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "queue bound must be a positive integer", 3,
                             "7.10"));
+}
+
+// §27.2 makes a generate block a collection of module items, so a queue a
+// procedure inside one declares takes a positive bound, folded in the block
+// instance when the block's genvar gives it.
+TEST(QueueDeclarationElaboration, BoundInsideGenerateBlocksIsChecked) {
+  EXPECT_TRUE(RejectedInsideGenerateBlocks(
+      {"", "logic y;", "initial begin int q[$:-1]; end"},
+      "queue bound must be a positive integer", "7.10"));
+  EXPECT_TRUE(AcceptedInsideGenerateBlocks(
+      {"", "logic y;", "initial begin int q[$:1]; end"}));
+  {
+    ElabFixture f;
+    ElaborateSrc(
+        "module m;\n"
+        "  for (genvar i = 0; i < 2; i++) begin : g\n"
+        "    initial begin int q[$:i]; end\n"
+        "  end\n"
+        "endmodule\n",
+        f);
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "queue bound must be a positive integer", 3,
+                              "7.10"));
+  }
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  for (genvar i = 1; i < 3; i++) begin : g\n"
+             "    initial begin int q[$:i]; end\n"
+             "  end\n"
+             "endmodule\n"));
 }
 
 }  // namespace

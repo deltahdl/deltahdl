@@ -647,6 +647,10 @@ void CheckProceduralAssignLhs(const Stmt* s, DiagEngine& diag);
 // §28.3.2 with §10.3.4: reports (highz0, highz1) on a net declaration, a
 // continuous assignment or a gate. Defined in elaborator_cont_assign.cpp.
 void CheckHighzStrengthPair(const ModuleItem* item, DiagEngine& diag);
+// §10.6.2: reports a force or release at `loc` applied to variable `name`,
+// assigned by a mixture of continuous and procedural assignments, once.
+void ReportForceOverMixture(std::string_view name, SourceLoc loc,
+                            DiagEngine& diag);
 using SelectShapeMap = std::unordered_map<std::string_view, VarSelectShape>;
 
 // What §11.5.1 needs to judge the operand of a select. Its second alternative

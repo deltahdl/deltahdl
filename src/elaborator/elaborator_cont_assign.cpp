@@ -474,6 +474,7 @@ void Elaborator::ValidateContAssignVarLeaf(ModuleItem* item,
                             "procedural assignments",
                             name),
                 Subclause("6.5"));
+    ReportForcesOverMixture(declared, name);
   }
   ReportContTargetInitializer(item, name, declared, var_init_names_, diag_);
 }
@@ -506,16 +507,19 @@ void CheckHighzStrengthPair(const ModuleItem* item, DiagEngine& diag) {
   }
 }
 
-// §27.3 (printed page 818): a generate block's items act as the module's own
-// would, so the strength pair §10.3.4 forbids, §10.4's rule that a procedural
-// assignment writes no net and the one-driver rule of §6.5 and §10.3.2 reach
-// them. The module's own checks run before its generate blocks are
-// elaborated, so each item of a block is checked as the block is, against the
-// targets the module's items and the earlier items recorded. Both tables hold
-// a variable under the declaration the name binds, as
-// ValidateContAssignIdentLhs records it.
-void Elaborator::ValidateGeneratedItem(const ModuleItem* item) {
+// §27.2 (printed page 818) makes a generate block a collection of module items
+// and §27.3 has them act as the module's own would, so every rule
+// ValidateItemRules enforces of a module item reaches them, as do the strength
+// pair §10.3.4 forbids and the one-driver rules of §6.5, §10.3.2 and §10.6.2.
+// The module's own checks run before its generate blocks are elaborated, so
+// each item of a block is checked as the block is, in the scope of the block
+// instance, against the targets the module's items and the earlier items
+// recorded. Every table holds a variable under the declaration the name binds,
+// as ValidateContAssignIdentLhs records it.
+void Elaborator::ValidateGeneratedItem(const ModuleItem* item,
+                                       const RtlirModule& mod) {
   CheckHighzStrengthPair(item, diag_);
+  ValidateItemRules(item, mod, BuildParamScope(&mod));
   if (!IsProceduralItemKind(item->kind)) return;
   std::unordered_map<std::string_view, SourceLoc> targets;
   CollectProcTargets({}, {item->body}, targets);
@@ -535,16 +539,51 @@ void Elaborator::ValidateGeneratedItem(const ModuleItem* item) {
                   Subclause("10.4"));
       continue;
     }
+    RecordProcTarget(name, loc);
+  }
+  std::unordered_map<std::string_view, SourceLoc> forced;
+  CollectForceReleaseTargets(item->body, forced);
+  for (const auto& [name, loc] : forced) {
     std::string_view declared =
         DeclaredScopedName(name, gen_prefix_scopes_, declared_names_);
-    if (cont_assign_targets_.count(declared) != 0) {
-      diag_.Error(loc,
-                  std::format("variable '{}' has both continuous and "
-                              "procedural assignments",
-                              name),
-                  Subclause("6.5"));
+    force_release_targets_.emplace(declared, loc);
+    if (cont_assign_targets_.count(declared) != 0 &&
+        proc_assign_targets_.count(declared) != 0) {
+      ReportForceOverMixture(name, loc, diag_);
     }
-    proc_assign_targets_.emplace(declared, loc);
+  }
+}
+
+// §6.5 of a variable a procedural assignment writes. Among the module's own
+// items the weighing waits for ValidateMixedAssignments, which runs once all of
+// them are known; inside a generate block every continuous assignment the
+// module and the earlier items make is already recorded, so the assignment is
+// weighed against them here, and a force or release already applied to the
+// variable is weighed under §10.6.2.
+void Elaborator::RecordProcTarget(std::string_view name, SourceLoc loc) {
+  std::string_view declared =
+      DeclaredScopedName(name, gen_prefix_scopes_, declared_names_);
+  if (!gen_prefix_scopes_.empty() &&
+      cont_assign_targets_.count(declared) != 0) {
+    diag_.Error(loc,
+                std::format("variable '{}' has both continuous and "
+                            "procedural assignments",
+                            name),
+                Subclause("6.5"));
+    ReportForcesOverMixture(declared, name);
+  }
+  proc_assign_targets_.emplace(declared, loc);
+}
+
+// §10.6.2 of the force or release already applied to `declared`, which an
+// assignment inside a generate block has just made a variable of mixed
+// continuous and procedural assignments; `name` is how that assignment wrote
+// the variable.
+void Elaborator::ReportForcesOverMixture(std::string_view declared,
+                                         std::string_view name) {
+  auto force = force_release_targets_.find(declared);
+  if (force != force_release_targets_.end()) {
+    ReportForceOverMixture(name, force->second, diag_);
   }
 }
 

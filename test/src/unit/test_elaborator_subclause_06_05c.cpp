@@ -5,6 +5,7 @@
 #include <string_view>
 
 #include "fixture_elaborator.h"
+#include "helpers_generate_block_items.h"
 #include "helpers_reported_error.h"
 
 namespace {
@@ -577,6 +578,18 @@ TEST(DeclaredBeforeUse, DerivedClassUsesWhatItsBaseMayDeclare) {
       "endmodule\n",
       unknown);
   EXPECT_FALSE(UsedBeforeDeclared(unknown, "z", 3));
+}
+
+// §27.2 makes a generate block a collection of module items, so a task inside
+// one assigning a variable a continuous assignment drives makes the mixture
+// §6.5 forbids, of the module's variable and of the block's own; a variable
+// no continuous assignment drives stays allowed.
+TEST(DeclaredBeforeUse, SubroutineAssignmentInsideGenerateBlocksJoinsMixture) {
+  EXPECT_TRUE(RejectedInsideGenerateBlocks(
+      {"", "logic v; assign v = 1;", "task t; v = 0; endtask"},
+      "variable 'v' has both continuous and procedural assignments", "6.5"));
+  EXPECT_TRUE(AcceptedInsideGenerateBlocks(
+      {"", "logic v; initial v = 1;", "task t; v = 0; endtask"}));
 }
 
 }  // namespace

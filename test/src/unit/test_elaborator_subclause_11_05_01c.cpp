@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "fixture_elaborator.h"
+#include "helpers_generate_block_items.h"
 #include "helpers_reported_error.h"
 
 using namespace delta;
@@ -369,6 +370,95 @@ TEST(PartSelectBoundsElaboration, BoundNamingABlocksConstantIsNotReported) {
                             "non-indexed part-select bounds shall be "
                             "constant expressions",
                             9, "11.5.1"));
+}
+
+// §27.2 makes a generate block a collection of module items, so a select of
+// a scalar and an indexed part-select of zero width are barred inside one. A
+// width the block's genvar or localparam gives is folded in the block
+// instance, and a name the block declares hides the module's.
+TEST(SelectElaboration, SelectsInsideGenerateBlocksAreChecked) {
+  EXPECT_TRUE(RejectedInsideGenerateBlocks(
+      {"", "logic s; wire y;", "assign y = s[0];"},
+      "bit-select or part-select of a scalar is illegal", "11.5.1"));
+  EXPECT_TRUE(RejectedInsideGenerateBlocks(
+      {"", "logic s, y;", "initial y = s[0];"},
+      "bit-select or part-select of a scalar is illegal", "11.5.1"));
+  EXPECT_TRUE(RejectedInsideGenerateBlocks(
+      {"", "logic [7:0] v; wire [1:0] y;", "assign y = v[0+:0];"},
+      "indexed part-select width must be a positive constant", "11.5.1"));
+  EXPECT_TRUE(RejectedInsideGenerateBlocks(
+      {"", "logic [7:0] v; logic [1:0] y;", "initial y = v[0+:0];"},
+      "indexed part-select width must be a positive constant", "11.5.1"));
+  EXPECT_TRUE(AcceptedInsideGenerateBlocks(
+      {"", "logic [7:0] v; logic [1:0] y;", "initial y = v[0+:2];"}));
+  {
+    ElabFixture f;
+    ElaborateSrc(
+        "module m;\n"
+        "  logic [7:0] v;\n"
+        "  logic [1:0] y;\n"
+        "  for (genvar i = 0; i < 2; i++) begin : g\n"
+        "    initial y = v[0+:i];\n"
+        "  end\n"
+        "endmodule\n",
+        f);
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "indexed part-select width must be a positive constant", 5, "11.5.1"));
+  }
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  logic [7:0] v;\n"
+             "  logic [1:0] y;\n"
+             "  for (genvar i = 1; i < 3; i++) begin : g\n"
+             "    initial y = v[0+:i];\n"
+             "  end\n"
+             "endmodule\n"));
+  {
+    ElabFixture f;
+    ElaborateSrc(
+        "module m;\n"
+        "  logic [7:0] v;\n"
+        "  logic [1:0] y;\n"
+        "  if (1) begin : g\n"
+        "    localparam int W = 0;\n"
+        "    initial y = v[0+:W];\n"
+        "  end\n"
+        "endmodule\n",
+        f);
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "indexed part-select width must be a positive constant", 6, "11.5.1"));
+  }
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  logic [7:0] v;\n"
+             "  logic [1:0] y;\n"
+             "  if (1) begin : g\n"
+             "    localparam int W = 2;\n"
+             "    initial y = v[0+:W];\n"
+             "  end\n"
+             "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  logic s;\n"
+             "  logic y;\n"
+             "  if (1) begin : g\n"
+             "    logic [3:0] s;\n"
+             "    initial y = s[0];\n"
+             "  end\n"
+             "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  logic [3:0] s;\n"
+             "  logic y;\n"
+             "  if (1) begin : g1\n"
+             "    logic s;\n"
+             "  end\n"
+             "  if (1) begin : g2\n"
+             "    initial y = s[0];\n"
+             "  end\n"
+             "endmodule\n"));
 }
 
 }  // namespace

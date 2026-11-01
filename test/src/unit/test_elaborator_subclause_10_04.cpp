@@ -6,6 +6,7 @@
 #include <utility>
 
 #include "fixture_simulator.h"
+#include "helpers_generate_block_items.h"
 #include "helpers_reported_error.h"
 
 using namespace delta;
@@ -248,6 +249,21 @@ TEST(ProceduralAssignmentElaboration,
         line, "10.4"));
   }
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "of constant", 8, "10.4"));
+}
+
+// §27.2 makes a generate block a collection of module items, so a task or a
+// function declared inside one assigns no net procedurally, and assigns a
+// variable.
+TEST(ProceduralAssignmentElaboration,
+     NetTargetInSubroutineInsideGenerateBlocksIsRejected) {
+  EXPECT_TRUE(RejectedInsideGenerateBlocks(
+      {"", "wire w;", "task t; w = 1; endtask"},
+      "net 'w' cannot be the target of a procedural assignment", "10.4"));
+  EXPECT_TRUE(RejectedInsideGenerateBlocks(
+      {"", "wire w;", "function void f; w = 1; endfunction"},
+      "net 'w' cannot be the target of a procedural assignment", "10.4"));
+  EXPECT_TRUE(
+      AcceptedInsideGenerateBlocks({"", "logic v;", "task t; v = 1; endtask"}));
 }
 
 }  // namespace

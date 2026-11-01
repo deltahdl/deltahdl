@@ -6,6 +6,7 @@
 
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
+#include "helpers_generate_block_items.h"
 #include "helpers_reported_error.h"
 
 using namespace delta;
@@ -705,6 +706,20 @@ TEST(AssignmentPatternElaboration, NestedKeyedPatternInATargetIsError) {
         << line;
   }
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kMessage, 10, "10.9"));
+}
+
+// §27.2 makes a generate block a collection of module items, so a pattern
+// on the left-hand side of a procedural or a continuous assignment inside one
+// is positional.
+TEST(AssignmentPatternElaboration, LhsPatternInsideGenerateBlocksIsPositional) {
+  EXPECT_TRUE(RejectedInsideGenerateBlocks(
+      {"", "logic a, b;", "initial '{x: a, y: b} = 2'b0;"},
+      "LHS assignment pattern shall use positional notation only", "10.9"));
+  EXPECT_TRUE(RejectedInsideGenerateBlocks(
+      {"", "wire a, b;", "assign '{x: a, y: b} = 2'b0;"},
+      "LHS assignment pattern shall use positional notation only", "10.9"));
+  EXPECT_TRUE(AcceptedInsideGenerateBlocks(
+      {"", "logic a, b;", "initial '{a, b} = 2'b0;"}));
 }
 
 }  // namespace

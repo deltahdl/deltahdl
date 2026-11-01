@@ -5,6 +5,7 @@
 
 #include "common/types.h"
 #include "fixture_elaborator.h"
+#include "helpers_generate_block_items.h"
 #include "helpers_reported_error.h"
 #include "model_net_declaration.h"
 
@@ -676,6 +677,21 @@ TEST(InterconnectElaboration, PortInterfaceAndGenerateBlockForms) {
                                            "    c x(.a(ic));\n"
                                            "  end\n"
                                            "endmodule\n"));
+}
+
+// §27.2 makes a generate block a collection of module items, so the
+// procedural uses of an interconnect a module item may not make are barred
+// inside one too, of the module's interconnect and of the block's own.
+TEST(InterconnectElaboration, ProceduralUseInsideGenerateBlocksIsRejected) {
+  EXPECT_TRUE(RejectedInsideGenerateBlocks(
+      {"", "interconnect ic; logic y;", "initial y = ic;"},
+      "interconnect net cannot be used in a procedural expression", "6.6.8"));
+  EXPECT_TRUE(RejectedInsideGenerateBlocks(
+      {"", "interconnect ic;", "initial force ic = 1;"},
+      "interconnect net cannot be used in procedural continuous assignment",
+      "6.6.8"));
+  EXPECT_TRUE(AcceptedInsideGenerateBlocks(
+      {"", "interconnect ic; logic y, z;", "initial y = z;"}));
 }
 
 }  // namespace

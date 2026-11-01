@@ -2,6 +2,7 @@
 
 #include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
+#include "helpers_generate_block_items.h"
 #include "helpers_reported_error.h"
 
 using namespace delta;
@@ -557,6 +558,20 @@ TEST(ChandleDataType, ImportedFunctionChandleResultAssignedToInt_Error) {
                             "chandle cannot be assigned to a non-chandle "
                             "variable",
                             5, "6.14"));
+}
+
+// §27.2 makes a generate block a collection of module items, so a chandle
+// is kept out of a continuous assignment and an event expression inside one,
+// and a comparison of it with null stays allowed.
+TEST(ChandleDataType, ChandleInsideGenerateBlocksIsRejected) {
+  EXPECT_TRUE(RejectedInsideGenerateBlocks(
+      {"", "chandle c; wire w;", "assign w = c;"},
+      "chandle cannot be used in continuous assignment", "6.14"));
+  EXPECT_TRUE(RejectedInsideGenerateBlocks(
+      {"", "chandle c; logic y;", "always @(c) y = 0;"},
+      "chandle cannot appear in event expression", "6.14"));
+  EXPECT_TRUE(AcceptedInsideGenerateBlocks(
+      {"", "chandle c; logic y;", "always @(c == null) y = 0;"}));
 }
 
 }  // namespace

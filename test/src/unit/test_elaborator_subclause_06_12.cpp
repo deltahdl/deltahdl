@@ -2,6 +2,7 @@
 
 #include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
+#include "helpers_generate_block_items.h"
 #include "helpers_reported_error.h"
 
 using namespace delta;
@@ -260,6 +261,44 @@ TEST(RealDataType, RealEdgeOnABlockLocalRealError) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "edge event on real type is illegal", 6, "6.12"));
   EXPECT_EQ(f.diag.ErrorCount(), 1u);
+}
+
+// §27.2 makes a generate block a collection of module items, so an edge
+// event on a real and a select of one are barred inside one, while a value
+// change on a real, and a select of a vector the block declares over a real
+// of the module, are not.
+TEST(RealDataType, EdgeAndSelectOfARealInsideGenerateBlocksAreRejected) {
+  EXPECT_TRUE(RejectedInsideGenerateBlocks(
+      {"", "real r; logic y;", "always @(posedge r) y = 0;"},
+      "edge event on real type is illegal", "6.12"));
+  EXPECT_TRUE(RejectedInsideGenerateBlocks(
+      {"", "real r; wire y;", "assign y = r[0];"},
+      "bit-select of a real variable is illegal", "6.12"));
+  EXPECT_TRUE(RejectedInsideGenerateBlocks(
+      {"", "real r; logic y;", "initial y = r[0];"},
+      "bit-select of a real variable is illegal", "6.12"));
+  EXPECT_TRUE(AcceptedInsideGenerateBlocks(
+      {"", "real r; logic y;", "always @(r) y = 0;"}));
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  real r;\n"
+             "  logic y;\n"
+             "  if (1) begin : g\n"
+             "    logic [3:0] r;\n"
+             "    initial y = r[0];\n"
+             "  end\n"
+             "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  logic [3:0] r;\n"
+             "  logic y;\n"
+             "  if (1) begin : g1\n"
+             "    real r;\n"
+             "  end\n"
+             "  if (1) begin : g2\n"
+             "    initial y = r[0];\n"
+             "  end\n"
+             "endmodule\n"));
 }
 
 }  // namespace

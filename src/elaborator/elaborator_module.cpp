@@ -678,10 +678,23 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   // generate constructs this module queued are elaborated after that, by
   // Elaborator::ProcessPendingGenerate, and §23.9 judges what they declare
   // against the scope they were written in, so keep the set here for them.
-  module_scope_names_[mod] = {declared_names_,      net_names_,
-                              cont_assign_targets_, proc_assign_targets_,
-                              var_init_names_,      uwire_drivers_,
-                              interconnect_names_};
+  // The type tables are taken rather than copied, since the Restore below
+  // overwrites every one of them.
+  module_scope_names_[mod] = {declared_names_,
+                              net_names_,
+                              cont_assign_targets_,
+                              proc_assign_targets_,
+                              var_init_names_,
+                              uwire_drivers_,
+                              interconnect_names_,
+                              force_release_targets_,
+                              std::move(var_types_),
+                              std::move(class_var_types_),
+                              std::move(scalar_var_names_),
+                              std::move(real_var_names_),
+                              std::move(real_param_names_),
+                              std::move(var_select_shapes_),
+                              std::move(class_var_names_)};
   saved_item_state.Restore(*this);
   return mod;
 }

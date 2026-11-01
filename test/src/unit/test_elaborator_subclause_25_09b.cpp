@@ -50,6 +50,7 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "fixture_elaborator.h"
+#include "helpers_generate_block_items.h"
 #include "helpers_reported_error.h"
 
 using namespace delta;
@@ -776,6 +777,22 @@ TEST(VirtualInterfaceCallElaboration, AnEightTypedefChainReachesTheClass) {
                             "'nosuch' names no task or function of interface "
                             "'ifc'",
                             7, "25.9"));
+}
+
+// §27.2 makes a generate block a collection of module items, so a virtual
+// interface is kept out of a continuous assignment and an event expression
+// inside one, and a procedural assignment of null to it stays allowed.
+TEST(VirtualInterfaceElaboration,
+     VirtualInterfaceInsideGenerateBlocksIsRejected) {
+  EXPECT_TRUE(RejectedInsideGenerateBlocks(
+      {"interface I; endinterface ", "virtual I v; wire w;", "assign w = v;"},
+      "virtual interface cannot be used in continuous assignment", "25.9"));
+  EXPECT_TRUE(RejectedInsideGenerateBlocks(
+      {"interface I; endinterface ", "virtual I v; logic y;",
+       "always @(v) y = 0;"},
+      "virtual interface cannot appear in event expression", "25.9"));
+  EXPECT_TRUE(AcceptedInsideGenerateBlocks(
+      {"interface I; endinterface ", "virtual I v;", "initial v = null;"}));
 }
 
 }  // namespace
