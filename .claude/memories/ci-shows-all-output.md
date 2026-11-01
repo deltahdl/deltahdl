@@ -8,6 +8,8 @@ metadata:
   modified: 2026-11-01T15:36:04.812Z
 ---
 
+# CI shows all output
+
 Every step of every workflow and composite action shows everything its tools print, for passing cases as well as failing ones. That means:
 
 - no `-q`, `--quiet`, `--silent` or `--status` flags;
