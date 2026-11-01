@@ -82,14 +82,17 @@ jobs:
       # everything else. llvm-cov reads coverage mapping out of the images it is
       # handed, so both have to be named or src/ reports as absent rather than
       # as uncovered.
+      - name: Merge profiles
+        uses: ./.github/actions/merge-profiles
+        with:
+          output: merged.profdata
+          paths: >-
+            profdata/unit/*.profdata
+            profraw/e2e/*.profraw
+            profraw/sv-tests/*.profraw
+            profraw/supplemental-integration/*.profraw
       - name: Generate coverage report
         run: |
-          llvm-profdata merge -sparse \
-            profdata/unit/*.profdata \
-            profraw/e2e/*.profraw \
-            profraw/sv-tests/*.profraw \
-            profraw/supplemental-integration/*.profraw \
-            -o merged.profdata
           llvm-cov show build/src/deltahdl \
             -object build/src/libdeltahdl_lib.so \
             -instr-profile=merged.profdata \
@@ -3108,10 +3111,10 @@ jobs:
       # and the next change to this matrix should argue against them rather
       # than against a guess at them.
       - name: Merge profraw
-        run: |
-          time llvm-profdata merge -sparse profraw/*.profraw \
-            -o unit-shard-${{ matrix.shard }}.profdata
-          ls -l unit-shard-${{ matrix.shard }}.profdata
+        uses: ./.github/actions/merge-profiles
+        with:
+          output: unit-shard-${{ matrix.shard }}.profdata
+          paths: profraw/*.profraw
       - name: Upload profdata
         uses: actions/upload-artifact@v7
         with:

@@ -1,0 +1,118 @@
+---
+description: >-
+  Merge LLVM instrumentation profiles into one indexed .profdata with
+  llvm-profdata merge -sparse, and say so in an annotation whenever the merge
+  is not clean. llvm-profdata reports on standard error alone, where a warning
+  on a step that goes on to succeed is read by nobody, and it passes some
+  inputs without a word at all. Each such case is named here and either fails
+  the step or annotates it: a pattern that matches no file fails it, an empty
+  input file and a warning from llvm-profdata annotate it, a non-zero exit, a
+  missing or empty output and an output holding no function fail it. Expects
+  llvm-profdata on PATH, which install-llvm puts there.
+inputs:
+  output:
+    description: The .profdata file to write.
+    required: true
+  paths:
+    description: >-
+      Whitespace-separated glob patterns naming the inputs, each a .profraw or
+      a .profdata. Every pattern has to match at least one file.
+    required: true
+name: Merge profiles
+runs:
+  steps:
+    - env:
+        INPUT_OUTPUT: ${{ inputs.output }}
+        INPUT_PATHS: ${{ inputs.paths }}
+      name: Merge profiles
+      run: |
+        # A pattern that matches nothing fails the step. Left to the shell it
+        # would reach llvm-profdata as a literal and fail there too, but as a
+        # missing file of that name, where the problem is that a tier or a
+        # shard handed over no profile at all.
+        shopt -s nullglob
+        set -f
+        read -r -a patterns <<< "${INPUT_PATHS}"
+        set +f
+        files=()
+        unmatched=0
+        for pattern in "${patterns[@]}"; do
+          # shellcheck disable=SC2206
+          matched=( ${pattern} )
+          if [ "${#matched[@]}" -eq 0 ]; then
+            echo "::error title=No profiles to merge::${pattern} matched" \
+              "no file, so whatever should have written it left no profile"
+            unmatched=1
+          fi
+          files+=( "${matched[@]}" )
+        done
+        if [ "${unmatched}" -ne 0 ]; then
+          exit 1
+        fi
+        # llvm-profdata merges an empty .profraw without a word, so a process
+        # that left its profile empty would drop its counters unannounced.
+        # It annotates rather than fails: the process's own verdict belongs to
+        # the test that ran it, and whether counters were lost is what the
+        # 100% gate in assert-coverage decides.
+        empty=()
+        while IFS= read -r file; do
+          empty+=( "${file}" )
+        done < <(find "${files[@]}" -maxdepth 0 -empty)
+        if [ "${#empty[@]}" -ne 0 ]; then
+          printf 'Empty profile: %s\n' "${empty[@]}"
+          echo "::warning title=Empty profiles::${#empty[@]} of" \
+            "${#files[@]} profiles are empty and contribute no counters," \
+            "${empty[0]} among them; the step log lists them all"
+        fi
+        # --failure-mode=any is llvm-profdata's default, named so that a
+        # change of default cannot make a corrupt input a warning.
+        log=$(mktemp)
+        start=${SECONDS}
+        if llvm-profdata merge -sparse --failure-mode=any "${files[@]}" \
+          -o "${INPUT_OUTPUT}" 2> "${log}"; then
+          status=0
+        else
+          status=$?
+        fi
+        seconds=$(( SECONDS - start ))
+        cat "${log}" >&2
+        # Every diagnostic becomes an annotation. GitHub keeps ten of each
+        # kind per step, so a count comes first and survives the cap.
+        awk -v out="${INPUT_OUTPUT}" '
+          function esc(s) {
+            gsub(/%/, "%25", s); gsub(/\r/, "%0D", s); return s
+          }
+          /^warning: / { w[++nw] = substr($0, 10) }
+          /^error: / { e[++ne] = substr($0, 8) }
+          END {
+            if (nw) printf "::warning title=llvm-profdata merge::%d " \
+              "warnings merging into %s; the step log lists them all\n", nw, out
+            for (i = 1; i <= nw; i++)
+              printf "::warning title=llvm-profdata merge::%s\n", esc(w[i])
+            for (i = 1; i <= ne; i++)
+              printf "::error title=llvm-profdata merge::%s\n", esc(e[i])
+          }' "${log}"
+        if [ "${status}" -ne 0 ]; then
+          echo "::error title=llvm-profdata merge::exited ${status} merging" \
+            "${#files[@]} profiles into ${INPUT_OUTPUT}"
+          exit "${status}"
+        fi
+        if [ ! -s "${INPUT_OUTPUT}" ]; then
+          echo "::error title=No merged profile::llvm-profdata exited 0" \
+            "but left ${INPUT_OUTPUT} missing or empty"
+          exit 1
+        fi
+        # Empty inputs alone merge into a valid profile of no function, which
+        # llvm-cov would read as nothing covered rather than as no profile.
+        functions=$(llvm-profdata show "${INPUT_OUTPUT}" |
+          awk -F': ' '/^Total functions:/ { print $2 }')
+        if [ "${functions:-0}" -eq 0 ]; then
+          echo "::error title=Empty merged profile::${INPUT_OUTPUT} holds" \
+            "no function's counters, merged from ${#files[@]} profiles"
+          exit 1
+        fi
+        echo "Merged ${#files[@]} profiles into ${INPUT_OUTPUT} in" \
+          "${seconds}s: $(wc -c < "${INPUT_OUTPUT}") bytes," \
+          "${functions} functions"
+      shell: bash
+  using: composite
