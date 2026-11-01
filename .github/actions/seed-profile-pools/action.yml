@@ -1,0 +1,86 @@
+---
+description: >-
+  Create, before any test runs, the pooled profile that each instrumented image
+  writes under an LLVM_PROFILE_FILE holding %m. With %m the LLVM profiling
+  runtime names a profile after the image and has every process add its
+  counters into that one file at exit, under a lock, rather than write a file
+  of its own. The first process to write a pool creates it, and if that process
+  is killed partway through the write the file is left truncated, every later
+  process fails to add to it, and llvm-profdata rejects it as corrupt, losing
+  every counter of that image. Here each image is run once with skip_main.so
+  preloaded, which replaces the program's main with one that exits 77, so the
+  pool is written whole by a process that runs nothing but the static
+  initializers every run of the image executes anyway, and so adds no coverage
+  of its own. Any other status fails the step: the loader only warns when a
+  preload fails and then runs the program whole, which would add counts of
+  code no test ran. Expects LLVM_PROFILE_FILE set with %m, and cc on PATH.
+inputs:
+  images:
+    description: >-
+      Whitespace-separated glob patterns naming the instrumented executables to
+      seed. Only the executable files a pattern matches are seeded, so that
+      build/test/test_* takes the test binaries and leaves the CMake scripts
+      gtest_discover_tests writes beside them for every test, built or not.
+      Each pattern has to match at least one executable file.
+    required: true
+name: Seed profile pools
+runs:
+  steps:
+    - env:
+        INPUT_IMAGES: ${{ inputs.images }}
+      name: Seed profile pools
+      run: |
+        if [[ "${LLVM_PROFILE_FILE:-}" != *%m* ]]; then
+          echo "::error title=No pooled profile::LLVM_PROFILE_FILE is" \
+            "'${LLVM_PROFILE_FILE:-}', which names no pool with %m, so" \
+            "seeding would only add a profile of its own"
+          exit 1
+        fi
+        shim="${RUNNER_TEMP}/skip_main.so"
+        echo "Compiling ${GITHUB_ACTION_PATH}/skip_main.c into ${shim}"
+        cc -shared -fPIC -O2 -o "${shim}" \
+          "${GITHUB_ACTION_PATH}/skip_main.c" -ldl
+        shopt -s nullglob
+        set -f
+        read -r -a patterns <<< "${INPUT_IMAGES}"
+        set +f
+        images=()
+        unmatched=0
+        for pattern in "${patterns[@]}"; do
+          found=0
+          # shellcheck disable=SC2206
+          matched=( ${pattern} )
+          for file in "${matched[@]}"; do
+            if [ -f "${file}" ] && [ -x "${file}" ]; then
+              images+=( "${file}" )
+              found=1
+            fi
+          done
+          if [ "${found}" -eq 0 ]; then
+            echo "::error title=No images to seed::${pattern} matched no" \
+              "executable file"
+            unmatched=1
+          fi
+        done
+        if [ "${unmatched}" -ne 0 ]; then
+          exit 1
+        fi
+        count=0
+        for image in "${images[@]}"; do
+          count=$(( count + 1 ))
+          echo "Seeding ${count}/${#images[@]} ${image}"
+          status=0
+          LD_PRELOAD="${shim}" "${image}" < /dev/null || status=$?
+          if [ "${status}" -ne 77 ]; then
+            echo "::error title=Seeding failed::${image} exited" \
+              "${status} rather than the 77 skip_main.so exits with, so" \
+              "either its own main ran and counted code no test ran, or" \
+              "its pool may not exist whole"
+            exit 1
+          fi
+        done
+        pools=$(dirname "${LLVM_PROFILE_FILE}")
+        echo "Pools in ${pools} after seeding ${#images[@]} images:"
+        ls -l "${pools}"
+      shell: bash
+  using: composite

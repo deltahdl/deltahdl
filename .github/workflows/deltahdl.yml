@@ -46,8 +46,8 @@ jobs:
         with:
           name: coverage-simulator
           path: build/src/
-      # Each shard arrives already merged, having summed its own 2 to 3G of
-      # .profraw into one file before uploading it. The files land in one
+      # Each shard arrives already merged, having summed its own pooled
+      # .profraw files into one before uploading it. The files land in one
       # directory and keep the shard number in their names, so nothing
       # collides under merge-multiple.
       - name: Download unit profdata
@@ -2311,7 +2311,7 @@ jobs:
         run: PYTHONPATH=.:scripts python3 -m run_sim_tests
   e2e-test-coverage:
     env:
-      LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%p.profraw
+      LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%m.profraw
     if: ${{ !cancelled() && needs.build-coverage-lib.result == 'success' }}
     needs: build-coverage-lib
     runs-on: ubuntu-latest
@@ -2324,6 +2324,12 @@ jobs:
           path: build/src/
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
+      # The pools LLVM_PROFILE_FILE names with %m are created whole before any
+      # test can be killed while creating one. See seed-profile-pools.
+      - name: Seed profile pools
+        uses: ./.github/actions/seed-profile-pools
+        with:
+          images: build/src/deltahdl
       - name: E2E tests
         run: PYTHONPATH=.:scripts python3 -m run_sim_tests
       # RunOnDeepStack in src/main.cpp runs the simulation on a thread with a
@@ -2708,7 +2714,7 @@ jobs:
   # assert-coverage.
   supplemental-integration-test-coverage:
     env:
-      LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%p.profraw
+      LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%m.profraw
     if: ${{ !cancelled() && needs.build-coverage-lib.result == 'success' }}
     needs: build-coverage-lib
     runs-on: ubuntu-latest
@@ -2721,6 +2727,12 @@ jobs:
           path: build/src/
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
+      # The pools LLVM_PROFILE_FILE names with %m are created whole before any
+      # test can be killed while creating one. See seed-profile-pools.
+      - name: Seed profile pools
+        uses: ./.github/actions/seed-profile-pools
+        with:
+          images: build/src/deltahdl
       - name: Integration tests
         run: PYTHONPATH=.:scripts python3 -m run_integration_tests
       - name: Upload profraw
@@ -2737,7 +2749,7 @@ jobs:
   # 'skipped' rather than 'success', which is what this job tests.
   sv-tests-coverage:
     env:
-      LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%p.profraw
+      LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%m.profraw
     if: >-
       !cancelled()
       && needs.cache-sv-tests.result == 'success'
@@ -2758,6 +2770,12 @@ jobs:
           path: build/src/
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
+      # The pools LLVM_PROFILE_FILE names with %m are created whole before any
+      # test can be killed while creating one. See seed-profile-pools.
+      - name: Seed profile pools
+        uses: ./.github/actions/seed-profile-pools
+        with:
+          images: build/src/deltahdl
       - name: Run sv-tests
         run: PYTHONPATH=.:scripts python3 -m run_sv_tests
       - name: Upload profraw
@@ -2853,7 +2871,7 @@ jobs:
       CCACHE_COMPRESSLEVEL: '10'
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_MAXSIZE: '0'
-      LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%p.profraw
+      LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%m.profraw
     if: ${{ !cancelled() && needs.build-coverage-lib.result == 'success' }}
     name: unit-test-coverage-shard-${{ matrix.shard }}
     needs: [build-coverage-lib, clang-tidy-test]
@@ -3080,6 +3098,12 @@ jobs:
       # in. The reading after them runs unconditionally for that reason.
       - name: Report free space before tests
         run: df -h /
+      # The pools LLVM_PROFILE_FILE names with %m are created whole before any
+      # test can be killed while creating one. See seed-profile-pools.
+      - name: Seed profile pools
+        uses: ./.github/actions/seed-profile-pools
+        with:
+          images: build/test/test_*
       - name: Unit tests
         run: >-
           ctest --test-dir build --verbose
@@ -3089,15 +3113,15 @@ jobs:
         name: Report free space after tests
         run: df -h /
       # Sum this slice's counters here so that one file crosses the job
-      # boundary rather than a gigabyte of near-duplicates. LLVM_PROFILE_FILE
-      # above names each profile after the process that writes it, and
-      # gtest_discover_tests in test/CMakeLists.txt registers every TEST case
-      # as a CTest test of its own, so ctest leaves one .profraw per case:
-      # 1,774 of them on unit-test-coverage-shard-07 in run 31074983813, 2 to
-      # 3G in all, each holding a full copy of the counter table for
-      # libdeltahdl_lib.so and most of it counters no case touched. Uploading
-      # that took 40 to 62 seconds a shard and 18.4 GiB a run, and
-      # assert-coverage summed the counters on arrival anyway. Counter addition
+      # boundary rather than one per instrumented image. LLVM_PROFILE_FILE
+      # above names each profile with %m, after the image that writes it, so
+      # the processes ctest starts, one per TEST case since gtest_discover_tests
+      # in test/CMakeLists.txt registers each case as a CTest test of its own,
+      # add their counters into one pool per test binary and one for
+      # libdeltahdl_lib.so. Named with %p, one profile per process, the shard
+      # left 1,774 of them on unit-test-coverage-shard-07 in run 31074983813,
+      # 2 to 3G in all, and merging them one call each took 273 seconds on
+      # shard 04 in run 41325046840. Counter addition
       # is associative, so merging a shard's own files here and merging every
       # shard's result there gives the profile that job builds today.
       #
