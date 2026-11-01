@@ -874,13 +874,6 @@ class Elaborator : public ElaboratorClassRules {
   // §16.9.4: the global clocking future sampled value functions may appear only
   // in a property or sequence expression, not in procedural code.
   void ValidateFutureGclkPlacement(const ModuleDecl* decl);
-  // §14.14: true when `decl` itself contains a global clocking declaration.
-  static bool ModuleDeclaresGlobalClocking(const ModuleDecl* decl);
-  // §16.5.2: the clocking event of the global clocking declaration `decl`
-  // itself contains, or null when it declares none. This is the event a
-  // $global_clock leading clocking event stands for.
-  static const std::vector<EventExpr>* ModuleGlobalClockingEvent(
-      const ModuleDecl* decl);
   void ValidateContAssignToClockvar(const ModuleDecl* decl);
   void WalkStmtsForClockvarAccess(const Stmt* s);
   void CheckClockvarAccessExpr(const Expr* e, bool is_lvalue);

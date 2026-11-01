@@ -12,6 +12,7 @@
 #include "elaborator/assertion_walk.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "elaborator/global_clocking_declaration.h"
 #include "elaborator/global_clocking_sampled_value.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -341,11 +342,11 @@ const Expr* FindGclkFunctionRefInItem(const ModuleItem* item,
   return nullptr;
 }
 
-bool Elaborator::ModuleDeclaresGlobalClocking(const ModuleDecl* decl) {
+bool ModuleDeclaresGlobalClocking(const ModuleDecl* decl) {
   return DeclHasGlobalClocking(decl);
 }
 
-const std::vector<EventExpr>* Elaborator::ModuleGlobalClockingEvent(
+const std::vector<EventExpr>* ModuleGlobalClockingEvent(
     const ModuleDecl* decl) {
   // §16.5.2: the event a $global_clock leading clocking event stands for. A
   // declaration whose clocking event is absent names no event to stand for, so
