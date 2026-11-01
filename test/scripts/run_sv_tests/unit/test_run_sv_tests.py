@@ -933,3 +933,14 @@ def test_running_the_package_as_a_module_calls_main(
     calls_made_by_running_as_a_module: Callable[[ModuleType], list[str]],
 ) -> None:
     assert calls_made_by_running_as_a_module(rst) == ["main"]
+
+
+def test_reports_the_output_of_a_passing_run(
+    rst: ModuleType, capsys: pytest.CaptureFixture[str],
+) -> None:
+    mock_result = MagicMock(returncode=0, stdout="parsed\n", stderr="")
+    with patch.object(rst.subprocess, "run", return_value=mock_result):
+        rst.run_test("/fake/test.sv")
+    assert "    exit status 0\n    stdout:\n      parsed\n" in (
+        capsys.readouterr().out
+    )

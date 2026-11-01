@@ -16,7 +16,7 @@ from xml.etree import ElementTree as ET
 from lib.python.run_tests_common import (
     BINARY, RED, REPO_ROOT, RESET, check_assertions, check_binary,
     natural_sort_key, parse_metadata, print_clause_breakdown, print_result,
-    reported_subclauses, subclause_is_within,
+    reported_subclauses, run_reported, subclause_is_within,
 )
 
 TEST_DIR = REPO_ROOT / "third_party" / "sv-tests" / "tests"
@@ -126,13 +126,7 @@ def run_test(
         cmd.append(f"+incdir+{incdir}")
     cmd.extend(library.files)
     cmd.append(path)
-    result = subprocess.run(
-        cmd,
-        capture_output=True,
-        timeout=30,
-        check=False,
-        text=True,
-    )
+    result = run_reported(cmd, timeout=30)
     if mode != "simulation":
         return result.returncode == 0, result.stderr, result.returncode
     if result.returncode != 0:
@@ -456,12 +450,8 @@ def print_status(result: dict[str, Any], ok_int: int) -> None:
 
 def suite_revision() -> str:
     try:
-        result = subprocess.run(
-            ["git", "-C", str(TEST_DIR), "rev-parse", "HEAD"],
-            capture_output=True,
-            timeout=30,
-            check=False,
-            text=True,
+        result = run_reported(
+            ["git", "-C", str(TEST_DIR), "rev-parse", "HEAD"], timeout=30,
         )
     except OSError:
         return "unknown"

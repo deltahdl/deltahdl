@@ -7,7 +7,9 @@ import sys
 import tempfile
 from pathlib import Path
 
-from lib.python.run_tests_common import BINARY, REPO_ROOT, check_binary, print_result
+from lib.python.run_tests_common import (
+    BINARY, REPO_ROOT, check_binary, print_result, run_reported,
+)
 
 TEST_DIR = REPO_ROOT / "test" / "src" / "e2e"
 
@@ -56,13 +58,8 @@ def run_before(
 ) -> str | None:
     before_path = sv_path.with_suffix(BEFORE_SUFFIX)
     try:
-        result = subprocess.run(
-            [str(BINARY), str(sv_path), *arguments],
-            capture_output=True,
-            text=True,
-            timeout=30,
-            check=False,
-            cwd=work_dir,
+        result = run_reported(
+            [str(BINARY), str(sv_path), *arguments], timeout=30, cwd=work_dir,
         )
     except subprocess.TimeoutExpired:
         return f"{before_path.name}: TIMEOUT"
@@ -147,13 +144,7 @@ def build_case_library(sv_path: Path, work_dir: str) -> str | None:
     if source is None:
         return None
     output = Path(work_dir) / f"{sv_path.stem}{shared_library_extension()}"
-    result = subprocess.run(
-        library_command(source, output),
-        capture_output=True,
-        text=True,
-        timeout=60,
-        check=False,
-    )
+    result = run_reported(library_command(source, output), timeout=60)
     if result.returncode == 0:
         return None
     return f"{source.name}: cc exited {result.returncode}\n{result.stderr}"
@@ -225,13 +216,8 @@ def run_test(sv_path: Path, expected_path: Path) -> tuple[bool, str]:
             if detail is not None:
                 return False, detail
         try:
-            result = subprocess.run(
-                command_line(sv_path),
-                capture_output=True,
-                text=True,
-                timeout=30,
-                check=False,
-                cwd=work_dir or None,
+            result = run_reported(
+                command_line(sv_path), timeout=30, cwd=work_dir or None,
             )
         except subprocess.TimeoutExpired:
             return False, "TIMEOUT"

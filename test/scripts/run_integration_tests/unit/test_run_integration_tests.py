@@ -4,6 +4,8 @@ from pathlib import Path
 from types import ModuleType
 from unittest.mock import patch
 
+import pytest
+
 RunCase = Callable[[str, int, str, str], tuple[list[str], tuple[bool, str]]]
 
 _HOLDS = ":assert: (1 == 1)\n"
@@ -190,3 +192,12 @@ def test_running_the_package_as_a_module_calls_main(
     calls_made_by_running_as_a_module: Callable[[ModuleType], list[str]],
 ) -> None:
     assert calls_made_by_running_as_a_module(rit) == ["main"]
+
+
+def test_the_output_of_a_passing_case_is_reported(
+    run_case: RunCase, capsys: pytest.CaptureFixture[str],
+) -> None:
+    run_case(_SIMULATION, 0, _HOLDS, "")
+    assert "    exit status 0\n    stdout:\n      :assert: (1 == 1)\n" in (
+        capsys.readouterr().out
+    )

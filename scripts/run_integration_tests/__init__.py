@@ -6,7 +6,7 @@ from pathlib import Path
 
 from lib.python.run_tests_common import (
     BINARY, REPO_ROOT, check_assertions, check_binary, parse_metadata,
-    print_clause_breakdown, print_result, reported_subclauses,
+    print_clause_breakdown, print_result, reported_subclauses, run_reported,
     subclause_is_within,
 )
 
@@ -101,13 +101,7 @@ def run_test(sv_path: Path) -> tuple[bool, str]:
         return False, str(exc)
     command = [str(BINARY)] if option is None else [str(BINARY), option]
     try:
-        result = subprocess.run(
-            [*command, str(sv_path)],
-            capture_output=True,
-            text=True,
-            timeout=30,
-            check=False,
-        )
+        result = run_reported([*command, str(sv_path)], timeout=30)
     except subprocess.TimeoutExpired:
         return False, "TIMEOUT"
     if metadata.get("should_fail_because"):

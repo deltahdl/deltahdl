@@ -4,6 +4,8 @@ from pathlib import Path
 from types import ModuleType
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 
 def _run_over_streams(
     rst: ModuleType, tmp_path: Path, out: str, err: str, expected: str,
@@ -666,3 +668,24 @@ def test_a_library_elsewhere_needs_no_flag_for_the_tools_symbols(
 def test_a_library_sees_the_tools_headers(rst: ModuleType, tmp_path: Path) -> None:
     command = rst.library_command(tmp_path / "a.c", tmp_path / "a.so")
     assert str(rst.REPO_ROOT / "src" / "simulator") in command
+
+
+def test_the_output_of_a_passing_run_is_reported(
+    rst: ModuleType, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+) -> None:
+    _run_over_case(rst, tmp_path, "shown", 0)
+    assert "    exit status 0\n    stdout:\n      ran\n" in capsys.readouterr().out
+
+
+def test_the_output_of_an_earlier_invocation_is_reported(
+    rst: ModuleType, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+) -> None:
+    _run_over_two_invocations(rst, tmp_path, "--precompile-into\ncells\n", 0)
+    assert "    stdout:\n      compiled\n" in capsys.readouterr().out
+
+
+def test_the_output_of_a_library_build_is_reported(
+    rst: ModuleType, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+) -> None:
+    _run_with_library(rst, tmp_path, 0)
+    assert "    stderr:\n      cc said no\n" in capsys.readouterr().out

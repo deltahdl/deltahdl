@@ -295,3 +295,11 @@ class TestSuiteRevision:
             rst.subprocess, "run", side_effect=FileNotFoundError,
         ):
             assert rst.suite_revision() == "unknown"
+
+    def test_reports_the_output_of_git(
+        self, rst: ModuleType, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        stub = MagicMock(returncode=0, stdout=f"{self._SHA}\n", stderr="")
+        with patch.object(rst.subprocess, "run", return_value=stub):
+            rst.suite_revision()
+        assert f"    stdout:\n      {self._SHA}\n" in capsys.readouterr().out

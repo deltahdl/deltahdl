@@ -2,6 +2,8 @@ import ast
 import operator
 import os
 import re
+import shlex
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any, Callable
@@ -29,6 +31,57 @@ def print_result(passed: bool, name: str) -> None:
         print(f"  {GREEN}PASS{RESET}: {name}", flush=True)
     else:
         print(f"  {RED}FAIL{RESET}: {name}", flush=True)
+
+
+def _captured_text(output: bytes | str | None) -> str:
+    if isinstance(output, bytes):
+        return output.decode(errors="replace")
+    return output or ""
+
+
+def _stream_section(label: str, text: str) -> str:
+    if not text:
+        return f"    {label}: (empty)\n"
+    body = "".join(f"      {line}\n" for line in text.splitlines())
+    return f"    {label}:\n{body}"
+
+
+def _write_report(
+    command: list[str], status: str, stdout: str, stderr: str,
+) -> None:
+    sys.stdout.write(
+        f"    $ {shlex.join(command)}\n"
+        f"    {status}\n"
+        f"{_stream_section('stdout', stdout)}"
+        f"{_stream_section('stderr', stderr)}"
+    )
+    sys.stdout.flush()
+
+
+def run_reported(
+    command: list[str], timeout: float, cwd: str | None = None,
+) -> subprocess.CompletedProcess[str]:
+    try:
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=False,
+            cwd=cwd,
+        )
+    except subprocess.TimeoutExpired as exc:
+        _write_report(
+            command,
+            f"timed out after {timeout} s",
+            _captured_text(exc.stdout),
+            _captured_text(exc.stderr),
+        )
+        raise
+    _write_report(
+        command, f"exit status {result.returncode}", result.stdout, result.stderr,
+    )
+    return result
 
 
 def natural_sort_key(text: str) -> list[Any]:
