@@ -1,8 +1,8 @@
 ---
 description: >-
   Merge LLVM instrumentation profiles into one indexed .profdata with
-  llvm-profdata merge -sparse, and say so in an annotation whenever the merge
-  is not clean. llvm-profdata reports on standard error alone, where a warning
+  llvm-profdata merge -sparse, listing every input with its size, and say so
+  in an annotation whenever the merge is not clean. llvm-profdata reports on standard error alone, where a warning
   on a step that goes on to succeed is read by nobody, and it passes some
   inputs without a word at all. Each such case is named here and either fails
   the step or annotates it: a pattern that matches no file fails it, an empty
@@ -49,15 +49,22 @@ runs:
         if [ "${unmatched}" -ne 0 ]; then
           exit 1
         fi
-        # llvm-profdata merges an empty .profraw without a word, so a process
-        # that left its profile empty would drop its counters unannounced.
+        # llvm-profdata names none of its inputs, so each one is listed here
+        # with its size before the merge reads it.
+        # It also merges an empty .profraw without a word, so a process that
+        # left its profile empty would drop its counters unannounced.
         # It annotates rather than fails: the process's own verdict belongs to
         # the test that ran it, and whether counters were lost is what the
         # 100% gate in assert-coverage decides.
         empty=()
-        while IFS= read -r file; do
-          empty+=( "${file}" )
-        done < <(find "${files[@]}" -maxdepth 0 -empty)
+        for file in "${files[@]}"; do
+          size=$(wc -c < "${file}")
+          size=$(( size ))
+          echo "Input ${file}: ${size} bytes"
+          if [ "${size}" -eq 0 ]; then
+            empty+=( "${file}" )
+          fi
+        done
         if [ "${#empty[@]}" -ne 0 ]; then
           printf 'Empty profile: %s\n' "${empty[@]}"
           echo "::warning title=Empty profiles::${#empty[@]} of" \
