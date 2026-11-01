@@ -8,11 +8,13 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "elaborator/assertion_rules.h"
+#include "elaborator/checker_instance_assertion.h"
 #include "elaborator/concurrent_assertion_expr.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_class_typedef_specialization.h"
 #include "elaborator/elaborator_helpers.h"
+#include "elaborator/elaborator_items_internal.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/global_clock_assertion_event.h"
 #include "elaborator/global_clocking_sampled_value.h"
@@ -325,18 +327,6 @@ bool PropertyInstanceIsEvaluated(const ModuleItem* item, const ModuleItem* decl,
   return true;
 }
 
-// §16.16 (a): a spec that is one name which names no property or sequence
-// is the boolean that name reads as, its clock the default clocking's; the
-// statement is made as the parser makes one for a clocked boolean.
-void SubstituteBooleanSpec(ModuleItem* item, Arena& arena) {
-  auto* stmt = NewInstanceStmt(item, arena);
-  stmt->assert_expr = item->assert_expr;
-  stmt->is_concurrent_clocked = true;
-  stmt->assert_pass_stmt = item->assert_pass_stmt;
-  stmt->assert_fail_stmt = item->assert_fail_stmt;
-  item->body = stmt;
-}
-
 // The rewrite is made on `item`, which every instance of the module shares,
 // and it is made once: the property declaration is the same for every
 // instance, so the second instance finds the body already there. Reports the
@@ -344,26 +334,6 @@ void SubstituteBooleanSpec(ModuleItem* item, Arena& arena) {
 // Parser::WarnUnevaluatedConcurrentAssertion states, when the name is no
 // property's or the body is not that form; the parser left the report to here
 // because it could not tell the two apart.
-// §16.12 with §26.3: an instance written by its package-qualified name,
-// `pk::pq` or `pk::pr(a, clk)`, which the parser left the scope resolution
-// it reads as since a package's variable reads the same, is made, once its
-// declaration is found, the instance named by the key the registry holds it
-// under, as the instance of a declaration in the scope is.
-void NameInstanceByKey(ModuleItem* item, Arena& arena) {
-  Expr* instance = item->assert_expr;
-  if (instance == nullptr) return;
-  if (instance->kind == ExprKind::kCall && instance->callee.empty()) {
-    instance->callee = item->prop_instance_name;
-    return;
-  }
-  if (instance->kind != ExprKind::kMemberAccess) return;
-  auto* name = arena.Create<Expr>();
-  name->kind = ExprKind::kIdentifier;
-  name->text = item->prop_instance_name;
-  name->range = instance->range;
-  item->assert_expr = name;
-}
-
 void SubstitutePropertyInstance(ModuleItem* item, Arena& arena,
                                 const PropertyRegistry& registry,
                                 const InferredAtInstance& inferred,
@@ -490,6 +460,15 @@ void PromotePropertyInstanceBoolean(ModuleItem* item, Arena& arena,
 }
 
 }  // namespace
+
+void SubstituteBooleanSpec(ModuleItem* item, Arena& arena) {
+  auto* stmt = NewInstanceStmt(item, arena);
+  stmt->assert_expr = item->assert_expr;
+  stmt->is_concurrent_clocked = true;
+  stmt->assert_pass_stmt = item->assert_pass_stmt;
+  stmt->assert_fail_stmt = item->assert_fail_stmt;
+  item->body = stmt;
+}
 
 void Elaborator::ElaborateSequenceDeclItem(ModuleItem* item, RtlirModule* mod) {
   ResolveClassScopedFormalTypes(*item, unit_, BuildParamScope(mod), typedefs_,
@@ -675,53 +654,6 @@ void Elaborator::ResolveStaticAssertionClock(
                 Subclause("16.16.1"));
     item->body = nullptr;
   }
-}
-
-// §17.2 and §17.3: the assertion `item` of `mod` as the instance reads it.
-// Where `mod` is a checker instance whose formals `trees` binds to sequences
-// or properties, that is a copy, the item being shared by every instance of
-// the checker, whose boolean, where it names such a formal, is the root of a
-// tree the evaluator substitutes the actual into; `item` itself otherwise.
-static ModuleItem* CheckerInstanceAssertion(
-    ModuleItem* item, const RtlirModule* mod,
-    const std::unordered_map<const RtlirModule*, ActualsByFormal>& trees,
-    const PropertyRegistry& registry, Arena& arena) {
-  auto found = trees.find(mod);
-  if (found == trees.end() || found->second.empty()) return item;
-  const ActualsByFormal& actuals = found->second;
-  auto* copy = arena.Create<ModuleItem>(*item);
-  const Stmt* stmt = item->body;
-  // The parser leaves a spec that is one name, `assert property (p)`, an
-  // instance of the property it may name, with no body yet.
-  const Expr* spec = stmt != nullptr ? stmt->assert_expr : item->assert_expr;
-  bool names_formal = (stmt == nullptr || (stmt->assert_property == nullptr &&
-                                           stmt->assert_sequence == nullptr)) &&
-                      spec != nullptr && spec->kind == ExprKind::kIdentifier &&
-                      actuals.contains(spec->text);
-  if (names_formal) {
-    if (stmt == nullptr) {
-      copy->prop_instance_name = {};
-      SubstituteBooleanSpec(copy, arena);
-    } else {
-      copy->body = arena.Create<Stmt>(*stmt);
-    }
-    copy->body->assert_property = arena.Create<PropertyExprNode>();
-    copy->body->assert_property->boolean = copy->body->assert_expr;
-  }
-  // §16.16 (d) with §F.4.1: a property that is such a formal, or opens with
-  // one, is on the clock its actual opens with, `@(posedge clk) a` or
-  // `@($global_clock) a`, where the assertion writes none.
-  if (copy->sensitivity.empty() && copy->body != nullptr) {
-    copy->sensitivity = FormalOpeningClock(copy->body->assert_property, actuals,
-                                           registry, arena);
-    if (!copy->sensitivity.empty()) {
-      if (copy->body == item->body) {
-        copy->body = arena.Create<Stmt>(*item->body);
-      }
-      copy->body->assert_clock_from_actual = true;
-    }
-  }
-  return copy;
 }
 
 // §16.14.7, §16.15 and §16.16 (a): the clock and the disable condition an

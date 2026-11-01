@@ -848,37 +848,6 @@ static void RecordCheckerActuals(const RtlirModuleInst& inst,
   ctx.RegisterCheckerActuals(inst_prefix, std::move(actuals));
 }
 
-const std::vector<EventExpr>& Lowerer::ClockOf(const RtlirProcess& proc) {
-  if (!lowering_checker_) return proc.sensitivity;
-  auto parent = checker_parent_prefixes_.find(inst_prefix_);
-  if (proc.body != nullptr && proc.body->assert_clock_from_actual &&
-      parent != checker_parent_prefixes_.end()) {
-    // The statement keeps the leading clock its property is evaluated
-    // under, and the copy the elaborator made of it is this instance's.
-    proc.body->assert_clock = ClockInInstantiatingScope(proc.body->assert_clock,
-                                                        parent->second, arena_);
-    return *arena_.Create<std::vector<EventExpr>>(
-        ClockInInstantiatingScope(proc.sensitivity, parent->second, arena_));
-  }
-  return *arena_.Create<std::vector<EventExpr>>(SubstituteClock(
-      proc.sensitivity, CheckerTreeActuals(inst_prefix_, ctx_), arena_));
-}
-
-// §16.5.1 with §17.3: the variables a checker's sequence or property actual
-// reads are read sampled in the checker's assertions, as they are where the
-// actual is written, so they are enrolled under the instantiating scope.
-void Lowerer::RecordCheckerActualSampleScope(const RtlirModuleInst& inst) {
-  std::unordered_set<std::string> names;
-  for (const RtlirPortBinding& binding : inst.port_bindings) {
-    CollectActualReadNames(binding.connection, names);
-  }
-  if (names.empty()) return;
-  AssertionSampleScope scope;
-  scope.inst_prefix = inst_prefix_;
-  scope.names.assign(names.begin(), names.end());
-  assertion_sample_scopes_.push_back(std::move(scope));
-}
-
 void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
                                 bool from_program) {
   // §23.3.2: the caller lowers bindings under the PARENT prefix; qualify the
@@ -889,11 +858,7 @@ void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
   std::string inst_seg = std::string(inst.inst_name) + ".";
   RecordCheckerActuals(inst, inst_prefix_, inst_prefix_ + inst_seg, ctx_,
                        arena_);
-  if (inst.resolved != nullptr && inst.resolved->is_checker) {
-    checker_parent_prefixes_[inst_prefix_ + inst_seg] = inst_prefix_;
-  }
-  RecordCheckerActualSampleScope(inst);
-  RecordProceduralCheckerActuals(inst, inst_prefix_ + inst_seg);
+  RecordCheckerInstanceScopes(inst, inst_seg);
   std::unordered_map<std::string_view, std::string_view> inout_joins;
   for (const auto& binding : inst.port_bindings) {
     if (TryAliasInterfacePort(inst, binding)) continue;

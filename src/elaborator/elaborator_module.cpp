@@ -650,31 +650,19 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   // child instances among them -- are elaborated, so a reference in a module
   // that does not itself declare a global clocking still resolves against an
   // ancestor's. Restored below so the flag reflects the parent's chain again.
-  bool saved_global_clocking_in_scope = global_clocking_in_scope_;
-  global_clocking_in_scope_ =
-      saved_global_clocking_in_scope || ModuleDeclaresGlobalClocking(decl);
+  bool saved_global_clocking_in_scope = std::exchange(
+      global_clocking_in_scope_,
+      global_clocking_in_scope_ || ModuleDeclaresGlobalClocking(decl));
 
   const std::vector<EventExpr>* own_gclk = ModuleGlobalClockingEvent(decl);
   const std::vector<EventExpr>* saved_global_clocking_event =
-      module_global_clocking_event_;
-  module_global_clocking_event_ = EnterGlobalClockingChain(
-      global_clocking_scopes_, own_gclk, current_inst_path_, arena_);
-  // §14.14: $global_clock in a checker's sequence or property actual is the
-  // checker's effective global clocking's event, its names written as the
-  // scope instantiating the checker reaches them, since the actual's names
-  // stand there (§17.3).
-  if (decl->decl_kind == ModuleDeclKind::kChecker &&
-      !global_clocking_scopes_.empty()) {
-    const GlobalClockingScope& nearest = global_clocking_scopes_.back();
-    std::string_view path = current_inst_path_;
-    size_t last_dot = path.rfind('.');
-    std::string_view parent =
-        path.substr(0, last_dot == std::string_view::npos ? 0 : last_dot);
-    const std::vector<EventExpr>* in_parent = EffectiveGlobalClockingEvent(
-        nearest.events, nearest.inst_path, parent, arena_);
-    for (auto& [formal, actual] : checker_tree_actuals_[mod]) {
-      actual = SubstituteGlobalClockInActual(actual, *in_parent, arena_);
-    }
+      std::exchange(module_global_clocking_event_,
+                    EnterGlobalClockingChain(global_clocking_scopes_, own_gclk,
+                                             current_inst_path_, arena_));
+  if (decl->decl_kind == ModuleDeclKind::kChecker) {
+    ResolveGlobalClockInCheckerActuals(checker_tree_actuals_[mod],
+                                       global_clocking_scopes_,
+                                       current_inst_path_, arena_);
   }
 
   ElaborateItems(decl, mod);

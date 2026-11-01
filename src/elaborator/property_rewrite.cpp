@@ -1,10 +1,12 @@
 #include "elaborator/property_rewrite.h"
 
 #include <cstddef>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "elaborator/elaborator_validate_internal.h"
@@ -311,6 +313,23 @@ bool PropertyRegistry::ReachesRecursiveProperty(const ModuleItem* decl) const {
     }
   }
   return false;
+}
+
+BlockDeclarationShadow::BlockDeclarationShadow(
+    PropertyRegistry* registry, const std::vector<ModuleItem*>& items)
+    : registry_(registry) {
+  for (const ModuleItem* item : items) {
+    if (item->kind != ModuleItemKind::kPropertyDecl &&
+        item->kind != ModuleItemKind::kSequenceDecl) {
+      continue;
+    }
+    if (!enclosing_) enclosing_ = *registry_;
+    registry_->RegisterShadowing(item);
+  }
+}
+
+BlockDeclarationShadow::~BlockDeclarationShadow() {
+  if (enclosing_) *registry_ = std::move(*enclosing_);
 }
 
 }  // namespace delta

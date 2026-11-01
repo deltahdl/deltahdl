@@ -29,6 +29,12 @@ void PromoteSequenceInstancesInProperties(const ModuleDecl* decl,
                                           const PropertyRegistry& registry,
                                           Arena& arena);
 
+// §16.16 (a): a spec that is one name which names no property or sequence
+// is the boolean that name reads as, its clock the default clocking's; the
+// statement is made as the parser makes one for a clocked boolean. Defined in
+// elaborator_items_assertions.cpp.
+void SubstituteBooleanSpec(ModuleItem* item, Arena& arena);
+
 // §8.23 with §6.20.1: folds and checks the parameter defaults of every class
 // declared at compilation-unit scope, recording each value under its
 // "Class.name" key in `cu_param_scope`. Defined in elaborator_class_params.cpp.

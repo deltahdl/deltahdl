@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <optional>
 #include <string_view>
 #include <unordered_map>
 #include <vector>
@@ -114,6 +115,24 @@ class PropertyRegistry {
       argument_refs_;
 
   void RecordArgumentRefs(const ModuleItem* decl);
+};
+
+// §16.8 and §16.12 with §23.9: while it lives, each property and sequence
+// declared among the generate block items `items`, wherever it stands, is
+// registered in `registry` under its name for the block's items, over a
+// declaration of the enclosing scope of that name; the enclosing scope's
+// registry is put back when it ends.
+class BlockDeclarationShadow {
+ public:
+  BlockDeclarationShadow(PropertyRegistry* registry,
+                         const std::vector<ModuleItem*>& items);
+  ~BlockDeclarationShadow();
+  BlockDeclarationShadow(const BlockDeclarationShadow&) = delete;
+  BlockDeclarationShadow& operator=(const BlockDeclarationShadow&) = delete;
+
+ private:
+  PropertyRegistry* registry_;
+  std::optional<PropertyRegistry> enclosing_;
 };
 
 }  // namespace delta

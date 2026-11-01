@@ -311,7 +311,6 @@ class Elaborator : public ElaboratorClassRules {
                               ModuleDecl* child_decl, RtlirModule* mod,
                               const ScopeMap& parent_scope);
   // The three checks on an instance's port connections once they are bound.
-  void BindCheckerTreeActuals(RtlirModuleInst& inst);
   void CheckInstancePorts(RtlirModuleInst& inst, const ModuleItem* item,
                           RtlirModule* mod);
 

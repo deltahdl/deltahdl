@@ -399,6 +399,8 @@ class Lowerer {
 
   void LowerPortBindings(const RtlirModuleInst& inst, bool from_program);
   void RecordCheckerActualSampleScope(const RtlirModuleInst& inst);
+  void RecordCheckerInstanceScopes(const RtlirModuleInst& inst,
+                                   const std::string& inst_seg);
   bool LowerArrayPortBinding(const RtlirModuleInst& inst,
                              const RtlirPortBinding& binding,
                              const std::string& inst_seg, bool from_program);

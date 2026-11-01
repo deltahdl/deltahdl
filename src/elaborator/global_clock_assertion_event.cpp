@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"

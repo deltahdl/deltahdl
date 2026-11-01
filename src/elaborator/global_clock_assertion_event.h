@@ -1,10 +1,13 @@
 #ifndef DELTA_ELABORATOR_GLOBAL_CLOCK_ASSERTION_EVENT_H
 #define DELTA_ELABORATOR_GLOBAL_CLOCK_ASSERTION_EVENT_H
 
+#include <cstddef>
 #include <string_view>
 #include <vector>
 
+#include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
+#include "parser/expr_substitute.h"
 
 namespace delta {
 
@@ -113,6 +116,30 @@ const std::vector<EventExpr>* EffectiveGlobalClockingEvent(
     const std::vector<EventExpr>* declared_events,
     std::string_view declaring_inst_path,
     std::string_view referencing_inst_path, Arena& arena);
+
+// §14.14 with §17.3: $global_clock in the sequence and property `actuals` of
+// the checker instance at `checker_inst_path` is the checker's effective
+// global clocking's event, its names written as the scope instantiating the
+// checker reaches them, since the actuals' names stand there. Each actual is
+// replaced by its rewritten copy. The nearest declaration is the last of
+// `scopes`, each holding a declaration's `events` and the `inst_path` of the
+// instance declaring it; with none, the actuals are left as they are.
+template <typename Scope>
+void ResolveGlobalClockInCheckerActuals(ActualsByFormal& actuals,
+                                        const std::vector<Scope>& scopes,
+                                        std::string_view checker_inst_path,
+                                        Arena& arena) {
+  if (scopes.empty()) return;
+  size_t last_dot = checker_inst_path.rfind('.');
+  std::string_view parent = checker_inst_path.substr(
+      0, last_dot == std::string_view::npos ? 0 : last_dot);
+  const std::vector<EventExpr>* in_parent = EffectiveGlobalClockingEvent(
+      scopes.back().events, scopes.back().inst_path, parent, arena);
+  for (auto& entry : actuals) {
+    entry.second =
+        SubstituteGlobalClockInActual(entry.second, *in_parent, arena);
+  }
+}
 
 }  // namespace delta
 

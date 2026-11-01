@@ -145,4 +145,11 @@ Expr* QualifiedInstance(Expr* instance, const PropertyRegistry& registry,
 void PromoteSequenceInstances(PropertyExprNode* node,
                               const PropertyRegistry& registry, Arena& arena);
 
+// §16.12 with §26.3: an instance written by its package-qualified name,
+// `pk::pq` or `pk::pr(a, clk)`, which the parser left the scope resolution
+// it reads as since a package's variable reads the same, is made, once its
+// declaration is found, the instance named by the key the registry holds it
+// under, as the instance of a declaration in the scope is.
+void NameInstanceByKey(ModuleItem* item, Arena& arena);
+
 }  // namespace delta

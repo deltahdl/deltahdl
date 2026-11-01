@@ -399,4 +399,24 @@ std::vector<EventExpr> DefaultClockingEvent(const RtlirModule* mod) {
   return mod->inherited_default_clock;
 }
 
+// §16.12 with §26.3: an instance written by its package-qualified name,
+// `pk::pq` or `pk::pr(a, clk)`, which the parser left the scope resolution
+// it reads as since a package's variable reads the same, is made, once its
+// declaration is found, the instance named by the key the registry holds it
+// under, as the instance of a declaration in the scope is.
+void NameInstanceByKey(ModuleItem* item, Arena& arena) {
+  Expr* instance = item->assert_expr;
+  if (instance == nullptr) return;
+  if (instance->kind == ExprKind::kCall && instance->callee.empty()) {
+    instance->callee = item->prop_instance_name;
+    return;
+  }
+  if (instance->kind != ExprKind::kMemberAccess) return;
+  auto* name = arena.Create<Expr>();
+  name->kind = ExprKind::kIdentifier;
+  name->text = item->prop_instance_name;
+  name->range = instance->range;
+  item->assert_expr = name;
+}
+
 }  // namespace delta
