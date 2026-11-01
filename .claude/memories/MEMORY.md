@@ -92,6 +92,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 
 - [Failing loudly](failing-loudly-in-orchestrators.md) — an orchestrator under `scripts/` raises or exits non-zero; it never skips and carries on.
 - [Positive prompts](positive-prompts.md) — write a generated prompt as the action wanted, not the one forbidden.
+- [CI shows all output](ci-shows-all-output.md) — every step prints everything its tools say, passing or failing: no quiet flags, no /dev/null, captured output printed too.
 - [Composite actions](composite-actions.md) — a CI mechanism is `.github/actions/<name>/action.yml`, not a shell script.
 - [Naming an inserted step](naming-an-inserted-pipeline-step.md) — give it a real position or a descriptive name, never "Step 0".
 - [The unpinned CI toolchain](unpinned-ci-toolchain.md) — everything floats to latest, the runner image too, whose new headers move include-cleaner's verdicts; Actions tags stay at their major version.
