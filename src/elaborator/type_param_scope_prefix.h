@@ -8,8 +8,8 @@
 #include "common/source_loc.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
+#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
-#include "parser/ast_module.h"
 #include "parser/ast_type.h"
 
 // §6.20.3: a type parameter may prefix the class scope resolution operator in

@@ -495,11 +495,6 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
   }
 
   CheckTypeParamNotSetToValue(item, diag_);
-  if (is_type) {
-    ReportTypeParamPrefixNotAClass(item->typedef_type.scope_name, item->loc,
-                                   {mod->params, typedefs_, class_names_},
-                                   diag_);
-  }
 
   RtlirParamDecl pd;
   pd.name = item->name;
@@ -514,6 +509,11 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
   pd.default_value = item->init_expr;
   if (!item->unpacked_dims.empty()) pd.unpacked_dims = &item->unpacked_dims;
   if (is_type) {
+    // The prefix is judged by the parameters elaborated before this one, so
+    // the check runs before the parameter's own type joins them.
+    ReportTypeParamPrefixNotAClass(item->typedef_type.scope_name, item->loc,
+                                   {mod->params, typedefs_, class_names_},
+                                   diag_);
     // The type the instantiation gives the parameter, or the default, is
     // what the declaration's restriction judges and what the declarations
     // written in terms of the parameter elaborate against. It is also the

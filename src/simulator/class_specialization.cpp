@@ -537,6 +537,19 @@ void SizeBaseTypedefProperties(ClassTypeInfo* spec, SimContext& ctx) {
   }
 }
 
+// §7.4.2 with §8.25: the element count of `prop`, a fixed unpacked array
+// declared by `member` with one dimension, folded again with the
+// specialization's values in `scope`; left as it was where the dimension does
+// not fold to a size.
+void RefoldPropertyArraySize(ClassTypeInfo::PropertyInfo& prop,
+                             const ClassMember& member, const ScopeMap& scope,
+                             SimContext& ctx, Arena& arena) {
+  if (prop.array_size == 0 || member.unpacked_dims.size() != 1) return;
+  PropertyArrayDim dim =
+      FoldPropertyDimension(member.unpacked_dims[0], scope, ctx, arena);
+  if (dim.size > 0) prop.array_size = dim.size;
+}
+
 // §8.25 (printed page 203): a property whose packed dimension names a value
 // parameter, the clause's `bit [size-1:0] a`, is as wide as the
 // specialization binds the parameter, ten bits in `vector #(10)`. The table a
@@ -563,17 +576,16 @@ void SizeValueParamProperties(ClassTypeInfo* spec, const ParamValues& values,
   for (auto& prop : spec->properties) {
     const ClassMember* member = DeclaredProperty(spec->decl, prop.name);
     if (member == nullptr) continue;
-    if (prop.array_size > 0 && member->unpacked_dims.size() == 1) {
-      PropertyArrayDim dim =
-          FoldPropertyDimension(member->unpacked_dims[0], scope, ctx, arena);
-      if (dim.size > 0) prop.array_size = dim.size;
-    }
+    RefoldPropertyArraySize(prop, *member, scope, ctx, arena);
     const DataType& type = *TypeOfThisNamed(&member->data_type, spec, ctx);
     if (SizeClassTypedefProperty(prop, type, spec, scope, ctx)) continue;
     uint32_t width = EvalTypeWidth(type, {}, scope);
     // §6.18 with §6.20.3: a name the class gives its meaning to is sized as
-    // the specialization binds it, `typedef C::T C_t;` by the C it binds.
-    if (width == 0)
+    // the specialization binds it, `typedef C::T C_t;` by the C it binds. A
+    // property declared as one of the class's own type parameters, `T x`, is
+    // SizeTypeParamProperties' to size, by the actual the specialization was
+    // made with.
+    if (width == 0 && TypeParamNamedBy(spec->decl, type.type_name).empty())
       width = DeclaredTypeWidth(
           ClassPropertyType(type, spec->decl, type_params), ctx);
     if (width == 0) continue;

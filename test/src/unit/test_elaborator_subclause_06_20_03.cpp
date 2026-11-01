@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 #include "helpers_rtlir_lookup.h"
@@ -564,7 +565,7 @@ TEST(TypeParameterElab, IntBoundTypeParamPrefixInTypeOperatorIsError) {
 // parameter to. An override naming a class makes a default of int no error,
 // and an override naming int makes a default naming a class one.
 TEST(TypeParameterElab, OverrideDecidesWhetherThePrefixIsAClass) {
-  const char* kModules =
+  const char* modules =
       "class K;\n"
       "  typedef byte inner;\n"
       "endclass\n"
@@ -574,10 +575,10 @@ TEST(TypeParameterElab, OverrideDecidesWhetherThePrefixIsAClass) {
       "module d #(parameter type T = K);\n"
       "  typedef T::inner my_t;\n"
       "endmodule\n";
-  EXPECT_TRUE(ElabOk(std::string(kModules) +
+  EXPECT_TRUE(ElabOk(std::string(modules) +
                      "module top; c #(K) u(); d v(); endmodule\n"));
   ElabFixture f;
-  ElaborateSrc(std::string(kModules) +
+  ElaborateSrc(std::string(modules) +
                    "module top; c #(K) u(); d #(int) v(); endmodule\n",
                f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
@@ -612,16 +613,17 @@ TEST(TypeParameterElab, SpecializationBindingANonClassPrefixIsError) {
       "endclass\n"
       "class P #(type C = X);\n"
       "  typedef C::T I;\n"
-      "  localparam type J = C::T;\n";
+      "  localparam type J = C::T;\n"
+      "endclass\n";
   for (const Form& form : kForms) {
     SCOPED_TRACE(form.where);
     std::string bad = form.items;
     std::string good = form.items;
     bad.replace(bad.find('@'), 1, "int");
     good.replace(good.find('@'), 1, "X");
-    EXPECT_TRUE(ElabOk(kClasses + "endclass\n" + good));
+    EXPECT_TRUE(ElabOk(kClasses + good));
     ElabFixture f;
-    ElaborateSrc(kClasses + "endclass\n" + bad, f);
+    ElaborateSrc(kClasses + bad, f);
     EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                               "type parameter 'C' used as a class scope "
                               "resolution prefix does not resolve to a class",
@@ -652,7 +654,8 @@ TEST(TypeParameterElab, DefaultSpecializationBindingANonClassPrefixIsError) {
                             5, "6.20.3"));
 }
 
-// §6.20.3 in every place a type parameter can be declared and used: an
+// §6.20.3 in every place a type parameter can be declared and used, `@`
+// standing for the type it is bound to and `%` for the use: an
 // interface (§25.3), a program (§24.3), a generate block (§27), a function and
 // a task body (§13), and a package's local type parameter (§26.2), each with
 // the three uses the clause permits -- a typedef, a type parameter assignment
@@ -665,24 +668,24 @@ TEST(TypeParameterElab, TypeParamPrefixInEveryPlaceMustResolveToAClass) {
   };
   const Place kPlaces[] = {
       {"interface",
-       "interface c #(parameter type T = @);\n  #\nendinterface\n"
+       "interface c #(parameter type T = @);\n  %\nendinterface\n"
        "module top; c u(); endmodule\n"},
       {"program",
-       "program c #(parameter type T = @);\n  #\nendprogram\n"
+       "program c #(parameter type T = @);\n  %\nendprogram\n"
        "module top; c u(); endmodule\n"},
       {"generate block",
-       "module c #(parameter type T = @);\n  if (1) begin : g #\n  end\n"
+       "module c #(parameter type T = @);\n  if (1) begin : g %\n  end\n"
        "endmodule\nmodule top; c u(); endmodule\n"},
       {"function body",
        "module c #(parameter type T = @);\n"
-       "  function automatic void f(); #\n  endfunction\n"
+       "  function automatic void f(); %\n  endfunction\n"
        "endmodule\nmodule top; c u(); endmodule\n"},
       {"task body",
        "module c #(parameter type T = @);\n"
-       "  task automatic k(); #\n  endtask\n"
+       "  task automatic k(); %\n  endtask\n"
        "endmodule\nmodule top; c u(); endmodule\n"},
       {"package",
-       "package pk;\n  localparam type T = @; #\nendpackage\n"
+       "package pk;\n  localparam type T = @; %\nendpackage\n"
        "module top; import pk::*; endmodule\n"},
   };
   const char* const kUses[] = {"typedef T::inner my_t;",
@@ -696,7 +699,7 @@ TEST(TypeParameterElab, TypeParamPrefixInEveryPlaceMustResolveToAClass) {
     for (const char* use : kUses) {
       SCOPED_TRACE(std::string(place.where) + ": " + use);
       std::string text = place.text;
-      text.replace(text.find('#'), 1, use);
+      text.replace(text.find('%'), 1, use);
       std::string good = kClass + text;
       std::string bad = good;
       good.replace(good.find('@'), 1, "K");
