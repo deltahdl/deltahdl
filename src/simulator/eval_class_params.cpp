@@ -36,7 +36,12 @@ uint32_t SimParamTypeWidth(const DataType& type, const ScopeMap& scope,
   uint32_t width = DeclaredParamTypeWidth(type, scope);
   if (width != 0 || type.kind != DataTypeKind::kNamed) return width;
   std::string key = TypeTableKey(type);
-  if (!IsIntegralType(ctx.FindTypeKind(key))) return 0;
+  // §6.11.1 with §7.2.1: a packed structure or union is integral, so a name
+  // standing for one is sized like a vector's and its value cut to that
+  // width; given no width, a 2-state structure's value kept its x and z.
+  const StructTypeInfo* aggregate = ctx.FindStructType(key);
+  bool packed_aggregate = aggregate != nullptr && aggregate->is_packed;
+  if (!packed_aggregate && !IsIntegralType(ctx.FindTypeKind(key))) return 0;
   uint32_t base = ctx.FindTypeWidth(key);
   uint32_t outer = PackedDimProduct(type, scope);
   return outer > 0 ? base * outer : base;
@@ -107,18 +112,44 @@ static Logic4Vec ParamDefaultValue(const Expr* expr, uint32_t width,
 Logic4Vec ClassParamSizer::Value(std::string_view name, const DataType* type,
                                  const Expr* expr, SimContext& ctx,
                                  Arena& arena) {
-  uint32_t width = 0;
-  if (type != nullptr && type->kind != DataTypeKind::kReal &&
-      type->kind != DataTypeKind::kShortreal &&
-      type->kind != DataTypeKind::kRealtime)
-    width = SimParamTypeWidth(
-        InClassScope(*type, *decl_,
-                     type_scope_.empty() ? decl_->name : type_scope_),
-        scope_, ctx);
+  // §6.20.2: the value is converted to the declared type -- cut or extended
+  // to an integral type's width, each x or z bit taken as 0 for a 2-state
+  // type (§6.11.2), and an integral value made a real for a real type
+  // (§6.12.1), a shortreal's held in 32 bits.
+  DataType scoped;
+  if (type != nullptr && type->kind == DataTypeKind::kNamed &&
+      type->scope_name.empty() && type->packed_dim_left == nullptr) {
+    if (const DataType* bound = TypeParamType(type->type_name)) type = bound;
+  }
+  if (type != nullptr)
+    scoped = InClassScope(*type, *decl_,
+                          type_scope_.empty() ? decl_->name : type_scope_);
+  bool is_real = type != nullptr && DeclaredTypeIsReal(scoped, ctx);
+  uint32_t width =
+      type != nullptr && !is_real ? SimParamTypeWidth(scoped, scope_, ctx) : 0;
   Logic4Vec val = ParamDefaultValue(expr, width, ctx, arena);
+  if (width != 0 && !DeclaredTypeIs4State(scoped, ctx)) CoerceTo2State(val);
+  if (is_real) val = ToDeclaredReal(val, &scoped, ctx, arena);
   if (!name.empty() && !val.is_real)
     scope_[name] = static_cast<int64_t>(val.ToUint64());
   return val;
+}
+
+const DataType* ClassParamSizer::TypeParamType(std::string_view name) const {
+  if (decl_ == nullptr || decl_->type_param_names.count(name) == 0)
+    return nullptr;
+  for (size_t i = 0; i < decl_->params.size(); ++i) {
+    if (decl_->params[i].first != name) continue;
+    const DataType* actual = type_actuals_ == nullptr
+                                 ? nullptr
+                                 : ActualForParam(*type_actuals_, i, name);
+    if (actual == nullptr && i < decl_->param_types.size())
+      actual = &decl_->param_types[i];
+    if (actual == nullptr || actual->kind == DataTypeKind::kImplicit)
+      return nullptr;
+    return actual;
+  }
+  return nullptr;
 }
 
 void ClassParamSizer::Record(size_t i, const Logic4Vec& val) {
@@ -228,6 +259,7 @@ void ApplyClassParamOverrides(std::string_view var_name, uint64_t handle,
   // list leaves at its default keeps the default the construction stored,
   // recorded for the ranges after it.
   ClassParamSizer sizer(obj->type->decl);
+  sizer.UseTypeActuals(actuals);
   for (size_t i = 0; i < params.size(); ++i) {
     // §23.10.2.2 through §8.25: a value actual is matched to its parameter
     // as a type actual is, by the name it was written with or else by its
@@ -267,8 +299,10 @@ void ApplyClassParamOverrides(std::string_view var_name, uint64_t handle,
   // object's own values, `N = W * 2` 8 under `C #(4) c4`, where the class's
   // copy was folded with the declaration's defaults.
   std::string_view cls = obj->type->name;
+  ClassParamSizer body_sizer(obj->type->decl);
+  body_sizer.UseTypeActuals(actuals);
   FoldClassBodyParams(
-      ClassParamSizer(obj->type->decl),
+      body_sizer,
       [obj](std::string_view name) -> const Logic4Vec* {
         auto it = obj->properties.find(std::string(name));
         return it != obj->properties.end() ? &it->second : nullptr;

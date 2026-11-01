@@ -4,6 +4,7 @@
 
 #include "elaborator/elaborator_items_params.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <format>
@@ -285,7 +286,7 @@ void PopulateValueParamInfo(
     const TypedefMap& typedefs, const ScopeMap& scope) {
   pd.decl_type = &item->data_type;
   PopulateParamTypeInfo(pd, item->data_type, typedefs, scope);
-  if (item->unpacked_dims.empty() && IsRealType(item->data_type.kind)) {
+  if (item->unpacked_dims.empty() && pd.decl_is_real) {
     real_param_names.insert(item->name);
   }
 }
@@ -464,6 +465,24 @@ void FoldParamUnpackedBounds(RtlirParamDecl& pd, const ScopeMap& scope) {
   pd.unpacked_bounds = std::move(bounds);
 }
 
+void RecordTypeParamActual(RtlirParamDecl& pd,
+                           const std::vector<RtlirParamDecl>& earlier,
+                           const TypedefMap& typedefs, Arena& arena) {
+  const DataType* dt = pd.decl_type;
+  if (dt == nullptr || dt->kind != DataTypeKind::kNamed ||
+      !dt->scope_name.empty())
+    return;
+  auto names_it = [&](const RtlirParamDecl& p) {
+    return p.is_type_param && p.name == dt->type_name;
+  };
+  auto tp = std::find_if(earlier.rbegin(), earlier.rend(), names_it);
+  if (tp == earlier.rend()) return;
+  auto bound = typedefs.find(dt->type_name);
+  pd.type_param_actual = bound != typedefs.end()
+                             ? arena.Create<DataType>(bound->second)
+                             : tp->resolved_type;
+}
+
 void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
   // §6.23: `localparam type(x) P = -5;` is a value parameter of x's type.
   ResolveTypeRef(item->data_type, item->loc, mod);
@@ -507,6 +526,7 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
   FoldParamUnpackedBounds(pd, kScope);
   if (!is_type) {
     PopulateValueParamInfo(pd, item, real_param_names_, typedefs_, kScope);
+    RecordTypeParamActual(pd, mod->params, typedefs_, arena_);
     // §11.5.1: a select on this parameter names bits by their index in the
     // range it is declared with, so keep the two bounds. They are folded
     // against the parameters already elaborated, which is what a bound written

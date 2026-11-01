@@ -457,16 +457,58 @@ void NegateWords(std::vector<uint64_t>& words) {
   AddWords(words, one);
 }
 
-std::vector<uint64_t> LiteralHighWords(std::string_view text, uint32_t width) {
-  if (width <= 64) return {};
-  auto [digits, base] = LiteralDigits(text);
+static bool g_unknown_digits_as_zero = false;
+
+TwoStateLiteralGuard::TwoStateLiteralGuard(bool on)
+    : prev_(g_unknown_digits_as_zero) {
+  g_unknown_digits_as_zero = on;
+}
+
+TwoStateLiteralGuard::~TwoStateLiteralGuard() {
+  g_unknown_digits_as_zero = prev_;
+}
+
+bool UnknownDigitsReadAsZero() { return g_unknown_digits_as_zero; }
+
+// §5.7.1 sets the bits an x, z or ? digit covers to x or z, which ConstVal
+// cannot spell. Where `unknown_as_zero` says so they are read as 0, the value
+// a 2-state type keeps of them (§6.11.2, §6.20.2), the digits on either side
+// standing in their places; otherwise the digits end at the first such one.
+static bool IsUnknownDigit(char c) {
+  return c == 'x' || c == 'X' || c == 'z' || c == 'Z' || c == '?';
+}
+
+static std::vector<uint64_t> WordsOfDigits(std::string_view digits,
+                                           uint64_t base,
+                                           bool unknown_as_zero) {
   std::vector<uint32_t> halves{0};
   for (char c : digits) {
-    uint64_t d = LiteralDigitValue(c);
+    uint64_t d =
+        unknown_as_zero && IsUnknownDigit(c) ? 0 : LiteralDigitValue(c);
     if (d >= base) break;
     MultiplyAddHalves(halves, base, d);
   }
-  return HighWordsAt(WordsOfHalves(halves), width);
+  return WordsOfHalves(halves);
+}
+
+std::vector<uint64_t> LiteralHighWords(std::string_view text, uint32_t width) {
+  if (width <= 64) return {};
+  auto [digits, base] = LiteralDigits(text);
+  return HighWordsAt(WordsOfDigits(digits, base, g_unknown_digits_as_zero),
+                     width);
+}
+
+std::optional<uint64_t> BasedLiteralLowWord(std::string_view text) {
+  std::string buf = LiteralTextWithoutSeparators(text);
+  size_t tick = buf.find('\'');
+  if (tick == std::string::npos) return std::nullopt;
+  size_t i = tick + 1;
+  if (i < buf.size() && (buf[i] == 's' || buf[i] == 'S')) ++i;
+  if (i >= buf.size()) return std::nullopt;
+  if (std::string_view("bBoOdDhH").find(buf[i]) == std::string_view::npos)
+    return std::nullopt;
+  return WordsOfDigits(std::string_view(buf).substr(i + 1), LiteralBase(buf[i]),
+                       true)[0];
 }
 
 bool ConstValBit(const ConstVal& v, int64_t offset) {

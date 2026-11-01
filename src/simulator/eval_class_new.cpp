@@ -367,6 +367,7 @@ static void InitClassPropertyDefaults(const ClassTypeInfo* info,
     // type (ClassParamSizer), as the class's own copy is (InitClassParams in
     // lowerer_class.cpp).
     ClassParamSizer sizer(info->decl);
+    sizer.UseTypeActuals(info->param_actuals);
     const auto& params = info->decl->params;
     for (size_t i = 0; i < params.size(); ++i) {
       const auto& [pname, pexpr] = params[i];

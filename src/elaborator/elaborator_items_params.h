@@ -12,6 +12,7 @@
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/type_eval.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -162,5 +163,15 @@ std::vector<std::pair<std::string_view, Expr*>> AssignableConfigParams(
 // empty where a dimension does not fold. A parameter among a module's items
 // and a parameter port are folded alike.
 void FoldParamUnpackedBounds(RtlirParamDecl& pd, const ScopeMap& scope);
+
+// §6.20.2 with §6.20.3: sets RtlirParamDecl::type_param_actual where `pd` is
+// declared with the bare name of a type parameter among `earlier`, the
+// parameters of its module already elaborated, to the type `typedefs` binds
+// that name to in this instance, or the type parameter's resolved_type where
+// the table holds no binding. A parameter port and a parameter among a
+// module's items are recorded alike.
+void RecordTypeParamActual(RtlirParamDecl& pd,
+                           const std::vector<RtlirParamDecl>& earlier,
+                           const TypedefMap& typedefs, Arena& arena);
 
 }  // namespace delta

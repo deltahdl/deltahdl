@@ -14,14 +14,17 @@
 #include <algorithm>
 #include <cstdint>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
 
+#include "elaborator/assertion_walk.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/const_eval_internal.h"
+#include "elaborator/elaborator_enum_constants.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "lexer/token.h"
@@ -412,6 +415,56 @@ std::optional<int64_t> EvalConstBits(const Expr* expr, const ScopeMap& scope) {
   return SelfDeterminedBits(expr->args[0], scope);
 }
 
+// The type a typedef name stands for in the typedef table of the scope being
+// elaborated, or null where no table is installed or it holds no such name.
+static const DataType* RegisteredNamedType(const DataType& type) {
+  return g_typedefs == nullptr ? nullptr : FindNamedType(type, *g_typedefs);
+}
+
+// §6.11.2: whether a value of `type` is held in 2 states, a typedef name
+// judged by the type the typedef table of the scope being elaborated has it
+// stand for (§6.18). Null, and a name no table holds, answer false.
+static bool HeldInTwoStates(const DataType* type) {
+  if (type == nullptr) return false;
+  if (type->kind == DataTypeKind::kNamed)
+    return RegisteredNamedType(*type) != nullptr &&
+           !Is4stateType(*type, *g_typedefs);
+  static const TypedefMap kNoTypedefs;
+  return !Is4stateType(*type,
+                       g_typedefs != nullptr ? *g_typedefs : kNoTypedefs);
+}
+
+// §5.7.1 with §11.4: whether every x or z a literal of `expr` writes reaches
+// the value in its own place -- the literal is the value, or an item of a
+// concatenation or replication that is -- so the value holds an unknown bit
+// exactly where a digit wrote one, or a name standing for a parameter whose
+// value does the same. An operator over such a literal or name makes other
+// bits unknown, `4'b1x1x + 1` being all x, so those are not read so.
+static bool ReadsAName(const Expr* expr) {
+  return expr->kind == ExprKind::kIdentifier ||
+         expr->kind == ExprKind::kMemberAccess;
+}
+
+static bool UnknownBitsStayInPlace(const Expr* expr) {
+  if (expr == nullptr) return true;
+  switch (expr->kind) {
+    case ExprKind::kIntegerLiteral:
+    case ExprKind::kUnbasedUnsizedLiteral:
+      return true;
+    case ExprKind::kConcatenation:
+    case ExprKind::kReplicate:
+      return !ExprContainsXZ(expr->repeat_count) &&
+             std::all_of(expr->elements.begin(), expr->elements.end(),
+                         UnknownBitsStayInPlace);
+    case ExprKind::kIdentifier:
+      return true;
+    case ExprKind::kMemberAccess:
+      return !ExprContainsXZ(expr);
+    default:
+      return !ExprContainsXZ(expr) && !AnySubExpr(expr, ReadsAName);
+  }
+}
+
 // Folding a parameter's value expression to size a name that reads it folds
 // the names that expression reads in turn. A value expression naming its own
 // parameter -- which §23.9 makes a self-reference where the name is also an
@@ -442,6 +495,27 @@ static std::optional<ConstVal> RefoldParamValue(const RtlirParamDecl& pd) {
   // refolded at 32 bits and read 0 above bit 64.
   return ConstEvalFull(value_expr, RegisteredModuleScope(),
                        DeclaredFoldContext(pd));
+}
+
+// §6.20.2 with §6.11.2: what a parameter of a 4-state type holding x or z is
+// worth to the value of a parameter of a 2-state type folded under
+// TwoStateLiteralGuard: the fold of its own value expression with those
+// digits read as the 0 bits the 2-state type keeps of them, where they reach
+// the value in their own places. Its ScopeMap value holds the digits up to
+// the first x alone, so `localparam bit [3:0] B = L` under `parameter logic
+// [3:0] L = 4'b1x1x` read 1 where B holds 10. Empty outside such a fold, for
+// a parameter of a 2-state type, whose value is already the one it keeps,
+// and where an operator spreads the unknown bits.
+static std::optional<ConstVal> TwoStateReadingOf(const RtlirParamDecl& pd) {
+  if (!UnknownDigitsReadAsZero()) return std::nullopt;
+  if (HeldInTwoStates(pd.type_param_actual != nullptr ? pd.type_param_actual
+                                                      : pd.decl_type))
+    return std::nullopt;
+  const Expr* value_expr =
+      pd.from_override ? LiteralOverrideExpr(pd) : pd.default_value;
+  if (value_expr == nullptr || !UnknownBitsStayInPlace(value_expr))
+    return std::nullopt;
+  return RefoldParamValue(pd);
 }
 
 // The words above bit 63 a parameter wider than 64 bits reads: the ones the
@@ -507,9 +581,16 @@ std::optional<ConstVal> RegisteredParamValue(std::string_view name,
   std::optional<ConstVal> refold;
   if (!recorded_width || (pd->decl_width > 64 && !recorded_words))
     refold = RefoldParamValue(*pd);
+  auto two_state = TwoStateReadingOf(*pd);
+  if (two_state) {
+    value = two_state->value;
+    refold = two_state;
+  }
   ParamReadWidth rw = ReadWidthOf(*pd, refold);
   ConstVal v = NormalizeConstVal(value, rw.width, rw.is_signed);
-  if (rw.width > 64) v.high_words = HighWordsOfParam(*pd, refold);
+  if (rw.width > 64)
+    v.high_words =
+        two_state ? two_state->high_words : HighWordsOfParam(*pd, refold);
   return v;
 }
 
@@ -538,15 +619,23 @@ static std::optional<int64_t> FoldValueInContext(
 // width and signedness wherever the name is (RegisteredParamValue, the
 // lowerer), and `localparam int H = P[95:64]` over a select of all ones has
 // always held the 0xFFFFFFFF the unsigned select folds to.
-std::optional<int64_t> FoldParamValue(const RtlirParamDecl& pd,
-                                      const Expr* expr, const ScopeMap& scope) {
-  return FoldValueInContext(expr, scope, DeclaredFoldContext(pd), std::nullopt);
+// §6.20.2 with §6.11.2: the value `expr` assigns to a parameter of `type`,
+// folded with a literal's x and z digits as the 0 bits a 2-state type holds
+// of them where they stay in place, and as before otherwise.
+static std::optional<int64_t> FoldConvertedToType(
+    const Expr* expr, const DataType* type, const ScopeMap& scope,
+    FoldContext ctx, std::optional<bool> read_signed) {
+  TwoStateLiteralGuard guard(HeldInTwoStates(type) &&
+                             UnknownBitsStayInPlace(expr));
+  return FoldValueInContext(expr, scope, ctx, read_signed);
 }
 
-// The type a typedef name stands for in the typedef table of the scope being
-// elaborated, or null where no table is installed or it holds no such name.
-static const DataType* RegisteredNamedType(const DataType& type) {
-  return g_typedefs == nullptr ? nullptr : FindNamedType(type, *g_typedefs);
+std::optional<int64_t> FoldParamValue(const RtlirParamDecl& pd,
+                                      const Expr* expr, const ScopeMap& scope) {
+  const DataType* type =
+      pd.type_param_actual != nullptr ? pd.type_param_actual : pd.decl_type;
+  return FoldConvertedToType(expr, type, scope, DeclaredFoldContext(pd),
+                             std::nullopt);
 }
 
 // A typedef name is read through the typedef table of the scope being
@@ -583,8 +672,66 @@ static bool DeclaredParamTypeIsSigned(const DataType& type) {
 std::optional<int64_t> FoldDeclaredParamValue(const Expr* expr,
                                               const DataType& type,
                                               const ScopeMap& scope) {
-  return FoldParamValueAtWidth(expr, scope, DeclaredParamTypeWidth(type, scope),
-                               DeclaredParamTypeIsSigned(type));
+  return FoldConvertedToType(
+      expr, &type, scope,
+      FoldContext{DeclaredParamTypeWidth(type, scope), false},
+      DeclaredParamTypeIsSigned(type));
+}
+
+std::optional<int64_t> TwoStateReading(const Expr* expr, const DataType& type,
+                                       const ScopeMap& scope, int64_t value) {
+  if (HeldInTwoStates(&type) || !UnknownBitsStayInPlace(expr))
+    return std::nullopt;
+  TwoStateLiteralGuard guard(true);
+  auto reading = FoldValueInContext(
+      expr, scope, FoldContext{DeclaredParamTypeWidth(type, scope), false},
+      DeclaredParamTypeIsSigned(type));
+  if (!reading || *reading == value) return std::nullopt;
+  return reading;
+}
+
+// The key a reading is recorded under, which no identifier or qualified name
+// of a scope spells, since an identifier does not begin with `$` (§5.6).
+static std::string TwoStateReadingKey(std::string_view name) {
+  return "$two_state::" + std::string(name);
+}
+
+// A ScopeMap's keys view strings that outlive it, so each key is kept once
+// here, an unordered_set's elements staying where they are as it grows.
+static std::unordered_set<std::string>& TwoStateReadingKeys() {
+  static std::unordered_set<std::string> keys;
+  return keys;
+}
+
+void SetTwoStateReading(ScopeMap& scope, std::string_view name,
+                        std::optional<int64_t> reading) {
+  auto& keys = TwoStateReadingKeys();
+  std::string key = TwoStateReadingKey(name);
+  if (!reading) {
+    scope.erase(key);
+    return;
+  }
+  scope[*keys.insert(std::move(key)).first] = *reading;
+}
+
+void BindDeclaredConstant(ScopeMap& scope, std::string_view name,
+                          int64_t value) {
+  scope[name] = value;
+  if (TwoStateReadingKeys().empty()) return;
+  scope.erase(TwoStateReadingKey(name));
+}
+
+std::optional<int64_t> RecordedTwoStateReading(const ScopeMap& scope,
+                                               std::string_view name) {
+  auto it = scope.find(TwoStateReadingKey(name));
+  if (it == scope.end()) return std::nullopt;
+  return it->second;
+}
+
+std::optional<int64_t> FindTwoStateReading(const ScopeMap& scope,
+                                           std::string_view name) {
+  if (!UnknownDigitsReadAsZero()) return std::nullopt;
+  return RecordedTwoStateReading(scope, name);
 }
 
 std::optional<int64_t> FoldParamValueAtWidth(const Expr* expr,

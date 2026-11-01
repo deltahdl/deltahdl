@@ -1,5 +1,4 @@
 #include <cstdint>
-#include <cstring>
 #include <string>
 #include <string_view>
 
@@ -7,10 +6,12 @@
 #include "common/types.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/rtlir.h"
+#include "parser/ast_expr.h"
 #include "parser/ast_type.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/eval_string.h"
 #include "simulator/evaluation.h"
+#include "simulator/expr_walk.h"
 #include "simulator/lowerer.h"
 #include "simulator/lowerer_register.h"
 #include "simulator/sim_context.h"
@@ -36,7 +37,7 @@ void Lowerer::LowerParams(const RtlirModule* mod) {
         inst_prefix_ + std::string(p.gen_block_prefix) + std::string(p.name));
     // §21.7.2.1: dumped, the parameter is declared with the parameter var_type.
     ctx_.Vcd().MarkVcdParameter(*full);
-    LowerParam(p, *full);
+    LowerParam(*mod, p, *full);
   }
   // §23.10.1 with §23.10.2: the defparams that redefine a parameter of one of
   // this instance's named blocks, read when the block's declaration runs.
@@ -61,8 +62,9 @@ static void CreateParamArray(const RtlirParamDecl& p, std::string_view full,
   var.name = p.name;
   var.width = shape.width;
   var.is_signed = shape.is_signed;
-  var.is_4state = DeclaredTypeIs4State(type, ctx);
-  var.is_real = DeclaredTypeIsReal(type, ctx);
+  const DataType& value_type = *ParamValueType(p);
+  var.is_4state = DeclaredTypeIs4State(value_type, ctx);
+  var.is_real = DeclaredTypeIsReal(value_type, ctx);
   var.dtype = &type;
   var.elem_type_kind = type.kind;
   var.init_expr = p.override_expr == nullptr ? p.default_value : nullptr;
@@ -87,7 +89,22 @@ static void CreateParamArray(const RtlirParamDecl& p, std::string_view full,
   ctx.SetLoweringInstancePrefix(own);
 }
 
-void Lowerer::LowerParam(const RtlirParamDecl& p, std::string_view full) {
+// §6.19: whether `expr` names an enumeration constant `mod` declares, which
+// hides a parameter of that name outside the module but is lowered after the
+// module's parameters, so evaluating `expr` here would read the hidden one.
+static bool NamesOwnEnumConstant(const Expr* expr, const RtlirModule& mod) {
+  bool found = false;
+  ForEachSubExpr(expr, [&](const Expr* e) {
+    if (e->kind != ExprKind::kIdentifier) return;
+    for (const auto& entry : mod.enum_types) {
+      for (const auto& m : entry.second) found = found || m.name == e->text;
+    }
+  });
+  return found;
+}
+
+void Lowerer::LowerParam(const RtlirModule& mod, const RtlirParamDecl& p,
+                         std::string_view full) {
   if (p.is_unbounded) {
     ctx_.RegisterUnboundedParam(full);
     ctx_.CreateVariable(full, 32);
@@ -102,13 +119,12 @@ void Lowerer::LowerParam(const RtlirParamDecl& p, std::string_view full) {
   // the way a real variable is -- the double's bit pattern in 64 bits, marked
   // real and registered as one. Everything that reads a real reads it from
   // that mark, so without it the same 64 bits are taken for the integer they
-  // spell.
+  // spell. §6.12: one declared shortreal is held in a shortreal's 32 bits.
   if (p.is_real_value) {
-    auto* rvar = ctx_.CreateVariable(full, 64);
-    uint64_t bits = 0;
-    std::memcpy(&bits, &p.resolved_real, sizeof(bits));
-    rvar->value = MakeLogic4VecVal(arena_, 64, bits);
-    rvar->value.is_real = true;
+    Logic4Vec real = ToDeclaredReal(MakeRealVec(arena_, p.resolved_real, 64),
+                                    ParamValueType(p), ctx_, arena_);
+    auto* rvar = ctx_.CreateVariable(full, real.width);
+    rvar->value = real;
     rvar->is_real = true;
     ctx_.RegisterRealVariable(full);
     return;
@@ -159,7 +175,10 @@ void Lowerer::LowerParam(const RtlirParamDecl& p, std::string_view full) {
   // §6.20.2: a value wider than 64 bits is re-evaluated whole from its own
   // expression, the folded value holding the low word alone, as is one
   // whose expression holds an x or a z (§5.7.1), which the fold holds as 0.
-  ReevaluateParamValue(p, var, ctx_, arena_);
+  // The elaborator's value stands for an expression of the declaration that
+  // names one of the module's own enumeration constants.
+  if (p.override_expr != nullptr || !NamesOwnEnumConstant(p.default_value, mod))
+    ReevaluateParamValue(p, var, ctx_, arena_);
   // §11.8.2: an operand is sign-extended to the propagated width only when it
   // is signed, so a parameter declared signed, or an untyped one whose final
   // value is (§6.20.2), has to reach evaluation carrying that. Without it

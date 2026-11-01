@@ -205,7 +205,7 @@ std::vector<RtlirEnumMember> BindEnumConstantsOfItem(const ModuleItem* item,
   std::vector<RtlirEnumMember> bound;
   ForEachEnumTypeOfItem(item, [&](std::string_view, const DataType& type) {
     for (const auto& m : FoldEnumMembers(type.enum_members, scope, arena)) {
-      scope[m.name] = m.value;
+      BindDeclaredConstant(scope, m.name, m.value);
       bound.push_back(m);
     }
   });

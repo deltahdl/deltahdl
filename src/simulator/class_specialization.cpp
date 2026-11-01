@@ -335,6 +335,7 @@ std::string SpecializationKey(const ClassTypeInfo* generic,
   // parameter, so one sizer takes the list in header order and records each
   // value for the ranges after it.
   ClassParamSizer sizer(decl);
+  sizer.UseTypeActuals(&spelled);
   std::string key(generic->name);
   key += "#(";
   for (size_t i = 0; i < decl->params.size(); ++i) {
@@ -679,9 +680,10 @@ static ClassTypeInfo* MakeSpecialization(ClassTypeInfo* generic,
   OwnVTableEntries(spec);
   // §6.20.4 with §8.25: the body's parameters are the specialization's too,
   // `C#(4)::N` 8 where the declaration's copy, folded with W's default, is 16.
-  FoldClassBodyParams(ClassParamSizer(generic->decl, generic->name),
-                      ClassStaticLookup(spec), ClassStaticStore(spec), ctx,
-                      arena);
+  ClassParamSizer body_sizer(generic->decl, generic->name);
+  body_sizer.UseTypeActuals(spec->param_actuals);
+  FoldClassBodyParams(body_sizer, ClassStaticLookup(spec),
+                      ClassStaticStore(spec), ctx, arena);
   ctx.RegisterClassType(spec->name, spec);
   // §8.25: a class-scope typedef whose actuals name a type parameter of this
   // class resolves to a type only once the actuals are known, so the aliases

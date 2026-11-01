@@ -222,12 +222,17 @@ struct PackageRegistration {
 // scope (InPackageScope), the key RegisterPackageTypedefs records it under.
 void RegisterOnePackageParam(ModuleItem* item, PackageRegistration& reg) {
   if (item->kind != ModuleItemKind::kParamDecl || !item->init_expr) return;
-  auto val = FoldDeclaredParamValue(
-      item->init_expr, InPackageScope(item->data_type, reg.pkg), reg.values);
+  const DataType kType = InPackageScope(item->data_type, reg.pkg);
+  auto val = FoldDeclaredParamValue(item->init_expr, kType, reg.values);
   if (!val) return;
   RecordPackageConstant(reg.pkg.name, item->name, *val, reg.cu_param_scope,
                         reg.arena);
   reg.values[item->name] = *val;
+  auto reading = TwoStateReading(item->init_expr, kType, reg.values, *val);
+  SetTwoStateReading(reg.values, item->name, reading);
+  SetTwoStateReading(reg.cu_param_scope,
+                     std::string(reg.pkg.name) + "." + std::string(item->name),
+                     reading);
 }
 
 // Records each package's value parameters and enumeration constants in the
@@ -404,6 +409,9 @@ void ClassifyCuScopeItem(ModuleItem* item, CuScope& scope) {
                                       scope.param_scope);
     if (val) {
       scope.param_scope[item->name] = *val;
+      SetTwoStateReading(scope.param_scope, item->name,
+                         TwoStateReading(item->init_expr, item->data_type,
+                                         scope.param_scope, *val));
     }
   }
 }

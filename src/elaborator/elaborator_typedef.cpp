@@ -265,7 +265,7 @@ std::string_view EnumTypeKey(std::string_view decl_name,
 void DeclareEnumType(const DataType& type, std::string_view key, uint32_t width,
                      ScopeMap& scope, const EnumMemberDeclCtx& ctx) {
   auto members = BuildEnumMembers(type, width, ctx);
-  for (const auto& m : members) scope[m.name] = m.value;
+  for (const auto& m : members) BindDeclaredConstant(scope, m.name, m.value);
   ctx.mod->enum_types[key] = std::move(members);
 }
 

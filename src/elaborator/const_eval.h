@@ -234,6 +234,37 @@ std::optional<int64_t> FoldDeclaredParamValue(const Expr* expr,
                                               const DataType& type,
                                               const ScopeMap& scope);
 
+// §6.20.2 with §6.11.2: what a parameter of a 4-state `type` given `expr`,
+// which folded to `value`, is worth to a parameter of a 2-state type whose
+// value names it: `expr` folded with each x, z and ? digit that reaches the
+// value in its own place read as the 0 bits a 2-state type keeps, where
+// `value` holds the digits up to the first such digit alone. Empty for a
+// 2-state `type`, where an operator spreads the unknown bits, and where the
+// reading is `value` itself. Defined in const_eval_bits.cpp.
+std::optional<int64_t> TwoStateReading(const Expr* expr, const DataType& type,
+                                       const ScopeMap& scope, int64_t value);
+
+// Records `reading`, TwoStateReading's answer for the parameter `name`, in
+// `scope` beside the parameter's value, for a fold under a 2-state type to
+// read in place of it; an empty one erases any reading an outer scope's
+// parameter of the same name left there. Defined in const_eval_bits.cpp.
+void SetTwoStateReading(ScopeMap& scope, std::string_view name,
+                        std::optional<int64_t> reading);
+
+// Binds `name` to `value` in `scope` for a declaration that hides any
+// parameter of that name an outer scope holds -- a genvar, an enumeration
+// constant, a local parameter -- and erases the reading SetTwoStateReading
+// recorded for the hidden parameter, which the new name does not carry
+// (§6.20.2 with §6.11.2, §23.9). Defined in const_eval_bits.cpp.
+void BindDeclaredConstant(ScopeMap& scope, std::string_view name,
+                          int64_t value);
+
+// The reading SetTwoStateReading recorded in `scope` for the name or
+// qualified key `name`, or empty where it recorded none, so an import can
+// carry it to the name it binds. Defined in const_eval_bits.cpp.
+std::optional<int64_t> RecordedTwoStateReading(const ScopeMap& scope,
+                                               std::string_view name);
+
 // The same fold at a width and signedness the caller has found for the
 // declared type itself, as the simulator does from the design's type tables
 // for a typedef name no TypedefRegistryGuard resolves; 0 leaves the value

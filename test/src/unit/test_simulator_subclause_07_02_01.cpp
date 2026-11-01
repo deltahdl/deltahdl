@@ -681,4 +681,64 @@ TEST(PackedStructSimulation, ATypedefMembersOwnPackedDimensionsStackOnIt) {
       "9 8 210 1\n");
 }
 
+// §7.2.1: a packed structure written in place is 4-state when any member is,
+// so a function's argument and return value of a structure of logic keep
+// 1x0z, while those of a structure of bit read 1000. Judged by its kind
+// alone, the logic structure was taken as 2-state and read 1000 too.
+TEST(PackedStructSimulation, AnInPlaceStructsStateIsItsMembers) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  function automatic struct packed {logic [3:0] a;} "
+                       "fl(input struct packed {logic [3:0] a;} x);\n"
+                       "    return x;\n"
+                       "  endfunction\n"
+                       "  function automatic struct packed {bit [3:0] a;} "
+                       "fb(input struct packed {bit [3:0] a;} x);\n"
+                       "    return x;\n"
+                       "  endfunction\n"
+                       "  initial $display(\"%b %b\", fl(4'b1x0z), "
+                       "fb(4'b1x0z));\n"
+                       "endmodule\n",
+                       f),
+            "1x0z 1000\n");
+}
+
+// §7.2.1 with §6.18: a member written with a typedef name is as 4-state as
+// the type the name stands for, at compilation-unit or module scope and in
+// a nested structure written in place. A structure whose member's typedef
+// names logic keeps 1x0z; one whose member's typedef names bit reads 1000.
+// Every name was taken as 2-state, so the logic forms read 1000 too.
+TEST(PackedStructSimulation, AnInPlaceStructOfATypedefMemberTakesItsState) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("typedef logic [3:0] n4_t;\n"
+                       "module t;\n"
+                       "  typedef bit [3:0] b4_t;\n"
+                       "  typedef logic [3:0] l4_t;\n"
+                       "  function automatic void fl(struct packed {n4_t a;} "
+                       "s);\n"
+                       "    $display(\"%b\", s);\n"
+                       "  endfunction\n"
+                       "  function automatic void fm(struct packed {l4_t a;} "
+                       "s);\n"
+                       "    $display(\"%b\", s);\n"
+                       "  endfunction\n"
+                       "  function automatic void fb(struct packed {b4_t a;} "
+                       "s);\n"
+                       "    $display(\"%b\", s);\n"
+                       "  endfunction\n"
+                       "  function automatic void fn(struct packed {struct "
+                       "packed {n4_t a;} s;} s);\n"
+                       "    $display(\"%b\", s);\n"
+                       "  endfunction\n"
+                       "  initial begin\n"
+                       "    fl(4'b1x0z);\n"
+                       "    fm(4'bz1x0);\n"
+                       "    fb(4'b1x0z);\n"
+                       "    fn(4'b1x0z);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1x0z\nz1x0\n1000\n1x0z\n");
+}
+
 }  // namespace

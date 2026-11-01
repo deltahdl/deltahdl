@@ -449,6 +449,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/lowerer_register.cpp
     simulator/lowerer_package_enum_constants.cpp
     simulator/lowerer_package_data.cpp
+    simulator/lowerer_package_param.cpp
     simulator/lowerer_unit_nets.cpp
     simulator/lowerer_package_type.cpp
     simulator/lowerer_sequence_monitors.cpp

@@ -124,7 +124,8 @@ class Lowerer {
   void LowerParams(const RtlirModule* mod);
   // §6.20: the storage of the one parameter `p`, keyed under `full`, the name
   // the instance's processes read it by.
-  void LowerParam(const RtlirParamDecl& p, std::string_view full);
+  void LowerParam(const RtlirModule& mod, const RtlirParamDecl& p,
+                  std::string_view full);
   // §27.4 and §27.5 with §23.6: registers each RtlirGenBlockMember of `mod`
   // under the key its path spells below the instance inst_prefix_ names.
   // Defined in lowerer_gen_block_members.cpp.

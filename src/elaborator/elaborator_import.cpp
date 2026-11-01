@@ -68,11 +68,18 @@ void RegisterImportedParam(const ModuleItem* pi, const PackageDecl& pkg,
   auto it = scope.cu_param_scope.find(qualified);
   if (it != scope.cu_param_scope.end()) {
     scope.cu_param_scope[name] = it->second;
+    SetTwoStateReading(
+        scope.cu_param_scope, name,
+        RecordedTwoStateReading(scope.cu_param_scope, qualified));
     return;
   }
-  auto val = FoldDeclaredParamValue(
-      pi->init_expr, InPackageScope(pi->data_type, pkg), scope.cu_param_scope);
-  if (val) scope.cu_param_scope[name] = *val;
+  const DataType kType = InPackageScope(pi->data_type, pkg);
+  auto val = FoldDeclaredParamValue(pi->init_expr, kType, scope.cu_param_scope);
+  if (!val) return;
+  scope.cu_param_scope[name] = *val;
+  SetTwoStateReading(
+      scope.cu_param_scope, name,
+      TwoStateReading(pi->init_expr, kType, scope.cu_param_scope, *val));
 }
 
 // Register a single imported package item into a module's elaboration scopes:

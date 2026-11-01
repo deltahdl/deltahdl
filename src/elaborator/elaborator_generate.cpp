@@ -778,7 +778,7 @@ static bool AdvanceGenerateForGenvar(DiagEngine& diag, const ModuleItem* item,
   std::optional<int64_t> next =
       ComputeGenerateForNextValue(diag, item, loop_scope);
   if (!next) return false;
-  loop_scope[genvar_name] = *next;
+  BindDeclaredConstant(loop_scope, genvar_name, *next);
   return true;
 }
 
@@ -828,7 +828,7 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
   auto genvar_name = opening->genvar_name;
 
   ScopeMap loop_scope = scope;
-  loop_scope[genvar_name] = opening->init_value;
+  BindDeclaredConstant(loop_scope, genvar_name, opening->init_value);
   std::string saved_prefix = gen_prefix_;
   active_loop_genvars_.insert(genvar_name);
 

@@ -115,6 +115,16 @@ static bool PatternItemsConstant(const Expr* e, const ScopeMap& values) {
   });
 }
 
+// §6.20.2 with §6.11.2: what a parameter of a 2-state type whose value names
+// this one reads of it (TwoStateReading), where it is declared with a 4-state
+// `type` and holds x or z, and empty otherwise.
+static std::optional<int64_t> ClassParamTwoStateReading(
+    const Expr* pexpr, const DataType* type, int64_t val,
+    const ScopeMap& values) {
+  if (type == nullptr) return std::nullopt;
+  return TwoStateReading(pexpr, *type, values, val);
+}
+
 // A real value and `$` are checked for being constant and recorded nowhere,
 // since the qualified "Class.name" scope holds integers alone; the simulator
 // reads a real class parameter as a real (ClassParamSizer in
@@ -157,6 +167,9 @@ static void RecordClassParam(std::string_view pname, const Expr* pexpr,
                                               "." + std::string(pname));
   reg.cu_param_scope[*qname] = *val;
   reg.values[pname] = *val;
+  auto reading = ClassParamTwoStateReading(pexpr, type, *val, reg.values);
+  SetTwoStateReading(reg.values, pname, reading);
+  SetTwoStateReading(reg.cu_param_scope, *qname, reading);
 }
 
 // The #() parameter ports live in cls->params; type parameters carry no value

@@ -588,4 +588,261 @@ TEST(ValueParameterSimulation, NestedClassParameterOfItsOwnTypedef) {
             "15\n");
 }
 
+// §6.20.2 with §6.11.2: a parameter of a 2-state type is of that type, so
+// each x or z bit of its value is held as 0, whichever 2-state type it is;
+// the 4-state `logic` beside them keeps its x and z.
+TEST(ValueParameterSimulation, TwoStateModuleParameterTakesXAndZAsZero) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  parameter bit [3:0] P = 4'b1x0z;\n"
+                 "  parameter int I = 'x;\n"
+                 "  parameter byte B = 8'bz1x1_0110;\n"
+                 "  localparam shortint S = 16'hzz12;\n"
+                 "  localparam longint L = 'z;\n"
+                 "  parameter logic [3:0] K = 4'b1x0z;\n"
+                 "  initial $display(\"%b %0d %b %h %0d %b\", P, I, B, S, "
+                 "L, K);\n"
+                 "endmodule\n",
+                 f),
+      "1000 0 01010110 0012 0 1x0z\n");
+}
+
+// The override of a 2-state parameter port is converted as its default is.
+TEST(ValueParameterSimulation, TwoStateParameterPortOverrideTakesXAndZAsZero) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module m #(parameter int W = 7);\n"
+                       "  initial $display(\"%0d\", W);\n"
+                       "endmodule\n"
+                       "module t;\n"
+                       "  m #(.W(32'b1z1x)) u();\n"
+                       "endmodule\n",
+                       f),
+            "10\n");
+}
+
+// §26.2: a package's parameter is converted to its declared type as a
+// module's is, a 2-state type written as a typedef the package declares
+// among them; the `logic` one keeps its x and z.
+TEST(ValueParameterSimulation, TwoStatePackageParameterTakesXAndZAsZero) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package pk;\n"
+                       "  typedef bit [3:0] pn_t;\n"
+                       "  parameter bit [3:0] PP = 4'b1x0z;\n"
+                       "  parameter int PI = 'z;\n"
+                       "  parameter pn_t PN = 4'bx1z1;\n"
+                       "  parameter logic [3:0] PL = 4'b1x0z;\n"
+                       "endpackage\n"
+                       "module t;\n"
+                       "  initial $display(\"%b %0d %b %b\", pk::PP, pk::PI, "
+                       "pk::PN, pk::PL);\n"
+                       "endmodule\n",
+                       f),
+            "1000 0 0101 1x0z\n");
+}
+
+// §3.12.1: the compilation unit's parameters are stored as a package's are.
+TEST(ValueParameterSimulation, TwoStateCompilationUnitParameterTakesZero) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("parameter bit [3:0] CU = 4'bz1x1;\n"
+                       "parameter logic [3:0] CL = 4'bz1x1;\n"
+                       "module t;\n"
+                       "  initial $display(\"%b %b\", CU, CL);\n"
+                       "endmodule\n",
+                       f),
+            "0101 z1x1\n");
+}
+
+// §8.25: a class's parameter port, its body parameter and a port of a
+// typedef type are converted to their 2-state types, read through the class
+// scope and through an object; the `logic` body parameter keeps x and z.
+TEST(ValueParameterSimulation, TwoStateClassParameterTakesXAndZAsZero) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("typedef bit [3:0] nib_t;\n"
+                       "class C #(parameter int CI = 'x, nib_t CN = 4'b1xx1);\n"
+                       "  parameter bit [7:0] CB = 8'hx5;\n"
+                       "  parameter logic [3:0] CL = 4'b1x0z;\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  C h;\n"
+                       "  initial begin\n"
+                       "    h = new;\n"
+                       "    $display(\"%0d %b %b %b %b\", C#()::CI, C#()::CN, "
+                       "C#()::CB, C#()::CL, h.CN);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "0 1001 00000101 1x0z 1001\n");
+}
+
+// §8.25.1: `C#(actual)::P` names the parameter of that specialization, whose
+// actual is converted to the declared type as an object's is: cut or
+// extended to the type's width, and x and z taken as 0 for a 2-state type.
+TEST(ValueParameterSimulation, SpecializationActualIsConvertedToItsType) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class C #(parameter int CI = 1, bit [3:0] CN = 3);\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  initial $display(\"%0d %0d %b %b\", C#(4'bxx11)::CI, "
+                       "$bits(C#(4'b0011)::CI), C#(1, 8'hfe)::CN, "
+                       "C#(.CN(4'bz1x1))::CN);\n"
+                       "endmodule\n",
+                       f),
+            "3 32 1110 0101\n");
+}
+
+// §6.20.2 holds for a parameter wherever it is written: an interface's and
+// a generate block's 2-state parameters are converted too.
+TEST(ValueParameterSimulation, TwoStateInterfaceAndGenerateParametersTakeZero) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("interface ifc;\n"
+                       "  parameter int II = 32'hxxxx_0003;\n"
+                       "endinterface\n"
+                       "module t;\n"
+                       "  ifc i();\n"
+                       "  if (1) begin : g\n"
+                       "    parameter bit [3:0] GP = 4'b1x1x;\n"
+                       "  end\n"
+                       "  initial $display(\"%h %b\", i.II, g.GP);\n"
+                       "endmodule\n",
+                       f),
+            "00000003 1010\n");
+}
+
+// A program's 2-state parameter, the remaining place one is written.
+TEST(ValueParameterSimulation, TwoStateProgramParameterTakesXAndZAsZero) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("program pg;\n"
+                       "  parameter byte PB = 8'bzzzz_1111;\n"
+                       "  initial $display(\"%b\", PB);\n"
+                       "endprogram\n"
+                       "module t;\n"
+                       "  pg p();\n"
+                       "endmodule\n",
+                       f),
+            "00001111\n");
+}
+
+// §6.11.1: `time` is a 64-bit unsigned type, so a parameter of it is 64 bits,
+// -1 reads as 2**64-1 rather than -1, and a real is rounded (§6.12.1).
+TEST(ValueParameterSimulation, TimeParameterIsSixtyFourUnsignedBits) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  parameter time T = 5;\n"
+                 "  parameter time N = -1;\n"
+                 "  parameter time R = 2.6;\n"
+                 "  initial $display(\"%0d %0d %0d %0d %0d\", T, $bits(T), "
+                 "N, R, N > 0);\n"
+                 "endmodule\n",
+                 f),
+      "5 64 18446744073709551615 3 1\n");
+}
+
+// §6.12: a shortreal is single precision, so a shortreal parameter holds 32
+// bits and the binary32 nearest its value -- 0.1 reads 0.100000001490 and
+// 16777217 reads 16777216 -- while an integral value is made a real.
+TEST(ValueParameterSimulation, ShortrealParameterHoldsASinglePrecisionValue) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  parameter shortreal S = 1.5;\n"
+                       "  parameter shortreal M = 0.1;\n"
+                       "  localparam shortreal L = 16777217;\n"
+                       "  parameter shortreal I = 7;\n"
+                       "  initial $display(\"%g %0d %.12f %.1f %g\", S, "
+                       "$bits(S), M, L, I / 4);\n"
+                       "endmodule\n",
+                       f),
+            "1.5 32 0.100000001490 16777216.0 1.75\n");
+}
+
+// The parameter port form, its override converted to shortreal as well.
+TEST(ValueParameterSimulation,
+     ShortrealParameterPortOverrideIsSinglePrecision) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module m #(parameter shortreal R = 1.0);\n"
+                       "  initial $display(\"%.12f %0d\", R, $bits(R));\n"
+                       "endmodule\n"
+                       "module t;\n"
+                       "  m #(.R(0.1)) u();\n"
+                       "endmodule\n",
+                       f),
+            "0.100000001490 32\n");
+}
+
+// A package's, a class port's and a class body's shortreal parameters.
+TEST(ValueParameterSimulation, ShortrealPackageAndClassParameters) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package pk;\n"
+                       "  parameter shortreal PS = 0.1;\n"
+                       "endpackage\n"
+                       "class C #(shortreal CS = 0.1);\n"
+                       "  localparam shortreal LS = 0.1;\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  initial $display(\"%.12f %0d %.12f %0d %.12f\", "
+                       "pk::PS, $bits(pk::PS), C#()::CS, $bits(C#()::CS), "
+                       "C#()::LS);\n"
+                       "endmodule\n",
+                       f),
+            "0.100000001490 32 0.100000001490 32 0.100000001490\n");
+}
+
+// §6.18: a typedef naming shortreal gives a parameter its type, in a module,
+// a package and a class alike.
+TEST(ValueParameterSimulation, ShortrealTypedefParameterIsSinglePrecision) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("typedef shortreal sr_t;\n"
+                       "package pk;\n"
+                       "  typedef shortreal psr_t;\n"
+                       "  parameter psr_t PS = 0.1;\n"
+                       "endpackage\n"
+                       "class C #(sr_t CS = 0.1);\n"
+                       "endclass\n"
+                       "module t #(parameter sr_t P = 0.1);\n"
+                       "  initial $display(\"%.12f %0d %.12f %0d %.12f\", P, "
+                       "$bits(P), pk::PS, $bits(pk::PS), C#()::CS);\n"
+                       "endmodule\n",
+                       f),
+            "0.100000001490 32 0.100000001490 32 0.100000001490\n");
+}
+
+// §6.12.1: a real-typed parameter given an integral value holds it as a real,
+// so it divides as one -- in a package and in a class's port and body.
+TEST(ValueParameterSimulation,
+     RealPackageAndClassParametersOfAnIntegerAreReal) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("package pk;\n"
+                 "  parameter real PR = 7;\n"
+                 "  parameter shortreal PS = 7;\n"
+                 "endpackage\n"
+                 "class C #(real CR = 7, shortreal CS = 7);\n"
+                 "  localparam real LR = 7;\n"
+                 "endclass\n"
+                 "module t;\n"
+                 "  initial $display(\"%g %g %g %g %g\", pk::PR / 2, "
+                 "pk::PS / 2, C#()::CR / 2, C#()::CS / 2, C#()::LR / 2);\n"
+                 "endmodule\n",
+                 f),
+      "3.5 3.5 3.5 3.5 3.5\n");
+}
+
+// §6.18: a module parameter of a typedef naming real is real, its fraction
+// kept, an integral default made a real and an integral override too.
+TEST(ValueParameterSimulation, RealTypedefModuleParameterIsReal) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("typedef real r_t;\n"
+                       "module m #(parameter r_t Q = 2.5);\n"
+                       "  parameter r_t R = 7;\n"
+                       "  initial $display(\"%g %g %0d\", Q / 2, R / 2, "
+                       "$bits(Q));\n"
+                       "endmodule\n"
+                       "module t;\n"
+                       "  m #(.Q(5)) u();\n"
+                       "endmodule\n",
+                       f),
+            "2.5 3.5 64\n");
+}
+
 }  // namespace

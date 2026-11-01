@@ -27,6 +27,7 @@
 #include "simulator/covergroup_instance.h"
 #include "simulator/dpi_formal_type.h"
 #include "simulator/dpi_runtime.h"
+#include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/expr_walk.h"
 #include "simulator/lowerer.h"
@@ -189,6 +190,25 @@ static bool HoldsXZLiteral(const Expr* expr) {
   return found;
 }
 
+// §6.20.2: whether `expr` names a parameter whose storage holds an x or a z,
+// `localparam logic [3:0] M = L` under `parameter logic [3:0] L = 4'b1x1x`.
+// The elaborator's fold holds no unknown bit, so the value it made of such a
+// name is not the one the name has.
+static bool NamesAnUnknownValue(const Expr* expr, SimContext& ctx) {
+  bool found = false;
+  ForEachSubExpr(expr, [&](const Expr* e) {
+    if (e->kind != ExprKind::kIdentifier) return;
+    const Variable* v = ctx.FindVariable(e->text);
+    if (v != nullptr && HasUnknownBits(v->value)) found = true;
+  });
+  return found;
+}
+
+const DataType* ParamValueType(const RtlirParamDecl& param) {
+  return param.type_param_actual != nullptr ? param.type_param_actual
+                                            : param.decl_type;
+}
+
 void ReevaluateParamValue(const RtlirParamDecl& param, Variable* var,
                           SimContext& ctx, Arena& arena) {
   uint32_t width = var->value.width;
@@ -205,19 +225,26 @@ void ReevaluateParamValue(const RtlirParamDecl& param, Variable* var,
   // An expression constant evaluation left unfolded -- a select reaching
   // outside its vector (§11.5.1), whose x the fold cannot hold -- is evaluated
   // here too, where the operands' state sets are known.
-  if (width <= 64 && param.is_resolved && !HoldsXZLiteral(expr)) return;
+  // A name standing for a value with an x or a z is read the same way, in
+  // the scope the expression is written in.
   std::string own = ctx.ActiveInstancePrefix();
   if (param.override_expr != nullptr)
     ctx.SetLoweringInstancePrefix(ctx.InstantiatingPrefix(own));
-  if (EveryNameHasStorage(expr, ctx)) {
+  bool folded = width <= 64 && param.is_resolved && !HoldsXZLiteral(expr) &&
+                !NamesAnUnknownValue(expr, ctx);
+  if (!folded && EveryNameHasStorage(expr, ctx)) {
     // §11.6.1 with §6.20.2: the value is sized to the declaration as an
     // assignment to it is. The words are copied because an expression that is
     // a bare parameter name answers that parameter's own storage.
     Logic4Vec value = EvalExpr(expr, ctx, arena, width);
     var->value = OwnRhsWords(ResizeToWidth(value, width, arena), arena);
     // §6.11.2: a parameter of a 2-state type stores an unknown bit its value
-    // has, `$size` of a dimension the operand lacks (§20.7), as 0.
-    if (param.decl_type != nullptr && !Is4stateType(param.decl_type->kind))
+    // has, `$size` of a dimension the operand lacks (§20.7), as 0. A typedef
+    // name is judged by the type it stands for (§6.18), so one naming a
+    // 4-state type, `typedef logic [3:0] n4_t`, keeps x and z, and a type
+    // parameter's name by the type it has in the instance (§6.20.3).
+    const DataType* type = ParamValueType(param);
+    if (type != nullptr && !DeclaredTypeIs4State(*type, ctx))
       CoerceTo2State(var->value);
   }
   ctx.SetLoweringInstancePrefix(own);

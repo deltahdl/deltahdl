@@ -30,6 +30,7 @@
 #include "simulator/eval_mailbox.h"
 #include "simulator/eval_semaphore.h"
 #include "simulator/evaluation.h"
+#include "simulator/lowerer_package_param.h"
 #include "simulator/lowerer_register.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
@@ -129,48 +130,6 @@ constexpr std::string_view kUnitScope = "$unit";
 static std::string PackageDataKey(const ModuleItem* item,
                                   std::string_view pkg) {
   return std::string(pkg) + "." + std::string(item->name);
-}
-
-// §6.20.2 (printed pages 126-127): whether a parameter's declaration fixes
-// its width -- by a range or a type other than the implicit one, as
-// HasDeclaredWidth (src/elaborator/const_eval_bits.cpp) reads it off a
-// module's RtlirParamDecl -- and not by a real, shortreal or realtime type,
-// whose value is a real that no vector width sizes (§6.12). One declared with
-// neither takes the width of its value.
-static bool ParamDeclaresAWidth(const ModuleItem* item) {
-  const DataType& type = item->data_type;
-  if (type.packed_dim_left == nullptr && type.kind == DataTypeKind::kImplicit)
-    return false;
-  return type.kind != DataTypeKind::kReal &&
-         type.kind != DataTypeKind::kShortreal &&
-         type.kind != DataTypeKind::kRealtime;
-}
-
-// The width a parameter's declaration fixes as far as it folds with no name
-// in scope, for the storage created before any parameter holds a value; 0
-// where the declaration fixes none or a range's bound names a parameter, the
-// storage then taking 32 bits until the initializer's own width replaces it
-// (InitPackageParam).
-static uint32_t DeclaredParamStorageWidth(const ModuleItem* item,
-                                          SimContext& ctx) {
-  if (!ParamDeclaresAWidth(item)) return 0;
-  const DataType& type = item->data_type;
-  if (type.packed_dim_left != nullptr) return PackedDimProduct(type);
-  return DeclaredTypeWidth(type, ctx);
-}
-
-// The width a parameter's declaration fixes, its range evaluated in the
-// package's frame where §6.20.1 lets a bound name an earlier parameter --
-// `logic [N-1:0] M` after `int N = 12` is twelve bits -- and 0 where the
-// declaration fixes none. Folded with no parameter in scope, `[N-1:0]` fell
-// to the base type's one bit and M held a single bit.
-static uint32_t DeclaredParamWidth(const ModuleItem* item, SimContext& ctx,
-                                   Arena& arena) {
-  if (!ParamDeclaresAWidth(item)) return 0;
-  const DataType& type = item->data_type;
-  if (type.packed_dim_left != nullptr)
-    return EvalFormalArgWidth(type, ctx, arena);
-  return DeclaredTypeWidth(type, ctx);
 }
 
 // The width of a data item's storage: a variable's declared type's, a
@@ -556,11 +515,12 @@ static std::string_view CreatePackageDataItem(const ModuleItem* item,
   RegisterPackageDataEnumType(item, pkg, *qname, ctx);
   // §21.7.2.1: a package's parameter, dumped, is declared parameter as a
   // module's is (Lowerer::LowerParams).
+  ShapePackageVariable(item, var, *qname, ctx, arena);
   if (item->kind != ModuleItemKind::kVarDecl) {
     ctx.Vcd().MarkVcdParameter(*qname);
+    CreatePackageAggregate(item, pkg, *qname, ctx, arena);
     return *qname;
   }
-  ShapePackageVariable(item, var, *qname, ctx, arena);
   RegisterPackageDataLayout(item, pkg, *qname, ctx, arena);
   RecordPackageVcdKind(item, *var, *qname, ctx);
   // §7.2.2 with §26.3: a package's structure variable with no initializer
@@ -762,40 +722,10 @@ static void InitPackageCarrier(const Expr* init, std::string_view key,
   const uint32_t kWidth = var->value.width;
   bool sized = !var->is_real && !var->is_event && !ctx.IsStringVariable(key);
   Logic4Vec value = EvalExpr(init, ctx, arena, sized ? kWidth : 0);
-  if (sized) {
-    if (value.is_real)
-      value = ConvertRealForKnownLhs(value, false, kWidth, arena);
-    value = OwnRhsWords(ResizeToWidth(value, kWidth, arena), arena);
-    if (!var->is_4state) CoerceTo2State(value);
-    value.is_signed = var->is_signed;
-  }
-  var->value = value;
+  var->value = sized ? HeldAtWidth(value, kWidth, *var, arena) : value;
   if (init->kind != ExprKind::kTagged || init->rhs == nullptr) return;
   ctx.SetVariableTag(*arena.Create<std::string>(std::string(key)),
                      init->rhs->text);
-}
-
-// §6.20.2 (printed pages 126-127) with §11.6.1 (printed 299): a parameter
-// declared with a range or a type keeps that range whatever its value, and
-// its initializer is the right-hand side of an assignment to it, so the
-// value is evaluated at the declared width -- an unbased unsized literal
-// filling it (§5.7.1), a narrower operand extended to it -- and cut or
-// extended to that width, as Lowerer::LowerParams with ReevaluateParamValue
-// (lowerer_register.cpp) size a module's. A parameter declared with neither
-// takes the range of its value, which is its self-determined evaluation. The
-// words are copied because an initializer that is a bare name answers that
-// name's own storage. Evaluated self-determined and stored whole whatever
-// the declaration said, `parameter logic [11:0] W = '1` held the literal's
-// 64-bit carrier and `p::W` read 18446744073709551615 for 4095.
-static void InitPackageParam(const ModuleItem* item, Variable* var,
-                             SimContext& ctx, Arena& arena) {
-  uint32_t width = DeclaredParamWidth(item, ctx, arena);
-  if (width == 0) {
-    var->value = EvalExpr(item->init_expr, ctx, arena);
-    return;
-  }
-  Logic4Vec value = EvalExpr(item->init_expr, ctx, arena, width);
-  var->value = OwnRhsWords(ResizeToWidth(value, width, arena), arena);
 }
 
 // One data item's initializer, evaluated into the storage
@@ -823,7 +753,8 @@ static void InitPackageDataItem(const ModuleItem* item, std::string_view pkg,
   auto found = variables.find(key);
   if (found == variables.end()) return;
   if (item->kind == ModuleItemKind::kParamDecl) {
-    InitPackageParam(item, found->second, ctx, arena);
+    InitPackageParam(WithPackageOwnType(item, pkg, ctx, arena), found->second,
+                     ctx, arena);
     return;
   }
   InitPackageCarrier(item->init_expr, key, found->second, ctx, arena);

@@ -74,6 +74,13 @@ bool DeclaredTypeIsString(const DataType& type, const SimContext& ctx);
 // question about a string.
 bool DeclaredTypeIsReal(const DataType& type, const SimContext& ctx);
 
+// §6.20.2 with §6.12.1: `value` as a parameter declared with `type` holds it
+// where `type` is or names a real type -- an integral value converted to a
+// real, held in a shortreal's 32 bits (§6.12) or a real's or realtime's 64 --
+// and `value` unchanged where `type` is null or no real type.
+Logic4Vec ToDeclaredReal(const Logic4Vec& value, const DataType* type,
+                         SimContext& ctx, Arena& arena);
+
 // §6.11.1/§6.18: whether the declared type is signed, resolving a typedef name
 // through the elaborated table. Defined in evaluation_literal.cpp beside
 // DeclaredTypeWidth and DeclaredTypeIsString, the other two facts a declaration

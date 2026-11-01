@@ -105,6 +105,7 @@ bool HasParamPortWithoutDefault(const ModuleDecl* decl) {
 void PopulateParamTypeInfo(RtlirParamDecl& pd, const DataType& dtype) {
   pd.has_decl_range = dtype.packed_dim_left != nullptr;
   pd.decl_is_real = IsRealType(dtype.kind);
+  pd.decl_is_shortreal = dtype.kind == DataTypeKind::kShortreal;
   pd.has_decl_type = dtype.kind != DataTypeKind::kImplicit || dtype.is_signed;
   pd.decl_is_signed = dtype.is_signed;
   pd.decl_type_implicit = dtype.kind == DataTypeKind::kImplicit;
@@ -113,10 +114,16 @@ void PopulateParamTypeInfo(RtlirParamDecl& pd, const DataType& dtype) {
   }
 }
 
+// §6.20.2 with §6.18: a parameter declared with a typedef name standing for
+// a real type, `typedef shortreal sr_t; parameter sr_t P = 0.1`, is of that
+// real type, so the name is followed through `typedefs` to the type it ends
+// at; read off the name alone, P was folded as an integer and held 0.
 void PopulateParamTypeInfo(RtlirParamDecl& pd, const DataType& dtype,
                            const TypedefMap& typedefs, const ScopeMap& scope) {
   pd.has_decl_range = dtype.packed_dim_left != nullptr;
-  pd.decl_is_real = IsRealType(dtype.kind);
+  DataTypeKind kind = ResolvedTypeKind(dtype, typedefs);
+  pd.decl_is_real = IsRealType(kind);
+  pd.decl_is_shortreal = kind == DataTypeKind::kShortreal;
   pd.has_decl_type = dtype.kind != DataTypeKind::kImplicit || dtype.is_signed;
   pd.decl_is_signed = dtype.is_signed;
   pd.decl_type_implicit = dtype.kind == DataTypeKind::kImplicit;
@@ -141,7 +148,8 @@ bool ParamExpectsIntegerValue(const RtlirParamDecl& pd, const DataType& dtype) {
   // real-to-integer conversion of §6.12.1 — when it carries a packed range or
   // an explicit non-real data type. A bare (untyped) parameter or one declared
   // real takes a real value instead and is not converted here.
-  return pd.has_decl_range || (pd.has_decl_type && !IsRealType(dtype.kind));
+  return pd.has_decl_range ||
+         (pd.has_decl_type && !IsRealType(dtype.kind) && !pd.decl_is_real);
 }
 
 // §6.20.2 (printed page 126): a parameter declared with neither type nor
@@ -158,13 +166,23 @@ static bool TakesRealFromValue(const RtlirParamDecl& pd, const Expr* init,
          !pd.has_decl_type && HasRealOperand(init);
 }
 
+// §6.12: a shortreal holds a single-precision value, so a parameter of that
+// type keeps its value rounded to one, and a constant derived from it reads
+// the rounded value: `localparam real D = S` under `parameter shortreal S =
+// 0.1` is 0.100000001490116, and `S == 0.1` is false.
+static double HeldAsDeclaredReal(const RtlirParamDecl& pd, double value) {
+  return pd.decl_is_shortreal ? static_cast<double>(static_cast<float>(value))
+                              : value;
+}
+
 bool TryFoldRealParamValue(RtlirParamDecl& pd, const Expr* init,
                            const DataType& dtype, const ScopeMap& scope) {
-  if (!IsRealType(dtype.kind) && !TakesRealFromValue(pd, init, dtype))
+  if (!IsRealType(dtype.kind) && !pd.decl_is_real &&
+      !TakesRealFromValue(pd, init, dtype))
     return false;
   auto rval = ConstEvalReal(init, scope);
   if (!rval) return false;
-  pd.resolved_real = *rval;
+  pd.resolved_real = HeldAsDeclaredReal(pd, *rval);
   pd.is_real_value = true;
   pd.is_resolved = true;
   return true;
@@ -218,10 +236,11 @@ int64_t RoundRealToInteger(double value) { return std::llround(value); }
 void ApplyOverrideRealness(RtlirParamDecl& pd, std::optional<double> real) {
   bool untyped = !pd.has_decl_range && !pd.has_decl_type;
   if (real && (pd.decl_is_real || untyped)) {
-    pd.resolved_real = *real;
+    pd.resolved_real = HeldAsDeclaredReal(pd, *real);
     pd.is_real_value = true;
   } else if (pd.decl_is_real) {
-    pd.resolved_real = static_cast<double>(pd.resolved_value);
+    pd.resolved_real =
+        HeldAsDeclaredReal(pd, static_cast<double>(pd.resolved_value));
     pd.is_real_value = true;
   } else {
     pd.is_real_value = false;
@@ -494,8 +513,7 @@ static RtlirParamDecl BuildParamDeclShell(const ModuleDecl* decl, size_t i,
     pd.decl_type = &decl->param_types[i];
     PopulateParamTypeInfo(pd, decl->param_types[i], ctx.typedefs, ctx.scope);
     RecordParamDeclRange(pd, decl->param_types[i], ctx.scope);
-    if (IsRealType(decl->param_types[i].kind))
-      ctx.real_param_names.insert(pname);
+    if (pd.decl_is_real) ctx.real_param_names.insert(pname);
   }
   return pd;
 }
@@ -556,6 +574,7 @@ void Elaborator::ElaborateParamPortList(const ModuleDecl* decl,
     RtlirParamDecl pd = BuildParamDeclShell(
         decl, i, {typedefs_, scope, real_param_names_, kWrittenTypes, arena_},
         has_param_type);
+    RecordTypeParamActual(pd, mod->params, typedefs_, arena_);
     const DataType* param_type =
         has_param_type ? &decl->param_types[i] : nullptr;
     ApplyParamOverride(pd, kAssigns, pname, param_type, arena_);

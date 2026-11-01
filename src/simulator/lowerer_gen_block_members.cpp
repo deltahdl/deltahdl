@@ -42,7 +42,7 @@ void Lowerer::RegisterGenBlockMembers(const RtlirModule* mod) {
         break;
       }
       case RtlirGenBlockMember::Kind::kParam:
-        LowerParam(mod->params[member.param_index], *key);
+        LowerParam(*mod, mod->params[member.param_index], *key);
         break;
       case RtlirGenBlockMember::Kind::kIndex: {
         Variable* var = ctx_.CreateVariable(*key, 32);

@@ -357,10 +357,19 @@ ConstVal NormalizeConstVal(int64_t value, uint32_t width, bool is_signed) {
 // width, and the digits can reach past the 64 bits Expr::int_val holds -- the
 // low 64 bits, since ed521261c. The bits above them are read from the digits
 // again here (LiteralHighWords), so a select, a shift or a bitwise operator
-// on a 96-bit literal sees the whole of it.
+// on a 96-bit literal sees the whole of it. ConstVal spells no x or z, so
+// the digits are read only up to the first x, z or ? digit, as Expr::int_val
+// holds them, except while a value assigned to a parameter of a 2-state type
+// is folded (TwoStateLiteralGuard): that type holds each such digit's bits as
+// 0 (§6.11.2, §6.20.2), so `parameter bit [3:0] P = 4'b1x1x` folds to 10
+// (BasedLiteralLowWord). Read as 0 elsewhere, `4'b1x1x === 4'b1010` folded
+// true in a 4-state context.
 std::optional<ConstVal> ConstEvalLiteral(const Expr* expr) {
   uint32_t width = ConstLiteralWidth(expr);
-  ConstVal v = NormalizeConstVal(static_cast<int64_t>(expr->int_val), width,
+  uint64_t low = expr->int_val;
+  if (UnknownDigitsReadAsZero())
+    low = BasedLiteralLowWord(expr->text).value_or(low);
+  ConstVal v = NormalizeConstVal(static_cast<int64_t>(low), width,
                                  IsSignedLiteral(expr->text));
   v.high_words = LiteralHighWords(expr->text, width);
   return v;

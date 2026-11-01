@@ -321,6 +321,7 @@ void BindClassParams(const ClassTypeInfo* cls, const Expr* base_id,
   // §8.25 with §6.20.2: the actual or the default is sized by the
   // parameter's declared type (ClassParamSizer).
   ClassParamSizer sizer(cls->decl);
+  sizer.UseTypeActuals(cls->param_actuals);
   for (size_t i = 0; i < params.size(); ++i) {
     // §6.20.1: a local would shadow a port array's element storage.
     if (cls->decl->param_port_unpacked_dims.count(params[i].first)) continue;

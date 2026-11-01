@@ -467,4 +467,45 @@ TEST(TypedefParameterType, NestedClassParameterOfItsOwnTypedefIsCut) {
   EXPECT_EQ(ParamValue(design, "Q"), 15);
 }
 
+// §6.20.2 with §6.11.1: a parameter of type `time` is of that type, 64 bits
+// and unsigned.
+TEST(TypedParameterSign, TimeParameterIsSixtyFourUnsignedBits) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam time T = -1;\n"
+      "  localparam int BT = $bits(T);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ParamValue(design, "BT"), 64);
+  const auto* t = FindParam(design, "m", "T");
+  ASSERT_NE(t, nullptr);
+  EXPECT_EQ(t->decl_width, 64u);
+  EXPECT_FALSE(t->decl_is_signed);
+}
+
+// §6.20.2 with §6.18: a parameter declared with a typedef naming shortreal
+// or real is of that real type, so 2.75 is held as a real; folded as the
+// integer the name was taken for, it was 3.
+TEST(TypedefParameterType, ParameterOfARealTypedefIsReal) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "typedef shortreal sr_t;\n"
+      "typedef real r_t;\n"
+      "module m #(parameter sr_t P = 2.75);\n"
+      "  localparam r_t Q = 2.75;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  for (const char* name : {"P", "Q"}) {
+    const auto* p = FindParam(design, "m", name);
+    ASSERT_NE(p, nullptr) << name;
+    EXPECT_TRUE(p->is_real_value) << name;
+    EXPECT_DOUBLE_EQ(p->resolved_real, 2.75) << name;
+  }
+}
+
 }  // namespace

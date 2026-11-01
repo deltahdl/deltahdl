@@ -602,6 +602,19 @@ struct RtlirParamDecl {
   // refold at a range a later defparam gives; null while no instance set one.
   std::unordered_map<std::string_view, int64_t> override_scope;
   const struct RtlirModule* override_module = nullptr;
+  // §6.20.2 with §6.20.3: for a value parameter whose decl_type is the name
+  // of a type parameter of its own module, `type T = int, T P = 'x`, the type
+  // that type parameter has in this instance, its default or the actual the
+  // instance gave it; null for any other parameter. The parameter's value is
+  // of this type, which the name alone does not say outside elaboration, so
+  // its state and whether it is a shortreal or a real are read off it. The
+  // arena owns it.
+  const DataType* type_param_actual = nullptr;
+  // §6.20.2 with §6.12: the parameter was declared shortreal, or with a
+  // typedef name or a type parameter standing for shortreal, so every value
+  // it takes is single precision; resolved_real holds that value widened,
+  // which is what a constant derived from the parameter reads.
+  bool decl_is_shortreal = false;
 };
 
 struct RtlirPortBinding {

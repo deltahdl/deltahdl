@@ -1,4 +1,5 @@
 #include <cstddef>
+#include <cstdint>
 #include <optional>
 #include <string_view>
 #include <unordered_map>
@@ -57,6 +58,19 @@ static SpecializationArg NamedParamOverride(const Expr& base,
   return {};
 }
 
+// The expression the specialization's argument list writes for the i-th
+// header parameter, `pname`, named or ordered, or null where it writes none.
+static const Expr* WrittenParamActual(const Expr& base, std::string_view pname,
+                                      size_t pos) {
+  const auto& elems = base.elements;
+  const auto& names = base.arg_names;
+  for (size_t j = 0; j < elems.size(); ++j) {
+    if (j < names.size() && names[j] == pname) return elems[j];
+  }
+  bool ordered = names.empty() || (pos < names.size() && names[pos].empty());
+  return ordered && pos < elems.size() ? elems[pos] : nullptr;
+}
+
 // An ordered override, the argument occupying the parameter's own port
 // position. Only an argument list that is ordered at that position qualifies.
 static SpecializationArg OrderedParamOverride(const Expr& base, size_t pos,
@@ -85,14 +99,28 @@ static std::optional<ConstVal> FoldClassParamDefault(const Expr* pexpr,
 
 // The value `values` gives a parameter from what one fold answered: the
 // value where it folded, and nothing where it did not, so that a name the
-// caller's scope happens to hold is not read in its place.
+// caller's scope happens to hold is not read in its place. Beside it, what a
+// parameter of a 2-state type reads of it (TwoStateReading), the fold of
+// `source`, the expression that gave the value, over `source_scope`, where
+// the parameter is declared with a 4-state `type` and holds x or z.
+struct BoundSource {
+  const Expr* source;
+  const DataType* type;
+  const ScopeMap& source_scope;
+};
+
 static void Bind(ScopeMap& values, std::string_view name,
-                 const std::optional<ConstVal>& v) {
+                 const std::optional<ConstVal>& v, const BoundSource& from) {
   if (v) {
     values[name] = v->value;
   } else {
     values.erase(name);
   }
+  std::optional<int64_t> reading;
+  if (v && from.source != nullptr && from.type != nullptr)
+    reading =
+        TwoStateReading(from.source, *from.type, from.source_scope, v->value);
+  SetTwoStateReading(values, name, reading);
 }
 
 // What the walk below answers for the parameter it was looking for. `arg`
@@ -140,14 +168,19 @@ static SpecializationArg FoldUnderSpecialization(const Expr* expr,
     if (decl->type_param_names.count(pname) != 0) continue;
     SpecializationArg arg = HeaderParamArg(expr, decl, i, scope, values);
     if (pname == target) return Answer(arg);
-    Bind(values, pname, arg.value);
+    const Expr* actual = WrittenParamActual(*expr->lhs, pname, i);
+    const DataType* type =
+        i < decl->param_types.size() ? &decl->param_types[i] : nullptr;
+    Bind(values, pname, arg.value,
+         actual != nullptr ? BoundSource{actual, type, scope}
+                           : BoundSource{decl->params[i].second, type, values});
   }
   for (const auto* m : decl->members) {
     if (m->kind != ClassMemberKind::kProperty || !m->is_param) continue;
     DataType type = InClassScope(m->data_type, *decl);
     auto v = FoldClassParamDefault(m->init_expr, &type, values);
     if (m->name == target) return Answer({false, v});
-    Bind(values, m->name, v);
+    Bind(values, m->name, v, {m->init_expr, &type, values});
   }
   return {};
 }

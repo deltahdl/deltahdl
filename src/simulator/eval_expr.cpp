@@ -21,6 +21,7 @@
 #include "simulator/eval_array.h"
 #include "simulator/eval_call_result.h"
 #include "simulator/eval_class_array_handles.h"
+#include "simulator/eval_class_params.h"
 #include "simulator/eval_expr_internal.h"
 #include "simulator/eval_function_hier.h"
 #include "simulator/eval_function_internal.h"
@@ -567,6 +568,35 @@ static const Expr* FindSpecializationOverride(const Expr& base,
   return nullptr;
 }
 
+// §8.25 with §6.20.2 (printed pages 126-127): the actual `value` the prefix
+// of `access`, `C#(...)::name`, gives the parameter it names is converted to
+// the parameter's declared type, cut or extended to its width and, for a
+// 2-state type, its x and z bits taken as 0 (ClassParamSizer); the parameters
+// ahead of it are sized first, in header order, for a range that names one of
+// them.
+static Logic4Vec SizedSpecializationActual(const Expr& access,
+                                           const ClassDecl& decl,
+                                           const Expr* value, SimContext& ctx,
+                                           Arena& arena) {
+  const Expr& base = *access.lhs;
+  ClassParamSizer sizer(&decl);
+  // §8.25 with §6.20.3: a parameter declared with a type parameter is of the
+  // type the specialization's actual names.
+  if (const ClassTypeInfo* spec = ScopeNamedSpecialization(&base, ctx, arena))
+    sizer.UseTypeActuals(spec->param_actuals);
+  size_t pos = ValueParamPosition(decl, access.rhs->text);
+  for (size_t i = 0; i < pos; ++i) {
+    std::string_view earlier = decl.params[i].first;
+    if (decl.type_param_names.count(earlier) != 0 ||
+        decl.param_port_unpacked_dims.count(earlier) != 0)
+      continue;
+    const Expr* e = FindSpecializationOverride(base, decl, earlier);
+    if (e == nullptr) e = decl.params[i].second;
+    if (e != nullptr) sizer.Value(i, e, ctx, arena);
+  }
+  return sizer.Value(pos, value, ctx, arena);
+}
+
 static bool TryParameterizedScopeParam(const Expr* expr, SimContext& ctx,
                                        Arena& arena, Logic4Vec& out) {
   if (!expr->lhs || expr->lhs->kind != ExprKind::kIdentifier ||
@@ -578,7 +608,7 @@ static bool TryParameterizedScopeParam(const Expr* expr, SimContext& ctx,
   const Expr* override_expr =
       FindSpecializationOverride(*expr->lhs, *cls->decl, expr->rhs->text);
   if (override_expr == nullptr) return false;
-  out = EvalExpr(override_expr, ctx, arena);
+  out = SizedSpecializationActual(*expr, *cls->decl, override_expr, ctx, arena);
   return true;
 }
 

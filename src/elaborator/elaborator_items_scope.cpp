@@ -25,7 +25,8 @@ ScopeMap Elaborator::BuildParamScope(const RtlirModule* mod) const {
   // instance's parameter override. gen_prefix_scopes_ places this fold in the
   // blocks being elaborated, so their genvar values are entered beside their
   // parameters, outermost first so that an inner loop's genvar wins.
-  for (const auto& [name, value] : gen_loop_consts_) scope[name] = value;
+  for (const auto& [name, value] : gen_loop_consts_)
+    BindDeclaredConstant(scope, name, value);
   return scope;
 }
 
@@ -52,17 +53,19 @@ ScopeMap Elaborator::BuildParamScope(
   // Elaborator::ElaborateTypedef, EmitBareEnumMembers and
   // RegisterImportedEnumLiterals.
   for (const auto& entry : mod->enum_types) {
-    for (const auto& member : entry.second) scope[member.name] = member.value;
+    for (const auto& member : entry.second)
+      BindDeclaredConstant(scope, member.name, member.value);
   }
   // §23.9 makes a generate block a new scope, so a parameter one declares is
   // read only by an expression written in that block or in one nested inside
   // it. Entering it under its bare name for every expression in the module
   // would fold it into expressions that cannot name it at all.
-  for (const auto& [name, value] : mod->constant_formals) scope[name] = value;
+  for (const auto& [name, value] : mod->constant_formals)
+    BindDeclaredConstant(scope, name, value);
   for (const auto& p : mod->params) {
     if (!p.is_resolved) continue;
     if (!ParamVisibleFromScopes(p.gen_block_prefix, scopes)) continue;
-    scope[p.name] = p.resolved_value;
+    BindDeclaredConstant(scope, p.name, p.resolved_value);
   }
   return scope;
 }

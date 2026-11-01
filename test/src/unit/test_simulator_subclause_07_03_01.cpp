@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
 using namespace delta;
@@ -284,6 +285,56 @@ TEST(PackedUnionSim, IndexOnAPackedArrayMemberSelectsAnElement) {
   EXPECT_EQ(RunAndGet(src, "b1"), 0x12u);
   EXPECT_EQ(RunAndGet(src, "n3"), 0xAu);
   EXPECT_EQ(RunAndGet(src, "n0"), 0xDu);
+}
+
+// §7.3.1: a packed union written in place is 4-state when any member is, so
+// a function's argument and return value of a union of logic members keep
+// 1x0z, while those of a union of bit members read 1000. Judged by its kind
+// alone, the logic union was taken as 2-state and read 1000 too.
+TEST(PackedUnionSimulation, AnInPlaceUnionsStateIsItsMembers) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  function automatic union packed {logic [3:0] a; "
+                       "logic [3:0] b;} fl(input union packed {logic [3:0] a; "
+                       "logic [3:0] b;} x);\n"
+                       "    return x;\n"
+                       "  endfunction\n"
+                       "  function automatic union packed {bit [3:0] a; "
+                       "bit [3:0] b;} fb(input union packed {bit [3:0] a; "
+                       "bit [3:0] b;} x);\n"
+                       "    return x;\n"
+                       "  endfunction\n"
+                       "  initial $display(\"%b %b\", fl(4'b1x0z), "
+                       "fb(4'b1x0z));\n"
+                       "endmodule\n",
+                       f),
+            "1x0z 1000\n");
+}
+
+// §7.3.1 with §6.18: a member written with a typedef name is as 4-state as
+// the type the name stands for, so a union of members of a typedef naming
+// logic keeps 1x0z and one of a typedef naming bit reads 1000. Every name
+// was taken as 2-state, so the logic union read 1000 too.
+TEST(PackedUnionSimulation, AnInPlaceUnionOfATypedefMemberTakesItsState) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("typedef logic [3:0] n4_t;\n"
+                       "module t;\n"
+                       "  typedef bit [3:0] b4_t;\n"
+                       "  function automatic void fl(union packed {n4_t a; "
+                       "n4_t b;} u);\n"
+                       "    $display(\"%b\", u);\n"
+                       "  endfunction\n"
+                       "  function automatic void fb(union packed {b4_t a; "
+                       "b4_t b;} u);\n"
+                       "    $display(\"%b\", u);\n"
+                       "  endfunction\n"
+                       "  initial begin\n"
+                       "    fl(4'b1x0z);\n"
+                       "    fb(4'b1x0z);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1x0z\n1000\n");
 }
 
 }  // namespace

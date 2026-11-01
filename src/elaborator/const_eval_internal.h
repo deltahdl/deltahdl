@@ -255,10 +255,47 @@ std::optional<ConstVal> ConstEvalSelectFull(const Expr* expr,
 
 // §5.7.1: the bits from 64 up of an integer literal's digits, as
 // ConstVal::high_words lays them out, cut to `width`. Empty for a literal no
-// wider than 64 bits, for one whose digits set no bit at or above 64, and
-// from the first x, z or ? digit on, where the fold ends as ParseIntText's
-// does. Defined in const_eval_wide.cpp.
+// wider than 64 bits and for one whose digits set no bit at or above 64. The
+// digits end at the first x, z or ? digit, as Expr::int_val's do, except
+// while UnknownDigitsReadAsZero, when such a digit stands for 0 bits as in
+// BasedLiteralLowWord. Defined in const_eval_wide.cpp.
 std::vector<uint64_t> LiteralHighWords(std::string_view text, uint32_t width);
+
+// §5.7.1: the low 64 bits of a based literal's digits, read in the base its
+// base format names, with the bits an x, z or ? digit covers read as 0, which
+// is what a 2-state type holds of them (§6.11.2); nullopt for a literal with
+// no base format, a simple decimal number or an unbased unsized one.
+// Expr::int_val instead ends at the first such digit. Defined in
+// const_eval_wide.cpp.
+std::optional<uint64_t> BasedLiteralLowWord(std::string_view text);
+
+// §6.11.2 with §6.20.2: while a guard constructed with `on` true is live, a
+// literal's x, z and ? digits are folded as 0 bits, the value a parameter of
+// a 2-state type holds of them; everywhere else the fold keeps reading the
+// digits only up to the first such digit, since ConstVal cannot spell an
+// unknown bit a 4-state context keeps. Guards nest, each restoring the state
+// it found. Defined in const_eval_wide.cpp.
+class TwoStateLiteralGuard {
+ public:
+  explicit TwoStateLiteralGuard(bool on);
+  ~TwoStateLiteralGuard();
+  TwoStateLiteralGuard(const TwoStateLiteralGuard&) = delete;
+  TwoStateLiteralGuard& operator=(const TwoStateLiteralGuard&) = delete;
+
+ private:
+  bool prev_;
+};
+
+// Whether a live TwoStateLiteralGuard has the fold read x, z and ? digits as
+// 0. Defined in const_eval_wide.cpp.
+bool UnknownDigitsReadAsZero();
+
+// The reading SetTwoStateReading recorded in `scope` for the name or
+// qualified key `name`, while a live TwoStateLiteralGuard has the fold read
+// unknown bits as 0, and empty otherwise or where none is recorded. Defined
+// in const_eval_bits.cpp.
+std::optional<int64_t> FindTwoStateReading(const ScopeMap& scope,
+                                           std::string_view name);
 
 // The bit `offset` above the least significant end of `v`, read through
 // ConstVal::high_words past bit 63, and 0 for an offset outside the value.

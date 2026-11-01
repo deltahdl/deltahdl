@@ -127,7 +127,9 @@ static std::optional<ConstVal> ConstEvalMemberAccessFull(
   // the key its class's registration records for the full path.
   if (auto key = ScopedNameKey(expr)) {
     auto it = scope.find(*key);
-    if (it != scope.end()) return ConstVal{it->second, 32, true};
+    if (it == scope.end()) return std::nullopt;
+    return ConstVal{FindTwoStateReading(scope, *key).value_or(it->second), 32,
+                    true};
   }
   return std::nullopt;
 }
@@ -714,7 +716,8 @@ static std::optional<ConstVal> ConstEvalIdentifierFull(const Expr* expr,
   // function's local, a package or class constant under its qualified key --
   // is read as the 32-bit signed integer it always was.
   if (auto param = RegisteredParamValue(expr->text, it->second)) return param;
-  return ConstVal{it->second, 32, true};
+  return ConstVal{FindTwoStateReading(scope, expr->text).value_or(it->second),
+                  32, true};
 }
 
 // §11.11 orders the three values minimum, then typical, then maximum, which

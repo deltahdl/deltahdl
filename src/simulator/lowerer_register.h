@@ -203,6 +203,12 @@ void RegisterUnitClassVariables(const RtlirDesign* design, SimContext& ctx,
 // Empty for any other type. Defined in src/simulator/lowerer_register.cpp.
 std::string UnitBuiltinClassKey(const DataType& type);
 
+// §6.20.2 with §6.20.3: the type a value parameter's value is of -- the type
+// its module's type parameter stands for in the instance, where it is
+// declared with that parameter's name, and the declared type otherwise; null
+// for a parameter declared with no type.
+const DataType* ParamValueType(const RtlirParamDecl& param);
+
 // §6.20.2: a parameter declared with a range or a type has the range of its
 // declaration, unchanged by any override, and RtlirParamDecl::resolved_value
 // holds its value in 64 bits with no x or z among them. `var` is the storage

@@ -74,10 +74,24 @@ class ClassParamSizer {
   // after it: an object's default kept beside a specialization's overrides.
   void Record(size_t i, const Logic4Vec& val);
 
+  // §8.25 with §6.20.3: the actuals a specialization gives the class's type
+  // parameters, matched by name or position, so a parameter declared with a
+  // type parameter, `parameter T P`, is converted to the type the actual
+  // names; a type parameter the list leaves out, or every one where none is
+  // given, stands for its default.
+  void UseTypeActuals(const std::vector<DataType>* actuals) {
+    type_actuals_ = actuals;
+  }
+
  private:
+  // The type the class's type parameter `name` stands for, null where `name`
+  // names none or the parameter has neither an actual nor a default.
+  const DataType* TypeParamType(std::string_view name) const;
+
   const ClassDecl* decl_;
   std::string_view type_scope_;
   ScopeMap scope_;
+  const std::vector<DataType>* type_actuals_ = nullptr;
 };
 
 // §8.25 (printed page 203) with §8.25.1: a specialization's parameters are

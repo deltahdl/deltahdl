@@ -225,15 +225,44 @@ static bool IsTwoStateIntegerKind(DataTypeKind kind) {
          kind == DataTypeKind::kLongint;
 }
 
+// §7.2.1, §7.3.1: a structure or union written in place with `packed`, or a
+// union with `soft`, whose state is that of its members.
+static bool IsPackedAggregate(const DataType& type) {
+  return (type.kind == DataTypeKind::kStruct ||
+          type.kind == DataTypeKind::kUnion) &&
+         (type.is_packed || type.is_soft);
+}
+
+// §7.2.1 with §6.18: a member's state is that of its own type, a nested
+// aggregate's or the one a typedef name stands for. Judged with no table to
+// read the name in, `n4_t a` under `typedef logic [3:0] n4_t` was 2-state.
+static bool MemberIs4State(const StructMember& m, const SimContext& ctx) {
+  if (m.nested_type != nullptr)
+    return DeclaredTypeIs4State(*m.nested_type, ctx);
+  DataType own;
+  own.kind = m.type_kind;
+  own.type_name = m.type_name;
+  own.scope_name = m.scope_name;
+  return DeclaredTypeIs4State(own, ctx);
+}
+
 // §6.18: a name is known to stand for a 2-state type where the design
 // registered it as an enumeration with a 2-state base (§6.19), a packed
 // structure or union with no 4-state member (§7.2.1, §7.3.1), or a kind among
 // §6.11.2's 2-state integer types. Any other name -- one the tables do not
 // hold, or one standing for a class, a string or an unpacked aggregate --
 // answers 4-state: keeping a bit §6.11.2 would have cleared is the smaller
-// error than clearing one it would have kept.
+// error than clearing one it would have kept. A type written in place is
+// judged by what it is written with: an enumeration by its base (§6.19) and
+// a packed structure or union by its members (§7.2.1, §7.3.1), each member
+// written with a name through the tables as the name itself is.
 bool DeclaredTypeIs4State(const DataType& type, const SimContext& ctx) {
-  if (type.kind != DataTypeKind::kNamed) return Is4stateType(type.kind);
+  if (IsPackedAggregate(type)) {
+    return std::any_of(
+        type.struct_members.begin(), type.struct_members.end(),
+        [&](const StructMember& m) { return MemberIs4State(m, ctx); });
+  }
+  if (type.kind != DataTypeKind::kNamed) return Is4stateType(type, {});
   std::string key = TypeTableKey(type);
   if (const EnumTypeInfo* e = ctx.FindEnumType(key)) return e->is_4state;
   if (const StructTypeInfo* s = ctx.FindStructType(key);
@@ -290,6 +319,13 @@ bool DeclaredTypeIsReal(const DataType& type, const SimContext& ctx) {
   if (IsRealKind(type.kind)) return true;
   return type.kind == DataTypeKind::kNamed &&
          IsRealKind(ctx.FindTypeKind(TypeTableKey(type)));
+}
+
+Logic4Vec ToDeclaredReal(const Logic4Vec& value, const DataType* type,
+                         SimContext& ctx, Arena& arena) {
+  if (type == nullptr || !DeclaredTypeIsReal(*type, ctx)) return value;
+  uint32_t width = DeclaredTypeWidth(*type, ctx) == 32 ? 32 : 64;
+  return MakeRealVec(arena, RealValueOf(value), width);
 }
 
 static int BitsPerDigit(char base_letter) {
