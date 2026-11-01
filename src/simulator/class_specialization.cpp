@@ -581,11 +581,8 @@ void SizeValueParamProperties(ClassTypeInfo* spec, const ParamValues& values,
     if (SizeClassTypedefProperty(prop, type, spec, scope, ctx)) continue;
     uint32_t width = EvalTypeWidth(type, {}, scope);
     // §6.18 with §6.20.3: a name the class gives its meaning to is sized as
-    // the specialization binds it, `typedef C::T C_t;` by the C it binds. A
-    // property declared as one of the class's own type parameters, `T x`, is
-    // SizeTypeParamProperties' to size, by the actual the specialization was
-    // made with.
-    if (width == 0 && TypeParamNamedBy(spec->decl, type.type_name).empty())
+    // the specialization binds it, `typedef C::T C_t;` by the C it binds.
+    if (width == 0)
       width = DeclaredTypeWidth(
           ClassPropertyType(type, spec->decl, type_params), ctx);
     if (width == 0) continue;

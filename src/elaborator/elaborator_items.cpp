@@ -35,6 +35,7 @@
 #include "elaborator/rtlir_scopes.h"
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
+#include "elaborator/type_param_scope_prefix.h"
 #include "elaborator/type_ref_walks.h"
 #include "elaborator/unit_scope_order.h"
 #include "elaborator/uwire_drivers.h"
@@ -593,6 +594,8 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
     return holds;
   });
   if (ElaborateDeclItem(item, mod)) return;
+  ReportProcedurePrefixesNotAClass(
+      *item, {mod->params, typedefs_, class_names_}, diag_);
   auto resolve = [&](DataType& dt, SourceLoc loc) {
     ResolveTypeRef(dt, loc, mod);
   };

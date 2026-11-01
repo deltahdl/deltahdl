@@ -163,9 +163,10 @@ TypedefMap TypeParamTypes(const ClassDecl* decl,
 // through a type parameter bound to a class, `typedef C::T C_t;` with C bound
 // to X reaching X's T -- followed to a built-in type or a name the class leaves
 // to the enclosing scope. `type` itself where it is no name, writes packed
-// dimensions of its own, is not a name the class gives a meaning, or reaches a
-// structure, union or enumeration, which have layouts of their own. Defined in
-// class_property_type.cpp.
+// dimensions of its own, is not a name the class gives a meaning, names one of
+// the class's own type parameters, which each specialization sizes by its
+// actual (§8.25), or reaches a structure, union or enumeration, which have
+// layouts of their own. Defined in class_property_type.cpp.
 DataType ClassPropertyType(const DataType& type, const ClassDecl* cls,
                            const TypedefMap& type_params);
 

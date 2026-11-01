@@ -37,6 +37,8 @@ void ElaboratorClassRules::RunPreElaborationClassValidations() {
 
   ReportUnitSpecializations(unit_, diag_);
 
+  ReportUnitScopePrefixesNotAClass(unit_, diag_);
+
   ValidateChainingConstructors();
 
   ValidateSuperRules();

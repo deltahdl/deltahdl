@@ -655,51 +655,82 @@ TEST(TypeParameterElab, DefaultSpecializationBindingANonClassPrefixIsError) {
 }
 
 // §6.20.3 in every place a type parameter can be declared and used, `@`
-// standing for the type it is bound to and `%` for the use: an
-// interface (§25.3), a program (§24.3), a generate block (§27), a function and
-// a task body (§13), and a package's local type parameter (§26.2), each with
-// the three uses the clause permits -- a typedef, a type parameter assignment
-// and the type operator. With the parameter bound to int each use is reported;
-// with it bound to the class K the same use is accepted.
+// standing for the type it is bound to and `%` for the use: an interface
+// (§25.3), a program (§24.3), a generate block (§27), an initial procedure's
+// block, a function and a task body (§13), a type parameter a function body
+// declares itself, a checker the module declares (§17, whose items take no
+// parameter declaration, A.1.8), a package (§26.2) and the compilation unit
+// (§3.12.1), each with the uses the clause permits that the place admits -- a
+// typedef, a type parameter assignment and the type operator. With the
+// parameter bound to int each use is reported; with it bound to the class K
+// the same use is accepted.
 TEST(TypeParameterElab, TypeParamPrefixInEveryPlaceMustResolveToAClass) {
   struct Place {
     const char* where;
     const char* text;
+    bool takes_param;
   };
   const Place kPlaces[] = {
       {"interface",
        "interface c #(parameter type T = @);\n  %\nendinterface\n"
-       "module top; c u(); endmodule\n"},
+       "module top; c u(); endmodule\n",
+       true},
       {"program",
        "program c #(parameter type T = @);\n  %\nendprogram\n"
-       "module top; c u(); endmodule\n"},
+       "module top; c u(); endmodule\n",
+       true},
       {"generate block",
        "module c #(parameter type T = @);\n  if (1) begin : g %\n  end\n"
-       "endmodule\nmodule top; c u(); endmodule\n"},
+       "endmodule\nmodule top; c u(); endmodule\n",
+       true},
+      {"initial block",
+       "module c #(parameter type T = @);\n  initial begin %\n  end\n"
+       "endmodule\nmodule top; c u(); endmodule\n",
+       true},
       {"function body",
        "module c #(parameter type T = @);\n"
        "  function automatic void f(); %\n  endfunction\n"
-       "endmodule\nmodule top; c u(); endmodule\n"},
+       "endmodule\nmodule top; c u(); endmodule\n",
+       true},
       {"task body",
        "module c #(parameter type T = @);\n"
        "  task automatic k(); %\n  endtask\n"
-       "endmodule\nmodule top; c u(); endmodule\n"},
+       "endmodule\nmodule top; c u(); endmodule\n",
+       true},
+      {"function body's own type parameter",
+       "module top;\n"
+       "  function automatic void f(); localparam type T = @; %\n"
+       "  endfunction\nendmodule\n",
+       true},
+      {"checker",
+       "module c #(parameter type T = @);\n"
+       "  checker chk; %\n  endchecker\n"
+       "  chk u_chk();\nendmodule\nmodule top; c u(); endmodule\n",
+       false},
       {"package",
        "package pk;\n  localparam type T = @; %\nendpackage\n"
-       "module top; import pk::*; endmodule\n"},
+       "module top; import pk::*; endmodule\n",
+       true},
+      {"compilation unit", "localparam type T = @;\n%\nmodule top; endmodule\n",
+       true},
   };
-  const char* const kUses[] = {"typedef T::inner my_t;",
-                               "localparam type U = T::inner;",
-                               "var type(T::inner) w;"};
+  struct Use {
+    const char* text;
+    bool is_param;
+  };
+  const Use kUses[] = {{"typedef T::inner my_t;", false},
+                       {"localparam type U = T::inner;", true},
+                       {"var type(T::inner) w;", false}};
   const std::string kClass =
       "class K;\n"
       "  typedef byte inner;\n"
       "endclass\n";
   for (const Place& place : kPlaces) {
-    for (const char* use : kUses) {
-      SCOPED_TRACE(std::string(place.where) + ": " + use);
+    for (const Use& use : kUses) {
+      if (use.is_param && !place.takes_param) continue;
+      SCOPED_TRACE(std::string(place.where) + ": " + use.text);
       std::string text = place.text;
-      text.replace(text.find('%'), 1, use);
+      text.replace(text.find('%'), 1, use.text);
       std::string good = kClass + text;
       std::string bad = good;
       good.replace(good.find('@'), 1, "K");

@@ -10,6 +10,7 @@
 #include "elaborator/type_eval.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 #include "parser/ast_type.h"
 
 // §6.20.3: a type parameter may prefix the class scope resolution operator in
@@ -58,6 +59,21 @@ const DataType* TypeRefThroughBoundPrefix(std::string_view prefix,
 void ReportSpecializationPrefixNotAClass(const DataType& written, SourceLoc loc,
                                          const CompilationUnit* unit,
                                          DiagEngine& diag);
+
+// ReportTypeParamPrefixNotAClass for each typedef and type parameter the body
+// of the procedure or subroutine `item` declares, and each type operator its
+// declarations write: a prefix naming a type parameter the body declares is
+// judged by the type that declaration gives it, and one naming the instance's
+// by `scope`.
+void ReportProcedurePrefixesNotAClass(const ModuleItem& item,
+                                      const TypeParamPrefixScope& scope,
+                                      DiagEngine& diag);
+
+// The same for each package and the compilation unit, whose own type
+// parameters no instance overrides: the prefixes their typedefs, type
+// parameters and variables write, and those of the subroutines they declare.
+void ReportUnitScopePrefixesNotAClass(const CompilationUnit* unit,
+                                      DiagEngine& diag);
 
 // ReportSpecializationPrefixNotAClass for each specialization the compilation
 // unit writes as the type of a typedef or variable of its own, or a class at

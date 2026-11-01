@@ -5,6 +5,7 @@
 #include "parser/ast_class.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
+#include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_class_params.h"
 
 // §6.18 with §8.25 and §6.20.3: the type a class property's name stands for
@@ -41,6 +42,11 @@ DataType ClassPropertyType(const DataType& type, const ClassDecl* cls,
                            const TypedefMap& type_params) {
   if (cls == nullptr || type.kind != DataTypeKind::kNamed ||
       type.packed_dim_left != nullptr || !type.extra_packed_dims.empty())
+    return type;
+  // §8.25: a property declared as one of the class's own type parameters, `T
+  // x` or through `typedef T X;`, is sized by each specialization's actual
+  // (SizeTypeParamProperties), never by the default the declaration gives T.
+  if (type.scope_name.empty() && !TypeParamNamedBy(cls, type.type_name).empty())
     return type;
   DataType cur = type;
   bool moved = false;
