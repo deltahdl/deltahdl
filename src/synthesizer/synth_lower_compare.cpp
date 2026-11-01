@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "elaborator/rtlir.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
@@ -371,6 +372,16 @@ bool SynthLower::IsSignedCase(const Stmt* stmt) {
     if (!IsSignedExpr(operand)) return false;
   }
   return true;
+}
+
+std::optional<bool> SynthLower::TypeRefCompareHere(const Expr* expr) const {
+  if (type_ref_compares_ == nullptr) return std::nullopt;
+  for (const TypeRefCompareResult& result : *type_ref_compares_) {
+    if (result.expr == expr && result.gen_prefix == gen_prefix_) {
+      return result.holds;
+    }
+  }
+  return std::nullopt;
 }
 
 }  // namespace delta

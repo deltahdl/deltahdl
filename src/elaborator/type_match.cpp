@@ -34,41 +34,44 @@ static DataTypeKind CanonKind(DataTypeKind k) {
   return k == DataTypeKind::kReg ? DataTypeKind::kLogic : k;
 }
 
-static bool VectorMatchesPredef(const DataType& vec, const DataType& predef) {
+static bool VectorMatchesPredef(const DataType& vec, const DataType& predef,
+                                const ScopeMap& scope) {
   if (Is4stateType(vec.kind) != Is4stateType(predef.kind)) return false;
   if (!vec.packed_dim_left || !vec.packed_dim_right) return false;
   if (!vec.extra_packed_dims.empty()) return false;
-  auto left = ConstEvalInt(vec.packed_dim_left);
-  auto right = ConstEvalInt(vec.packed_dim_right);
+  auto left = ConstEvalInt(vec.packed_dim_left, scope);
+  auto right = ConstEvalInt(vec.packed_dim_right, scope);
   if (!left || !right || *right != 0 || *left < 0) return false;
   auto vec_width = static_cast<uint32_t>(*left + 1);
   return vec_width == EvalTypeWidth(predef);
 }
 
 // Whether two bounds of a packed dimension are the same: both absent, or both
-// present with equal values. A bound that does not fold without a scope, such
-// as `W-1`, is not told apart from the other.
-static bool SameBound(const Expr* a, const Expr* b) {
+// present with equal values, folded against `scope`, the parameters and genvar
+// values in force where the types are written. A bound that does not fold
+// there is not told apart from the other.
+static bool SameBound(const Expr* a, const Expr* b, const ScopeMap& scope) {
   if ((a == nullptr) != (b == nullptr)) return false;
   if (a == nullptr) return true;
-  auto va = ConstEvalInt(a);
-  auto vb = ConstEvalInt(b);
+  auto va = ConstEvalInt(a, scope);
+  auto vb = ConstEvalInt(b, scope);
   return !va || !vb || *va == *vb;
 }
 
 // §6.22.1(f): two fixed-size array types match only where they have the same
 // left and right bounds, dimension by dimension, so `bit [11:0]` does not
 // match `bit [12:0]`, nor `bit [7:0]` match `bit [0:7]`.
-static bool SamePackedBounds(const DataType& a, const DataType& b) {
-  if (!SameBound(a.packed_dim_left, b.packed_dim_left) ||
-      !SameBound(a.packed_dim_right, b.packed_dim_right))
+static bool SamePackedBounds(const DataType& a, const DataType& b,
+                             const ScopeMap& scope) {
+  if (!SameBound(a.packed_dim_left, b.packed_dim_left, scope) ||
+      !SameBound(a.packed_dim_right, b.packed_dim_right, scope))
     return false;
   if (a.extra_packed_dims.size() != b.extra_packed_dims.size()) return false;
   for (size_t i = 0; i < a.extra_packed_dims.size(); ++i) {
-    if (!SameBound(a.extra_packed_dims[i].first,
-                   b.extra_packed_dims[i].first) ||
-        !SameBound(a.extra_packed_dims[i].second,
-                   b.extra_packed_dims[i].second))
+    if (!SameBound(a.extra_packed_dims[i].first, b.extra_packed_dims[i].first,
+                   scope) ||
+        !SameBound(a.extra_packed_dims[i].second, b.extra_packed_dims[i].second,
+                   scope))
       return false;
   }
   return true;
@@ -76,19 +79,21 @@ static bool SamePackedBounds(const DataType& a, const DataType& b) {
 
 // Whether two unpacked dimensions are the same: a range `[l:r]` bound by bound,
 // and a size `[n]` by its value.
-static bool SameUnpackedDim(const Expr* a, const Expr* b) {
+static bool SameUnpackedDim(const Expr* a, const Expr* b,
+                            const ScopeMap& scope) {
   bool a_range = a != nullptr && a->kind == ExprKind::kBinary &&
                  a->op == TokenKind::kColon;
   bool b_range = b != nullptr && b->kind == ExprKind::kBinary &&
                  b->op == TokenKind::kColon;
   if (a_range != b_range) return false;
-  if (!a_range) return SameBound(a, b);
-  return SameBound(a->lhs, b->lhs) && SameBound(a->rhs, b->rhs);
+  if (!a_range) return SameBound(a, b, scope);
+  return SameBound(a->lhs, b->lhs, scope) && SameBound(a->rhs, b->rhs, scope);
 }
 
 // Whether two members of one declaration have the same type: the kind,
 // signing, name and dimensions, and a nested aggregate's own members.
-static bool SameMember(const StructMember& a, const StructMember& b) {
+static bool SameMember(const StructMember& a, const StructMember& b,
+                       const ScopeMap& scope) {
   if (CanonKind(a.type_kind) != CanonKind(b.type_kind) ||
       a.is_signed != b.is_signed || a.type_name != b.type_name ||
       a.scope_name != b.scope_name)
@@ -101,20 +106,24 @@ static bool SameMember(const StructMember& a, const StructMember& b) {
   pb.packed_dim_left = b.packed_dim_left;
   pb.packed_dim_right = b.packed_dim_right;
   pb.extra_packed_dims = b.extra_packed_dims;
-  if (!SamePackedBounds(pa, pb)) return false;
+  if (!SamePackedBounds(pa, pb, scope)) return false;
   if ((a.nested_type == nullptr) != (b.nested_type == nullptr)) return false;
-  if (a.nested_type != nullptr && !TypesMatch(*a.nested_type, *b.nested_type))
+  if (a.nested_type != nullptr &&
+      !TypesMatch(*a.nested_type, *b.nested_type, scope))
     return false;
   return std::equal(a.unpacked_dims.begin(), a.unpacked_dims.end(),
                     b.unpacked_dims.begin(), b.unpacked_dims.end(),
-                    SameUnpackedDim);
+                    [&](const Expr* x, const Expr* y) {
+                      return SameUnpackedDim(x, y, scope);
+                    });
 }
 
 // §6.22.1(c) and (d): an enum, struct or union type matches only a type of
 // its own declaration. Two specializations of one class's struct typedef
 // (§6.25) share the declaration and are still different types, which the
 // members they were specialized to tell apart.
-static bool SameDeclaration(const DataType& a, const DataType& b) {
+static bool SameDeclaration(const DataType& a, const DataType& b,
+                            const ScopeMap& scope) {
   bool declared = a.kind == DataTypeKind::kEnum ||
                   a.kind == DataTypeKind::kStruct ||
                   a.kind == DataTypeKind::kUnion;
@@ -125,22 +134,28 @@ static bool SameDeclaration(const DataType& a, const DataType& b) {
     return false;
   return std::equal(a.struct_members.begin(), a.struct_members.end(),
                     b.struct_members.begin(), b.struct_members.end(),
-                    SameMember);
+                    [&](const StructMember& x, const StructMember& y) {
+                      return SameMember(x, y, scope);
+                    });
 }
 
 bool TypesMatch(const DataType& a, const DataType& b) {
+  return TypesMatch(a, b, ScopeMap{});
+}
+
+bool TypesMatch(const DataType& a, const DataType& b, const ScopeMap& scope) {
   if (a.is_signed != b.is_signed) return false;
 
   if (CanonKind(a.kind) == CanonKind(b.kind)) {
     if (a.kind == DataTypeKind::kNamed) return a.type_name == b.type_name;
-    return SameDeclaration(a, b) && SamePackedBounds(a, b);
+    return SameDeclaration(a, b, scope) && SamePackedBounds(a, b, scope);
   }
 
   if (IsSimpleBitVector(a.kind) && HasPredefinedWidth(b.kind)) {
-    return VectorMatchesPredef(a, b);
+    return VectorMatchesPredef(a, b, scope);
   }
   if (HasPredefinedWidth(a.kind) && IsSimpleBitVector(b.kind)) {
-    return VectorMatchesPredef(b, a);
+    return VectorMatchesPredef(b, a, scope);
   }
   return false;
 }

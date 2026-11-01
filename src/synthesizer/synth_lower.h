@@ -197,6 +197,9 @@ class SynthLower {
   // subclauses rule that the result is 1'b0 or 1'b1, so bit 0 carries the
   // comparison and every bit above it is zero.
   uint32_t LowerCompareBit(const Expr* expr, AigGraph& aig, uint32_t bit);
+  // The answer recorded for `expr`, a comparison of two type references, in
+  // the generate block instance being lowered, or nullopt where none is.
+  std::optional<bool> TypeRefCompareHere(const Expr* expr) const;
 
   // The comparison an operator answers before the negation §11.4.4 and §11.4.5
   // define four of the ten by: `a >= b` for both `a >= b` and `a < b`, and the
@@ -635,6 +638,14 @@ class SynthLower {
   // nothing to the graph, so the graph no longer describes the module and Lower
   // answers with no netlist rather than with a wrong one.
   bool lowering_incomplete_ = false;
+
+  // §6.23 with §6.20.3: what each comparison of two type references the module
+  // writes stands for in this instance, by the generate block instance it is
+  // written in, which the elaborator records in place of folding the shared
+  // tree (RtlirModule::type_ref_compares); and the generate prefix of the item
+  // being lowered, which picks a loop iteration's own entry.
+  const std::vector<TypeRefCompareResult>* type_ref_compares_ = nullptr;
+  std::string_view gen_prefix_;
 };
 
 }  // namespace delta

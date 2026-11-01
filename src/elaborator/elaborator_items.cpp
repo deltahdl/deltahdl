@@ -402,22 +402,15 @@ using TypeRefCompareFolder = std::function<std::optional<int64_t>(const Expr*)>;
 
 // §6.23: a comparison of two type references is a constant expression, true
 // exactly when the types match by §6.22.1, which only the elaborator's type
-// tables can judge. Each one a procedure writes is folded here to the one-bit
-// literal it stands for, so the procedure reads its value; compared at run
-// time by the names alone, `type(node) == type(bit)` under `typedef bit node`
-// was 0.
+// tables can judge. Each one a procedure writes is handed to `fold`, which
+// keeps its answer for the instance being elaborated, so the procedure reads
+// its value; compared at run time by the names alone, `type(node) ==
+// type(bit)` under `typedef bit node` was 0. The expression itself is left as
+// written: every instance of the module shares it, and §6.20.3 lets each bind
+// parameters that give the comparison another answer.
 void FoldTypeRefComparesInExpr(Expr* e, const TypeRefCompareFolder& fold) {
   if (e == nullptr) return;
-  if (IsTypeRefComparison(e)) {
-    if (std::optional<int64_t> matched = fold(e)) {
-      e->kind = ExprKind::kIntegerLiteral;
-      e->int_val = static_cast<uint64_t>(*matched);
-      e->text = *matched != 0 ? "1'b1" : "1'b0";
-      e->lhs = nullptr;
-      e->rhs = nullptr;
-      return;
-    }
-  }
+  if (IsTypeRefComparison(e) && fold(e).has_value()) return;
   for (Expr* sub :
        {e->lhs, e->rhs, e->condition, e->true_expr, e->false_expr}) {
     FoldTypeRefComparesInExpr(sub, fold);
@@ -592,7 +585,12 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
   // operator.
   ReportItemImplicationOperators(*item, diag_);
   FoldItemTypeRefCompares(item, [this, mod](const Expr* e) {
-    return EvalConstTypeRefCompare(e, mod);
+    std::optional<int64_t> holds = EvalConstTypeRefCompare(e, mod);
+    if (holds.has_value()) {
+      mod->type_ref_compares.push_back(
+          {.expr = e, .gen_prefix = InternedGenPrefix(), .holds = *holds != 0});
+    }
+    return holds;
   });
   if (ElaborateDeclItem(item, mod)) return;
   auto resolve = [&](DataType& dt, SourceLoc loc) {

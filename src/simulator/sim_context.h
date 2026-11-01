@@ -49,6 +49,7 @@
 #include "simulator/sim_context_name_tables.h"
 #include "simulator/sim_context_random_stability.h"
 #include "simulator/sim_context_scope_stack.h"
+#include "simulator/sim_context_type_ref_compares.h"
 #include "simulator/sim_context_types.h"
 // ClockingManager, SpecifyManager and DpiRuntime, each held by value behind an
 // owning unique_ptr below. The constructor of this class is defined inline,
@@ -76,7 +77,8 @@ struct Stmt;
 
 class SimContext : public DeclaredNameTables,
                    public RandomStability,
-                   public ScopeStack {
+                   public ScopeStack,
+                   public TypeRefCompares {
  public:
   SimContext(Scheduler& sched, Arena& arena, DiagEngine& diag,
              uint32_t seed = 0)
@@ -393,6 +395,8 @@ class SimContext : public DeclaredNameTables,
   std::string ActiveUnitScope() const;  // "$unit#k" running, "" for one unit
   // §27.4: the generate block prefix of the process `proc`, running or not.
   static std::string_view GenBlockPrefixOf(const Process& proc);
+  // §6.23: TypeRefCompares' answer for `expr` where the running code stands.
+  std::optional<bool> TypeRefCompareHere(const Expr* expr) const;
 
   // §32.4.3: the instance an evaluation stands in, where that is not the
   // running process's. simulator/instance_prefix_override.h holds the reason

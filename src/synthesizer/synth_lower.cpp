@@ -207,6 +207,8 @@ void SynthLower::ResetForModule(const RtlirModule* mod) {
   propagated_width_ = 0;
   propagated_signed_ = false;
   lowering_incomplete_ = false;
+  type_ref_compares_ = &mod->type_ref_compares;
+  gen_prefix_ = {};
 
   // The scope a select's index folds in. §6.20.2 makes a parameter a constant
   // known at elaboration, and the elaborator has already resolved each one, so
@@ -490,6 +492,10 @@ uint32_t SynthLower::LowerLogicalBit(const Expr* expr, AigGraph& aig,
 
 uint32_t SynthLower::LowerBinaryBit(const Expr* expr, AigGraph& aig,
                                     uint32_t bit) {
+  // §11.4.5: a comparison is one unsigned bit, so the bits above it are zero.
+  if (std::optional<bool> holds = TypeRefCompareHere(expr)) {
+    return bit == 0 && *holds ? AigGraph::kConstTrue : AigGraph::kConstFalse;
+  }
   if (expr->op == TokenKind::kPlus || expr->op == TokenKind::kMinus) {
     return LowerAddSubBit(expr, aig, bit);
   }

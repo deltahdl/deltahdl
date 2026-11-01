@@ -723,6 +723,14 @@ std::vector<const ClassDecl*> Lowerer::RegisterChildClasses(
   return fresh_classes;
 }
 
+void RegisterTypeRefCompares(const std::string& inst_prefix,
+                             const RtlirModule* mod, SimContext& ctx) {
+  for (const TypeRefCompareResult& result : mod->type_ref_compares) {
+    ctx.RecordTypeRefCompare(inst_prefix + std::string(result.gen_prefix),
+                             result.expr, result.holds);
+  }
+}
+
 void Lowerer::LowerChildInstance(const RtlirModuleInst& child) {
   for (const RtlirPortBinding& binding : child.port_bindings) {
     LowerTopNamedBy(binding.connection);
@@ -748,6 +756,7 @@ void Lowerer::LowerChildInstance(const RtlirModuleInst& child) {
   if (child.is_nested_decl) ctx_.RegisterNestedDeclScope(inst_prefix_);
 
   RegisterInstanceKeyBinding(inst_prefix_, child.resolved, ctx_);
+  RegisterTypeRefCompares(inst_prefix_, child.resolved, ctx_);
   LowerParams(child.resolved);
   // §30.3: the child's specify blocks belong to this instance, so they are
   // recorded under this instance's prefix. Lower registers them once every

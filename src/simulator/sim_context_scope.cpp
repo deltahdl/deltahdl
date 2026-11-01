@@ -3,8 +3,10 @@
 #include <cstdint>
 #include <format>
 #include <iterator>
+#include <optional>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -16,6 +18,7 @@
 #include "simulator/scope.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_scope_stack.h"
+#include "simulator/sim_context_type_ref_compares.h"
 #include "simulator/variable.h"
 
 namespace delta {
@@ -159,6 +162,34 @@ std::string_view SimContext::ActiveGenBlockPrefix() const {
   // (FrameOwnerEntry::gen_depth).
   if (current_process_ == nullptr) return {};
   return GenBlockPrefixOf(*current_process_);
+}
+
+void TypeRefCompares::SetLoweringGenBlockPrefix(std::string_view prefix) {
+  lowering_gen_prefix_ = std::string(prefix);
+}
+
+void TypeRefCompares::RecordTypeRefCompare(std::string scope, const Expr* expr,
+                                           bool holds) {
+  type_ref_compares_[expr][std::move(scope)] = holds;
+}
+
+std::optional<bool> TypeRefCompares::TypeRefCompareIn(
+    const Expr* expr, const std::string& scope) const {
+  auto by_scope = type_ref_compares_.find(expr);
+  if (by_scope == type_ref_compares_.end()) return std::nullopt;
+  auto found = by_scope->second.find(scope);
+  if (found == by_scope->second.end()) return std::nullopt;
+  return found->second;
+}
+
+std::optional<bool> SimContext::TypeRefCompareHere(const Expr* expr) const {
+  std::string scope = ActiveInstancePrefix();
+  if (current_process_ != nullptr) {
+    scope += ActiveGenBlockPrefix();
+  } else {
+    scope += LoweringGenBlockPrefix();
+  }
+  return TypeRefCompareIn(expr, scope);
 }
 
 std::string_view SimContext::GenBlockPrefixOf(const Process& proc) {

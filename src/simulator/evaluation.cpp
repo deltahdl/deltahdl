@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -671,6 +672,13 @@ static bool TryTypeRefComparison(const Expr* expr, SimContext& ctx,
   if (!is_eq && !is_neq) return false;
   if (!expr->lhs || expr->lhs->kind != ExprKind::kTypeRef) return false;
   if (!expr->rhs || expr->rhs->kind != ExprKind::kTypeRef) return false;
+  // §6.20.3: the elaborator judged the comparison against the types of the
+  // instance it stands in, by §6.22.1's matching, which the names below
+  // cannot answer.
+  if (std::optional<bool> holds = ctx.TypeRefCompareHere(expr)) {
+    out = MakeLogic4VecVal(arena, 1, *holds ? 1 : 0);
+    return true;
+  }
   TypeRefRuntimeId a = ResolveTypeRefRuntimeId(expr->lhs, ctx);
   TypeRefRuntimeId b = ResolveTypeRefRuntimeId(expr->rhs, ctx);
   if (!a.resolved || !b.resolved) return false;

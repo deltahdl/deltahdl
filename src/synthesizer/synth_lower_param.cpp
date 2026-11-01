@@ -246,6 +246,7 @@ void SynthLower::SetGenScope(const GenBlockConsts& consts,
                              const GenBlockPrefixes& prefixes) {
   RestoreShadowedSignals();
   scope_ = param_scope_;
+  gen_prefix_ = prefixes.empty() ? std::string_view{} : prefixes.back();
   for (const auto& [name, value] : consts) {
     scope_[name] = value;
     InstallScopeConstant(name, IntegerBits(value), true,

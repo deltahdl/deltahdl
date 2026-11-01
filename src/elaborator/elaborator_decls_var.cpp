@@ -757,6 +757,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   RtlirVariable var;
   var.name = ScopedName(item->name);
   TakeWrittenFields(item, td_array_dims_, gen_loop_consts_, var);
+  var.gen_block_prefix = InternedGenPrefix();
   // §7.2 with §8.4: a structure written in the declaration itself sizes its
   // members of a class type as the handles they hold, as a typedef's does.
   SizeClassHandleMembers(item->data_type, typedefs_, class_names_);

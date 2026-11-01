@@ -336,6 +336,10 @@ bool IsSimpleBitVectorType(const DataType& dtype);
 bool IsUnpackedAggregateType(const DataType& type);
 
 bool TypesMatch(const DataType& a, const DataType& b);
+// §6.22.1 with the bounds of each fixed-size dimension folded against `scope`,
+// the parameters and genvar values in force where the two types are written,
+// so `logic [W-1:0]` under W = 4 matches `logic [3:0]` and no other width.
+bool TypesMatch(const DataType& a, const DataType& b, const ScopeMap& scope);
 
 bool TypesEquivalent(const DataType& a, const DataType& b);
 

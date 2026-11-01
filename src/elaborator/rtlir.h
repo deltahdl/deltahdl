@@ -358,6 +358,9 @@ struct RtlirVariable {
   // for a variable the elaborator synthesized rather than read out of a
   // declaration, which corresponds to nothing in the source text to report.
   SourceLoc loc;
+  // §27.4: the prefix of the generate block instance declaring the variable,
+  // empty for one the module declares, which its initializer is read in.
+  std::string_view gen_block_prefix;
 };
 
 struct RtlirContAssign {
@@ -669,6 +672,14 @@ struct RtlirModuleInst {
   std::vector<std::string_view> procedure_automatics;
 };
 
+// §6.23: what one comparison of type references, `expr`, gives in the generate
+// block instance named by `gen_prefix`, empty outside every generate block.
+struct TypeRefCompareResult {
+  const Expr* expr = nullptr;
+  std::string_view gen_prefix;
+  bool holds = false;
+};
+
 struct RtlirModule {
   std::string_view name;
   // Where the module was declared, which §37.3.6 asks of its instances.
@@ -841,6 +852,11 @@ struct RtlirModule {
   // §23.4: the declaration the module was elaborated from, one another
   // declaration declares nested in its body among them.
   const ModuleDecl* decl = nullptr;
+  // §6.23 with §6.20.3: what each comparison of type references the module's
+  // code writes gives in this instance, and in each generate block instance
+  // within it. The expression belongs to the declaration every instance
+  // shares, so the answer is kept here rather than written into it.
+  std::vector<TypeRefCompareResult> type_ref_compares;
 };
 
 struct RtlirDesign : RtlirTypedefFacts {

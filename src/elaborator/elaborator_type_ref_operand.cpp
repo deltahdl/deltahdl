@@ -275,7 +275,7 @@ std::optional<bool> ElaboratorOperationRules::DataTypesMatch(
   std::optional<DataType> type_b =
       ThroughTypeNames(b, typedefs_, unit_, arena_);
   if (!type_a || !type_b) return std::nullopt;
-  return TypesMatch(*type_a, *type_b);
+  return TypesMatch(*type_a, *type_b, constants);
 }
 
 std::optional<UnpackedArrayType> ElaboratorOperationRules::TypeRefOperandArray(

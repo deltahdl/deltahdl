@@ -257,6 +257,7 @@ void Lowerer::RecordSpecifyScope(const RtlirModule* mod) {
 void Lowerer::LowerModule(const RtlirModule* mod) {
   EnterInstanceUnit(design_, mod, inst_prefix_, ctx_, arena_);
   RegisterInstanceKeyBinding(inst_prefix_, mod, ctx_);
+  RegisterTypeRefCompares(inst_prefix_, mod, ctx_);
   LowerParams(mod);
   RecordSpecifyScope(mod);
   RegisterModuleNets(mod, ctx_, arena_);

@@ -567,7 +567,9 @@ void Lowerer::LowerVar(std::string_view name, const RtlirVariable& var) {
   // index in its initializer, a semaphore's `new(i + 1)` among them.
   GenBlockConstFrame loop_consts(var.gen_block_consts, ctx_, arena_);
   if (var.init_expr) {
+    ctx_.SetLoweringGenBlockPrefix(var.gen_block_prefix);
     LowerVarInit(name, var, v, width);
+    ctx_.SetLoweringGenBlockPrefix({});
   }
   if (!var.init_expr) ApplyStructMemberDefaults(name, var, v, ctx_, arena_);
   // §8.25: the specialization recorded above stands; the generic class's bare

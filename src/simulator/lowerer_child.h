@@ -22,6 +22,13 @@ struct RtlirModule;
 void RegisterInstanceKeyBinding(const std::string& inst_prefix,
                                 const RtlirModule* mod, SimContext& ctx);
 
+// §6.23 with §6.20.3: hands the run what each comparison of type references
+// `mod`'s code writes gives in the instance named by `inst_prefix` and in each
+// generate block instance within it (RtlirModule::type_ref_compares). Defined
+// in lowerer_child.cpp.
+void RegisterTypeRefCompares(const std::string& inst_prefix,
+                             const RtlirModule* mod, SimContext& ctx);
+
 // §40.3.2.1 Table 40-2 with §23.6: the hierarchical path of the instance the
 // run keys under `key`. The first top's declarations and instances are keyed
 // with its name left off, which the path puts back; a later top's start with
