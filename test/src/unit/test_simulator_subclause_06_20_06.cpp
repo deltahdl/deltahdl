@@ -48,4 +48,346 @@ TEST(ConstConstantSim, AutomaticConstReevaluatedEachCall) {
   LowerRunAndCheck(f, design, {{"r1", 11u}, {"r2", 21u}});
 }
 
+// §6.20.6: a const in an automatic task takes its value from the task's input
+// each time the task is entered; two calls with different inputs give two
+// different values.
+TEST(ConstConstantSim, AutomaticTaskConstReevaluatedEachCall) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int r1, r2;\n"
+      "  task automatic triple(input int a, output int o);\n"
+      "    const int c = a * 3;\n"
+      "    o = c;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    triple(2, r1);\n"
+      "    triple(5, r2);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+  LowerRunAndCheck(f, design, {{"r1", 6u}, {"r2", 15u}});
+}
+
+// §6.20.6: a const declared automatic in a begin block of an initial process
+// is set during simulation from a variable assigned just before the block.
+TEST(ConstConstantSim, ConstVarAutomaticInBlockTakesRuntimeValue) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    int a;\n"
+                      "    a = 3;\n"
+                      "    begin\n"
+                      "      const var automatic int x = a + 1;\n"
+                      "      result = x;\n"
+                      "    end\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            4u);
+}
+
+// §6.20.6: an automatic const in a loop body is initialized on every entry of
+// the body, so each iteration sees its own value; a value kept from the first
+// entry would leave every element 2.
+TEST(ConstConstantSim, AutomaticConstInLoopBodyNewValueEachEntry) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int r1, r2, r3;\n"
+      "  int r[4];\n"
+      "  initial begin\n"
+      "    for (int i = 1; i < 4; i++) begin\n"
+      "      const automatic int c = i * 2;\n"
+      "      r[i] = c;\n"
+      "    end\n"
+      "    r1 = r[1];\n"
+      "    r2 = r[2];\n"
+      "    r3 = r[3];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+  LowerRunAndCheck(f, design, {{"r1", 2u}, {"r2", 4u}, {"r3", 6u}});
+}
+
+// §6.20.6: the initializer of an automatic const may read a module variable,
+// an expression no constant could take; the value read is the one the
+// variable holds when the block is entered.
+TEST(ConstConstantSim, AutomaticConstReadsModuleVariableAtEntry) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int m, r1, r2;\n"
+      "  initial begin\n"
+      "    m = 7;\n"
+      "    for (int i = 0; i < 2; i++) begin\n"
+      "      const automatic int c = m;\n"
+      "      if (i == 0) r1 = c; else r2 = c;\n"
+      "      m = 9;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+  LowerRunAndCheck(f, design, {{"r1", 7u}, {"r2", 9u}});
+}
+
+// §6.20.6: a const declared without a lifetime in a block nested inside an
+// automatic task is automatic too, and takes the task's input each call.
+TEST(ConstConstantSim, ImplicitlyAutomaticConstInTaskBlock) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int r1, r2;\n"
+      "  task automatic dec(input int a, output int o);\n"
+      "    begin\n"
+      "      const int c = a - 1;\n"
+      "      o = c;\n"
+      "    end\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    dec(5, r1);\n"
+      "    dec(10, r2);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+  LowerRunAndCheck(f, design, {{"r1", 4u}, {"r2", 9u}});
+}
+
+// §6.20.6: a class method is automatic, so a const in it takes its value
+// from the argument and the object's property each time the method runs; the
+// second call, with a new argument and a changed property, gives a new value
+// where a const kept from the first call would give 105 again.
+TEST(ConstConstantSim, ClassMethodConstTakesRuntimeValue) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  class C;\n"
+      "    int base = 100;\n"
+      "    function int add(int a);\n"
+      "      const int c = a + base;\n"
+      "      return c;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  int r1, r2;\n"
+      "  C obj;\n"
+      "  initial begin\n"
+      "    obj = new;\n"
+      "    r1 = obj.add(5);\n"
+      "    obj.base = 200;\n"
+      "    r2 = obj.add(7);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+  LowerRunAndCheck(f, design, {{"r1", 105u}, {"r2", 207u}});
+}
+
+// §6.20.6: an automatic const may be initialized by a call of a function that
+// is not a constant function; the call runs at each entry, so the counter it
+// advances shows in each const.
+TEST(ConstConstantSim, AutomaticConstFromFunctionCallReevaluated) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int count, r1, r2;\n"
+      "  function int next();\n"
+      "    count = count + 1;\n"
+      "    return count;\n"
+      "  endfunction\n"
+      "  function automatic int take();\n"
+      "    const int c = next();\n"
+      "    return c;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    count = 0;\n"
+      "    r1 = take();\n"
+      "    r2 = take();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+  LowerRunAndCheck(f, design, {{"r1", 1u}, {"r2", 2u}});
+}
+
+// §6.20.6: a const in an automatic task may be set from a module variable;
+// it reads the value the variable holds when the task is entered, 7 and then
+// 9, never the 5 it was declared with.
+TEST(ConstConstantSim, AutomaticTaskConstReadsModuleVariableWhenCalled) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int g = 5;\n"
+      "  int x, y;\n"
+      "  task automatic twice(output int r);\n"
+      "    const int c = g * 2;\n"
+      "    r = c;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    g = 7;\n"
+      "    twice(x);\n"
+      "    g = 9;\n"
+      "    twice(y);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+  LowerRunAndCheck(f, design, {{"x", 14u}, {"y", 18u}});
+}
+
+// §6.20.6 with §6.21: in a module declared automatic, a task or function with
+// no lifetime keyword is automatic, so a const in it takes each call's
+// argument; a static const would keep the value of its first initialization.
+TEST(ConstConstantSim, ConstInAutomaticModuleSubroutineIsAutomatic) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module automatic t;\n"
+      "  int r1, r2, r3, r4;\n"
+      "  task inc(input int a, output int o);\n"
+      "    const int c = a + 1;\n"
+      "    o = c;\n"
+      "  endtask\n"
+      "  function int dbl(int a);\n"
+      "    const int c = a * 2;\n"
+      "    return c;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    inc(3, r1);\n"
+      "    inc(8, r2);\n"
+      "    r3 = dbl(3);\n"
+      "    r4 = dbl(8);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+  LowerRunAndCheck(f, design,
+                   {{"r1", 4u}, {"r2", 9u}, {"r3", 6u}, {"r4", 16u}});
+}
+
+// §6.20.6 with §6.21: a program declared automatic makes its task and function
+// automatic by default, so a const in each takes each call's argument.
+TEST(ConstConstantSim, ConstInAutomaticProgramSubroutineIsAutomatic) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "program automatic p;\n"
+      "  int r1, r2, r3, r4;\n"
+      "  task sub(input int a, output int o);\n"
+      "    const int c = a - 2;\n"
+      "    o = c;\n"
+      "  endtask\n"
+      "  function int tri3(int a);\n"
+      "    const int c = a * 3;\n"
+      "    return c;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    sub(5, r1);\n"
+      "    sub(11, r2);\n"
+      "    r3 = tri3(4);\n"
+      "    r4 = tri3(7);\n"
+      "  end\n"
+      "endprogram\n"
+      "module top;\n"
+      "  p u();\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+  LowerRunAndCheck(f, design,
+                   {{"u.r1", 3u}, {"u.r2", 9u}, {"u.r3", 12u}, {"u.r4", 21u}});
+}
+
+// §6.20.6 with §6.21: an interface declared automatic makes its task and
+// function automatic by default, so a const in each, reached through an
+// interface instance, takes each call's argument.
+TEST(ConstConstantSim, ConstInAutomaticInterfaceSubroutineIsAutomatic) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "interface automatic ifc;\n"
+      "  task add5(input int a, output int o);\n"
+      "    const int c = a + 5;\n"
+      "    o = c;\n"
+      "  endtask\n"
+      "  function int sq(int a);\n"
+      "    const int c = a * a;\n"
+      "    return c;\n"
+      "  endfunction\n"
+      "endinterface\n"
+      "module t;\n"
+      "  int r1, r2, r3, r4;\n"
+      "  ifc u();\n"
+      "  initial begin\n"
+      "    u.add5(1, r1);\n"
+      "    u.add5(4, r2);\n"
+      "    r3 = u.sq(3);\n"
+      "    r4 = u.sq(6);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+  LowerRunAndCheck(f, design,
+                   {{"r1", 6u}, {"r2", 9u}, {"r3", 9u}, {"r4", 36u}});
+}
+
+// §6.20.6 with §6.21: a package declared automatic makes its task and
+// function automatic by default, so a const in each, called through the
+// package scope, takes each call's argument.
+TEST(ConstConstantSim, ConstInAutomaticPackageSubroutineIsAutomatic) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "package automatic p;\n"
+      "  task sub3(input int a, output int o);\n"
+      "    const int c = a - 3;\n"
+      "    o = c;\n"
+      "  endtask\n"
+      "  function int add7(int a);\n"
+      "    const int c = a + 7;\n"
+      "    return c;\n"
+      "  endfunction\n"
+      "endpackage\n"
+      "module t;\n"
+      "  int r1, r2, r3, r4;\n"
+      "  initial begin\n"
+      "    p::sub3(10, r1);\n"
+      "    p::sub3(20, r2);\n"
+      "    r3 = p::add7(2);\n"
+      "    r4 = p::add7(30);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+  LowerRunAndCheck(f, design,
+                   {{"r1", 7u}, {"r2", 17u}, {"r3", 9u}, {"r4", 37u}});
+}
+
+// §6.20.6 with §6.21: a const declared automatic inside a static task or
+// function overrides the enclosing static lifetime and is set on each entry,
+// so two calls give two values; a static const would repeat the first.
+TEST(ConstConstantSim, ExplicitlyAutomaticConstInStaticSubroutine) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int r1, r2, r3, r4;\n"
+      "  task inc(input int a, output int o);\n"
+      "    const automatic int c = a + 1;\n"
+      "    o = c;\n"
+      "  endtask\n"
+      "  function int add_ten(int a);\n"
+      "    const automatic int c = a + 10;\n"
+      "    return c;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    inc(2, r1);\n"
+      "    inc(6, r2);\n"
+      "    r3 = add_ten(1);\n"
+      "    r4 = add_ten(5);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+  LowerRunAndCheck(f, design,
+                   {{"r1", 3u}, {"r2", 7u}, {"r3", 11u}, {"r4", 15u}});
+}
+
 }  // namespace
