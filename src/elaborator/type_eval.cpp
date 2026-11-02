@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstdlib>
+#include <functional>
 #include <string_view>
 #include <unordered_set>
 #include <utility>
@@ -190,42 +191,36 @@ uint32_t StructMemberStorageWidth(const StructMember& m,
   return EvalStructMemberWidth(m, typedefs) * UnpackedMemberCount(m);
 }
 
-static uint32_t EvalStructOrUnionWidth(const DataType& dtype) {
+uint32_t CombinedMemberWidth(
+    const DataType& dtype,
+    const std::function<uint32_t(const StructMember&)>& member_width) {
   if (dtype.struct_members.empty()) return 0;
   if (dtype.kind == DataTypeKind::kUnion) {
     uint32_t max_w = 0;
     for (const auto& m : dtype.struct_members) {
-      max_w = std::max(max_w, StructMemberStorageWidth(m));
+      max_w = std::max(max_w, member_width(m));
     }
-
     if (dtype.is_tagged && dtype.is_packed)
       max_w += TagBitWidth(static_cast<uint32_t>(dtype.struct_members.size()));
     return max_w;
   }
   uint32_t total = 0;
   for (const auto& m : dtype.struct_members) {
-    total += StructMemberStorageWidth(m);
+    total += member_width(m);
   }
   return total;
 }
 
+static uint32_t EvalStructOrUnionWidth(const DataType& dtype) {
+  return CombinedMemberWidth(
+      dtype, [](const StructMember& m) { return StructMemberStorageWidth(m); });
+}
+
 uint32_t EvalStructOrUnionWidth(const DataType& dtype,
                                 const TypedefMap& typedefs) {
-  if (dtype.struct_members.empty()) return 0;
-  if (dtype.kind == DataTypeKind::kUnion) {
-    uint32_t max_w = 0;
-    for (const auto& m : dtype.struct_members) {
-      max_w = std::max(max_w, StructMemberStorageWidth(m, typedefs));
-    }
-    if (dtype.is_tagged && dtype.is_packed)
-      max_w += TagBitWidth(static_cast<uint32_t>(dtype.struct_members.size()));
-    return max_w;
-  }
-  uint32_t total = 0;
-  for (const auto& m : dtype.struct_members) {
-    total += StructMemberStorageWidth(m, typedefs);
-  }
-  return total;
+  return CombinedMemberWidth(dtype, [&typedefs](const StructMember& m) {
+    return StructMemberStorageWidth(m, typedefs);
+  });
 }
 
 uint32_t TaggedUnionTagWidth(const DataType& dtype) {

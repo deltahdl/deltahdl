@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -148,6 +149,13 @@ uint32_t EvalStructMemberWidth(const StructMember& m,
                                const TypedefMap& typedefs);
 uint32_t StructMemberStorageWidth(const StructMember& m,
                                   const TypedefMap& typedefs);
+// §7.2.1 and §7.3.1: the bits a structure's or union's members take together,
+// a structure's summed and a union's the widest, with a packed tagged union's
+// tag, each member taking the bits `member_width` gives it. Its own packed
+// dimensions, which make an array of it, are the caller's.
+uint32_t CombinedMemberWidth(
+    const DataType& dtype,
+    const std::function<uint32_t(const StructMember&)>& member_width);
 // §7.2.1 and §7.3.1: the bits a structure's or union's members take together,
 // a structure's summed and a union's the widest, with a packed tagged union's
 // tag; each member's dimensions folded with no scope. Its own packed

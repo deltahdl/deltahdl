@@ -292,6 +292,24 @@ static const std::unordered_set<std::string_view>* NamesToClashAgainst(
   return declares_its_constants ? &scope_names : &kNoDeclaredNames;
 }
 
+// §6.19: only a member that takes the incremented value is out of range; a
+// following member giving its own value takes none, as the last takes none at
+// all.
+static void CheckEnumAutoIncrement(const DataType& dtype,
+                                   const EnumMember& member, int64_t next_val,
+                                   const EnumBaseRange& range, SourceLoc loc,
+                                   DiagEngine& diag) {
+  const bool kNextIncrements =
+      &member != &dtype.enum_members.back() && !(&member + 1)->value;
+  if (kNextIncrements && next_val > 0 &&
+      static_cast<uint64_t>(next_val) > range.max_val) {
+    diag.Error(loc,
+               "enum auto-increment exceeds maximum representable value of "
+               "base type",
+               Subclause("6.19"));
+  }
+}
+
 void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc,
                                   bool declares_its_constants) {
   CheckEnumBaseType(dtype, loc, typedefs_, diag_);
@@ -331,17 +349,8 @@ void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc,
       CheckEnumDuplicateValues(next_val, count, seen_values, loc, diag_);
     }
     next_val += count;
-    // §6.19: only a member that takes the incremented value is out of range;
-    // a following member giving its own value takes none, as the last takes
-    // none at all.
-    const bool kNextIncrements =
-        &member != &dtype.enum_members.back() && !(&member + 1)->value;
-    if (!prev_had_xz && next_val > 0 &&
-        static_cast<uint64_t>(next_val) > range.max_val && kNextIncrements) {
-      diag_.Error(loc,
-                  "enum auto-increment exceeds maximum representable "
-                  "value of base type",
-                  Subclause("6.19"));
+    if (!prev_had_xz) {
+      CheckEnumAutoIncrement(dtype, member, next_val, range, loc, diag_);
     }
   }
 }

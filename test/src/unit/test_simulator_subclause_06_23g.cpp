@@ -309,6 +309,27 @@ TEST(ScopeValueTypeRefSim, ComparisonSetsAParameter) {
   ExpectAtEveryPlace(ComparisonBattery(), Context::kParameter);
 }
 
+// §6.23: a type reference never evaluates its operand, so a parameter
+// comparing the types of a 4-state variable the host declares, of an operation
+// on it with an x literal, or of an x literal alone takes the elaborator's
+// answer though the operand's value is unknown. Taken as a value with unknown
+// bits, the parameter was evaluated again at run time, where a comparison of
+// a name with a type's text gave 0 and one of two expressions 1.
+TEST(ScopeValueTypeRefSim, AParameterNeverEvaluatesTheOperandsUnknownBits) {
+  Battery battery;
+  battery.declarations = "  logic [3:0] own;\n";
+  for (const auto& [test, holds] : std::array<std::pair<const char*, bool>, 5>{{
+           {"type(own) == type(logic [3:0])", true},
+           {"type(own) == type(bit [3:0])", false},
+           {"type(own + 1'b0) == type(logic [7:0])", false},
+           {"type(own + 4'bx) == type(logic [3:0])", true},
+           {"type(4'b1x0z) == type(logic [3:0])", true},
+       }}) {
+    battery.Add(test, holds, holds);
+  }
+  ExpectAtEveryPlace(battery, Context::kParameter);
+}
+
 // A variable declared with `var type(operand)`, and a probe of it, `{0}` its
 // name, that holds under the byte values and under the nibble values as
 // listed. A probe reads the declared width with $bits (§20.6.2) or the number

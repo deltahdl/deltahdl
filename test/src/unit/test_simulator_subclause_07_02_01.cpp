@@ -741,4 +741,46 @@ TEST(PackedStructSimulation, AnInPlaceStructOfATypedefMemberTakesItsState) {
             "1x0z\nz1x0\n1000\n1x0z\n");
 }
 
+// §7.2.1 and §7.3.1 with §6.18: a member written with a type name takes the
+// width the name stands for, so $bits of a structure or union typedef counts
+// it in full wherever the typedef stands: the compilation unit's, a package's
+// read through p::, a module's and a function's. A structure of an 8-bit
+// vector name, a byte enumeration name and a bit is 17; three of the vector
+// name, b_t [2:0], 24; a packed union of the two names 8, and tagged 9 with
+// its tag; a structure holding the first structure and a bit 18; and two of
+// it, s_t [1:0], 34. Sized with no table, each named member counted 1 bit,
+// or the product of the dimensions written on it.
+TEST(PackedStructSimulation, AMemberWrittenWithATypeNameTakesItsWidth) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("typedef logic [5:0] w_t;\n"
+                 "typedef struct packed { w_t a; bit c; } us_t;\n"
+                 "package p;\n"
+                 "  typedef shortint h_t;\n"
+                 "  typedef struct packed { h_t a; bit c; } ps_t;\n"
+                 "endpackage\n"
+                 "module t;\n"
+                 "  typedef logic [7:0] b_t;\n"
+                 "  typedef enum byte { A, B } e_t;\n"
+                 "  typedef struct packed { b_t a; e_t e; bit c; } s_t;\n"
+                 "  typedef struct packed { b_t [2:0] a; } d_t;\n"
+                 "  typedef union packed { b_t a; e_t e; } u_t;\n"
+                 "  typedef union tagged packed { b_t a; e_t e; } tu_t;\n"
+                 "  typedef struct packed { s_t inner; bit d; } n_t;\n"
+                 "  typedef s_t [1:0] sa_t;\n"
+                 "  function automatic int fw();\n"
+                 "    typedef struct packed { b_t a; e_t e; } f_t;\n"
+                 "    return $bits(f_t);\n"
+                 "  endfunction\n"
+                 "  initial begin\n"
+                 "    $display(\"%0d %0d %0d %0d %0d\", $bits(us_t), "
+                 "$bits(p::ps_t), $bits(s_t), $bits(d_t), $bits(u_t));\n"
+                 "    $display(\"%0d %0d %0d %0d\", $bits(tu_t), $bits(n_t), "
+                 "$bits(sa_t), fw());\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "7 17 17 24 8\n9 18 34 16\n");
+}
+
 }  // namespace

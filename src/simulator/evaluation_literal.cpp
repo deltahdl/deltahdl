@@ -171,7 +171,36 @@ static uint32_t DeclaredPackedDimProduct(const DataType& type,
   return folded != 0 ? folded : RunningPackedDimProduct(type, ctx);
 }
 
+// §7.2.1 with §6.18: the bits a member takes in its structure or union, a
+// member written with a type name taking the width the name stands for in the
+// running scope's tables. Sized with no table, `m_t f` under a typedef of an
+// enumeration took one bit.
+static uint32_t RunningMemberWidth(const StructMember& m, SimContext& ctx) {
+  if (IsDynamicArrayMember(m)) return kDynamicMemberHandleWidth;
+  uint32_t each = EvalStructMemberWidth(m);
+  if (m.nested_type != nullptr) {
+    each = DeclaredTypeWidth(*m.nested_type, ctx);
+  } else if (m.resolved_width == 0 && m.type_kind == DataTypeKind::kNamed) {
+    DataType own;
+    own.kind = m.type_kind;
+    own.type_name = m.type_name;
+    own.scope_name = m.scope_name;
+    own.packed_dim_left = m.packed_dim_left;
+    own.packed_dim_right = m.packed_dim_right;
+    own.extra_packed_dims = m.extra_packed_dims;
+    each = DeclaredTypeWidth(own, ctx);
+  }
+  return each * UnpackedMemberCount(m);
+}
+
 uint32_t DeclaredTypeWidth(const DataType& type, SimContext& ctx) {
+  if (type.kind == DataTypeKind::kStruct || type.kind == DataTypeKind::kUnion) {
+    uint32_t each = CombinedMemberWidth(type, [&ctx](const StructMember& m) {
+      return RunningMemberWidth(m, ctx);
+    });
+    uint32_t outer = DeclaredPackedDimProduct(type, ctx);
+    return outer > 0 ? each * outer : each;
+  }
   if (type.kind != DataTypeKind::kNamed && PackedDimProduct(type) == 0) {
     if (uint32_t running = RunningPackedDimProduct(type, ctx)) return running;
   }

@@ -156,14 +156,14 @@ void RecordPackedRange(const DataType* dt, Variable* v, SimContext& ctx,
 // created ahead of every module, so those are passed over.
 static bool EveryNameHasStorage(const Expr* expr, SimContext& ctx) {
   std::vector<const Expr*> scoped;
-  ForEachSubExpr(expr, [&](const Expr* e) {
+  ForEachEvaluatedSubExpr(expr, [&](const Expr* e) {
     if (e->kind == ExprKind::kMemberAccess && e->is_scope_resolution) {
       scoped.push_back(e->lhs);
       scoped.push_back(e->rhs);
     }
   });
   bool all = true;
-  ForEachSubExpr(expr, [&](const Expr* e) {
+  ForEachEvaluatedSubExpr(expr, [&](const Expr* e) {
     if (e->kind == ExprKind::kCall) all = false;
     if (e->kind != ExprKind::kIdentifier) return;
     if (std::find(scoped.begin(), scoped.end(), e) != scoped.end()) return;
@@ -177,7 +177,7 @@ static bool EveryNameHasStorage(const Expr* expr, SimContext& ctx) {
 // base -- which the elaborator's fold, holding no unknown bit, folded as 0.
 static bool HoldsXZLiteral(const Expr* expr) {
   bool found = false;
-  ForEachSubExpr(expr, [&](const Expr* e) {
+  ForEachEvaluatedSubExpr(expr, [&](const Expr* e) {
     if (e->kind != ExprKind::kUnbasedUnsizedLiteral &&
         e->kind != ExprKind::kIntegerLiteral)
       return;
@@ -196,7 +196,7 @@ static bool HoldsXZLiteral(const Expr* expr) {
 // name is not the one the name has.
 static bool NamesAnUnknownValue(const Expr* expr, SimContext& ctx) {
   bool found = false;
-  ForEachSubExpr(expr, [&](const Expr* e) {
+  ForEachEvaluatedSubExpr(expr, [&](const Expr* e) {
     if (e->kind != ExprKind::kIdentifier) return;
     const Variable* v = ctx.FindVariable(e->text);
     if (v != nullptr && HasUnknownBits(v->value)) found = true;

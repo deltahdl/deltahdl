@@ -549,7 +549,9 @@ TEST(EnumerationSimulation, EnumerationIsAsWideAsItsBaseTypeEverywhere) {
 // a program's and a checker's typedef with a variable of it, and an inline
 // enumeration's variable beside it, the checker setting its flag from an
 // always_comb (§17.5); and a class's typedef with a property of it and a
-// property of an inline enumeration, read through a handle. r records each.
+// property of an inline enumeration, read through a handle. Each instance
+// keeps its own ok, since a module may not name a checker's or a program's
+// signals (§23.6, §24.3), and the module records the class's in its own.
 std::string EnumWidthInOtherScopes(const EnumBase& enum_base) {
   const std::string kDeclared = std::format(
       "  typedef enum {0} {{XA, XB}} x_t;\n  x_t v;\n"
@@ -568,16 +570,12 @@ std::string EnumWidthInOtherScopes(const EnumBase& enum_base) {
       "  ifc u_ifc();\n"
       "  pg u_pg();\n"
       "  ck u_ck();\n"
-      "  bit [3:0] r;\n"
+      "  bit ok;\n"
       "  c h;\n"
       "  initial begin\n"
       "    h = new;\n"
-      "    #1;\n"
-      "    r[0] = u_ifc.ok;\n"
-      "    r[1] = u_pg.ok;\n"
-      "    r[2] = u_ck.ok;\n"
-      "    r[3] = $bits(h.v) == {2} && $bits(c::x_t) == {2} &&\n"
-      "           $bits(h.w) == {2};\n"
+      "    ok = $bits(h.v) == {2} && $bits(c::x_t) == {2} &&\n"
+      "         $bits(h.w) == {2};\n"
       "  end\n"
       "endmodule\n",
       kDeclared, kOk, enum_base.width);
@@ -587,7 +585,10 @@ TEST(EnumerationSimulation, EnumerationIsAsWideAsItsBaseInEveryScope) {
   for (const EnumBase& enum_base : kEnumBases) {
     const std::string kSrc = EnumWidthInOtherScopes(enum_base);
     SCOPED_TRACE(kSrc);
-    EXPECT_EQ(RunAndGet(kSrc, "r"), 0xFu);
+    for (const char* ok : {"u_ifc.ok", "u_pg.ok", "u_ck.ok", "ok"}) {
+      SCOPED_TRACE(ok);
+      EXPECT_EQ(RunAndGet(kSrc, ok), 1u);
+    }
   }
 }
 
