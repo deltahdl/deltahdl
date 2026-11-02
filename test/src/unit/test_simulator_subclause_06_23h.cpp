@@ -7,7 +7,7 @@
 #include <string>
 #include <string_view>
 
-#include "fixture_simulator.h"
+#include "helpers_scheduler.h"
 
 using namespace delta;
 
