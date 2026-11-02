@@ -15,6 +15,7 @@
 #include "elaborator/elaborator_class_typedef_specialization.h"
 #include "elaborator/elaborator_data.h"
 #include "elaborator/net_data_type.h"
+#include "elaborator/rtlir.h"
 #include "elaborator/type_ref_walks.h"
 #include "elaborator/unpacked_array_type.h"
 #include "parser/ast_design.h"
@@ -204,6 +205,20 @@ class ElaboratorOperationRules : public ElaboratorData {
   // §6.23: CheckTypeRefArgInner for each type reference
   // unit_scope_type_refs_ holds, with the names in scope at it.
   void ValidateUnitScopeTypeRefArgs();
+  // §6.23 with §26.2 and §3.12.1: the second walk of the procedures a package
+  // or the compilation unit declares -- its tasks and functions and its
+  // classes' methods -- once the typedefs are registered: each declaration's
+  // type reference to an expression is typed (ExprSelfType), and each
+  // comparison of type references is judged and kept in
+  // unit_type_ref_compares_. Defined in elaborator_type_ref_operand.cpp.
+  void ElaborateUnitScopeProcedures();
+  // Runs `use` with the scope a type reference's names are read in: `mod`'s
+  // (InExprTypeScope), or, while ElaborateUnitScopeProcedures walks, the
+  // package's or the unit's (InUnitExprTypeScope). False, running nothing,
+  // where `mod` is null outside that walk.
+  bool InOperandScope(
+      const RtlirModule* mod,
+      const std::function<void(const ExprTypeScope&)>& use) const;
   // §6.23: the self-determined type of the expression `expr` a type reference
   // names (ExprSelfType), each name in it read as `mod` declares it where the
   // reference stands: a net, variable or port, a value parameter, or an
@@ -307,6 +322,13 @@ class ElaboratorOperationRules : public ElaboratorData {
   // The type references the packages and the compilation unit write outside
   // their modules, recorded as ResolveUnitScopeTypeRefs resolves them.
   std::vector<UnitScopeTypeRef> unit_scope_type_refs_;
+  // §6.23 with §26.2: each comparison of type references a package's or the
+  // compilation unit's procedure writes, with its answer, which holds for
+  // every caller, such a procedure belonging to no instance.
+  std::vector<TypeRefCompareResult> unit_type_ref_compares_;
+  // Whether a null module stands for the package type_ref_package_ or the
+  // compilation unit, as it does while ElaborateUnitScopeProcedures walks.
+  bool type_ref_in_unit_procedure_ = false;
   // The operands of type references CheckTypeRefArgInner has reported.
   std::unordered_set<const Expr*> reported_type_ref_args_;
   // §6.21 with §6.23: the TypeRefResolver for the declarations a procedure

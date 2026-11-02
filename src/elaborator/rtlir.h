@@ -919,6 +919,10 @@ struct RtlirDesign : RtlirTypedefFacts {
   std::string last_elab_severity_msg;
   std::string last_elab_severity_scope;
   SourceLoc last_elab_severity_loc;
+  // §6.23 with §26.2: each comparison of type references a package's or the
+  // compilation unit's procedure writes, with its answer, which holds for
+  // every caller; its gen_prefix is empty.
+  std::vector<TypeRefCompareResult> unit_type_ref_compares;
 };
 
 }  // namespace delta

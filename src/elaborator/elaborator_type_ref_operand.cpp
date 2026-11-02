@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "common/arena.h"
+#include "common/source_loc.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/const_eval_internal.h"
 #include "elaborator/elaborator_class_lookup.h"
@@ -24,6 +25,7 @@
 #include "elaborator/rtlir_scopes.h"
 #include "elaborator/scope_value_type.h"
 #include "elaborator/type_eval.h"
+#include "elaborator/type_ref_compare_fold.h"
 #include "elaborator/type_ref_walks.h"
 #include "elaborator/unpacked_array_type.h"
 #include "lexer/token.h"
@@ -31,6 +33,7 @@
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 
 // §6.23: the data type each operand of a comparison of two type references
@@ -349,15 +352,21 @@ std::optional<UnpackedArrayType> ElaboratorOperationRules::TypeRefOperandArray(
   // §6.23: a name the module declares a value by -- a net or variable, then a
   // parameter or an enumeration's named constant -- is an expression,
   // standing for the value's type, which a typedef or nettype names in turn.
-  if (written && mod != nullptr && IsBareName(*written)) {
+  if (written && IsBareName(*written)) {
     std::optional<UnpackedArrayType> value;
-    InExprTypeScope(*mod, [&](const ExprTypeScope& scope) {
+    InOperandScope(mod, [&](const ExprTypeScope& scope) {
       if (std::optional<DeclaredValue> declared =
               scope.value_named(written->type_name)) {
         value = ValueArrayType(*declared);
       }
     });
     if (value) return value;
+  }
+  // §26.3: a type a package's procedure names bare is the package's own where
+  // the package declares it.
+  if (written && mod == nullptr && type_ref_in_unit_procedure_ &&
+      type_ref_package_ != nullptr) {
+    written = InPackage(std::move(*written), *type_ref_package_);
   }
   if (written) return UnpackedArrayType{std::move(*written), {}};
   if (std::optional<DataType> returned = CalledFunctionType(op->lhs))
@@ -599,11 +608,23 @@ void ElaboratorOperationRules::InLocals(std::span<const ProceduralLocal> locals,
   type_ref_block_vars_.resize(kMark);
 }
 
+bool ElaboratorOperationRules::InOperandScope(
+    const RtlirModule* mod,
+    const std::function<void(const ExprTypeScope&)>& use) const {
+  if (mod != nullptr) {
+    InExprTypeScope(*mod, use);
+    return true;
+  }
+  if (!type_ref_in_unit_procedure_) return false;
+  InUnitExprTypeScope(use);
+  return true;
+}
+
 std::optional<DataType> ElaboratorOperationRules::TypeRefExprType(
     const Expr* expr, const RtlirModule* mod) const {
-  if (expr == nullptr || mod == nullptr) return std::nullopt;
+  if (expr == nullptr) return std::nullopt;
   std::optional<DataType> type;
-  InExprTypeScope(*mod, [&](const ExprTypeScope& scope) {
+  InOperandScope(mod, [&](const ExprTypeScope& scope) {
     type = ExprSelfType(expr, scope);
   });
   return type;
@@ -611,9 +632,9 @@ std::optional<DataType> ElaboratorOperationRules::TypeRefExprType(
 
 std::optional<UnpackedArrayType> ElaboratorOperationRules::TypeRefArrayType(
     const Expr* expr, const RtlirModule* mod) const {
-  if (expr == nullptr || mod == nullptr) return std::nullopt;
+  if (expr == nullptr) return std::nullopt;
   std::optional<UnpackedArrayType> array;
-  InExprTypeScope(*mod, [&](const ExprTypeScope& scope) {
+  InOperandScope(mod, [&](const ExprTypeScope& scope) {
     array = ExprSelfArrayType(expr, scope);
   });
   return array;
@@ -636,6 +657,21 @@ std::vector<Expr*> ElaboratorOperationRules::TypeRefUnpackedDims(
   return std::move(array->dims);
 }
 
+// §26.2 with §3.12.1: the constants a package's or the compilation unit's
+// procedure folds against: the unit's, which `all` holds, and those of the
+// package `pkg`, held there under "pkg.name", by their bare names as well.
+static ScopeMap UnitProcedureConstants(const ScopeMap& all,
+                                       const PackageDecl* pkg) {
+  ScopeMap constants = all;
+  if (pkg == nullptr) return constants;
+  const std::string kPrefix = std::string(pkg->name) + ".";
+  for (const auto& [name, value] : all) {
+    if (name.starts_with(kPrefix))
+      constants[name.substr(kPrefix.size())] = value;
+  }
+  return constants;
+}
+
 // §6.23 — a comparison of two type references is a constant expression whose
 // result is true exactly when the referenced types match per §6.22.1 (equality
 // forms yield that truth value; inequality forms its negation). Fold such a
@@ -651,7 +687,10 @@ std::optional<bool> ElaboratorOperationRules::TypeRefsMatch(
   // values fold against the module's constants and the generate constants in
   // force.
   const ScopeMap kConstants =
-      mod != nullptr ? ConstantsIn(*mod, gen_const_scope_) : gen_const_scope_;
+      mod != nullptr ? ConstantsIn(*mod, gen_const_scope_)
+      : type_ref_in_unit_procedure_
+          ? UnitProcedureConstants(cu_param_scope_, type_ref_package_)
+          : gen_const_scope_;
   return UnpackedArrayTypesMatch(*type_a, *type_b, ArrayTables(), kConstants,
                                  [&](const DataType& x, const DataType& y) {
                                    return DataTypesMatch(x, y, kConstants);
@@ -666,6 +705,47 @@ std::optional<int64_t> ElaboratorOperationRules::EvalConstTypeRefCompare(
   bool is_negated =
       expr->op == TokenKind::kBangEq || expr->op == TokenKind::kBangEqEq;
   return (*matched != is_negated) ? 1 : 0;
+}
+
+void ElaboratorOperationRules::ElaborateUnitScopeProcedures() {
+  type_ref_in_unit_procedure_ = true;
+  // §6.23: a declaration's reference to an expression takes the expression's
+  // type; one naming nothing the scope types, `type(this)` or a class's type
+  // parameter, is left as written for the run to read.
+  const TypeRefResolver kResolve =
+      [this](DataType& dt, SourceLoc,
+             std::span<const ProceduralLocal> locals) -> std::vector<Expr*> {
+    std::vector<Expr*> taken;
+    const Expr* ref = dt.type_ref_expr;
+    if (ref == nullptr) return taken;
+    InLocals(locals, [&] {
+      if (std::optional<UnpackedArrayType> array =
+              TypeRefValueArray(ref, nullptr)) {
+        taken = std::move(array->dims);
+        AdoptReferencedType(dt, array->element);
+      } else if (std::optional<DataType> type = TypeRefExprType(ref, nullptr)) {
+        AdoptExpressionType(dt, type, arena_);
+      }
+    });
+    return taken;
+  };
+  const TypeRefCompareFolder kFold = [this](const Expr* e) {
+    std::optional<int64_t> holds = EvalConstTypeRefCompare(e, nullptr);
+    if (holds.has_value()) {
+      unit_type_ref_compares_.push_back({.expr = e, .holds = *holds != 0});
+    }
+    return holds;
+  };
+  const ProceduralStmtVisitor kVisit =
+      [&](Stmt* s, std::span<const ProceduralLocal> locals) {
+        InLocals(locals, [&] { FoldTypeRefComparesOfStmt(s, kFold); });
+      };
+  ResolveUnitScopeProcedureTypeRefs(
+      unit_, arena_,
+      [this](const PackageDecl* pkg) { type_ref_package_ = pkg; }, kResolve,
+      kVisit);
+  type_ref_package_ = nullptr;
+  type_ref_in_unit_procedure_ = false;
 }
 
 }  // namespace delta

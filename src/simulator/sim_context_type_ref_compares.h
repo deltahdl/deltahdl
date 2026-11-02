@@ -20,6 +20,9 @@ namespace delta {
 class TypeRefCompares {
  public:
   void RecordTypeRefCompare(std::string scope, const Expr* expr, bool holds);
+  // §6.23 with §26.2: the answer to `expr`, a comparison a package's or the
+  // compilation unit's procedure writes, which holds wherever it runs.
+  void RecordUnitTypeRefCompare(const Expr* expr, bool holds);
   // §27.4: the generate block instance declaring what is being built, where
   // that is a declaration whose initializer is evaluated before any process.
   void SetLoweringGenBlockPrefix(std::string_view prefix);
@@ -36,6 +39,7 @@ class TypeRefCompares {
   std::unordered_map<const Expr*, std::unordered_map<std::string, bool>>
       type_ref_compares_;
   std::string lowering_gen_prefix_;
+  std::unordered_map<const Expr*, bool> unit_type_ref_compares_;
 };
 
 }  // namespace delta

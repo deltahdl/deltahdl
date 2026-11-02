@@ -403,7 +403,6 @@ void Elaborator::RunPreElaborationValidations() {
   ValidateNameSpaces();
 
   ValidateConfigDesignStatements();
-
   ValidateConfigDefaultClauses();
 
   ValidateConfigInstanceClauses();
@@ -614,6 +613,7 @@ RtlirDesign* Elaborator::ElaborateTops(
   // cu_param_scope_ by now, and a compilation-unit class is lowered ahead of
   // the modules, with the design as its only scope.
   design->unit_constants = cu_param_scope_;
+  design->unit_type_ref_compares = std::move(unit_type_ref_compares_);
   FinalizeDesignTail(
       design, unit_,
       TypeNameSources{typedefs_, aggregate_typedef_names_, arena_},

@@ -69,14 +69,8 @@ static ValueShapeOf ShapesIn(const RtlirModule* mod) {
   return [mod](std::string_view name) { return NamedValueShape(name, mod); };
 }
 
-// §6.23: takes onto `dt`, in place of its type reference, the self-determined
-// type `type` of the expression the reference names: a structure, union or
-// enumeration whole, keeping the declaration's own `const`, and any other type
-// as AdoptReferencedType takes it. A logic bit where the expression is of no
-// type a data type alone carries.
-static void AdoptExpressionType(DataType& dt,
-                                const std::optional<DataType>& type,
-                                Arena& arena) {
+void AdoptExpressionType(DataType& dt, const std::optional<DataType>& type,
+                         Arena& arena) {
   if (!type) {
     AdoptLogicVector(dt, {}, arena);
     return;

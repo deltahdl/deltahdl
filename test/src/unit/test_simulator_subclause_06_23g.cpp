@@ -407,7 +407,10 @@ TEST(ScopeValueTypeRefSim, DeclarationTakesTheValuesType) {
 // fork-join the case is written in. An interface's and a program's initial
 // block hold the case as a module's does, and so does the method of a class
 // any of them, or a generate block, declares (§8.26), whose names hide the
-// host's as a subroutine's do.
+// host's as a subroutine's do. A package's or the compilation unit's task or
+// function, and the method of a class either declares, hide the package's or
+// the unit's names the same way (§26.2, §3.12.1); such a procedure belongs to
+// no instance, so each comparison in it holds or fails for every caller.
 struct Procedure {
   const char* name;
   const char* text;
@@ -482,6 +485,36 @@ constexpr std::array kProcedures = {
               "    initial begin\n      c h;\n      h = new;\n      h.fn();\n"
               "    end\n  end\nendmodule\n",
               "r"},
+    Procedure{"package's function",
+              "package p;\n{0}  function automatic void fn();\n{1}{2}"
+              "  endfunction\nendpackage\n"
+              "module t;\n  initial p::fn();\nendmodule\n",
+              "p.r"},
+    Procedure{"package's task",
+              "package p;\n{0}  task automatic tk();\n{1}{2}  endtask\n"
+              "endpackage\nmodule t;\n  initial p::tk();\nendmodule\n",
+              "p.r"},
+    Procedure{"compilation unit's function",
+              "{0}function automatic void fn();\n{1}{2}endfunction\n"
+              "module t;\n  initial fn();\nendmodule\n",
+              "$unit.r"},
+    Procedure{"compilation unit's task",
+              "{0}task automatic tk();\n{1}{2}endtask\n"
+              "module t;\n  initial tk();\nendmodule\n",
+              "$unit.r"},
+    Procedure{"method of a package's class",
+              "package p;\n{0}  class c;\n    function void fn();\n{1}{2}"
+              "    endfunction\n  endclass\nendpackage\n"
+              "module t;\n  initial begin\n    p::c h;\n    h = new;\n"
+              "    h.fn();\n  end\nendmodule\n",
+              "p.r"},
+    Procedure{
+        "method of the compilation unit's class",
+        "{0}class c;\n  function void fn();\n{1}{2}  endfunction\n"
+        "endclass\n"
+        "module t;\n  initial begin\n    c h;\n    h = new;\n    h.fn();\n"
+        "  end\nendmodule\n",
+        "$unit.r"},
 };
 
 // The procedure's own names: an int a and a byte b, a byte x over the

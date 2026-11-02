@@ -173,8 +173,14 @@ void TypeRefCompares::RecordTypeRefCompare(std::string scope, const Expr* expr,
   type_ref_compares_[expr][std::move(scope)] = holds;
 }
 
+void TypeRefCompares::RecordUnitTypeRefCompare(const Expr* expr, bool holds) {
+  unit_type_ref_compares_[expr] = holds;
+}
+
 std::optional<bool> TypeRefCompares::TypeRefCompareIn(
     const Expr* expr, const std::string& scope) const {
+  auto unit = unit_type_ref_compares_.find(expr);
+  if (unit != unit_type_ref_compares_.end()) return unit->second;
   auto by_scope = type_ref_compares_.find(expr);
   if (by_scope == type_ref_compares_.end()) return std::nullopt;
   auto found = by_scope->second.find(scope);

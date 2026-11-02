@@ -69,7 +69,19 @@ static void RegisterDesignTypeWidths(const RtlirDesign* design,
 // unit's while the unit may name a package's, so the unit's storage follows
 // the packages' and its initializers (InitCompilationUnitData) follow the
 // packages' initializers.
+// §6.23 with §26.2: the answers the elaborator gave the comparisons of type
+// references in the packages' and the compilation unit's procedures, recorded
+// before any of those procedures runs, a package initializer's call among
+// them.
+static void RegisterUnitTypeRefCompares(const RtlirDesign* design,
+                                        SimContext& ctx) {
+  for (const TypeRefCompareResult& compare : design->unit_type_ref_compares) {
+    ctx.RecordUnitTypeRefCompare(compare.expr, compare.holds);
+  }
+}
+
 void Lowerer::LowerDesignData() {
+  RegisterUnitTypeRefCompares(design_, ctx_);
   RegisterDesignTypeWidths(design_, ctx_);
   RegisterTypeTargets(design_, ctx_);
   RegisterDesignTypeLayouts(design_, ctx_, arena_);

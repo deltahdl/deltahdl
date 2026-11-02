@@ -369,6 +369,15 @@ void AdoptReferencedType(DataType& dt, const DataType& type);
 void ResolveScopeTypeRef(DataType& dt, const std::vector<ModuleItem*>& items,
                          Arena& arena);
 
+// §6.23: takes onto `dt`, in place of its type reference, the self-determined
+// type `type` of the expression the reference names: a structure, union or
+// enumeration whole, keeping the declaration's own `const`, and any other type
+// as AdoptReferencedType takes it. A logic bit where the expression is of no
+// type a data type alone carries. Defined in
+// elaborator_validate_struct_types.cpp.
+void AdoptExpressionType(DataType& dt, const std::optional<DataType>& type,
+                         Arena& arena);
+
 // Whether any identifier or callee anywhere in `e` is one of `names`. A caller
 // that has failed to fold an expression asks this to tell a value it cannot
 // compute yet from one it can never compute.

@@ -377,6 +377,19 @@ void ResolveClassTypeRefs(ClassDecl& cls, const TypeRefResolver& resolve_outer,
   }
 }
 
+// The package and compilation-unit scopes of `unit`: `on_items` is shown each
+// package's items with the package, then the unit's own with none; `on_class`
+// each class declared at the unit's top, outside every package.
+static void ForEachUnitScope(
+    CompilationUnit* unit,
+    const std::function<void(const PackageDecl*,
+                             const std::vector<ModuleItem*>&)>& on_items,
+    const std::function<void(ClassDecl&)>& on_class) {
+  for (const PackageDecl* pkg : unit->packages) on_items(pkg, pkg->items);
+  on_items(nullptr, unit->cu_items);
+  for (ClassDecl* cls : unit->classes) on_class(*cls);
+}
+
 void ResolveUnitScopeTypeRefs(CompilationUnit* unit, Arena& arena,
                               std::vector<UnitScopeTypeRef>& written) {
   const PackageDecl* package = nullptr;
@@ -398,22 +411,45 @@ void ResolveUnitScopeTypeRefs(CompilationUnit* unit, Arena& arena,
           record(ref->lhs, ref->range.start, locals);
         });
       };
-  auto walk = [&](const std::vector<ModuleItem*>& scope_items) {
-    items = &scope_items;
-    ForEachItemTypeRef(scope_items, [&](const Expr* operand, SourceLoc loc) {
-      record(operand, loc, {});
-    });
-    ResolveScopeItemTypeRefs(scope_items, kInScope, unit, arena, kVisit);
-  };
-  for (const PackageDecl* pkg : unit->packages) {
-    package = pkg;
-    walk(pkg->items);
-  }
-  package = nullptr;
-  walk(unit->cu_items);
-  for (ClassDecl* cls : unit->classes) {
-    ResolveClassTypeRefs(*cls, kInScope, unit, arena, kVisit);
-  }
+  ForEachUnitScope(
+      unit,
+      [&](const PackageDecl* pkg, const std::vector<ModuleItem*>& scope_items) {
+        package = pkg;
+        items = &scope_items;
+        ForEachItemTypeRef(scope_items,
+                           [&](const Expr* operand, SourceLoc loc) {
+                             record(operand, loc, {});
+                           });
+        ResolveScopeItemTypeRefs(scope_items, kInScope, unit, arena, kVisit);
+      },
+      [&](ClassDecl& cls) {
+        package = nullptr;
+        ResolveClassTypeRefs(cls, kInScope, unit, arena, kVisit);
+      });
+}
+
+void ResolveUnitScopeProcedureTypeRefs(
+    CompilationUnit* unit, Arena& arena,
+    const std::function<void(const PackageDecl*)>& enter,
+    const TypeRefResolver& resolve, const ProceduralStmtVisitor& visit) {
+  ForEachUnitScope(
+      unit,
+      [&](const PackageDecl* pkg, const std::vector<ModuleItem*>& items) {
+        enter(pkg);
+        for (ModuleItem* item : items) {
+          if (item->kind == ModuleItemKind::kFunctionDecl ||
+              item->kind == ModuleItemKind::kTaskDecl) {
+            ResolveProceduralTypeRefs(item, resolve, arena, visit);
+          } else if (item->kind == ModuleItemKind::kClassDecl) {
+            ResolveClassTypeRefs(*item->class_decl, resolve, unit, arena,
+                                 visit);
+          }
+        }
+      },
+      [&](ClassDecl& cls) {
+        enter(nullptr);
+        ResolveClassTypeRefs(cls, resolve, unit, arena, visit);
+      });
 }
 
 }  // namespace delta

@@ -287,6 +287,7 @@ void Elaborator::ValidatePerDeclarationRulesInUnitScopes() {
   // §6.23 for the type references the two scopes write, whose names are
   // read as the scope writing them declares them.
   ValidateUnitScopeTypeRefArgs();
+  ElaborateUnitScopeProcedures();
 
   // §11.12's rules on a let's formals for the lets the two scopes declare, and
   // their subroutines and classes' methods; ResolveUnitScopeTypeRefs has
