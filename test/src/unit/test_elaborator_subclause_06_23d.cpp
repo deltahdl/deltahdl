@@ -661,8 +661,9 @@ std::array<Writer, 3> ClassScopes() {
 // in, so a property read through either is a member of that object, `this`
 // reaching the class's own and inherited properties and `super` those of the
 // class it extends, in a class a module, a package or the compilation unit
-// declares; {0} declares the base class's properties.
-constexpr std::array<std::string_view, 4> kThisAndSuperPlaces = {
+// declares, the base class taking parameters or none (§8.25); {0} declares the
+// base class's properties.
+constexpr std::array<std::string_view, 6> kThisAndSuperPlaces = {
     "class pb; {0} endclass class c extends pb; function void m(); "
     "var type(this.{1}) v; endfunction endclass",
     "class pb; {0} endclass class c extends pb; function void m(); bit b; "
@@ -670,7 +671,11 @@ constexpr std::array<std::string_view, 4> kThisAndSuperPlaces = {
     "class pb; {0} endclass class c extends pb; function void m(); "
     "var type(super.{1}) v; endfunction endclass",
     "class pb; {0} endclass class c extends pb; function void m(); bit b; "
-    "b = (type(super.{1}) == type(int)); endfunction endclass"};
+    "b = (type(super.{1}) == type(int)); endfunction endclass",
+    "class pb #(int N = 1); {0} endclass class c extends pb; "
+    "function void m(); var type(this.{1}) v; endfunction endclass",
+    "class pb #(type T = int); {0} endclass class c extends pb #(byte); "
+    "function void m(); var type(super.{1}) v; endfunction endclass"};
 
 TEST(TypeRefDynamicElementElab, PropertyElementThroughThisOrSuperReported) {
   for (const Writer& writing : ClassScopes()) {
@@ -688,13 +693,16 @@ TEST(TypeRefDynamicElementElab, PropertyThroughThisOrSuperAccepted) {
 
 // §8.26: a class a module, an interface or a program declares, in its body or
 // in a generate block, is the type of a handle declared there, and a property
-// read through the handle is a member of the object it refers to (§8.5); {0}
-// declares the class's properties.
-constexpr std::array<std::string_view, 3> kLocalClassHandlePlaces = {
+// read through the handle is a member of the object it refers to (§8.5), the
+// class's own or one it inherits from a class taking parameters (§8.25); {0}
+// declares the properties.
+constexpr std::array<std::string_view, 4> kLocalClassHandlePlaces = {
     "class mk; {0} endclass mk h; var type(h.{1}) v;",
     "class mk; {0} endclass initial begin mk h; bit b; "
     "b = (type(h.{1}) == type(int)); end",
-    "if (1) begin : g class mk; {0} endclass mk h; var type(h.{1}) v; end"};
+    "if (1) begin : g class mk; {0} endclass mk h; var type(h.{1}) v; end",
+    "class mb #(int N = 1); {0} endclass class mk extends mb #(2); endclass "
+    "mk h; var type(h.{1}) v;"};
 
 // A module, an interface and a program, each writing a case at line 7.
 std::array<Writer, 3> ClassDeclaringElements() {

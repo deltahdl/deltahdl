@@ -273,6 +273,22 @@ static const PackageDecl* PackageDeclaring(const ClassDecl* cls,
   return nullptr;
 }
 
+// §8.13 with §8.25: the parameter values the class `owner` takes as a base of
+// `cls`: those the extends clause of the class extending it writes, where that
+// class has no parameters its clause could name; nothing where `owner` is no
+// base of `cls` or its values hang on another class's parameters.
+static const std::vector<DataType>* BaseArguments(const ClassDecl* cls,
+                                                  const ClassDecl* owner,
+                                                  const CompilationUnit* unit) {
+  for (int depth = 0; cls != nullptr && depth < 64; ++depth) {
+    const ClassDecl* base = FindBaseClass(cls, unit);
+    if (base == owner)
+      return cls->params.empty() ? &cls->base_class_type_params : nullptr;
+    cls = base;
+  }
+  return nullptr;
+}
+
 std::optional<UnpackedArrayType> ElaboratorOperationRules::MemberTypeOf(
     const ClassSpecialization& handle, std::string_view name,
     const ScopeMap& constants) const {
@@ -294,11 +310,15 @@ std::optional<UnpackedArrayType> ElaboratorOperationRules::MemberTypeOf(
   if (const PackageDecl* pkg = PackageDeclaring(owned.owner, *unit_))
     written.type = InPackage(written.type, *pkg);
   // §8.13: a member the class inherits is read in the class declaring it,
-  // whose own parameters the handle's specialization does not give.
-  if (owned.owner != handle.cls && !owned.owner->params.empty())
-    return std::nullopt;
-  const ClassSpecialization kOwner{
-      owned.owner, owned.owner == handle.cls ? handle.args : &NoArguments()};
+  // specialized by the values the class extending it gives its parameters.
+  const std::vector<DataType>* args = handle.args;
+  if (owned.owner != handle.cls) {
+    args = owned.owner->params.empty()
+               ? &NoArguments()
+               : BaseArguments(handle.cls, owned.owner, unit_);
+  }
+  if (args == nullptr) return std::nullopt;
+  const ClassSpecialization kOwner{owned.owner, args};
   std::optional<SpecializedClassType> typed =
       SpecializedMemberType(kOwner, written, constants, typedefs_, arena_);
   if (!typed) return std::nullopt;
