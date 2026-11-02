@@ -506,14 +506,31 @@ void ElaboratorOperationRules::InUnitExprTypeScope(
   const TypeShapeTables kTables = ArrayTables();
   const OuterScope kOuter{unit_, nullptr, kTables, arena_};
   const PackageDecl* pkg = type_ref_package_;
-  ExprTypeScope scope{
-      {},
-      [this](const Expr* call) { return CalledFunctionType(call); },
-      [](const Expr*) { return std::optional<DataType>(); },
-      typedefs_,
-      cu_param_scope_,
-      arena_};
+  // §26.3: a function the package declares is called by its bare name inside
+  // the package, its return type read behind the package.
+  auto call_returns = [this, pkg](const Expr* call) {
+    const ModuleItem* fn =
+        pkg != nullptr && (call->lhs == nullptr ||
+                           call->lhs->kind == ExprKind::kIdentifier)
+            ? FunctionAmong(pkg->items, call->callee)
+            : nullptr;
+    if (fn == nullptr) return CalledFunctionType(call);
+    return std::optional<DataType>(InPackage(fn->return_type, *pkg));
+  };
+  ExprTypeScope scope{{}, call_returns, {}, typedefs_, cu_param_scope_, arena_};
   scope.array_tables = &kTables;
+  // §6.23: a type reference in the operand, a cast's (§6.24.1), stands for
+  // the type of the value its bare name names, as the scope declares it, and
+  // otherwise for the type it writes.
+  scope.type_ref = [&](const Expr* ref) -> std::optional<DataType> {
+    std::optional<DataType> written = TypeRefWrittenType(ref);
+    std::optional<DeclaredValue> value;
+    if (written && IsBareName(*written))
+      value = scope.value_named(written->type_name);
+    if (value && value->unpacked_dims == 0)
+      return ThroughTypeNames(value->type, typedefs_, unit_, arena_);
+    return ResolveTypeRefOperandType(ref, nullptr);
+  };
   scope.value_named =
       [&](std::string_view name) -> std::optional<DeclaredValue> {
     std::optional<DeclaredValue> value;

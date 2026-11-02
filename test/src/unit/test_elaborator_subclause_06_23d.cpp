@@ -26,7 +26,9 @@ namespace {
 // value is declared: a name a procedure, a subroutine's formals or a for loop
 // declares, a dimension of a multidimensional array after the first (§7.4.5),
 // a member of a structure (§7.2), a property read through a class handle
-// (§8.5) and the queue an array locator method gives (§7.12.1) each count.
+// (§8.5), the queue an array locator method gives (§7.12.1), and a member of
+// the value a function call returns or a cast converts to (§6.24.1) each
+// count.
 // Each forbidden form is written beside the nearest allowed one: the dynamic
 // object named whole, a fixed-size dimension's element, a member or property
 // named whole, and a fixed-size array a procedure declares over a dynamic one
@@ -38,14 +40,15 @@ constexpr std::string_view kReport =
 // The declarations every case reads, at lines 1 to 6, so that the line the
 // case writes is line 7: a class whose properties are a dynamic array, a
 // queue, an associative array of each kind of index and a fixed-size array,
-// and a structure whose member is a queue.
+// a structure whose member is a queue, and a function returning the
+// structure it is given.
 constexpr std::string_view kPreamble =
     "class hc;\n"
     "  int d[]; int q[$]; int a[int]; int w[*]; int f[2];\n"
     "endclass\n"
     "module m;\n"
     "  typedef struct { int q[$]; } sq_t;\n"
-    "  logic r;\n";
+    "  logic r; function automatic sq_t fs(sq_t v); return v; endfunction\n";
 
 constexpr uint32_t kCaseLine = 7;
 
@@ -55,7 +58,7 @@ struct Form {
   std::string_view operand;
 };
 
-constexpr std::array<Form, 11> kForbiddenForms = {{
+constexpr std::array<Form, 14> kForbiddenForms = {{
     {"int d[];", "d[0]"},
     {"int d[$];", "d[0]"},
     {"int d[int];", "d[0]"},
@@ -67,9 +70,12 @@ constexpr std::array<Form, 11> kForbiddenForms = {{
     {"hc h;", "h.a[0]"},
     {"hc h;", "h.w[0]"},
     {"int arr[4];", "arr.find with (item > 1)[0]"},
+    {"sq_t s;", "fs(s).q[0]"},
+    {"sq_t s;", "type(s)'(s).q[0]"},
+    {"sq_t s;", "type(sq_t)'(s).q[0]"},
 }};
 
-constexpr std::array<Form, 10> kAllowedForms = {{
+constexpr std::array<Form, 14> kAllowedForms = {{
     {"int d[];", "d"},
     {"int d[$];", "d"},
     {"int d[int];", "d"},
@@ -80,6 +86,10 @@ constexpr std::array<Form, 10> kAllowedForms = {{
     {"hc h;", "h.a"},
     {"hc h;", "h.w"},
     {"hc h;", "h.f[1]"},
+    {"int arr[4];", "arr.find with (item > 1)"},
+    {"sq_t s;", "fs(s).q"},
+    {"sq_t s;", "type(s)'(s).q"},
+    {"sq_t s;", "type(sq_t)'(s).q"},
 }};
 
 // Each place a type reference is written in, one line long, {0} standing for
@@ -604,7 +614,7 @@ constexpr std::string_view kPackagePreamble =
     "  int d[]; int q[$]; int a[int]; int w[*]; int f[2];\n"
     "  endclass\n"
     "  typedef struct { int q[$]; } sq_t;\n"
-    "  logic r;\n";
+    "  logic r; function automatic sq_t fs(sq_t v); return v; endfunction\n";
 
 constexpr std::array<std::string_view, 8> kUnitScopePlaces = {
     kModuleDeclaration,      kParameterValue,      kTaskDeclaration,
