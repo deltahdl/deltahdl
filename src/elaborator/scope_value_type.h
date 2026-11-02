@@ -7,6 +7,8 @@
 #include <string_view>
 
 #include "common/source_loc.h"
+#include "elaborator/expression_self_type.h"
+#include "elaborator/net_data_type.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_type.h"
 
@@ -87,5 +89,51 @@ std::optional<ValueShape> ScopeValueShape(std::string_view name,
 // The type of the value `name` names outside the module of `scope`.
 std::optional<DataType> OuterValueType(std::string_view name,
                                        const TypeRefScope& scope);
+
+// The package `unit` declares as `name`; null where it declares none.
+const PackageDecl* PackageNamed(const CompilationUnit& unit,
+                                std::string_view name);
+
+// What a name an expression writes is looked up in beyond the module holding
+// it: the compilation unit, null where none is known, the declaration of the
+// module, whose position bounds the part of the unit a reference in it
+// searches (§3.12.1), null where no module is being elaborated, the tables
+// that tell the kind of array an unpacked dimension makes, and the arena a
+// parameter's vector type is made in.
+struct OuterScope {
+  const CompilationUnit* unit;
+  const ModuleDecl* reference;
+  const TypeShapeTables& tables;
+  Arena& arena;
+};
+
+// §6.23 with §26.2, §3.12.1 and §6.19.3: the value `name` stands for among
+// `items`, the declarations of the package or of the compilation unit whose
+// typedefs are read behind the scope `scope`: a variable's or net's type and
+// unpacked dimensions, a value parameter's type (ScopeValueType), or an
+// enumeration constant's, the typedef naming its enumeration or else the
+// enumeration as written. A type the declaration writes by one of the scope's
+// own typedef names is read behind `scope`, the key the typedef is recorded
+// under. Nothing where `items` declare no value of the name.
+std::optional<DeclaredValue> ScopeValue(std::span<ModuleItem* const> items,
+                                        std::string_view scope,
+                                        std::string_view name,
+                                        const OuterScope& outer);
+
+// §26.3 with §3.12.1: the value `name`, written behind the scope `prefix`,
+// stands for: one the package of that name declares, or, behind `$unit`, one
+// the compilation unit declares before the module. Nothing where the scope is
+// neither, or declares no value of the name.
+std::optional<DeclaredValue> ScopedValue(std::string_view prefix,
+                                         std::string_view name,
+                                         const OuterScope& outer);
+
+// §26.3 with §3.12.1: the value the bare `name` stands for outside `mod`: one
+// a package `mod` imports it from declares, or else one the compilation unit
+// declares before the module. Nothing where neither declares a value of the
+// name.
+std::optional<DeclaredValue> OuterValue(const RtlirModule& mod,
+                                        std::string_view name,
+                                        const OuterScope& outer);
 
 }  // namespace delta

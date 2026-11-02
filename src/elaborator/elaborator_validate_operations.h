@@ -163,7 +163,9 @@ class ElaboratorOperationRules : public ElaboratorData {
                                     const RtlirModule* mod) const;
   // §6.23 with §7.4: resolve one type-reference operand of a comparison to
   // the type it denotes, an unpacked array's element type with its unpacked
-  // dimensions: a value `mod` declares by the name written its declared type
+  // dimensions: a value `mod` declares by the name written, or a package or
+  // the compilation unit declares by a name written behind its scope or one
+  // the module imports or does not hide (§26.3, §3.12.1), its declared type
   // and dimensions, a type as written, a call of a function its return type
   // (CalledFunctionType), and any other expression its self-determined type
   // (TypeRefArrayType); then each typedef name read through, an array
@@ -190,7 +192,9 @@ class ElaboratorOperationRules : public ElaboratorData {
   // §6.23: the self-determined type of the expression `expr` a type reference
   // names (ExprSelfType), each name in it read as `mod` declares it where the
   // reference stands: a net, variable or port, a value parameter, or an
-  // enumeration's named constant. Nothing where `mod` is null or the
+  // enumeration's named constant; or else as a package `mod` imports it from
+  // or the compilation unit declares it, as a name behind a package's scope
+  // or `$unit::` is read (§26.3, §3.12.1). Nothing where `mod` is null or the
   // expression is of no type a data type alone carries.
   std::optional<DataType> TypeRefExprType(const Expr* expr,
                                           const RtlirModule* mod) const;

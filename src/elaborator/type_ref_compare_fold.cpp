@@ -71,6 +71,9 @@ void FoldTypeRefComparesInStmt(Stmt* s, const TypeRefCompareFolder& fold) {
   for (Expr* e : {s->lhs, s->expr, s->condition, s->assert_expr}) {
     FoldTypeRefComparesInExpr(e, fold);
   }
+  // A declaration's initializer, a block parameter's value among them, is
+  // not a procedural statement (§11.3.6).
+  FoldTypeRefComparesInExpr(s->var_init, BarringAssignments(fold));
   ForEachChildStmt(
       s, [&](Stmt* const& sub) { FoldTypeRefComparesInStmt(sub, fold); });
 }

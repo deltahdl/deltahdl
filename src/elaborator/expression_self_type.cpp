@@ -256,15 +256,26 @@ std::optional<DeclaredValue> ClassMemberValue(const DataType& handle,
   return UnderDims(std::move(member->element), member->dims, scope);
 }
 
+// §26.3 and §3.12.1: the value `name`, written behind the scope `prefix`,
+// stands for, where the scope reaches one.
+std::optional<DeclaredValue> ValueBehindScope(std::string_view prefix,
+                                              std::string_view name,
+                                              const ExprTypeScope& scope) {
+  if (!scope.scoped_value) return std::nullopt;
+  return scope.scoped_value(prefix, name);
+}
+
 // §7.2 and §8.5: the member a member select names, of the type it is
 // declared with and the unpacked dimensions it writes, a structure's or
-// union's or a class's through a handle. Nothing for a package's or class's
-// scope resolution, and for a base that is none of those.
+// union's or a class's through a handle; and a value a package declares,
+// named behind its scope, `p::v` (§26.3). Nothing for a scope that declares
+// no value of the name, and for a base that is none of those.
 std::optional<DeclaredValue> MemberValue(const Expr* access,
                                          const ExprTypeScope& scope) {
-  if (access->is_scope_resolution || access->rhs == nullptr) {
-    return std::nullopt;
-  }
+  if (access->rhs == nullptr) return std::nullopt;
+  // A scope written as other than a name alone, `p::C::v`, names no package.
+  if (access->is_scope_resolution)
+    return ValueBehindScope(access->lhs->text, access->rhs->text, scope);
   std::optional<DeclaredValue> base = ValueOf(access->lhs, scope);
   if (!base || base->unpacked_dims != 0) return std::nullopt;
   const DataType* aggregate = ResolvedAggregateType(
@@ -483,7 +494,8 @@ std::optional<DeclaredValue> ValueOf(const Expr* expr,
   if (expr == nullptr) return std::nullopt;
   switch (expr->kind) {
     case ExprKind::kIdentifier:
-      if (!expr->scope_prefix.empty()) return std::nullopt;
+      if (!expr->scope_prefix.empty())
+        return ValueBehindScope(expr->scope_prefix, expr->text, scope);
       return scope.value_named(expr->text);
     case ExprKind::kSelect:
       return SelectedValue(expr, scope);

@@ -17,6 +17,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "elaborator/scope_value_type.h"
 #include "elaborator/type_eval.h"
 #include "elaborator/type_ref_walks.h"
 #include "lexer/token.h"
@@ -350,15 +351,6 @@ bool ElaboratorOperationRules::IsHierarchicalMemberAccess(const Expr* e) const {
   if (e->kind != ExprKind::kMemberAccess || e->is_scope_resolution)
     return false;
   return !NamesSelectableValue(MemberChainRoot(e->lhs));
-}
-
-// The package `unit` declares as `name`; null where it declares none.
-static const PackageDecl* PackageNamed(const CompilationUnit& unit,
-                                       std::string_view name) {
-  auto it = std::ranges::find_if(unit.packages, [&](const PackageDecl* p) {
-    return p != nullptr && p->name == name;
-  });
-  return it != unit.packages.end() ? *it : nullptr;
 }
 
 // Whether `type` is an enumeration one of whose named constants is `name`

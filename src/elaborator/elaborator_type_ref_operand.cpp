@@ -20,6 +20,7 @@
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_enum_member.h"
 #include "elaborator/rtlir_scopes.h"
+#include "elaborator/scope_value_type.h"
 #include "elaborator/type_eval.h"
 #include "elaborator/unpacked_array_type.h"
 #include "lexer/token.h"
@@ -65,6 +66,14 @@ static bool IsScopedTypeName(const Expr* e) {
          e->is_scope_resolution && e->lhs != nullptr &&
          e->lhs->kind == ExprKind::kIdentifier && e->rhs != nullptr &&
          e->rhs->kind == ExprKind::kIdentifier;
+}
+
+// Whether `e` is a name written behind a scope: a scope resolution of one
+// identifier by another, `p::v`, or a name behind `$unit::`.
+static bool IsScopedName(const Expr* e) {
+  return IsScopedTypeName(e) ||
+         (e != nullptr && e->kind == ExprKind::kIdentifier &&
+          !e->scope_prefix.empty());
 }
 
 // The data type a type reference names as written, before any name in it is
@@ -280,6 +289,13 @@ std::optional<bool> ElaboratorOperationRules::DataTypesMatch(
 
 std::optional<UnpackedArrayType> ElaboratorOperationRules::TypeRefOperandArray(
     const Expr* op, const RtlirModule* mod) const {
+  // §26.3 with §3.12.1: a name behind a package's scope or `$unit::` that
+  // names a value there, rather than a type, is an expression, standing for
+  // the value's type.
+  if (IsScopedName(op->lhs)) {
+    if (std::optional<UnpackedArrayType> value = TypeRefArrayType(op->lhs, mod))
+      return value;
+  }
   std::optional<DataType> written = TypeRefWrittenType(op);
   // §6.23: a name the module declares a value by -- a net or variable, then a
   // parameter or an enumeration's named constant -- is an expression,
@@ -366,12 +382,15 @@ struct ValueLookup {
   ScopedDeclarations declarations;
   const TypedefMap& typedefs;
   Arena& arena;
+  const OuterScope& outer;
 };
 }  // namespace
 
 // The value `name` stands for: a net, variable or port, then a value
 // parameter the generate blocks in force see, then an enumeration's named
-// constant.
+// constant, and last a value outside the module, imported from a package or
+// declared by the compilation unit (OuterValue), which a name the module
+// declares hides (§3.12.1, §26.3).
 static std::optional<DeclaredValue> ValueIn(std::string_view name,
                                             const ValueLookup& lookup) {
   const ScopedDeclarations& declarations = lookup.declarations;
@@ -399,7 +418,9 @@ static std::optional<DeclaredValue> ValueIn(std::string_view name,
           EnumConstantType(lookup.mod, name, lookup.typedefs)) {
     return DeclaredValue{*type};
   }
-  return std::nullopt;
+  // A typedef in force names a type, hiding any outer value of its name.
+  if (lookup.typedefs.contains(name)) return std::nullopt;
+  return OuterValue(lookup.mod, name, lookup.outer);
 }
 
 // §11.2.1: the constants of `mod` an expression in a type reference may fold
@@ -425,9 +446,12 @@ void ElaboratorOperationRules::InExprTypeScope(
     const RtlirModule& mod,
     const std::function<void(const ExprTypeScope&)>& use) const {
   ScopeMap constants = ConstantsIn(mod, gen_const_scope_);
-  ValueLookup lookup{
-      mod, {gen_prefix_scopes_, declared_names_}, typedefs_, arena_};
   const TypeShapeTables kTables = ArrayTables();
+  const OuterScope kOuter{
+      unit_, module_decl_path_.empty() ? nullptr : module_decl_path_.back(),
+      kTables, arena_};
+  ValueLookup lookup{
+      mod, {gen_prefix_scopes_, declared_names_}, typedefs_, arena_, kOuter};
   ExprTypeScope scope{
       [&](std::string_view name) { return ValueIn(name, lookup); },
       [this](const Expr* call) { return CalledFunctionType(call); },
@@ -439,6 +463,10 @@ void ElaboratorOperationRules::InExprTypeScope(
   scope.class_member = [this, &constants](const DataType& handle,
                                           std::string_view name) {
     return ClassMemberType(handle, name, constants);
+  };
+  scope.scoped_value = [&kOuter](std::string_view prefix,
+                                 std::string_view name) {
+    return ScopedValue(prefix, name, kOuter);
   };
   use(scope);
 }

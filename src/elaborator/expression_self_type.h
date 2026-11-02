@@ -64,6 +64,13 @@ struct ExprTypeScope {
   std::function<std::optional<UnpackedArrayType>(const DataType&,
                                                  std::string_view)>
       class_member = {};
+  // §26.3 and §3.12.1: the value a name written behind a scope stands for,
+  // `p::v` behind the package p or `$unit::v` behind the compilation unit,
+  // `prefix` naming the scope; nothing where the scope declares no value of
+  // the name. Empty where no scope beyond the expression's own is in reach.
+  std::function<std::optional<DeclaredValue>(std::string_view prefix,
+                                             std::string_view name)>
+      scoped_value = {};
 };
 
 // The bit or logic vector [width-1:0] of the signing given, a scalar where it
@@ -75,9 +82,11 @@ DataType VectorType(uint32_t width, bool is_signed, bool four_state,
 
 // §6.23 (printed page 138): the self-determined type of `expr`, which a type
 // reference to the expression stands for, the expression left unevaluated.
-// - A name is the type its declaration writes; a bit-select or part-select of
-//   a vector is unsigned and of the vector's state (§11.5.1), one bit or as
-//   many as it names; an element of a packed array is the array's element
+// - A name is the type its declaration writes, one written behind a package's
+//   scope or `$unit::` the type the package's or compilation unit's
+//   declaration writes (§26.3, §3.12.1); a bit-select or part-select of a
+//   vector is unsigned and of the vector's state (§11.5.1), one bit or as many
+//   as it names; an element of a packed array is the array's element
 //   type, unsigned unless that is a name (§7.4.1); an element of an unpacked
 //   array the array's element type (§7.4.2); a character of a string a byte
 //   (§6.16); a member of a structure or union the type it is declared with

@@ -305,6 +305,14 @@ std::string_view Elaborator::ResolveTypeRef(DataType& dt, SourceLoc loc,
     AdoptReferencedType(dt, *returned);
     return {};
   }
+  // §3.12.1: a value behind `$unit::` is the compilation unit's, not one the
+  // module declares by the same name.
+  if (!ref->scope_prefix.empty()) {
+    if (std::optional<DataType> scoped = TypeRefExprType(ref, mod)) {
+      AdoptExpressionType(dt, scoped, arena_);
+      return {};
+    }
+  }
   if (ref->kind != ExprKind::kIdentifier) {
     AdoptExpressionType(dt, TypeRefExprType(ref, mod), arena_);
     return {};

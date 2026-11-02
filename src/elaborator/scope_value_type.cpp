@@ -8,15 +8,18 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
 #include "elaborator/const_eval_internal.h"
 #include "elaborator/elaborator_enum_constants.h"
+#include "elaborator/expression_self_type.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
 #include "elaborator/type_eval.h"
 #include "elaborator/unit_scope_order.h"
+#include "elaborator/unpacked_array_type.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -170,6 +173,31 @@ DataType ScopeValueType(const ModuleItem& item,
       arena);
 }
 
+// What ForEachEnumDeclaring hands each enumeration it finds: the item
+// declaring it, the path ForEachEnumTypeOfItem gives it within the item's type,
+// and the enumeration.
+using EnumDeclaringVisitor = std::function<void(
+    const ModuleItem& item, std::string_view path, const DataType& type)>;
+
+// Calls `fn` for each enumeration one of `items` declares with a named
+// constant `name`. A `name[N]` member declares the constants it generates
+// (EnumMemberDeclaredNames).
+static void ForEachEnumDeclaring(std::string_view name,
+                                 std::span<ModuleItem* const> items,
+                                 const EnumDeclaringVisitor& fn) {
+  for (const ModuleItem* item : items) {
+    ForEachEnumTypeOfItem(
+        item, [&](std::string_view path, const DataType& type) {
+          for (const EnumMember& member : type.enum_members) {
+            const std::vector<std::string> kNames =
+                EnumMemberDeclaredNames(member, {});
+            if (std::ranges::find(kNames, name) != kNames.end())
+              fn(*item, path, type);
+          }
+        });
+  }
+}
+
 // §6.19 with §6.19.3: the shape of the enumeration constant `name` that one
 // of `items` declares, which is of the enumeration's type. A `name[N]`
 // member declares the constants it generates (EnumMemberDeclaredNames).
@@ -177,15 +205,11 @@ DataType ScopeValueType(const ModuleItem& item,
 std::optional<ValueShape> EnumConstantShape(
     std::string_view name, std::span<ModuleItem* const> items) {
   std::optional<ValueShape> shape;
-  const auto kVisit = [&](std::string_view, const DataType& type) {
-    for (const EnumMember& member : type.enum_members) {
-      const std::vector<std::string> kNames =
-          EnumMemberDeclaredNames(member, {});
-      if (std::ranges::find(kNames, name) == kNames.end()) continue;
-      shape = ValueShape{EvalTypeWidth(type), IsSignedType(type, {})};
-    }
-  };
-  for (const ModuleItem* item : items) ForEachEnumTypeOfItem(item, kVisit);
+  ForEachEnumDeclaring(
+      name, items,
+      [&](const ModuleItem&, std::string_view, const DataType& type) {
+        shape = ValueShape{EvalTypeWidth(type), IsSignedType(type, {})};
+      });
   return shape;
 }
 
@@ -207,22 +231,141 @@ std::optional<ValueShape> ScopeValueShape(std::string_view name,
   return ValueShape{EvalTypeWidth(type), type.is_signed};
 }
 
+// The typedef name `type_name` read behind the scope `scope`.
+static DataType NamedBehind(std::string_view scope,
+                            std::string_view type_name) {
+  DataType named;
+  named.kind = DataTypeKind::kNamed;
+  named.scope_name = scope;
+  named.type_name = type_name;
+  return named;
+}
+
+// §6.19.3: the type of the enumeration constant `name` one of `items`
+// declares: the typedef naming the enumeration, read behind `scope`, or the
+// enumeration as written where no typedef names it.
+static std::optional<DataType> ScopeEnumConstantType(
+    std::string_view name, std::string_view scope,
+    std::span<ModuleItem* const> items) {
+  std::optional<DataType> type;
+  ForEachEnumDeclaring(
+      name, items,
+      [&](const ModuleItem& item, std::string_view path,
+          const DataType& enumeration) {
+        type = enumeration;
+        if (item.kind == ModuleItemKind::kTypedef && path.empty())
+          type = NamedBehind(scope, item.name);
+      });
+  return type;
+}
+
 // §26.3 with §3.12.1: the type of the value `name` names outside the module,
 // read in the scope declaring it (ScopeValueType): one a package the module
-// imports it from declares, or else one of the compilation unit written before
-// the reference. Nothing where neither is.
+// imports it from declares, an enumeration constant among them, whose type
+// is its enumeration's (ScopeEnumConstantType), or else one of the
+// compilation unit written before the reference. Nothing where neither is.
 std::optional<DataType> OuterValueType(std::string_view name,
                                        const TypeRefScope& scope) {
-  const PackageDecl* pkg =
-      PackageDeclaring(scope.unit, name, [&](std::string_view package) {
-        return ImportsFrom(*scope.mod, package, name);
-      });
+  for (const PackageDecl* pkg : scope.unit->packages) {
+    if (!ImportsFrom(*scope.mod, pkg->name, name)) continue;
+    if (const ModuleItem* item = ItemNamed(pkg->items, name))
+      return ScopeValueType(*item, pkg->items, scope.arena);
+    if (std::optional<DataType> constant =
+            ScopeEnumConstantType(name, pkg->name, pkg->items))
+      return constant;
+  }
   const std::vector<ModuleItem*> kItems =
-      pkg != nullptr ? pkg->items
-                     : UnitItemsBefore(scope.unit, scope.reference);
+      UnitItemsBefore(scope.unit, scope.reference);
   const ModuleItem* item = ItemNamed(kItems, name);
   if (item == nullptr) return std::nullopt;
   return ScopeValueType(*item, kItems, scope.arena);
+}
+
+// The package `unit` declares as `name`; null where it declares none.
+const PackageDecl* PackageNamed(const CompilationUnit& unit,
+                                std::string_view name) {
+  auto it = std::ranges::find_if(unit.packages, [&](const PackageDecl* p) {
+    return p != nullptr && p->name == name;
+  });
+  return it != unit.packages.end() ? *it : nullptr;
+}
+
+// `type` read behind `scope` where it is written bare by the name of a typedef
+// `items` declare, as the table of typedefs records it; `type` as it is
+// otherwise.
+static DataType BehindScope(DataType type, std::span<ModuleItem* const> items,
+                            std::string_view scope) {
+  if (type.kind != DataTypeKind::kNamed || !type.scope_name.empty())
+    return type;
+  const ModuleItem* item = ItemNamed(items, type.type_name);
+  if (item != nullptr && item->kind == ModuleItemKind::kTypedef)
+    type.scope_name = scope;
+  return type;
+}
+
+// Whether `item` declares a value: a variable, a net or a value parameter,
+// whose type is not the void a type parameter's records (§6.20.3).
+static bool DeclaresValue(const ModuleItem& item) {
+  return item.kind == ModuleItemKind::kVarDecl ||
+         item.kind == ModuleItemKind::kNetDecl ||
+         (item.kind == ModuleItemKind::kParamDecl &&
+          item.data_type.kind != DataTypeKind::kVoid);
+}
+
+std::optional<DeclaredValue> ScopeValue(std::span<ModuleItem* const> items,
+                                        std::string_view scope,
+                                        std::string_view name,
+                                        const OuterScope& outer) {
+  const ModuleItem* item = ItemNamed(items, name);
+  if (item == nullptr) {
+    std::optional<DataType> constant =
+        ScopeEnumConstantType(name, scope, items);
+    if (!constant) return std::nullopt;
+    return DeclaredValue{std::move(*constant)};
+  }
+  if (!DeclaresValue(*item)) return std::nullopt;
+  DeclaredValue value{
+      BehindScope(ScopeValueType(*item, items, outer.arena), items, scope),
+      static_cast<uint32_t>(item->unpacked_dims.size())};
+  value.dims = item->unpacked_dims;
+  if (!value.dims.empty())
+    value.outermost = UnpackedDimKind(value.dims.front(), outer.tables);
+  return value;
+}
+
+// §3.12.1: the items of the compilation unit a reference in the module of
+// `outer` searches, those written before the module; none where no module is
+// known.
+static std::vector<ModuleItem*> UnitItemsSearched(const OuterScope& outer) {
+  if (outer.reference == nullptr) return {};
+  return UnitItemsBefore(outer.unit, outer.reference->range.start);
+}
+
+std::optional<DeclaredValue> ScopedValue(std::string_view prefix,
+                                         std::string_view name,
+                                         const OuterScope& outer) {
+  if (outer.unit == nullptr) return std::nullopt;
+  if (prefix == "$unit")
+    return ScopeValue(UnitItemsSearched(outer), prefix, name, outer);
+  const PackageDecl* pkg = PackageNamed(*outer.unit, prefix);
+  if (pkg == nullptr) return std::nullopt;
+  return ScopeValue(pkg->items, pkg->name, name, outer);
+}
+
+// §26.3 with §3.12.1: a package's import comes first, then the compilation
+// unit, as OuterValueType reads them.
+std::optional<DeclaredValue> OuterValue(const RtlirModule& mod,
+                                        std::string_view name,
+                                        const OuterScope& outer) {
+  if (outer.unit == nullptr) return std::nullopt;
+  for (const PackageDecl* pkg : outer.unit->packages) {
+    if (!ImportsFrom(mod, pkg->name, name)) continue;
+    if (std::optional<DeclaredValue> value =
+            ScopeValue(pkg->items, pkg->name, name, outer)) {
+      return value;
+    }
+  }
+  return ScopeValue(UnitItemsSearched(outer), "$unit", name, outer);
 }
 
 }  // namespace delta
