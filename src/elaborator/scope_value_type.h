@@ -128,6 +128,14 @@ std::optional<DeclaredValue> ScopedValue(std::string_view prefix,
                                          std::string_view name,
                                          const OuterScope& outer);
 
+// §26.3: the value the bare `name` stands for through the imports among
+// `items`, those of a package or of the compilation unit: one the package an
+// import names declares, the import naming `name` or every name. Nothing
+// where no import reaches a value of the name.
+std::optional<DeclaredValue> ImportedValue(std::span<ModuleItem* const> items,
+                                           std::string_view name,
+                                           const OuterScope& outer);
+
 // §26.3 with §3.12.1: the value the bare `name` stands for outside `mod`: one
 // a package `mod` imports it from declares, or else one the compilation unit
 // declares before the module. Nothing where neither declares a value of the

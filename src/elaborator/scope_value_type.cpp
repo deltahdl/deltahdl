@@ -352,6 +352,23 @@ std::optional<DeclaredValue> ScopedValue(std::string_view prefix,
   return ScopeValue(pkg->items, pkg->name, name, outer);
 }
 
+std::optional<DeclaredValue> ImportedValue(std::span<ModuleItem* const> items,
+                                           std::string_view name,
+                                           const OuterScope& outer) {
+  for (const ModuleItem* item : items) {
+    if (item == nullptr || item->kind != ModuleItemKind::kImportDecl) continue;
+    const ImportItem& import = item->import_item;
+    if (!import.is_wildcard && import.item_name != name) continue;
+    const PackageDecl* pkg = PackageNamed(*outer.unit, import.package_name);
+    if (pkg == nullptr) continue;
+    if (std::optional<DeclaredValue> value =
+            ScopeValue(pkg->items, pkg->name, name, outer)) {
+      return value;
+    }
+  }
+  return std::nullopt;
+}
+
 // §26.3 with §3.12.1: a package's import comes first, then the compilation
 // unit, as OuterValueType reads them.
 std::optional<DeclaredValue> OuterValue(const RtlirModule& mod,

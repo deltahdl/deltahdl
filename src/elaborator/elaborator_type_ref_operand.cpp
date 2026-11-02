@@ -588,17 +588,30 @@ void ElaboratorOperationRules::InUnitExprTypeScope(
                       cu_param_scope_,
                       arena_};
   scope.array_tables = &kTables;
+  const std::span<ModuleItem* const> kItems =
+      pkg != nullptr ? std::span<ModuleItem* const>(pkg->items)
+                     : std::span<ModuleItem* const>(unit_->cu_items);
+  // §23.9 with §26.3: a name the procedure declares hides the scope's own,
+  // which hides one the scope imports.
   scope.value_named =
       [&](std::string_view name) -> std::optional<DeclaredValue> {
-    std::optional<DeclaredValue> value;
-    if (const BlockValue* local = InnermostBlockValue(name)) {
-      value = UnderDims(*local->type, *local->dims, scope);
-    } else {
-      value = ScopeValue(pkg != nullptr ? pkg->items : unit_->cu_items,
-                         pkg != nullptr ? pkg->name : "$unit", name, kOuter);
-    }
-    if (value && pkg != nullptr) value->type = InPackage(value->type, *pkg);
+    if (const BlockValue* local = InnermostBlockValue(name))
+      return UnderDims(*local->type, *local->dims, scope);
+    std::optional<DeclaredValue> value =
+        ScopeValue(kItems, pkg != nullptr ? pkg->name : "$unit", name, kOuter);
+    if (!value) return ImportedValue(kItems, name, kOuter);
+    if (pkg != nullptr) value->type = InPackage(value->type, *pkg);
     return value;
+  };
+  // §26.3 with §3.12.1: a name behind a package's scope is that package's;
+  // one behind `$unit::` the compilation unit's, which a package never names
+  // (§26.2).
+  scope.scoped_value =
+      [&](std::string_view prefix,
+          std::string_view name) -> std::optional<DeclaredValue> {
+    if (prefix != "$unit") return ScopedValue(prefix, name, kOuter);
+    if (pkg != nullptr) return std::nullopt;
+    return ScopeValue(unit_->cu_items, prefix, name, kOuter);
   };
   scope.class_member = [this](const DataType& handle, std::string_view name) {
     return ClassMemberType(handle, name, cu_param_scope_);
