@@ -57,6 +57,7 @@ static void SetModuleEnumShape(const RtlirModule* mod,
     if (v.enum_type_name != info.type_name) continue;
     info.width = EnumWidthOfVariable(v);
     info.is_4state = v.is_4state;
+    info.is_signed = v.is_signed;
     return;
   }
   if (design == nullptr) return;
@@ -64,6 +65,7 @@ static void SetModuleEnumShape(const RtlirModule* mod,
   if (it == design->type_enums.end() || it->second == nullptr) return;
   info.width = EvalTypeWidth(EnumArrayElement(*it->second));
   info.is_4state = Is4stateType(*it->second, TypedefMap{});
+  info.is_signed = IsSignedType(*it->second, TypedefMap{});
 }
 
 void Lowerer::RegisterEnumTypes(const RtlirModule* mod) {

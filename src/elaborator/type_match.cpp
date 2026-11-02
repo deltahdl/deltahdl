@@ -211,4 +211,58 @@ bool ElementTypesEquivalent(const ElementTypeInfo& a,
   return false;
 }
 
+bool IsAssignmentCompatible(const DataType& a, const DataType& b) {
+  if (TypesEquivalent(a, b)) return true;
+
+  // §6.22.3/§6.22.4: assignment compatibility for integral types is symmetric
+  // EXCEPT when the target (b) is an enum -- an integral value requires an
+  // explicit cast to be assigned to an enum, so an enum target is excluded here
+  // and only the legal enum-source direction is accepted by the rule below.
+  if (IsIntegralType(a.kind) && IsIntegralType(b.kind) &&
+      b.kind != DataTypeKind::kEnum)
+    return true;
+
+  if (a.kind == DataTypeKind::kEnum && IsIntegralType(b.kind)) return true;
+
+  bool a_real =
+      (a.kind == DataTypeKind::kReal || a.kind == DataTypeKind::kShortreal ||
+       a.kind == DataTypeKind::kRealtime);
+  bool b_real =
+      (b.kind == DataTypeKind::kReal || b.kind == DataTypeKind::kShortreal ||
+       b.kind == DataTypeKind::kRealtime);
+  if ((a_real && IsIntegralType(b.kind)) ||
+      (b_real && IsIntegralType(a.kind))) {
+    return true;
+  }
+  return a_real && b_real;
+}
+
+bool IsCastCompatible(const DataType& a, const DataType& b) {
+  if (IsAssignmentCompatible(a, b)) return true;
+
+  if (IsIntegralType(a.kind) && b.kind == DataTypeKind::kEnum) return true;
+  if (IsIntegralType(b.kind) && a.kind == DataTypeKind::kEnum) return true;
+  return false;
+}
+
+// §6.22.5: a chandle is one of the handle types the clause singles out as
+// type-incompatible with every type other than itself. (Class handles and
+// interface class handles are spelled with named types and are covered by the
+// residual rule below: a named type is never integral, real, or an enum, so it
+// is cast-compatible only with the same named type and incompatible with all
+// others.)
+static bool IsHandleType(const DataType& dtype) {
+  return dtype.kind == DataTypeKind::kChandle;
+}
+
+bool IsTypeIncompatible(const DataType& a, const DataType& b) {
+  // The handle types named by §6.22.5 are incompatible with every type that is
+  // not the same handle type; no implicit or explicit cast can bridge them.
+  if (IsHandleType(a) || IsHandleType(b)) return !TypesMatch(a, b);
+
+  // Otherwise type-incompatible is the residual: the nonequivalent types with
+  // no implicit or explicit casting rule, i.e. anything not cast-compatible.
+  return !IsCastCompatible(a, b);
+}
+
 }  // namespace delta

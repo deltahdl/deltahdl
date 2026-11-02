@@ -67,13 +67,18 @@ static void RegisterPackageItemEnumConstants(const ModuleItem* item,
   ForEachEnumTypeOfItem(item, [&](std::string_view, const DataType& type) {
     uint32_t width = EvalTypeWidth(EnumArrayElement(type), {});
     if (width == 0) width = 32;
+    // A constant is of the enumeration's type, so it reads with the base's
+    // signing as well as its width: -1 of a byte base widens to -1.
+    bool is_signed = IsSignedType(type, TypedefMap{});
     for (const auto& m : FoldEnumMembers(type.enum_members, values, arena)) {
       values[m.name] = m.value;
       auto* qname = arena.Create<std::string>(std::string(pkg_name) + "." +
                                               std::string(m.name));
       ctx.Vcd().MarkVcdEnumConstant(*qname);
-      ctx.CreateVariable(*qname, width)->value =
+      Variable* constant = ctx.CreateVariable(*qname, width);
+      constant->value =
           MakeLogic4VecVal(arena, width, static_cast<uint64_t>(m.value));
+      constant->is_signed = is_signed;
     }
   });
 }

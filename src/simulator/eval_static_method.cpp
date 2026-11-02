@@ -134,7 +134,7 @@ bool TryPackageClassStaticMember(const Expr* expr, SimContext& ctx,
   // way, `std::process::RUNNING` naming the state §9.7 lists.
   auto eit = cls->enum_members.find(std::string(member));
   if (eit == cls->enum_members.end()) return false;
-  out = MakeLogic4VecVal(arena, 32, eit->second);
+  out = ClassEnumLiteral(*cls, eit->first, eit->second, arena);
   return true;
 }
 

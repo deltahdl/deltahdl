@@ -113,6 +113,30 @@ TEST(EnumerationElaboration, EnumAutoIncrementOverflow_Error) {
                             2, "6.19"));
 }
 
+TEST(EnumerationElaboration, EnumAutoIncrementPastBaseIntoLastMember_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  enum byte unsigned {A = 255, B} x;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "enum auto-increment exceeds maximum representable "
+                            "value of base type",
+                            2, "6.19"));
+}
+
+TEST(EnumerationElaboration, EnumMaximumFollowedByExplicitValue_Ok) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  enum byte unsigned {A = 255, B = 1} x;\n"
+      "  enum bit [0:0] {C = 1, D = 0} y;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 TEST(EnumerationElaboration, EnumHierarchicalNameInitializer_Error) {
   ElabFixture f;
   ElaborateSrc(

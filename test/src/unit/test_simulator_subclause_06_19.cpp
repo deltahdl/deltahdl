@@ -1,5 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <array>
+#include <cstdint>
+#include <format>
+#include <string>
+
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
@@ -456,6 +461,257 @@ TEST(EnumerationSimulation, PackageEnumArrayConstantsAreAsWideAsItsBase) {
       "endmodule\n",
       f);
   EXPECT_EQ(out, "01 001\n");
+}
+
+// §6.19: an enumeration's base type, and the width that base gives it: int
+// where none is written, each integer atom type by its own width, each scalar
+// integer vector type as one bit, and a vector by its dimension. A base that
+// is a typedef name is issue #11449.
+struct EnumBase {
+  const char* base;
+  uint32_t width;
+};
+
+constexpr std::array kEnumBases = {
+    EnumBase{"", 32},
+    EnumBase{"byte", 8},
+    EnumBase{"byte unsigned", 8},
+    EnumBase{"shortint", 16},
+    EnumBase{"int", 32},
+    EnumBase{"int unsigned", 32},
+    EnumBase{"longint", 64},
+    EnumBase{"integer", 32},
+    EnumBase{"time", 64},
+    EnumBase{"bit", 1},
+    EnumBase{"logic", 1},
+    EnumBase{"reg unsigned", 1},
+    EnumBase{"bit [11:0]", 12},
+    EnumBase{"logic signed [2:0]", 3},
+};
+
+// A design declaring an enumeration of `base` in each place of a module one
+// may stand -- a module's typedef and a variable of it, a module's variable of
+// an inline enumeration, a package's typedef, the compilation unit's typedef,
+// a generate block's typedef, a variable of an inline enumeration local to an
+// initial procedure and to a function, and a packed structure member -- with
+// r recording, bit by bit, whether each is `width` bits wide.
+std::string EnumWidthDesign(const EnumBase& enum_base) {
+  return std::format(
+      "package p;\n"
+      "  typedef enum {0} {{PA, PB}} e_t;\n"
+      "endpackage\n"
+      "typedef enum {0} {{UA, UB}} u_t;\n"
+      "module t;\n"
+      "  typedef enum {0} {{MA, MB}} m_t;\n"
+      "  m_t mv;\n"
+      "  enum {0} {{IA, IB}} iv;\n"
+      "  p::e_t pv;\n"
+      "  u_t uv;\n"
+      "  typedef struct packed {{ m_t f; bit g; }} s_t;\n"
+      "  localparam int kWidth = $bits(m_t);\n"
+      "  bit [11:0] r;\n"
+      "  if (1) begin : gb\n"
+      "    typedef enum {0} {{GA, GB}} g_t;\n"
+      "    g_t gv;\n"
+      "    initial r[11] = $bits(gv) == {1} && $bits(g_t) == {1};\n"
+      "  end\n"
+      "  function automatic int local_width();\n"
+      "    enum {0} {{FA, FB}} fv;\n"
+      "    return $bits(fv);\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    enum {0} {{LA, LB}} lv;\n"
+      "    r[0] = $bits(mv) == {1};\n"
+      "    r[1] = $bits(iv) == {1};\n"
+      "    r[2] = $bits(pv) == {1};\n"
+      "    r[3] = $bits(uv) == {1};\n"
+      "    r[4] = $bits(m_t) == {1};\n"
+      "    r[5] = $bits(p::e_t) == {1};\n"
+      "    r[6] = $bits(u_t) == {1};\n"
+      "    r[7] = $bits(s_t) == {1} + 1;\n"
+      "    r[8] = kWidth == {1};\n"
+      "    r[9] = $bits(lv) == {1};\n"
+      "    r[10] = local_width() == {1};\n"
+      "  end\n"
+      "endmodule\n",
+      enum_base.base, enum_base.width);
+}
+
+TEST(EnumerationSimulation, EnumerationIsAsWideAsItsBaseTypeEverywhere) {
+  for (const EnumBase& enum_base : kEnumBases) {
+    const std::string kSrc = EnumWidthDesign(enum_base);
+    SCOPED_TRACE(kSrc);
+    EXPECT_EQ(RunAndGet(kSrc, "r"), 0xFFFu);
+  }
+}
+
+// The same enumerations in the remaining places one may stand: an interface's,
+// a program's and a checker's typedef with a variable of it, and an inline
+// enumeration's variable beside it, the checker setting its flag from an
+// always_comb (§17.5); and a class's typedef with a property of it and a
+// property of an inline enumeration, read through a handle. r records each.
+std::string EnumWidthInOtherScopes(const EnumBase& enum_base) {
+  const std::string kDeclared = std::format(
+      "  typedef enum {0} {{XA, XB}} x_t;\n  x_t v;\n"
+      "  enum {0} {{YA, YB}} w;\n",
+      enum_base.base);
+  const std::string kOk =
+      std::format("$bits(v) == {0} && $bits(x_t) == {0} && $bits(w) == {0}",
+                  enum_base.width);
+  return std::format(
+      "interface ifc;\n{0}  bit ok;\n  initial ok = {1};\nendinterface\n"
+      "program pg;\n{0}  bit ok;\n"
+      "  initial begin\n    ok = {1};\n    #2;\n  end\nendprogram\n"
+      "checker ck;\n{0}  bit ok;\n  always_comb ok = {1};\nendchecker\n"
+      "class c;\n{0}endclass\n"
+      "module t;\n"
+      "  ifc u_ifc();\n"
+      "  pg u_pg();\n"
+      "  ck u_ck();\n"
+      "  bit [3:0] r;\n"
+      "  c h;\n"
+      "  initial begin\n"
+      "    h = new;\n"
+      "    #1;\n"
+      "    r[0] = u_ifc.ok;\n"
+      "    r[1] = u_pg.ok;\n"
+      "    r[2] = u_ck.ok;\n"
+      "    r[3] = $bits(h.v) == {2} && $bits(c::x_t) == {2} &&\n"
+      "           $bits(h.w) == {2};\n"
+      "  end\n"
+      "endmodule\n",
+      kDeclared, kOk, enum_base.width);
+}
+
+TEST(EnumerationSimulation, EnumerationIsAsWideAsItsBaseInEveryScope) {
+  for (const EnumBase& enum_base : kEnumBases) {
+    const std::string kSrc = EnumWidthInOtherScopes(enum_base);
+    SCOPED_TRACE(kSrc);
+    EXPECT_EQ(RunAndGet(kSrc, "r"), 0xFu);
+  }
+}
+
+// §6.19 with §6.24.1: a variable of an enumeration holds its base type's bits
+// and no more, so a value one bit wider cast to the enumeration and read back
+// through an int keeps the base's width and signing: the low byte of 9'h1FF
+// is -1 in a signed byte and 255 in an unsigned one.
+TEST(EnumerationSimulation, EnumerationVariableHoldsItsBaseTypesBits) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  typedef enum byte {A, B} sb_t;\n"
+                      "  typedef enum byte unsigned {C, D} ub_t;\n"
+                      "  typedef enum shortint {E, F} ss_t;\n"
+                      "  typedef enum bit {G, H} b1_t;\n"
+                      "  sb_t sb;\n"
+                      "  ub_t ub;\n"
+                      "  ss_t ss;\n"
+                      "  b1_t b1;\n"
+                      "  bit [3:0] r;\n"
+                      "  initial begin\n"
+                      "    sb = sb_t'(9'h1FF);\n"
+                      "    ub = ub_t'(9'h1FF);\n"
+                      "    ss = ss_t'(17'h1FFFF);\n"
+                      "    b1 = b1_t'(2'b11);\n"
+                      "    r[0] = int'(sb) == -1;\n"
+                      "    r[1] = int'(ub) == 255;\n"
+                      "    r[2] = int'(ss) == -1;\n"
+                      "    r[3] = int'(b1) == 1;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            0xFu);
+}
+
+// §6.19 with §7.4.1: the packed dimensions written after an enumeration's
+// body make a packed array of it, each element as wide as the base: a byte
+// base, and a vector base whose own dimension is multiplied by the array's.
+TEST(EnumerationSimulation, PackedArrayOfEnumerationsMultipliesItsBaseWidth) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  typedef enum byte {A, B} [1:0] pb_t;\n"
+                      "  typedef enum bit [5:0] {C, D} [2:0] pv_t;\n"
+                      "  pb_t pb;\n"
+                      "  pv_t pv;\n"
+                      "  bit [3:0] r;\n"
+                      "  initial begin\n"
+                      "    r[0] = $bits(pb) == 16;\n"
+                      "    r[1] = $bits(pb_t) == 16;\n"
+                      "    r[2] = $bits(pv) == 18;\n"
+                      "    r[3] = $bits(pv_t) == 18;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            0xFu);
+}
+
+// §6.19: a constant of an enumeration is a value of it, as wide as the base
+// and signed where the base is, wherever the enumeration is declared: -1 of a
+// byte base widens to -1 in an int, and 255 of an unsigned byte base widens to
+// 255, read bare in the module, through a package's scope and through a
+// class's.
+TEST(EnumerationSimulation, ConstantOfAnEnumerationCarriesItsBasesSigning) {
+  EXPECT_EQ(RunAndGet("package p;\n"
+                      "  typedef enum byte {PM = -1, PN = 1} e_t;\n"
+                      "  typedef enum byte unsigned {PU = 255} u_t;\n"
+                      "endpackage\n"
+                      "class c;\n"
+                      "  typedef enum byte {CM = -1, CN = 1} e_t;\n"
+                      "  typedef enum byte unsigned {CU = 255} u_t;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  typedef enum byte {MM = -1, MN = 1} e_t;\n"
+                      "  typedef enum byte unsigned {MU = 255} u_t;\n"
+                      "  int x;\n"
+                      "  bit [5:0] r;\n"
+                      "  initial begin\n"
+                      "    x = MM;\n"
+                      "    r[0] = x == -1;\n"
+                      "    x = MU;\n"
+                      "    r[1] = x == 255;\n"
+                      "    x = p::PM;\n"
+                      "    r[2] = x == -1;\n"
+                      "    x = p::PU;\n"
+                      "    r[3] = x == 255;\n"
+                      "    x = c::CM;\n"
+                      "    r[4] = x == -1;\n"
+                      "    x = c::CU;\n"
+                      "    r[5] = x == 255;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            0x3Fu);
+}
+
+// §6.19 with §6.19.5: first(), last(), next() and prev() return values of the
+// enumeration, as wide as its base and signed where the base is. So a
+// variable of a byte enumeration holding its member -1 equals first() of
+// itself, next() steps from that member and prev() steps back to it, and two
+// results concatenate to
+// the base's width each; an unsigned byte base's member 255 widens to 255.
+TEST(EnumerationSimulation, EnumerationMethodsReturnValuesOfItsBase) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  typedef enum byte {M = -1, N = 1} e_t;\n"
+                      "  typedef enum byte unsigned {U = 255, V = 1} u_t;\n"
+                      "  e_t e;\n"
+                      "  e_t e2 = N;\n"
+                      "  u_t u;\n"
+                      "  int x;\n"
+                      "  bit [15:0] c;\n"
+                      "  bit [5:0] r;\n"
+                      "  initial begin\n"
+                      "    e = M;\n"
+                      "    u = U;\n"
+                      "    r[0] = e == e.first();\n"
+                      "    r[1] = e.next() == N;\n"
+                      "    r[2] = e2.prev() == M;\n"
+                      "    x = e.first();\n"
+                      "    r[3] = x == -1;\n"
+                      "    x = u.first();\n"
+                      "    r[4] = x == 255;\n"
+                      "    c = {e.first(), e.last()};\n"
+                      "    r[5] = c == 16'hFF01;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            0x3Fu);
 }
 
 }  // namespace

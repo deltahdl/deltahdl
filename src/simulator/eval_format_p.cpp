@@ -92,8 +92,14 @@ static std::string FormatEnumValueForP(const EnumTypeInfo& et,
   // a number, a value holding x or z matched no member.
   if (val.nwords > 0) {
     const Logic4Word& w = val.words[0];
+    // A member's value is kept as folded, and a value of the enumeration
+    // holds the base type's bits alone.
+    uint64_t mask = et.width == 0 || et.width >= 64
+                        ? ~uint64_t{0}
+                        : (uint64_t{1} << et.width) - 1;
     for (const auto& m : et.members) {
-      if (m.value == w.aval && m.xz == w.bval) return std::string(m.name);
+      if ((m.value & mask) == w.aval && m.xz == w.bval)
+        return std::string(m.name);
     }
   }
   return FormatArg(val, 'd');

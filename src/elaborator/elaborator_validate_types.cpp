@@ -331,9 +331,13 @@ void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc,
       CheckEnumDuplicateValues(next_val, count, seen_values, loc, diag_);
     }
     next_val += count;
+    // §6.19: only a member that takes the incremented value is out of range;
+    // a following member giving its own value takes none, as the last takes
+    // none at all.
+    const bool kNextIncrements =
+        &member != &dtype.enum_members.back() && !(&member + 1)->value;
     if (!prev_had_xz && next_val > 0 &&
-        static_cast<uint64_t>(next_val) > range.max_val &&
-        &member != &dtype.enum_members.back()) {
+        static_cast<uint64_t>(next_val) > range.max_val && kNextIncrements) {
       diag_.Error(loc,
                   "enum auto-increment exceeds maximum representable "
                   "value of base type",

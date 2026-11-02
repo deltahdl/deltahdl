@@ -20,40 +20,61 @@
 
 namespace delta {
 
+Logic4Vec ClassEnumLiteral(const ClassTypeInfo& cls, const std::string& name,
+                           uint64_t value, Arena& arena) {
+  auto it = cls.enum_literal_shapes.find(name);
+  ClassTypeInfo::EnumLiteralShape shape =
+      it == cls.enum_literal_shapes.end() ? ClassTypeInfo::EnumLiteralShape{}
+                                          : it->second;
+  Logic4Vec v = MakeLogic4VecVal(arena, shape.width, value);
+  v.is_signed = shape.is_signed;
+  return v;
+}
+
 bool TryClassScopeEnumLiteral(std::string_view name, const ClassTypeInfo* cls,
                               Arena& arena, Logic4Vec& out) {
   for (; cls != nullptr; cls = cls->parent) {
     auto it = cls->enum_members.find(std::string(name));
     if (it == cls->enum_members.end()) continue;
-    out = MakeLogic4VecVal(arena, 32, it->second);
+    out = ClassEnumLiteral(*cls, it->first, it->second, arena);
     return true;
   }
   return false;
 }
 
-// §6.19: a member's value as the methods return it, x and z bits included.
-static Logic4Vec MemberValue(const EnumMemberInfo& m, Arena& arena) {
-  Logic4Vec v = MakeLogic4VecVal(arena, 32, m.value);
+// §6.19: a member's value as the methods return it, a value of the
+// enumeration: as wide as its base type and signed where the base is, x and z
+// bits included.
+static Logic4Vec MemberValue(const EnumMemberInfo& m, const EnumTypeInfo& info,
+                             Arena& arena) {
+  Logic4Vec v = MakeLogic4VecVal(arena, info.width, m.value);
   v.words[0].bval = m.xz;
+  v.is_signed = info.is_signed;
   return v;
 }
 
 static Logic4Vec EnumFirst(const EnumTypeInfo& info, Arena& arena) {
   if (info.members.empty()) return MakeLogic4VecVal(arena, 32, 0);
-  return MemberValue(info.members.front(), arena);
+  return MemberValue(info.members.front(), info, arena);
 }
 
 static Logic4Vec EnumLast(const EnumTypeInfo& info, Arena& arena) {
   if (info.members.empty()) return MakeLogic4VecVal(arena, 32, 0);
-  return MemberValue(info.members.back(), arena);
+  return MemberValue(info.members.back(), info, arena);
 }
 
 // §6.19.5.3, §6.19.5.4 and §6.19.5.6 ask which member a value is, and §6.19
 // lets a member of a 4-state enumeration hold x or z, `XX='x`. So a value is
 // a member where every bit matches, x and z included, as `===` compares; read
 // as a number, `'x` was 0 and matched the member whose value is 0.
-static bool IsMemberValue(const EnumMemberInfo& m, Logic4Word current) {
-  return m.value == current.aval && m.xz == current.bval;
+// A member's value is kept as folded, -1 with every bit set, while a variable
+// of the enumeration holds the base type's bits alone, 8'hFF for a byte base,
+// so the value is compared in `width` bits.
+static bool IsMemberValue(const EnumMemberInfo& m, uint32_t width,
+                          Logic4Word current) {
+  uint64_t mask =
+      width == 0 || width >= 64 ? ~uint64_t{0} : (uint64_t{1} << width) - 1;
+  return (m.value & mask) == current.aval && m.xz == current.bval;
 }
 
 // §6.19.5.3 and §6.19.5.4: what next() and prev() return for a value that is
@@ -74,7 +95,8 @@ static Logic4Vec EnumDefault(const EnumTypeInfo& info, Arena& arena) {
 
 static int FindMemberIndex(const EnumTypeInfo& info, Logic4Word current) {
   for (size_t i = 0; i < info.members.size(); ++i) {
-    if (IsMemberValue(info.members[i], current)) return static_cast<int>(i);
+    if (IsMemberValue(info.members[i], info.width, current))
+      return static_cast<int>(i);
   }
   return -1;
 }
@@ -86,7 +108,7 @@ static Logic4Vec EnumNext(const EnumTypeInfo& info, Logic4Word current,
   if (idx < 0) return EnumDefault(info, arena);
   auto n = static_cast<int>(info.members.size());
   int new_idx = (idx + static_cast<int>(count % n)) % n;
-  return MemberValue(info.members[new_idx], arena);
+  return MemberValue(info.members[new_idx], info, arena);
 }
 
 static Logic4Vec EnumPrev(const EnumTypeInfo& info, Logic4Word current,
@@ -97,7 +119,7 @@ static Logic4Vec EnumPrev(const EnumTypeInfo& info, Logic4Word current,
   auto n = static_cast<int>(info.members.size());
   int offset = static_cast<int>(count % n);
   int new_idx = ((idx - offset) % n + n) % n;
-  return MemberValue(info.members[new_idx], arena);
+  return MemberValue(info.members[new_idx], info, arena);
 }
 
 static Logic4Vec EnumNum(const EnumTypeInfo& info, Arena& arena) {
@@ -107,7 +129,7 @@ static Logic4Vec EnumNum(const EnumTypeInfo& info, Arena& arena) {
 static Logic4Vec EnumName(const EnumTypeInfo& info, Logic4Word current,
                           Arena& arena) {
   for (auto& m : info.members) {
-    if (!IsMemberValue(m, current)) continue;
+    if (!IsMemberValue(m, info.width, current)) continue;
     auto name = m.name;
     uint32_t width = static_cast<uint32_t>(name.size()) * 8;
     if (width == 0) width = 8;
@@ -284,7 +306,7 @@ static const EnumTypeInfo* EnumTypeOfClassMember(const ClassTypeInfo* cls,
   if (type == nullptr) return nullptr;
   // §6.19 with §8.5: an enumeration the property declares inline is
   // registered under the property's own key (CollectClassEnumMembers in
-  // lowerer_class.cpp); it names no type to look up.
+  // class_enum_members.cpp); it names no type to look up.
   if (type->kind == DataTypeKind::kEnum)
     return ctx.FindEnumType(ClassInlineEnumKey(declarer->name, name));
   return EnumTypeOfDeclaredType(*type, {declarer, {}}, ctx);

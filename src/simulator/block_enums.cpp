@@ -180,6 +180,7 @@ struct BlockEnumWalk {
     info.type_name = key;
     info.width = EvalTypeWidth(EnumArrayElement(type));
     info.is_4state = Is4stateType(type, TypedefMap{});
+    info.is_signed = IsSignedType(type, TypedefMap{});
     for (const RtlirEnumMember& m :
          FoldEnumMembers(type.enum_members, scope, arena)) {
       info.members.push_back(EnumMemberInfoOf(m, info.width, ctx, arena));

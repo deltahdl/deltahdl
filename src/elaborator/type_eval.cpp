@@ -276,6 +276,23 @@ DataType EnumArrayElement(const DataType& dtype) {
   return element;
 }
 
+// §6.19: an enumeration is as wide as its base type, int where it names none.
+// A keyword base sizes it here, an integer atom by its own width and a scalar
+// integer vector as one bit; a base written with a packed dimension is sized
+// from that dimension before this is reached, and taken as int here where the
+// dimension names a parameter no scope is at hand to fold. A typedef name for
+// the base is still taken as int (issue #11449).
+static uint32_t EnumBaseWidth(const DataType& dtype) {
+  if (dtype.packed_dim_left != nullptr ||
+      dtype.enum_base_kind == DataTypeKind::kImplicit ||
+      dtype.enum_base_kind == DataTypeKind::kNamed) {
+    return 32;
+  }
+  DataType base;
+  base.kind = dtype.enum_base_kind;
+  return EvalTypeWidth(base);
+}
+
 uint32_t EvalTypeWidth(const DataType& dtype) {
   // §7.4.4: packed dimensions may also be built up in stages through typedef,
   // and its example `typedef bit [1:5] bsix; bsix [1:10] v5;` is 50 bits: a
@@ -327,7 +344,7 @@ uint32_t EvalTypeWidth(const DataType& dtype) {
     case DataTypeKind::kRealtime:
       return 64;
     case DataTypeKind::kEnum:
-      return 32;
+      return EnumBaseWidth(dtype);
     case DataTypeKind::kStruct:
     case DataTypeKind::kUnion:
       return EvalStructOrUnionWidth(dtype);
@@ -687,60 +704,6 @@ bool IsUnpackedAggregateType(const DataType& type) {
   return (type.kind == DataTypeKind::kStruct ||
           type.kind == DataTypeKind::kUnion) &&
          !type.is_packed && !type.is_soft;
-}
-
-bool IsAssignmentCompatible(const DataType& a, const DataType& b) {
-  if (TypesEquivalent(a, b)) return true;
-
-  // §6.22.3/§6.22.4: assignment compatibility for integral types is symmetric
-  // EXCEPT when the target (b) is an enum -- an integral value requires an
-  // explicit cast to be assigned to an enum, so an enum target is excluded here
-  // and only the legal enum-source direction is accepted by the rule below.
-  if (IsIntegralType(a.kind) && IsIntegralType(b.kind) &&
-      b.kind != DataTypeKind::kEnum)
-    return true;
-
-  if (a.kind == DataTypeKind::kEnum && IsIntegralType(b.kind)) return true;
-
-  bool a_real =
-      (a.kind == DataTypeKind::kReal || a.kind == DataTypeKind::kShortreal ||
-       a.kind == DataTypeKind::kRealtime);
-  bool b_real =
-      (b.kind == DataTypeKind::kReal || b.kind == DataTypeKind::kShortreal ||
-       b.kind == DataTypeKind::kRealtime);
-  if ((a_real && IsIntegralType(b.kind)) ||
-      (b_real && IsIntegralType(a.kind))) {
-    return true;
-  }
-  return a_real && b_real;
-}
-
-bool IsCastCompatible(const DataType& a, const DataType& b) {
-  if (IsAssignmentCompatible(a, b)) return true;
-
-  if (IsIntegralType(a.kind) && b.kind == DataTypeKind::kEnum) return true;
-  if (IsIntegralType(b.kind) && a.kind == DataTypeKind::kEnum) return true;
-  return false;
-}
-
-// §6.22.5: a chandle is one of the handle types the clause singles out as
-// type-incompatible with every type other than itself. (Class handles and
-// interface class handles are spelled with named types and are covered by the
-// residual rule below: a named type is never integral, real, or an enum, so it
-// is cast-compatible only with the same named type and incompatible with all
-// others.)
-static bool IsHandleType(const DataType& dtype) {
-  return dtype.kind == DataTypeKind::kChandle;
-}
-
-bool IsTypeIncompatible(const DataType& a, const DataType& b) {
-  // The handle types named by §6.22.5 are incompatible with every type that is
-  // not the same handle type; no implicit or explicit cast can bridge them.
-  if (IsHandleType(a) || IsHandleType(b)) return !TypesMatch(a, b);
-
-  // Otherwise type-incompatible is the residual: the nonequivalent types with
-  // no implicit or explicit casting rule, i.e. anything not cast-compatible.
-  return !IsCastCompatible(a, b);
 }
 
 static bool IsOneBitResultOp(TokenKind op) {

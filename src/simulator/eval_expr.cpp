@@ -193,7 +193,7 @@ static bool TryClassEnumAccess(Variable* base_var, std::string_view field_name,
   if (!obj || !obj->type) return false;
   auto it = obj->type->enum_members.find(std::string(field_name));
   if (it == obj->type->enum_members.end()) return false;
-  out = MakeLogic4VecVal(arena, 32, it->second);
+  out = ClassEnumLiteral(*obj->type, it->first, it->second, arena);
   return true;
 }
 
@@ -209,7 +209,7 @@ static bool TryLocalStaticMember(const ClassTypeInfo* cls_type,
   }
   auto eit = cls_type->enum_members.find(std::string(field_name));
   if (eit != cls_type->enum_members.end()) {
-    out = MakeLogic4VecVal(arena, 32, eit->second);
+    out = ClassEnumLiteral(*cls_type, eit->first, eit->second, arena);
     return true;
   }
   return false;

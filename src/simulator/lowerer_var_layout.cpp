@@ -184,6 +184,7 @@ void RegisterDesignEnumTypes(const RtlirDesign* design, SimContext& ctx,
     info.type_name = name;
     info.width = EvalTypeWidth(EnumArrayElement(*dtype));
     info.is_4state = Is4stateType(*dtype, TypedefMap{});
+    info.is_signed = IsSignedType(*dtype, TypedefMap{});
     for (const RtlirEnumMember& m :
          FoldEnumMembers(dtype->enum_members, design->unit_constants, arena)) {
       info.members.push_back(EnumMemberInfoOf(m, info.width, ctx, arena));

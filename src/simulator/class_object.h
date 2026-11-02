@@ -345,6 +345,16 @@ struct ClassTypeInfo {
   // access to the containing class's static properties, local ones included.
   // Nullptr where none of them declares `name`.
   const ClassTypeInfo* StaticPropertyOwner(std::string_view name) const;
+
+  // §6.19 with §8.4: the width and signing of the enumeration each literal of
+  // enum_members belongs to, its base type's, so `C::M` of an enumeration
+  // with a byte base reads as a signed 8-bit value. A literal with no entry
+  // reads as a 32-bit value (ClassEnumLiteral).
+  struct EnumLiteralShape {
+    uint32_t width = 32;
+    bool is_signed = false;
+  };
+  std::unordered_map<std::string, EnumLiteralShape> enum_literal_shapes;
 };
 
 inline constexpr uint64_t kNullClassHandle = 0;

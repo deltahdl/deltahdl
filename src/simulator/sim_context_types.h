@@ -82,6 +82,10 @@ struct EnumTypeInfo {
   // member.
   uint32_t width = 32;
   bool is_4state = false;
+  // §6.19: whether the base type is signed, which the values first(), last(),
+  // next() and prev() return carry along with the width, as the enumeration's
+  // own values do.
+  bool is_signed = false;
 };
 
 struct StructTypeInfo;

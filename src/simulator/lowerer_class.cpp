@@ -15,6 +15,7 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
+#include "simulator/class_enum_members.h"
 #include "simulator/class_object.h"
 #include "simulator/class_specialization.h"
 #include "simulator/class_typedef_layout.h"
@@ -655,58 +656,6 @@ static void InitClassParams(ClassTypeInfo* info, const ClassDecl* cls,
                       ClassStaticStore(info), ctx, arena);
 }
 
-// The enumeration `member` declares, inline on a property, `enum {a, b} e;`,
-// or by a typedef of the class, with the key it is registered under; null
-// for any other member.
-static const DataType* DeclaredEnumOf(const ClassTypeInfo* info,
-                                      const ClassMember* member,
-                                      std::string& key) {
-  const DataType* type = nullptr;
-  if (member->kind == ClassMemberKind::kProperty &&
-      member->data_type.kind == DataTypeKind::kEnum) {
-    // §6.19 with §8.5: under the property's own key (ClassInlineEnumKey),
-    // which EnumTypeOfClassMember resolves the property's type by.
-    type = &member->data_type;
-    key = ClassInlineEnumKey(info->name, member->name);
-  } else if (member->kind == ClassMemberKind::kTypedef &&
-             member->typedef_item != nullptr) {
-    type = &member->typedef_item->typedef_type;
-    key = std::string(info->name) + "::" + std::string(member->name);
-  }
-  return type != nullptr && !type->enum_members.empty() ? type : nullptr;
-}
-
-// §8.23 with §6.19: the literals of every enumeration a typedef of the class
-// declares, or a property of it declares inline, each bound in the class
-// scope, and the enumeration itself registered under "Class::name" or the
-// property's key (DeclaredEnumOf), the key a property or a variable declared
-// with it resolves its type by (EnumTypeOfDeclaredType in eval_enum.cpp), so
-// that §6.19.5's methods on such a value have members to walk. A nested class's
-// typedef is entered by no other path: the design's typedef table
-// (RtlirDesign::type_enums) holds the unit's classes alone.
-static void CollectClassEnumMembers(ClassTypeInfo* info, const ClassDecl* cls,
-                                    SimContext& ctx, Arena& arena) {
-  for (const auto* member : cls->members) {
-    std::string key;
-    const DataType* decl_type = DeclaredEnumOf(info, member, key);
-    if (decl_type == nullptr) continue;
-    EnumTypeInfo type;
-    type.type_name = *arena.Create<std::string>(std::move(key));
-    type.width = EvalTypeWidth(*decl_type);
-    type.is_4state = Is4stateType(*decl_type, TypedefMap{});
-    int64_t next_val = 0;
-    for (const auto& em : decl_type->enum_members) {
-      if (em.value) next_val = static_cast<int64_t>(em.value->int_val);
-      info->enum_members[std::string(em.name)] =
-          static_cast<uint64_t>(next_val);
-      type.members.push_back({em.name, static_cast<uint64_t>(next_val)});
-      ++next_val;
-    }
-    if (ctx.FindEnumType(type.type_name) == nullptr)
-      ctx.RegisterEnumType(type.type_name, type);
-  }
-}
-
 static void InheritInterfaceStaticsAndEnums(ClassTypeInfo* info,
                                             const ClassTypeInfo* src) {
   for (const auto& [k, v] : src->static_properties) {
@@ -714,8 +663,12 @@ static void InheritInterfaceStaticsAndEnums(ClassTypeInfo* info,
       info->static_properties[k] = v;
   }
   for (const auto& [k, v] : src->enum_members) {
-    if (info->enum_members.find(k) == info->enum_members.end())
+    if (info->enum_members.find(k) == info->enum_members.end()) {
       info->enum_members[k] = v;
+      auto shape = src->enum_literal_shapes.find(k);
+      if (shape != src->enum_literal_shapes.end())
+        info->enum_literal_shapes[k] = shape->second;
+    }
   }
 }
 

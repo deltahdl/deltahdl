@@ -583,6 +583,11 @@ struct ClassObject;
 bool TryClassScopeEnumLiteral(std::string_view name, const ClassTypeInfo* cls,
                               Arena& arena, Logic4Vec& out);
 
+// §6.19 with §8.4: the literal `name` that `cls` declares, holding `value`,
+// read at its enumeration's width and signing.
+Logic4Vec ClassEnumLiteral(const ClassTypeInfo& cls, const std::string& name,
+                           uint64_t value, Arena& arena);
+
 void BindClassParams(const ClassTypeInfo* cls, const Expr* base_id,
                      SimContext& ctx, Arena& arena);
 
