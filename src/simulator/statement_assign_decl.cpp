@@ -289,7 +289,10 @@ void CreateDeclAggregate(const Stmt* stmt, uint32_t elem_width, SimContext& ctx,
 static std::string_view StaticFrameOf(const Stmt* stmt,
                                       std::string_view func_name,
                                       SimContext& ctx) {
-  if (!func_name.empty()) return func_name;
+  if (!func_name.empty()) {
+    std::string_view block = ctx.InnermostStmtFrame();
+    return block.empty() ? func_name : block;
+  }
   auto* key = ctx.GetArena().Create<std::string>(
       std::format("static@{}:{}:{}", stmt->range.start.file_id,
                   stmt->range.start.line, stmt->range.start.column));
@@ -409,13 +412,24 @@ static Variable* CreateVarInScope(std::string_view name, uint32_t width,
 }
 
 // The variable a static local's declaration made the first time it ran,
-// kept in its static frame; null where the declaration is not static or has
-// not run yet.
-static Variable* KeptStaticLocal(const Stmt* stmt, SimContext& ctx) {
+// and the static frame it is kept in; a null variable where the declaration
+// is not static or has not run yet. One a subroutine's named block declares
+// with an initializer is made before time 0 in the subroutine's frame
+// (InitSubroutineStatics), where it is found when its block's frame does not
+// hold it.
+struct KeptLocal {
+  Variable* var = nullptr;
+  std::string_view frame;
+};
+
+static KeptLocal KeptStaticLocal(const Stmt* stmt, SimContext& ctx) {
   std::string_view func_name = ctx.CurrentFuncName();
-  if (!IsEffectivelyStaticLocal(stmt, func_name, ctx)) return nullptr;
-  return ctx.FindStaticFuncVar(StaticFrameOf(stmt, func_name, ctx),
-                               stmt->var_name);
+  if (!IsEffectivelyStaticLocal(stmt, func_name, ctx)) return {};
+  std::string_view frame = StaticFrameOf(stmt, func_name, ctx);
+  if (Variable* var = ctx.FindStaticFuncVar(frame, stmt->var_name))
+    return {var, frame};
+  if (func_name.empty() || frame == func_name) return {};
+  return {ctx.FindStaticFuncVar(func_name, stmt->var_name), func_name};
 }
 
 // §9.3.4 with §23.6: a class handle a block declares is of its class under
@@ -440,11 +454,10 @@ static void BindClassHandle(std::string_view name, std::string_view class_type,
 // procedure, and `b1.cnt` named no variable.
 static bool TryReuseKeptStaticLocal(const Stmt* stmt, SimContext& ctx,
                                     Arena& arena) {
-  Variable* kept = KeptStaticLocal(stmt, ctx);
-  if (kept == nullptr) return false;
-  ctx.AliasLocalVariable(stmt->var_name, kept);
-  RestoreStaticAggregate(StaticFrameOf(stmt, ctx.CurrentFuncName(), ctx),
-                         stmt->var_name, ctx);
+  KeptLocal kept = KeptStaticLocal(stmt, ctx);
+  if (kept.var == nullptr) return false;
+  ctx.AliasLocalVariable(stmt->var_name, kept.var);
+  RestoreStaticAggregate(kept.frame, stmt->var_name, ctx);
   std::string_view class_key =
       DeclaredClassKey(stmt->var_decl_type, ctx, arena);
   if (class_key.empty()) {
@@ -826,7 +839,7 @@ StmtResult ExecVarDeclImpl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (stmt->kind == StmtKind::kBlockItemDecl)
     return ExecBlockItemDeclImpl(stmt, ctx, arena);
   // §6.21: a static local made already keeps the object it was bound to.
-  if (KeptStaticLocal(stmt, ctx) != nullptr)
+  if (KeptStaticLocal(stmt, ctx).var != nullptr)
     return ExecVarDeclBody(stmt, ctx, arena);
   StmtResult result = ExecVarDeclBody(stmt, ctx, arena);
   Variable* local = ctx.FindLocalVariable(stmt->var_name);

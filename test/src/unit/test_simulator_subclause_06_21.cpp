@@ -585,4 +585,90 @@ TEST(ScopeAndLifetimeSimulation, AnAutomaticTasksBlockAggregatesStartAfresh) {
   }
 }
 
+// §6.21 with §13.4.2: a named block of a static function declares static
+// variables, kept from one call to the next as a static task's are, its
+// array's element, its queue's item and its associative array's entry there on
+// the second call. Kept under the function's frame, they were dropped when the
+// call returned and the function's own frame was kept in their place.
+TEST(ScopeAndLifetimeSimulation, AStaticFunctionsBlockAggregatesOutliveIt) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  int pass;\n"
+      "  bit [3:0] r;\n"
+      "  function void f();\n"
+      "    begin : nb\n"
+      "      int arr [3];\n"
+      "      int q [$];\n"
+      "      int aa [int];\n"
+      "      int n;\n"
+      "      pass++;\n"
+      "      if (pass == 2) r = {$size(arr) == 3 && arr[2] == 5, q.size() == 1 "
+      "&& q[0] == 7, aa.num() == 1 && aa[4] == 9, n == 1};\n"
+      "      arr[2] = 5; q.push_back(7); aa[4] = 9; n++;\n"
+      "    end\n"
+      "  endfunction\n"
+      "  initial begin f(); f(); end\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(val, 0xFu);
+}
+
+// §6.21 with §9.3.4: each named block is a scope of its own, so two blocks of
+// one static task each declaring a queue `q` declare two queues, each keeping
+// its own items from call to call: after two calls the first holds two 1s and
+// the second two 2s. Shared, each held all four.
+TEST(ScopeAndLifetimeSimulation, TwoBlocksOfATaskKeepQueuesOfTheirOwn) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  int pass;\n"
+      "  bit [1:0] r;\n"
+      "  task tk();\n"
+      "    pass++;\n"
+      "    begin : b1\n"
+      "      int q [$];\n"
+      "      q.push_back(1);\n"
+      "      if (pass == 2) r[0] = q.size() == 2 && q[1] == 1;\n"
+      "    end\n"
+      "    begin : b2\n"
+      "      int q [$];\n"
+      "      q.push_back(2);\n"
+      "      if (pass == 2) r[1] = q.size() == 2 && q[1] == 2;\n"
+      "    end\n"
+      "  endtask\n"
+      "  initial begin tk(); tk(); end\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(val, 3u);
+}
+
+// §6.21 with §6.8: a static variable a subroutine's named block declares with
+// an initializer is initialized once, before any procedure runs, and keeps
+// what each call leaves in it: 10 on the first call, 11 on the second, in a
+// task and in a function alike. Initialized on each call, it read 10 twice.
+TEST(ScopeAndLifetimeSimulation, ABlocksInitializedStaticIsInitializedOnce) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  int pass;\n"
+      "  bit [3:0] r;\n"
+      "  task tk();\n"
+      "    begin : nb\n"
+      "      static int x = 10;\n"
+      "      pass++;\n"
+      "      r[pass - 1] = x == 9 + pass;\n"
+      "      x++;\n"
+      "    end\n"
+      "  endtask\n"
+      "  function void f();\n"
+      "    begin : fb\n"
+      "      static int y = 10;\n"
+      "      r[pass + 1] = y == 9 + pass;\n"
+      "      y++;\n"
+      "    end\n"
+      "  endfunction\n"
+      "  initial begin tk(); f(); tk(); f(); end\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(val, 0xFu);
+}
+
 }  // namespace

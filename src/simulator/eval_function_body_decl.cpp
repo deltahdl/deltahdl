@@ -374,19 +374,32 @@ static void ExecFuncVarDeclAutomatic(const Stmt* stmt, SimContext& ctx,
 // static local is kept in its subroutine's static frame, and the queue,
 // associative array or shape its declaration made is kept beside it
 // (RetainStaticAggregate); a later call's declaration refers to both again.
+//
+// §6.21: one a named block of the body declares is kept under the block's
+// frame, which holds it while the block runs and keeps it when the block
+// ends; kept under the subroutine's, the subroutine's own frame, kept in turn
+// when the call returns, replaced it. One the block declares with an
+// initializer is made before time 0 in the subroutine's frame
+// (InitSubroutineStatics) and found there.
 static void ExecFuncVarDeclStatic(const Stmt* stmt, std::string_view func_name,
                                   SimContext& ctx, Arena& arena) {
-  auto* existing = ctx.FindStaticFuncVar(func_name, stmt->var_name);
+  std::string_view block = ctx.InnermostStmtFrame();
+  std::string_view frame = block.empty() ? func_name : block;
+  auto* existing = ctx.FindStaticFuncVar(frame, stmt->var_name);
+  if (existing == nullptr && frame != func_name) {
+    existing = ctx.FindStaticFuncVar(func_name, stmt->var_name);
+    if (existing != nullptr) frame = func_name;
+  }
   if (existing) {
     ctx.AliasLocalVariable(stmt->var_name, existing);
-    RestoreStaticAggregate(func_name, stmt->var_name, ctx);
+    RestoreStaticAggregate(frame, stmt->var_name, ctx);
     return;
   }
   auto* v = CreateFuncLocalVar(stmt->var_name, stmt->var_decl_type,
                                CarrierInit(stmt), ctx, arena);
   CreateFuncLocalAggregate(stmt, v, ctx, arena);
-  ctx.SaveStaticFuncVar(func_name, stmt->var_name, v);
-  RetainStaticAggregate(func_name, stmt->var_name, ctx, arena);
+  ctx.SaveStaticFuncVar(frame, stmt->var_name, v);
+  RetainStaticAggregate(frame, stmt->var_name, ctx, arena);
 }
 
 // §6.23 with §8.11: `var static type(this) m_inst;` in a method declares a

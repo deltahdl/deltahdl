@@ -82,6 +82,10 @@ struct Scope {
   // §11.12: the lets the block or the subroutine body this frame stands for
   // declares, each the let its name refers to within that scope.
   std::unordered_map<std::string_view, ModuleItem*> lets;
+  // §6.21: the name a block's or a labelled statement's frame is kept under
+  // between activations (ScopeStack::StmtFrameName), empty for a subroutine's
+  // frame and for a frame kept under no name.
+  std::string_view stmt_frame;
 };
 
 // §13.4.2 with §27.4: what one subroutine enable still running keeps its

@@ -215,6 +215,8 @@ void SimContext::PushStaticScope(std::string_view func_name) {
                                false,
                                {},
                                {}});
+  if (stmt_frame_names_.contains(func_name.data()))
+    scope_stack_.back().stmt_frame = func_name;
 }
 
 void SimContext::PopStaticScope(std::string_view func_name) {
@@ -329,8 +331,14 @@ std::string_view ScopeStack::StmtFrameName(const Stmt* stmt) {
     std::string_view label = stmt->label.empty() ? "block" : stmt->label;
     it->second =
         std::format("{}@{}:{}:{}", label, at.file_id, at.line, at.column);
+    stmt_frame_names_.insert(it->second.data());
   }
   return it->second;
+}
+
+std::string_view ScopeStack::InnermostStmtFrame() const {
+  return scope_stack_.empty() ? std::string_view{}
+                              : scope_stack_.back().stmt_frame;
 }
 
 }  // namespace delta

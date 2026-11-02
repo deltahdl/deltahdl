@@ -3,6 +3,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "simulator/scope.h"
@@ -90,6 +91,11 @@ class ScopeStack {
   // shared by every labelled statement of the instance with that label, and
   // `d.b.c` took over `a.b.c`.
   std::string_view StmtFrameName(const Stmt* stmt);
+  // §6.21 with §13.3.2: the name StmtFrameName gave the innermost frame,
+  // where that frame is a block's or a labelled statement's kept between
+  // activations; empty otherwise. A static local declared there is kept under
+  // it, beside the frame's other variables.
+  std::string_view InnermostStmtFrame() const;
   // The active subroutine call chain, outermost frame first. Used to report the
   // call stack for $stacktrace (§20.17.2).
   const std::vector<std::string_view>& FuncNameStack() const {
@@ -111,6 +117,9 @@ class ScopeStack {
   std::vector<std::string_view> func_name_stack_;
   std::vector<FrameOwnerEntry> processless_frame_owners_;
   std::unordered_map<const Stmt*, std::string> stmt_frames_;
+  // The storage of each name in stmt_frames_, by which PushStaticScope tells
+  // a statement's frame from a subroutine's.
+  std::unordered_set<const char*> stmt_frame_names_;
 };
 
 }  // namespace delta
