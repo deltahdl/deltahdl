@@ -284,6 +284,9 @@ void Elaborator::CheckRandsequenceNamesIn(
 // twice and no report is made twice.
 void Elaborator::ValidatePerDeclarationRulesInUnitScopes() {
   if (unit_ == nullptr) return;
+  // §6.23 for the type references the two scopes write, whose names are
+  // read as the scope writing them declares them.
+  ValidateUnitScopeTypeRefArgs();
 
   // §11.12's rules on a let's formals for the lets the two scopes declare, and
   // their subroutines and classes' methods; ResolveUnitScopeTypeRefs has
@@ -321,15 +324,17 @@ void Elaborator::ValidatePerDeclarationRulesInUnitScopes() {
   // not at hand to judge a member default's constancy against, and §25.9 on
   // the interface a virtual interface type names, there one the compilation
   // unit declares.
-  const TypeShapeTables kShapeTables{typedefs_, td_array_dims_, class_names_};
-  const AggregateShapeCtx kShapeCtx{kShapeTables, nullptr, diag_};
-  ForEachUnitDeclaredType(
-      unit_, [this, &kShapeCtx](const DeclaredType& declared) {
-        CheckDeclaredTypeRules(declared, kShapeCtx, UnitCovergroups(unit_));
-        ValidateVirtualInterfaceType(
-            declared.type, declared.loc,
-            [this](std::string_view name) { return FindModule(name); }, diag_);
-      });
+  ForEachUnitDeclaredType(unit_, [this](const DeclaredType& declared) {
+    CheckDeclaredTypeRules(
+        declared,
+        AggregateShapeCtx{
+            TypeShapeTables{typedefs_, td_array_dims_, class_names_}, nullptr,
+            diag_},
+        UnitCovergroups(unit_));
+    ValidateVirtualInterfaceType(
+        declared.type, declared.loc,
+        [this](std::string_view name) { return FindModule(name); }, diag_);
+  });
   // §23.9 for the same two scopes: their subroutines are in no module's item
   // list, so Elaborator::ValidateUnresolvedReferences never reads them.
   const UnitScopeNames kNames{cu_scope_names_, cu_param_scope_, typedefs_,
