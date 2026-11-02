@@ -170,14 +170,16 @@ void CreateBlockArrayElements(const Stmt* stmt, uint32_t elem_width,
   // §23.9: a declaration inside a begin-end block is local to that block, so
   // its shape goes away with the block rather than answering for a like-named
   // variable after it. The element variables below are created the same way a
-  // few lines down in this file.
+  // few lines down in this file. They are named in the running instance, as
+  // a name is looked up there, so that a block of an interface's subroutine
+  // reaches them (§23.9).
   ctx.RegisterArrayInScope(stmt->var_name, info);
   CreateBlockArrayLeaves(
       BlockArrayLeaves{dims, elem_width, ctx, arena,
                        DeclaredTypeIsSigned(stmt->var_decl_type, ctx),
                        info.is_4state,
                        DeclaredTypeIsString(stmt->var_decl_type, ctx)},
-      0, std::string(stmt->var_name));
+      0, ctx.ActiveInstancePrefix() + std::string(stmt->var_name));
 }
 
 }  // namespace delta

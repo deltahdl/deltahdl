@@ -277,17 +277,32 @@ static void RecordPackageFuncNames(
 // qualifier; before the two flags were split, marking a body here made an
 // instance method of a package class run in class scope without `this`, its
 // properties unreachable.
+static void DefaultSubroutineLifetime(ModuleItem* item,
+                                      bool scope_is_automatic) {
+  if ((item->kind != ModuleItemKind::kFunctionDecl &&
+       item->kind != ModuleItemKind::kTaskDecl) ||
+      !item->method_class.empty() || item->is_automatic || item->is_static) {
+    return;
+  }
+  if (scope_is_automatic) {
+    item->is_automatic = true;
+  } else {
+    item->is_static = true;
+  }
+}
+
+// A generate block is no scope of a lifetime of its own (§27), so a subroutine
+// it declares, in every branch and arm, takes the enclosing design element's.
 void DefaultSubroutineLifetimes(const std::vector<ModuleItem*>& items,
                                 bool scope_is_automatic) {
   for (auto* item : items) {
-    if ((item->kind == ModuleItemKind::kFunctionDecl ||
-         item->kind == ModuleItemKind::kTaskDecl) &&
-        item->method_class.empty() && !item->is_automatic && !item->is_static) {
-      if (scope_is_automatic) {
-        item->is_automatic = true;
-      } else {
-        item->is_static = true;
-      }
+    DefaultSubroutineLifetime(item, scope_is_automatic);
+    DefaultSubroutineLifetimes(item->gen_body, scope_is_automatic);
+    if (item->gen_else != nullptr) {
+      DefaultSubroutineLifetimes({item->gen_else}, scope_is_automatic);
+    }
+    for (const GenerateCaseItem& arm : item->gen_case_items) {
+      DefaultSubroutineLifetimes(arm.body, scope_is_automatic);
     }
   }
 }
@@ -490,11 +505,14 @@ bool IsImplicitNestedInstantiationCandidate(std::string_view name,
 
 // §13.3.1: subroutines declared in a package take their default lifetime from
 // the package. Packages are not elaborated through ElaborateItems (they are not
-// modules), so their task/function default lifetimes are resolved here.
+// modules), so their task/function default lifetimes are resolved here, and
+// those of the compilation unit's subroutines too, which no lifetime keyword
+// can make automatic and so are static (§6.21).
 void Elaborator::DefaultPackageTaskFuncLifetimes() {
   for (auto* pkg : unit_->packages) {
     DefaultSubroutineLifetimes(pkg->items, pkg->is_automatic);
   }
+  DefaultSubroutineLifetimes(unit_->cu_items, false);
 }
 
 void Elaborator::RunPostItemValidations(const ModuleDecl* decl,
