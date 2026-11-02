@@ -459,6 +459,11 @@ void Elaborator::RunPreElaborationValidations() {
 
   RunPreElaborationClassValidations();
 
+  // §6.23 for the type references the compilation unit and the packages
+  // write, which ResolveUnitScopeTypeRefs recorded; their names are read as
+  // the scope writing them declares them.
+  ValidateUnitScopeTypeRefArgs();
+
   ValidatePerDeclarationRulesInUnitScopes();
 
   ValidateTimescaleConsistency();
