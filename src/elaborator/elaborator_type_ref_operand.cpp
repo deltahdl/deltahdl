@@ -273,20 +273,19 @@ static const PackageDecl* PackageDeclaring(const ClassDecl* cls,
   return nullptr;
 }
 
-// §8.13 with §8.25: the parameter values the class `owner` takes as a base of
-// `cls`: those the extends clause of the class extending it writes, where that
-// class has no parameters its clause could name; nothing where `owner` is no
-// base of `cls` or its values hang on another class's parameters.
+// §8.13 with §8.25: the parameter values the class `owner`, a base of `cls`,
+// takes: those the extends clause of the class extending it writes, where that
+// class has no parameters its clause could name; nothing where it has.
 static const std::vector<DataType>* BaseArguments(const ClassDecl* cls,
                                                   const ClassDecl* owner,
                                                   const CompilationUnit* unit) {
-  for (int depth = 0; cls != nullptr && depth < 64; ++depth) {
-    const ClassDecl* base = FindBaseClass(cls, unit);
-    if (base == owner)
-      return cls->params.empty() ? &cls->base_class_type_params : nullptr;
-    cls = base;
+  const ClassDecl* extending = cls;
+  for (const ClassDecl* base = FindBaseClass(cls, unit); base != owner;
+       base = FindBaseClass(base, unit)) {
+    extending = base;
   }
-  return nullptr;
+  return extending->params.empty() ? &extending->base_class_type_params
+                                   : nullptr;
 }
 
 std::optional<UnpackedArrayType> ElaboratorOperationRules::MemberTypeOf(
