@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <array>
+#include <string>
+
 #include "helpers_scheduler.h"
 
 using namespace delta;
@@ -411,6 +414,135 @@ TEST(ScopeAndLifetimeSimulation, ANamedBlocksClassHandleIsReachedByItsPath) {
       "endmodule\n",
       "r");
   EXPECT_EQ(val, 4u);
+}
+
+// A place a block declaring variables stands in: the source is `head`, the
+// declarations, `mid`, the statements and `tail`, within a module declaring
+// an int pass and a five-bit r.
+struct BlockPlace {
+  const char* name;
+  const char* head;
+  const char* mid;
+  const char* tail;
+};
+
+std::string InModule(const BlockPlace& place, const std::string& decls,
+                     const std::string& body) {
+  return std::string("module t;\n  int pass;\n  bit [4:0] r;\n") + place.head +
+         decls + place.mid + body + place.tail + "endmodule\n";
+}
+
+// A fixed-size array, a two-dimensional one, a queue and an associative array,
+// each declared `lifetime` (empty or `automatic `).
+std::string AggregateDecls(const std::string& lifetime) {
+  return "      " + lifetime + "int arr [3];\n      " + lifetime +
+         "int m [2][3];\n      " + lifetime + "int q [$];\n      " + lifetime +
+         "int aa [int];\n";
+}
+
+// A static declaration and an automatic one.
+constexpr std::array<const char*, 2> kLifetimes = {"", "automatic "};
+
+constexpr const char* kFill =
+    "      arr[2] = 5; m[1][2] = 3; q.push_back(7); aa[4] = 9;\n";
+
+// The blocks entered once: a named begin-end block, a named fork, whose
+// declarations its branches share, and an unnamed begin-end block, all of an
+// initial procedure.
+constexpr std::array kBlocksEnteredOnce = {
+    BlockPlace{"named begin block", "  initial begin\n    begin : nb\n", "",
+               "    end\n  end\n"},
+    BlockPlace{"named fork block", "  initial begin\n    fork : nf\n",
+               "      begin\n", "      end\n    join\n  end\n"},
+    BlockPlace{"unnamed begin block", "  initial begin\n    begin\n", "",
+               "    end\n  end\n"},
+};
+
+// §6.21 with §7.4, §7.10 and §7.8: an aggregate a block declares is a variable
+// of the block with the dimensions its declaration writes, there from the
+// block's first statement. A named block's static variables are made before
+// any procedure starts, and the shape of each was lost on the way to the block
+// running: $size(arr) was 32, the array read as the int its element is.
+TEST(ScopeAndLifetimeSimulation, ABlocksAggregatesKeepTheirShape) {
+  const std::string kBody =
+      std::string(kFill) +
+      "      r = {$size(arr) == 3 && arr[2] == 5, $size(m) == 2 && "
+      "$size(m, 2) == 3 && m[1][2] == 3, q.size() == 1 && q[0] == 7, "
+      "aa.num() == 1 && aa[4] == 9, 1'b1};\n";
+  for (const char* lifetime : kLifetimes) {
+    for (const BlockPlace& place : kBlocksEnteredOnce) {
+      SCOPED_TRACE(place.name);
+      const std::string kSrc = InModule(place, AggregateDecls(lifetime), kBody);
+      SCOPED_TRACE(kSrc);
+      EXPECT_EQ(RunAndGet(kSrc, "r"), 0x1Fu);
+    }
+  }
+}
+
+// The blocks entered twice: a named and an unnamed begin-end block and a named
+// fork repeated by an initial procedure, and a named and an unnamed begin-end
+// block of a static task called twice.
+constexpr std::array kBlocksEnteredTwice = {
+    BlockPlace{"repeated named begin block",
+               "  initial repeat (2) begin : nb\n", "", "  end\n"},
+    BlockPlace{"repeated unnamed begin block", "  initial repeat (2) begin\n",
+               "", "  end\n"},
+    BlockPlace{"repeated named fork block", "  initial repeat (2) fork : nf\n",
+               "      begin\n", "      end\n  join\n"},
+    BlockPlace{"named begin block of a static task",
+               "  task tk();\n    begin : nb\n", "",
+               "    end\n  endtask\n  initial begin tk(); tk(); end\n"},
+    BlockPlace{"unnamed begin block of a static task",
+               "  task tk();\n    begin\n", "",
+               "    end\n  endtask\n  initial begin tk(); tk(); end\n"},
+};
+
+// §6.21: a block's variable is static unless declared automatic, one variable
+// whose storage outlives the block, so the second entry finds the elements,
+// the queue's item and the associative array's entry the first left; an
+// automatic one is made afresh on each entry, its elements 0, its queue and
+// associative array empty, and its shape the same. Kept between entries only
+// as variables, the static aggregates lost their shape and their contents.
+TEST(ScopeAndLifetimeSimulation, ABlocksStaticAggregatesOutliveIt) {
+  const std::string kStaticHolds =
+      "      if (pass == 2) r = {$size(arr) == 3 && arr[2] == 5, $size(m, 2) "
+      "== 3 && m[1][2] == 3, q.size() == 1 && q[0] == 7, aa.num() == 1 && "
+      "aa[4] == 9, 1'b1};\n";
+  const std::string kAutomaticHolds =
+      "      if (pass == 2) r = {$size(arr) == 3 && arr[2] == 0, $size(m, 2) "
+      "== 3 && m[1][2] == 0, q.size() == 0, aa.num() == 0, 1'b1};\n";
+  for (const BlockPlace& place : kBlocksEnteredTwice) {
+    SCOPED_TRACE(place.name);
+    const std::string kStatic = InModule(
+        place, AggregateDecls(""), "      pass++;\n" + kStaticHolds + kFill);
+    SCOPED_TRACE(kStatic);
+    EXPECT_EQ(RunAndGet(kStatic, "r"), 0x1Fu);
+    const std::string kAutomatic =
+        InModule(place, AggregateDecls("automatic "),
+                 "      pass++;\n" + kAutomaticHolds + kFill);
+    SCOPED_TRACE(kAutomatic);
+    EXPECT_EQ(RunAndGet(kAutomatic, "r"), 0x1Fu);
+  }
+}
+
+// §6.21 with §27.4: each generate block instance is a scope of its own, and
+// the static queue its named block declares is its own: the second entry in
+// each instance finds the one item that instance pushed. Shared, the second
+// instance's block found the first's two items and r[1] stayed 0.
+TEST(ScopeAndLifetimeSimulation, EachGenerateInstanceKeepsItsBlocksAggregates) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  bit [1:0] r;\n"
+      "  for (genvar g = 0; g < 2; g++) begin : gb\n"
+      "    initial repeat (2) begin : nb\n"
+      "      int q [$];\n"
+      "      if (q.size() == 1) r[g] = q[0] == g;\n"
+      "      q.push_back(g);\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(val, 3u);
 }
 
 }  // namespace

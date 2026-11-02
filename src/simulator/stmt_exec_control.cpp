@@ -28,6 +28,7 @@
 #include "simulator/process.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
+#include "simulator/static_aggregate.h"
 #include "simulator/stmt_exec.h"
 #include "simulator/stmt_exec_internal.h"
 #include "simulator/stmt_result.h"
@@ -63,6 +64,7 @@ static std::string_view EnterBlockScope(const Stmt* stmt, SimContext& ctx,
   std::string_view frame = BlockFrameName(stmt, ctx);
   if (frame.empty()) return frame;
   ctx.PushStaticScope(frame);
+  RestoreBlockAggregates(*stmt, frame, ctx);
   if (!stmt->label.empty()) {
     ctx.RegisterNamedScope(stmt->label, ctx.CurrentProcess());
     ctx.PushActiveNamedScope(stmt->label);
@@ -83,6 +85,7 @@ static void TeardownBlockScope(const Stmt* stmt, SimContext& ctx, Arena& arena,
     ctx.PopActiveNamedScope();
     ctx.UnregisterNamedScope(stmt->label, ctx.CurrentProcess());
   }
+  RetainBlockAggregates(*stmt, frame, ctx, arena);
   ctx.PopStaticScope(frame);
 }
 

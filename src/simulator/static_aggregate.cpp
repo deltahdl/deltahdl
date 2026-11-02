@@ -6,9 +6,11 @@
 #include <vector>
 
 #include "common/arena.h"
+#include "parser/ast_stmt.h"
 #include "simulator/process.h"
 #include "simulator/scope.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_scope_stack.h"
 #include "simulator/sim_context_types.h"
 
 namespace delta {
@@ -114,6 +116,44 @@ bool RestoreStaticAggregate(std::string_view frame, std::string_view name,
     }
   });
   return kept_any;
+}
+
+// Runs `use` on the name of each static declaration `block` holds among its
+// own items, a begin-end block's or a fork's, when no subroutine is running,
+// with the key the frame `frame` is kept under in the running instance and
+// generate block instance (SimContext::StaticFrameKey), so that each instance
+// keeps aggregates of its own (§27.4).
+template <typename Use>
+static void ForEachBlockStaticName(const Stmt& block, std::string_view frame,
+                                   SimContext& ctx, Use use) {
+  if (!ctx.CurrentFuncName().empty()) return;
+  std::string_view key;
+  auto each = [&](const std::vector<Stmt*>& items) {
+    for (const Stmt* s : items) {
+      if (s == nullptr || s->kind != StmtKind::kVarDecl || s->var_is_automatic)
+        continue;
+      if (key.empty()) key = ctx.StaticFrameKey(frame);
+      use(key, s->var_name);
+    }
+  };
+  each(block.stmts);
+  each(block.fork_stmts);
+}
+
+void RetainBlockAggregates(const Stmt& block, std::string_view frame,
+                           SimContext& ctx, Arena& arena) {
+  ForEachBlockStaticName(block, frame, ctx,
+                         [&](std::string_view key, std::string_view name) {
+                           RetainStaticAggregate(key, name, ctx, arena);
+                         });
+}
+
+void RestoreBlockAggregates(const Stmt& block, std::string_view frame,
+                            SimContext& ctx) {
+  ForEachBlockStaticName(block, frame, ctx,
+                         [&](std::string_view key, std::string_view name) {
+                           RestoreStaticAggregate(key, name, ctx);
+                         });
 }
 
 }  // namespace delta

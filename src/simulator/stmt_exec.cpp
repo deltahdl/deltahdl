@@ -32,6 +32,7 @@
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
 #include "simulator/statement_coverage.h"
+#include "simulator/static_aggregate.h"
 #include "simulator/stmt_exec_internal.h"
 #include "simulator/stmt_result.h"
 #include "simulator/vcd_dump_state.h"
@@ -360,6 +361,7 @@ static ExecTask AwaitForkJoin(ForkJoinState* state) {
 static void EnterForkLabelScope(const Stmt* stmt, SimContext& ctx,
                                 Arena& arena) {
   ctx.PushStaticScope(ctx.StmtFrameName(stmt));
+  RestoreBlockAggregates(*stmt, ctx.StmtFrameName(stmt), ctx);
   ctx.PushActiveNamedScope(stmt->label);
   // §21.7.2.3: a dump opens a named parallel block's scope as a fork.
   ctx.Vcd().SetVcdScopeKind(ActiveNamedScopePath(ctx), VcdScopeKind::kFork);
@@ -372,6 +374,7 @@ static void ExitForkLabelScope(const Stmt* stmt, SimContext& ctx, Arena& arena,
   if (ended) SampleAtBlockEvent(stmt->label, false, ctx, arena);
   ctx.UnregisterNamedScope(stmt->label, ctx.CurrentProcess());
   ctx.PopActiveNamedScope();
+  RetainBlockAggregates(*stmt, ctx.StmtFrameName(stmt), ctx, arena);
   ctx.PopStaticScope(ctx.StmtFrameName(stmt));
 }
 

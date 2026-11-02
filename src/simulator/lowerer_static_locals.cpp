@@ -26,6 +26,7 @@
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
+#include "simulator/static_aggregate.h"
 #include "simulator/stmt_exec_internal.h"
 #include "simulator/vcd_dump_state.h"
 #include "simulator/vcd_writer.h"
@@ -373,6 +374,7 @@ void MakeNamedBlockStatics(const Stmt* s, SimContext& ctx, Arena& arena) {
   });
   if (named) {
     ctx.PopActiveNamedScope();
+    RetainBlockAggregates(*s, ctx.StmtFrameName(s), ctx, arena);
     ctx.PopStaticScope(ctx.StmtFrameName(s));
   }
 }

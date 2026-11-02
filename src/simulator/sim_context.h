@@ -244,6 +244,11 @@ class SimContext : public DeclaredNameTables,
   // under StaticFrameKey the last time the function returned.
   void PushStaticScope(std::string_view func_name);
   void PopStaticScope(std::string_view func_name);
+  // §13.3.2: static storage is per declaration: a module's subroutine's and
+  // named block's under the running instance's path, the bare name at the
+  // top, and a package's or unit's subroutine's under its owner's name, the
+  // innermost Process::frame_owners entry (DeclaredNameTables).
+  std::string_view StaticFrameKey(std::string_view name);
 
   // §18.17.7: while a randsequence production with a non-void return type is
   // being generated, the engine points the return slot at the production's
@@ -810,11 +815,6 @@ class SimContext : public DeclaredNameTables,
  private:
   // See ResolveInstanceScope.
   std::string InstanceKeyOf(const std::string& cand) const;
-  // §13.3.2: static storage is per declaration: a module's subroutine's and
-  // named block's under the running instance's path, the bare name at the
-  // top, and a package's or unit's subroutine's under its owner's name, the
-  // innermost Process::frame_owners entry (DeclaredNameTables).
-  std::string_view StaticFrameKey(std::string_view name);
   Scheduler& scheduler_;
   Arena& arena_;
   DiagEngine& diag_;

@@ -6,6 +6,7 @@ namespace delta {
 
 class Arena;
 class SimContext;
+struct Stmt;
 
 // §13.3.1 (printed page 339) and §13.4.2 (printed 344): a subroutine defined
 // in a module, interface, program or package is static by default, every item
@@ -28,6 +29,19 @@ class SimContext;
 void RetainStaticAggregate(std::string_view frame, std::string_view name,
                            SimContext& ctx, Arena& arena);
 bool RestoreStaticAggregate(std::string_view frame, std::string_view name,
+                            SimContext& ctx);
+
+// §6.21: a variable a block declares outside any subroutine is static unless
+// declared automatic, and the block's frame, `frame`, is pushed with the
+// variables it held when last left (SimContext::PushStaticScope), its maps of
+// queues, associative arrays and shapes empty again. RetainBlockAggregates
+// keeps, as RetainStaticAggregate does, the aggregates the static declarations
+// of `block` made in the top frame; RestoreBlockAggregates makes that frame
+// refer to them again on the next entry. Inside a subroutine the subroutine's
+// own declarations keep them (ExecFuncVarDecl), and these do nothing.
+void RetainBlockAggregates(const Stmt& block, std::string_view frame,
+                           SimContext& ctx, Arena& arena);
+void RestoreBlockAggregates(const Stmt& block, std::string_view frame,
                             SimContext& ctx);
 
 }  // namespace delta
