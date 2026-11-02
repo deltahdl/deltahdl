@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <array>
+#include <cstdint>
 #include <string>
 
 #include "helpers_scheduler.h"
@@ -669,6 +670,88 @@ TEST(ScopeAndLifetimeSimulation, ABlocksInitializedStaticIsInitializedOnce) {
       "endmodule\n",
       "r");
   EXPECT_EQ(val, 0xFu);
+}
+
+// The function a place below declares: a named block holding an array, a
+// queue, an associative array and an int, all of the block's lifetime, and a
+// queue written static. On the second call it reports, one bit each, whether
+// the first call's element, item, entry and count are still there, and
+// whether the static queue holds the first call's item.
+std::string BlockAggregateFunction(const char* qualifier) {
+  return std::string("  ") + qualifier +
+         "function bit [4:0] f();\n"
+         "    bit [4:0] res;\n"
+         "    begin : nb\n"
+         "      int arr [3];\n"
+         "      int q [$];\n"
+         "      int aa [int];\n"
+         "      int n;\n"
+         "      static int sq [$];\n"
+         "      res = {arr[2] == 5, q.size() == 1, aa.num() == 1, n == 1, "
+         "sq.size() == 1};\n"
+         "      arr[2] = 5; q.push_back(7); aa[4] = 9; n++; sq.push_back(1);\n"
+         "    end\n"
+         "    return res;\n"
+         "  endfunction\n";
+}
+
+// §6.21 with §13.3.1 and §8.10: a subroutine declared in a package, an
+// interface, a program or a generate block is static, as one in a module is,
+// so its named block's variables are static and the second call finds what
+// the first left in each of them, every bit set. A class's method is
+// automatic, so its block's variables start afresh on each call and only the
+// queue written static keeps its item.
+TEST(ScopeAndLifetimeSimulation,
+     ABlocksAggregatesKeepTheirSubroutinesLifetime) {
+  struct Place {
+    std::string src;
+    uint64_t want;
+  };
+  const std::string kFn = BlockAggregateFunction("");
+  const std::array<Place, 5> kPlaces = {{
+      {"package p;\n" + kFn +
+           "endpackage\n"
+           "module t;\n"
+           "  bit [4:0] r;\n"
+           "  initial begin void'(p::f()); r = p::f(); end\n"
+           "endmodule\n",
+       0x1F},
+      {"interface ifc;\n" + kFn +
+           "endinterface\n"
+           "module t;\n"
+           "  bit [4:0] r;\n"
+           "  ifc i();\n"
+           "  initial begin void'(i.f()); r = i.f(); end\n"
+           "endmodule\n",
+       0x1F},
+      {"module t;\n"
+       "  bit [4:0] r;\n"
+       "  program pg;\n" +
+           kFn +
+           "    initial begin void'(f()); r = f(); end\n"
+           "  endprogram\n"
+           "endmodule\n",
+       0x1F},
+      {"module t;\n"
+       "  bit [4:0] r;\n"
+       "  if (1) begin : g\n" +
+           kFn +
+           "  end\n"
+           "  initial begin void'(g.f()); r = g.f(); end\n"
+           "endmodule\n",
+       0x1F},
+      {"class C;\n" + BlockAggregateFunction("static ") +
+           "endclass\n"
+           "module t;\n"
+           "  bit [4:0] r;\n"
+           "  initial begin void'(C::f()); r = C::f(); end\n"
+           "endmodule\n",
+       0x01},
+  }};
+  for (const Place& place : kPlaces) {
+    SCOPED_TRACE(place.src);
+    EXPECT_EQ(RunAndGet(place.src, "r"), place.want);
+  }
 }
 
 }  // namespace
