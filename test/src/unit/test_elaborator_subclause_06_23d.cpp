@@ -112,6 +112,8 @@ constexpr std::string_view kGenerateDeclaration =
     "if (1) begin : g {0} var type({1}) v; end";
 constexpr std::string_view kGenerateStatement =
     "if (1) begin : g {0} initial r = (type({1}) == type(int)); end";
+constexpr std::string_view kGenerateContinuousAssignment =
+    "if (1) begin : g {0} assign r = (type({1}) == type(int)); end";
 
 std::string Placed(std::string_view place, const Form& form) {
   return std::vformat(place,
@@ -273,6 +275,14 @@ TEST(TypeRefDynamicElementElab, ReportedInAGenerateBlockStatement) {
 
 TEST(TypeRefDynamicElementElab, AcceptedInAGenerateBlockStatement) {
   ExpectAllowedFormsAccepted(kGenerateStatement);
+}
+
+TEST(TypeRefDynamicElementElab, ReportedInAGenerateBlockContinuousAssignment) {
+  ExpectForbiddenFormsReported(kGenerateContinuousAssignment);
+}
+
+TEST(TypeRefDynamicElementElab, AcceptedInAGenerateBlockContinuousAssignment) {
+  ExpectAllowedFormsAccepted(kGenerateContinuousAssignment);
 }
 
 // A subroutine's formal is a name the subroutine declares (§13.3), so a

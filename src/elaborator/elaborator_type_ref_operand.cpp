@@ -221,13 +221,15 @@ std::optional<ClassSpecialization> ElaboratorOperationRules::ClassTypeOf(
   if (unit_ == nullptr) return std::nullopt;
   const DataType* at = &type;
   for (int names = 0; names < 16 && at->kind == DataTypeKind::kNamed; ++names) {
-    if (!at->scope_name.empty() || class_names_.contains(at->type_name)) {
+    // §3.12.1: a name no typedef of the module's gives may name a class the
+    // compilation unit declares.
+    auto named = typedefs_.find(at->type_name);
+    if (!at->scope_name.empty() || class_names_.contains(at->type_name) ||
+        named == typedefs_.end()) {
       const ClassDecl* cls = ClassOfDeclaredType(*at, {}, unit_);
       if (cls == nullptr) return std::nullopt;
       return ClassSpecialization{cls, &at->type_params};
     }
-    auto named = typedefs_.find(at->type_name);
-    if (named == typedefs_.end()) return std::nullopt;
     at = &named->second;
   }
   return std::nullopt;
