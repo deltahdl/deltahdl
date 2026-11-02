@@ -446,4 +446,46 @@ std::optional<SpecializedClassType> SpecializedMemberType(
                         {handle.cls, *bound, arena}, 0);
 }
 
+// The argument `written`, given in the extends clause of the class `bound`
+// binds, as that specialization reads it: a value folded under its bindings
+// into a literal, a type with its type parameters replaced.
+static std::optional<DataType> ExtendsArgument(
+    const DataType& written, const ClassDecl* cls,
+    const SpecializationBindings& bound, Arena& arena) {
+  const bool kNamesValue = written.kind == DataTypeKind::kNamed &&
+                           written.scope_name.empty() &&
+                           bound.scope.contains(written.type_name) &&
+                           !cls->type_param_names.contains(written.type_name);
+  if (written.type_ref_expr != nullptr || kNamesValue) {
+    std::optional<int64_t> value = ArgumentValue(written, bound.scope);
+    if (!value) return std::nullopt;
+    DataType arg;
+    arg.type_ref_expr = IntLiteral(*value, arena);
+    arg.param_arg_name = written.param_arg_name;
+    return arg;
+  }
+  std::optional<SpecializedClassType> type =
+      SpecializeType(written, {}, {cls, bound, arena}, 0);
+  if (!type) return std::nullopt;
+  type->type.param_arg_name = written.param_arg_name;
+  return std::move(type->type);
+}
+
+const std::vector<DataType>* SpecializedExtendsArguments(
+    const ClassSpecialization& handle, const ScopeMap& module_scope,
+    const TypedefMap& typedefs, Arena& arena) {
+  if (handle.cls->params.empty()) return &handle.cls->base_class_type_params;
+  auto bound =
+      BindSpecialization(handle.cls, *handle.args, module_scope, typedefs);
+  if (!bound) return nullptr;
+  auto* args = arena.Create<std::vector<DataType>>();
+  for (const DataType& written : handle.cls->base_class_type_params) {
+    std::optional<DataType> arg =
+        ExtendsArgument(written, handle.cls, *bound, arena);
+    if (!arg) return nullptr;
+    args->push_back(std::move(*arg));
+  }
+  return args;
+}
+
 }  // namespace delta

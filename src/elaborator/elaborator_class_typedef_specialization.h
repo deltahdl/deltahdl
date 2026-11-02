@@ -88,4 +88,13 @@ std::optional<SpecializedClassType> SpecializedMemberType(
     const ClassSpecialization& handle, const SpecializedClassType& written,
     const ScopeMap& module_scope, const TypedefMap& typedefs, Arena& arena);
 
+// §8.13 with §8.25: the values the extends clause of `handle`'s class gives
+// the parameters of the class it extends, each written in the class and so
+// read under `handle`'s bindings: a value folded, a type with the class's type
+// parameters replaced. Null where `handle` does not bind or a value does not
+// fold.
+const std::vector<DataType>* SpecializedExtendsArguments(
+    const ClassSpecialization& handle, const ScopeMap& module_scope,
+    const TypedefMap& typedefs, Arena& arena);
+
 }  // namespace delta

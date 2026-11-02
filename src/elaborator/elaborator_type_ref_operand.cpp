@@ -273,24 +273,6 @@ static const PackageDecl* PackageDeclaring(const ClassDecl* cls,
   return nullptr;
 }
 
-// §8.13 with §8.25: the values the extends clause of the class `at` names
-// gives the parameters of the class it extends, each written in `at` and so
-// read as `at`'s specialization reads its members; nothing where one does not
-// specialize.
-static const std::vector<DataType>* ExtendsArguments(
-    const ClassSpecialization& at, const ScopeMap& constants,
-    const TypedefMap& typedefs, Arena& arena) {
-  if (at.cls->params.empty()) return &at.cls->base_class_type_params;
-  auto* args = arena.Create<std::vector<DataType>>();
-  for (const DataType& written : at.cls->base_class_type_params) {
-    std::optional<SpecializedClassType> arg =
-        SpecializedMemberType(at, {written, {}}, constants, typedefs, arena);
-    if (!arg) return nullptr;
-    args->push_back(std::move(arg->type));
-  }
-  return args;
-}
-
 std::optional<UnpackedArrayType> ElaboratorOperationRules::MemberTypeOf(
     const ClassSpecialization& handle, std::string_view name,
     const ScopeMap& constants) const {
@@ -316,7 +298,7 @@ std::optional<UnpackedArrayType> ElaboratorOperationRules::MemberTypeOf(
   ClassSpecialization owner = handle;
   while (owner.cls != owned.owner && owner.args != nullptr) {
     owner = {FindBaseClass(owner.cls, unit_),
-             ExtendsArguments(owner, constants, typedefs_, arena_)};
+             SpecializedExtendsArguments(owner, constants, typedefs_, arena_)};
   }
   if (owner.args == nullptr) return std::nullopt;
   std::optional<SpecializedClassType> typed =
