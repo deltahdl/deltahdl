@@ -273,19 +273,22 @@ static const PackageDecl* PackageDeclaring(const ClassDecl* cls,
   return nullptr;
 }
 
-// §8.13 with §8.25: the parameter values the class `owner`, a base of `cls`,
-// takes: those the extends clause of the class extending it writes, where that
-// class has no parameters its clause could name; nothing where it has.
-static const std::vector<DataType>* BaseArguments(const ClassDecl* cls,
-                                                  const ClassDecl* owner,
-                                                  const CompilationUnit* unit) {
-  const ClassDecl* extending = cls;
-  for (const ClassDecl* base = FindBaseClass(cls, unit); base != owner;
-       base = FindBaseClass(base, unit)) {
-    extending = base;
+// §8.13 with §8.25: the values the extends clause of the class `at` names
+// gives the parameters of the class it extends, each written in `at` and so
+// read as `at`'s specialization reads its members; nothing where one does not
+// specialize.
+static const std::vector<DataType>* ExtendsArguments(
+    const ClassSpecialization& at, const ScopeMap& constants,
+    const TypedefMap& typedefs, Arena& arena) {
+  if (at.cls->params.empty()) return &at.cls->base_class_type_params;
+  auto* args = arena.Create<std::vector<DataType>>();
+  for (const DataType& written : at.cls->base_class_type_params) {
+    std::optional<SpecializedClassType> arg =
+        SpecializedMemberType(at, {written, {}}, constants, typedefs, arena);
+    if (!arg) return nullptr;
+    args->push_back(std::move(arg->type));
   }
-  return extending->params.empty() ? &extending->base_class_type_params
-                                   : nullptr;
+  return args;
 }
 
 std::optional<UnpackedArrayType> ElaboratorOperationRules::MemberTypeOf(
@@ -310,16 +313,14 @@ std::optional<UnpackedArrayType> ElaboratorOperationRules::MemberTypeOf(
     written.type = InPackage(written.type, *pkg);
   // §8.13: a member the class inherits is read in the class declaring it,
   // specialized by the values the class extending it gives its parameters.
-  const std::vector<DataType>* args = handle.args;
-  if (owned.owner != handle.cls) {
-    args = owned.owner->params.empty()
-               ? &NoArguments()
-               : BaseArguments(handle.cls, owned.owner, unit_);
+  ClassSpecialization owner = handle;
+  while (owner.cls != owned.owner && owner.args != nullptr) {
+    owner = {FindBaseClass(owner.cls, unit_),
+             ExtendsArguments(owner, constants, typedefs_, arena_)};
   }
-  if (args == nullptr) return std::nullopt;
-  const ClassSpecialization kOwner{owned.owner, args};
+  if (owner.args == nullptr) return std::nullopt;
   std::optional<SpecializedClassType> typed =
-      SpecializedMemberType(kOwner, written, constants, typedefs_, arena_);
+      SpecializedMemberType(owner, written, constants, typedefs_, arena_);
   if (!typed) return std::nullopt;
   return UnpackedArrayType{std::move(typed->type),
                            std::move(typed->unpacked_dims)};

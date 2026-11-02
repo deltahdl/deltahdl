@@ -663,7 +663,7 @@ std::array<Writer, 3> ClassScopes() {
 // class it extends, in a class a module, a package or the compilation unit
 // declares, the base class taking parameters or none (§8.25); {0} declares the
 // base class's properties.
-constexpr std::array<std::string_view, 7> kThisAndSuperPlaces = {
+constexpr std::array<std::string_view, 9> kThisAndSuperPlaces = {
     "class pb; {0} endclass class c extends pb; function void m(); "
     "var type(this.{1}) v; endfunction endclass",
     "class pb; {0} endclass class c extends pb; function void m(); bit b; "
@@ -678,7 +678,13 @@ constexpr std::array<std::string_view, 7> kThisAndSuperPlaces = {
     "function void m(); var type(super.{1}) v; endfunction endclass",
     "class pb #(int N = 1); {0} endclass class pm extends pb #(3); endclass "
     "class c extends pm; function void m(); var type(this.{1}) v; "
-    "endfunction endclass"};
+    "endfunction endclass",
+    "class pb #(int N = 1); {0} endclass class pm #(int M = 2) extends "
+    "pb #(M); endclass class c extends pm #(4); function void m(); "
+    "var type(this.{1}) v; endfunction endclass",
+    "class pb #(type T = int); {0} endclass class pm #(type U = byte) extends "
+    "pb #(U); endclass class c extends pm; function void m(); "
+    "var type(super.{1}) v; endfunction endclass"};
 
 TEST(TypeRefDynamicElementElab, PropertyElementThroughThisOrSuperReported) {
   for (const Writer& writing : ClassScopes()) {
