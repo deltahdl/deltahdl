@@ -15,6 +15,7 @@ struct ClassDecl;
 struct CompilationUnit;
 struct Expr;
 struct ModuleItem;
+struct PackageDecl;
 struct Stmt;
 
 // A name a procedure declares, with the type and unpacked dimensions it was
@@ -75,13 +76,29 @@ void ResolveClassTypeRefs(ClassDecl& cls, const TypeRefResolver& resolve_outer,
                           const CompilationUnit* unit, Arena& arena,
                           const ProceduralStmtVisitor& visit = {});
 
+// §6.23: a type reference a package or the compilation unit writes outside
+// its modules: its operand, where it is written, the package, null for the
+// unit, and the names in scope at it that a subroutine, a block or a class
+// declares, a class's properties among them, innermost last.
+struct UnitScopeTypeRef {
+  const Expr* operand;
+  SourceLoc loc;
+  const PackageDecl* package;
+  std::vector<ProceduralLocal> locals;
+};
+
 // §6.23 with §26.2 and §3.12.1: the type references a package or the
 // compilation unit writes outside its modules, resolved in place against the
 // scope's own declarations (ResolveScopeTypeRef): the types of each package's
 // and the unit's typedefs and nettypes, its typedefs' and variables'
 // associative indexes written as type references (A.2.5), and those their
 // subroutines and classes write. They are resolved ahead of the typedefs'
-// registration, which records the type each typedef names.
-void ResolveUnitScopeTypeRefs(CompilationUnit* unit, Arena& arena);
+// registration, which records the type each typedef names. Each type
+// reference the scopes write is added to `written` as it is met, before its
+// resolution forgets the operand: those just named, those the statements of
+// their subroutines and classes' methods write, and those their variables',
+// nets' and parameters' declarations write.
+void ResolveUnitScopeTypeRefs(CompilationUnit* unit, Arena& arena,
+                              std::vector<UnitScopeTypeRef>& written);
 
 }  // namespace delta

@@ -6,10 +6,13 @@
 #include <optional>
 #include <utility>
 
+#include "common/source_loc.h"
 #include "elaborator/expression_self_type.h"
 #include "elaborator/unpacked_array_type.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 
 namespace delta {
 
@@ -73,6 +76,28 @@ void ForEachTypeRefOfStmt(const Stmt* s,
   for (const CaseItem& item : s->case_items) {
     for (const Expr* pattern : item.patterns) ForEachTypeRef(pattern, on_ref);
   }
+}
+
+void ForEachItemExprTypeRef(
+    const ModuleItem* item,
+    const std::function<void(const Expr*, SourceLoc)>& on_ref) {
+  auto in_expr = [&](const Expr* e) {
+    ForEachTypeRef(
+        e, [&](const Expr* ref) { on_ref(ref->lhs, ref->range.start); });
+  };
+  if (item->kind == ModuleItemKind::kContAssign) in_expr(item->assign_rhs);
+  if (item->kind == ModuleItemKind::kParamDecl) in_expr(item->init_expr);
+  if (item->kind != ModuleItemKind::kNetDecl &&
+      item->kind != ModuleItemKind::kVarDecl) {
+    return;
+  }
+  in_expr(item->data_type.packed_dim_left);
+  in_expr(item->data_type.packed_dim_right);
+  for (const auto& [left, right] : item->data_type.extra_packed_dims) {
+    in_expr(left);
+    in_expr(right);
+  }
+  for (const Expr* dim : item->unpacked_dims) in_expr(dim);
 }
 
 }  // namespace delta

@@ -193,9 +193,9 @@ std::optional<Expr*> FoldedUnpackedDim(Expr* dim, const ScopeMap& scope,
     if (range->lhs == nullptr || range->rhs == nullptr) return std::nullopt;
     return range;
   }
-  if (Expr* size = FoldedBound(dim, scope, arena)) return size;
-  if (IsAssociativeDim(dim)) return dim;
-  return std::nullopt;
+  Expr* size = FoldedBound(dim, scope, arena);
+  if (size == nullptr && !IsAssociativeDim(dim)) return std::nullopt;
+  return size != nullptr ? size : dim;
 }
 
 // The unpacked dimensions `dims`, each folded as FoldedUnpackedDim folds it;

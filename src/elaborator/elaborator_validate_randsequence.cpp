@@ -284,6 +284,9 @@ void Elaborator::CheckRandsequenceNamesIn(
 // twice and no report is made twice.
 void Elaborator::ValidatePerDeclarationRulesInUnitScopes() {
   if (unit_ == nullptr) return;
+  // §6.23 for the type references the two scopes write, whose names are
+  // read as the scope writing them declares them.
+  ValidateUnitScopeTypeRefArgs();
 
   // §11.12's rules on a let's formals for the lets the two scopes declare, and
   // their subroutines and classes' methods; ResolveUnitScopeTypeRefs has

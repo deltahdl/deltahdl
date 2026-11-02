@@ -190,6 +190,15 @@ class ElaboratorOperationRules : public ElaboratorData {
   void InExprTypeScope(
       const RtlirModule& mod,
       const std::function<void(const ExprTypeScope&)>& use) const;
+  // The same for a type reference a package or the compilation unit writes
+  // outside its modules: a name read as the procedure around the reference
+  // declares it (type_ref_block_vars_), or else as the package
+  // type_ref_package_ declares it, or the unit where that is null (§26.2).
+  void InUnitExprTypeScope(
+      const std::function<void(const ExprTypeScope&)>& use) const;
+  // §6.23: CheckTypeRefArgInner for each type reference
+  // unit_scope_type_refs_ holds, with the names in scope at it.
+  void ValidateUnitScopeTypeRefArgs();
   // §6.23: the self-determined type of the expression `expr` a type reference
   // names (ExprSelfType), each name in it read as `mod` declares it where the
   // reference stands: a net, variable or port, a value parameter, or an
@@ -286,6 +295,13 @@ class ElaboratorOperationRules : public ElaboratorData {
   // The elaborated module ValidateTypeRefArgs walks, in which the names a
   // type reference's operand writes are typed; null outside it.
   const RtlirModule* type_ref_mod_ = nullptr;
+  // The package whose type reference ValidateUnitScopeTypeRefArgs judges,
+  // whose values a name in it may name (NamesModuleValue); null outside it
+  // and for the compilation unit's.
+  const PackageDecl* type_ref_package_ = nullptr;
+  // The type references the packages and the compilation unit write outside
+  // their modules, recorded as ResolveUnitScopeTypeRefs resolves them.
+  std::vector<UnitScopeTypeRef> unit_scope_type_refs_;
   // The operands of type references CheckTypeRefArgInner has reported.
   std::unordered_set<const Expr*> reported_type_ref_args_;
   // §6.21 with §6.23: the TypeRefResolver for the declarations a procedure

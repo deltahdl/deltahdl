@@ -2,10 +2,13 @@
 
 #include <functional>
 
+#include "common/source_loc.h"
+
 namespace delta {
 
 struct Expr;
 struct ExprTypeScope;
+struct ModuleItem;
 struct Stmt;
 
 // §6.23: whether the expression `e` a type reference names selects, at any
@@ -29,5 +32,13 @@ void ForEachTypeRef(const Expr* e,
 // statements `s` holds are not among them.
 void ForEachTypeRefOfStmt(const Stmt* s,
                           const std::function<void(const Expr*)>& on_ref);
+
+// Shows `on_ref` the operand of each type reference the item `item` writes in
+// an expression outside any statement, with where the reference is written:
+// a continuous assignment's right-hand side, a parameter's value (§6.20.2)
+// and the ranges of a net's or variable's dimensions (§11.2.1).
+void ForEachItemExprTypeRef(
+    const ModuleItem* item,
+    const std::function<void(const Expr*, SourceLoc)>& on_ref);
 
 }  // namespace delta

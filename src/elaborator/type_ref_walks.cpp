@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <functional>
 #include <span>
 #include <string_view>
 #include <vector>
@@ -12,6 +13,7 @@
 #include "elaborator/elaborator_class_lookup.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "elaborator/type_ref_dynamic_element.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
@@ -227,10 +229,12 @@ void ResolveItemIndexTypeRefs(ModuleItem& item, const TypeRefResolver& resolve,
 // compilation unit's, write in their typedefs' and nettypes' types, their
 // typedefs' and variables' associative indexes (A.2.5), their subroutines,
 // their lets' formals (§11.12) and their classes, with `resolve` resolving a
-// name none of them declares more closely.
+// name none of them declares more closely. `visit` is shown each statement of
+// their subroutines and methods as ResolveProceduralTypeRefs shows it.
 void ResolveScopeItemTypeRefs(const std::vector<ModuleItem*>& items,
                               const TypeRefResolver& resolve,
-                              const CompilationUnit* unit, Arena& arena) {
+                              const CompilationUnit* unit, Arena& arena,
+                              const ProceduralStmtVisitor& visit) {
   for (ModuleItem* item : items) {
     switch (item->kind) {
       case ModuleItemKind::kTypedef:
@@ -246,14 +250,30 @@ void ResolveScopeItemTypeRefs(const std::vector<ModuleItem*>& items,
       case ModuleItemKind::kFunctionDecl:
       case ModuleItemKind::kTaskDecl:
       case ModuleItemKind::kLetDecl:
-        ResolveProceduralTypeRefs(item, resolve, arena);
+        ResolveProceduralTypeRefs(item, resolve, arena, visit);
         break;
       case ModuleItemKind::kClassDecl:
-        ResolveClassTypeRefs(*item->class_decl, resolve, unit, arena);
+        ResolveClassTypeRefs(*item->class_decl, resolve, unit, arena, visit);
         break;
       default:
         break;
     }
+  }
+}
+
+// §6.23: shows `on_ref` the operand of each type reference the declarations
+// among `items` write outside any statement, with where it is written: a
+// variable's or net's type and the expressions ForEachItemExprTypeRef names.
+void ForEachItemTypeRef(
+    const std::vector<ModuleItem*>& items,
+    const std::function<void(const Expr*, SourceLoc)>& on_ref) {
+  for (const ModuleItem* item : items) {
+    if ((item->kind == ModuleItemKind::kVarDecl ||
+         item->kind == ModuleItemKind::kNetDecl) &&
+        item->data_type.type_ref_expr != nullptr) {
+      on_ref(item->data_type.type_ref_expr, item->loc);
+    }
+    ForEachItemExprTypeRef(item, on_ref);
   }
 }
 
@@ -337,26 +357,42 @@ void ResolveClassTypeRefs(ClassDecl& cls, const TypeRefResolver& resolve_outer,
   }
 }
 
-void ResolveUnitScopeTypeRefs(CompilationUnit* unit, Arena& arena) {
-  for (const PackageDecl* pkg : unit->packages) {
-    ResolveScopeItemTypeRefs(
-        pkg->items,
-        [&](DataType& dt, SourceLoc,
-            std::span<const ProceduralLocal>) -> std::vector<Expr*> {
-          ResolveScopeTypeRef(dt, pkg->items, arena);
-          return {};
-        },
-        unit, arena);
-  }
-  const TypeRefResolver kInUnit =
-      [&](DataType& dt, SourceLoc,
-          std::span<const ProceduralLocal>) -> std::vector<Expr*> {
-    ResolveScopeTypeRef(dt, unit->cu_items, arena);
+void ResolveUnitScopeTypeRefs(CompilationUnit* unit, Arena& arena,
+                              std::vector<UnitScopeTypeRef>& written) {
+  const PackageDecl* package = nullptr;
+  const std::vector<ModuleItem*>* items = nullptr;
+  auto record = [&](const Expr* operand, SourceLoc loc,
+                    std::span<const ProceduralLocal> locals) {
+    written.push_back({operand, loc, package, {locals.begin(), locals.end()}});
+  };
+  const TypeRefResolver kInScope =
+      [&](DataType& dt, SourceLoc loc,
+          std::span<const ProceduralLocal> locals) -> std::vector<Expr*> {
+    if (dt.type_ref_expr != nullptr) record(dt.type_ref_expr, loc, locals);
+    ResolveScopeTypeRef(dt, *items, arena);
     return {};
   };
-  ResolveScopeItemTypeRefs(unit->cu_items, kInUnit, unit, arena);
+  const ProceduralStmtVisitor kVisit =
+      [&](Stmt* s, std::span<const ProceduralLocal> locals) {
+        ForEachTypeRefOfStmt(s, [&](const Expr* ref) {
+          record(ref->lhs, ref->range.start, locals);
+        });
+      };
+  auto walk = [&](const std::vector<ModuleItem*>& scope_items) {
+    items = &scope_items;
+    ForEachItemTypeRef(scope_items, [&](const Expr* operand, SourceLoc loc) {
+      record(operand, loc, {});
+    });
+    ResolveScopeItemTypeRefs(scope_items, kInScope, unit, arena, kVisit);
+  };
+  for (const PackageDecl* pkg : unit->packages) {
+    package = pkg;
+    walk(pkg->items);
+  }
+  package = nullptr;
+  walk(unit->cu_items);
   for (ClassDecl* cls : unit->classes) {
-    ResolveClassTypeRefs(*cls, kInUnit, unit, arena);
+    ResolveClassTypeRefs(*cls, kInScope, unit, arena, kVisit);
   }
 }
 

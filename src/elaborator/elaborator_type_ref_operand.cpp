@@ -484,6 +484,63 @@ void ElaboratorOperationRules::InExprTypeScope(
   use(scope);
 }
 
+// §26.3: `type` read behind the package `pkg` where it is written bare by the
+// name of a typedef or a class `pkg` declares, as the typedefs and classes of
+// the package are recorded; `type` as it is otherwise.
+static DataType InPackage(DataType type, const PackageDecl& pkg) {
+  if (type.kind != DataTypeKind::kNamed || !type.scope_name.empty())
+    return type;
+  const bool kDeclared =
+      std::ranges::any_of(pkg.items, [&](const ModuleItem* item) {
+        return (item->kind == ModuleItemKind::kTypedef &&
+                item->name == type.type_name) ||
+               (item->kind == ModuleItemKind::kClassDecl &&
+                item->class_decl->name == type.type_name);
+      });
+  if (kDeclared) type.scope_name = pkg.name;
+  return type;
+}
+
+void ElaboratorOperationRules::InUnitExprTypeScope(
+    const std::function<void(const ExprTypeScope&)>& use) const {
+  const TypeShapeTables kTables = ArrayTables();
+  const OuterScope kOuter{unit_, nullptr, kTables, arena_};
+  const PackageDecl* pkg = type_ref_package_;
+  ExprTypeScope scope{
+      {},
+      [this](const Expr* call) { return CalledFunctionType(call); },
+      [](const Expr*) { return std::optional<DataType>(); },
+      typedefs_,
+      cu_param_scope_,
+      arena_};
+  scope.array_tables = &kTables;
+  scope.value_named =
+      [&](std::string_view name) -> std::optional<DeclaredValue> {
+    std::optional<DeclaredValue> value;
+    if (const BlockValue* local = InnermostBlockValue(name)) {
+      value = UnderDims(*local->type, *local->dims, scope);
+    } else {
+      value = ScopeValue(pkg != nullptr ? pkg->items : unit_->cu_items,
+                         pkg != nullptr ? pkg->name : "$unit", name, kOuter);
+    }
+    if (value && pkg != nullptr) value->type = InPackage(value->type, *pkg);
+    return value;
+  };
+  scope.class_member = [this](const DataType& handle, std::string_view name) {
+    return ClassMemberType(handle, name, cu_param_scope_);
+  };
+  use(scope);
+}
+
+void ElaboratorOperationRules::ValidateUnitScopeTypeRefArgs() {
+  for (const UnitScopeTypeRef& ref : unit_scope_type_refs_) {
+    type_ref_package_ = ref.package;
+    InLocals(ref.locals,
+             [&] { CheckTypeRefArgInner(ref.operand, ref.loc, nullptr); });
+  }
+  type_ref_package_ = nullptr;
+}
+
 const ElaboratorOperationRules::BlockValue*
 ElaboratorOperationRules::InnermostBlockValue(std::string_view name) const {
   auto local = std::ranges::find_if(

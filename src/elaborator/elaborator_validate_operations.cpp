@@ -445,6 +445,12 @@ bool ElaboratorOperationRules::NamesModuleValue(std::string_view name) const {
   }
   if (const_names_.contains(name) || enum_member_names_.contains(name))
     return true;
+  // §26.2: a package's own value, read in a type reference it writes.
+  if (type_ref_package_ != nullptr &&
+      (DeclaresSelectableValue(type_ref_package_->items, name) ||
+       ImportsSelectableValue(type_ref_package_->items, name))) {
+    return true;
+  }
   const ModuleDecl* decl = TypeRefModule();
   if (decl != nullptr && (DeclaresDataPort(*decl, name) ||
                           DeclaresSelectableValue(decl->items, name) ||
@@ -469,6 +475,9 @@ bool ElaboratorOperationRules::NamesSelectableValue(const Expr* root) const {
            DeclaresSelectableValue(pkg->items, root->rhs->text);
   }
   if (root->kind != ExprKind::kIdentifier) return true;
+  // §8.11 and §8.15: `this` and `super` are handles to the object a method
+  // runs in, whose `.` selects a member of it.
+  if (root->text == "this" || root->text == "super") return true;
   if (root->scope_prefix == "$root") return false;
   if (root->scope_prefix == "$unit")
     return DeclaresSelectableValue(unit_->cu_items, root->text);
@@ -510,13 +519,20 @@ bool ElaboratorOperationRules::TypeRefArgHasMemberAccess(const Expr* e) const {
   return false;
 }
 
+// A null `mod` reads the names of a type reference a package or the
+// compilation unit writes outside its modules (InUnitExprTypeScope).
 bool ElaboratorOperationRules::TypeRefArgUsesDynamicElement(
     const Expr* e, const RtlirModule* mod) const {
   if (e == nullptr) return false;
   bool selects = false;
-  InExprTypeScope(*mod, [&](const ExprTypeScope& scope) {
+  auto judge = [&](const ExprTypeScope& scope) {
     selects = SelectsDynamicElement(e, scope);
-  });
+  };
+  if (mod != nullptr) {
+    InExprTypeScope(*mod, judge);
+  } else {
+    InUnitExprTypeScope(judge);
+  }
   return selects;
 }
 
@@ -607,23 +623,9 @@ void ElaboratorOperationRules::WalkStmtsForTypeRefArg(const Stmt* s) {
 // operand of a type reference in them to this rule (ExprContainsHierRef).
 void ElaboratorOperationRules::WalkItemExprsForTypeRefArg(
     const ModuleItem* item) {
-  if (item->kind == ModuleItemKind::kContAssign) {
-    WalkExprForTypeRefArg(item->assign_rhs);
-  }
-  if (item->kind == ModuleItemKind::kParamDecl) {
-    WalkExprForTypeRefArg(item->init_expr);
-  }
-  if (item->kind != ModuleItemKind::kNetDecl &&
-      item->kind != ModuleItemKind::kVarDecl) {
-    return;
-  }
-  WalkExprForTypeRefArg(item->data_type.packed_dim_left);
-  WalkExprForTypeRefArg(item->data_type.packed_dim_right);
-  for (const auto& [left, right] : item->data_type.extra_packed_dims) {
-    WalkExprForTypeRefArg(left);
-    WalkExprForTypeRefArg(right);
-  }
-  for (const Expr* dim : item->unpacked_dims) WalkExprForTypeRefArg(dim);
+  ForEachItemExprTypeRef(item, [this](const Expr* operand, SourceLoc loc) {
+    CheckTypeRefArgInner(operand, loc, type_ref_mod_);
+  });
 }
 
 void ElaboratorOperationRules::ValidateTypeRefArgs(const ModuleDecl* decl) {

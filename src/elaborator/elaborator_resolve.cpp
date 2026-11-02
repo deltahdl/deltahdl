@@ -585,7 +585,7 @@ void Elaborator::RegisterCuScopeItems() {
   // p::P` reads the "p.P" key RegisterPackageParams records. The types the
   // packages' and the unit's declarations write as type references are
   // resolved first, so the typedefs record the types they name (§6.23).
-  ResolveUnitScopeTypeRefs(unit_, arena_);
+  ResolveUnitScopeTypeRefs(unit_, arena_, unit_scope_type_refs_);
   RegisterPackageTypedefs(unit_, typedefs_, td_array_dims_, arena_);
   // §6.6.7 with A.2.1.3 and A.2.2.1: a nettype's data type or renamed source
   // may be written through a package, `nettype P::T n;` or `nettype P::nt

@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <format>
+#include <functional>
 #include <initializer_list>
 #include <span>
 #include <string>
@@ -546,30 +547,112 @@ std::string WritingIn(std::string_view keyword, std::string_view place,
          "\nmodule top;\n  m i();\nendmodule\n";
 }
 
+// What writes a case's source: the place, with the form written into it, in
+// the scope a test reads.
+using Writer =
+    std::function<std::string(std::string_view place, const Form& form)>;
+
+void ExpectForbiddenFormsReportedIn(std::span<const std::string_view> places,
+                                    const Writer& writing) {
+  for (std::string_view place : places) {
+    for (const Form& form : kForbiddenForms) {
+      SCOPED_TRACE(writing(place, form));
+      ElabFixture f;
+      ElaborateSrc(writing(place, form), f);
+      EXPECT_TRUE(
+          ReportedError(f.diag.Diagnostics(), kReport, kCaseLine, "6.23"));
+    }
+  }
+}
+
+void ExpectAllowedFormsAcceptedIn(std::span<const std::string_view> places,
+                                  const Writer& writing) {
+  for (std::string_view place : places) {
+    for (const Form& form : kAllowedForms) {
+      SCOPED_TRACE(writing(place, form));
+      EXPECT_TRUE(ElabOk(writing(place, form)));
+    }
+  }
+}
+
 TEST(TypeRefDynamicElementElab, ReportedInEachOtherDesignElement) {
   for (const DesignElement& element : kDesignElements) {
-    for (std::string_view place : element.places) {
-      for (const Form& form : kForbiddenForms) {
-        SCOPED_TRACE(std::string(element.keyword) + ": " + std::string(place) +
-                     ": " + std::string(form.operand));
-        ElabFixture f;
-        ElaborateSrc(WritingIn(element.keyword, place, form), f);
-        EXPECT_TRUE(
-            ReportedError(f.diag.Diagnostics(), kReport, kCaseLine, "6.23"));
-      }
-    }
+    ExpectForbiddenFormsReportedIn(
+        element.places, [&](std::string_view place, const Form& form) {
+          return WritingIn(element.keyword, place, form);
+        });
   }
 }
 
 TEST(TypeRefDynamicElementElab, AcceptedInEachOtherDesignElement) {
   for (const DesignElement& element : kDesignElements) {
-    for (std::string_view place : element.places) {
-      for (const Form& form : kAllowedForms) {
-        SCOPED_TRACE(std::string(element.keyword) + ": " + std::string(place) +
-                     ": " + std::string(form.operand));
-        EXPECT_TRUE(ElabOk(WritingIn(element.keyword, place, form)));
-      }
-    }
+    ExpectAllowedFormsAcceptedIn(
+        element.places, [&](std::string_view place, const Form& form) {
+          return WritingIn(element.keyword, place, form);
+        });
+  }
+}
+
+// A package (§26.2) and the compilation unit (§3.12.1) declare names and write
+// type references outside every module: in a declaration, a parameter's
+// value, a task, a function and a class's method. A package refers to no name
+// the compilation unit declares, so the class it reads is its own; the case
+// stands at line 7 in either.
+constexpr std::string_view kPackagePreamble =
+    "package p;\n"
+    "  class hc;\n"
+    "  int d[]; int q[$]; int a[int]; int w[*]; int f[2];\n"
+    "  endclass\n"
+    "  typedef struct { int q[$]; } sq_t;\n"
+    "  logic r;\n";
+
+constexpr std::array<std::string_view, 8> kUnitScopePlaces = {
+    kModuleDeclaration,      kParameterValue,      kTaskDeclaration,
+    kTaskStatement,          kFunctionDeclaration, kFunctionStatement,
+    kClassMethodDeclaration, kClassMethodStatement};
+
+std::string WritingInPackage(std::string_view place, const Form& form) {
+  return std::string(kPackagePreamble) + Placed(place, form) +
+         "\nendpackage\nmodule top;\nendmodule\n";
+}
+
+std::string WritingInCompilationUnit(std::string_view place, const Form& form) {
+  std::string src(kPreamble);
+  src.erase(src.find("module m;"), std::string_view("module m;").size());
+  return src + Placed(place, form) + "\nmodule top;\nendmodule\n";
+}
+
+TEST(TypeRefDynamicElementElab, ReportedInAPackage) {
+  ExpectForbiddenFormsReportedIn(kUnitScopePlaces, WritingInPackage);
+}
+
+TEST(TypeRefDynamicElementElab, AcceptedInAPackage) {
+  ExpectAllowedFormsAcceptedIn(kUnitScopePlaces, WritingInPackage);
+}
+
+TEST(TypeRefDynamicElementElab, ReportedInTheCompilationUnit) {
+  ExpectForbiddenFormsReportedIn(kUnitScopePlaces, WritingInCompilationUnit);
+}
+
+TEST(TypeRefDynamicElementElab, AcceptedInTheCompilationUnit) {
+  ExpectAllowedFormsAcceptedIn(kUnitScopePlaces, WritingInCompilationUnit);
+}
+
+// §8.11 and §8.15: `this` and `super` are handles to the object a method runs
+// in, so a property read through either is a member of that object and no
+// hierarchical reference, in a class a module, a package or the compilation
+// unit declares; {0} declares the base class's properties.
+constexpr std::array<std::string_view, 2> kThisAndSuperPlaces = {
+    "class pb; {0} endclass class c extends pb; function void m(); "
+    "var type(this.{1}) v; endfunction endclass",
+    "class pb; {0} endclass class c extends pb; function void m(); "
+    "var type(super.{1}) v; endfunction endclass"};
+
+TEST(TypeRefDynamicElementElab, PropertyThroughThisOrSuperAccepted) {
+  const std::array<Writer, 3> kScopes = {Writing, WritingInPackage,
+                                         WritingInCompilationUnit};
+  for (const Writer& writing : kScopes) {
+    ExpectAllowedFormsAcceptedIn(kThisAndSuperPlaces, writing);
   }
 }
 
