@@ -595,12 +595,18 @@ void ElaboratorOperationRules::InUnitExprTypeScope(
   // which hides one the scope imports.
   scope.value_named =
       [&](std::string_view name) -> std::optional<DeclaredValue> {
-    if (const BlockValue* local = InnermostBlockValue(name))
-      return UnderDims(*local->type, *local->dims, scope);
-    std::optional<DeclaredValue> value =
-        ScopeValue(kItems, pkg != nullptr ? pkg->name : "$unit", name, kOuter);
-    if (!value) return ImportedValue(kItems, name, kOuter);
-    if (pkg != nullptr) value->type = InPackage(value->type, *pkg);
+    std::optional<DeclaredValue> value;
+    if (const BlockValue* local = InnermostBlockValue(name)) {
+      value = UnderDims(*local->type, *local->dims, scope);
+    } else {
+      value = ScopeValue(kItems, pkg != nullptr ? pkg->name : "$unit", name,
+                         kOuter);
+      // An imported value's type is already read behind its own package.
+      if (!value) return ImportedValue(kItems, name, kOuter);
+    }
+    // A type the package's procedure writes by one of its typedefs' names is
+    // recorded behind the package.
+    if (value && pkg != nullptr) value->type = InPackage(value->type, *pkg);
     return value;
   };
   // §26.3 with §3.12.1: a name behind a package's scope is that package's;
