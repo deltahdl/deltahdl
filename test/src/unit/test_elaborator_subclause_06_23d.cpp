@@ -35,11 +35,12 @@ constexpr std::string_view kReport =
     "type operator argument shall not reference elements of dynamic objects";
 
 // The declarations every case reads, at lines 1 to 6, so that the line the
-// case writes is line 7: a class whose property is a dynamic array, and a
-// structure whose member is a queue.
+// case writes is line 7: a class whose properties are a dynamic array, a
+// queue, an associative array of each kind of index and a fixed-size array,
+// and a structure whose member is a queue.
 constexpr std::string_view kPreamble =
     "class hc;\n"
-    "  int d[];\n"
+    "  int d[]; int q[$]; int a[int]; int w[*]; int f[2];\n"
     "endclass\n"
     "module m;\n"
     "  typedef struct { int q[$]; } sq_t;\n"
@@ -53,7 +54,7 @@ struct Form {
   std::string_view operand;
 };
 
-constexpr std::array<Form, 8> kForbiddenForms = {{
+constexpr std::array<Form, 11> kForbiddenForms = {{
     {"int d[];", "d[0]"},
     {"int d[$];", "d[0]"},
     {"int d[int];", "d[0]"},
@@ -61,16 +62,22 @@ constexpr std::array<Form, 8> kForbiddenForms = {{
     {"int q[$][3];", "q[0][1]"},
     {"sq_t s;", "s.q[0]"},
     {"hc h;", "h.d[0]"},
+    {"hc h;", "h.q[0]"},
+    {"hc h;", "h.a[0]"},
+    {"hc h;", "h.w[0]"},
     {"int arr[4];", "arr.find with (item > 1)[0]"},
 }};
 
-constexpr std::array<Form, 6> kAllowedForms = {{
+constexpr std::array<Form, 10> kAllowedForms = {{
     {"int d[];", "d"},
     {"int d[$];", "d"},
     {"int d[int];", "d"},
     {"int fx[2][];", "fx[1]"},
     {"sq_t s;", "s.q"},
     {"hc h;", "h.d"},
+    {"hc h;", "h.q"},
+    {"hc h;", "h.a"},
+    {"hc h;", "h.f[1]"},
 }};
 
 // Each place a type reference is written in, one line long, {0} standing for

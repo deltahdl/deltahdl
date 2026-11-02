@@ -15,7 +15,9 @@
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator_class_lookup.h"
 #include "elaborator/elaborator_helpers.h"
+#include "elaborator/queue_dim.h"
 #include "elaborator/type_eval.h"
+#include "elaborator/unpacked_array_type.h"
 #include "lexer/token.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
@@ -171,18 +173,28 @@ bool FoldPackedDims(DataType& type, const ScopeMap& scope, Arena& arena) {
   return true;
 }
 
+// §7.8: an associative dimension, its index type or the wildcard `[*]`.
+bool IsAssociativeDim(const Expr* dim) {
+  return (dim->kind == ExprKind::kIdentifier && dim->text == "*") ||
+         IndexDimType(dim).has_value();
+}
+
 // The unpacked dimensions `dims` folded under the specialization, each written
-// `[left:right]` or `[size]`; nothing where one does not fold, a dynamic,
-// queue or associative dimension among them.
+// `[left:right]` or `[size]`, and a dynamic, queue or associative dimension,
+// which has no size to fold, kept as written; nothing where a size does not
+// fold.
 std::optional<std::vector<Expr*>> FoldUnpackedDims(
     const std::vector<Expr*>& dims, const ScopeMap& scope, Arena& arena) {
   std::vector<Expr*> folded;
-  for (const Expr* dim : dims) {
-    if (dim == nullptr) return std::nullopt;
+  for (Expr* dim : dims) {
+    if (dim == nullptr || IsQueueDim(dim)) {
+      folded.push_back(dim);
+      continue;
+    }
     if (dim->kind != ExprKind::kBinary || dim->op != TokenKind::kColon) {
       Expr* size = FoldedBound(dim, scope, arena);
-      if (size == nullptr) return std::nullopt;
-      folded.push_back(size);
+      if (size == nullptr && !IsAssociativeDim(dim)) return std::nullopt;
+      folded.push_back(size != nullptr ? size : dim);
       continue;
     }
     auto* range = arena.Create<Expr>(*dim);
