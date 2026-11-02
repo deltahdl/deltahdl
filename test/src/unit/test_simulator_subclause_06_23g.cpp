@@ -109,6 +109,12 @@ constexpr std::array kPlaces = {
           "module t;\n{0}  function automatic void fn();\n{1}  endfunction\n"
           "  initial fn();\nendmodule\n",
           "r", Scope::kSubroutine},
+    Place{"method of a module's class",
+          "module t;\n{0}  class c;\n    function void fn();\n{1}"
+          "    endfunction\n  endclass\n"
+          "  initial begin\n    c o;\n    o = new;\n    o.fn();\n  end\n"
+          "endmodule\n",
+          "r", Scope::kSubroutine},
 };
 
 // Where the expression stands: a procedural if's condition, a continuous
@@ -520,11 +526,11 @@ constexpr std::array kProcedures = {
 // The procedure's own names: an int a and a byte b, a byte x over the
 // module's int x, a structure s, a vector w, an unpacked array q, a string, a
 // queue, a variable of an enumeration, an int m [2][3] over the module's
-// int m [5], and a vector v.
+// int m [5], a vector v, and en, declared by the type of e.next().
 constexpr const char* kProcedureNames =
     "    int a;\n    byte b;\n    byte x;\n    s_t s;\n    logic [7:0] w;\n"
     "    shortint q [3];\n    string str;\n    int dq [$];\n    e_t e;\n"
-    "    int m [2][3];\n    logic [7:0] v;\n";
+    "    int m [2][3];\n    logic [7:0] v;\n    var type(e.next()) en;\n";
 
 // A test and whether it holds.
 struct Holds {
@@ -566,7 +572,8 @@ void ExpectInEveryProcedure(std::string_view names, const Battery& battery,
 }
 
 // By §11.6.1, §11.8.1 and §11.3.4, `a + b` of an int and a byte is a signed
-// 2-state 32-bit vector, which matches int and not logic [31:0] (§6.22.1(e));
+// 2-state 32-bit vector, which matches int and neither logic [31:0] nor the
+// unsigned bit [31:0] (§6.22.1(e));
 // `x + 1'b0` is as wide as the byte x, unsigned and 4-state; a member, a
 // part-select and an element of an unpacked array are of the type they are
 // declared with; len and size give an int (§6.16.1, §7.10.2.1) and next the
@@ -575,6 +582,7 @@ void ExpectInEveryProcedure(std::string_view names, const Battery& battery,
 constexpr std::array kProcedureCompared = {
     Holds{"type(a + b) == type(int)", true},
     Holds{"type(a + b) == type(logic [31:0])", false},
+    Holds{"type(a + b) != type(bit [31:0])", true},
     Holds{"type(x + 1'b0) == type(logic [7:0])", true},
     Holds{"type(x + 1'b0) == type(logic [31:0])", false},
     Holds{"type(x) == type(byte)", true},
@@ -588,6 +596,7 @@ constexpr std::array kProcedureCompared = {
     Holds{"type(str.len()) == type(int)", true},
     Holds{"type(dq.size()) == type(int)", true},
     Holds{"type(e.next()) == type(e_t)", true},
+    Holds{"type(en) == type(e_t)", true},
     Holds{"type(m[0]) == type(i3_t)", true},
     Holds{"type(m[0]) == type(int)", false},
     Holds{"type(n + 1'b0) == type(logic [15:0])", true},
@@ -692,6 +701,55 @@ TEST(ProceduralNameTypeRefSim, FormalsAndLoopVariablesHideTheModulesNames) {
       "  end\n"
       "endmodule\n";
   EXPECT_EQ(RunAndGet(kSrc, "r"), 0b1101'1110u);
+}
+
+// A task's formals w, q, str, dq and e, a function's shortint x and string
+// str, and a for loop's logic [7:0] w hide the module's ints of those names: a
+// part-select, an element, len(), size() and next() over them are of the
+// types §6.23 gives the block's own variables, whether compared or declaring
+// a variable, and a declaration by e.next() is of the enumeration itself.
+TEST(ProceduralNameTypeRefSim, FormalsAndLoopVariablesTypeSelectsAndMethods) {
+  const std::string kSrc =
+      "module t;\n"
+      "  typedef enum logic [2:0] {E0, E1} e_t;\n"
+      "  logic [7:0] wv;\n  shortint qv [3];\n  string sv;\n"
+      "  int dqv [$];\n  e_t ev;\n"
+      "  int w, q, str, dq, e, x;\n"
+      "  bit [15:0] r;\n"
+      "  task automatic tk(input logic [7:0] w, input shortint q [3],\n"
+      "                    input string str, input int dq [$], input e_t e);\n"
+      "    var type(w[3:0]) d1;\n"
+      "    var type(q[0]) d2;\n"
+      "    var type(e.next()) d3;\n"
+      "    r[15] = $bits(d1) == 4 && $isunknown(d1);\n"
+      "    r[14] = $bits(d2) == 16;\n"
+      "    r[13] = type(d3) == type(e_t);\n"
+      "    if (type(w[3:0]) == type(logic [3:0])) r[12] = 1'b1;\n"
+      "    if (type(q[0]) == type(shortint)) r[11] = 1'b1;\n"
+      "    if (type(str.len()) == type(int)) r[10] = 1'b1;\n"
+      "    if (type(dq.size()) == type(int)) r[9] = 1'b1;\n"
+      "    if (type(e.next()) == type(e_t)) r[8] = 1'b1;\n"
+      "    if (type(w[3:0]) == type(logic [7:0])) r[7] = 1'b1;\n"
+      "  endtask\n"
+      "  function automatic bit [2:0] fn(input shortint x, input string str);\n"
+      "    var type(x + 1'b0) v;\n"
+      "    var type(str.len()) n;\n"
+      "    return {$bits(v) == 16 && $isunknown(v), $bits(n) == 32,\n"
+      "            type(x + 1'b0) == type(logic [7:0])};\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    tk(wv, qv, sv, dqv, ev);\n"
+      "    r[6:4] = fn(0, \"\");\n"
+      "    for (logic [7:0] w = 0; w < 1; w++) begin\n"
+      "      var type(w[3:0]) d;\n"
+      "      r[3] = $bits(d) == 4;\n"
+      "      if (type(w[3:0]) == type(logic [3:0])) r[2] = 1'b1;\n"
+      "      if (type(w[3:0]) == type(int)) r[1] = 1'b1;\n"
+      "      r[0] = type(w) == type(logic [7:0]);\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(kSrc, "r"), 0b1111'1111'0110'1101u);
 }
 
 // Formals and for loop variables that hide nothing type an expression as a
