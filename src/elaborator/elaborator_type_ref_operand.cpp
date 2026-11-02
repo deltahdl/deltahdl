@@ -273,6 +273,21 @@ static const ModuleItem* PackageTypedefNamed(const PackageDecl& pkg,
   return found == pkg.items.end() ? nullptr : *found;
 }
 
+// §26.3: the type `written`, which a procedure of the package `pkg` names, as
+// the procedure sees it: the package's own where the package declares it
+// bare, a typedef's unpacked dimensions with it (§7.4); `written` alone where
+// `pkg` is null, the procedure belonging to no package.
+static UnpackedArrayType InProcedurePackage(DataType written,
+                                            const PackageDecl* pkg) {
+  if (pkg == nullptr) return UnpackedArrayType{std::move(written), {}};
+  const ModuleItem* typedef_item = PackageTypedefNamed(*pkg, written);
+  if (typedef_item != nullptr && !typedef_item->unpacked_dims.empty()) {
+    return UnpackedArrayType{InPackage(typedef_item->typedef_type, *pkg),
+                             typedef_item->unpacked_dims};
+  }
+  return UnpackedArrayType{InPackage(std::move(written), *pkg), {}};
+}
+
 // §26.2: the package that declares the class `cls` among its items, or none
 // where another scope declares it.
 static const PackageDecl* PackageDeclaring(const ClassDecl* cls,
@@ -375,20 +390,12 @@ std::optional<UnpackedArrayType> ElaboratorOperationRules::TypeRefOperandArray(
     });
     if (value) return value;
   }
-  // §26.3: a type a package's procedure names bare is the package's own where
-  // the package declares it, a typedef's unpacked dimensions with it (§7.4).
-  if (written && mod == nullptr && type_ref_in_unit_procedure_ &&
-      type_ref_package_ != nullptr) {
-    const ModuleItem* typedef_item =
-        PackageTypedefNamed(*type_ref_package_, *written);
-    if (typedef_item != nullptr && !typedef_item->unpacked_dims.empty()) {
-      return UnpackedArrayType{
-          InPackage(typedef_item->typedef_type, *type_ref_package_),
-          typedef_item->unpacked_dims};
-    }
-    written = InPackage(std::move(*written), *type_ref_package_);
+  if (written) {
+    return InProcedurePackage(std::move(*written),
+                              mod == nullptr && type_ref_in_unit_procedure_
+                                  ? type_ref_package_
+                                  : nullptr);
   }
-  if (written) return UnpackedArrayType{std::move(*written), {}};
   if (std::optional<DataType> returned = CalledFunctionType(op->lhs))
     return UnpackedArrayType{std::move(*returned), {}};
   return TypeRefArrayType(op->lhs, mod);
