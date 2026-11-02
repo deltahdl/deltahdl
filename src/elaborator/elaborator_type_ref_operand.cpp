@@ -260,6 +260,19 @@ static DataType InPackage(DataType type, const PackageDecl& pkg) {
   return type;
 }
 
+// §26.3: the typedef the package `pkg` declares by the name `type` is
+// written with, where `type` is written bare; none otherwise.
+static const ModuleItem* PackageTypedefNamed(const PackageDecl& pkg,
+                                             const DataType& type) {
+  if (type.kind != DataTypeKind::kNamed || !type.scope_name.empty())
+    return nullptr;
+  auto found = std::ranges::find_if(pkg.items, [&](const ModuleItem* item) {
+    return item->kind == ModuleItemKind::kTypedef &&
+           item->name == type.type_name;
+  });
+  return found == pkg.items.end() ? nullptr : *found;
+}
+
 // §26.2: the package that declares the class `cls` among its items, or none
 // where another scope declares it.
 static const PackageDecl* PackageDeclaring(const ClassDecl* cls,
@@ -363,9 +376,16 @@ std::optional<UnpackedArrayType> ElaboratorOperationRules::TypeRefOperandArray(
     if (value) return value;
   }
   // §26.3: a type a package's procedure names bare is the package's own where
-  // the package declares it.
+  // the package declares it, a typedef's unpacked dimensions with it (§7.4).
   if (written && mod == nullptr && type_ref_in_unit_procedure_ &&
       type_ref_package_ != nullptr) {
+    const ModuleItem* typedef_item =
+        PackageTypedefNamed(*type_ref_package_, *written);
+    if (typedef_item != nullptr && !typedef_item->unpacked_dims.empty()) {
+      return UnpackedArrayType{
+          InPackage(typedef_item->typedef_type, *type_ref_package_),
+          typedef_item->unpacked_dims};
+    }
     written = InPackage(std::move(*written), *type_ref_package_);
   }
   if (written) return UnpackedArrayType{std::move(*written), {}};

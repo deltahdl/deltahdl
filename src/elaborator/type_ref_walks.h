@@ -103,11 +103,12 @@ void ResolveUnitScopeTypeRefs(CompilationUnit* unit, Arena& arena,
 
 // §6.23 with §26.2 and §3.12.1: the procedures a package or the compilation
 // unit declares outside its modules walked again -- their tasks and functions
-// (ResolveProceduralTypeRefs) and their classes' methods
-// (ResolveClassTypeRefs) -- with `resolve` resolving the type references the
-// first walk left and `visit` shown each of their statements. `enter` is told
-// the package each scope is, null for the unit, before its procedures are
-// walked.
+// (ResolveProceduralTypeRefs) and the methods of their classes
+// (ResolveClassTypeRefs), but for a parameterized class's, whose
+// specializations (§8.25) may each answer differently -- with `resolve`
+// resolving the type references the first walk left and `visit` shown each
+// of their statements. `enter` is told the package each scope is, null for
+// the unit, before its procedures are walked.
 void ResolveUnitScopeProcedureTypeRefs(
     CompilationUnit* unit, Arena& arena,
     const std::function<void(const PackageDecl*)>& enter,

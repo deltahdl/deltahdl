@@ -440,7 +440,8 @@ void ResolveUnitScopeProcedureTypeRefs(
           if (item->kind == ModuleItemKind::kFunctionDecl ||
               item->kind == ModuleItemKind::kTaskDecl) {
             ResolveProceduralTypeRefs(item, resolve, arena, visit);
-          } else if (item->kind == ModuleItemKind::kClassDecl) {
+          } else if (item->kind == ModuleItemKind::kClassDecl &&
+                     item->class_decl->params.empty()) {
             ResolveClassTypeRefs(*item->class_decl, resolve, unit, arena,
                                  visit);
           }
@@ -448,7 +449,8 @@ void ResolveUnitScopeProcedureTypeRefs(
       },
       [&](ClassDecl& cls) {
         enter(nullptr);
-        ResolveClassTypeRefs(cls, resolve, unit, arena, visit);
+        if (cls.params.empty())
+          ResolveClassTypeRefs(cls, resolve, unit, arena, visit);
       });
 }
 
