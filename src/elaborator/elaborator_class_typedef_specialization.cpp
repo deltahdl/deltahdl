@@ -447,16 +447,13 @@ std::optional<SpecializedClassType> SpecializedMemberType(
 }
 
 // The argument `written`, given in the extends clause of the class `bound`
-// binds, as that specialization reads it: a value folded under its bindings
-// into a literal, a type with its type parameters replaced.
+// binds, as that specialization reads it: a value, which the parser keeps as
+// an expression, folded under its bindings into a literal, and a type with the
+// class's type parameters replaced.
 static std::optional<DataType> ExtendsArgument(
     const DataType& written, const ClassDecl* cls,
     const SpecializationBindings& bound, Arena& arena) {
-  const bool kNamesValue = written.kind == DataTypeKind::kNamed &&
-                           written.scope_name.empty() &&
-                           bound.scope.contains(written.type_name) &&
-                           !cls->type_param_names.contains(written.type_name);
-  if (written.type_ref_expr != nullptr || kNamesValue) {
+  if (written.type_ref_expr != nullptr) {
     std::optional<int64_t> value = ArgumentValue(written, bound.scope);
     if (!value) return std::nullopt;
     DataType arg;
