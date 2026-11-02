@@ -580,8 +580,10 @@ void Elaborator::ElaborateModuleClassDecl(ModuleItem* item, RtlirModule* mod) {
   // §6.23 with §6.22.1: a comparison a method writes is folded as one a
   // module's subroutine writes, with the method's locals and the class's
   // properties in scope, and kept for the instance the class is declared in.
+  // A method runs outside every generate block of the instance, whichever
+  // block declares its class, so the answer is kept under none.
   const TypeRefCompareFolder kFold = RecordingInto(
-      mod, InternedGenPrefix(),
+      mod, {},
       [this, mod](const Expr* e) { return EvalConstTypeRefCompare(e, mod); });
   ResolveClassTypeRefs(*item->class_decl, ResolverAmongLocals(mod, resolve),
                        unit_, arena_,
