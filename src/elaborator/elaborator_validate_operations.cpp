@@ -14,11 +14,11 @@
 #include "common/diagnostic.h"
 #include "common/types.h"
 #include "elaborator/const_eval.h"
-#include "elaborator/elaborator.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/scope_value_type.h"
 #include "elaborator/type_eval.h"
+#include "elaborator/type_ref_dynamic_element.h"
 #include "elaborator/type_ref_walks.h"
 #include "lexer/token.h"
 #include "parser/ast_design.h"
@@ -510,84 +510,75 @@ bool ElaboratorOperationRules::TypeRefArgHasMemberAccess(const Expr* e) const {
   return false;
 }
 
-// True when this node is itself a select on a dynamic object; the recursive
-// descent into children is handled separately by the caller. Dynamic arrays,
-// queues, and associative arrays are all variable-size (dynamic) objects, so a
-// select into any of them is a reference to an element of a dynamic object.
-static bool TypeRefArgSelectsDynamicElement(
-    const Expr* e,
-    const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
-        array_info) {
-  if (e->kind != ExprKind::kSelect || !e->base ||
-      e->base->kind != ExprKind::kIdentifier) {
-    return false;
-  }
-  auto it = array_info.find(e->base->text);
-  return it != array_info.end() &&
-         (it->second.is_dynamic || it->second.is_assoc || it->second.is_queue);
+bool ElaboratorOperationRules::TypeRefArgUsesDynamicElement(
+    const Expr* e, const RtlirModule* mod) const {
+  if (e == nullptr) return false;
+  bool selects = false;
+  InExprTypeScope(*mod, [&](const ExprTypeScope& scope) {
+    selects = SelectsDynamicElement(e, scope);
+  });
+  return selects;
 }
 
-bool ElaboratorOperationRules::TypeRefArgUsesDynamicElement(
-    const Expr* e) const {
-  if (!e) return false;
-  if (TypeRefArgSelectsDynamicElement(e, var_array_info_)) return true;
-  const Expr* const kChildren[] = {e->lhs,       e->rhs,       e->base,
-                                   e->index,     e->condition, e->true_expr,
-                                   e->false_expr};
-  for (const Expr* child : kChildren) {
-    if (TypeRefArgUsesDynamicElement(child)) return true;
+// §6.23: each operand is reported once, however many walks reach it and
+// however many instances of its module are elaborated.
+void ElaboratorOperationRules::ReportDynamicElementArg(const Expr* inner,
+                                                       SourceLoc loc,
+                                                       const RtlirModule* mod) {
+  if (reported_type_ref_args_.contains(inner) ||
+      !TypeRefArgUsesDynamicElement(inner, mod)) {
+    return;
   }
-  for (const auto* elem : e->elements) {
-    if (TypeRefArgUsesDynamicElement(elem)) return true;
-  }
-  for (const auto* arg : e->args) {
-    if (TypeRefArgUsesDynamicElement(arg)) return true;
-  }
-  return false;
+  reported_type_ref_args_.insert(inner);
+  diag_.Error(loc,
+              "type operator argument shall not reference elements of "
+              "dynamic objects",
+              Subclause("6.23"));
+}
+
+bool ElaboratorOperationRules::ReportHierarchicalArg(const Expr* inner,
+                                                     SourceLoc loc) {
+  if (!inner || reported_type_ref_args_.contains(inner)) return true;
+  if (!TypeRefArgHasMemberAccess(inner)) return false;
+  reported_type_ref_args_.insert(inner);
+  diag_.Error(loc,
+              "type operator argument uses a hierarchical reference, which "
+              "the type operator does not accept",
+              Subclause("6.23"));
+  return true;
 }
 
 void ElaboratorOperationRules::CheckTypeRefArgInner(const Expr* inner,
-                                                    SourceLoc loc) {
-  if (!inner) return;
-  if (TypeRefArgHasMemberAccess(inner)) {
-    diag_.Error(loc,
-                "type operator argument uses a hierarchical reference, which "
-                "the type operator does not accept",
-                Subclause("6.23"));
-    return;
-  }
-  if (TypeRefArgUsesDynamicElement(inner)) {
-    diag_.Error(loc,
-                "type operator argument shall not reference elements of "
-                "dynamic objects",
-                Subclause("6.23"));
+                                                    SourceLoc loc,
+                                                    const RtlirModule* mod) {
+  if (!ReportHierarchicalArg(inner, loc)) {
+    ReportDynamicElementArg(inner, loc, mod);
   }
 }
 
+void ElaboratorOperationRules::CheckDynamicElementArgsOfStmt(
+    const Stmt* s, const RtlirModule* mod) {
+  ForEachTypeRefOfStmt(s, [&](const Expr* ref) {
+    ReportDynamicElementArg(ref->lhs, ref->range.start, mod);
+  });
+}
+
 void ElaboratorOperationRules::WalkExprForTypeRefArg(const Expr* expr) {
-  if (!expr) return;
-  if (expr->kind == ExprKind::kTypeRef) {
-    CheckTypeRefArgInner(expr->lhs, expr->range.start);
-  }
-  WalkExprForTypeRefArg(expr->lhs);
-  WalkExprForTypeRefArg(expr->rhs);
-  WalkExprForTypeRefArg(expr->condition);
-  WalkExprForTypeRefArg(expr->true_expr);
-  WalkExprForTypeRefArg(expr->false_expr);
-  for (auto* elem : expr->elements) WalkExprForTypeRefArg(elem);
-  for (auto* arg : expr->args) WalkExprForTypeRefArg(arg);
+  ForEachTypeRef(expr, [this](const Expr* ref) {
+    CheckTypeRefArgInner(ref->lhs, ref->range.start, type_ref_mod_);
+  });
 }
 
 void ElaboratorOperationRules::WalkStmtsForTypeRefArg(const Stmt* s) {
   if (!s) return;
-  WalkExprForTypeRefArg(s->lhs);
-  WalkExprForTypeRefArg(s->rhs);
-  WalkExprForTypeRefArg(s->expr);
-  WalkExprForTypeRefArg(s->condition);
-  WalkExprForTypeRefArg(s->assert_expr);
-  if (s->var_decl_type.type_ref_expr) {
-    CheckTypeRefArgInner(s->var_decl_type.type_ref_expr, s->range.start);
-  }
+  // The procedure's statements are judged for elements of dynamic objects as
+  // they are elaborated, with every name the procedure declares in scope
+  // (CheckDynamicElementArgsOfStmt); this walk, which knows only the
+  // variables blocks declare, reports hierarchical references alone.
+  ForEachTypeRefOfStmt(s, [this](const Expr* ref) {
+    ReportHierarchicalArg(ref->lhs, ref->range.start);
+  });
+  ReportHierarchicalArg(s->var_decl_type.type_ref_expr, s->range.start);
   // §6.23 bars a hierarchical reference and a reference to an element of a
   // dynamic object from the operand of the type operator wherever the operator
   // is written, so this descends every link ForEachChildStmt in
@@ -641,7 +632,8 @@ void ElaboratorOperationRules::ValidateTypeRefArgs(const ModuleDecl* decl) {
   for (const auto& param : decl->params) WalkExprForTypeRefArg(param.second);
   for (const auto* item : decl->items) {
     if (item->data_type.type_ref_expr) {
-      CheckTypeRefArgInner(item->data_type.type_ref_expr, item->loc);
+      CheckTypeRefArgInner(item->data_type.type_ref_expr, item->loc,
+                           type_ref_mod_);
     }
     bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {

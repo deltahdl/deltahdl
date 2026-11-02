@@ -142,6 +142,14 @@ std::optional<UnpackedArrayType> ExprSelfArrayType(const Expr* expr,
 DeclaredValue UnderDims(DataType type, const std::vector<Expr*>& dims,
                         const ExprTypeScope& scope);
 
+// The value the expression `expr` stands for, where it is a name, a select of
+// one or a member of one: its declared type and the unpacked dimensions left
+// of it, and the kind of array the outermost of them makes; nothing for any
+// other expression, for a name the scope does not resolve, and for an element
+// of a dynamic object.
+std::optional<DeclaredValue> ExprValue(const Expr* expr,
+                                       const ExprTypeScope& scope);
+
 // The unpacked array type of `value`: its type under its unpacked dimensions,
 // nothing where those are not recorded.
 std::optional<UnpackedArrayType> ValueArrayType(const DeclaredValue& value);

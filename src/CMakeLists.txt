@@ -281,6 +281,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_validate_types.cpp
     elaborator/elaborator_validate_struct_types.cpp
     elaborator/scope_value_type.cpp
+    elaborator/type_ref_dynamic_element.cpp
     elaborator/type_ref_walks.cpp
     elaborator/type_eval.cpp
     elaborator/type_match.cpp

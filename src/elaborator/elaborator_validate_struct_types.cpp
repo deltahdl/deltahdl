@@ -290,7 +290,7 @@ std::string_view Elaborator::ResolveTypeRef(DataType& dt, SourceLoc loc,
       dt, arena_, [&](DataType& type) { ResolveTypeRef(type, loc, mod); });
   if (!dt.type_ref_expr) return {};
   auto* ref = dt.type_ref_expr;
-  CheckTypeRefArgInner(ref, loc);
+  CheckTypeRefArgInner(ref, loc, mod);
   const ModuleDecl* decl = module_decl_path_.back();
   const TypeRefScope kScope{mod, typedefs_, unit_, loc, arena_, decl};
   ReportTypeRefPrefixNotAClass(ref, loc, {mod->params, typedefs_, class_names_},

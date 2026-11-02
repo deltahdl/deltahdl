@@ -519,6 +519,9 @@ void Elaborator::RunPostItemValidations(const ModuleDecl* decl,
                                         RtlirModule* mod) {
   CheckAlwaysCombMultiDriver(decl, mod);
   CheckAggregateElementDrivers(decl, mod);
+  // §6.23: the module whose names ValidateTypeRefArgs types a type
+  // reference's operand by, among the checks ValidateModuleConstraints runs.
+  type_ref_mod_ = mod;
   ValidateModuleConstraints(decl, mod);
   ValidateValueParams(decl, mod);
   ValidateLhsPatternWidths(decl, mod);

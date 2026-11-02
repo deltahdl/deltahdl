@@ -230,8 +230,23 @@ class ElaboratorOperationRules : public ElaboratorData {
   void WalkItemExprsForTypeRefArg(const ModuleItem* item);
   void WalkExprForTypeRefArg(const Expr* expr);
   void WalkStmtsForTypeRefArg(const Stmt* s);
-  void CheckTypeRefArgInner(const Expr* inner, SourceLoc loc);
-  bool TypeRefArgUsesDynamicElement(const Expr* e) const;
+  // §6.23: reports the operand `inner` of a type reference written at `loc`
+  // where it holds a hierarchical reference, or else where it selects an
+  // element of a dynamic object, each name in it read as `mod` declares it
+  // (SelectsDynamicElement); an operand once reported is not reported again.
+  void CheckTypeRefArgInner(const Expr* inner, SourceLoc loc,
+                            const RtlirModule* mod);
+  // The first of those reports alone: true where `inner` is absent, is
+  // reported now or was reported before, so that no other report is due.
+  bool ReportHierarchicalArg(const Expr* inner, SourceLoc loc);
+  // The second of those reports alone.
+  void ReportDynamicElementArg(const Expr* inner, SourceLoc loc,
+                               const RtlirModule* mod);
+  // The same report for each type reference the statement `s` itself writes
+  // (ForEachTypeRefOfStmt), its operand typed in `mod`.
+  void CheckDynamicElementArgsOfStmt(const Stmt* s, const RtlirModule* mod);
+  bool TypeRefArgUsesDynamicElement(const Expr* e,
+                                    const RtlirModule* mod) const;
   bool IsHierarchicalMemberAccess(const Expr* e) const;
   bool NamesSelectableValue(const Expr* root) const;
   bool NamesModuleValue(std::string_view name) const;
@@ -268,6 +283,11 @@ class ElaboratorOperationRules : public ElaboratorData {
   // The module ValidateTypeRefArgs walks, whose ports and imports a name in a
   // type reference may name a value by (TypeRefModule); null outside it.
   const ModuleDecl* type_ref_module_ = nullptr;
+  // The elaborated module ValidateTypeRefArgs walks, in which the names a
+  // type reference's operand writes are typed; null outside it.
+  const RtlirModule* type_ref_mod_ = nullptr;
+  // The operands of type references CheckTypeRefArgInner has reported.
+  std::unordered_set<const Expr*> reported_type_ref_args_;
   // §6.21 with §6.23: the TypeRefResolver for the declarations a procedure
   // writes, which resolves each through `resolve` with the names the
   // procedure declares ahead of it innermost in type_ref_block_vars_, so that

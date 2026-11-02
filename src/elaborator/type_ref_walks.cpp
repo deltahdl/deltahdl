@@ -179,6 +179,40 @@ const ClassMember* PropertyNamed(const ClassDecl& cls, const Expr& ref,
   return owned.member;
 }
 
+// §8.5 and §8.13: the properties of `cls` and of the classes it extends, as
+// names in scope in its methods, those of the class furthest up the chain
+// first, so that a property a class declares hides one it inherits. The chain
+// stops at a parameterized base class, whose properties' types the
+// specialization `cls` extends gives (PropertyNamed), and at a base class
+// `unit` does not declare. The elaborator has broken every cycle of extends
+// clauses before the walk, so the chain ends.
+std::vector<ProceduralLocal> PropertiesInScope(const ClassDecl& cls,
+                                               const CompilationUnit& unit) {
+  std::vector<const ClassDecl*> chain = {&cls};
+  while (!chain.back()->base_class.empty()) {
+    const ClassDecl* base = FindBaseClass(chain.back(), &unit);
+    if (base == nullptr || !base->params.empty()) break;
+    chain.push_back(base);
+  }
+  std::vector<ProceduralLocal> properties;
+  for (auto c = chain.rbegin(); c != chain.rend(); ++c) {
+    for (const ClassMember* m : (*c)->members) {
+      if (m->kind == ClassMemberKind::kProperty)
+        properties.push_back({m->name, &m->data_type, &m->unpacked_dims});
+    }
+  }
+  return properties;
+}
+
+// The names `outer` holds followed by those `inner` holds, which hide them.
+std::vector<ProceduralLocal> NamesInScope(
+    std::span<const ProceduralLocal> outer,
+    std::span<const ProceduralLocal> inner) {
+  std::vector<ProceduralLocal> all(outer.begin(), outer.end());
+  all.insert(all.end(), inner.begin(), inner.end());
+  return all;
+}
+
 // A.2.5 with §6.23: the associative indexes the declaration `item`, a
 // variable or a typedef, writes as type references, `[type(k)]`, given the
 // types `resolve` gives their arguments, made in `arena`.
@@ -258,7 +292,10 @@ void ResolveProceduralTypeRefs(ModuleItem* item,
 // none of the class's properties and is left to `resolve_outer`, which leaves
 // it as written for the method's evaluation to read.
 void ResolveClassTypeRefs(ClassDecl& cls, const TypeRefResolver& resolve_outer,
-                          const CompilationUnit* unit, Arena& arena) {
+                          const CompilationUnit* unit, Arena& arena,
+                          const ProceduralStmtVisitor& visit) {
+  const std::vector<ProceduralLocal> kProperties =
+      PropertiesInScope(cls, *unit);
   const TypeRefResolver kInClass =
       [&](DataType& dt, SourceLoc loc,
           std::span<const ProceduralLocal> locals) -> std::vector<Expr*> {
@@ -268,8 +305,14 @@ void ResolveClassTypeRefs(ClassDecl& cls, const TypeRefResolver& resolve_outer,
       AdoptReferencedType(dt, property->data_type);
       return property->unpacked_dims;
     }
-    return resolve_outer(dt, loc, locals);
+    return resolve_outer(dt, loc, NamesInScope(kProperties, locals));
   };
+  ProceduralStmtVisitor in_class;
+  if (visit) {
+    in_class = [&](Stmt* s, std::span<const ProceduralLocal> locals) {
+      visit(s, NamesInScope(kProperties, locals));
+    };
+  }
   for (ClassMember* m : cls.members) {
     switch (m->kind) {
       case ClassMemberKind::kProperty:
@@ -280,13 +323,13 @@ void ResolveClassTypeRefs(ClassDecl& cls, const TypeRefResolver& resolve_outer,
             [&](DataType& type) { kInClass(type, m->loc, {}); }, arena);
         break;
       case ClassMemberKind::kMethod:
-        ResolveProceduralTypeRefs(m->method, kInClass, arena);
+        ResolveProceduralTypeRefs(m->method, kInClass, arena, in_class);
         break;
       case ClassMemberKind::kTypedef:
         ResolveItemIndexTypeRefs(*m->typedef_item, kInClass, arena);
         break;
       case ClassMemberKind::kClassDecl:
-        ResolveClassTypeRefs(*m->nested_class, kInClass, unit, arena);
+        ResolveClassTypeRefs(*m->nested_class, kInClass, unit, arena, in_class);
         break;
       default:
         break;

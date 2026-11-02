@@ -67,9 +67,13 @@ void ResolveProceduralTypeRefs(ModuleItem* item,
 // or inherits as one from a class it extends that `unit` declares (§8.13),
 // written bare or selected of `this` (§8.11), is the class's own, over the
 // scope around it, and stands for the property's type and unpacked
-// dimensions; `resolve_outer` resolves any other name.
+// dimensions; `resolve_outer` resolves any other name, with those properties
+// in scope behind the names the method declares. `visit`, where given, is
+// shown each statement of each method as ResolveProceduralTypeRefs shows it,
+// with the same properties in scope behind the method's names.
 void ResolveClassTypeRefs(ClassDecl& cls, const TypeRefResolver& resolve_outer,
-                          const CompilationUnit* unit, Arena& arena);
+                          const CompilationUnit* unit, Arena& arena,
+                          const ProceduralStmtVisitor& visit = {});
 
 // §6.23 with §26.2 and §3.12.1: the type references a package or the
 // compilation unit writes outside its modules, resolved in place against the

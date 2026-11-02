@@ -751,6 +751,11 @@ DataType VectorType(uint32_t width, bool is_signed, bool four_state,
   return type;
 }
 
+std::optional<DeclaredValue> ExprValue(const Expr* expr,
+                                       const ExprTypeScope& scope) {
+  return ValueOf(expr, scope);
+}
+
 std::optional<UnpackedArrayType> ValueArrayType(const DeclaredValue& value) {
   if (value.dims.size() != value.unpacked_dims) return std::nullopt;
   return UnpackedArrayType{value.type, value.dims};

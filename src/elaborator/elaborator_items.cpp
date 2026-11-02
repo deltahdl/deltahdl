@@ -489,13 +489,17 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
   auto resolve = [&](DataType& dt, SourceLoc loc) {
     ResolveTypeRef(dt, loc, mod);
   };
-  // §6.23 with §23.9: each statement's comparisons of type references are
-  // folded with the names the procedure declares in scope at it, which hide
-  // the module's.
+  // §6.23 with §23.9: each statement's type references are judged, and its
+  // comparisons of them folded, with the names the procedure declares in
+  // scope at it, which hide the module's. The operands are judged first,
+  // since a folded comparison no longer holds them.
   ResolveProceduralTypeRefs(
       item, ResolverAmongLocals(mod, resolve), arena_,
       [&](Stmt* s, std::span<const ProceduralLocal> locals) {
-        InLocals(locals, [&] { FoldTypeRefComparesOfStmt(s, kFold); });
+        InLocals(locals, [&] {
+          CheckDynamicElementArgsOfStmt(s, mod);
+          FoldTypeRefComparesOfStmt(s, kFold);
+        });
       });
   // §11.12's rules on a let's formals, for each let the item's procedure or
   // subroutine body declares.
@@ -550,12 +554,16 @@ void Elaborator::ElaborateModuleClassDecl(ModuleItem* item, RtlirModule* mod) {
   // ResolveModuleClassFormalTypes once the walk has reached the definition.
   ResolveClassMethodFormalTypes(item->class_decl, typedefs_, arena_);
   // §6.23: the type references the class writes, resolved against its own
-  // properties and then the module's names.
+  // properties and then the module's names, and each a method's statement
+  // writes judged with the names the method declares in scope at it.
   auto resolve = [&](DataType& dt, SourceLoc loc) {
     ResolveTypeRef(dt, loc, mod);
   };
-  ResolveClassTypeRefs(*item->class_decl, ResolverAmongLocals(mod, resolve),
-                       unit_, arena_);
+  ResolveClassTypeRefs(
+      *item->class_decl, ResolverAmongLocals(mod, resolve), unit_, arena_,
+      [&](Stmt* s, std::span<const ProceduralLocal> locals) {
+        InLocals(locals, [&] { CheckDynamicElementArgsOfStmt(s, mod); });
+      });
   // §11.12's rules on a let's formals, for each let a method's body declares.
   auto elaborate_let = [&](ModuleItem* let) { ElaborateLetFormals(let, mod); };
   ForEachClassBodyItem(item->class_decl, [&](const ModuleItem* method) {
