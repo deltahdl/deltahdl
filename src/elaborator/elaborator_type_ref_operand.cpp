@@ -732,7 +732,8 @@ void ElaboratorOperationRules::ElaborateUnitScopeProcedures() {
   const TypeRefCompareFolder kFold = [this](const Expr* e) {
     std::optional<int64_t> holds = EvalConstTypeRefCompare(e, nullptr);
     if (holds.has_value()) {
-      unit_type_ref_compares_.push_back({.expr = e, .holds = *holds != 0});
+      unit_type_ref_compares_.push_back(
+          {.expr = e, .gen_prefix = {}, .holds = *holds != 0});
     }
     return holds;
   };
