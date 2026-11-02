@@ -31,14 +31,26 @@ void RetainStaticAggregate(std::string_view frame, std::string_view name,
 bool RestoreStaticAggregate(std::string_view frame, std::string_view name,
                             SimContext& ctx);
 
-// §6.21: a variable a block declares outside any subroutine is static unless
-// declared automatic, and the block's frame, `frame`, is pushed with the
-// variables it held when last left (SimContext::PushStaticScope), its maps of
-// queues, associative arrays and shapes empty again. RetainBlockAggregates
-// keeps, as RetainStaticAggregate does, the aggregates the static declarations
-// of `block` made in the top frame; RestoreBlockAggregates makes that frame
-// refer to them again on the next entry. Inside a subroutine the subroutine's
-// own declarations keep them (ExecFuncVarDecl), and these do nothing.
+// §6.21 with §13.3.1: a variable a block declares is static unless declared
+// automatic or declared in an automatic subroutine, and the block's frame,
+// `frame`, is pushed with the variables it held when last left
+// (SimContext::PushStaticScope), its maps of queues, associative arrays and
+// shapes empty again. RetainBlockAggregates keeps, as RetainStaticAggregate
+// does, the aggregates such declarations of `block` made in the top frame;
+// RestoreBlockAggregates makes that frame refer to them again on the next
+// entry. A declaration IsEffectivelyStaticLocal holds keeps its own.
+// §6.21 and §13.3.2: true where the declaration `stmt`, run while the
+// subroutine `func_name` (empty for none) is running, is a static variable its
+// declaration keeps in a static frame: one written static, or one not written
+// automatic in a subroutine declared static.
+bool IsEffectivelyStaticLocal(const Stmt* stmt, std::string_view func_name,
+                              SimContext& ctx);
+
+// §6.21 with §13.3.1 and §8.6: true where the declaration `stmt` makes a new
+// variable on each entry to its block: one written automatic, or one not
+// written static in an automatic subroutine or a class method.
+bool IsAutomaticLocal(const Stmt& stmt, SimContext& ctx);
+
 void RetainBlockAggregates(const Stmt& block, std::string_view frame,
                            SimContext& ctx, Arena& arena);
 void RestoreBlockAggregates(const Stmt& block, std::string_view frame,

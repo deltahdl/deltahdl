@@ -492,6 +492,12 @@ constexpr std::array kBlocksEnteredTwice = {
     BlockPlace{"named begin block of a static task",
                "  task tk();\n    begin : nb\n", "",
                "    end\n  endtask\n  initial begin tk(); tk(); end\n"},
+    BlockPlace{"named begin block of a task declared static",
+               "  task static tk();\n    begin : nb\n", "",
+               "    end\n  endtask\n  initial begin tk(); tk(); end\n"},
+    BlockPlace{"named begin block of a task with a delay",
+               "  task tk();\n    #1;\n    begin : nb\n", "",
+               "    end\n  endtask\n  initial begin tk(); tk(); end\n"},
     BlockPlace{"unnamed begin block of a static task",
                "  task tk();\n    begin\n", "",
                "    end\n  endtask\n  initial begin tk(); tk(); end\n"},
@@ -543,6 +549,40 @@ TEST(ScopeAndLifetimeSimulation, EachGenerateInstanceKeepsItsBlocksAggregates) {
       "endmodule\n",
       "r");
   EXPECT_EQ(val, 3u);
+}
+
+// §6.21 with §13.3.1: a block of an automatic task declares automatic
+// variables unless written static, so each call's named block starts with its
+// array's elements 0 and its queue and associative array empty, its shape the
+// same; written static, the queue is one for every call. The task runs at
+// once or after a delay, which runs its body as a process. Kept by the block's
+// frame, the automatic ones carried the first call's contents into the second.
+TEST(ScopeAndLifetimeSimulation, AnAutomaticTasksBlockAggregatesStartAfresh) {
+  constexpr std::array<const char*, 2> kDelays = {"", "    #1;\n"};
+  for (const char* delay : kDelays) {
+    const std::string kSrc =
+        std::string(
+            "module t;\n"
+            "  int pass;\n"
+            "  bit [3:0] r;\n"
+            "  task automatic tk();\n") +
+        delay +
+        "    begin : nb\n"
+        "      int arr [3];\n"
+        "      int q [$];\n"
+        "      int aa [int];\n"
+        "      static int sq [$];\n"
+        "      pass++;\n"
+        "      if (pass == 2) r = {$size(arr) == 3 && arr[2] == 0, q.size() == "
+        "0, aa.num() == 0, sq.size() == 1};\n"
+        "      arr[2] = 5; q.push_back(7); aa[4] = 9; sq.push_back(1);\n"
+        "    end\n"
+        "  endtask\n"
+        "  initial begin tk(); tk(); end\n"
+        "endmodule\n";
+    SCOPED_TRACE(kSrc);
+    EXPECT_EQ(RunAndGet(kSrc, "r"), 0xFu);
+  }
 }
 
 }  // namespace

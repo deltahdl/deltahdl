@@ -278,24 +278,6 @@ void CreateDeclAggregate(const Stmt* stmt, uint32_t elem_width, SimContext& ctx,
   }
 }
 
-// §13.3.2: all variables of a static task are static. A local with no explicit
-// lifetime keyword inherits its enclosing subroutine's lifetime, so a plain
-// local declared inside a static-lifetime task/function is itself static and
-// must be a single cell shared across every activation -- including concurrent
-// ones. Such a local therefore has to resolve against the shared static-frame
-// store rather than the per-activation scope stack (which, since automatic and
-// block locals are now private to each process, would otherwise give each
-// concurrent activation its own copy). An explicit `automatic` local never
-// becomes static.
-static bool IsEffectivelyStaticLocal(const Stmt* stmt,
-                                     std::string_view func_name,
-                                     SimContext& ctx) {
-  if (stmt->var_is_static) return true;
-  if (stmt->var_is_automatic || func_name.empty()) return false;
-  auto* f = ctx.FindFunction(func_name);
-  return f && f->is_static && !f->is_automatic;
-}
-
 // The static frame a static local lives in: its subroutine's, or, for a
 // declaration written static outside any subroutine, a frame of the
 // declaration's own named after where it is written. §6.21 makes such a
@@ -578,13 +560,16 @@ static void CreateDeclVariable(const Stmt* stmt, uint32_t width, bool is_real,
 
 // §9.3.4 with §6.21: true where a declaration that is not static is executed
 // again in the frame already holding its variable, which it then stands in.
+// One that is automatic, written so or in an automatic subroutine or a class
+// method, makes its variable afresh instead (IsAutomaticLocal).
 // The variable a block re-entered keeps is in its own frame; an enclosing
 // block's of the same name is another variable, which this declaration hides
 // rather than reuses. A static local made already is TryReuseKeptStaticLocal's.
 static bool TryReuseExistingDeclVar(const Stmt* stmt,
                                     std::string_view func_name,
                                     SimContext& ctx) {
-  if (IsEffectivelyStaticLocal(stmt, func_name, ctx) || stmt->var_is_automatic)
+  if (IsEffectivelyStaticLocal(stmt, func_name, ctx) ||
+      IsAutomaticLocal(*stmt, ctx))
     return false;
   return ctx.InnermostScopeDeclares(stmt->var_name);
 }

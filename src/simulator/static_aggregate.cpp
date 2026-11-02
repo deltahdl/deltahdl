@@ -6,10 +6,12 @@
 #include <vector>
 
 #include "common/arena.h"
+#include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 #include "simulator/process.h"
 #include "simulator/scope.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_name_tables.h"
 #include "simulator/sim_context_scope_stack.h"
 #include "simulator/sim_context_types.h"
 
@@ -118,20 +120,55 @@ bool RestoreStaticAggregate(std::string_view frame, std::string_view name,
   return kept_any;
 }
 
+// §13.3.2: all variables of a static task are static. A local with no explicit
+// lifetime keyword inherits its enclosing subroutine's lifetime, so a plain
+// local declared inside a static-lifetime task/function is itself static and
+// must be a single cell shared across every activation -- including concurrent
+// ones. Such a local therefore has to resolve against the shared static-frame
+// store rather than the per-activation scope stack (which, since automatic and
+// block locals are now private to each process, would otherwise give each
+// concurrent activation its own copy). An explicit `automatic` local never
+// becomes static.
+bool IsEffectivelyStaticLocal(const Stmt* stmt, std::string_view func_name,
+                              SimContext& ctx) {
+  if (stmt->var_is_static) return true;
+  if (stmt->var_is_automatic || func_name.empty()) return false;
+  auto* f = ctx.FindFunction(func_name);
+  return f && f->is_static && !f->is_automatic;
+}
+
+bool IsAutomaticLocal(const Stmt& stmt, SimContext& ctx) {
+  if (stmt.var_is_automatic) return true;
+  std::string_view func_name = ctx.CurrentFuncName();
+  if (stmt.var_is_static || func_name.empty()) return false;
+  if (ctx.CurrentMethodClass() != nullptr) return true;
+  const ModuleItem* f = ctx.FindFunction(func_name);
+  return f != nullptr && f->is_automatic;
+}
+
+// True where a declaration `block` holds keeps nothing of its own between the
+// block's activations, so the block's frame has to: a static one its
+// declaration does not keep (IsEffectivelyStaticLocal), in a block that no
+// subroutine declares or that a module's subroutine of static lifetime does.
+static bool BlockKeepsDecl(const Stmt& s, SimContext& ctx) {
+  if (s.kind != StmtKind::kVarDecl || IsAutomaticLocal(s, ctx)) return false;
+  std::string_view func_name = ctx.CurrentFuncName();
+  if (IsEffectivelyStaticLocal(&s, func_name, ctx)) return false;
+  return func_name.empty() || ctx.FindFunction(func_name) != nullptr;
+}
+
 // Runs `use` on the name of each static declaration `block` holds among its
-// own items, a begin-end block's or a fork's, when no subroutine is running,
-// with the key the frame `frame` is kept under in the running instance and
+// own items, a begin-end block's or a fork's, that the block keeps, with the
+// key the frame `frame` is kept under in the running instance and
 // generate block instance (SimContext::StaticFrameKey), so that each instance
 // keeps aggregates of its own (§27.4).
 template <typename Use>
 static void ForEachBlockStaticName(const Stmt& block, std::string_view frame,
                                    SimContext& ctx, Use use) {
-  if (!ctx.CurrentFuncName().empty()) return;
   std::string_view key;
   auto each = [&](const std::vector<Stmt*>& items) {
     for (const Stmt* s : items) {
-      if (s == nullptr || s->kind != StmtKind::kVarDecl || s->var_is_automatic)
-        continue;
+      if (s == nullptr || !BlockKeepsDecl(*s, ctx)) continue;
       if (key.empty()) key = ctx.StaticFrameKey(frame);
       use(key, s->var_name);
     }
