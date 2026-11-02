@@ -41,7 +41,8 @@ struct ExprTypeScope {
   // scope declares.
   std::function<std::optional<DataType>(const Expr*)> call_returns;
   // The type a type reference written in the expression stands for, as the
-  // casting type of `type(x)'(y)`, or nothing.
+  // casting type of `type(x)'(y)`, or nothing; a scope that leaves it unset
+  // types no such cast.
   std::function<std::optional<DataType>(const Expr*)> type_ref;
   const TypedefMap& typedefs;
   // The constants a part-select's bounds, a replication's count and a size

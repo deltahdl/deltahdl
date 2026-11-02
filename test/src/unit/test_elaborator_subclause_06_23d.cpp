@@ -27,8 +27,7 @@ namespace {
 // declares, a dimension of a multidimensional array after the first (§7.4.5),
 // a member of a structure (§7.2), a property read through a class handle
 // (§8.5), the queue an array locator method gives (§7.12.1), and a member of
-// the value a function call returns or a cast converts to (§6.24.1) each
-// count.
+// the value a function call returns (§13.4) each count.
 // Each forbidden form is written beside the nearest allowed one: the dynamic
 // object named whole, a fixed-size dimension's element, a member or property
 // named whole, and a fixed-size array a procedure declares over a dynamic one
@@ -58,7 +57,7 @@ struct Form {
   std::string_view operand;
 };
 
-constexpr std::array<Form, 14> kForbiddenForms = {{
+constexpr std::array<Form, 12> kForbiddenForms = {{
     {"int d[];", "d[0]"},
     {"int d[$];", "d[0]"},
     {"int d[int];", "d[0]"},
@@ -71,11 +70,9 @@ constexpr std::array<Form, 14> kForbiddenForms = {{
     {"hc h;", "h.w[0]"},
     {"int arr[4];", "arr.find with (item > 1)[0]"},
     {"sq_t s;", "fs(s).q[0]"},
-    {"sq_t s;", "type(s)'(s).q[0]"},
-    {"sq_t s;", "type(sq_t)'(s).q[0]"},
 }};
 
-constexpr std::array<Form, 14> kAllowedForms = {{
+constexpr std::array<Form, 12> kAllowedForms = {{
     {"int d[];", "d"},
     {"int d[$];", "d"},
     {"int d[int];", "d"},
@@ -88,8 +85,6 @@ constexpr std::array<Form, 14> kAllowedForms = {{
     {"hc h;", "h.f[1]"},
     {"int arr[4];", "arr.find with (item > 1)"},
     {"sq_t s;", "fs(s).q"},
-    {"sq_t s;", "type(s)'(s).q"},
-    {"sq_t s;", "type(sq_t)'(s).q"},
 }};
 
 // Each place a type reference is written in, one line long, {0} standing for

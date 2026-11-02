@@ -196,6 +196,11 @@ class ElaboratorOperationRules : public ElaboratorData {
   // type_ref_package_ declares it, or the unit where that is null (§26.2).
   void InUnitExprTypeScope(
       const std::function<void(const ExprTypeScope&)>& use) const;
+  // §26.3: the type the call `call` returns where a package or the
+  // compilation unit writes it: a function type_ref_package_ declares, called
+  // by its bare name, returns its type read behind the package; any other
+  // call is CalledFunctionType's.
+  std::optional<DataType> UnitCallType(const Expr* call) const;
   // §6.23: CheckTypeRefArgInner for each type reference
   // unit_scope_type_refs_ holds, with the names in scope at it.
   void ValidateUnitScopeTypeRefArgs();

@@ -565,7 +565,8 @@ bool IsTypeName(std::string_view name, const TypedefMap& typedefs) {
 std::optional<DataType> CastToWrittenType(const Expr* cast,
                                           const ExprTypeScope& scope) {
   const Expr* target = cast->rhs;
-  if (target->kind == ExprKind::kTypeRef) return scope.type_ref(target);
+  if (target->kind == ExprKind::kTypeRef)
+    return scope.type_ref ? scope.type_ref(target) : std::nullopt;
   if (target->kind == ExprKind::kIdentifier &&
       IsTypeName(target->text, scope.typedefs)) {
     return TypeNameToDataType(target->text);
