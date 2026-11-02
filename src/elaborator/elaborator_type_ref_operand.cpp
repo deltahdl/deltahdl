@@ -240,6 +240,39 @@ std::optional<ClassSpecialization> ElaboratorOperationRules::ClassTypeOf(
   return std::nullopt;
 }
 
+// §26.3: `type` read behind the package `pkg` where it is written bare by the
+// name of a typedef or a class `pkg` declares, as the typedefs and classes of
+// the package are recorded; `type` as it is otherwise.
+static DataType InPackage(DataType type, const PackageDecl& pkg) {
+  if (type.kind != DataTypeKind::kNamed || !type.scope_name.empty())
+    return type;
+  const bool kDeclared =
+      std::ranges::any_of(pkg.items, [&](const ModuleItem* item) {
+        return (item->kind == ModuleItemKind::kTypedef &&
+                item->name == type.type_name) ||
+               (item->kind == ModuleItemKind::kClassDecl &&
+                item->class_decl->name == type.type_name);
+      });
+  if (kDeclared) type.scope_name = pkg.name;
+  return type;
+}
+
+// §26.2: the package that declares the class `cls` among its items, or none
+// where another scope declares it.
+static const PackageDecl* PackageDeclaring(const ClassDecl* cls,
+                                           const CompilationUnit& unit) {
+  for (const PackageDecl* pkg : unit.packages) {
+    if (pkg != nullptr &&
+        std::ranges::any_of(pkg->items, [&](const ModuleItem* item) {
+          return item->kind == ModuleItemKind::kClassDecl &&
+                 item->class_decl == cls;
+        })) {
+      return pkg;
+    }
+  }
+  return nullptr;
+}
+
 std::optional<UnpackedArrayType> ElaboratorOperationRules::MemberTypeOf(
     const ClassSpecialization& handle, std::string_view name,
     const ScopeMap& constants) const {
@@ -256,6 +289,10 @@ std::optional<UnpackedArrayType> ElaboratorOperationRules::MemberTypeOf(
   } else {
     return std::nullopt;
   }
+  // §26.3: a member of a class a package declares is written in the package,
+  // whose own typedefs and classes its bare type names name.
+  if (const PackageDecl* pkg = PackageDeclaring(owned.owner, *unit_))
+    written.type = InPackage(written.type, *pkg);
   // §8.13: a member the class inherits is read in the class declaring it,
   // whose own parameters the handle's specialization does not give.
   if (owned.owner != handle.cls && !owned.owner->params.empty())
@@ -487,23 +524,6 @@ void ElaboratorOperationRules::InExprTypeScope(
     return ScopedValue(prefix, name, kOuter);
   };
   use(scope);
-}
-
-// §26.3: `type` read behind the package `pkg` where it is written bare by the
-// name of a typedef or a class `pkg` declares, as the typedefs and classes of
-// the package are recorded; `type` as it is otherwise.
-static DataType InPackage(DataType type, const PackageDecl& pkg) {
-  if (type.kind != DataTypeKind::kNamed || !type.scope_name.empty())
-    return type;
-  const bool kDeclared =
-      std::ranges::any_of(pkg.items, [&](const ModuleItem* item) {
-        return (item->kind == ModuleItemKind::kTypedef &&
-                item->name == type.type_name) ||
-               (item->kind == ModuleItemKind::kClassDecl &&
-                item->class_decl->name == type.type_name);
-      });
-  if (kDeclared) type.scope_name = pkg.name;
-  return type;
 }
 
 std::optional<DataType> ElaboratorOperationRules::UnitCallType(
