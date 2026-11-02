@@ -109,4 +109,41 @@ TEST(ClassMethodTypeRefSim, ComparisonInAnAssignment) {
   ExpectInEveryPlace(body);
 }
 
+// §6.23 with §26.3: in a method of a class that another package or the
+// compilation unit declares, a package's variable, value parameter and
+// enumeration constant, named through the package or imported, have the types
+// their declarations give them, compared or declaring a variable. A byte is
+// signed and 2-state, so it differs from logic [7:0], which `p::v + 1'b0`
+// matches.
+TEST(ClassMethodTypeRefSim, PackageValuesInAnotherScopesClass) {
+  constexpr std::array kHosts = {
+      "package q;\n  import p::*;\n{}endpackage\nmodule t;\n  int res;\n"
+      "  initial begin\n    q::c h;\n    h = new;\n    res = h.check();\n"
+      "  end\nendmodule\n",
+      "import p::*;\n{}module t;\n  int res;\n  initial begin\n    c h;\n"
+      "    h = new;\n    res = h.check();\n  end\nendmodule\n",
+  };
+  const std::string kPackage =
+      "package p;\n  byte v;\n  parameter byte P = 3;\n"
+      "  typedef enum byte {E0, E1} e_t;\nendpackage\n";
+  const std::string kClass =
+      "  class c;\n    function int check();\n      int r = 0;\n"
+      "      var type(p::v + 1'b0) d;\n"
+      "      if (type(p::v + 1'b0) == type(logic [7:0])) r[7] = 1'b1;\n"
+      "      if (type(p::v) == type(logic [7:0])) r[6] = 1'b1;\n"
+      "      if (type(v[3:0]) == type(bit [3:0])) r[5] = 1'b1;\n"
+      "      if (type(P) == type(byte)) r[4] = 1'b1;\n"
+      "      if (type(E1) == type(p::e_t)) r[3] = 1'b1;\n"
+      "      if (type(p::E1 + 1'b0) == type(logic [7:0])) r[2] = 1'b1;\n"
+      "      r[1] = $bits(d) == 8 && $isunknown(d);\n"
+      "      r[0] = type(d) == type(byte);\n"
+      "      return r;\n    endfunction\n  endclass\n";
+  for (const char* host : kHosts) {
+    const std::string kSrc =
+        kPackage + std::vformat(host, std::make_format_args(kClass));
+    SCOPED_TRACE(kSrc);
+    EXPECT_EQ(RunAndGet(kSrc, "res"), 0b1011'1110u);
+  }
+}
+
 }  // namespace
