@@ -482,6 +482,12 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
     }
     return holds;
   };
+  // §6.23: the type references a continuous assignment, a parameter's value
+  // or a declaration's ranges write, judged as the item is elaborated, so that
+  // one a generate block writes is judged with the block's names in scope.
+  // The operands are judged before a comparison of them is folded away.
+  type_ref_mod_ = mod;
+  WalkItemExprsForTypeRefArg(item);
   FoldItemTypeRefCompares(item, kFold);
   ReportItemPrefixesNotAClass(*item, {mod->params, typedefs_, class_names_},
                               diag_);

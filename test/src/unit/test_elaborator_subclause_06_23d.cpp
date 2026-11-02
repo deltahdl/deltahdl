@@ -77,6 +77,7 @@ constexpr std::array<Form, 10> kAllowedForms = {{
     {"hc h;", "h.d"},
     {"hc h;", "h.q"},
     {"hc h;", "h.a"},
+    {"hc h;", "h.w"},
     {"hc h;", "h.f[1]"},
 }};
 

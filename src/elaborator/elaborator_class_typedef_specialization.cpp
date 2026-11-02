@@ -179,29 +179,34 @@ bool IsAssociativeDim(const Expr* dim) {
          IndexDimType(dim).has_value();
 }
 
-// The unpacked dimensions `dims` folded under the specialization, each written
+// The unpacked dimension `dim` folded under the specialization, written
 // `[left:right]` or `[size]`, and a dynamic, queue or associative dimension,
 // which has no size to fold, kept as written; nothing where a size does not
 // fold.
-std::optional<std::vector<Expr*>> FoldUnpackedDims(
-    const std::vector<Expr*>& dims, const ScopeMap& scope, Arena& arena) {
-  std::vector<Expr*> folded;
-  for (Expr* dim : dims) {
-    if (dim == nullptr || IsQueueDim(dim)) {
-      folded.push_back(dim);
-      continue;
-    }
-    if (dim->kind != ExprKind::kBinary || dim->op != TokenKind::kColon) {
-      Expr* size = FoldedBound(dim, scope, arena);
-      if (size == nullptr && !IsAssociativeDim(dim)) return std::nullopt;
-      folded.push_back(size != nullptr ? size : dim);
-      continue;
-    }
+std::optional<Expr*> FoldedUnpackedDim(Expr* dim, const ScopeMap& scope,
+                                       Arena& arena) {
+  if (dim == nullptr || IsQueueDim(dim)) return dim;
+  if (dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon) {
     auto* range = arena.Create<Expr>(*dim);
     range->lhs = FoldedBound(dim->lhs, scope, arena);
     range->rhs = FoldedBound(dim->rhs, scope, arena);
     if (range->lhs == nullptr || range->rhs == nullptr) return std::nullopt;
-    folded.push_back(range);
+    return range;
+  }
+  if (Expr* size = FoldedBound(dim, scope, arena)) return size;
+  if (IsAssociativeDim(dim)) return dim;
+  return std::nullopt;
+}
+
+// The unpacked dimensions `dims`, each folded as FoldedUnpackedDim folds it;
+// nothing where one does not fold.
+std::optional<std::vector<Expr*>> FoldUnpackedDims(
+    const std::vector<Expr*>& dims, const ScopeMap& scope, Arena& arena) {
+  std::vector<Expr*> folded;
+  for (Expr* dim : dims) {
+    std::optional<Expr*> one = FoldedUnpackedDim(dim, scope, arena);
+    if (!one) return std::nullopt;
+    folded.push_back(*one);
   }
   return folded;
 }
