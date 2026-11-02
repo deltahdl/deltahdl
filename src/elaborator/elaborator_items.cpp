@@ -2,6 +2,7 @@
 #include <format>
 #include <functional>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -473,21 +474,29 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
   // A.8.6: the item's ordinary expressions join no operands under a property
   // operator.
   ReportItemImplicationOperators(*item, diag_);
-  FoldItemTypeRefCompares(item, [this, mod](const Expr* e) {
+  const TypeRefCompareFolder kFold = [this, mod](const Expr* e) {
     std::optional<int64_t> holds = EvalConstTypeRefCompare(e, mod);
     if (holds.has_value()) {
       mod->type_ref_compares.push_back(
           {.expr = e, .gen_prefix = InternedGenPrefix(), .holds = *holds != 0});
     }
     return holds;
-  });
+  };
+  FoldItemTypeRefCompares(item, kFold);
   ReportItemPrefixesNotAClass(*item, {mod->params, typedefs_, class_names_},
                               diag_);
   if (ElaborateDeclItem(item, mod)) return;
   auto resolve = [&](DataType& dt, SourceLoc loc) {
     ResolveTypeRef(dt, loc, mod);
   };
-  ResolveProceduralTypeRefs(item, ResolverAmongLocals(mod, resolve), arena_);
+  // §6.23 with §23.9: each statement's comparisons of type references are
+  // folded with the names the procedure declares in scope at it, which hide
+  // the module's.
+  ResolveProceduralTypeRefs(
+      item, ResolverAmongLocals(mod, resolve), arena_,
+      [&](Stmt* s, std::span<const ProceduralLocal> locals) {
+        InLocals(locals, [&] { FoldTypeRefComparesOfStmt(s, kFold); });
+      });
   // §11.12's rules on a let's formals, for each let the item's procedure or
   // subroutine body declares.
   auto elaborate_let = [&](ModuleItem* let) { ElaborateLetFormals(let, mod); };

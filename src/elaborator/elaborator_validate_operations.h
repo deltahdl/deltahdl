@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <functional>
 #include <optional>
+#include <span>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
@@ -241,11 +242,29 @@ class ElaboratorOperationRules : public ElaboratorData {
                               std::string_view name) const;
   const ModuleDecl* TypeRefModule() const;
   bool TypeRefArgHasMemberAccess(const Expr* e) const;
-  // The variables the statements WalkStmtsForTypeRefArg is inside declare,
-  // innermost last, each with whether a `.` after it selects a member of it
-  // rather than naming a scope (NamesSelectableValue): a block's declaration
-  // hides a module's of the same name for the rest of the block (§6.21).
-  std::vector<std::pair<std::string_view, bool>> type_ref_block_vars_;
+  // A variable a procedure declares, with whether a `.` after it selects a
+  // member of it rather than naming a scope (NamesSelectableValue), and the
+  // type and unpacked dimensions it is declared with.
+  struct BlockValue {
+    std::string_view name;
+    bool selectable;
+    const DataType* type;
+    const std::vector<Expr*>* dims;
+  };
+  // The variables the statements WalkStmtsForTypeRefArg is inside declare, or
+  // those in scope at a statement or declaration a procedure writes, innermost
+  // last: a block's declaration hides a module's of the same name for the rest
+  // of the block (§6.21).
+  std::vector<BlockValue> type_ref_block_vars_;
+  // The innermost of type_ref_block_vars_ named `name`, null where none is.
+  // Defined in elaborator_type_ref_operand.cpp.
+  const BlockValue* InnermostBlockValue(std::string_view name) const;
+  // Runs `use` with `locals`, the names a procedure declares in scope at what
+  // `use` reads, innermost in type_ref_block_vars_, so that a type reference
+  // read there types a name by the procedure's declaration of it (§23.9).
+  // Defined in elaborator_type_ref_operand.cpp.
+  void InLocals(std::span<const ProceduralLocal> locals,
+                const std::function<void()>& use);
   // The module ValidateTypeRefArgs walks, whose ports and imports a name in a
   // type reference may name a value by (TypeRefModule); null outside it.
   const ModuleDecl* type_ref_module_ = nullptr;

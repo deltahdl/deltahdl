@@ -4,7 +4,6 @@
 #include <optional>
 
 #include "elaborator/const_eval.h"
-#include "elaborator/elaborator_validate_internal.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -61,8 +60,9 @@ TypeRefCompareFolder BarringAssignments(const TypeRefCompareFolder& fold) {
   };
 }
 
-void FoldTypeRefComparesInStmt(Stmt* s, const TypeRefCompareFolder& fold) {
-  if (s == nullptr) return;
+// The expressions of `s` alone; the statements it holds are each handed to
+// this in turn by the walk that knows the names in scope at them.
+void FoldTypeRefComparesOfStmt(Stmt* s, const TypeRefCompareFolder& fold) {
   // §10.6: assign and force are the procedural continuous assignments.
   bool is_continuous =
       s->kind == StmtKind::kAssign || s->kind == StmtKind::kForce;
@@ -71,22 +71,25 @@ void FoldTypeRefComparesInStmt(Stmt* s, const TypeRefCompareFolder& fold) {
   for (Expr* e : {s->lhs, s->expr, s->condition, s->assert_expr}) {
     FoldTypeRefComparesInExpr(e, fold);
   }
+  // §12.5: a case item's expressions are compared with the case expression
+  // while the procedure runs.
+  for (CaseItem& item : s->case_items) {
+    for (Expr* pattern : item.patterns) {
+      FoldTypeRefComparesInExpr(pattern, fold);
+    }
+  }
   // A declaration's initializer, a block parameter's value among them, is
   // not a procedural statement (§11.3.6).
   FoldTypeRefComparesInExpr(s->var_init, BarringAssignments(fold));
-  ForEachChildStmt(
-      s, [&](Stmt* const& sub) { FoldTypeRefComparesInStmt(sub, fold); });
 }
 
-// The comparisons of type references `item` writes where a value is read while
-// the design runs: its procedure's or subroutine's statements, a continuous
-// assignment's right-hand side and a net's or variable's initializer. A
-// parameter's value is folded by constant evaluation (TypedefRegistryGuard),
-// and a let's body stands for its formals' actuals, which are not yet known.
+// The comparisons of type references `item` writes outside a procedure where
+// a value is read while the design runs: a continuous assignment's right-hand
+// side and a net's or variable's initializer. A parameter's value is folded by
+// constant evaluation (TypedefRegistryGuard), and a let's body stands for its
+// formals' actuals, which are not yet known.
 void FoldItemTypeRefCompares(ModuleItem* item,
                              const TypeRefCompareFolder& fold) {
-  FoldTypeRefComparesInStmt(item->body, fold);
-  for (auto* s : item->func_body_stmts) FoldTypeRefComparesInStmt(s, fold);
   if (item->kind != ModuleItemKind::kContAssign &&
       item->kind != ModuleItemKind::kNetDecl &&
       item->kind != ModuleItemKind::kVarDecl)

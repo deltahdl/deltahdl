@@ -15,6 +15,7 @@ struct ClassDecl;
 struct CompilationUnit;
 struct Expr;
 struct ModuleItem;
+struct Stmt;
 
 // A name a procedure declares, with the type and unpacked dimensions it was
 // declared with.
@@ -36,6 +37,11 @@ struct ProceduralLocal {
 using TypeRefResolver = std::function<std::vector<Expr*>(
     DataType&, SourceLoc, std::span<const ProceduralLocal>)>;
 
+// A statement a procedure writes, shown with the names the procedure declares
+// in scope at it, latest last.
+using ProceduralStmtVisitor =
+    std::function<void(Stmt*, std::span<const ProceduralLocal>)>;
+
 // §6.23 with A.2.7, A.2.8 and A.6.8: the type references of the subroutine or
 // procedural block `item`, resolved in place: its formals' types, the types of
 // the variables its blocks declare and those of the variables its for loops
@@ -44,10 +50,14 @@ using TypeRefResolver = std::function<std::vector<Expr*>(
 // of its latest declaration in scope; any other is left to `resolve_outer`.
 // A.2.5: a formal's or a block variable's associative index written as a type
 // reference, `[type(k)]`, takes its type the same way, in `arena`, the
-// dimension's type_value.
+// dimension's type_value. `visit`, where given, is shown each statement of
+// the procedure, a declaration among them, with the names it declares in
+// scope there: a for loop's own names with the loop, and a declaration's
+// ahead of it but not its own.
 void ResolveProceduralTypeRefs(ModuleItem* item,
                                const TypeRefResolver& resolve_outer,
-                               Arena& arena);
+                               Arena& arena,
+                               const ProceduralStmtVisitor& visit = {});
 
 // §6.23 with §8.5 and §23.9: the type references of the class `cls`,
 // resolved in place: its properties' types, the associative indexes its

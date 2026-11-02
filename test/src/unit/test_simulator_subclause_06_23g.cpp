@@ -133,9 +133,11 @@ bool Admits(Scope scope, Context context) {
 }
 
 // What sets r's bit `count - 1 - k` to the outcome of tests[k], written in
-// `context` in a host of `scope`.
+// `context` in a host of `scope`, a parameter declared with
+// `parameter_keyword`.
 std::string Writing(std::span<const std::string> tests, Context context,
-                    Scope scope) {
+                    Scope scope,
+                    std::string_view parameter_keyword = "localparam") {
   const size_t kCount = tests.size();
   std::string items;
   std::string conditionals;
@@ -156,7 +158,8 @@ std::string Writing(std::span<const std::string> tests, Context context,
         listed += std::format("{}b{}", kSeparator, k);
         break;
       case Context::kParameter:
-        items += std::format("  localparam bit L{} = {};\n", k, tests[k]);
+        items +=
+            std::format("  {} bit L{} = {};\n", parameter_keyword, k, tests[k]);
         listed += std::format("{}L{}", kSeparator, k);
         break;
       default:
@@ -365,16 +368,376 @@ constexpr std::array kDeclared = {
     Declared{"g", "$bits({0}) == 8", true, false},
 };
 
-TEST(ScopeValueTypeRefSim, DeclarationTakesTheValuesType) {
+// After `declarations`, a variable d<k> declared with `var type(operand)` for
+// each of `declared`, and its probe.
+Battery DeclarationBattery(std::string declarations,
+                           std::span<const Declared> declared) {
   Battery battery;
-  for (size_t k = 0; k < kDeclared.size(); ++k) {
+  battery.declarations = std::move(declarations);
+  for (size_t k = 0; k < declared.size(); ++k) {
     const std::string kName = std::format("d{}", k);
     battery.declarations +=
-        std::format("  var type({}) {};\n", kDeclared[k].operand, kName);
-    battery.Add(std::vformat(kDeclared[k].probe, std::make_format_args(kName)),
-                kDeclared[k].under_bytes, kDeclared[k].under_nibbles);
+        std::format("  var type({}) {};\n", declared[k].operand, kName);
+    battery.Add(std::vformat(declared[k].probe, std::make_format_args(kName)),
+                declared[k].under_bytes, declared[k].under_nibbles);
   }
-  ExpectAtEveryPlace(battery, Context::kDeclaration);
+  return battery;
+}
+
+TEST(ScopeValueTypeRefSim, DeclarationTakesTheValuesType) {
+  ExpectAtEveryPlace(DeclarationBattery("", kDeclared), Context::kDeclaration);
+}
+
+// §6.23 with §23.9: a name a procedure declares -- a variable of a begin-end
+// or fork-join block, a formal of a task or function, or a for loop's
+// variable -- hides the module's name it shares within the procedure, and a
+// type reference to an expression written there types the expression by the
+// procedure's names: compared, it matches by §6.22.1, and a declaration
+// written with it takes the type. The module declares an int x, an int array
+// m of five elements and a 4-bit a, which the procedure's own x, m and a hide,
+// and a shortint n, which no name of the procedure hides. Typed by the
+// module's names, an expression over the procedure's names had no type, so a
+// declaration was one logic bit, and one over a hidden name took the module's
+// type.
+//
+// `text` holds the module's declarations at `{0}`, the procedure's names at
+// `{1}` and what the case writes at `{2}`; `result` names the r the case sets.
+// The procedure's names are declared in the block the case is written in, or
+// in the initial block, task or function enclosing a nested begin-end or a
+// fork-join the case is written in. An interface's and a program's initial
+// block hold the case as a module's does.
+struct Procedure {
+  const char* name;
+  const char* text;
+  const char* result;
+};
+
+constexpr std::array kProcedures = {
+    Procedure{"initial block",
+              "module t;\n{0}  initial begin\n{1}{2}  end\nendmodule\n", "r"},
+    Procedure{"nested block",
+              "module t;\n{0}  initial begin\n    begin : nb\n{1}{2}    end\n"
+              "  end\nendmodule\n",
+              "r"},
+    Procedure{"fork-join",
+              "module t;\n{0}  initial begin\n    fork\n{1}{2}    join\n  end\n"
+              "endmodule\n",
+              "r"},
+    Procedure{"task",
+              "module t;\n{0}  task automatic tk();\n{1}{2}  endtask\n"
+              "  initial tk();\nendmodule\n",
+              "r"},
+    Procedure{"function",
+              "module t;\n{0}  function automatic void fn();\n{1}{2}"
+              "  endfunction\n  initial fn();\nendmodule\n",
+              "r"},
+    Procedure{"nested block in the declaring initial block",
+              "module t;\n{0}  initial begin\n{1}    begin : nb\n{2}    end\n"
+              "  end\nendmodule\n",
+              "r"},
+    Procedure{"fork-join in the declaring initial block",
+              "module t;\n{0}  initial begin\n{1}    fork\n{2}    join\n  end\n"
+              "endmodule\n",
+              "r"},
+    Procedure{"nested block in the declaring task",
+              "module t;\n{0}  task automatic tk();\n{1}    begin\n{2}    end\n"
+              "  endtask\n  initial tk();\nendmodule\n",
+              "r"},
+    Procedure{"nested block in the declaring function",
+              "module t;\n{0}  function automatic void fn();\n{1}    begin\n"
+              "{2}    end\n  endfunction\n  initial fn();\nendmodule\n",
+              "r"},
+    Procedure{"interface initial block",
+              "interface ifc;\n{0}  initial begin\n{1}{2}  end\nendinterface\n"
+              "module t;\n  ifc u_ifc();\nendmodule\n",
+              "u_ifc.r"},
+    Procedure{"program initial block",
+              "program pg;\n{0}  initial begin\n{1}{2}  end\nendprogram\n"
+              "module t;\n  pg u_pg();\nendmodule\n",
+              "u_pg.r"},
+};
+
+// The procedure's own names: an int a and a byte b, a byte x over the
+// module's int x, a structure s, a vector w, an unpacked array q, a string, a
+// queue, a variable of an enumeration, an int m [2][3] over the module's
+// int m [5], and a vector v.
+constexpr const char* kProcedureNames =
+    "    int a;\n    byte b;\n    byte x;\n    s_t s;\n    logic [7:0] w;\n"
+    "    shortint q [3];\n    string str;\n    int dq [$];\n    e_t e;\n"
+    "    int m [2][3];\n    logic [7:0] v;\n";
+
+// A test and whether it holds.
+struct Holds {
+  const char* text;
+  bool holds;
+};
+
+// Each of `tests`, the first r's most significant bit.
+Battery HoldsBattery(std::span<const Holds> tests) {
+  Battery battery;
+  for (const Holds& test : tests)
+    battery.Add(test.text, test.holds, test.holds);
+  return battery;
+}
+
+// Runs `battery` written in `context`, a parameter declared with
+// `parameter_keyword`, in each of kProcedures declaring `names`, in a host
+// declaring the names the procedure's hide, n and the types the tests name,
+// and expects r to be what the battery gives.
+void ExpectInEveryProcedure(std::string_view names, const Battery& battery,
+                            Context context,
+                            std::string_view parameter_keyword = "localparam") {
+  const std::string kModule = std::format(
+      "  int x;\n  int m [5];\n  bit [3:0] a;\n  shortint n;\n"
+      "  typedef struct packed {{ logic [4:0] f; logic [2:0] g; }} s_t;\n"
+      "  typedef enum logic [2:0] {{E0, E1}} e_t;\n  typedef int i3_t [3];\n"
+      "  bit [{}:0] r;\n",
+      battery.tests.size() - 1);
+  const std::string kWritten =
+      battery.declarations +
+      Writing(battery.tests, context, Scope::kSubroutine, parameter_keyword);
+  for (const Procedure& procedure : kProcedures) {
+    SCOPED_TRACE(procedure.name);
+    const std::string kSrc = std::vformat(
+        procedure.text, std::make_format_args(kModule, names, kWritten));
+    SCOPED_TRACE(kSrc);
+    EXPECT_EQ(RunAndGet(kSrc, procedure.result), battery.under_bytes);
+  }
+}
+
+// By §11.6.1, §11.8.1 and §11.3.4, `a + b` of an int and a byte is a signed
+// 2-state 32-bit vector, which matches int and not logic [31:0] (§6.22.1(e));
+// `x + 1'b0` is as wide as the byte x, unsigned and 4-state; a member, a
+// part-select and an element of an unpacked array are of the type they are
+// declared with; len and size give an int (§6.16.1, §7.10.2.1) and next the
+// enumeration (§6.19.5.3); an element of m [2][3] is an int [3]; and
+// logic [0:7] does not match logic [7:0], their bounds differing (§6.22.1(f)).
+constexpr std::array kProcedureCompared = {
+    Holds{"type(a + b) == type(int)", true},
+    Holds{"type(a + b) == type(logic [31:0])", false},
+    Holds{"type(x + 1'b0) == type(logic [7:0])", true},
+    Holds{"type(x + 1'b0) == type(logic [31:0])", false},
+    Holds{"type(x) == type(byte)", true},
+    Holds{"type(x) == type(int)", false},
+    Holds{"type(v) == type(logic [7:0])", true},
+    Holds{"type(v) == type(logic [0:7])", false},
+    Holds{"type(a) != type(bit [3:0])", true},
+    Holds{"type(s.f) == type(logic [4:0])", true},
+    Holds{"type(w[3:0]) == type(logic [3:0])", true},
+    Holds{"type(q[0]) == type(shortint)", true},
+    Holds{"type(str.len()) == type(int)", true},
+    Holds{"type(dq.size()) == type(int)", true},
+    Holds{"type(e.next()) == type(e_t)", true},
+    Holds{"type(m[0]) == type(i3_t)", true},
+    Holds{"type(m[0]) == type(int)", false},
+    Holds{"type(n + 1'b0) == type(logic [15:0])", true},
+};
+
+TEST(ProceduralNameTypeRefSim, ComparisonInAProceduralIf) {
+  ExpectInEveryProcedure(kProcedureNames, HoldsBattery(kProcedureCompared),
+                         Context::kProceduralIf);
+}
+
+// Written as the right-hand side of the procedural assignment `r = {...}`.
+TEST(ProceduralNameTypeRefSim, ComparisonInAnAssignment) {
+  ExpectInEveryProcedure(kProcedureNames, HoldsBattery(kProcedureCompared),
+                         Context::kDeclaration);
+}
+
+// §6.20.4 with §6.23: a parameter the procedure declares, compared over the
+// procedure's own logic [3:0] x, is decided at elaboration: `x + 4'bx` is four
+// 4-state bits, matching logic [3:0] and not logic [7:0], though x holds x
+// when the procedure runs. Typed by the module's int x, the first was 0.
+constexpr std::array kProcedureParameters = {
+    Holds{"type(x + 4'bx) == type(logic [3:0])", true},
+    Holds{"type(x + 4'bx) == type(logic [7:0])", false},
+    Holds{"type(x) == type(logic [3:0])", true},
+    Holds{"type(x) == type(int)", false},
+    Holds{"type(a + b) == type(int)", true},
+    Holds{"type(n + 1'b0) == type(logic [15:0])", true},
+};
+
+constexpr const char* kParameterNames =
+    "    logic [3:0] x;\n    int a;\n    byte b;\n";
+
+TEST(ProceduralNameTypeRefSim, ComparisonSetsALocalParameter) {
+  ExpectInEveryProcedure(kParameterNames, HoldsBattery(kProcedureParameters),
+                         Context::kParameter);
+}
+
+// The same, the procedure's parameter declared with the keyword parameter.
+TEST(ProceduralNameTypeRefSim, ComparisonSetsAParameter) {
+  ExpectInEveryProcedure(kParameterNames, HoldsBattery(kProcedureParameters),
+                         Context::kParameter, "parameter");
+}
+
+// Each declaration's width, and its state through its initial value (§6.8):
+// x in a 4-state variable, which $isunknown (§20.9) reports, and 0 in a
+// 2-state one. m[0] is three ints, which $size counts (§20.7). A bare name the
+// procedure declares, and a module name it does not hide, keep their types.
+constexpr std::array kProcedureDeclared = {
+    Declared{"a + b", "$bits({0}) == 32 && !$isunknown({0})", true, true},
+    Declared{"x + 1'b0", "$bits({0}) == 8 && $isunknown({0})", true, true},
+    Declared{"s.f", "$bits({0}) == 5 && $isunknown({0})", true, true},
+    Declared{"w[3:0]", "$bits({0}) == 4 && $isunknown({0})", true, true},
+    Declared{"q[0]", "$bits({0}) == 16 && !$isunknown({0})", true, true},
+    Declared{"str.len()", "$bits({0}) == 32 && !$isunknown({0})", true, true},
+    Declared{"dq.size()", "$bits({0}) == 32", true, true},
+    Declared{"e.next()", "$bits({0}) == 3", true, true},
+    Declared{"m[0]", "$size({0}) == 3", true, true},
+    Declared{"a", "$bits({0}) == 32", true, true},
+    Declared{"x", "$bits({0}) == 8", true, true},
+    Declared{"n + 1'b0", "$bits({0}) == 16 && $isunknown({0})", true, true},
+};
+
+TEST(ProceduralNameTypeRefSim, DeclarationTakesTheProceduresNames) {
+  ExpectInEveryProcedure(kProcedureNames,
+                         DeclarationBattery("", kProcedureDeclared),
+                         Context::kDeclaration);
+}
+
+// A task's byte formal x and a function's shortint formal x hide the module's
+// int x, and a for loop's byte k the module's int k: `x + 4'bx` and
+// `x + 1'b0` are as wide as the formal, in a local parameter, a declaration,
+// a case item and a return, and `k + 1'b0` as wide as the loop's k.
+TEST(ProceduralNameTypeRefSim, FormalsAndLoopVariablesHideTheModulesNames) {
+  const std::string kSrc =
+      "module t;\n"
+      "  int x;\n"
+      "  int k;\n"
+      "  bit [7:0] r;\n"
+      "  task automatic tk(input byte x);\n"
+      "    localparam bit L = type(x + 4'bx) == type(logic [7:0]);\n"
+      "    var type(x + 1'b0) d;\n"
+      "    r[7] = $bits(d) == 8;\n"
+      "    r[6] = L;\n"
+      "    if (type(x) == type(int)) r[5] = 1'b1;\n"
+      "    case (1'b1)\n"
+      "      type(x + 1'b0) == type(logic [7:0]): r[4] = 1'b1;\n"
+      "      default: ;\n"
+      "    endcase\n"
+      "  endtask\n"
+      "  function automatic bit fn(input shortint x);\n"
+      "    return type(x + 1'b0) == type(logic [15:0]);\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    tk(0);\n"
+      "    r[3] = fn(0);\n"
+      "    for (byte k = 0; k < 1; k++) begin\n"
+      "      var type(k + 1'b0) e;\n"
+      "      r[2] = $bits(e) == 8;\n"
+      "      if (type(k) == type(byte)) r[1] = 1'b1;\n"
+      "      if (type(k + 1'b0) == type(logic [31:0])) r[0] = 1'b1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(kSrc, "r"), 0b1101'1110u);
+}
+
+// Formals and for loop variables that hide nothing type an expression as a
+// block's variables do: `a + b` of an int and a byte formal is an int; a
+// structure formal's member and an element of an int [2][3] formal, which
+// hides the module's int m [5], are of the types they are declared with; and
+// an int loop variable of a task, a function and a fork-join makes `i + 1'b0`
+// 32 4-state bits. Typed by the module's names, `a + b` and `i + 1'b0` had no
+// type, so a declaration was one logic bit, and m[0] was an int.
+TEST(ProceduralNameTypeRefSim, FormalsAndLoopVariablesTypeAnExpression) {
+  const std::string kSrc =
+      "module t;\n"
+      "  int m [5];\n"
+      "  typedef struct packed { logic [4:0] f; logic [2:0] g; } s_t;\n"
+      "  typedef int i3_t [3];\n"
+      "  s_t sv;\n"
+      "  int mv [2][3];\n"
+      "  bit [15:0] r;\n"
+      "  task automatic tk(input int a, input byte b, input s_t s,\n"
+      "                    input int m [2][3]);\n"
+      "    var type(a + b) d;\n"
+      "    var type(s.f) d2;\n"
+      "    var type(m[0]) d3;\n"
+      "    r[15] = $bits(d) == 32 && !$isunknown(d);\n"
+      "    if (type(a + b) == type(int)) r[14] = 1'b1;\n"
+      "    if (type(a + b) == type(logic [31:0])) r[13] = 1'b1;\n"
+      "    if (type(s.f) == type(logic [4:0])) r[12] = 1'b1;\n"
+      "    r[11] = $bits(d2) == 5;\n"
+      "    if (type(m[0]) == type(i3_t)) r[10] = 1'b1;\n"
+      "    r[9] = $size(d3) == 3;\n"
+      "    for (int i = 0; i < 1; i++)\n"
+      "      if (type(i + 1'b0) == type(logic [31:0])) r[8] = 1'b1;\n"
+      "  endtask\n"
+      "  function automatic bit [3:0] fn(input int a, input byte b);\n"
+      "    bit [3:0] o;\n"
+      "    o[3] = type(a + b) == type(int);\n"
+      "    o[2] = type(a + b) == type(logic [31:0]);\n"
+      "    for (int i = 0; i < 1; i++) begin\n"
+      "      var type(i + 1'b0) e;\n"
+      "      o[1] = $bits(e) == 32;\n"
+      "      o[0] = type(i) == type(int);\n"
+      "    end\n"
+      "    return o;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    tk(1, 2, sv, mv);\n"
+      "    r[7:4] = fn(1, 2);\n"
+      "    fork\n"
+      "      for (int i = 0; i < 1; i++) begin\n"
+      "        var type(i + 1'b0) e;\n"
+      "        r[3] = $bits(e) == 32 && $isunknown(e);\n"
+      "        if (type(i + 1'b0) == type(logic [31:0])) r[2] = 1'b1;\n"
+      "        if (type(i) == type(int)) r[1] = 1'b1;\n"
+      "        if (type(i + 1'b0) == type(logic [7:0])) r[0] = 1'b1;\n"
+      "      end\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(kSrc, "r"), 0b1101'1111'1011'1110u);
+}
+
+// §6.21 with §23.9: the latest declaration of a name in scope is the one a
+// type reference reads. A nested block's logic [3:0] x hides a task's byte
+// formal x, and its logic [3:0] y the initial block's byte y, which hides the
+// module's int y; a for loop's byte j hides an enclosing block's int j. Within
+// the inner scope an expression over the name is as wide as the inner
+// declaration, and after it the outer declaration's type is back. Read from
+// the outermost declaration, the inner scope's `x + 1'b0` was 8 bits and
+// `j + 1'b0` 32.
+TEST(ProceduralNameTypeRefSim, TheInnermostDeclarationHidesTheOuter) {
+  const std::string kSrc =
+      "module t;\n"
+      "  int y;\n"
+      "  bit [9:0] r;\n"
+      "  task automatic tk(input byte x);\n"
+      "    begin\n"
+      "      logic [3:0] x;\n"
+      "      var type(x + 1'b0) d;\n"
+      "      r[9] = $bits(d) == 4;\n"
+      "      if (type(x + 1'b0) == type(logic [3:0])) r[8] = 1'b1;\n"
+      "      if (type(x) == type(byte)) r[7] = 1'b1;\n"
+      "    end\n"
+      "    if (type(x) == type(byte)) r[6] = 1'b1;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    byte y;\n"
+      "    tk(0);\n"
+      "    begin : nb\n"
+      "      logic [3:0] y;\n"
+      "      var type(y + 1'b0) e;\n"
+      "      r[5] = $bits(e) == 4;\n"
+      "      if (type(y) == type(byte)) r[4] = 1'b1;\n"
+      "    end\n"
+      "    if (type(y + 1'b0) == type(logic [7:0])) r[3] = 1'b1;\n"
+      "    begin\n"
+      "      int j;\n"
+      "      for (byte j = 0; j < 1; j++) begin\n"
+      "        var type(j + 1'b0) f;\n"
+      "        r[2] = $bits(f) == 8;\n"
+      "        if (type(j) == type(int)) r[1] = 1'b1;\n"
+      "      end\n"
+      "      if (type(j) == type(int)) r[0] = 1'b1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(kSrc, "r"), 0b11'0110'1101u);
 }
 
 }  // namespace

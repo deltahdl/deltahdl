@@ -1,7 +1,9 @@
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -22,6 +24,7 @@
 #include "elaborator/rtlir_scopes.h"
 #include "elaborator/scope_value_type.h"
 #include "elaborator/type_eval.h"
+#include "elaborator/type_ref_walks.h"
 #include "elaborator/unpacked_array_type.h"
 #include "lexer/token.h"
 #include "parser/ast_class.h"
@@ -453,13 +456,21 @@ void ElaboratorOperationRules::InExprTypeScope(
   ValueLookup lookup{
       mod, {gen_prefix_scopes_, declared_names_}, typedefs_, arena_, kOuter};
   ExprTypeScope scope{
-      [&](std::string_view name) { return ValueIn(name, lookup); },
+      {},
       [this](const Expr* call) { return CalledFunctionType(call); },
       [&](const Expr* ref) { return ResolveTypeRefOperandType(ref, &mod); },
       typedefs_,
       constants,
       arena_};
   scope.array_tables = &kTables;
+  // §23.9: a name the procedure the reference is written in declares hides
+  // the module's.
+  scope.value_named =
+      [&](std::string_view name) -> std::optional<DeclaredValue> {
+    if (const BlockValue* local = InnermostBlockValue(name))
+      return UnderDims(*local->type, *local->dims, scope);
+    return ValueIn(name, lookup);
+  };
   scope.class_member = [this, &constants](const DataType& handle,
                                           std::string_view name) {
     return ClassMemberType(handle, name, constants);
@@ -469,6 +480,26 @@ void ElaboratorOperationRules::InExprTypeScope(
     return ScopedValue(prefix, name, kOuter);
   };
   use(scope);
+}
+
+const ElaboratorOperationRules::BlockValue*
+ElaboratorOperationRules::InnermostBlockValue(std::string_view name) const {
+  auto local = std::ranges::find_if(
+      type_ref_block_vars_.rbegin(), type_ref_block_vars_.rend(),
+      [&](const BlockValue& value) { return value.name == name; });
+  return local == type_ref_block_vars_.rend() ? nullptr : &*local;
+}
+
+void ElaboratorOperationRules::InLocals(std::span<const ProceduralLocal> locals,
+                                        const std::function<void()>& use) {
+  const size_t kMark = type_ref_block_vars_.size();
+  for (const ProceduralLocal& local : locals) {
+    type_ref_block_vars_.push_back({local.name,
+                                    DeclaresSelectableType(*local.type),
+                                    local.type, local.unpacked_dims});
+  }
+  use();
+  type_ref_block_vars_.resize(kMark);
 }
 
 std::optional<DataType> ElaboratorOperationRules::TypeRefExprType(

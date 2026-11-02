@@ -472,10 +472,8 @@ bool ElaboratorOperationRules::NamesSelectableValue(const Expr* root) const {
   if (root->scope_prefix == "$root") return false;
   if (root->scope_prefix == "$unit")
     return DeclaresSelectableValue(unit_->cu_items, root->text);
-  for (auto decl = type_ref_block_vars_.rbegin();
-       decl != type_ref_block_vars_.rend(); ++decl) {
-    if (decl->first == root->text) return decl->second;
-  }
+  if (const BlockValue* local = InnermostBlockValue(root->text))
+    return local->selectable;
   return NamesModuleValue(root->text);
 }
 
@@ -484,14 +482,11 @@ TypeRefResolver ElaboratorOperationRules::ResolverAmongLocals(
   return [this, mod, resolve = std::move(resolve)](
              DataType& dt, SourceLoc loc,
              std::span<const ProceduralLocal> locals) {
-    const size_t kMark = type_ref_block_vars_.size();
-    for (const ProceduralLocal& local : locals) {
-      type_ref_block_vars_.emplace_back(local.name,
-                                        DeclaresSelectableType(*local.type));
-    }
-    std::vector<Expr*> taken = TypeRefUnpackedDims(dt.type_ref_expr, mod);
-    resolve(dt, loc);
-    type_ref_block_vars_.resize(kMark);
+    std::vector<Expr*> taken;
+    InLocals(locals, [&] {
+      taken = TypeRefUnpackedDims(dt.type_ref_expr, mod);
+      resolve(dt, loc);
+    });
     return taken;
   };
 }
@@ -609,8 +604,9 @@ void ElaboratorOperationRules::WalkStmtsForTypeRefArg(const Stmt* s) {
                    [this](Stmt* const& sub) { WalkStmtsForTypeRefArg(sub); });
   type_ref_block_vars_.resize(mark);
   if (s->kind == StmtKind::kVarDecl) {
-    type_ref_block_vars_.emplace_back(s->var_name,
-                                      DeclaresSelectableType(s->var_decl_type));
+    type_ref_block_vars_.push_back({s->var_name,
+                                    DeclaresSelectableType(s->var_decl_type),
+                                    &s->var_decl_type, &s->var_unpacked_dims});
   }
 }
 

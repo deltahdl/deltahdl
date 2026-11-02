@@ -109,9 +109,13 @@ void ResolveFormalTypeRefs(ModuleItem* item,
 // `locals` the names in scope ahead of it; a block's own names, and a for
 // loop's, are dropped when the walk leaves it. §11.12 lets a block declare a
 // let, whose formals see the block's names ahead of them and are in scope
-// only within the let.
+// only within the let. `visit`, where given, is shown each statement but a
+// let's declaration with the names in scope at it: a for loop's own names
+// among them, and a declaration's own name not, since its initializer sees
+// only the names declared ahead of it (§6.21).
 void ResolveTypeRefsInStmt(Stmt* s, std::vector<ProceduralLocal>& locals,
-                           const TypeRefResolver& resolve_outer, Arena& arena) {
+                           const TypeRefResolver& resolve_outer, Arena& arena,
+                           const ProceduralStmtVisitor& visit) {
   if (s == nullptr) return;
   if (s->kind == StmtKind::kBlockItemDecl &&
       s->decl_item->kind == ModuleItemKind::kLetDecl) {
@@ -122,8 +126,9 @@ void ResolveTypeRefsInStmt(Stmt* s, std::vector<ProceduralLocal>& locals,
   if (s->kind != StmtKind::kVarDecl) {
     const size_t kOuter = locals.size();
     DeclareForLoopLocals(s, locals, resolve_outer);
+    if (visit) visit(s, locals);
     ForEachChildStmt(s, [&](Stmt* const& sub) {
-      ResolveTypeRefsInStmt(sub, locals, resolve_outer, arena);
+      ResolveTypeRefsInStmt(sub, locals, resolve_outer, arena, visit);
     });
     locals.resize(kOuter);
     return;
@@ -132,6 +137,7 @@ void ResolveTypeRefsInStmt(Stmt* s, std::vector<ProceduralLocal>& locals,
                       locals, resolve_outer);
   ResolveLocalIndexTypeRefs(s->var_unpacked_dims, s->range.start, locals,
                             resolve_outer, arena);
+  if (visit) visit(s, locals);
   locals.push_back({s->var_name, &s->var_decl_type, &s->var_unpacked_dims});
 }
 
@@ -237,13 +243,14 @@ void AdoptReferencedType(DataType& dt, const DataType& type) {
 // names in scope.
 void ResolveProceduralTypeRefs(ModuleItem* item,
                                const TypeRefResolver& resolve_outer,
-                               Arena& arena) {
+                               Arena& arena,
+                               const ProceduralStmtVisitor& visit) {
   std::vector<ProceduralLocal> locals;
   locals.reserve(item->func_args.size());
   ResolveFormalTypeRefs(item, locals, resolve_outer, arena);
-  ResolveTypeRefsInStmt(item->body, locals, resolve_outer, arena);
+  ResolveTypeRefsInStmt(item->body, locals, resolve_outer, arena, visit);
   for (auto* s : item->func_body_stmts) {
-    ResolveTypeRefsInStmt(s, locals, resolve_outer, arena);
+    ResolveTypeRefsInStmt(s, locals, resolve_outer, arena, visit);
   }
 }
 

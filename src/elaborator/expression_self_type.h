@@ -136,6 +136,12 @@ std::optional<DataType> ExprSelfType(const Expr* expr,
 std::optional<UnpackedArrayType> ExprSelfArrayType(const Expr* expr,
                                                    const ExprTypeScope& scope);
 
+// The value of `type` under the unpacked dimensions `dims`, outermost first,
+// the kind of array the outermost makes read from the scope's array tables;
+// a value of no array where `dims` is empty.
+DeclaredValue UnderDims(DataType type, const std::vector<Expr*>& dims,
+                        const ExprTypeScope& scope);
+
 // The unpacked array type of `value`: its type under its unpacked dimensions,
 // nothing where those are not recorded.
 std::optional<UnpackedArrayType> ValueArrayType(const DeclaredValue& value);

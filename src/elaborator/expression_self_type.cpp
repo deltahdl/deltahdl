@@ -206,8 +206,8 @@ std::optional<DataType> PackedSelectType(const DataType& type,
   return PackedPart(*array, select, scope);
 }
 
-// The value of `type` under the unpacked dimensions `dims`, whose outermost
-// makes the kind of array it is.
+}  // namespace
+
 DeclaredValue UnderDims(DataType type, const std::vector<Expr*>& dims,
                         const ExprTypeScope& scope) {
   DeclaredValue value{std::move(type), static_cast<uint32_t>(dims.size())};
@@ -216,6 +216,8 @@ DeclaredValue UnderDims(DataType type, const std::vector<Expr*>& dims,
     value.outermost = UnpackedDimKind(dims.front(), *scope.array_tables);
   return value;
 }
+
+namespace {
 
 // §7.4.5: an element of an unpacked array is of the array's dimensions after
 // the first, the outermost of which makes the kind of array it is in turn.
