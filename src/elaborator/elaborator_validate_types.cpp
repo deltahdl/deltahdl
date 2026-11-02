@@ -295,13 +295,15 @@ static const std::unordered_set<std::string_view>* NamesToClashAgainst(
 // §6.19: only a member that takes the incremented value is out of range; a
 // following member giving its own value takes none, as the last takes none at
 // all.
-static void CheckEnumAutoIncrement(const DataType& dtype,
-                                   const EnumMember& member, int64_t next_val,
+static bool NextMemberIncrements(const DataType& dtype,
+                                 const EnumMember& member) {
+  return &member != &dtype.enum_members.back() && !(&member + 1)->value;
+}
+
+static void CheckEnumAutoIncrement(bool next_increments, int64_t next_val,
                                    const EnumBaseRange& range, SourceLoc loc,
                                    DiagEngine& diag) {
-  const bool kNextIncrements =
-      &member != &dtype.enum_members.back() && !(&member + 1)->value;
-  if (kNextIncrements && next_val > 0 &&
+  if (next_increments && next_val > 0 &&
       static_cast<uint64_t>(next_val) > range.max_val) {
     diag.Error(loc,
                "enum auto-increment exceeds maximum representable value of "
@@ -350,7 +352,8 @@ void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc,
     }
     next_val += count;
     if (!prev_had_xz) {
-      CheckEnumAutoIncrement(dtype, member, next_val, range, loc, diag_);
+      CheckEnumAutoIncrement(NextMemberIncrements(dtype, member), next_val,
+                             range, loc, diag_);
     }
   }
 }
