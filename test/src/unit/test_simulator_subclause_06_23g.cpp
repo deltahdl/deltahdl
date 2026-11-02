@@ -405,7 +405,9 @@ TEST(ScopeValueTypeRefSim, DeclarationTakesTheValuesType) {
 // The procedure's names are declared in the block the case is written in, or
 // in the initial block, task or function enclosing a nested begin-end or a
 // fork-join the case is written in. An interface's and a program's initial
-// block hold the case as a module's does.
+// block hold the case as a module's does, and so does the method of a class
+// any of them, or a generate block, declares (§8.26), whose names hide the
+// host's as a subroutine's do.
 struct Procedure {
   const char* name;
   const char* text;
@@ -455,6 +457,31 @@ constexpr std::array kProcedures = {
               "program pg;\n{0}  initial begin\n{1}{2}  end\nendprogram\n"
               "module t;\n  pg u_pg();\nendmodule\n",
               "u_pg.r"},
+    Procedure{"method of a module's class",
+              "module t;\n{0}  class c;\n    function void fn();\n{1}{2}"
+              "    endfunction\n  endclass\n"
+              "  initial begin\n    c h;\n    h = new;\n    h.fn();\n  end\n"
+              "endmodule\n",
+              "r"},
+    Procedure{"method of an interface's class",
+              "interface ifc;\n{0}  class c;\n    function void fn();\n{1}{2}"
+              "    endfunction\n  endclass\n"
+              "  initial begin\n    c h;\n    h = new;\n    h.fn();\n  end\n"
+              "endinterface\nmodule t;\n  ifc u_ifc();\nendmodule\n",
+              "u_ifc.r"},
+    Procedure{"method of a program's class",
+              "program pg;\n{0}  class c;\n    function void fn();\n{1}{2}"
+              "    endfunction\n  endclass\n"
+              "  initial begin\n    c h;\n    h = new;\n    h.fn();\n  end\n"
+              "endprogram\nmodule t;\n  pg u_pg();\nendmodule\n",
+              "u_pg.r"},
+    Procedure{"method of a generate block's class",
+              "module t;\n{0}  if (1) begin : g\n    class c;\n"
+              "      function void fn();\n{1}{2}      endfunction\n"
+              "    endclass\n"
+              "    initial begin\n      c h;\n      h = new;\n      h.fn();\n"
+              "    end\n  end\nendmodule\n",
+              "r"},
 };
 
 // The procedure's own names: an int a and a byte b, a byte x over the

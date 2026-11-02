@@ -452,6 +452,22 @@ void Elaborator::CheckPrimitiveTerminals(const ModuleItem* item,
                               diag_);
 }
 
+// A folder that judges each comparison with `judge` and, where it is decided,
+// records the answer for the instance `mod` and the generate scope
+// `gen_prefix`, where the simulator finds it as the comparison runs.
+static TypeRefCompareFolder RecordingInto(
+    RtlirModule* mod, std::string_view gen_prefix,
+    std::function<std::optional<int64_t>(const Expr*)> judge) {
+  return [mod, gen_prefix, judge = std::move(judge)](const Expr* e) {
+    std::optional<int64_t> holds = judge(e);
+    if (holds.has_value()) {
+      mod->type_ref_compares.push_back(
+          {.expr = e, .gen_prefix = gen_prefix, .holds = *holds != 0});
+    }
+    return holds;
+  };
+}
+
 void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
   // A generate block's bind directive is applied with the rest by
   // Elaborator::ApplyBindDirectives, once this block is known to be selected.
@@ -474,14 +490,9 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
   // A.8.6: the item's ordinary expressions join no operands under a property
   // operator.
   ReportItemImplicationOperators(*item, diag_);
-  const TypeRefCompareFolder kFold = [this, mod](const Expr* e) {
-    std::optional<int64_t> holds = EvalConstTypeRefCompare(e, mod);
-    if (holds.has_value()) {
-      mod->type_ref_compares.push_back(
-          {.expr = e, .gen_prefix = InternedGenPrefix(), .holds = *holds != 0});
-    }
-    return holds;
-  };
+  const TypeRefCompareFolder kFold = RecordingInto(
+      mod, InternedGenPrefix(),
+      [this, mod](const Expr* e) { return EvalConstTypeRefCompare(e, mod); });
   // §6.23: the type references a continuous assignment, a parameter's value
   // or a declaration's ranges write, judged as the item is elaborated, so that
   // one a generate block writes is judged with the block's names in scope.
@@ -566,11 +577,20 @@ void Elaborator::ElaborateModuleClassDecl(ModuleItem* item, RtlirModule* mod) {
   auto resolve = [&](DataType& dt, SourceLoc loc) {
     ResolveTypeRef(dt, loc, mod);
   };
-  ResolveClassTypeRefs(
-      *item->class_decl, ResolverAmongLocals(mod, resolve), unit_, arena_,
-      [&](Stmt* s, std::span<const ProceduralLocal> locals) {
-        InLocals(locals, [&] { CheckDynamicElementArgsOfStmt(s, mod); });
-      });
+  // §6.23 with §6.22.1: a comparison a method writes is folded as one a
+  // module's subroutine writes, with the method's locals and the class's
+  // properties in scope, and kept for the instance the class is declared in.
+  const TypeRefCompareFolder kFold = RecordingInto(
+      mod, InternedGenPrefix(),
+      [this, mod](const Expr* e) { return EvalConstTypeRefCompare(e, mod); });
+  ResolveClassTypeRefs(*item->class_decl, ResolverAmongLocals(mod, resolve),
+                       unit_, arena_,
+                       [&](Stmt* s, std::span<const ProceduralLocal> locals) {
+                         InLocals(locals, [&] {
+                           CheckDynamicElementArgsOfStmt(s, mod);
+                           FoldTypeRefComparesOfStmt(s, kFold);
+                         });
+                       });
   // §11.12's rules on a let's formals, for each let a method's body declares.
   auto elaborate_let = [&](ModuleItem* let) { ElaborateLetFormals(let, mod); };
   ForEachClassBodyItem(item->class_decl, [&](const ModuleItem* method) {
