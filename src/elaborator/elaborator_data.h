@@ -41,6 +41,7 @@ class UnitHierHeadNames;
 
 class Arena;
 class DiagEngine;
+struct ClassDecl;
 struct RtlirDesign;
 struct RtlirModule;
 struct RtlirVariable;
@@ -365,6 +366,10 @@ class ElaboratorData {
 
   std::unordered_map<std::string_view, DataTypeKind> forward_typedef_kinds_;
   std::unordered_set<std::string_view> class_names_;
+  // §8.26: the classes a module, interface or program declares, by name, as
+  // their bodies are elaborated; the compilation unit's own classes are
+  // CompilationUnit::classes.
+  std::unordered_map<std::string_view, const ClassDecl*> module_classes_;
   std::unordered_set<std::string_view> parameterized_class_names_;
   std::unordered_set<std::string_view> class_var_names_;
   std::unordered_map<std::string_view, std::string_view> class_var_types_;

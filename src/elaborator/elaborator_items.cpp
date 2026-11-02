@@ -534,6 +534,7 @@ void Elaborator::ElaborateModuleClassDecl(ModuleItem* item, RtlirModule* mod) {
   typedefs_.erase(item->name);
   td_array_dims_.erase(item->name);
   if (item->class_decl == nullptr) return;
+  module_classes_[item->class_decl->name] = item->class_decl;
   // §37.32 detail 3 with §27.4: a generate block instance's class finds the
   // names its extends clause writes among its block's typedefs.
   if (!gen_block_path_.empty()) {

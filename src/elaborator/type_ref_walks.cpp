@@ -206,6 +206,26 @@ std::vector<ProceduralLocal> PropertiesInScope(const ClassDecl& cls,
   return properties;
 }
 
+// §8.11 and §8.15: the handles a method of `cls` reads its own object
+// through, `this` of the class's type and, where the class extends another,
+// `super` of the type of the class it extends, as names in scope in its
+// methods; their types are made in `arena`.
+std::vector<ProceduralLocal> SelfHandles(const ClassDecl& cls, Arena& arena) {
+  static const std::vector<Expr*> kNoUnpackedDims;
+  auto* self = arena.Create<DataType>();
+  self->kind = DataTypeKind::kNamed;
+  self->type_name = cls.name;
+  std::vector<ProceduralLocal> handles = {{"this", self, &kNoUnpackedDims}};
+  if (cls.base_class.empty()) return handles;
+  auto* base = arena.Create<DataType>();
+  base->kind = DataTypeKind::kNamed;
+  base->type_name = cls.base_class;
+  base->scope_name = cls.base_class_scope;
+  base->type_params = cls.base_class_type_params;
+  handles.push_back({"super", base, &kNoUnpackedDims});
+  return handles;
+}
+
 // The names `outer` holds followed by those `inner` holds, which hide them.
 std::vector<ProceduralLocal> NamesInScope(
     std::span<const ProceduralLocal> outer,
@@ -315,7 +335,7 @@ void ResolveClassTypeRefs(ClassDecl& cls, const TypeRefResolver& resolve_outer,
                           const CompilationUnit* unit, Arena& arena,
                           const ProceduralStmtVisitor& visit) {
   const std::vector<ProceduralLocal> kProperties =
-      PropertiesInScope(cls, *unit);
+      NamesInScope(SelfHandles(cls, arena), PropertiesInScope(cls, *unit));
   const TypeRefResolver kInClass =
       [&](DataType& dt, SourceLoc loc,
           std::span<const ProceduralLocal> locals) -> std::vector<Expr*> {

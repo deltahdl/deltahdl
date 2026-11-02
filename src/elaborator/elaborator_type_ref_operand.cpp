@@ -227,6 +227,11 @@ std::optional<ClassSpecialization> ElaboratorOperationRules::ClassTypeOf(
     if (!at->scope_name.empty() || class_names_.contains(at->type_name) ||
         named == typedefs_.end()) {
       const ClassDecl* cls = ClassOfDeclaredType(*at, {}, unit_);
+      // §8.26: a class a module declares is no class of the unit's.
+      auto in_module = module_classes_.find(at->type_name);
+      if (cls == nullptr && at->scope_name.empty() &&
+          in_module != module_classes_.end())
+        cls = in_module->second;
       if (cls == nullptr) return std::nullopt;
       return ClassSpecialization{cls, &at->type_params};
     }

@@ -557,10 +557,11 @@ std::string WritingIn(std::string_view keyword, std::string_view place,
 using Writer =
     std::function<std::string(std::string_view place, const Form& form)>;
 
-void ExpectForbiddenFormsReportedIn(std::span<const std::string_view> places,
-                                    const Writer& writing) {
+void ExpectForbiddenFormsReportedIn(
+    std::span<const std::string_view> places, const Writer& writing,
+    std::span<const Form> forms = kForbiddenForms) {
   for (std::string_view place : places) {
-    for (const Form& form : kForbiddenForms) {
+    for (const Form& form : forms) {
       SCOPED_TRACE(writing(place, form));
       ElabFixture f;
       ElaborateSrc(writing(place, form), f);
@@ -571,9 +572,10 @@ void ExpectForbiddenFormsReportedIn(std::span<const std::string_view> places,
 }
 
 void ExpectAllowedFormsAcceptedIn(std::span<const std::string_view> places,
-                                  const Writer& writing) {
+                                  const Writer& writing,
+                                  std::span<const Form> forms = kAllowedForms) {
   for (std::string_view place : places) {
-    for (const Form& form : kAllowedForms) {
+    for (const Form& form : forms) {
       SCOPED_TRACE(writing(place, form));
       EXPECT_TRUE(ElabOk(writing(place, form)));
     }
@@ -643,21 +645,79 @@ TEST(TypeRefDynamicElementElab, AcceptedInTheCompilationUnit) {
   ExpectAllowedFormsAcceptedIn(kUnitScopePlaces, WritingInCompilationUnit);
 }
 
+// The forms a class's property can be written as: all but the last, which
+// calls the module's function and so is no member of a class.
+std::span<const Form> PropertyForms(std::span<const Form> forms) {
+  return forms.first(forms.size() - 1);
+}
+
+// The scopes a class can be declared in: a module, a package and the
+// compilation unit.
+std::array<Writer, 3> ClassScopes() {
+  return {Writing, WritingInPackage, WritingInCompilationUnit};
+}
+
 // §8.11 and §8.15: `this` and `super` are handles to the object a method runs
-// in, so a property read through either is a member of that object and no
-// hierarchical reference, in a class a module, a package or the compilation
-// unit declares; {0} declares the base class's properties.
-constexpr std::array<std::string_view, 2> kThisAndSuperPlaces = {
+// in, so a property read through either is a member of that object, `this`
+// reaching the class's own and inherited properties and `super` those of the
+// class it extends, in a class a module, a package or the compilation unit
+// declares; {0} declares the base class's properties.
+constexpr std::array<std::string_view, 4> kThisAndSuperPlaces = {
     "class pb; {0} endclass class c extends pb; function void m(); "
     "var type(this.{1}) v; endfunction endclass",
+    "class pb; {0} endclass class c extends pb; function void m(); bit b; "
+    "b = (type(this.{1}) == type(int)); endfunction endclass",
     "class pb; {0} endclass class c extends pb; function void m(); "
-    "var type(super.{1}) v; endfunction endclass"};
+    "var type(super.{1}) v; endfunction endclass",
+    "class pb; {0} endclass class c extends pb; function void m(); bit b; "
+    "b = (type(super.{1}) == type(int)); endfunction endclass"};
+
+TEST(TypeRefDynamicElementElab, PropertyElementThroughThisOrSuperReported) {
+  for (const Writer& writing : ClassScopes()) {
+    ExpectForbiddenFormsReportedIn(kThisAndSuperPlaces, writing,
+                                   PropertyForms(kForbiddenForms));
+  }
+}
 
 TEST(TypeRefDynamicElementElab, PropertyThroughThisOrSuperAccepted) {
-  const std::array<Writer, 3> kScopes = {Writing, WritingInPackage,
-                                         WritingInCompilationUnit};
-  for (const Writer& writing : kScopes) {
-    ExpectAllowedFormsAcceptedIn(kThisAndSuperPlaces, writing);
+  for (const Writer& writing : ClassScopes()) {
+    ExpectAllowedFormsAcceptedIn(kThisAndSuperPlaces, writing,
+                                 PropertyForms(kAllowedForms));
+  }
+}
+
+// §8.26: a class a module, an interface or a program declares, in its body or
+// in a generate block, is the type of a handle declared there, and a property
+// read through the handle is a member of the object it refers to (§8.5); {0}
+// declares the class's properties.
+constexpr std::array<std::string_view, 3> kLocalClassHandlePlaces = {
+    "class mk; {0} endclass mk h; var type(h.{1}) v;",
+    "class mk; {0} endclass initial begin mk h; bit b; "
+    "b = (type(h.{1}) == type(int)); end",
+    "if (1) begin : g class mk; {0} endclass mk h; var type(h.{1}) v; end"};
+
+// A module, an interface and a program, each writing a case at line 7.
+std::array<Writer, 3> ClassDeclaringElements() {
+  return {Writing,
+          [](std::string_view place, const Form& form) {
+            return WritingIn("interface", place, form);
+          },
+          [](std::string_view place, const Form& form) {
+            return WritingIn("program", place, form);
+          }};
+}
+
+TEST(TypeRefDynamicElementElab, PropertyElementOfALocalClassReported) {
+  for (const Writer& writing : ClassDeclaringElements()) {
+    ExpectForbiddenFormsReportedIn(kLocalClassHandlePlaces, writing,
+                                   PropertyForms(kForbiddenForms));
+  }
+}
+
+TEST(TypeRefDynamicElementElab, PropertyOfALocalClassAccepted) {
+  for (const Writer& writing : ClassDeclaringElements()) {
+    ExpectAllowedFormsAcceptedIn(kLocalClassHandlePlaces, writing,
+                                 PropertyForms(kAllowedForms));
   }
 }
 
