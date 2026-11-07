@@ -117,7 +117,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 
 ## Delegation
 
-- [Working without subagents](working-without-subagents.md) — no Agent call of any type and no Workflow call for any part of the work, reading, searching, reviewing and filing included; only the user's own message asking for one makes an exception.
+- [Working without subagents](working-without-subagents.md) — no Agent call of any type and no Workflow call for any part of the work, reading, searching, reviewing and filing included; `permissions.deny` in `.claude/settings.json` blocks both, and only the user's own message asking for one makes an exception.
 
 ## The notes themselves
 

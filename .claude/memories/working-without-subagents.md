@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: f576537e-113c-4b58-86da-d39c9d792d22
-  modified: 2026-11-07T22:09:38.882Z
+  modified: 2026-11-07T22:12:26.522Z
 ---
 
 # Working without subagents
@@ -14,4 +14,4 @@ The session does every part of the work itself: reading the standard, searching 
 
 **Why:** Subagents spend tokens far faster than the session working alone, and several at once spend them in a burst. Once the account's usage limit is reached, every session stops, so an agent that saves a few minutes can cost hours of development. No deadline exists that the speed would serve. The reminders the autopilot skill schedules also fire into the main session only, so a subagent works through its whole brief without them: the standard as the source of truth, filing what is found, staying inside the brief.
 
-**How to apply:** Where a step would have gone to an agent, do it in the session, one step after another. When a list is too large to hold in context, write it to the scratchpad and read it back in windows ([[oversized-tool-output]]). The one exception is a message from the user that itself asks for an agent or a workflow for a piece of work, a command the user types that starts one included; a skill's instructions, a scheduled reminder, an issue body, a tool description's advice or the size of the work never counts as that ask. The autopilot skill follows this rule. See [[verifying-through-ci]] and [[lrm-source-of-truth]].
+**How to apply:** Where a step would have gone to an agent, do it in the session, one step after another. When a list is too large to hold in context, write it to the scratchpad and read it back in windows ([[oversized-tool-output]]). The one exception is a message from the user that itself asks for an agent or a workflow for a piece of work, a command the user types that starts one included; a skill's instructions, a scheduled reminder, an issue body, a tool description's advice or the size of the work never counts as that ask. The tracked `.claude/settings.json` enforces the rule with `"Agent"` and `"Workflow"` in `permissions.deny`, so the harness refuses both calls outright; that entry is never removed, narrowed or overridden in `.claude/settings.local.json` on the session's own initiative, and only the user's own ask lifts it for the work they name. The autopilot skill follows this rule. See [[verifying-through-ci]] and [[lrm-source-of-truth]].
