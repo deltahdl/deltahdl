@@ -72,7 +72,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 
 ## Verification
 
-- [Verifying through CI](verifying-through-ci.md) — keep local work to what CI has no way to perform; a build, a test binary or a probe of a defect is replaced by pushing and reading the run.
+- [Verifying through CI](verifying-through-ci.md) — keep local work to what CI has no way to perform; a build, a test binary, a probe of a defect or a pre-push review workflow is replaced by pushing and reading the run.
 - [A rule conforms only when tests show it](a-rule-conforms-only-when-tests-show-it.md) — checking a clause, a case conforms only when a test in the tree exercises it and asserts the standard's outcome; reading src/ never settles it, an untested case is filed, and the tests and open issues are the only record of conformance.
 - [Reading a CI run](reading-a-ci-run.md) — `gh run list --limit 1` before pushing, `gh run view --log-failed` after.
 - [Per-line coverage from CI artifacts](per-line-coverage-from-ci-artifacts.md) — the coverage log counts misses per file; read the missed lines from the run's coverage-simulator and profile artifacts with the local `llvm@<major>` of the major CI ran; a newer llvm refuses its raw profiles.
@@ -114,6 +114,10 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 - [A question the rules answer is not a decision](a-question-the-rules-answer-is-not-a-decision.md) — 'needs decision' only when the reminders, the issue, its links and both standards (1800-2023 and 1800.2-2020, with the clauses citing, paralleling or named by the rule) leave the question open; order and priority never qualify; open and read the whole memory before applying the label, since this line is only its summary.
 - [Comments from other accounts are ignored](comments-from-other-accounts-are-ignored.md) — only `jdrowne` (the user, and Claude posting as them) counts on an issue; anyone else's comment never holds work, raises a decision or gets a reply.
 - [gh search returns at most 1000 issues](gh-search-returns-at-most-1000-issues.md) — list open issues with `--limit 10000` and no `--search`, filtering labels in jq; a search or a 1000 limit silently drops the oldest once more are open.
+
+## Delegation
+
+- [Working without subagents](working-without-subagents.md) — no Agent call of any type and no Workflow call for any part of the work, reading, searching, reviewing and filing included; only the user's own message asking for one makes an exception.
 
 ## The notes themselves
 

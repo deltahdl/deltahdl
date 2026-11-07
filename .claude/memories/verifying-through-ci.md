@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 80ac19af-0e3c-46db-9fa6-1642c305f31d
-  modified: 2026-10-03T00:59:43.573Z
+  modified: 2026-11-07T22:09:40.739Z
 ---
 
 # Verifying through CI, not locally
@@ -31,5 +31,6 @@ What a run does not do yet can still be made to run there: a test written for it
 - "Build every target once the fixes are in, to see the push compiles." That is the build job's check.
 - "Run the new test to see it pass, or to see it fail first." That is the unit test job.
 - "A pre-push regression script." Rebuilding the unit tests, running every binary, collecting coverage and replaying the e2e sources are the CI jobs under another name.
+- "A review workflow before the push, to catch a compile error or a gate failure." Rounds of review agents reading the diff for what the build, clang-tidy, the copy-paste detectors and the coverage gate report spend more tokens and time than the red run they would spare, and a red run costs nothing; push and read the run instead, and see [[working-without-subagents]].
 
 One step CI has no way to perform is [clang-format-style-flag](clang-format-style-flag.md), which rewrites the files and so is how the committed bytes come to exist. Another is reading the LRM, which is copyrighted and kept only on this machine, as in [zooming-on-a-formula](zooming-on-a-formula.md).
