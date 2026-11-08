@@ -29,6 +29,7 @@
 #include "elaborator/elaborator_validate_classes_internal.h"
 #include "elaborator/net_data_type.h"
 #include "elaborator/nettype_uses.h"
+#include "elaborator/param_value_assignability.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
 #include "elaborator/type_eval.h"
@@ -483,12 +484,21 @@ std::string_view Elaborator::ResolveVarDeclTypeRefs(ModuleItem* item,
   return adopted_enumeration;
 }
 
+void Elaborator::ReportSpecializationValues(const DataType& written,
+                                            const RtlirModule* mod) {
+  if (written.type_params.empty()) return;
+  const TypeShapeTables kTables{typedefs_, td_array_dims_, class_names_};
+  ReportSpecializationValueTypes(written, {*mod, gen_prefix_},
+                                 {kTables, BuildParamScope(mod), unit_}, diag_);
+}
+
 void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   if (item->is_genvar) return;
 
   ReportUndeclaredTypeName(item);
   ReportSpecializationBindingErrors(item->data_type, item->loc,
                                     {typedefs_, unit_, class_names_}, diag_);
+  ReportSpecializationValues(item->data_type, mod);
 
   std::string_view adopted_enumeration = ResolveVarDeclTypeRefs(item, mod);
 

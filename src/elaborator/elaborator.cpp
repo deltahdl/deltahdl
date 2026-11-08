@@ -21,7 +21,9 @@
 #include "elaborator/elaborator_node_attributes.h"
 #include "elaborator/elaborator_type_facts.h"
 #include "elaborator/elaborator_validate_classes.h"
+#include "elaborator/net_data_type.h"
 #include "elaborator/package_assertion_scope.h"
+#include "elaborator/param_value_assignability.h"
 #include "elaborator/pending_generate.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/sdf_annotate_calls.h"
@@ -364,6 +366,9 @@ void Elaborator::RunPreElaborationValidations() {
 
   ValidatePackageValueParams();
 
+  const TypeShapeTables kTables{typedefs_, td_array_dims_, class_names_};
+  ReportUnitParamValueTypes({kTables, cu_param_scope_, unit_}, diag_);
+
   RunPreElaborationClassValidations();
 
   ValidatePerDeclarationRulesInUnitScopes();
@@ -460,6 +465,8 @@ RtlirDesign* Elaborator::ElaborateTops(
     for (const auto& pg : batch) ProcessPendingGenerate(pg);
   }
 
+  for (const auto* top : design->top_modules)
+    ReportParamDefaultMismatches(*top, diag_);
   for (auto* top : design->top_modules) {
     ValidateModportExportConflicts(top);
     CollectAllModules(top, design->all_modules);

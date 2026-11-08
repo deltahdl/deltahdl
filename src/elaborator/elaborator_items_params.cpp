@@ -21,6 +21,7 @@
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/net_data_type.h"
+#include "elaborator/param_value_assignability.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/simple_bit_vector.h"
 #include "elaborator/type_eval.h"
@@ -185,16 +186,17 @@ void ReportAssignedTypeOutsideRestriction(
 }
 
 void ApplyBodyParamAssignment(RtlirParamDecl& pd, const ModuleItem* item,
-                              Arena& arena, const TypeShapeTables& tables,
+                              Arena& arena, const ParamValueScope& target,
                               DiagEngine& diag) {
   if (pd.is_localparam || !pd.gen_block_prefix.empty()) return;
   const InstanceParamAssignments* assigns = BodyParamAssignments();
   if (assigns == nullptr) return;
-  ApplyParamOverride(pd, *assigns, item->name, tables.typedefs, arena);
+  ApplyParamOverride(pd, *assigns, item->name, target.tables.typedefs, arena);
   CheckDollarOverride(
       *assigns,
       {item->name, nullptr, &item->data_type, !item->unpacked_dims.empty()},
-      tables, diag);
+      target.tables, diag);
+  ReportInstanceOverrideType(pd, *assigns, target, diag);
 }
 
 }  // namespace
@@ -272,8 +274,8 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
     PopulateValueParamInfo(pd, item, real_param_names_, typedefs_, kScope);
     RecordTypeParamActual(pd, mod->params, typedefs_, arena_);
     RecordParamDeclRange(pd, item->data_type, kScope);
-    ApplyBodyParamAssignment(pd, item, arena_,
-                             {typedefs_, td_array_dims_, class_names_}, diag_);
+    const TypeShapeTables kTables{typedefs_, td_array_dims_, class_names_};
+    ApplyBodyParamAssignment(pd, item, arena_, {kTables, kScope, unit_}, diag_);
   }
 
   const bool kFoldsDefault = item->init_expr != nullptr && !pd.from_override;

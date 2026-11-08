@@ -600,6 +600,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_scope_rules.cpp
     elaborator/scope_resolution_bases.cpp
     elaborator/package_references.cpp
+    elaborator/param_value_assignability.cpp
     elaborator/elaborator_scope_rules_enclosing.cpp
     elaborator/elaborator_scope_rules_hier.cpp
     elaborator/elaborator_scope_rules_imports.cpp

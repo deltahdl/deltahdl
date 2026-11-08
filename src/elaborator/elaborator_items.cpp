@@ -25,6 +25,8 @@
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/implication_operator_rules.h"
 #include "elaborator/interconnect_uses.h"
+#include "elaborator/net_data_type.h"
+#include "elaborator/param_value_assignability.h"
 #include "elaborator/procedural_checker_instance.h"
 #include "elaborator/procedural_concurrent_assertion.h"
 #include "elaborator/property_instance.h"
@@ -511,8 +513,18 @@ void Elaborator::AddProcedure(ModuleItem* item, RtlirModule* mod,
                              infers ? &const_names_ : nullptr,
                              module_global_clocking_event_,
                              &kTasks};
-  AddProcess(kind, item, mod, kEnv, BuildParamScope(mod));
+  const ScopeMap kScope = BuildParamScope(mod);
+  ReportProcedureParamTypes(item, mod, kScope);
+  AddProcess(kind, item, mod, kEnv, kScope);
   mod->processes.back().checker_instances = std::move(sites);
+}
+
+void Elaborator::ReportProcedureParamTypes(const ModuleItem* item,
+                                           const RtlirModule* mod,
+                                           const ScopeMap& scope) {
+  const TypeShapeTables kTables{typedefs_, td_array_dims_, class_names_};
+  ReportProcedureParamValueTypes(*item, {*mod, gen_prefix_},
+                                 {kTables, scope, unit_}, diag_);
 }
 
 bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
@@ -525,6 +537,7 @@ bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
       AddProcedure(item, mod, RtlirProcessKind::kInitial);
       return true;
     case ModuleItemKind::kFinalBlock:
+      ReportProcedureParamTypes(item, mod, BuildParamScope(mod));
       AddProcess(RtlirProcessKind::kFinal, item, mod, kNoInferenceEnv,
                  BuildParamScope(mod));
       return true;
@@ -546,6 +559,7 @@ bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
     case ModuleItemKind::kTaskDecl:
       DeclareInModuleNameSpace(item->name, item->loc);
       ReportMisplacedOverrideSpecifiers(*item, diag_);
+      ReportProcedureParamTypes(item, mod, BuildParamScope(mod));
       ValidateFunctionBody(item);
       ValidateFunctionArgDefaultsScope(item);
       ResolveFormalAggregateTypes(item, typedefs_, arena_);

@@ -87,7 +87,6 @@ static void CreateParamArray(const RtlirParamDecl& p, std::string_view full,
   CreateArrayElements(full, var, ctx, arena);
   const Expr* value =
       p.override_expr != nullptr ? p.override_expr : p.default_value;
-  if (value == nullptr) return;
   std::string own = ctx.ActiveInstancePrefix();
   if (p.override_expr != nullptr)
     ctx.SetLoweringInstancePrefix(ctx.InstantiatingPrefix(own));

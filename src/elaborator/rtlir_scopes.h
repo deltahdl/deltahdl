@@ -20,6 +20,10 @@ using GenBlockConsts = std::vector<std::pair<std::string_view, int64_t>>;
 
 using GenBlockPrefixes = std::vector<std::string_view>;
 
+inline std::string_view InnermostScope(const GenBlockPrefixes& scopes) {
+  return scopes.empty() ? std::string_view{} : scopes.back();
+}
+
 inline bool ParamVisibleFromScopes(std::string_view decl_prefix,
                                    const GenBlockPrefixes& scopes) {
   if (decl_prefix.empty()) return true;

@@ -22,7 +22,9 @@
 #include "elaborator/elaborator_items_params.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/net_data_type.h"
+#include "elaborator/param_value_assignability.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_scopes.h"
 #include "elaborator/simple_bit_vector.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_expr.h"
@@ -341,6 +343,17 @@ bool ApplyParamOverride(RtlirParamDecl& pd,
   return true;
 }
 
+void ReportInstanceOverrideType(const RtlirParamDecl& pd,
+                                const InstanceParamAssignments& assigns,
+                                const ParamValueScope& target,
+                                DiagEngine& diag) {
+  const auto* ovr = FindParamOverride(assigns.params, pd.name);
+  if (ovr == nullptr) return;
+  ReportOverrideNotAssignable(
+      pd, target,
+      {ovr->value_expr, assigns.module, assigns.scope, assigns.prefix}, diag);
+}
+
 void CheckDollarOverride(const InstanceParamAssignments& assigns,
                          const DollarParamValue& param,
                          const TypeShapeTables& tables, DiagEngine& diag) {
@@ -426,8 +439,9 @@ void Elaborator::ElaborateParamPortList(const ModuleDecl* decl,
   TypeParamValueCtx tp_ctx{typedefs_, class_names_, diag_};
   const TypedefMap kWrittenTypes = std::exchange(pending_type_param_types_, {});
   const TypeShapeTables kShapeTables{typedefs_, td_array_dims_, class_names_};
-  const InstanceParamAssignments kAssigns{params, RegisteredModuleScope(),
-                                          RegisteredModule()};
+  const InstanceParamAssignments kAssigns{
+      params, RegisteredModuleScope(), RegisteredModule(),
+      InnermostScope(RegisteredGenPrefixes())};
   for (size_t i = 0; i < decl->params.size(); ++i) {
     const auto& [pname, pval] = decl->params[i];
     auto scope = BuildParamScope(mod);
@@ -444,6 +458,8 @@ void Elaborator::ElaborateParamPortList(const ModuleDecl* decl,
         has_param_type ? &decl->param_types[i] : nullptr;
     const bool kUnpacked = decl->param_port_unpacked_dims.count(pname) != 0;
     ApplyParamOverride(pd, kAssigns, pname, typedefs_, arena_);
+    ReportInstanceOverrideType(pd, kAssigns, {kShapeTables, scope, unit_},
+                               diag_);
     CheckDollarOverride(kAssigns, {pname, nullptr, param_type, kUnpacked},
                         kShapeTables, diag_);
     if (!pd.is_resolved && !pd.from_override && pval) {

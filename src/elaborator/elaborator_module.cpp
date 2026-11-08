@@ -487,7 +487,8 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   }
 
   const InstanceParamAssignments kBodyAssignments{
-      params, RegisteredModuleScope(), RegisteredModule()};
+      params, RegisteredModuleScope(), RegisteredModule(),
+      InnermostScope(RegisteredGenPrefixes())};
   BodyParamAssignmentsGuard body_assignments_guard(
       decl->has_param_port_list ? nullptr : &kBodyAssignments);
 

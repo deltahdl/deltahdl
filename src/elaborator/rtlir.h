@@ -256,6 +256,7 @@ struct RtlirParamDecl {
   const struct RtlirModule* override_module = nullptr;
   const DataType* type_param_actual = nullptr;
   bool decl_is_shortreal = false;
+  const struct ParamDefaultMismatch* default_mismatch = nullptr;
 };
 
 struct RtlirPortBinding {

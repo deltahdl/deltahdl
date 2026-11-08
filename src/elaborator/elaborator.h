@@ -153,6 +153,10 @@ class Elaborator : public ElaboratorClassRules {
   void ElaborateModuleClassDecl(ModuleItem* item, RtlirModule* mod);
   bool ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod);
   void AddProcedure(ModuleItem* item, RtlirModule* mod, RtlirProcessKind kind);
+  void ReportProcedureParamTypes(const ModuleItem* item, const RtlirModule* mod,
+                                 const ScopeMap& scope);
+  void ReportSpecializationValues(const DataType& written,
+                                  const RtlirModule* mod);
   void AddInferenceCallees(const Stmt* body);
   void ResolveStaticAssertionClock(ModuleItem* item,
                                    const std::vector<EventExpr>& default_clock);

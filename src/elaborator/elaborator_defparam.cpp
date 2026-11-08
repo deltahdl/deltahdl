@@ -19,6 +19,8 @@
 #include "elaborator/elaborator_defparam_walk.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_params.h"
+#include "elaborator/net_data_type.h"
+#include "elaborator/param_value_assignability.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
 #include "elaborator/type_eval.h"
@@ -452,17 +454,20 @@ void Elaborator::ApplyDefparamSite(RtlirModule* mod, const DefparamSite& site,
       continue;
     }
     RtlirModule* target_mod = rooted.target_mod;
+    const TypedefMap kTargetTypes =
+        ModuleTypedefTable(typedefs_, FindModule(target_mod->name));
     DefparamOverride ovr{
-        param,
-        val_expr,
-        scope,
-        site.item->loc,
-        mod,
-        TakesValueWhole(
-            *param, val_expr,
-            ModuleTypedefTable(typedefs_, FindModule(target_mod->name)))};
+        param, val_expr,
+        scope, site.item->loc,
+        mod,   TakesValueWhole(*param, val_expr, kTargetTypes),
+    };
     DefparamAppliedRecord rec{applied_defparams_, key};
     if (!SetDefparamValue(diag_, *param, ovr, rec)) continue;
+    const TypeShapeTables kTargetTables{kTargetTypes, td_array_dims_,
+                                        class_names_};
+    ReportOverrideNotAssignable(
+        *param, {kTargetTables, BuildParamScope(target_mod), unit_},
+        {val_expr, mod, scope, site.prefix}, diag_);
     RecordResolvedHighWords(*param, val_expr, scope);
     param->defparam_value_expr = val_expr;
     param->defparam_value_scope = scope;

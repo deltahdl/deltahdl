@@ -22,6 +22,8 @@
 #include "elaborator/elaborator_node_attributes.h"
 #include "elaborator/implication_operator_rules.h"
 #include "elaborator/interface_property_instance.h"
+#include "elaborator/net_data_type.h"
+#include "elaborator/param_value_assignability.h"
 #include "elaborator/property_instance.h"
 #include "elaborator/property_rewrite.h"
 #include "elaborator/rtlir.h"
@@ -420,6 +422,9 @@ void Elaborator::RunPostItemValidations(const ModuleDecl* decl,
   type_ref_mod_ = mod;
   ValidateModuleConstraints(decl, mod);
   ValidateValueParams(decl, mod);
+  const TypeShapeTables kTables{typedefs_, td_array_dims_, class_names_};
+  RecordParamDefaultMismatches(*mod, 0, {kTables, BuildParamScope(mod), unit_},
+                               arena_);
   ValidateLhsPatternWidths(decl, mod);
   ValidateClockvarAccess(decl);
   ValidateClockingSignalTargets(decl);

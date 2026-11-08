@@ -13,6 +13,7 @@
 #include "elaborator/dollar_parameter_values.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/net_data_type.h"
+#include "elaborator/param_value_assignability.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_design.h"
@@ -31,6 +32,7 @@ struct InstanceParamAssignments {
   const Elaborator::ParamList& params;
   ScopeMap scope;
   const RtlirModule* module;
+  std::string_view prefix;
 };
 
 const Elaborator::ParamOverride* FindParamOverride(
@@ -49,6 +51,11 @@ bool ApplyParamOverride(RtlirParamDecl& pd,
                         const InstanceParamAssignments& assigns,
                         std::string_view pname, const TypedefMap& typedefs,
                         Arena& arena);
+
+void ReportInstanceOverrideType(const RtlirParamDecl& pd,
+                                const InstanceParamAssignments& assigns,
+                                const ParamValueScope& target,
+                                DiagEngine& diag);
 
 void CheckDollarOverride(const InstanceParamAssignments& assigns,
                          const DollarParamValue& param,

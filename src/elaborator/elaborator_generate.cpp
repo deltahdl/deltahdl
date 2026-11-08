@@ -14,6 +14,8 @@
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/gen_block_members.h"
 #include "elaborator/module_scope_names.h"
+#include "elaborator/net_data_type.h"
+#include "elaborator/param_value_assignability.h"
 #include "elaborator/pending_generate.h"
 #include "elaborator/property_rewrite.h"
 #include "elaborator/rtlir.h"
@@ -69,6 +71,7 @@ void Elaborator::ProcessPendingGenerate(const PendingGenerate& pg) {
       std::exchange(interface_inst_types_, pg.interface_inst_types);
   auto saved_decl_path = std::exchange(module_decl_path_, pg.module_decl_path);
   auto scope = BuildParamScope(pg.mod);
+  const std::size_t kFirstParam = pg.mod->params.size();
   switch (pg.item->kind) {
     case ModuleItemKind::kGenerateIf:
       ElaborateGenerateIf(pg.item, pg.mod, scope);
@@ -83,6 +86,9 @@ void Elaborator::ProcessPendingGenerate(const PendingGenerate& pg) {
       break;
   }
   ValidateGenerateValueParams(pg.item, pg.mod, scope, diag_);
+  const TypeShapeTables kTables{typedefs_, td_array_dims_, class_names_};
+  RecordParamDefaultMismatches(
+      *pg.mod, kFirstParam, {kTables, BuildParamScope(pg.mod), unit_}, arena_);
   for (const auto& [name, dtype] : typedefs_)
     saved_typedefs.insert_or_assign(name, dtype);
   typedefs_ = std::move(saved_typedefs);
