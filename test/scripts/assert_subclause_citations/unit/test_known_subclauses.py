@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 import pytest
@@ -38,11 +39,9 @@ def test_a_line_that_is_not_an_identifier_is_reported(
 ) -> None:
     path = tmp_path / "clauses.txt"
     path.write_text(f"1\n{line}\n2\n")
-    with pytest.raises(ValueError) as raised:
+    message = f"{path}:2: {line!r} is not a clause identifier"
+    with pytest.raises(ValueError, match=f"^{re.escape(message)}$"):
         known_subclauses(path)
-    assert str(raised.value) == (
-        f"{path}:2: {line!r} is not a clause identifier"
-    )
 
 
 def test_the_committed_list_holds_a_clause_the_standard_defines() -> None:
