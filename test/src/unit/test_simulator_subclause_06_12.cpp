@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <string>
 
 #include "fixture_real.h"
@@ -41,6 +42,83 @@ TEST(RealDataType, ShortrealDisplaysItsStoredValue) {
       "endmodule\n",
       f);
   EXPECT_EQ(printed, "0.100000\n");
+}
+
+struct ShortrealSource {
+  const char* where;
+  const char* before;
+  const char* decls;
+  const char* setup;
+  const char* value;
+};
+
+std::string ReadShortrealBackAsReal(const ShortrealSource& source) {
+  return std::string(source.before) + "module t;\n" + source.decls +
+         "  real w;\n  bit [63:0] b;\n  initial begin\n" + source.setup +
+         "    w = " + source.value + ";\n    b = $realtobits(w);\n" +
+         "  end\nendmodule\n";
+}
+
+TEST(RealDataType, ShortrealHoldsTheNearestBinary32InEveryPlaceItIsGiven) {
+  const ShortrealSource kSources[] = {
+      {"blocking assignment", "", "  shortreal s;\n", "    s = 0.1;\n", "s"},
+      {"nonblocking assignment", "", "  shortreal s;\n",
+       "    s <= 0.1;\n    #1;\n", "s"},
+      {"declaration initializer", "", "  shortreal s = 0.1;\n", "", "s"},
+      {"assignment from a real variable", "",
+       "  real r = 0.1;\n  shortreal s;\n", "    s = r;\n", "s"},
+      {"continuous assignment", "",
+       "  real r = 0.1;\n  shortreal s;\n  assign s = r;\n", "    #1;\n", "s"},
+      {"cast", "", "", "", "shortreal'(0.1)"},
+      {"parameter", "", "  parameter shortreal P = 0.1;\n", "", "P"},
+      {"function argument", "",
+       "  function automatic real f(shortreal x);\n    return x;\n"
+       "  endfunction\n",
+       "", "f(0.1)"},
+      {"function return value", "",
+       "  function automatic shortreal g();\n    return 0.1;\n"
+       "  endfunction\n",
+       "", "g()"},
+      {"task output argument", "",
+       "  shortreal s;\n  task automatic k(output shortreal x);\n"
+       "    x = 0.1;\n  endtask\n",
+       "    k(s);\n", "s"},
+      {"input port",
+       "module c(input shortreal x, output real y);\n  assign y = x;\n"
+       "endmodule\n",
+       "  real r = 0.1;\n  real y;\n  c u(r, y);\n", "    #1;\n", "y"},
+  };
+  for (const ShortrealSource& source : kSources) {
+    SCOPED_TRACE(source.where);
+    EXPECT_EQ(RunAndGet(ReadShortrealBackAsReal(source), "b"),
+              0x3FB99999A0000000u);
+  }
+}
+
+TEST(RealDataType, ShortrealRoundsTiesSubnormalsAndOverflowLikeBinary32) {
+  struct Rounding {
+    ShortrealSource source;
+    uint64_t widened;
+  };
+  const Rounding kRoundings[] = {
+      {{"integer halfway between two binary32 values", "",
+        "  int i = 16777219;\n  shortreal s;\n", "    s = i;\n", "s"},
+       0x4170000040000000u},
+      {{"value in the subnormal range", "", "  shortreal s;\n",
+        "    s = 1e-45;\n", "s"},
+       0x36A0000000000000u},
+      {{"value beyond the largest finite binary32", "", "  shortreal s;\n",
+        "    s = 1e39;\n", "s"},
+       0x7FF0000000000000u},
+      {{"negative value beyond the largest finite binary32", "",
+        "  shortreal s;\n", "    s = -1e39;\n", "s"},
+       0xFFF0000000000000u},
+  };
+  for (const Rounding& rounding : kRoundings) {
+    SCOPED_TRACE(rounding.source.where);
+    EXPECT_EQ(RunAndGet(ReadShortrealBackAsReal(rounding.source), "b"),
+              rounding.widened);
+  }
 }
 
 TEST(RealDataType, RealKeepsDoublePrecision) {
