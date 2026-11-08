@@ -3,3 +3,4 @@ src/elaborator/const_eval_func.cpp
 src/elaborator/elaborator_process_validate.cpp
 src/elaborator/elaborator_validate_jump_statements.cpp
 src/elaborator/elaborator_scope_rules_names.cpp
+src/elaborator/dollar_contexts.cpp
