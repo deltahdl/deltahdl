@@ -25,7 +25,6 @@ namespace delta {
 
 namespace {
 
-constexpr int kMaxTypedefHops = 64;
 constexpr int kMaxLocateDepth = 256;
 int g_locate_depth = 0;
 
@@ -46,13 +45,7 @@ const TypedefMap& Typedefs() {
 }
 
 const DataType& ResolvedType(const DataType& type) {
-  const DataType* resolved = &type;
-  for (int hops = 0; hops < kMaxTypedefHops; ++hops) {
-    const DataType* named = FindNamedType(*resolved, Typedefs());
-    if (named == nullptr) break;
-    resolved = named;
-  }
-  return *resolved;
+  return LastTypeInChain(type, Typedefs());
 }
 
 bool HoldsAggregate(const DataType& type) {
@@ -555,6 +548,10 @@ std::optional<ConstVal> FoldLeaf(const LocatedPart& part) {
   return ConstEvalStringLiteral(part.state.value);
 }
 
+double AsReal(const ConstVal& value) {
+  return static_cast<double>(value.value);
+}
+
 std::optional<LocatedPart> LocateRead(const Expr* expr, const ScopeMap& scope) {
   if (!IsPartStep(expr)) return std::nullopt;
   return LocatePart(expr, scope);
@@ -579,11 +576,9 @@ std::optional<double> ConstEvalAggregatePartReal(const Expr* expr,
                                                  const ScopeMap& scope) {
   LocateDepth depth;
   std::optional<LocatedPart> part = LocateRead(expr, scope);
-  if (!part) return std::nullopt;
-  if (KindOfLeaf(part->reader) != LeafKind::kReal) {
-    return FoldLeaf(*part).transform(
-        [](const ConstVal& value) { return static_cast<double>(value.value); });
-  }
+  if (!part) return ConstEvalFull(expr, scope).transform(AsReal);
+  if (KindOfLeaf(part->reader) != LeafKind::kReal)
+    return FoldLeaf(*part).transform(AsReal);
   FrameGuard guard(part->state.frame);
   bool is_short =
       ResolvedType(part->reader.type).kind == DataTypeKind::kShortreal;

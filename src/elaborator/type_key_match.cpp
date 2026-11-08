@@ -103,7 +103,7 @@ bool TypeKeyMatchesType(std::string_view key, const DataType& type,
   if (it == typedefs.end()) {
     if (std::optional<IntegralShape> shape = ShapeOfKeyword(key))
       return IntegralShapesMatch(shape, *t);
-    return TypeKeyMatchesKind(key, t->kind) && t->packed_dim_left == nullptr;
+    return TypeKeyMatchesKind(key, t->kind);
   }
   const DataType* k = FollowTypedefs(it->second, typedefs, names);
   if (k == nullptr) return false;

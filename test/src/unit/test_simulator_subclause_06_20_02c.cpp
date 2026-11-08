@@ -411,6 +411,8 @@ TEST(AggregateParameterConstantReads,
       "  parameter int G [2][2] = '{default: ROW};\n"
       "  parameter int F [2][2] = '{default: row_t'{7, 8}};\n"
       "  parameter int C [2] = '{int'(3), 4};\n"
+      "  parameter int SEED [2] = '{3, 21};\n"
+      "  parameter two_t V = '{k: 2, default: SEED[1]};\n"
       "  logic [T.q.x-1:0] v1;\n"
       "  logic [T.p.y-1:0] v2;\n"
       "  logic [T.k-1:0] v3;\n"
@@ -421,7 +423,10 @@ TEST(AggregateParameterConstantReads,
       "  logic [F[1][1]-1:0] v8;\n"
       "  logic [F[0][0]-1:0] v9;\n"
       "  logic [C[0]-1:0] v10;\n"
-      "  int n1, n2, n3, n4, n5, n6, n7, n8, n9, n10;\n"
+      "  logic [V.q.x-1:0] v11;\n"
+      "  logic [V.p.y-1:0] v12;\n"
+      "  logic [V.k-1:0] v13;\n"
+      "  int n1, n2, n3, n4, n5, n6, n7, n8, n9, n10, n11, n12, n13;\n"
       "  initial begin\n"
       "    n1 = $bits(v1);\n"
       "    n2 = $bits(v2);\n"
@@ -433,6 +438,9 @@ TEST(AggregateParameterConstantReads,
       "    n8 = $bits(v8);\n"
       "    n9 = $bits(v9);\n"
       "    n10 = $bits(v10);\n"
+      "    n11 = $bits(v11);\n"
+      "    n12 = $bits(v12);\n"
+      "    n13 = $bits(v13);\n"
       "  end\n"
       "endmodule\n",
       f, "n1");
@@ -446,7 +454,10 @@ TEST(AggregateParameterConstantReads,
                    {"n7", 6},
                    {"n8", 8},
                    {"n9", 7},
-                   {"n10", 3}});
+                   {"n10", 3},
+                   {"n11", 21},
+                   {"n12", 5},
+                   {"n13", 2}});
 }
 
 TEST(AggregateParameterConstantReads, PackedPartsFoldFromPatternsAndIntegers) {
@@ -466,13 +477,15 @@ TEST(AggregateParameterConstantReads, PackedPartsFoldFromPatternsAndIntegers) {
       "  sg_t s;\n"
       "  ps_t [1:0] pa;\n"
       "  rev_t r;\n"
+      "  ps_t [0:1] pb;\n"
       "} w_t;\n"
       "module t;\n"
       "  parameter w_t W = '{p: '{lo: 4'h3, hi: 4'h1}, q: '{4'h1, 4'h2},\n"
       "                      k: 2, n: 4'h9, s: 8'hF2,\n"
-      "                      pa: '{1: 8'h12, 0: 8'h34}, r: 4'h8};\n"
+      "                      pa: '{1: 8'h12, 0: 8'h34}, r: 4'h8,\n"
+      "                      pb: '{1: 8'h12, 0: 8'h34}};\n"
       "  parameter w_t X = '{p: 8'h25, q: 8'h34, k: 1, n: 4'h1, s: 8'h12,\n"
-      "                      pa: 16'h0, r: 4'h0};\n"
+      "                      pa: 16'h0, r: 4'h0, pb: 16'h0};\n"
       "  parameter w_t Y = '{default: 4'h1};\n"
       "  parameter w_t Z = '{nib_t: 9, default: 0};\n"
       "  parameter ps_t PS = '{lo: 4'h7, hi: 4'h2};\n"
@@ -499,7 +512,7 @@ TEST(AggregateParameterConstantReads, PackedPartsFoldFromPatternsAndIntegers) {
       "  int n1, n2, n3, n4, n5, n6, n7, n8, n9, n10;\n"
       "  int n11, n12, n13, n14, n15, n16, n17, n18, n19, br;\n"
       "  if (W.s.hi < 0 && X.s.hi > 0 && W.pa == 16'h1234 &&\n"
-      "      Y.pa == 16'h1111 && Z.r == 0) begin : g\n"
+      "      Y.pa == 16'h1111 && Z.r == 0 && W.pb == 16'h3412) begin : g\n"
       "    initial br = 1;\n"
       "  end else begin : g\n"
       "    initial br = 2;\n"
@@ -596,6 +609,9 @@ TEST(AggregateParameterConstantReads, RealAndStringPartsFold) {
       "  localparam real RE = RA[1] * 4;\n"
       "  localparam real RK = P.i / 2.0;\n"
       "  localparam string S = P.s;\n"
+      "  localparam string T = SA[0];\n"
+      "  parameter logic [3:0] W4 = 4'b0110;\n"
+      "  localparam real RW = W4[1] * 1.5;\n"
       "  logic [RI-1:0] v1;\n"
       "  logic [$rtoi(RR)-1:0] v2;\n"
       "  logic [$rtoi(RE)-1:0] v3;\n"
@@ -606,7 +622,10 @@ TEST(AggregateParameterConstantReads, RealAndStringPartsFold) {
       "  logic [P.s.len()-1:0] v8;\n"
       "  logic [SA[1].len()-1:0] v9;\n"
       "  logic [P.s.getc(1) - 100:0] v10;\n"
-      "  int n1, n2, n3, n4, n5, n6, n7, n8, n9, n10, br;\n"
+      "  logic [P.i[1] * 4 + P.i[2] * 2:0] v11;\n"
+      "  logic [T.len()-1:0] v12;\n"
+      "  logic [$rtoi(RW * 2)-1:0] v13;\n"
+      "  int n1, n2, n3, n4, n5, n6, n7, n8, n9, n10, n11, n12, n13, br;\n"
       "  if (P.s == \"hey\") begin : g\n"
       "    initial br = 1;\n"
       "  end else begin : g\n"
@@ -623,6 +642,9 @@ TEST(AggregateParameterConstantReads, RealAndStringPartsFold) {
       "    n8 = $bits(v8);\n"
       "    n9 = $bits(v9);\n"
       "    n10 = $bits(v10);\n"
+      "    n11 = $bits(v11);\n"
+      "    n12 = $bits(v12);\n"
+      "    n13 = $bits(v13);\n"
       "  end\n"
       "endmodule\n",
       f, "n1");
@@ -637,6 +659,9 @@ TEST(AggregateParameterConstantReads, RealAndStringPartsFold) {
                    {"n8", 3},
                    {"n9", 4},
                    {"n10", 2},
+                   {"n11", 5},
+                   {"n12", 2},
+                   {"n13", 3},
                    {"br", 1}});
 }
 

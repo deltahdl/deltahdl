@@ -144,6 +144,39 @@ TEST(ConstExprElab, PortListParameterWithoutDefaultAcceptedWithOverride) {
   EXPECT_FALSE(f.has_errors);
 }
 
+TEST(ConstExprElab, StructParameterWithoutDefaultRejectsAMemberReadUnset) {
+  ElabFixture f;
+  ElaborateSrc(
+      "typedef struct { int a; } s_t;\n"
+      "module child #(parameter s_t P)();\n"
+      "  localparam int L = P.a;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child u0();\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "parameter 'P' of 'child' has no default value and "
+                            "no override at instantiation",
+                            2, "6.20.1"));
+}
+
+TEST(ConstExprElab, StructParameterWithoutDefaultReadsItsOverride) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "typedef struct { int a; } s_t;\n"
+      "module child #(parameter s_t P)();\n"
+      "  localparam int L = P.a;\n"
+      "  logic [L-1:0] v;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child #(.P('{a: 5})) u0();\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 TEST(ConstExprElab, NoDefaultParamSuppressesImplicitNestedInstantiation) {
   ElabFixture f;
   auto* design = ElaborateSrc(

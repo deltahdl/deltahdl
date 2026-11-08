@@ -504,6 +504,26 @@ TEST(ValueParameters, ValueSetFromAVariableANetOrAHierarchicalNameIsReported) {
        "module m;\n  typedef struct { int a; } s_t;\n  s_t v;\n"
        "  parameter int P = v.a;\nendmodule\n",
        "parameter 'P' value contains a hierarchical reference", 4, "6.20.2"},
+      {"module body parameter whose packed member and packed elements are a "
+       "variable",
+       "module m;\n"
+       "  typedef struct packed { logic [3:0] a; logic [3:0] b; } ps_t;\n"
+       "  typedef struct { ps_t ps; logic [1:0][3:0] pa; } w_t;\n"
+       "  logic [3:0] v;\n"
+       "  parameter w_t P = '{ps: '{a: v, b: 4'h1}, pa: '{v, 4'h2}};\n"
+       "  localparam int L1 = P.ps;\n  localparam int L2 = P.pa;\nendmodule\n",
+       "parameter 'P' value is not a constant expression", 5, "6.20.2"},
+      {"module body parameter whose struct member is a variable",
+       "module m;\n  typedef struct { int x; } in_t;\n"
+       "  typedef struct { in_t n; } o_t;\n  in_t w;\n"
+       "  parameter o_t Q = '{n: w};\n  localparam int L = Q.n.x;\n"
+       "endmodule\n",
+       "parameter 'Q' value is not a constant expression", 5, "6.20.2"},
+      {"module body parameter from a member of a parameter named from $root",
+       "module t;\n  typedef struct { int a; } s_t;\n"
+       "  parameter s_t P = '{a: 1};\n  parameter int Q = $root.t.P.a;\n"
+       "endmodule\n",
+       "parameter 'Q' value contains a hierarchical reference", 4, "6.20.2"},
   };
   for (const ValueSource& source : kSources) {
     SCOPED_TRACE(source.where);
