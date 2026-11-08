@@ -9,6 +9,7 @@
 
 namespace delta {
 
+struct ClassDecl;
 struct CompilationUnit;
 struct DataType;
 struct Expr;
@@ -25,6 +26,12 @@ struct DeclaredType {
 using DeclaredTypeVisit = std::function<void(const DeclaredType&)>;
 
 void ForEachInnerDeclaredType(const ModuleDecl* decl,
+                              const DeclaredTypeVisit& visit);
+
+void ForEachItemDeclaredType(const ModuleItem* item,
+                             const DeclaredTypeVisit& visit);
+
+void ForEachClassDeclaredType(const ClassDecl* cls,
                               const DeclaredTypeVisit& visit);
 
 void ForEachUnitDeclaredType(const CompilationUnit* unit,

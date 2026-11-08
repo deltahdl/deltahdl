@@ -25,4 +25,6 @@ void CheckUnboundedParamsInQueueContexts(
 void CheckDollarOperands(const ModuleDecl* decl, const CompilationUnit& unit,
                          DiagEngine& diag);
 
+void CheckUnitDollarOperands(const CompilationUnit& unit, DiagEngine& diag);
+
 }  // namespace delta

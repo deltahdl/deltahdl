@@ -14,6 +14,7 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
+#include "elaborator/dollar_contexts.h"
 #include "elaborator/dollar_parameter_values.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_data.h"
@@ -457,6 +458,7 @@ void Elaborator::RegisterCuScopeItems() {
   RegisterClassParams(unit_, cu_param_scope_, arena_, diag_);
   CheckClassParamDollarValues(unit_, {typedefs_, td_array_dims_, class_names_},
                               diag_);
+  CheckUnitDollarOperands(*unit_, diag_);
   ResolveUnitScopeFormalTypes(unit_, typedefs_, arena_);
   all_typedefs_ = typedefs_;
   all_cu_param_scope_ = cu_param_scope_;

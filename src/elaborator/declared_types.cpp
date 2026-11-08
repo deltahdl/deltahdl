@@ -94,6 +94,16 @@ static void VisitScopeItem(const ModuleItem* item, bool typedefs,
   VisitInner(item, visit);
 }
 
+void ForEachItemDeclaredType(const ModuleItem* item,
+                             const DeclaredTypeVisit& visit) {
+  VisitScopeItem(item, true, visit);
+}
+
+void ForEachClassDeclaredType(const ClassDecl* cls,
+                              const DeclaredTypeVisit& visit) {
+  VisitClass(cls, visit);
+}
+
 void ForEachUnitDeclaredType(const CompilationUnit* unit,
                              const DeclaredTypeVisit& visit) {
   for (const ModuleItem* item : unit->cu_items)

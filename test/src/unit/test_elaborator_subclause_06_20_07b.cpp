@@ -223,4 +223,228 @@ TEST(DollarConstantElaboration,
   ExpectDollarReportedOnlyOn(f, {4, 7, 12, 13, 15, 16}, {10, 14});
 }
 
+TEST(DollarConstantElaboration,
+     DollarIsJudgedInsideEveryGenerateBlockWithItsOwnDeclarations) {
+  ElabFixture f;
+  Elaborate(
+      "module top;\n"
+      "  int x, q[$];\n"
+      "  int a [4];\n"
+      "  int s [4];\n"
+      "  if (1) begin : g\n"
+      "    int b [4];\n"
+      "    int s [$];\n"
+      "    int z = $;\n"
+      "    int k = s[$];\n"
+      "    logic [$:0] p;\n"
+      "    initial begin\n"
+      "      x = b[$];\n"
+      "      x = a[$];\n"
+      "      x = q[$ - 1];\n"
+      "      x = int'(x inside {[1:$]});\n"
+      "      x = int'(x inside {[1:$ - 1]});\n"
+      "      x = s[$ - 1];\n"
+      "    end\n"
+      "  end\n"
+      "  initial x = s[$];\n"
+      "  if ($ > 0) begin : h\n"
+      "  end else begin : e\n"
+      "    int f = $;\n"
+      "    int m = 1;\n"
+      "  end\n"
+      "  for (genvar i = 0; i < 2; i++) begin : l\n"
+      "    int c = $ + i;\n"
+      "    int d = i;\n"
+      "  end\n"
+      "  case (1)\n"
+      "    $: begin : c1\n"
+      "    end\n"
+      "    1: begin : c2\n"
+      "      int e = $;\n"
+      "    end\n"
+      "  endcase\n"
+      "endmodule\n",
+      f);
+  ExpectDollarReportedOnlyOn(f, {8, 10, 12, 13, 16, 20, 21, 23, 27, 31, 34},
+                             {9, 14, 15, 17, 24, 28});
+}
+
+TEST(DollarConstantElaboration,
+     DollarIsJudgedInAnInterfaceAProgramAndAChecker) {
+  ElabFixture f;
+  Elaborate(
+      "interface ifc;\n"
+      "  int x, q[$];\n"
+      "  int a [4];\n"
+      "  int z = $;\n"
+      "  initial begin\n"
+      "    x = a[$];\n"
+      "    x = q[$];\n"
+      "  end\n"
+      "endinterface\n"
+      "checker chk(logic clk);\n"
+      "  function automatic int f(int v[$], int w[2]);\n"
+      "    int u = v[$];\n"
+      "    return u + w[$];\n"
+      "  endfunction\n"
+      "  function automatic int g();\n"
+      "    return $;\n"
+      "  endfunction\n"
+      "endchecker\n"
+      "program prg;\n"
+      "  int x, q[$];\n"
+      "  int a [4];\n"
+      "  initial begin\n"
+      "    x = $;\n"
+      "    x = a[$ - 1];\n"
+      "    x = q[$ - 1];\n"
+      "    x = int'(x inside {[0:$]});\n"
+      "  end\n"
+      "endprogram\n"
+      "module top;\n"
+      "  logic clk;\n"
+      "  ifc i1();\n"
+      "  chk c1(clk);\n"
+      "endmodule\n",
+      f);
+  ExpectDollarReportedOnlyOn(f, {4, 6, 13, 16, 23, 24}, {7, 12, 25, 26});
+}
+
+TEST(DollarConstantElaboration,
+     DollarSelectsOnlyAQueueAmongASubroutinesArgumentsAndLocals) {
+  ElabFixture f;
+  Elaborate(
+      "module top;\n"
+      "  int x, q[$];\n"
+      "  int s [4];\n"
+      "  function automatic int f(int a[4], int b[$], int c = $);\n"
+      "    int d [2];\n"
+      "    int s [$];\n"
+      "    x = a[$];\n"
+      "    x = b[$];\n"
+      "    x = d[$ - 1];\n"
+      "    x = s[$];\n"
+      "    return q[$];\n"
+      "  endfunction\n"
+      "  task automatic t(int k = 1);\n"
+      "    int e [3];\n"
+      "    x = e[$];\n"
+      "    x = k;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    int g [2];\n"
+      "    x = g[$];\n"
+      "    x = s[$];\n"
+      "  end\n"
+      "  initial begin\n"
+      "    int h [$];\n"
+      "    x = h[$];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ExpectDollarReportedOnlyOn(f, {4, 7, 9, 15, 20, 21}, {8, 10, 11, 16, 25});
+}
+
+TEST(DollarConstantElaboration, DollarIsJudgedInAPackageAndTheCompilationUnit) {
+  ElabFixture f;
+  Elaborate(
+      "package p;\n"
+      "  int pa [4];\n"
+      "  int pq [$];\n"
+      "  int pz = $;\n"
+      "  logic [$:0] pv;\n"
+      "  typedef logic [1:$] pt;\n"
+      "  function automatic int pf(int k);\n"
+      "    if (k == $) return 0;\n"
+      "    return pa[$];\n"
+      "  endfunction\n"
+      "  function automatic int pg();\n"
+      "    return pq[$] + pq[$ - 1];\n"
+      "  endfunction\n"
+      "endpackage\n"
+      "int ua [4];\n"
+      "int uz = $;\n"
+      "logic [7:$] uv;\n"
+      "typedef logic [$:2] ut;\n"
+      "function automatic int uf();\n"
+      "  return ua[$];\n"
+      "endfunction\n"
+      "function automatic int ug(int v[$]);\n"
+      "  return v[$ - 1];\n"
+      "endfunction\n"
+      "module top;\n"
+      "  import p::*;\n"
+      "  int x = int'(pz inside {[0:$]});\n"
+      "endmodule\n",
+      f);
+  ExpectDollarReportedOnlyOn(f, {4, 5, 6, 8, 9, 16, 17, 18, 20}, {12, 23, 27});
+}
+
+TEST(DollarConstantElaboration,
+     DollarIsJudgedInAClassItsConstraintsAndAnInlineConstraint) {
+  ElabFixture f;
+  Elaborate(
+      "class Base;\n"
+      "  function new(int k = 0);\n"
+      "  endfunction\n"
+      "endclass\n"
+      "class C extends Base;\n"
+      "  rand int a [4];\n"
+      "  rand int q [$];\n"
+      "  rand int x;\n"
+      "  int z = $;\n"
+      "  logic [$:0] cv;\n"
+      "  constraint c1 { x dist {[0:$] := 1}; }\n"
+      "  constraint c2 { x dist {[0:$ - 1] := 1}; }\n"
+      "  constraint c3 { x dist {$ := 1}; }\n"
+      "  constraint c4 { x dist {[0:9] := $}; }\n"
+      "  constraint c5 { x inside {[1:$]}; }\n"
+      "  constraint c6 { a[$] == 1; }\n"
+      "  constraint c7 { q[$] == 1; }\n"
+      "  constraint c8 { if (x > $) x < 3; }\n"
+      "  constraint c9 { x dist {[$:9] :/ 1, 10 := 2}; }\n"
+      "  function new();\n"
+      "    super.new($);\n"
+      "  endfunction\n"
+      "  function int m(int k);\n"
+      "    int l [2];\n"
+      "    if (k == $) return 0;\n"
+      "    return l[$];\n"
+      "  endfunction\n"
+      "  function int n();\n"
+      "    return q[$ - 1];\n"
+      "  endfunction\n"
+      "endclass\n"
+      "class D extends Base($);\n"
+      "endclass\n"
+      "class E extends Base(1);\n"
+      "endclass\n"
+      "package p;\n"
+      "  class PC;\n"
+      "    int pz = $;\n"
+      "    int pq [$];\n"
+      "    function int f();\n"
+      "      return pq[$];\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "endpackage\n"
+      "module top;\n"
+      "  class MC;\n"
+      "    int ma [3];\n"
+      "    function int f();\n"
+      "      return ma[$];\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  C obj = new;\n"
+      "  initial begin\n"
+      "    void'(obj.randomize() with { x dist {[0:$ - 1] := 1}; });\n"
+      "    void'(obj.randomize() with { x dist {[1:$] := 1}; });\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ExpectDollarReportedOnlyOn(
+      f, {9, 10, 12, 13, 14, 16, 18, 21, 25, 26, 32, 38, 49, 54},
+      {11, 15, 17, 19, 29, 34, 41, 55});
+}
+
 }  // namespace
