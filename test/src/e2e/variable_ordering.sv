@@ -1,22 +1,3 @@
-// §18.5.9 variable ordering: the solver gives a uniform distribution over the
-// legal value combinations, so where a 1-bit s implies a 32-bit d is zero, s
-// is true in one of the 1 + 2^32 legal combinations and is drawn true as
-// good as never; solve...before orders the solve so that s is chosen first,
-// 0 or 1 with equal probability, and d then subject to it; the ordering
-// changes no legal combination and cannot make the solver fail; and the
-// variables may be solved in an order the ordering does not give where the
-// outcome is the same, the clause's x held to 0 and below y under solve y
-// before x. The Unordered and the Ordered below are the clause's B, 1024
-// draws each, the Chained orders a before b and b before c under a -> b == 0
-// and b == 0 -> c == 0, 1024 times, and the Fixed is the clause's x and y,
-// 64 times. Over the draws no draw of the Unordered has s set; the Ordered
-// has s set in between 400 and 624 draws, d zero on every draw with s set
-// and nonzero on some draw without, and every randomize() succeeding; the
-// Chained has a set in between 400 and 624 draws, b zero on every draw with
-// a set and c zero on every draw with b zero; and the Fixed holds x at 0 and
-// y above it on every draw, every randomize() succeeding. Each line prints
-// whether the count met what the clause determines and never a value the
-// generator chose.
 class Unordered;
   rand bit s;
   rand bit [31:0] d;

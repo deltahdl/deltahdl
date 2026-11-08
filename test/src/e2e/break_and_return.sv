@@ -1,13 +1,3 @@
-// IEEE 1800-2023 §18.17.6: break and return terminate a production
-// prematurely and differ in the scope they exit. A break executed in a
-// production code block jumps out of the randsequence block, so the clause's
-// SETUP breaking when the fifo is full leaves COMMAND and DATA ungenerated
-// and execution continues at the next statement, while a break inside a
-// loop statement terminates the smallest enclosing loop as §12.8 has it. A
-// return aborts the current production and generation continues with the
-// next production, so the clause's TOP : P1 P2 displays A B C A B C with
-// flag 0, A B C A with flag 1, P2 aborted after A, and A C A C with flag 2,
-// B aborted twice.
 module break_and_return;
   int flag, fifo_length, max_length, command, data, next, loop_ended, went_on, i, ungenerated, loop_only;
 

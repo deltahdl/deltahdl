@@ -1,9 +1,3 @@
-// A.2.4 spells class_new `new [ ( list_of_arguments ) ]`, and A.8.2 lets a
-// list_of_arguments bind its arguments by the formals' names, whether from its
-// first element or after ordered ones. The first call below names both formals
-// in the reverse of their order and the second names one after an ordered
-// value, so a constructor that took them by position would print 35 and 49.
-// This is the form uvm_factory.svh writes at line 1185 for every override.
 class Packet;
   int command;
   int address;

@@ -1,17 +1,3 @@
-// §18.5.6 If–else constraints: if (expression) constraint_set [else
-// constraint_set] holds every constraint of the first set where the
-// expression, any integral or real expression, is true and every
-// constraint of the optional else set otherwise, and the form is equivalent
-// to implications, so the condition and the sets are interdependent and
-// constrain each other. An else omitted from a nested if sequence goes with
-// the closest previous if that lacks one. The Sized here is the clause's
-// example, an if with an else if implying len below 10 when mode is little
-// and above 100 when big; the Fixed holds len to 50, which leaves mode
-// neither little nor big; the Nested is the clause's dangling else, whose
-// else belongs to the inner if, so big leaves len unconstrained, little
-// holds it below 10 and other above 100; the Realed selects k on a real r;
-// and the Braced holds an unnamed set of two relations on one side and a
-// single relation on the other.
 typedef enum {little, big, other} mode_t;
 
 class Sized;

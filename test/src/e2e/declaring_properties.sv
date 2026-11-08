@@ -1,25 +1,3 @@
-// §16.12 Declaring properties: a named property declares a behaviour that
-// an assert, assume or cover statement puts to use, with formal arguments an
-// instance binds actual arguments to, the instance being the property's body
-// with the actuals substituted for the formals, and instantiable before its
-// declaration; a disable iff clause attached to a property_expr makes a
-// property_spec whose attempts are disabled, neither succeeding nor failing,
-// while the disable condition is true, the condition reading the variables'
-// current values rather than sampled ones. The assertions below run over
-// four ticks, clk rising at 5, 15, 25 and 35 so that tick n is at 10n - 5,
-// the tick counter counting through: sig is high at ticks 2 and 3, rst at 2
-// and 4, and live is set by a blocking assignment at the edge of tick 3 and
-// cleared at the edge of tick 4. Each assertion counts its passes and
-// failures, printed once at the end.
-//
-// a_plain, !sig, passes at 1 and 4 and fails at 2 and 3. a_rst, the same
-// under disable iff (rst), is disabled at 2 and 4, so it passes at 1 and
-// fails at 3. a_live, under disable iff (live), is disabled at 3 alone,
-// live reading 1 there as the edge's assignment left it, so it passes at 1
-// and 4 and fails at 2; a_sampled, !live, reads live's sampled value, 0 at
-// 3 and 1 at 4, so it passes at 1 to 3 and fails at 4. a_guarded
-// instantiates p_guarded(sig, rst), the assertion a_rst is, and a_early
-// instantiates p_low(sig), declared after it, the assertion a_plain is.
 module declaring_properties;
   logic clk = 0;
   int tick = 1;

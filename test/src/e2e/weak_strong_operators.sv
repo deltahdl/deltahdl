@@ -1,27 +1,3 @@
-// §16.12.15 Weak and strong operators: s_nexttime, s_always, s_eventually,
-// s_until, s_until_with and the sequence operator strong are strong, in
-// that they require a terminating condition to happen in the future, the
-// clock ticking enough for it to; nexttime, always, until, eventually,
-// until_with and the sequence operator weak are weak, in that they impose
-// no requirement on the terminating condition and do not require the clock
-// to tick. The clause relates the notion to safety properties, whose
-// failures happen at a finite time: `always a` fails at the tick a is
-// false, where a failure of `s_eventually a` cannot be identified at a
-// finite time. The assertions below run over a clock that rises at 5, 15
-// and 25 and stops, the run going on to 100 with no further tick, the tick
-// counter counting through so that tick n is at 10n - 5: a is high
-// throughout, b low throughout, and c high at ticks 1 and 2 alone.
-//
-// Each pair holds the weak form and fails the strong one where the clock
-// stops with the terminating condition unmet: the attempt from 3 of
-// `nexttime a` and `s_nexttime a`, whose next tick never comes, the three
-// attempts of `always a` and `s_always [0:3] a`, whose fourth tick never
-// comes, of `eventually [0:3] b` and `s_eventually b`, b never true, and of
-// `a until b` and `a s_until b`, b never true, and the attempt from 3 of
-// `weak(a ##1 a)` and `strong(a ##1 a)`, whose second a never comes. The
-// verdicts are reached when the run ends, their actions run in the final
-// blocks after $finish, where the safety property `always c` fails its
-// three attempts at 25, the tick c falls at, with the clock still ticking.
 module weak_strong_operators;
   logic clk = 0;
   int tick = 1;

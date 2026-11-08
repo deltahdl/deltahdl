@@ -1,22 +1,3 @@
-// §18.5.11 functions in constraints: a constraint expression can call a
-// function, which is called before the constraints are solved with its
-// return value treated as a state variable, and a random variable used as a
-// function argument establishes an implicit variable ordering, the
-// constraints over the higher-priority variables solved first and those
-// variables state variables to the rest, with the cyclic variables solved
-// first within each prioritized set. The Counted below is the clause's
-// count_ones, a function looping over the bits of a 10-bit v to which C1
-// holds length; the Prioritized is the clause's B, x held at most F(y) under
-// y inside {2, 4, 8}, with x of 5 bits and F tripling its argument; and the
-// Cycled holds x to G(r) over a randc r of 2 bits, G adding one. Over 128
-// draws of the Counted length equals the ones the module counts in v; over
-// 1200 draws of the Prioritized x is at most three times y on every draw and
-// y takes each of 2, 4 and 8 in near a third of the draws, y solved first
-// from its own set, where a joint draw over the legal combinations would
-// give y the 8 that admits the most x far more often; and over 4 draws of
-// the Cycled r takes each of its four values once and x follows it as G
-// gives. Each line prints whether the count met what the clause determines
-// and never a value the generator chose.
 class Counted;
   rand bit [9:0] v;
   rand int length;

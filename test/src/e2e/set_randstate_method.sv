@@ -1,15 +1,3 @@
-// IEEE 1800-2023 §18.13.5: set_randstate() sets the internal state of an
-// object's RNG with the given value, a string obtained from get_randstate();
-// the state of the RNG associated with a process is set with the
-// set_randstate() method of the process (§9.7). The install is what the RNG
-// draws from next: a state read from an object and installed on it again
-// replays the draws that followed the read, installed on another object it
-// makes that object continue the stream from the same place, the installed
-// state reads back, and an object not installed on keeps its own state; a
-// process is set the same way, a forked thread given the state continues the
-// stream, and the install on the thread does not set the parent process: the
-// fork seeds the thread with the parent's next value (§18.14.1), so the parent
-// is left where a fork without the install leaves it.
 module set_randstate_method;
   class Packet;
     rand bit [15:0] payload;

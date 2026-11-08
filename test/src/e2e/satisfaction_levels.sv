@@ -1,28 +1,3 @@
-// §16.12.21 Finite-length versus infinite-length behavior: dynamic
-// verification considers behaviours of finite length alone, on which a
-// property is satisfied at one of four levels. It holds strongly where no
-// bad state has been seen, every future obligation has been met and it
-// holds on any extension of the path; it holds, but not strongly, where no
-// bad state has been seen and every obligation has been met but an
-// extension may fail it; it is pending where no bad state has been seen
-// but an obligation has not been met; and it fails where a bad state has
-// been seen, so that it holds on no extension. The assertions below run
-// over eight ticks, clk rising at 5, 15, ..., 75 so that tick n is at 10n -
-// 5, the run ending at 80: start is high at 1 alone, a throughout, b at 2
-// alone and c never, and each property is start |-> p, so that the attempt
-// from 1 is the one p is put to and the seven others hold at their tick
-// with start low.
-//
-// strongly, start |-> ##1 b, is decided true at 2, where b holds: no
-// extension of the path can fail it, so it holds strongly, and every
-// attempt is decided before the run ends. holds, start |-> always a, sees
-// no bad state and, always being weak, has no obligation unmet when the
-// run ends, but a could fall on an extension, so it holds without holding
-// strongly, its verdict reached at the end of the run. pending, start |->
-// s_eventually c, sees no bad state either, but s_eventually is strong and
-// c has not happened when the run ends, an obligation unmet, so it is
-// pending, which the end of the run reports as its attempt failing. fails,
-// start |-> ##1 c, sees a bad state at 2, where c is low, and fails there.
 module satisfaction_levels;
   logic clk = 0;
   int tick = 1;

@@ -1,6 +1,3 @@
-// --dump-ast prints a line for each module and each package the parse produced,
-// with the module's port and item counts and the package's item count, before
-// the run goes on to simulate the design.
 package dump_ast_pkg;
   localparam int P = 1;
   typedef logic [3:0] nibble_t;

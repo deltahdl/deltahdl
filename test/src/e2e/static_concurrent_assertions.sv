@@ -1,29 +1,3 @@
-// §16.14.5 Using concurrent assertion statements outside procedural code:
-// a concurrent assertion statement, an assert, an assume, a cover or a
-// restrict, can stand outside a procedural context, within a module, an
-// interface or a program, where it has always semantics, a new evaluation
-// attempt of its property_spec beginning at every occurrence of its
-// leading clock event, so assert property (ps) action_block is equivalent
-// to always assert property (ps) action_block; and cover property (ps)
-// statement_or_null to always cover property (ps) statement_or_null. The
-// assertions below run over eight ticks, clk rising at 5, 15, ..., 75 so
-// that tick n is at 10n - 5, the tick counter counting through: a is high
-// at ticks 1, 3 and 6, b at 1, 3, 4, 6 and 7 and c at 2, 5 and 7, and the
-// run ends at 80.
-//
-// The clause's a1 asserts the clause's rule3, @(posedge clk) a |-> b ##1
-// c, from the beginning to the end of simulation: the attempts from 1 and
-// 6 hold at 2 and 7, the attempt from 3 fails at 4, c low there, and the
-// five attempts at which a is low hold vacuously, so a1 passes seven times
-// and fails once; the always form beside it counts the same. The clause's
-// c1 covers the clause's seq3, @(posedge clk) b ##1 c, from the beginning
-// to the end: the attempts from 1, 4 and 6 match at 2, 5 and 7, so c1 is
-// covered three times, and the always form beside it counts the same. The
-// interface bus asserts its own rule3 over its ports, failing at 4 as a1
-// does, and the program prog covers its own seq3, covered at 2, 5 and 7 as
-// c1 is, and the tool's end-of-simulation results name the three cover
-// statements, the always form's under the module alone, it carrying no
-// label.
 interface bus_if(input logic clk, input logic a, input logic b,
                  input logic c);
   property rule3;

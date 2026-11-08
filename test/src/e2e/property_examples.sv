@@ -1,29 +1,3 @@
-// §16.12.20 Property examples: the clause's rule1 to rule5a, run as the
-// property_spec of an assertion each. The assertions run over eight ticks,
-// clk rising at 5, 15, ..., 75 so that tick n is at 10n - 5, and clkev, the
-// clock rule2 names, toggling at each rising edge: a is high at 1, 2, 3 and
-// 6, b at 1, 4 and 6, c at 2, 3 and 7, d at 2, 3, 5 and 7, e at 5 and 8,
-// and f at 3.
-//
-// rule1, a |-> b ##1 c ##1 d: the attempt from 1 holds at 3, those from 2
-// and 3 fail at their tick with b low, the one from 6 fails at 8 with d
-// low, and the four with a low hold at their tick. rule2 negates the same
-// sequence in the consequent under disable iff (e): the attempt from 1
-// fails at 3, those from 2 and 3 hold with b low, the one from 4 holds
-// with a low, the attempt from 6 is dropped at 8, where e disables the
-// property, as is any that would begin at 5 or 8, and the one from 7
-// holds. rule3, a[*2] |-> ((##[1:3] c) or (d |=> e)): the attempt from 1
-// has its antecedent at 2 and c at 3, so it holds at 3; the one from 2 has
-// its antecedent at 3, no c at 4 to 6 and no e at 4 after d at 3, so it
-// fails at 6; the six others hold, at the tick after a where a holds
-// alone. rule4 joins the same operands under and: the attempt from 1 fails
-// at 3, where e is low after d at 2, the one from 2 at 4, and the six
-// others hold. rule5, a ##1 (b || c)[->1] |-> if (b) (##1 d |-> e) else
-// f: the attempt from 1 reaches c at 2 and, b being low, f, low, so it
-// fails at 2; the one from 2 reaches c at 3 and f, high, so it holds at 3;
-// the one from 3 reaches b at 4 and d at 5 with e high, so it holds at 5;
-// the one from 6 reaches c at 7 and f, low, so it fails at 7; the four
-// others hold at their tick. rule5a is rule5 through an instance of rule6.
 module property_examples;
   logic clk = 0;
   logic clkev = 0;
@@ -67,7 +41,7 @@ module property_examples;
     a ##1 (b || c)[->1] |->
       if (b)
         (##1 d |-> e)
-      else // c
+      else
         f;
   endproperty
 
@@ -80,7 +54,7 @@ module property_examples;
     a ##1 (b || c)[->1] |->
       if (b)
         rule6(d, e)
-      else // c
+      else
         f;
   endproperty
 

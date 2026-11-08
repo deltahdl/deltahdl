@@ -1,31 +1,3 @@
-// §16.9.11 Composing sequences from simpler subsequences: a named sequence
-// instantiated by name in another must match from the tick the reference is
-// reached at, while its end point is detected with the method triggered,
-// which is true at a tick the sequence reaches an end point at whatever the
-// match's starting point, applied to an instance with or without arguments;
-// and a sequence's empty match does not activate triggered. The clause's
-// examples run below, sysclk rising at 5, 15, 25, ... so that tick n is at
-// 10n - 5, the tick counter counting straight through, and each process
-// records the ticks its sequence reaches an end point at.
-//
-// Ticks 1 to 6 run rule1: trans is high at 1, start_trans at 2, a at 3, b at
-// 4, c at 5 and end_trans at 6, so s, `a ##1 b ##1 c`, matches from 3, the
-// tick after start_trans, and rule1 ends at 6.
-//
-// Ticks 11 to 14 run the triggered forms: reset is high at 11, inst at 12,
-// ready from 11 to 13, proc1 at 12, proc2 at 13 and branch_back at 14, so e1,
-// `$rose(ready) ##1 proc1 ##1 proc2`, matches from 11 to 13 and reaches its
-// end point at 13, one tick after inst, where rule_triggered, rule2 and
-// rule2a read it, and each ends at 14; rule_instance, which instantiates e1
-// where they read its end point, needs e1 to match from 13, where ready does
-// not rise, so it does not end. Ticks 21 to 26 run the same with ready rising
-// at 23, proc1 at 24, proc2 at 25 and branch_back at 26: e1 matches from 23,
-// so rule_instance ends at 26, while no end point of e1 falls at 23 and the
-// triggered forms do not end.
-//
-// Ticks 31 and 32 have req high, so zero_or_one_req, `(req==1'b1)[*0:1]`,
-// reaches an end point at each of them and, its empty match not activating
-// triggered, at no other tick.
 module sequence_composition;
   logic sysclk = 0;
   int tick = 1;

@@ -1,12 +1,3 @@
-// IEEE 1800-2023 §18.17.3: a case production statement evaluates its case
-// expression and compares it against each case item expression in the order
-// given, generating the production of the first matching item, the default
-// item's production when none matches, or nothing when there is no default;
-// case item expressions separated by commas share a production. The clause's
-// SELECT compares device & 7 against 0 for NETWORK and 1, 2 for DISK with
-// MEMORY as default, so a device of 8 selects network, 9 and 10 disk, 11
-// memory and 16 network again; the first of two matching items wins; and a
-// case with no match and no default generates nothing.
 module case_production;
   int device, i, first_wins, nothing;
   int devices[5];

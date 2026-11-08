@@ -1,18 +1,3 @@
-// IEEE 1800-2023 §18.17.7: data is passed down to a production with the
-// syntax of a task call, its formal arguments declared as a task's and
-// available throughout the production, so the clause's gen(string s =
-// "done") prints what each of five productions passes and its default when
-// main passes nothing; a production with a return type returns a value with
-// return, read in the code blocks of the production that generated it
-// through an implicit variable named after it, an array indexed from 1 when
-// it appears more than once in the rule with elements assigned in syntactic
-// order, so in the clause's Example 1 value[1] and value[2] hold the two
-// values in order and operator holds the string; in Example 2 B[1] holds the
-// count after the first B, C the count after the five repeated Cs, B[2] the
-// count after the second B, and D[1] holds D(5) when cond is true and D[2]
-// holds D(20) when it is false; and a whole sequence can be generated into a
-// queue for later processing, as the clause's GenQueue does, bounded by its
-// arguments at both ends with every item within them.
 module value_passing;
   int i, p, cnt, cond, first_ok, second_ok, third_ok, every, b1, c_after, b2, d1, d2, low, high;
   int b1_range, c_five, b2_range, d_true, d_false, bounded, in_bounds, sized, op_ok;

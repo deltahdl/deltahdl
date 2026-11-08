@@ -1,16 +1,3 @@
-// §18.4.2 Randc modifier: a variable declared randc is random-cyclic,
-// cycling through all the values of its declared range in a random
-// permutation, randomize() computing an initial permutation and returning
-// its values in order on successive calls, and after the last computing a
-// new one, so that no value repeats within an iteration; the permutation
-// is recomputed whenever the constraints on the variable change, so that a
-// constraint block enabled after some draws confines the next ones; an
-// implementation may cap the size of a randc variable but at no less than
-// 8 bits, so an 8-bit one visits all 256 values in 256 calls; and a randc
-// variable declared static keeps its cyclic state with the class, so
-// randomize() through any instance takes the next value of the one
-// sequence. Each line prints whether the draws met what the rule
-// determines and never a value the generator chose.
 class Cyclic;
   randc bit [1:0] y;
 endclass

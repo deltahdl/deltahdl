@@ -1,16 +1,3 @@
-// §18.5.5 Implication: the operator -> declares an expression that implies
-// a constraint, the expression any integral or real expression and the
-// consequent any constraint or an unnamed constraint set. a -> b is the
-// Boolean (!a || b): where the expression is true every constraint of the
-// set holds, otherwise the values are unconstrained, and conversely where
-// the set cannot hold the expression is false. Both sides are
-// interdependent, so len constrains mode as mode constrains len. The
-// Sized here is the clause's example, mode implying len below 10 when
-// little and above 100 when big; the Fixed holds len to 50, which leaves
-// mode neither little nor big; the Pair is the clause's 4-bit a and b
-// under (a == 0) -> (b == 1), which leaves 241 of the 256 combinations and
-// a == 0 a probability of 1/241; the Guarded implies k from a real r; and
-// the Braced implies an unnamed set of two relations.
 typedef enum {little, big, other} mode_t;
 
 class Sized;

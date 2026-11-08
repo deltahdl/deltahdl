@@ -30,17 +30,17 @@ module alu_tb;
 
     initial begin
         a = 8'd10; b = 8'd5;
-        op = 3'b000; #10; // add
+        op = 3'b000; #10;
         $display("10 + 5 = %0d (zero=%b)", result, zero);
 
-        op = 3'b001; #10; // sub
+        op = 3'b001; #10;
         $display("10 - 5 = %0d", result);
 
-        op = 3'b010; #10; // and
+        op = 3'b010; #10;
         $display("10 & 5 = %0d", result);
 
         a = 8'd0; b = 8'd0;
-        op = 3'b000; #10; // add zeros
+        op = 3'b000; #10;
         $display("0 + 0 = %0d (zero=%b)", result, zero);
 
         $finish;

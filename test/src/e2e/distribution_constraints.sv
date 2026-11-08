@@ -1,22 +1,3 @@
-// §18.5.3 Distribution: beside the set membership operator, a constraint
-// may weight the members of a set, a distribution being both a relational
-// test for membership and a statistical distribution over its members.
-// Each item of the set is a value or a range with a weight, := or :/, an
-// unweighted integral item weighing 1; absent other constraints, the
-// probability of an item is proportional to its weight, and a nonzero
-// weight never removes a value from the solution space, while a value the
-// distribution names only with a total weight of zero is excluded. The two
-// operators differ on a range: := weighs each element, the range's weight
-// being its size times the weight, counting elements other constraints
-// exclude, while :/ weighs the range as a whole; either way the weight
-// applies to the range as a whole, so with 100 and 101 excluded the range
-// [100:102] weighted 3 still leaves 102 three times as likely as 103. A
-// value in several items adds their weights, a zero weight included, and
-// a default item weighs every value of the type no other item names. A
-// distribution may mix real and integral values, a range of reals using
-// :/ with a weight and a tolerance range [centre +%- percent] naming the
-// reals within that percentage of the centre. The classes here draw each
-// case in turn and the counts are compared against the clause's ratios.
 class Weighted;
   rand int x;
   constraint c { x dist {100 := 1, 200 := 2, 300 := 5}; }

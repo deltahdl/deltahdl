@@ -1,12 +1,3 @@
-// IEEE 1800-2023 §18.17.2: a production is made conditional with an if-else
-// production statement: the expression may be any expression evaluating to a
-// Boolean value; when it is true the production after it is generated,
-// otherwise the one after the optional else. The clause's PP_OP generates
-// PUSH while depth is below 2 and POP otherwise, PUSH and POP moving depth
-// in their code blocks, so five PP_OP from a depth of 0 generate push, push,
-// pop, push, pop and leave depth at 1; and with no else a false expression
-// generates nothing while a true expression of two operands generates its
-// production.
 module if_else_production;
   int depth, nothing, generated;
 

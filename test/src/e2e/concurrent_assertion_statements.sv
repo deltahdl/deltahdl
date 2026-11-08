@@ -1,16 +1,3 @@
-// §16.14 Concurrent assertions: a property on its own is never evaluated
-// and is checked through an assertion statement, one of assert property,
-// assume property, cover property, cover sequence and restrict property,
-// which may stand in an always or initial procedure, a module, an
-// interface, a program, a generate block or a checker; a statement may be
-// named, and its name is a level of the hierarchical name its action block
-// reports, while an unnamed statement creates no scope. clk rises at 5,
-// 15, ..., 105, and each of the signals a to j is low across one tick, a at
-// 15, b at 25 and so on to j at 105, so that each statement below fails or
-// is covered at a tick of its own and reports %m there. The declared
-// property idle is never instantiated, so nothing evaluates it. The
-// statement in the always procedure takes the procedure's clock; a
-// statement in an initial procedure, on a clock of its own, is §16.14.6's.
 interface bus_if(input logic clk, input logic f);
   if_named: assert property (@(posedge clk) f)
     else $display("%m failed at %0d", $time);

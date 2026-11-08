@@ -1,14 +1,3 @@
-// §16.8 Declaring sequences: a named sequence is declared with an optional
-// list of formal arguments and instantiated by its name, the actuals bound to
-// the formals by position or by name and substituted for the formals'
-// references, `$` among them as the upper bound of a delay range; an instance
-// stands anywhere a sequence_expr does, before the declaration included, and
-// behaves as the flattened sequence; a sequence declared without a clock
-// inherits one from the sequence that instantiates it; and a sequence is
-// evaluated on the clocking event it names, posedge, negedge or either edge.
-// The clause's own s, rule and s20_1 are run here beside a windowed one. clk
-// rises at 5, 15, 25, ... and falls at 10, 20, 30, ...; each signal is high
-// for one tick, and each process records the ticks its sequence ends at.
 module named_sequences;
   logic clk = 0;
   logic trans = 0;

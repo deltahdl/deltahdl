@@ -1,16 +1,3 @@
-// IEEE 1800-2023 9.2.2.2.1 (printed page 223): the expression of an immediate
-// assertion (§16.3) in an always_comb procedure, or in a function the procedure
-// calls, joins the procedure's implicit sensitivity list just as the condition
-// of an if statement would. What an assertion's action blocks read stays out of
-// that list.
-//
-// So `en`, the assertion expression, is in the list, and `a`, read only in the
-// pass statement, is not. Driving `a` from 10 to 20 leaves the procedure
-// unevaluated and `y` holding the 13 that time zero produced.
-//
-// The unconditional `y = 8'd99;` gives the block an output on every path, so a
-// run in which the pass statement never executed would print 99 rather than a
-// value that happens to match.
 module always_comb_assert_action_sensitivity;
   logic en = 1'b1;
   logic [7:0] a = 8'd10;

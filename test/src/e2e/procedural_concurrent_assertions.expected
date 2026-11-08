@@ -14,7 +14,7 @@ loop_p passes 12 fails 6
 r4_p passes 1 fails 0
 c_p covered 4 times
 $finish at time 120
-cover property procedural_concurrent_assertions.c_p (line 74): attempted 6, succeeded 4, succeeded vacuously 0
-[75] ERROR procedural_concurrent_assertions.r2_p (test/src/e2e/procedural_concurrent_assertions.sv:83): Assertion failed.
-[75] ERROR procedural_concurrent_assertions.r2_p (test/src/e2e/procedural_concurrent_assertions.sv:83): Assertion failed.
-[105] ERROR procedural_concurrent_assertions.r2_p (test/src/e2e/procedural_concurrent_assertions.sv:83): Assertion failed.
+cover property procedural_concurrent_assertions.c_p (line 30): attempted 6, succeeded 4, succeeded vacuously 0
+[75] ERROR procedural_concurrent_assertions.r2_p (test/src/e2e/procedural_concurrent_assertions.sv:39): Assertion failed.
+[75] ERROR procedural_concurrent_assertions.r2_p (test/src/e2e/procedural_concurrent_assertions.sv:39): Assertion failed.
+[105] ERROR procedural_concurrent_assertions.r2_p (test/src/e2e/procedural_concurrent_assertions.sv:39): Assertion failed.

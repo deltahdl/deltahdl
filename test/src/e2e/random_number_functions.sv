@@ -1,10 +1,3 @@
-// IEEE 1800-2023 §18.13: the random number system functions and methods.
-// §18.13.1 $urandom returns a new unsigned 32-bit number on each call and the
-// same sequence for the same seed; §18.13.2 $urandom_range returns an unsigned
-// integer within maxval ... minval, minval defaulting to 0 and reversed
-// arguments being swapped; §18.13.3 srandom seeds the RNG of an object or of a
-// process; §18.13.4 get_randstate retrieves that RNG's state as a string and
-// §18.13.5 set_randstate installs it again.
 module random_number_functions;
   class Packet;
     rand bit [15:0] payload;
@@ -25,7 +18,6 @@ module random_number_functions;
   string st;
 
   initial begin
-    // §18.13.1: the same seed yields the same sequence.
     seq_a[0] = $urandom(254);
     for (i = 1; i < 4; i++) seq_a[i] = $urandom;
     seq_b[0] = $urandom(254);
@@ -33,11 +25,6 @@ module random_number_functions;
     replayed = 0;
     for (i = 0; i < 4; i++) if (seq_a[i] == seq_b[i]) replayed++;
 
-    // §18.13.1: the clause's example seeds the generator once, then takes a
-    // 64-bit value from two calls and a 4-bit one from a masked call. The
-    // number is unsigned and 32 bits wide, so over 32 further unseeded draws
-    // its top bit is set in some and the upper half of the concatenation is
-    // nonzero in some; a seed inside the loop would replay one value instead.
     addr[32:1] = $urandom(254);
     high_seen = 0;
     upper_seen = 0;
@@ -53,7 +40,6 @@ module random_number_functions;
     $display("$urandom: replayed by its seed in %0d of 4, top bit seen: %0d, upper half of addr seen: %0d, number below 16 in %0d of 32",
              replayed, high_seen, upper_seen, low_number);
 
-    // §18.13.2: within maxval ... minval, with minval omitted, and reversed.
     in_range = 0;
     in_range_omitted = 0;
     in_range_reversed = 0;
@@ -72,7 +58,6 @@ module random_number_functions;
     $display("$urandom_range: within 0..7 in %0d, %0d and %0d of 256, both ends drawn: %0d",
              in_range, in_range_omitted, in_range_reversed, zero_seen & seven_seen);
 
-    // §18.13.3: srandom seeds an object's RNG and a process's RNG.
     pkt = new;
     pkt.srandom(7);
     for (i = 0; i < 4; i++) begin
@@ -96,7 +81,6 @@ module random_number_functions;
     $display("srandom: the object replays %0d of 4, the process replays %0d of 4",
              obj_seeded, proc_seeded);
 
-    // §18.13.4 and §18.13.5: a state retrieved and set again replays.
     st = pkt.get_randstate();
     for (i = 0; i < 4; i++) begin
       k = pkt.randomize();

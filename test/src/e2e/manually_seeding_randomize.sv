@@ -1,17 +1,3 @@
-// IEEE 1800-2023 §18.15: each object maintains its own internal RNG, used
-// exclusively by its randomize() method, so objects are randomized
-// independently of each other and of calls to other system randomization
-// functions; an object's RNG is seeded at creation with the next value of the
-// creating thread's RNG, hierarchical object seeding, and can be seeded by
-// hand with srandom() either in a class method or outside the class. So two
-// Packets whose new(seed) calls this.srandom(seed) with 200 draw alike
-// though created at different points of the thread, and a $urandom and a
-// $random between the draws change nothing; a Packet re-seeded from outside
-// with 300 draws as one created with 300; srandom() in new() sets the seed
-// before any member is randomized, so a Packet that randomizes itself inside
-// new() after the srandom holds the first draw of one that does not; and a
-// Plain object without a seeding constructor draws as one seeded by hand
-// with the value the creating thread would have drawn next.
 module manually_seeding_randomize;
   class Packet;
     rand bit [15:0] header;

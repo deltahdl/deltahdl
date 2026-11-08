@@ -1,8 +1,3 @@
-// 18.6.3: the behavior of the randomization methods: a static random
-// variable shared by every instance and changed in all of them by each
-// call, a failing randomize() leaving the variables at their previous
-// values and post_randomize() uncalled, and the object random stability
-// randomize() implements, an object's RNG seeded by srandom().
 class Shared;
   static rand bit [7:0] v;
   rand bit [7:0] own;
@@ -31,8 +26,6 @@ module randomization_behavior;
   int ok, agree, changed, i, kept_x, kept_y, same, differ;
 
   initial begin
-    // The static v is one storage: after either instance is randomized both
-    // read the same value, and a call on the other changes it for both.
     s1 = new;
     s2 = new;
     agree = 0;
@@ -48,9 +41,6 @@ module randomization_behavior;
     $display("static v: instances agree in %0d of 64 reads, a call on the other changed it in some: %0d",
              agree, changed > 0);
 
-    // A failing call: with the ceiling at 0 no x lies at or below it and
-    // above 0, so the constraints are infeasible, x and y retain their
-    // previous values and post_randomize() is not called.
     fa = new;
     ok = fa.randomize();
     kept_x = fa.x;
@@ -60,8 +50,6 @@ module randomization_behavior;
     $display("infeasible: randomize returns %0d, x and y retained: %0d, post_randomize %0d",
              ok, (fa.x == kept_x) && (fa.y == kept_y), fa.post_calls);
 
-    // Object random stability: two objects seeded alike draw the same
-    // sequence, and one seeded otherwise draws another.
     p = new;
     q = new;
     r = new;

@@ -1,30 +1,3 @@
-// §16.13.3 Clock flow: the scope of a clocking event flows left to right
-// across the linear operators, concatenation, implication and the like, and
-// distributes to the operands of the branching ones, and or if-else among
-// them, until another replaces it; it flows into parentheses and into an
-// instance of a named sequence, and out of neither, a clock named inside
-// them reaching no further; and of two clocking events juxtaposed the
-// second nullifies the first. clk0 rises at 5, 15, ..., 75 so that tick n
-// of it is at 10n - 5, the tick counter counting through, and clk1 rises at
-// 12, 27, 45, 57 and 72, reading the counter as 2, 3, 5, 6 and 8.
-//
-// written and implied are the clause's first pair: clk0 flows across |=>
-// into the consequent, so naming it there again changes nothing, and both
-// read y a tick of clk0 after x and z at the tick of clk1 after that, which
-// holds from 5, at 27, and fails from 35, at 57. concat and nested are the
-// clause's adjoint pair, x ##1 y |=> z and x |=> y |=> z with z on clk1,
-// and read the same. paren, w ##1 (x2 ##1 @(posedge clk1) y2) |=> z2, has
-// y2 on clk1 and z2 on clk0, the clock in the parentheses flowing no
-// further: from 5, w, x2 at 15 and y2 at 27 match, and z2 is read at 35,
-// the tick of clk0 after 27, where it holds. distribute, v |=> (w3 ##1
-// @(posedge clk1) x3) and (y3 ##1 z3), has clk0 distributed to both
-// operands of the and and x3 alone on clk1: from 45 the consequent begins
-// at 55, x3 is read at 57 and z3 at 65, where both hold. instance, xi |=>
-// s_d ##1 zi with s_d declared on clk1, reads yd at 12, the tick of clk1
-// after 5, and zi at 15, the tick of clk0 after 12, the declaration's clock
-// flowing no further than the instance, where both hold. juxtaposed,
-// @(posedge clk1) @(posedge clk0) xj, is @(posedge clk0) xj, which holds
-// at 5 and 35, where xj is high, and fails at the six other ticks of clk0.
 module clock_flow;
   logic clk0 = 0;
   logic clk1 = 0;

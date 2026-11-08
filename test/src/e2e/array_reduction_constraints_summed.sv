@@ -1,15 +1,3 @@
-// §18.5.7.2 array reduction iterative constraints: in a constraint, an array
-// reduction method is an expression iterated over each element of the array,
-// joined by the method's operand, and its result is of the element type, or
-// of the type of the expression in the with clause where one is given; and
-// the size constraints of a dynamic array are solved first and the iterative
-// constraints next.
-// The Summed is the clause's example, a dynamic byte array A held to five
-// elements whose sum through int'(item) is held below a bound, 300 here,
-// which the eight-bit result the elements alone would give is always below.
-// Over 64 draws every draw has five elements summing below 300 as an int,
-// and some draw sums above 100. Each line prints whether the count met what
-// the clause determines and never a value the generator chose.
 class Summed;
   rand bit [7:0] A[];
   constraint c1 { A.size == 5; }

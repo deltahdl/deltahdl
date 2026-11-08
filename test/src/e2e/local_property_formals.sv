@@ -1,20 +1,3 @@
-// §16.12.19 Local variable formal arguments in property declarations: the
-// rules of §16.8.2 apply to a named property, so a formal designated local
-// is a local variable of the instance, a new copy of it initialized from the
-// actual when the attempt begins; its direction is input, written or
-// inferred, and inout and output are illegal. The assertions below run over
-// eight ticks, clk rising at 5, 15, ..., 75 so that tick n is at 10n - 5: c
-// is high at 1 and 4, data is 5 at 1 and 2, 9 at 3 to 5 and 2 from 6, and
-// do1 is 5 at 3, 2 at 6 and 0 elsewhere.
-//
-// local_input is p_local, whose lv is a local variable formal of direction
-// input, and inferred is p_inferred, whose lv is the same with the direction
-// left to be inferred: each attempt after c compares do1 two ticks later
-// with data as it stood at c's tick, 5 from 1 and 9 from 4, so the attempt
-// from 1 holds at 3 and the one from 4 fails at 6, where do1 is 2. live is
-// p_live, whose v is not local, so it reads data as it stands at the
-// comparison, 9 at 3 and 2 at 6: the attempt from 1 fails at 3 and the one
-// from 4 holds at 6. The six attempts with c low hold at their tick.
 module local_property_formals;
   logic clk = 0;
   int tick = 1;

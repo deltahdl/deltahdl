@@ -1,12 +1,3 @@
-// §23.3.1 instantiates each top-level module once, implicitly, under an
-// instance name equal to the module's own, and each such instance is a
-// scope of its own (§23.9), so t1 and t2 each hold their own x and their own
-// instance u. §23.6 reaches one from the other by the complete path, t2.x and
-// t1.u.v, a call through it runs in the named top, t2.f() reading t2's x,
-// and $root.t2.x is t2's x from inside t2 itself. %m names the instance a
-// process runs in from the top it stands under. The tops' declarations were
-// stored under one name each, the last top's replacing the first's, so both
-// tops read t2's values.
 module leaf;
   int v;
   initial #1 $display("%m v %0d", v);

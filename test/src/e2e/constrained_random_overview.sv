@@ -1,19 +1,3 @@
-// §18.1 General: the clause describes random variables, constraint blocks,
-// randomization methods, disabling randomization, controlling constraints,
-// scope variable randomization, seeding the random number generator,
-// random weighted case statements and random sequence generation, one
-// tour of which this design takes, each stop printing what the rules of
-// the subclause describing it determine and never a value the generator
-// chose. The Bus of §18.3 carries the random variables addr and data and
-// the constraint block word_align, so addr's two low-order bits are 0
-// after every randomize(); randomize() answers 1 for a solvable problem
-// and its with clause adds a constraint, addr == 8; data.rand_mode(0)
-// leaves data at the 99 written before the next randomize();
-// word_align.constraint_mode(0) lets an in-line addr == 3 be solved;
-// std::randomize(v) with a range constrains the scope variable v to it;
-// two objects in the same state seeded alike through srandom draw the
-// same addr; a randcase whose second branch weighs 0 takes the first; and
-// a randsequence runs its productions in order.
 class Bus;
   rand bit [15:0] addr;
   rand bit [31:0] data;

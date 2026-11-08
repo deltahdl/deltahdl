@@ -1,8 +1,3 @@
-// §21.6: plusargs are the arguments a simulation is given that begin with +,
-// and $test$plusargs and $value$plusargs search the ones the command line
-// holds. This case's .args gives +HELLO, +TEST=5 and +NAME=bob, so
-// the queries below answer from the invocation itself, through a package
-// function as well as directly.
 package pa;
   function automatic int has(string s);
     return $test$plusargs(s);

@@ -1,16 +1,3 @@
-// §16.9.2 Repetition in sequences: consecutive repetition `[*n]` or
-// `[*min:max]` matches the operand at consecutive ticks and ends at the last
-// of them, `[*]` and `[+]` standing for `[*0:$]` and `[*1:$]`; goto
-// repetition `[->min:max]` matches a Boolean at ticks that need not be
-// consecutive and ends at the last match; nonconsecutive repetition
-// `[=min:max]` is the goto form extended past the last match by ticks the
-// Boolean is false at. The clause's own sequences are run below. clk rises at
-// 5, 15, 25, ...; a is high for the tick at 15, b for 25, 35 and 45, and c
-// for 55 in the first round; in the second, from 105, a is high for 115, b
-// for 125 and 135, and c for 155; in the third, from 205, a is high for 215,
-// 245 and 275 and b for 235, 265 and 295; and in the fourth, from 305, a is
-// high for 315 and b for 345, 355 and 365. Each process records the ticks its
-// sequence ends at.
 module sequence_repetition;
   logic clk = 0;
   logic a = 0;
@@ -90,19 +77,15 @@ module sequence_repetition;
   end
 
   initial begin
-    // Round one: a at 15, b at 25, 35 and 45, c at 55.
     #10 a = 1;
     #10 a = 0; b = 1;
     #30 b = 0; c = 1;
     #10 c = 0;
-    // Round two, from 105: a at 115, b at 125 and 135, c at 155, with b low
-    // at 145 between.
     #50 a = 1;
     #10 a = 0; b = 1;
     #20 b = 0;
     #10 c = 1;
     #10 c = 0;
-    // Round three, from 205: a at 215, 245 and 275 and b at 235, 265 and 295.
     #50 a = 1;
     #10 a = 0;
     #10 b = 1;
@@ -113,7 +96,6 @@ module sequence_repetition;
     #10 a = 0;
     #10 b = 1;
     #10 b = 0;
-    // Round four, from 305: a at 315 and b at 345, 355 and 365.
     #10 a = 1;
     #10 a = 0;
     #20 b = 1;

@@ -1,18 +1,3 @@
-// §18.5 Constraint blocks: the values of random variables are determined by
-// the constraint expressions declared in constraint blocks, which are
-// members of a class as its variables and methods are, and a block's name
-// is unique within its class and names it to constraint_mode(). A block is
-// a list of expression statements, each restricting the range of a
-// variable or defining a relation between variables, and a constraint
-// expression is any SystemVerilog expression. The Item here declares three
-// blocks: range holds lo between 10 and 20 in two statements, order
-// relates hi to lo and to the state variable limit, and spacing holds the
-// difference of hi and lo to a multiple of 4 through an arithmetic
-// expression. Every block holds at once over 64 draws; limit's current
-// value bounds hi once it is lowered; turning range off by its name frees
-// lo while order and spacing still hold; and an Other class declares its
-// own block named range, the name unique within a class rather than across
-// them.
 class Item;
   rand bit [7:0] lo;
   rand bit [7:0] hi;

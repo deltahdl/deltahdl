@@ -1,24 +1,3 @@
-// §18.3 Concepts and usage: random stimulus is generated within objects,
-// whose random variables take values subject to user-defined constraints.
-// The clause's Bus carries the random addr and data and the word_align
-// constraint, and calling randomize() selects new values for all of its
-// random variables such that all of its constraints are satisfied, data,
-// unconstrained, taking any value in its declared range; MyBus extends
-// Bus, inheriting its random variables and constraints and adding the
-// random atype, whose addr_range constraint selects one of three address
-// ranges by implication, so that a randomized MyBus has addr, data and
-// atype computed together; randomize() with declares additional
-// constraints in line, the clause's exercise_bus restricting atype to low,
-// addr to 10 to 20 and data to the powers of two; the solver handles
-// algebraic factoring, complex Boolean expressions and mixed integer and
-// bit expressions, the power-of-two constraint written arithmetically or
-// as 1 << n with n a 5-bit random variable; if a solution exists the
-// solver finds it; the chosen values satisfy all constraints, an
-// implication's among them; an enum random variable takes only a named
-// constant; and constraint_mode() disables a named constraint block, the
-// clause's exercise_illegal randomizing with the low-order address bits
-// forced nonzero. Every line prints how many of the randomizations met
-// what the rules determine and never a value the generator chose.
 class Bus;
   rand bit [15:0] addr;
   rand bit [31:0] data;

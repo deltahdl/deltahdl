@@ -1,19 +1,3 @@
-// IEEE 1800-2023 §18.17: a randsequence grammar is composed of productions,
-// each a name and production items, terminals being code blocks and
-// nonterminals decomposed into them; a production list streams its items in
-// sequence and lists separated by | are choices the generator makes at
-// random, so the clause's example, main : first second done with first
-// choosing add or dec and second pop or push, yields one of add pop done,
-// add push done, dec pop done and dec push done, each of which 200 runs
-// reach. As each production is generated the side effects of its code block
-// produce the stimulus; the statement creates no loop of itself but a
-// recursive production will loop, so a production naming itself runs one or
-// more times and stops; the statement is an automatic scope and each code
-// block an anonymous automatic scope, a static variable needing the static
-// prefix, so a static counter in a code block sees every activation while an
-// automatic one starts afresh each time; and the production named in the
-// parentheses is the top-level one, the first production when none is named,
-// so randsequence(second) runs only the second production.
 module randsequence_statement;
   int i, f, s, d, n, sv, av;
   int seen[4], every, finite, only_second, from_first;

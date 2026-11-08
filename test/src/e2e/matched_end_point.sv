@@ -1,22 +1,3 @@
-// §16.13.5 Detecting and using the end point of a sequence in multiclock
-// context: where the clock of the source sequence differs from the
-// destination sequence's, its end point is detected with the method
-// matched, which, unlike triggered, synchronizes between the two clocks by
-// storing the result of the source match until the first tick of the
-// destination clock after it; the result does not depend on the source's
-// starting point, and the method applies to an instance with arguments.
-// The clause's e1 and e2 are run here: e1 on clk, rising at 5, 15, ..., and
-// e2 on sysclk, rising at 8, 24, 40, ..., the two never together. Each
-// process records the times its sequence reaches an end point at.
-//
-// e1(ready, proc1, proc2) matches at 35, ready having risen for the tick at
-// 15 and proc1 and proc2 holding at 25 and 35, and again at 95. e2 reads
-// reset at 8 and inst at 24, and e1's end point through matched at 40, the
-// first tick of sysclk after 35, and branch_back at 56, where it ends; the
-// second round has reset at 72, inst at 88, the match of 95 read at 104,
-// and branch_back at 120. twice reads matched on e1_inst, the
-// instance named, at consecutive ticks of sysclk: the first read consumes
-// the stored match, so the second reads false and the sequence never ends.
 module matched_end_point;
   logic clk = 0;
   logic sysclk = 0;

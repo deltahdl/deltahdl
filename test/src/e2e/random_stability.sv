@@ -1,12 +1,3 @@
-// IEEE 1800-2023 §18.14: the RNG is localized to threads and objects, and the
-// sequence of random values a thread or object returns is independent of the
-// RNG in other threads or objects, which is random stability; it applies to
-// $urandom and $urandom_range, shuffle(), randcase and randsequence, srandom()
-// and randomize(). So a thread seeded and drawn from through every one of
-// those returns the same values whether or not objects and other threads draw
-// between, and an object seeded and randomized returns the same values whether
-// or not its thread and another object draw between; another seed selects
-// other values, so the agreement is the stability and not a constant.
 module random_stability;
   class Packet;
     rand bit [15:0] payload;
@@ -23,7 +14,6 @@ module random_stability;
   bit [15:0] s1[4], s2[4], s3[4];
   int untouched_by_objects, changed_by_seed, untouched_by_thread, untouched_by_draws, changed_by_object_seed;
 
-  // The five kinds the clause lists, drawn from the running thread's RNG.
   task automatic draw_five();
     int j;
     u = $urandom;

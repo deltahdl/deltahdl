@@ -1,16 +1,3 @@
-// IEEE 1800-2023 §18.16: randcase introduces a case statement that randomly
-// selects one of its branches, an item's weight divided by the sum of all
-// weights giving the probability of taking that branch, so the clause's
-// weights of 3, 1 and 4 take the branches near 3/8, 1/8 and 1/2 of the time
-// and every draw takes one branch; a zero-weighted branch is not taken and
-// no branch is taken when all weights are zero; the weights are arbitrary
-// expressions, each of self-determined precision and evaluated at most once,
-// added as unsigned values, so with a = 1 and b = 1 the clause's 12'h800
-// branch takes most draws and the a - b branch none, and with a = 8'hFF and
-// b = 1 the a + b branch, whose 8-bit sum is 0, none; and the statement is
-// thread stable, its random numbers coming from $urandom_range(), so a
-// forked thread seeded alike selects the same branches beside a busier
-// thread.
 module randcase_statement;
   int x, i, c1, c2, c3, n, calls, taken, none, mostly, never, wrapped;
   byte a, b;

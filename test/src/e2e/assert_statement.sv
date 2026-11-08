@@ -1,22 +1,3 @@
-// §16.14.1 Assert statement: the assert statement enforces a property;
-// the pass statements of its action block run where the property is true,
-// the fail statements where it is false, and neither where the evaluation
-// is disabled; a null statement stands where no action is needed; with no
-// else clause the tool calls $error on a failure; the action block may not
-// hold a concurrent assertion but may hold an immediate one; and the pass
-// and fail statements run in the Reactive region. clk rises at 5, 15, ...,
-// 75. The clause's env_prop asserts abc(rst, in1, in2), not (b ##1 c)
-// disabled while a is 2, on the clock the body opens with after its
-// disable condition: in1 is high at 15 and in2 at 25, so the attempt of 15
-// fails at 25; in1 is high at 35 and in2 at 45, but rst is 2 across 45, so
-// that attempt is disabled and runs no statement; the other attempts pass,
-// five in all. no_else has no else clause and x is low at 65, so the tool
-// reports the failure itself; null_fail has a null fail statement and y is
-// low at 55, so its else clause is not omitted and the tool reports
-// nothing; nested holds an immediate assertion in its fail statement,
-// which reads z's value in the Reactive region, 0, at 75.
-// reactive counts the ticks at which its pass statement saw the write an
-// always procedure made in the tick's Active region.
 module assert_statement;
   logic clk = 0;
   int rst = 0;

@@ -1,15 +1,3 @@
-// IEEE 1800-2023 §18.17.1: the := operator assigns a weight to a production
-// list and the probability that a list is generated is proportional to its
-// weight, so the clause's first : add := 3 | dec := (1 + 1) generates add
-// near 60% of the time and dec near 40%; a weight is only meaningful between
-// alternatives, so a lone production list weighted 0 is still generated; a
-// list with no weight uses 1, so a | b := 3 generates a near 25% and b near
-// 75%; weight expressions are evaluated when their enclosing production is
-// selected, so weights change dynamically: with w = 10 the list x := w
-// beside y := (10 - w) is always taken, with w = 0 never, and three picks in
-// one statement, x zeroing w, take x then y then y; and the weight may be a
-// ps_identifier, a parameter W3 = 3 generating add near 60% as the literal
-// did.
 module production_weights;
   parameter int W3 = 3;
   int i, x, w, n, adds, decs, as, bs, xs, lone;

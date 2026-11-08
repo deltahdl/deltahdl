@@ -24,9 +24,10 @@ def run_case(
 ) -> Callable[[str, int, str, str], CaseRun]:
     runner = module_loader("run_integration_tests", _RIT_INIT)
 
-    def _run(header: str, returncode: int, out: str, err: str) -> CaseRun:
+    def _run(metadata: str, returncode: int, out: str, err: str) -> CaseRun:
         sv = tmp_path / "case.sv"
-        sv.write_text(f"/*\n{header}*/\nmodule case_m; endmodule\n")
+        sv.write_text("module case_m; endmodule\n")
+        (tmp_path / "case.metadata").write_text(metadata)
         seen: list[str] = []
 
         def fake_run(cmd: list[str], **_: object) -> MagicMock:

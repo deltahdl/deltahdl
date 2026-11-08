@@ -1,26 +1,3 @@
-// §18.5.7.1 foreach iterative constraints: a foreach iterates over the
-// elements of an array with a loop variable per dimension, the scope of each
-// loop variable being the foreach construct, and its constraint_set can hold
-// predicates, which behave as guards where they involve only constants,
-// state variables, loop variables or the size of the array iterated; an
-// index expression can include loop variables, constants and state
-// variables; and the size method of a dynamic array is solved with the size
-// constraints first and is a state variable within the foreach. The Sorted
-// below is the clause's example, a dynamic int array A whose size c1 holds
-// inside {[1:10]} and whose c2 holds each element above the one before it
-// under the guard that keeps the index in bounds, beside a property k that
-// the loop variable of the same name shadows within the foreach; the Fixed
-// leaves the size of A unconstrained, so a randomize() keeps the size new[]
-// gave it, and holds each element to three times its index; and the Stepped
-// holds each element of a four-element B from the state variable off on to
-// one more than the element off places before it, through an index
-// expression over the loop variable and the state variable. Over 128 draws
-// of the Sorted every draw is sized 1 to 10 and ascending, every size from 1
-// to 10 is drawn, and k stays 100; the Fixed sized to 5 keeps 5 elements
-// holding 0, 3, 6, 9 and 12; over 64 draws of the Stepped every draw holds
-// B[2] one above B[0] and B[3] one above B[1]. Each line prints whether the
-// count met what the clause determines and never a value the generator
-// chose.
 class Sorted;
   rand int A[];
   int k = 100;

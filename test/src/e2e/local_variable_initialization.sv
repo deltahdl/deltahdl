@@ -1,32 +1,3 @@
-// §16.13.7 Local variable initialization assignments: for a singly clocked
-// property, the initialization assignment of a local variable is performed
-// when the evaluation attempt of the instance begins, at a tick of its one
-// clock; for a multiclock property with a single semantic leading clock,
-// at the earliest tick of that clock at or after the attempt begins; and
-// where an instance has two or more semantic leading clocks, a separate
-// copy of the local is created for each, initialized at the earliest tick
-// of its clock at or after the attempt begins and read by the subproperty
-// on that clock. clk rises at 5, 15, 25, ..., clk1 at 18, 38, 58, ... and
-// clk2 at 22, 42, 62, .... f is high at 5 alone, so each assertion's
-// attempt at 5 is the one that is not vacuous; the other nine, at 15 to
-// 95, pass vacuously. e is 1 before 10 and from 16 to 20, so it is 1 at 5
-// and at 18 and 0 at 15 and at 22.
-//
-// p is the clause's property: its instance begins at 15, after f, and its
-// two subproperties are on clk1 and clk2, so v is copied twice, the clk1
-// copy initialized at 18, to 1, and the clk2 copy at 22, to 0. a is 1 at
-// 18 alone and b is 1 there, so (a == v)[*1:$] matches at 18 and b holds;
-// c is 1 at 22 alone and d is 0, so c[*1:$] matches at 22 and d == v
-// holds: p passes. p with d != v reads the clk2 copy the other way and
-// fails at 22, which shows that copy is 0 and not the 1 that e held at 18
-// or at 5. r has clk1 alone as its semantic leading clock, so u is
-// initialized at 18, to 1, and (a == u)[*1:$] matches at 18 with b
-// holding; r with !b as its consequent fails at 18, where the match is,
-// which shows u is 1 and not the 0 that e held at 15, where the attempt
-// began, since a == 0 does not hold at 18. q is singly clocked, on the clock flowing in from the assertion,
-// so w is initialized at 5, where the attempt begins, to 1, and g == w
-// holds at 15, where g is 1; q with g != w fails at 15, which shows w is 1
-// and not the 0 that e held at 15.
 module local_variable_initialization;
   logic clk = 0;
   logic clk1 = 0;

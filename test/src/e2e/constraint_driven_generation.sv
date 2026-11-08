@@ -1,19 +1,3 @@
-// §18.2 Overview: constraint-driven test generation lets a test bench
-// generate its stimulus, the constraints written in a compact declarative
-// way and processed by a solver that generates random values meeting
-// them, which can reach corner cases a directed test would miss; the
-// constraints are specified on top of an object-oriented data
-// abstraction that models the data to be randomized as objects holding
-// random variables and user-defined constraints, which determine the
-// legal values, objects being ideal for complex aggregate data such as
-// Ethernet packets. The Packet here is such an abstraction: its random
-// kind, length and tag are legal only where the constraints allow, a
-// runt being shorter than 64, a jumbo longer than 1518, a plain frame
-// in between, the tag set only on a plain frame, and its corner
-// constraint making a jumbo as long as it can be. Each of 24 randomize()
-// calls yields legal values, every value is checked against the same
-// constraints and the count of those meeting them is printed, as is the
-// corner the constraints reach without a directed test naming it.
 typedef enum {RUNT, PLAIN, JUMBO} kind_t;
 
 class Packet;

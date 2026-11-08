@@ -1,29 +1,3 @@
-// §16.12.18 Typed formal arguments in property declarations: the rules of
-// §16.8.1 for typed formal arguments apply to a named property, so a formal
-// typed with a data type takes its actual cast to that type and a formal of
-// type event takes an event expression; and a formal may be of type
-// property, in which case its actual is a property_expr, a boolean or a
-// sequence_expr being one, and each reference to it stands where a
-// property_expr may. A formal of type sequence takes a sequence_expr. The
-// assertions below run over eight ticks, clk rising at 5, 15, ..., 75 so
-// that tick n is at 10n - 5: v is 8'h02 at 2 and 4 and 8'h01 at 6, w is high
-// at 2 and 6, go at 1, 3, 5 and 7, b at 2, 3, 6, 7 and 8, and c at 2 and 4.
-//
-// untyped and typed are p_untyped and p_bit, alike but for p_bit typing x
-// as bit: x untyped reads v whole, high at 2, 4 and 6, where w fails it at
-// 4; x a bit reads the low bit of v, high at 6 alone, where w holds. ev is
-// p_ev with the event posedge clk as its actual, and sig p_sig with clk as
-// the signal under the edge its clock writes; both check w after v == 2
-// and fail at 4. prop_bool, prop_seq and prop_prop pass a boolean, a
-// sequence and a property to p_prop's formal of type property, the
-// consequent after go: b fails at 1 and 5; b ##1 c fails at 1 and 5 with
-// b low and at 8 with c low after 7; b or nexttime c fails at 6 alone,
-// with b low and c low a tick later. negated passes b |-> c to p_not,
-// whose body negates its formal: the implication holds at every tick but
-// 3, 6, 7 and 8, where b is high and c low, so the negation holds at
-// those four. seq_ante passes go ##1 b to p_seq's formal of type
-// sequence, the antecedent of its implication: the antecedent matches at
-// 2, 6 and 8, a tick after go, and c fails it at 6 and 8.
 module typed_property_formals;
   logic clk = 0;
   int tick = 1;

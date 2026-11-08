@@ -1,10 +1,3 @@
-// IEEE 1800-2023 §18.13.1: $urandom returns a new unsigned 32-bit random
-// number on each call. Its optional seed, any integral expression, selects
-// the sequence, and the same seed yields the same sequence every time; the
-// generator is deterministic, so the sequence a program cycles through is the
-// same on each execution. The clause's example seeds it once into a
-// bit-select, concatenates two calls into a 64-bit value and masks one call
-// to four bits.
 module urandom_function;
   parameter int SEED = 254;
   bit [64:1] addr;
@@ -18,8 +11,6 @@ module urandom_function;
   int unsigned r, prev;
 
   initial begin
-    // The same seed replays the sequence; the seed may be a literal, a
-    // parameter, an expression or a variable of equal value.
     seq_a[0] = $urandom(254);
     for (i = 1; i < 8; i++) seq_a[i] = $urandom;
     seq_b[0] = $urandom(SEED);
@@ -35,7 +26,6 @@ module urandom_function;
     for (i = 1; i < 8; i++) seq_b[i] = $urandom;
     by_variable = 0;
     for (i = 0; i < 8; i++) if (seq_a[i] == seq_b[i]) by_variable++;
-    // A different seed selects a different sequence.
     seq_b[0] = $urandom(255);
     for (i = 1; i < 8; i++) seq_b[i] = $urandom;
     diverged = 0;
@@ -43,8 +33,6 @@ module urandom_function;
     $display("seeded: replayed by 254 in %0d of 8, by 250 + 4 in %0d, by a variable in %0d, changed by 255: %0d",
              replayed, by_expression, by_variable, diverged);
 
-    // Each call returns a new number; it is unsigned and 32 bits wide, so an
-    // assignment to a 64-bit variable zero-extends it whatever its top bit.
     advanced = 0;
     high_seen = 0;
     upper_zero = 0;
@@ -60,7 +48,6 @@ module urandom_function;
     $display("unsigned 32-bit: a new number in %0d of 32 calls, upper 32 bits zero in %0d of 32, top bit seen: %0d",
              advanced, upper_zero, high_seen);
 
-    // The clause's example.
     addr[32:1] = $urandom(254);
     upper_seen = 0;
     low_number = 0;

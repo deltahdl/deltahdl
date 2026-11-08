@@ -1,19 +1,3 @@
-// §16.9.10 Sequence contained within another sequence: `seq1 within seq2`
-// abbreviates `(1[*0:$] ##1 seq1 ##1 1[*0:$]) intersect seq2`, matching along
-// an interval seq2 matches along where seq1 matches along a subinterval of
-// it: seq1's match starts no earlier than seq2's and ends no later. The
-// sequences below run over Figure 16-13's trace, mclk rising at 5, 15, 25,
-// ... so that tick n is at 10n - 5, the tick counter counting straight
-// through: irdy is high at ticks 1 and 2 and from 12, trdy at 1 to 3 and
-// from 11, so $fell(irdy) ##1 !irdy[*8] matches from 3 to 11.
-//
-// The clause's !trdy[*7] within ($fell(irdy) ##1 !irdy[*8]) matches from 3 to
-// 11, !trdy[*7] holding from 4 to 10 inside, and ends at 11; !irdy[*9]
-// within the same matches from 3 to 11 as the outer does, and ends at 11;
-// (irdy ##1 !irdy) within it does not match, irdy ##1 !irdy matching from 2
-// to 3 alone, before the outer begins; and (!trdy ##1 trdy ##1 trdy) within
-// it does not match either, the inner matching from 10 to 12 alone, after
-// the outer ends.
 module within_sequence;
   logic mclk = 0;
   int tick = 1;

@@ -1,7 +1,3 @@
-/*
-:subclause: 8.25
-:stage: simulation
-*/
 class S #(type T = int);
   static int n = 0;
   function new();

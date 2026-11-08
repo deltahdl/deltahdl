@@ -1,25 +1,3 @@
-// §16.11 Calling subroutines on match of a sequence: a task, void function
-// or system task written in the list after a sequence, in parentheses with
-// it, is called at every end point of the sequence, the calls of the list in
-// order, scheduled in the Reactive region like an action block without the
-// evaluation waiting on them; an argument passed by value reads the sampled
-// value the match was evaluated with, and a local variable assigned before
-// the call in the list may be passed by value. The clause's s1 and three
-// sequences beside it run below, each evaluated by a cover sequence, which
-// reaches every end point of its sequence, since a declaration alone is
-// evaluated nowhere and so calls nothing. clk rises at 5, 15, 25, ... so that
-// tick n is at 10n - 5, the tick counter counting straight through.
-//
-// s1 matches at the first b strictly after an a, and its $display writes v
-// and w as assigned from e and f: a is high at tick 1 with e high and b at 3
-// with f low, then a at 11 with e low and b at 12 with f high. every_end's
-// $display runs at each end point of c ##[1:2] d, ticks 22 and 23 with c at
-// 21 and d at 22 and 23. in_order's two calls run in the order written at
-// the match of g at 31, the void function note after them. sampled's k
-// counts the clock's edges through a nonblocking assignment, so at the tick
-// at 41, h high, the match reads k as 40 where k reads 41 by the time the
-// call runs in the Reactive region, which its argument passed by reference
-// shows.
 module subroutine_on_match;
   logic clk = 0;
   int tick = 1;

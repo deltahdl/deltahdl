@@ -1,19 +1,3 @@
-// §16.12.3 Negation property: `not property_expr` evaluates, at each
-// attempt, to the opposite of the underlying property, and switches the
-// strength of a sequence: the clause's a1, `not a ##1 b`, negates a weak
-// sequence, which holds beginning at the last tick of a clock that stops
-// ticking while a is true, so a1 fails there, where a2, `not strong(a ##1
-// b)`, holds. The assertions below run over four ticks, clk rising at 5,
-// 15, 25 and 35 so that tick n is at 10n - 5, the tick counter counting
-// through: a is high at ticks 1, 2 and 4 and b at 2, so a ##1 b matches
-// from 1 at 2, the attempts from 2 and 3 can no longer match at 3, and the
-// attempt from 4 is unfinished when the run ends at 40; busy is high at 3.
-//
-// a1 fails at 2, passes at 3 twice and fails again when the run ends, its
-// fail action run in the final blocks, after $finish; a2 fails at 2 and
-// passes at 3 twice, and the run's end adds nothing; a3, `not busy`, passes
-// three times and fails at 3, as a4 does through p_idle, whose body is the
-// negation.
 module negation_property;
   logic clk = 0;
   int tick = 1;

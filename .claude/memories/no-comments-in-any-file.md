@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 71fdefb1-3397-48b8-838f-7c5e17be7223
-  modified: 2026-11-08T02:38:48.018Z
+  modified: 2026-11-08T02:41:46.215Z
 ---
 
 # No comments in any file
@@ -14,7 +14,7 @@ No file deltahdl tracks carries a comment or a docstring. That covers every lang
 
 - **Namespace end comments:** `clang-format --style=google` writes `}  // namespace NAME`, or `}  // namespace` for an anonymous namespace, on the brace that closes it, and writes it again when it is deleted.
 - **The six annex headers** in `src/simulator/`, whose comments are the standard's text, per [[annex-files-are-not-edited]].
-- **Test inputs whose comment is under test:** a SystemVerilog or Verilog input under `test/src/` whose test checks how a comment is handled, such as how comments lex or a directive written inside one.
+- **Test inputs whose comment is under test:** a SystemVerilog or Verilog input under `test/src/` whose test checks how a comment is handled, such as how comments lex or a directive written inside one. An input keeps its comments only when deleting one would change what its test asserts. The comment checker's `--exclude` lists exactly these inputs, each as a `*/test/src/…` glob, so an input that comes to need a comment is added to that list in the same commit, and every other input carries none. A test's own data goes in a sidecar beside its input rather than in a comment: an integration case under `test/src/integration/` names its `:subclause:`, `:stage:` and `:should_fail_because:` lines in `<stem>.metadata`, which `scripts/run_integration_tests` reads, failing the case on a line that names no known key.
 
 **Why:** No compiler, test or linter checks prose beside code, so it stops being true and nothing says when. A rename leaves every sentence naming the old identifier wrong, in files the change never touched. The reasoning belongs in the commit message and the issue, which are dated and attached to a change. `git log -S '<a phrase>'` finds a deleted comment's text.
 

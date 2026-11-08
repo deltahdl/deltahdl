@@ -10,7 +10,6 @@ module assoc_arg;
     tab[2] = 20;
     tab[3] = 30;
     $display("%0d", read_sum(tab));
-    // Verify original is unmodified (by-value copy).
     $display("%0d", tab[1]);
   end
 endmodule

@@ -1,19 +1,3 @@
-// §16.12.11 Always property: `always property_expr` is true if and only if
-// the property holds at every current or future tick; `always [min:max]
-// property_expr` at every tick of the range that exists; and `s_always
-// [min:max] property_expr` needs every tick of the range to exist and the
-// property to hold at each. The assertions below run over four ticks, clk
-// rising at 5, 15, 25 and 35 so that tick n is at 10n - 5, the tick counter
-// counting through: a is high at ticks 1 to 3 and b at every tick, and the
-// run ends at 40.
-//
-// weak_a, `always a`, fails at 4 for every attempt, a low there. weak_b,
-// `always b`, is decided by no tick and holds for every attempt when the
-// run ends, its pass action run four times in the final blocks after
-// $finish. ranged, `always [0:1] b`, is true at 2, 3 and 4 for the attempts
-// from 1 to 3 and, its second tick never reached, true at the end of the
-// run for the attempt from 4; strong_ranged, `s_always [0:1] b`, fails then
-// instead, the range needing that tick.
 module always_property;
   logic clk = 0;
   int tick = 1;

@@ -1,8 +1,3 @@
-// §13.3 puts no limit on how many tasks a task may enable and §13.4 lets a
-// function call itself, so a design's call chain is as deep as it writes it.
-// The chain here nests one class method call per level through an automatic
-// function, a class task and an if statement, deeper than UVM's run_test
-// reaches before its root object exists, and reads the depth back.
 class node;
   int depth;
   function new(int d);

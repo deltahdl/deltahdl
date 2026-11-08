@@ -7,6 +7,6 @@ a1: a is not 1
 a1: a is 1
 f1: a is 1
 $finish at time 26
-cover deferred_assertion_reporting (line 56): evaluated 1, succeeded 1
-cover deferred_assertion_reporting (line 67): evaluated 1, succeeded 1
-[25] ERROR deferred_assertion_reporting (test/src/e2e/deferred_assertion_reporting.sv:71): Assertion failed.
+cover deferred_assertion_reporting (line 35): evaluated 1, succeeded 1
+cover deferred_assertion_reporting (line 41): evaluated 1, succeeded 1
+[25] ERROR deferred_assertion_reporting (test/src/e2e/deferred_assertion_reporting.sv:44): Assertion failed.

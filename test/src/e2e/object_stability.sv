@@ -1,15 +1,3 @@
-// IEEE 1800-2023 §18.14.3: the randomize() built into every class exhibits
-// object stability, the calls to randomize() on one instance being
-// independent of the calls on other instances and of calls to other
-// randomize functions. In the clause's example c1.x and c2.y are independent
-// of each other, a z = $random between the two calls changes neither, and
-// each instance has a unique source of random values that can be seeded
-// independently, its seed taken from the parent thread when the instance is
-// created. So the example run again with a $random, a $urandom and a
-// std::randomize() between the calls returns the same c1.x and c2.y; c1.x is
-// the same after five more calls on c2; two instances seeded alike draw
-// alike and an instance seeded again replays; and an instance seeded by hand
-// with the parent thread's next value draws as the one created there.
 module object_stability;
   class C1;
     rand integer x;

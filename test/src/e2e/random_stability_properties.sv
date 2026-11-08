@@ -1,21 +1,3 @@
-// IEEE 1800-2023 §18.14.1: random stability has four properties. Each module
-// instance has an initialization RNG seeded with the default seed, used to
-// seed its static processes, each with the RNG's next value, and the objects
-// its static declaration initializers create; so the first static process of
-// two instances of one module draws alike, so does the object each creates,
-// and two static processes of one instance differ. A new dynamic thread's RNG
-// is seeded with the next random value of its parent thread (hierarchical
-// seeding), so a thread seeded by hand with the value the parent would have
-// drawn next draws as one the fork seeded, and threads added at the end of a
-// fork leave the earlier ones agreeing. An object created with new is seeded
-// with the next random value of the creating thread, so an object seeded by
-// hand with that value draws as one new seeded, and objects created after it
-// leave its draws agreeing. Every noninitialization RNG can be seeded by hand,
-// and with hierarchical seeding one seed at the root thread defines the whole
-// subtree, so the root seeded again replays two forked threads that each
-// create and draw from an object.
-// The instantiating module is written last, because a run that names no top
-// module elaborates the last module of the source.
 module stable_leaf;
   class Item;
     rand bit [15:0] payload;

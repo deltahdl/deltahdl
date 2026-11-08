@@ -1,19 +1,3 @@
-// §16.9.8 First_match operation: an attempt of first_match(seq) is an
-// attempt of seq beginning at the same tick, and of that attempt's matches
-// only those ending at the earliest tick are matches of the first_match, the
-// later ones discarded; where seq's attempt has no match, neither has the
-// first_match's. The clause's own sequences run below, clk rising at 5, 15,
-// 25, ... so that tick n is at 10n - 5, the tick counter counting straight
-// through, and each process records the ticks its sequence reaches an end
-// point at.
-//
-// te1 is high at tick 1 and te2 at 3 to 6, so t1, te1 ##[2:5] te2, ends at
-// 3, 4, 5 and 6 from tick 1, and ts1, first_match(te1 ##[2:5] te2), at 3
-// alone. a and c are high at ticks 11 and 21, b at 13, 14 and 23, and d at
-// 13 and 22: from tick 11, a ##[2:3] b ends at 13 and 14 and c ##[1:2] d at
-// 13, so t2 ends at 13 and 14, and ts2, first_match(t2), at 13, both matches
-// ending there being its; from tick 21, a ##[2:3] b ends at 23 and c ##[1:2]
-// d at 22, so t2 ends at 22 and 23 and ts2 at 22.
 module first_match_operation;
   logic clk = 0;
   int tick = 1;

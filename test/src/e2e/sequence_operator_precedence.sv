@@ -1,12 +1,3 @@
-// §16.9.1 Operator precedence: Table 16-1 orders the sequence operators, ##
-// binding tighter than and and and tighter than or, the two associating to
-// the left. Three sequences over the same four signals read by that order:
-// concat_and is `(a ##1 b) and c`, both operands matched from the tick at 15
-// where a and c hold and the whole ending at the later end point, 25 where b
-// holds; and_or is `(a and c) or d`, ending at 15 where a and c both hold and
-// at 25, 45 and 55 where d holds; and concat_or is `(a ##1 b) or (c ##1 d)`,
-// ending at 25 where the first concatenation does, and at 55 where c at 45 is
-// followed by d. clk rises at 5, 15, 25, ...
 module sequence_operator_precedence;
   logic clk = 0;
   logic a = 0;

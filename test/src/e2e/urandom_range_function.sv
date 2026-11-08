@@ -1,10 +1,3 @@
-// IEEE 1800-2023 §18.13.2: $urandom_range returns an unsigned integer within
-// maxval ... minval. With minval omitted the range is maxval ... 0, and with
-// maxval below minval the arguments are reversed so that the first is the
-// larger, so the clause's three examples, (7, 0), (7) and (0, 7), each yield
-// 0 to 7 inclusive. Both arguments are int unsigned, so a range above the
-// largest int is honoured. The function is automatically thread stable
-// (§18.14.2): a thread's draws are independent of another thread's.
 module urandom_range_function;
   int i, k;
   int unsigned r;
@@ -34,7 +27,6 @@ module urandom_range_function;
              in_range, $countones(seen), in_range_omitted, $countones(seen_omitted),
              in_range_reversed, $countones(seen_reversed));
 
-    // Equal bounds leave one value; bounds above the largest int are unsigned.
     equal_bounds = 0;
     above_int_max = 0;
     for (i = 0; i < 32; i++) begin
@@ -45,8 +37,6 @@ module urandom_range_function;
     $display("equal bounds return 5 in %0d of 32, a range above the largest int is kept in %0d of 32",
              equal_bounds, above_int_max);
 
-    // Thread stability: a thread seeded the same way draws the same values
-    // whether the thread beside it draws eight numbers or a hundred more.
     fork
       begin
         automatic process p = process::self();

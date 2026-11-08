@@ -1,20 +1,3 @@
-// §16.12.10 Nexttime property: `nexttime property_expr` is true if and only
-// if the property is true beginning at the next tick or there is no
-// further tick, and `s_nexttime property_expr` if and only if there is a
-// next tick and the property is true beginning there; the indexed forms
-// `nexttime [n]` and `s_nexttime [n]` count n ticks instead of one, the
-// weak form holding where fewer follow and the strong failing. The
-// assertions below run over four ticks, clk rising at 5, 15, 25 and 35 so
-// that tick n is at 10n - 5, the tick counter counting through: a is high
-// at ticks 2 and 3, and the run ends at 40, tick 4 the last.
-//
-// weak_next, the clause's p1, is true at 2 and 3 for the attempts from 1
-// and 2, false at 4 for the attempt from 3, and true when the run ends for
-// the attempt from 4, no tick following, its pass action run in the final
-// blocks after $finish; strong_next, p2, fails then instead. weak_two, p7,
-// is true at 3 for the attempt from 1, false at 4 for the attempt from 2,
-// and true when the run ends for the attempts from 3 and 4, fewer than two
-// ticks following; strong_two, p8, fails then twice.
 module nexttime_property;
   logic clk = 0;
   int tick = 1;

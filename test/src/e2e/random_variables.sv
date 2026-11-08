@@ -1,18 +1,3 @@
-// §18.4 Random variables: class variables declared rand or randc are
-// random variables the solver randomizes, a singular variable of any
-// integral or real type; §18.4.1 has a rand variable uniformly distributed
-// over its range, an 8-bit one over 0 to 255 and a real one over the range
-// its constraints leave, §18.4.2 a randc variable cycle through all the
-// values of its declared range in a random permutation, so four
-// randomizations of a 2-bit one visit each value once; §18.3's enum rule
-// has an enum random variable take only a named constant; a packed
-// structure declared rand is treated as an integral type, and its member
-// of enum type is not held to the named constants; and an object handle
-// declared rand has the object's variables and constraints solved
-// concurrently with those of the object holding the handle, the handle
-// itself never modified. Each line prints how many of 40 randomizations
-// of the Vars object met what the rule determines and never a value the
-// generator chose.
 typedef enum bit [1:0] {A = 2'b00, B = 2'b11} ab_e;
 typedef struct packed {
   ab_e ValidAB;

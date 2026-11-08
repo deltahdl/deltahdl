@@ -1,28 +1,3 @@
-// §16.14.2 Assume statement: an assumed property is checked and reported
-// in simulation as an asserted one is; the pass statements of its action
-// block run where the property is true, the fail statements where it is
-// false, and neither where the evaluation is disabled; a null statement
-// stands where no action is needed, and with no else clause the tool calls
-// $error on a failure; a dist within an assert or cover statement is the
-// inside operator with the weights ignored, and the property an assume
-// statement assumes holds the same with or without its biasing. clk rises
-// at 5, 15, ..., 85. The clause's env_prop assumes abc(req, gnt, rst),
-// a |=> b disabled while c, with a fail statement calling $error: req is
-// high at 15, 25 and 35 and gnt at 25 and 35, so the attempt of 35 fails at
-// 45; req is high at 55 and rst across 65, so the attempts of 55 and 65 are
-// disabled and run no statement; counted assumes the same with counting
-// statements, passing at the six other ticks. null_stmt writes the null
-// statement and no else clause, and x is low at 65, so the tool reports
-// the failure itself. The clause's a1 assumes v dist {0:=40, 1:=60}; v is
-// 0, then 1 from 30, and 2 at 85, outside the distribution, so a1 fails
-// there; dist_assert and inside_assert assert the dist and the inside
-// {0, 1} it is equivalent to, and dist_cover covers it, so the three count
-// the same eight ticks. The clause's request and acknowledge protocol is
-// assumed and asserted over req, ack and reset_n: reset_n is low at 5, req
-// is raised at 10 and acknowledged at 35, raised and acknowledged at once
-// at 55, and each is dropped the cycle after, so assume_req1 to
-// assume_req3 and assert_ack2 hold throughout, while ack is raised at 70
-// with req low, so assert_ack1 fails at 75.
 module assume_statement;
   logic clk = 0;
   logic req = 0, gnt = 0, rst = 0;

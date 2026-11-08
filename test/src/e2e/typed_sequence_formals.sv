@@ -1,15 +1,3 @@
-// §16.8.1 Typed formal arguments in sequence declarations: a formal typed
-// with a data type takes its actual cast to that type, so the clause's s1 and
-// s2, alike but for s2 typing x as bit, read an 8-bit actual differently; a
-// formal of type event takes an event expression, the clause's
-// event_arg_example(posedge clk) being @(posedge clk) x ##1 y; a formal not
-// typed event stands as the signal under the edge the body writes, the
-// clause's event_arg_example2(clk) being the same; and a shortint, int or
-// longint formal may bound a cycle delay, its actual an elaboration-time
-// constant, the clause's delay_arg_example taking a parameter. clk rises at
-// 5, 15, 25, ...; v is 8'h02 for the tick at 15, 8'h01 for the tick at 25 and
-// 0 before and after; w is high for the ticks at 25 and 35. Each process
-// records the ticks its sequence ends at.
 module typed_sequence_formals;
   logic clk = 0;
   logic [7:0] v = 0;

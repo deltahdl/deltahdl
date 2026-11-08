@@ -1,23 +1,3 @@
-// §16.14.7 Inferred clocking and disable functions: $inferred_clock and
-// $inferred_disable, used as the entire default value of a formal argument
-// of a property, are replaced at the point the property is instantiated by
-// the clocking event and the disable condition inferred there: for an
-// instance that is the top-level property expression of an assertion
-// statement, the event expression determined at the statement's location,
-// the default clocking of the scope for a static assertion and the clock
-// inferred from the procedure for a procedural one, and the condition of
-// the default disable iff whose scope includes the call, 1'b0 outside any;
-// an actual argument supplied for the formal stands instead. The clause's
-// p_triggers is instantiated by its a1, a2 and a3 beside the assertion
-// each is logically equivalent to, and each pair reports alike: a1 and
-// a1_explicit on negedge clk1 disabled while rst1, a2 and a2_explicit on
-// posedge clk1 disabled by 1'b0, and a3 and a3_explicit, in the always
-// procedure, on posedge clk2 disabled while rst1. clk1 rises at 5, 15, ...
-// and falls at 10, 20, ..., clk2 rises at 13 and 33, a and b are 1
-// throughout, so each attempt's antecedent matches at its own tick and
-// its consequent reads c at the next, c is 1 from 12 to 28, rst1 is 1
-// from 36 to 42, disabling a1's attempt of 40 and dropping its attempt of
-// 30, and the run ends at 48, where the attempts still in flight hold.
 module inferred_clocking_functions;
   logic a = 1, b = 1, c = 0, d = 0, rst1 = 0, clk1 = 0, clk2 = 0;
   logic rst = 0;

@@ -1,18 +1,3 @@
-// IEEE 1800-2023 §18.14.2: the values $urandom and $urandom_range return, the
-// scope randomize() and shuffle() draw, and the branches randcase and
-// randsequence select, are independent of thread execution order. The
-// clause's fork of three threads -- one seeding itself with 100 before
-// drawing x, one drawing y before seeding itself with 200, one drawing z as
-// the sum of two values -- shows thread locality, x, y and z being
-// independent of the order the threads run in, and hierarchical seeding, each
-// thread's random state being initialized with the next random value of the
-// parent thread as a seed. So the fork run again with its threads delayed
-// into another order returns the same x, y and z; x is the first value of a
-// thread seeded with 100, and y and z are what threads seeded by hand with
-// the parent's second and third next values return. And the root of a thread
-// execution subtree determines the seeding of its children, so a subtree
-// whose root seeds itself draws alike from wherever in the parent it is
-// forked.
 module thread_stability;
   process p;
   integer x, y, z, x2, y2, z2, x100;

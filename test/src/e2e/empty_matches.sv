@@ -1,13 +1,3 @@
-// §16.9.2.1 Repetition, concatenation, and empty matches: a repetition count
-// of 0 gives an empty sequence, and concatenation with one follows the
-// clause's rules: `empty ##0 seq` and `seq ##0 empty` match nowhere, `empty
-// ##n seq` is `##(n-1) seq` and `seq ##n empty` is `seq ##(n-1) `true`. So
-// `a[*0] ##0 b` never ends where the fusion ``true ##0 b` ends at every tick
-// b holds at, `b ##2 a[*0]` ends a tick after each b, and a sequence
-// admitting both an empty and a nonempty match is the or of its cases,
-// `b ##1 a[*0:1] ##2 c` being `(b ##2 c) or (b ##1 a ##2 c)`. clk rises at 5,
-// 15, 25, ...; b is high for the ticks at 15 and 25 and a for the tick at 25;
-// then b is high for 55 and c for 75, and b for 95, a for 105 and c for 125.
 module empty_matches;
   logic clk = 0;
   logic a = 0;

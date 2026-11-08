@@ -1,27 +1,3 @@
-// §16.12.14 Abort properties: for `accept_on (expression_or_dist)
-// property_expr` and `sync_accept_on`, the evaluation of the property is
-// true if the abort condition becomes true during it and that of the
-// property_expr otherwise; for `reject_on` and `sync_reject_on` it is false
-// then. The asynchronous forms check the condition at every simulation time
-// step, the synchronous at the clock ticks alone; an abort at the step the
-// operand's evaluation ends at takes precedence, nested aborts are decided
-// by the outermost, and `not` inverts the effect. The assertions below run
-// over eight ticks, clk rising at 5, 15, ..., 75 so that tick n is at 10n -
-// 5, the tick counter counting through: go is high at tick 1, get at 2 and
-// 3, put at 4 and 6, stop at 5, flag at 2 and both at 3, stop_async is high
-// from 47 to 49 alone, between the ticks at 45 and 55, and nv is low
-// throughout.
-//
-// sync_stop is the clause's assertion in its synchronous form: the attempt
-// from 1 has its consequent begin at 3, put holds at 4 and stop at 5, so
-// the reject makes the consequent false and the attempt fails at 5, the
-// seven other attempts true with go low. async_stop, over the pulse of
-// stop_async between the ticks, fails at 6, the asynchronous reject seeing
-// the pulse, where sync_async, its synchronous form, never does and holds
-// at 6 with the second put. accepts, `sync_accept_on(flag) nv`, is true at
-// 2 alone; nested, `sync_accept_on(both) sync_reject_on(both) nv`, is true
-// at 3 alone, the outermost abort deciding; and negated, `not
-// (sync_accept_on(flag) nv)`, is false at 2 alone.
 module abort_property;
   logic clk = 0;
   int tick = 1;

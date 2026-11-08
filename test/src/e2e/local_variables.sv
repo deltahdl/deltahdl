@@ -1,33 +1,3 @@
-// §16.10 Local variables: a named sequence declares local variables with an
-// explicit data type, a new copy of each created at the beginning of every
-// evaluation attempt and its initialization assignment performed then, in
-// declaration order, one's expression reading the locals declared before it
-// as assigned; a local is assigned at the end point of a subsequence by a
-// match item written after it in parentheses, the items performed in order
-// at each nonempty match, may be reassigned later, accumulates when its
-// assignment is attached to a repeated operand or counts with an
-// increment, and, passed as an entire actual argument to an untyped formal
-// of a named sequence, is bound to the formal, an assignment to which is
-// read in the instantiating context after the instance matches. The clause's
-// sequences run below, clk rising at 5, 15, 25, ... so that tick n is at
-// 10n - 5, the tick counter counting straight through, and each process
-// records the ticks its sequence reaches an end point at.
-//
-// data_check captures data_in where a falls and compares data_out with it
-// where b next holds: a is high at tick 1, data_in is 7 at 2, b is high at 5
-// with data_out 7, so it ends at 5; a is high at 11, data_in is 3 at 12 and
-// b is high at 15 with data_out 4, so it does not end there; and a is high at
-// 62, data_in is 9 at 63 and b is high at 64 with data_out 9, so it ends at
-// 64. rep_v sums data over four matches of r: r is high at 21, 23, 25 and 27
-// with data 1, 2, 3 and 4, rb at 28 and rc at 29 with r_out 10, so it ends at
-// 29. count_a_cycles counts the ticks p stays high from its rise against
-// MAX, 3: p is high from 31 to 33 and low at 34, so it ends at 34 with x 3;
-// p is high from 41 to 45, so x reaches 5 and it does not end. init_order
-// initializes v from data_in and w from v: a is high at 51 with data_in 4,
-// and data_out is 5 at 52, so it ends at 52. seq2 hands its v1 to
-// sub_seq2's untyped formal lv, which is assigned data_in where a falls: c
-// is high at 61, and do1 is 9 at 65, where seq2 reads v1 as assigned, so it
-// ends at 65.
 module local_variables;
   localparam int MAX = 3;
   logic clk = 0;

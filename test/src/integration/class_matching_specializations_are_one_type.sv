@@ -1,7 +1,3 @@
-/*
-:subclause: 8.25
-:stage: simulation
-*/
 typedef int word_t;
 
 class S #(type T = int);

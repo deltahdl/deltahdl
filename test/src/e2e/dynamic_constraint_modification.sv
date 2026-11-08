@@ -1,10 +1,3 @@
-// 18.10: dynamic constraint modification: the four ways the clause lists
-// of changing what randomize() solves without changing the class. An
-// implication or if-else predicated on a state variable, a block turned
-// off through constraint_mode() and so ignored by randomize(), a variable
-// turned off through rand_mode() and so a state variable to the solver,
-// and a dist whose weights are state variables, changed between calls to
-// move the probability of each value.
 class Channel;
   rand bit [7:0] len;
   rand int sel;
@@ -24,9 +17,6 @@ module dynamic_constraint_modification;
 
   initial begin
     c = new;
-    // Predicated constraints: the state fast selects which branch of the
-    // if-else and whether the implication binds, so with fast set len lies
-    // in (3, 16) on every draw and with it clear at or above 16.
     short_draws = 0;
     long_draws = 0;
     c.fast = 1;
@@ -42,9 +32,6 @@ module dynamic_constraint_modification;
     $display("predicated: fast draws len in (3, 16) in %0d of 32, slow draws at or above 16 in %0d of 32",
              short_draws, long_draws);
 
-    // A block turned off is ignored by randomize(): with cap off, len is
-    // drawn at or above 200 in some of 64 draws, and with it back on in
-    // none of 64.
     high = 0;
     c.cap.constraint_mode(0);
     for (i = 0; i < 64; i++) begin
@@ -60,8 +47,6 @@ module dynamic_constraint_modification;
     end
     $display("constraint_mode: cap on, len at or above 200 in %0d of 64", high);
 
-    // A variable turned off is a state variable to the solver: base held
-    // at 1000 leaves top drawn in (1000, 1008) on every call.
     near = 0;
     c.base = 1000;
     c.base.rand_mode(0);
@@ -71,8 +56,6 @@ module dynamic_constraint_modification;
     end
     $display("rand_mode: base held, top in (1000, 1008) in %0d of 32", near);
 
-    // The weights of a dist are state variables read at each call: at 9:1
-    // ones outnumber twos over 64 draws, and at 1:9 twos outnumber ones.
     ones = 0;
     twos = 0;
     c.w_one = 9;

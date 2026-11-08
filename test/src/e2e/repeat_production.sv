@@ -1,13 +1,3 @@
-// IEEE 1800-2023 §18.17.4: a repeat production statement iterates over a
-// production the number of times its expression, a non-negative integral
-// value, evaluates to. The clause's PUSH_OPER : repeat($urandom_range(2, 6))
-// PUSH generates PUSH a random number of times between 2 and 6, so a hundred
-// runs each push 2 to 6 times and reach both ends; repeat(0) generates
-// nothing and repeat(1 + 2) three; and the repeat cannot be terminated
-// prematurely of itself, a break in the repeated production's code block
-// terminating the entire randsequence block (§18.17.6), so a break in the
-// third of five pushes leaves three pushes and the production after the
-// repeat ungenerated.
 module repeat_production;
   int i, count, tail, in_range, two_seen, six_seen, both_seen, zero_none, three, no_tail;
 

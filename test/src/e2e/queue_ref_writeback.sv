@@ -10,7 +10,6 @@ module queue_ref_writeback;
     q.push_back(20);
     q.push_back(30);
 
-    // Pass q[1] by ref, set to 99.
     set_ref(q[1]);
     $display("%0d", q[0]);
     $display("%0d", q[1]);

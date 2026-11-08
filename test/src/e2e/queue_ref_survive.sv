@@ -11,7 +11,6 @@ module queue_ref_survive;
     q.push_back(20);
     q.push_back(30);
 
-    // Ref to q[1] (val=20) survives push_front; element shifts to index 2.
     push_and_set(q[1]);
     $display("%0d", q.size());
     $display("%0d", q[0]);

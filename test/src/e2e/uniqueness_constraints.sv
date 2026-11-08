@@ -1,16 +1,3 @@
-// §18.5.4 Uniqueness constraints: a group of variables constrained with
-// unique holds no two members at the same value after randomization. The
-// group is a restricted range_list whose items are singular variables of
-// integral or real type, or unpacked arrays and slices of them, all of
-// equivalent type and none randc; a group of fewer than two members has
-// no effect and raises no contradiction. The Trio here draws three ints
-// over a three-value domain, so every draw spends the domain and no pair
-// coincides; the Excluding is the clause's example on singular variables,
-// b and c drawn from 4 to 6 beside an excluded held to 5 by another
-// constraint, so neither takes 5 and the two split 4 and 6 between them;
-// the Lone names a single member beside a relation fixing it, which the
-// group leaves alone; and the Reals draw two reals from the same two
-// values and never alike.
 class Trio;
   rand int a;
   rand int b;

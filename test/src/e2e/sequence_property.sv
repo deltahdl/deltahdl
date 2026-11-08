@@ -1,19 +1,3 @@
-// §16.12.2 Sequence property: a sequence_expr is a property in three forms,
-// bare, weak(sequence_expr) and strong(sequence_expr); strong holds if and
-// only if the sequence has a nonempty match, and weak holds unless a finite
-// prefix witnesses that the sequence cannot match, so an attempt still in
-// flight when the run ends fails a strong property and not a weak one. A
-// bare sequence_expr is weak in an assert or assume and strong otherwise, in
-// a cover among them. The assertions below evaluate the clause's p3, b ##1
-// c, over four ticks, clk rising at 5, 15, 25 and 35 so that tick n is at
-// 10n - 5, the tick counter counting through: b is high at ticks 2 to 4 and
-// c at 3, so the attempt from 2 matches at 3, the attempt from 1 has no
-// match from its first tick and fails at 1, the one from 3 fails at 4 where
-// c is low, and the one from 4 is unfinished when the run ends at 40.
-//
-// weak_seq and weak_wrapped pass once and fail twice; strong_seq passes
-// once and fails twice at ticks and once more when the run ends, its fail action run then, after $finish;
-// and cov, whose sequence is strong, matches once.
 module sequence_property;
   logic clk = 0;
   int tick = 1;

@@ -1,20 +1,3 @@
-// §16.12.4 Disjunction property: `property_expr1 or property_expr2`
-// evaluates to true if and only if at least one of its operands does. The
-// assertions below run over four ticks, clk rising at 5, 15, 25 and 35 so
-// that tick n is at 10n - 5, the tick counter counting through: a is high
-// at ticks 1 and 4, b at 2 and c at 3, so a ##1 b matches from 1 at 2,
-// cannot match from 2 or 3, and is unfinished from 4 when the run ends at
-// 40.
-//
-// bool_or, `a or b`, holds at 1, 2 and 4 and fails at 3. weak_or, `(a ##1
-// b) or c`, is decided where either operand is: true at 2 for the attempt
-// from 1, whose sequence matches there, false at 2 for the attempt from 2,
-// both operands false, true at 3 through c for the attempt from 3, and, its
-// weak sequence unfinished at the end of the run, true then for the attempt
-// from 4, its pass action run in the final blocks after $finish. strong_or,
-// `strong(a ##1 b) or c`, reads that unfinished sequence as false and fails
-// then instead. not_or, `not a or b`, is (not a) or b as Table 16-3 has
-// `not` bind tighter, false at 1 and 4 and true at 2 and 3.
 module disjunction_property;
   logic clk = 0;
   int tick = 1;

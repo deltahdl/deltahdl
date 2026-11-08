@@ -1,13 +1,3 @@
-// §18.5.7.2 array reduction iterative constraints: in a constraint, an array
-// reduction method is an expression iterated over each element of the array,
-// joined by the method's operand, and its result is of the element type, or
-// of the type of the expression in the with clause where one is given; and
-// the size constraints of a dynamic array are solved first and the iterative
-// constraints next.
-// The Sized draws two to six elements whose sum through int'(item) is held
-// to 100. Over 64 draws every draw's elements sum to 100 over the size
-// drawn, and more than one size is drawn. The line prints whether the count
-// met what the clause determines and never a value the generator chose.
 class Sized;
   rand bit [7:0] C[];
   constraint c1 { C.size inside {[2:6]}; }

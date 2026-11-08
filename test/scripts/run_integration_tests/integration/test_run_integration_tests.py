@@ -8,7 +8,12 @@ import pytest
 
 ExitCode = Callable[[Callable[[], object]], int | str | None]
 
-_SIMULATION = "/*\n:subclause: 8.25\n:stage: simulation\n*/\nmodule m; endmodule\n"
+_SIMULATION = ":subclause: 8.25\n:stage: simulation\n"
+
+
+def _write_case(test_dir: Path, stem: str, metadata: str) -> None:
+    (test_dir / f"{stem}.sv").write_text(f"module {stem}; endmodule\n")
+    (test_dir / f"{stem}.metadata").write_text(metadata)
 
 
 def _stub_printing(stdout_of: dict[str, str]) -> Callable[..., MagicMock]:
@@ -39,8 +44,8 @@ def _printed(
 
 
 def _one_holding_one_failing(tmp_path: Path) -> Callable[..., MagicMock]:
-    (tmp_path / "holds.sv").write_text(_SIMULATION)
-    (tmp_path / "breaks.sv").write_text(_SIMULATION)
+    _write_case(tmp_path, "holds", _SIMULATION)
+    _write_case(tmp_path, "breaks", _SIMULATION)
     return _stub_printing({
         "holds": ":assert: (1 == 1)\n", "breaks": ":assert: (1 == 2)\n",
     })
@@ -49,7 +54,7 @@ def _one_holding_one_failing(tmp_path: Path) -> Callable[..., MagicMock]:
 def test_all_holding_exits_zero(
     rit: ModuleType, tmp_path: Path, get_exit_code: ExitCode,
 ) -> None:
-    (tmp_path / "holds.sv").write_text(_SIMULATION)
+    _write_case(tmp_path, "holds", _SIMULATION)
     fake_run = _stub_printing({"holds": ":assert: (1 == 1)\n"})
     assert get_exit_code(lambda: _run_main(rit, tmp_path, fake_run)) == 0
 
@@ -105,21 +110,21 @@ def test_the_clause_table_counts_the_failures_under_the_top_clause(
     assert "│ 8      │      1 │" in out
 
 
-def test_a_malformed_header_does_not_stop_the_later_cases(
+def test_incomplete_metadata_does_not_stop_the_later_cases(
     rit: ModuleType,
     tmp_path: Path,
     get_exit_code: ExitCode,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    (tmp_path / "a_stageless.sv").write_text("/*\n:subclause: 8.25\n*/\n")
-    (tmp_path / "b_holds.sv").write_text(_SIMULATION)
+    _write_case(tmp_path, "a_stageless", ":subclause: 8.25\n")
+    _write_case(tmp_path, "b_holds", _SIMULATION)
     fake_run = _stub_printing({"b_holds": ":assert: (1 == 1)\n"})
     out = _printed(rit, tmp_path, fake_run, get_exit_code, capsys)
     assert "integration-tests summary: 1/2 passed (50.0%), 1 failed" in out
 
 
 def _one_unnumbered(tmp_path: Path) -> Callable[..., MagicMock]:
-    (tmp_path / "unnumbered.sv").write_text("/*\n:stage: simulation\n*/\n")
+    _write_case(tmp_path, "unnumbered", ":stage: simulation\n")
     return _stub_printing({})
 
 
@@ -143,6 +148,17 @@ def test_a_failure_without_a_subclause_counts_under_none(
     fake_run = _one_unnumbered(tmp_path)
     out = _printed(rit, tmp_path, fake_run, get_exit_code, capsys)
     assert "│ none   │      1 │" in out
+
+
+def test_a_case_without_a_metadata_file_is_named_by_its_file(
+    rit: ModuleType,
+    tmp_path: Path,
+    get_exit_code: ExitCode,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    (tmp_path / "bare.sv").write_text("module bare; endmodule\n")
+    out = _printed(rit, tmp_path, _stub_printing({}), get_exit_code, capsys)
+    assert "  FAIL: bare.sv\n" in out
 
 
 def test_an_empty_directory_exits_one(

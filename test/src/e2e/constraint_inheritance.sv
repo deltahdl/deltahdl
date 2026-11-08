@@ -1,20 +1,3 @@
-// §18.5.2 Constraint inheritance: constraints are inherited as other class
-// members are, a derived class inheriting every constraint of its
-// superclass; a derived constraint of an inherited name replaces the
-// inherited one and a derived constraint of a new name is an additional
-// constraint; randomize() is virtual, so it honors the constraints of the
-// object it is called on whatever the type of the handle; a derived
-// prototype of an inherited name replaces the inherited constraint and is
-// completed as an external block; an abstract class may declare a pure
-// constraint, an obligation on every non-abstract derived class to
-// provide a constraint of that name; and the :initial, :extends and :final
-// specifiers state that a constraint is not an override, is one, and may
-// not be replaced further. The Base here holds x at least 0 and below 100
-// in two blocks; a Derived replaces hi to hold x below 10, marked
-// :extends, and adds even; a Fixed replaces hi through a prototype
-// completed outside the class to hold x to 42; a Range implements the pure
-// constraint of the abstract Bounded; and a Sealed declares its own
-// :initial :final block.
 class Base;
   rand int x;
   constraint lo { x >= 0; }

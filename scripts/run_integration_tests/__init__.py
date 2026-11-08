@@ -5,9 +5,8 @@ from collections import defaultdict
 from pathlib import Path
 
 from lib.python.run_tests_common import (
-    BINARY, REPO_ROOT, check_assertions, check_binary, parse_metadata,
-    print_clause_breakdown, print_result, reported_subclauses, run_reported,
-    subclause_is_within,
+    BINARY, REPO_ROOT, check_assertions, check_binary, print_clause_breakdown,
+    print_result, reported_subclauses, run_reported, subclause_is_within,
 )
 
 TEST_DIR = REPO_ROOT / "test" / "src" / "integration"
@@ -22,9 +21,44 @@ _SUBCLAUSE_TEXT = re.compile(r"\d+(?:\.\d+)*")
 
 _ASSERT_LINE = re.compile(r":assert:")
 
+_METADATA_LINE = re.compile(r":(subclause|stage|should_fail_because): (.*)")
+
 
 def collect_tests() -> list[Path]:
     return sorted(TEST_DIR.glob("*.sv"))
+
+
+def metadata_path(sv_path: Path) -> Path:
+    return sv_path.with_suffix(".metadata")
+
+
+def read_metadata(sv_path: Path) -> dict[str, str]:
+    path = metadata_path(sv_path)
+    if not path.is_file():
+        msg = f"{sv_path.name}: expected {path.name} beside it"
+        raise ValueError(msg)
+    metadata: dict[str, str] = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        match = _METADATA_LINE.fullmatch(line)
+        if not match:
+            msg = (
+                f"{path.name}: expected a :subclause:, :stage: or"
+                f" :should_fail_because: line, got {line!r}"
+            )
+            raise ValueError(msg)
+        key, value = match.groups()
+        if key in metadata:
+            msg = f"{path.name}: gives :{key}: twice"
+            raise ValueError(msg)
+        metadata[key] = value.strip()
+    return metadata
+
+
+def case_subclause(sv_path: Path) -> str:
+    try:
+        return numbered_subclause(read_metadata(sv_path))
+    except ValueError:
+        return ""
 
 
 def numbered_subclause(metadata: dict[str, str]) -> str:
@@ -36,8 +70,9 @@ def subclause_of(metadata: dict[str, str], sv_path: Path) -> str:
     subclause = numbered_subclause(metadata)
     if not subclause:
         msg = (
-            f"{sv_path.name}: expected a :subclause: header,"
-            f" got {metadata.get('subclause', '')!r}"
+            f"{metadata_path(sv_path).name}: expected a :subclause: line"
+            f" naming a numbered subclause, got"
+            f" {metadata.get('subclause', '')!r}"
         )
         raise ValueError(msg)
     return subclause
@@ -55,8 +90,8 @@ def stage_option(metadata: dict[str, str], sv_path: Path) -> str | None:
     stage = metadata.get("stage", "")
     if stage not in _OPTION_OF_STAGE:
         msg = (
-            f"{sv_path.name}: expected a :stage: header naming one of"
-            f" {', '.join(_OPTION_OF_STAGE)}, got {stage!r}"
+            f"{metadata_path(sv_path).name}: expected a :stage: line naming"
+            f" one of {', '.join(_OPTION_OF_STAGE)}, got {stage!r}"
         )
         raise ValueError(msg)
     return _OPTION_OF_STAGE[stage]
@@ -93,8 +128,8 @@ def acceptance_outcome(
 
 
 def run_test(sv_path: Path) -> tuple[bool, str]:
-    metadata = parse_metadata(str(sv_path))
     try:
+        metadata = read_metadata(sv_path)
         subclause = subclause_of(metadata, sv_path)
         option = stage_option(metadata, sv_path)
     except ValueError as exc:
@@ -119,7 +154,7 @@ def main() -> None:
 
     failed_by_clause: defaultdict[str, int] = defaultdict(int)
     for sv_path in tests:
-        subclause = numbered_subclause(parse_metadata(str(sv_path)))
+        subclause = case_subclause(sv_path)
         ok, detail = run_test(sv_path)
         print_result(ok, result_name(subclause, sv_path))
         failed_by_clause[clause_row(subclause)] += not ok

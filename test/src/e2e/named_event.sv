@@ -2,7 +2,6 @@ module named_event;
   event e;
   int i = 0;
 
-  // Test 1: delayed trigger (should work)
   always @(e) begin
     i = i + 1;
   end

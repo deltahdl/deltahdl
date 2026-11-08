@@ -1,15 +1,3 @@
-// §18.4.1 Rand modifier: a variable declared rand is a standard random
-// variable whose values are uniformly distributed over its range, so an
-// unconstrained rand bit [7:0] is assigned any value from 0 to 255 with
-// equal probability, the chance of the same value on successive calls
-// being 1/256, and a rand real is uniformly distributed over its range,
-// the real v constrained to 0.0 to 2.0 landing in 0.0 to 1.0 as often as in
-// 1.0 to 2.0. Over 8192 randomizations every one of the 256 values of y is
-// drawn, none more than twice its share of 32, successive calls repeat a
-// value about 1/256 of the time, within 64 repeats where 32 are expected,
-// and the two halves of v's range receive counts within a tenth of each
-// other; each line prints whether the count met what a uniform draw
-// determines and never a value the generator chose.
 class Uniform;
   rand bit [7:0] y;
   rand real v;

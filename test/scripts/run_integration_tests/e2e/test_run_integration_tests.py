@@ -2,19 +2,19 @@ import subprocess
 from collections.abc import Callable
 from pathlib import Path
 
-_SIMULATION = "/*\n:subclause: 8.25\n:stage: simulation\n*/\nmodule m; endmodule\n"
+_SIMULATION = ":subclause: 8.25\n:stage: simulation\n"
 _REJECTED = (
-    "/*\n:subclause: 8.25\n:stage: elaboration\n"
-    ":should_fail_because: the rule under test forbids it\n*/\n"
-    "module m; endmodule\n"
+    ":subclause: 8.25\n:stage: elaboration\n"
+    ":should_fail_because: the rule under test forbids it\n"
 )
 RunRunnerMain = Callable[[str, Path, Path], subprocess.CompletedProcess[str]]
 
 
-def _one_case(tmp_path: Path, text: str) -> Path:
+def _one_case(tmp_path: Path, metadata: str) -> Path:
     test_dir = tmp_path / "tests"
     test_dir.mkdir()
-    (test_dir / "case.sv").write_text(text)
+    (test_dir / "case.sv").write_text("module m; endmodule\n")
+    (test_dir / "case.metadata").write_text(metadata)
     return test_dir
 
 

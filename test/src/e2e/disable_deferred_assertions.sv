@@ -1,13 +1,4 @@
-// §16.4.4 Disabling deferred assertions: a disable naming a specific deferred
-// assertion cancels that assertion's pending reports; a disable applied to the
-// outermost scope of a procedure with an active deferred assertion queue
-// flushes the queue, every pending report on it cleared, beside the ordinary
-// effects of §9.6.2; and a disable of a task or of a scope that is not a
-// procedure's outermost one flushes nothing. The clause's two examples are run
-// with $error standing where its first has $fatal, so that the run goes on.
 module disable_deferred_assertions;
-  // The first example: a1's failure is reported only in a time step where
-  // bad_val_ok does not settle at 1, the disable a1 cancelling it otherwise.
   logic bad_val = 0;
   logic bad_val_ok = 0;
   always @(bad_val or bad_val_ok) begin : b1
@@ -17,8 +8,6 @@ module disable_deferred_assertions;
     end
   end
 
-  // The second example: a disable of b2 from b3 flushes every report pending
-  // on b2's queue.
   logic a = 0;
   logic b = 0;
   logic [7:0] c = 0;
@@ -34,8 +23,6 @@ module disable_deferred_assertions;
     disable b2;
   end
 
-  // A disable of a scope that is not the procedure's outermost one leaves the
-  // report a4 queued in it pending, and it is reported.
   logic d = 1;
   always @(d) begin : b4
     begin : inner
@@ -44,7 +31,6 @@ module disable_deferred_assertions;
     end
   end
 
-  // A disable of a task leaves the report its call queued pending as well.
   logic e = 1;
   task t_check;
     a5: assert #0 (e) else $error("a5: e is 0");

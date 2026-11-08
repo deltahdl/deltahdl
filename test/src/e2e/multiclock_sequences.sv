@@ -1,24 +1,3 @@
-// §16.13 Multiclock support: a sequence may be built from subsequences on
-// different clocks, joined by ##1, which moves from the end point of the
-// first, at a tick of its clock, to the nearest strictly subsequent tick of
-// the second clock, or by ##0, which moves to the nearest possibly
-// overlapping tick of the second clock, the same tick where the two clocks
-// tick together; and where the two clocks are identical the sequence is the
-// singly clocked one. clk0 rises at 5, 15, ..., 75 so that tick n of it is
-// at 10n - 5, the tick counter counting through, and clk1 rises at 12, 27,
-// 45, 57 and 72, reading the counter as 2, 3, 5, 6 and 8, the tick at 45
-// together with clk0's fifth: sig0 is high at 1, 2, 5 and 7 and sig1 at 3
-// and 5.
-//
-// delayed, sig0 ##1 @(posedge clk1) sig1, begins at each tick of clk0 and,
-// sig0 holding, reads sig1 at the next tick of clk1 after it: the attempt
-// from 15 holds at 27, the one from 45 fails at 57, the next tick of clk1
-// strictly after 45, and those from 5 and 65 fail at 12 and 72; the four
-// with sig0 low fail at their tick. overlapped, with ##0, is the same but
-// for the attempt from 45, which reads sig1 at clk1's tick at 45 itself
-// and holds there. same_clock names clk0 again after ##1, which changes
-// nothing, so it reads as plain, sig0 ##1 sig1, does: sig1 a tick of clk0
-// after sig0, which holds from 15 alone, at 25.
 module multiclock_sequences;
   logic clk0 = 0;
   logic clk1 = 0;

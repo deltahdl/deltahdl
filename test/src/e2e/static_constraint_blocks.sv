@@ -1,22 +1,3 @@
-// §18.5.10 static constraint blocks: a constraint block declared static has
-// calls to constraint_mode() affect all instances of the constraint in all
-// objects, so a static constraint set to off is off for every instance of
-// the class, while a block that is not static keeps a mode of its own per
-// object; and a constraint declared through a prototype and an external
-// block carries the static keyword on both or on neither. The Shared below
-// holds a static bounded, x below 10, beside an even that is not static; the
-// Own holds the same bounded without static; and the Completed declares a
-// static prototype nonzero completed by a static external block holding x
-// above 0. Over 64 draws of each of two Shared every draw is below 10 and
-// even; with bounded turned off through the first, the second reports it
-// off, some of its 64 draws reach 10 or more and every one is still even;
-// turned back on through the second, the first reports it on and its 64
-// draws are all below 10 again. With bounded turned off through the first
-// of two Own, the second reports it on and its 64 draws all stay below 10.
-// The two Completed draw x above 0 on every one of 64 draws each, and the
-// block turned off through one is off through the other. Each line prints
-// whether the count met what the clause determines and never a value the
-// generator chose.
 class Shared;
   rand bit [7:0] x;
   static constraint bounded { x < 10; }

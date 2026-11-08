@@ -55,7 +55,7 @@ def test_a_subclause_that_is_not_a_number_is_named_in_the_detail(
     assert "got 'classes'" in detail
 
 
-def test_a_case_without_a_subclause_fails_naming_the_header(
+def test_a_case_without_a_subclause_fails_naming_the_key(
     run_case: RunCase,
 ) -> None:
     _, (_, detail) = run_case(":stage: simulation\n", 0, _HOLDS, "")
@@ -67,7 +67,7 @@ def test_a_subclause_that_is_not_a_number_fails_the_case(run_case: RunCase) -> N
     assert not ok
 
 
-def test_a_case_without_a_stage_fails_naming_the_header(run_case: RunCase) -> None:
+def test_a_case_without_a_stage_fails_naming_the_key(run_case: RunCase) -> None:
     _, (_, detail) = run_case(":subclause: 8.25\n", 0, _HOLDS, "")
     assert ":stage:" in detail
 
@@ -77,9 +77,57 @@ def test_an_unknown_stage_fails_the_case(run_case: RunCase) -> None:
     assert not ok
 
 
-def test_a_malformed_header_runs_nothing(run_case: RunCase) -> None:
+def test_incomplete_metadata_runs_nothing(run_case: RunCase) -> None:
     seen, _ = run_case(":subclause: 8.25\n", 0, "", "")
     assert not seen
+
+
+def test_a_case_without_a_metadata_file_fails_naming_it(
+    rit: ModuleType, tmp_path: Path,
+) -> None:
+    sv = tmp_path / "bare.sv"
+    sv.write_text(f"/*\n{_SIMULATION}*/\nmodule bare; endmodule\n")
+    with patch.object(rit.subprocess, "run"):
+        outcome = rit.run_test(sv)
+    assert outcome == (False, "bare.sv: expected bare.metadata beside it")
+
+
+def test_a_case_without_a_metadata_file_runs_nothing(
+    rit: ModuleType, tmp_path: Path,
+) -> None:
+    sv = tmp_path / "bare.sv"
+    sv.write_text(f"/*\n{_SIMULATION}*/\nmodule bare; endmodule\n")
+    with patch.object(rit.subprocess, "run") as run:
+        rit.run_test(sv)
+    assert not run.called
+
+
+@pytest.mark.parametrize("line", [
+    "subclause: 8.25",
+    " :subclause: 8.25",
+    "// :subclause: 8.25",
+    ":tags: classes",
+    "",
+])
+def test_a_line_naming_no_known_key_fails_quoting_it(
+    run_case: RunCase, line: str,
+) -> None:
+    _, outcome = run_case(f"{_SIMULATION}{line}\n", 0, _HOLDS, "")
+    assert outcome == (
+        False,
+        "case.metadata: expected a :subclause:, :stage: or"
+        f" :should_fail_because: line, got {line!r}",
+    )
+
+
+def test_a_line_naming_no_known_key_runs_nothing(run_case: RunCase) -> None:
+    seen, _ = run_case(f"{_SIMULATION}:tags: classes\n", 0, _HOLDS, "")
+    assert not seen
+
+
+def test_a_key_given_twice_fails_naming_it(run_case: RunCase) -> None:
+    _, outcome = run_case(f"{_SIMULATION}:stage: parsing\n", 0, "", "")
+    assert outcome == (False, "case.metadata: gives :stage: twice")
 
 
 def test_the_command_starts_with_the_binary(
@@ -179,7 +227,8 @@ def test_a_crash_is_no_rejection(run_case: RunCase) -> None:
 
 def test_a_timeout_fails_the_case(rit: ModuleType, tmp_path: Path) -> None:
     sv = tmp_path / "slow.sv"
-    sv.write_text(f"/*\n{_ELABORATION}*/\nmodule slow; endmodule\n")
+    sv.write_text("module slow; endmodule\n")
+    (tmp_path / "slow.metadata").write_text(_ELABORATION)
     with patch.object(
         rit.subprocess, "run",
         side_effect=subprocess.TimeoutExpired(cmd="deltahdl", timeout=30),

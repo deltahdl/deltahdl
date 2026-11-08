@@ -1,5 +1,3 @@
-// §19.7, Table 19-1: the coverage report at the end of the run lists as many
-// of a cross's missing cross bins as its cross_num_print_missing asks for.
 module t;
   bit x, y;
   covergroup cg;

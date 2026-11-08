@@ -1,12 +1,3 @@
-// §16.5 Concurrent assertions overview: a concurrent assertion is evaluated
-// only at the ticks of its clock, over the sampled values of its expression,
-// and in the Observed region. clk rises at 5, 15, 25, 35 and 45; a pulses
-// between the first two ticks and is never seen; a is written 1 in the same
-// time step as the third tick, so that tick samples the value a held before
-// the step, 0, and the assertion passes while a already reads 1 in its pass
-// statement, which runs in the Reactive region after the tick's own display;
-// the fourth tick samples the 1 and fails; a falls between the ticks after,
-// and the fifth passes.
 module concurrent_assertions_overview;
   logic clk = 0;
   logic a = 0;

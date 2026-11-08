@@ -1,17 +1,3 @@
-// §33.5.4 (printed page 944): the tool doing the binding needs only the
-// lib.cell specification of the top-level cells, the configuration to use, or
-// both. The design so bound is the design of the invocation, and running it is
-// what shows which cell was bound.
-//
-// separate_compilation_bind_runs.before compiles this file into the library
-// `runs` and writes it to runs.lib; separate_compilation_bind_runs.args loads
-// runs.lib and names the configuration below. The bind elaborated the design
-// and stopped, so the leaf's $display never ran and the invocation printed
-// nothing. Both invocations run in a temporary directory the runner makes.
-//
-// PrecompiledLibrary::Load in src/parser/precompiled_library.cpp reads the
-// compiled form back with the directive state the precompile recorded; this
-// file carries no compiler directive.
 module separate_compilation_runs_top;
   separate_compilation_runs_leaf #(.W(4)) u();
 endmodule

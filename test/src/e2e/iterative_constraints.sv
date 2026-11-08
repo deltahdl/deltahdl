@@ -1,16 +1,3 @@
-// §18.5.7 Iterative constraints: an arrayed variable is constrained through
-// loop variables and indexing expressions, or through array reduction
-// methods. The Indexed below is the clause's example, a byte array A under
-// C1, a foreach holding each element inside {2, 4, 8, 16}, and C2, a foreach
-// holding each element above twice its index; the Summed holds three
-// elements of B below 10 through a foreach and their sum to 12 through the
-// sum() reduction. Over 128 draws of the Indexed every element of every draw
-// is in the set and above twice its index, the first element is drawn at 2,
-// which only its own index of 0 admits, and the last at 16; over 64 draws
-// of the Summed the elements add up to 12, read element by element and
-// through sum() on the object, and each is below 10. Each line prints
-// whether the count met what the clause determines and never a value the
-// generator chose.
 class Indexed;
   rand byte A[4];
   constraint C1 { foreach (A[i]) A[i] inside {2, 4, 8, 16}; }

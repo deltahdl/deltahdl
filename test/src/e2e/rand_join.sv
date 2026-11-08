@@ -1,14 +1,3 @@
-// IEEE 1800-2023 §18.17.5: rand join randomly interleaves two or more
-// production sequences while keeping the relative order of each, so the
-// clause's TOP : rand join S1 S2 with S1 : A B and S2 : C D produces one of
-// A B C D, A C B D, A C D B, C D A B, C A B D and C A D B on every run and
-// all six over many; the optional real expression in 0.0 to 1.0 is the
-// degree to which the length of the sequences still to be interleaved
-// affects the choice, 0.0 giving the shortest remaining sequences priority
-// (A B C D and C D A B), 1.0 the longest (the four interleaved ones), and
-// the default 0.5 prioritizing no length, so each of the six is near a sixth
-// of the runs; and nonterminals are interleaved to a depth of 1, so the two
-// items of a nonterminal inside S1 stay adjacent.
 module rand_join;
   int i, p, code, seq[4], counts[6], codes[6];
   int every, all_six, near_sixth, shortest_first, longest_first, adjacent;

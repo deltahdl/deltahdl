@@ -1,22 +1,3 @@
-// §16.12.12 Until property: `property_expr1 until property_expr2` is true
-// where property_expr1 holds at every tick from the attempt's until, not
-// including, a tick property_expr2 holds at; `until_with` needs
-// property_expr1 at that tick as well; and the strong forms, `s_until` and
-// `s_until_with`, need a tick property_expr2 holds at to exist, where the
-// weak forms hold with property_expr1 true at every tick though
-// property_expr2 never holds. The assertions below run over four ticks, clk
-// rising at 5, 15, 25 and 35 so that tick n is at 10n - 5, the tick counter
-// counting through: a is high at ticks 1, 2 and 4, b at 3 and c at every
-// tick, and the run ends at 40.
-//
-// weak_until, `a until b`, is true at 3 for the attempts from 1 to 3, a not
-// needed there, and true when the run ends for the attempt from 4, a high
-// with b never true again, its pass action run in the final blocks after
-// $finish; strong_until, `a s_until b`, fails then instead. with_a, `a until_with
-// b`, needs a at 3 as well and fails there for the attempts from 1 to 3,
-// holding at the end for the attempt from 4; with_c, `c until_with b`, is
-// true at 3 for those attempts and at the end for the last, where
-// strong_with, `c s_until_with b`, fails.
 module until_property;
   logic clk = 0;
   int tick = 1;

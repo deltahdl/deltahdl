@@ -1,16 +1,3 @@
-// §18.5.1 External constraint blocks: a constraint prototype declared in a
-// class, in the implicit form of a name alone or the explicit form
-// prefixed by extern, specifies that the class has a constraint of that
-// name without giving its block; either is completed by an external
-// constraint block written after the class in the same scope and named
-// through the class scope resolution operator. An implicit prototype
-// without an external block is an empty constraint, one with no effect on
-// randomization, as a block holding the constant 1 would be. The C here
-// carries both forms, completed outside the class to hold x inside -4, 5
-// and 7 and to at least 0, so every draw is 5 or 7; the completed block
-// keeps its prototype's name, so turning proto1 off frees x to any value
-// at least 0; and the E declaring an uncompleted implicit prototype
-// randomizes as if it had no constraint, its 8-bit y drawn freely.
 class C;
   rand int x;
   constraint proto1;

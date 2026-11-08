@@ -1,11 +1,3 @@
-// IEEE 1800-2023 §18.13.4: get_randstate() retrieves the current internal
-// state of an object's RNG as a string, of a length and format the
-// implementation chooses; the state of the RNG associated with a process is
-// retrieved with the get_randstate() method of the process (§9.7). The
-// retrieval is a read: two retrievals with no draw between them agree, a draw
-// moves the state, two objects seeded alike hold the same state, and a state
-// retrieved and installed again with set_randstate() replays the draws that
-// followed its retrieval.
 module get_randstate_method;
   class Packet;
     rand bit [15:0] payload;

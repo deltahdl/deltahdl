@@ -1,20 +1,3 @@
-// §16.13.6 Sequence methods: triggered and matched read the end point of
-// a named sequence, of an instance with arguments or of a formal of type
-// sequence, a single bit that does not depend on where the match began.
-// The clause's e1 on sysclk, rising at 8, 24, 40, ..., is run here with a
-// rising at 10, b holding at 40 and c at 56, so e1 ends at 56. e2 reads
-// reset at 24, inst at 40, e1's end point through triggered at 56, the same
-// tick, and branch_back at 72, where it ends. e3 is on clk, rising at 5,
-// 15, ..., and reads e1's end point through matched at 65, the first tick
-// of clk after 56, between reset1 at 55 and branch_back1 at 75, where it
-// ends. e2_with_arg takes the source sequence as a formal of type sequence
-// and applies triggered to the formal; e4 instantiates it with e1's body
-// as the actual, `@(posedge sysclk) $rose(a) ##1 b ##1 c`, and ends at 72
-// as e2 does. The program check, declared in the module, waits for either
-// of e1 and e2 to end, which e1 does first, and then, from the labelled
-// statement, for e2; it reports the other two sequences' end points at 90
-// and finishes there, the simulation ending when its initial block does
-// (§24.3.4).
 module sequence_methods;
   logic clk = 0;
   logic sysclk = 0;

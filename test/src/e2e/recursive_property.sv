@@ -1,31 +1,3 @@
-// §16.12.17 Recursive properties: a named property is recursive where its
-// declaration instantiates itself, and several properties may be mutually
-// recursive; the instance is evaluated as the property's body with the
-// actuals substituted for the formals, and each recursive instance stands
-// after a positive advance in time, so the recursion unrolls one instance
-// per tick. The abort operators may be used inside a recursive property.
-// The assertions below run over eight ticks, clk rising at 5, 15, ..., 75
-// so that tick n is at 10n - 5, the tick counter counting through: a and
-// hold are high at every tick but 6, done at 5, go at 2 and 7, s1 and ph1
-// at 1 and 3, s2 at 2, ph2 never, abt at 3 and acc at 5.
-//
-// always_a is the clause's prop_always over a: the attempt from each tick
-// requires a at that tick and, a tick later, prop_always(a) again, so the
-// attempts from 1 to 6 fail at 6, where a is low, and those from 7 and 8,
-// in flight when the run ends with a high at every tick they reached, hold.
-// weak_until is prop_weak_until over hold and done: the attempts from 1 to
-// 5 hold at 5, where done is high, the one from 6 fails at 6 with neither
-// hold nor done, and those from 7 and 8 hold at the end. guarded is p1,
-// `go |-> prop_always(a)`: the attempt from 2 fails at 6, the one from 7
-// holds at the end, and the six with go low hold at their tick. mutual is
-// check_phase1 with check_phase2: the attempt from 1 has s1, ph1 at 1 and
-// check_phase2 from 2, where s2 holds and ph2 does not, so it fails at 2;
-// the one from 3 has ph1 at 3 and check_phase2 from 4, where s2 is low, so
-// it holds at 4; the six with s1 low hold at their tick. aborted is p3
-// with p4, `accept_on(acc) reject_on(abt) p3(a, acc, abt)` a tick after a:
-// the attempts from 1 and 2 are rejected at 3, those from 3 and 4 accepted
-// at 5, those from 5 and 6 fail at 6 with a low, and those from 7 and 8
-// hold at the end.
 module recursive_property;
   logic clk = 0;
   int tick = 1;
