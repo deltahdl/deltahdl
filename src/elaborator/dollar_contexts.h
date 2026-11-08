@@ -10,6 +10,8 @@ namespace delta {
 struct Expr;
 struct ModuleDecl;
 
+bool IsLoneDollar(const Expr* e);
+
 bool ContainsDollar(const Expr* e);
 
 void CheckUnboundedParamsInQueueContexts(

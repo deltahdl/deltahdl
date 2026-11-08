@@ -96,6 +96,27 @@ TEST(RangeSystemFunctionSim, HierarchicalUnboundedParameterReturnsTrue) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
+TEST(RangeSystemFunctionSim, InstanceOverrideOfDollarIsUnbounded) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module sub #(parameter int P = 4, parameter Q = 4);\n"
+                 "endmodule\n"
+                 "interface itf #(parameter int P = 4);\n"
+                 "endinterface\n"
+                 "module t;\n"
+                 "  sub #(.P($)) a();\n"
+                 "  sub #($) b();\n"
+                 "  sub #(.Q(5)) c();\n"
+                 "  itf #($) i();\n"
+                 "  initial $display(\"%0d %0d %0d %0d %0d\",\n"
+                 "                   $isunbounded(a.P), $isunbounded(b.P),\n"
+                 "                   $isunbounded(b.Q), $isunbounded(c.Q),\n"
+                 "                   $isunbounded(i.P));\n"
+                 "endmodule\n",
+                 f),
+      "1 1 0 0 1\n");
+}
+
 TEST(RangeSystemFunctionSim, HierarchicalBoundedParameterReturnsFalse) {
   SimFixture f;
   auto* var = RunAndFindVar(

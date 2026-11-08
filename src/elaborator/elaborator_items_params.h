@@ -10,7 +10,9 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
+#include "elaborator/dollar_parameter_values.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/net_data_type.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_design.h"
@@ -42,6 +44,10 @@ bool ApplyParamOverride(RtlirParamDecl& pd,
                         const InstanceParamAssignments& assigns,
                         std::string_view pname, const DataType* dtype,
                         Arena& arena);
+
+void CheckDollarOverride(const InstanceParamAssignments& assigns,
+                         const DollarParamValue& param,
+                         const TypeShapeTables& tables, DiagEngine& diag);
 
 class BodyParamAssignmentsGuard {
  public:

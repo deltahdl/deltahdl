@@ -30,9 +30,13 @@ bool AnyScalarChildContainsDollar(const Expr* e) {
 
 }  // namespace
 
+bool IsLoneDollar(const Expr* e) {
+  return e->kind == ExprKind::kIdentifier && e->text == "$";
+}
+
 bool ContainsDollar(const Expr* e) {
   if (e == nullptr) return false;
-  if (e->kind == ExprKind::kIdentifier && e->text == "$") return true;
+  if (IsLoneDollar(e)) return true;
   if (AnyScalarChildContainsDollar(e)) return true;
   for (const Expr* a : e->args)
     if (ContainsDollar(a)) return true;

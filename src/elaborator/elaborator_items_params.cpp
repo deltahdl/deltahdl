@@ -185,11 +185,16 @@ void ReportAssignedTypeOutsideRestriction(
 }
 
 void ApplyBodyParamAssignment(RtlirParamDecl& pd, const ModuleItem* item,
-                              Arena& arena) {
+                              Arena& arena, const TypeShapeTables& tables,
+                              DiagEngine& diag) {
   if (pd.is_localparam || !pd.gen_block_prefix.empty()) return;
   const InstanceParamAssignments* assigns = BodyParamAssignments();
   if (assigns == nullptr) return;
   ApplyParamOverride(pd, *assigns, item->name, &item->data_type, arena);
+  CheckDollarOverride(
+      *assigns,
+      {item->name, nullptr, &item->data_type, !item->unpacked_dims.empty()},
+      tables, diag);
 }
 
 }  // namespace
@@ -267,7 +272,8 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
     PopulateValueParamInfo(pd, item, real_param_names_, typedefs_, kScope);
     RecordTypeParamActual(pd, mod->params, typedefs_, arena_);
     RecordParamDeclRange(pd, item->data_type, kScope);
-    ApplyBodyParamAssignment(pd, item, arena_);
+    ApplyBodyParamAssignment(pd, item, arena_,
+                             {typedefs_, td_array_dims_, class_names_}, diag_);
   }
 
   const bool kFoldsDefault = item->init_expr != nullptr && !pd.from_override;

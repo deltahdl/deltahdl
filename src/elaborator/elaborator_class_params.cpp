@@ -38,10 +38,6 @@ struct ClassParamRegistration {
   const std::unordered_set<std::string_view>* specparams = nullptr;
 };
 
-static bool IsDollarValue(const Expr* e) {
-  return e->kind == ExprKind::kIdentifier && e->text == "$";
-}
-
 static bool TakesRealClassParamValue(const Expr* pexpr, const DataType* type) {
   if (type != nullptr && IsRealType(type->kind)) return true;
   bool untyped =
@@ -214,7 +210,7 @@ std::unordered_set<std::string_view> NonIntegralParamNames(
     if (v == nullptr) continue;
     bool names_one = v->kind == ExprKind::kIdentifier && names.count(v->text);
     bool is_real = HasRealOperand(v) && ConstEvalReal(v, values);
-    if (IsDollarValue(v) || names_one || is_real) names.insert(item->name);
+    if (IsLoneDollar(v) || names_one || is_real) names.insert(item->name);
   }
   return names;
 }

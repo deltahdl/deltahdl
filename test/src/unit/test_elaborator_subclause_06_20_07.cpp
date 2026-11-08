@@ -13,9 +13,11 @@
 
 #include "common/diagnostic.h"
 #include "elaborator/net_data_type.h"
+#include "elaborator/rtlir.h"
 #include "elaborator/simple_bit_vector.h"
 #include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
+#include "helpers_config_params.h"
 #include "helpers_reported_error.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_type.h"
@@ -629,6 +631,165 @@ TEST(DollarConstantElaboration, SelfContainedDollarClassParameterIsAccepted) {
              "package q;\n"
              "  E #(.N($)) pv;\n"
              "endpackage\n"));
+}
+
+bool ChildParamUnbounded(const RtlirModule* top, std::string_view inst,
+                         std::string_view param) {
+  for (const auto& child : top->children) {
+    if (child.simple_inst_name != inst || child.resolved == nullptr) continue;
+    for (const auto& p : child.resolved->params) {
+      if (p.name == param) return p.is_unbounded;
+    }
+  }
+  return false;
+}
+
+TEST(DollarConstantElaboration,
+     DollarOverrideOfAnInstanceParameterOfAnotherTypeIsRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module s #(parameter real R = 1.0, parameter int N = 1);\n"
+      "endmodule\n"
+      "module b;\n"
+      "  parameter real R = 1.0;\n"
+      "  parameter string S = \"x\";\n"
+      "endmodule\n"
+      "interface i #(parameter real R = 1.0);\n"
+      "endinterface\n"
+      "program p #(parameter shortreal R = 1.0);\n"
+      "endprogram\n"
+      "module m;\n"
+      "  s #(.R($)) u1();\n"
+      "  s #($, $) u2();\n"
+      "  b #(.R($), .S($)) u3();\n"
+      "  i #($) u4();\n"
+      "  p #(.R($)) u5();\n"
+      "  if (1) begin : g\n"
+      "    s #(.R($)) u6();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const std::pair<uint32_t, std::string_view> kParams[] = {
+      {12, "R"}, {13, "R"}, {14, "R"}, {14, "S"},
+      {15, "R"}, {16, "R"}, {18, "R"}};
+  ExpectDollarTypeReported(f, kParams);
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "'$' may be assigned only to a parameter of a "
+                             "simple bit vector type, and parameter 'N' is "
+                             "not one",
+                             13, "6.20.7"));
+}
+
+TEST(DollarConstantElaboration,
+     DollarOverrideOfAnInstanceParameterOfASimpleBitVectorTypeIsAccepted) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module s #(parameter int N = 1, parameter M = 1,\n"
+      "           parameter bit [3:0] B = 1);\n"
+      "endmodule\n"
+      "module b;\n"
+      "  parameter logic [7:0] L = 1;\n"
+      "  parameter integer I = 1;\n"
+      "endmodule\n"
+      "interface i #(parameter int N = 1);\n"
+      "endinterface\n"
+      "program p #(parameter longint N = 1);\n"
+      "endprogram\n"
+      "module m;\n"
+      "  s #(.N($), .M($), .B($)) u1();\n"
+      "  s #($, 2) u2();\n"
+      "  b #(.L($), .I($)) u3();\n"
+      "  i #($) u4();\n"
+      "  p #(.N($)) u5();\n"
+      "  if (1) begin : g\n"
+      "    s #(.N($)) u6();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const RtlirModule* top = design->top_modules[0];
+  const std::pair<std::string_view, std::string_view> kUnbounded[] = {
+      {"u1", "N"}, {"u1", "M"}, {"u1", "B"}, {"u2", "N"}, {"u3", "L"},
+      {"u3", "I"}, {"u4", "N"}, {"u5", "N"}, {"u6", "N"}};
+  for (const auto& [inst, param] : kUnbounded) {
+    EXPECT_TRUE(ChildParamUnbounded(top, inst, param)) << inst << "." << param;
+  }
+  EXPECT_FALSE(ChildParamUnbounded(top, "u2", "M"));
+}
+
+TEST(DollarConstantElaboration, NonSelfContainedDollarOverrideIsError) {
+  ElabFixture f;
+  Elaborate(
+      "module s #(parameter int N = 1, parameter int M = 1);\n"
+      "endmodule\n"
+      "module b;\n"
+      "  parameter int K = 1;\n"
+      "endmodule\n"
+      "module m;\n"
+      "  s #(.N($ + 1)) u1();\n"
+      "  s #(1, $ - 1) u2();\n"
+      "  b #(.K(-$)) u3();\n"
+      "  if (1) begin : g\n"
+      "    s #(.M($ * 2)) u4();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const std::pair<uint32_t, std::string_view> kParams[] = {
+      {7, "N"}, {8, "M"}, {9, "K"}, {11, "M"}};
+  for (const auto& [line, name] : kParams) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        std::format("'$' may only be assigned to parameter '{}' as a "
+                    "complete, self-contained expression",
+                    name),
+        line, "6.20.7"))
+        << line;
+  }
+}
+
+TEST(DollarConstantElaboration, DollarConfigurationOverrideIsJudged) {
+  ElabFixture f;
+  ConfigElab(f,
+             "module c #(parameter real R = 1.0, parameter int N = 1,\n"
+             "           parameter int M = 1);\n"
+             "endmodule\n"
+             "module top; c u(); endmodule\n"
+             "config cfg;\n"
+             "  design top;\n"
+             "  instance top.u use #(.R($), .N($ + 1), .M($));\n"
+             "endconfig\n");
+  const std::pair<uint32_t, std::string_view> kParams[] = {{7, "R"}};
+  ExpectDollarTypeReported(f, kParams);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'$' may only be assigned to parameter 'N' as a "
+                            "complete, self-contained expression",
+                            7, "6.20.7"));
+  for (const Diagnostic& diag : f.diag.Diagnostics()) {
+    EXPECT_EQ(diag.message.find("has no constant value"), std::string::npos)
+        << diag.message;
+  }
+}
+
+TEST(DollarConstantElaboration, DollarConfigurationOverrideIsUnbounded) {
+  ElabFixture f;
+  auto* u = ConfigElabFirstChild(f,
+                                 "module c #(parameter int N = 1);\n"
+                                 "endmodule\n"
+                                 "module top; c u(); endmodule\n"
+                                 "config cfg;\n"
+                                 "  design top;\n"
+                                 "  instance top.u use #(.N($));\n"
+                                 "endconfig\n");
+  ASSERT_NE(u, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  bool found = false;
+  for (const auto& p : u->params) {
+    if (p.name != "N") continue;
+    found = true;
+    EXPECT_TRUE(p.is_unbounded);
+  }
+  EXPECT_TRUE(found);
 }
 
 TEST(DollarConstantElaboration,

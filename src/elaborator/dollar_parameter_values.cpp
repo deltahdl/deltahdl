@@ -20,40 +20,19 @@ namespace delta {
 
 namespace {
 
-struct ParamValue {
-  std::string_view name;
-  const Expr* value;
-  const DataType* type;
-  bool has_unpacked_dims;
-};
-
 struct DollarValueScan {
   const CompilationUnit* unit;
   const TypeShapeTables& tables;
   DiagEngine& diag;
 };
 
-void CheckParamValue(const ParamValue& param, const DollarValueScan& scan) {
-  if (!ContainsDollar(param.value)) return;
-  if (param.value->kind == ExprKind::kIdentifier && param.value->text == "$") {
-    ValidateUnboundedParamType({param.name, param.type, param.has_unpacked_dims,
-                                param.value->range.start},
-                               scan.tables, scan.diag);
-    return;
-  }
-  scan.diag.Error(param.value->range.start,
-                  std::format("'$' may only be assigned to parameter '{}' as "
-                              "a complete, self-contained expression",
-                              param.name),
-                  Subclause("6.20.7"));
-}
-
 bool IsValueParam(const ClassDecl& cls, size_t index) {
   return index < cls.params.size() &&
          cls.type_param_names.count(cls.params[index].first) == 0;
 }
 
-ParamValue PortParam(const ClassDecl& cls, size_t index, const Expr* value) {
+DollarParamValue PortParam(const ClassDecl& cls, size_t index,
+                           const Expr* value) {
   std::string_view name = cls.params[index].first;
   const DataType* type =
       index < cls.param_types.size() ? &cls.param_types[index] : nullptr;
@@ -82,7 +61,8 @@ void CheckSpecializationDollarValues(std::string_view class_name,
     const size_t kIndex = PortParamIndex(*cls, value, i);
     if (value.type_name.empty() && value.type_ref_expr != nullptr &&
         IsValueParam(*cls, kIndex)) {
-      CheckParamValue(PortParam(*cls, kIndex, value.type_ref_expr), scan);
+      CheckDollarParamValue(PortParam(*cls, kIndex, value.type_ref_expr),
+                            scan.tables, scan.diag);
     }
   }
 }
@@ -90,14 +70,15 @@ void CheckSpecializationDollarValues(std::string_view class_name,
 void CheckClassDollarValues(const ClassDecl& cls, const DollarValueScan& scan) {
   for (size_t i = 0; i < cls.params.size(); ++i) {
     if (IsValueParam(cls, i))
-      CheckParamValue(PortParam(cls, i, cls.params[i].second), scan);
+      CheckDollarParamValue(PortParam(cls, i, cls.params[i].second),
+                            scan.tables, scan.diag);
   }
   for (const ClassMember* m : cls.members) {
     if (m->kind != ClassMemberKind::kProperty) continue;
     if (m->is_param) {
-      CheckParamValue(
+      CheckDollarParamValue(
           {m->name, m->init_expr, &m->data_type, !m->unpacked_dims.empty()},
-          scan);
+          scan.tables, scan.diag);
     } else {
       CheckSpecializationDollarValues(m->data_type.type_name,
                                       m->data_type.type_params, scan);
@@ -132,6 +113,22 @@ void CheckVariableDollarValues(const std::vector<ModuleItem*>& items,
 }
 
 }  // namespace
+
+void CheckDollarParamValue(const DollarParamValue& param,
+                           const TypeShapeTables& tables, DiagEngine& diag) {
+  if (!ContainsDollar(param.value)) return;
+  if (IsLoneDollar(param.value)) {
+    ValidateUnboundedParamType({param.name, param.type, param.has_unpacked_dims,
+                                param.value->range.start},
+                               tables, diag);
+    return;
+  }
+  diag.Error(param.value->range.start,
+             std::format("'$' may only be assigned to parameter '{}' as a "
+                         "complete, self-contained expression",
+                         param.name),
+             Subclause("6.20.7"));
+}
 
 void CheckClassParamDollarValues(const CompilationUnit* unit,
                                  const TypeShapeTables& tables,

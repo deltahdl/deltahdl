@@ -15,6 +15,8 @@
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/const_eval_internal.h"
+#include "elaborator/dollar_contexts.h"
+#include "elaborator/dollar_parameter_values.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_params.h"
@@ -298,6 +300,11 @@ bool ApplyParamOverride(RtlirParamDecl& pd,
                         Arena& arena) {
   const auto* ovr = FindParamOverride(assigns.params, pname);
   if (!ovr) return false;
+  if (ContainsDollar(ovr->value_expr)) {
+    pd.from_override = true;
+    pd.is_unbounded = IsLoneDollar(ovr->value_expr);
+    return true;
+  }
   pd.resolved_value = ConvertOverrideValue(ovr->value, pd);
   pd.is_resolved = true;
   pd.from_override = true;
@@ -313,6 +320,16 @@ bool ApplyParamOverride(RtlirParamDecl& pd,
   }
   RecordStringParamValue(pd, ovr->value_expr, dtype, arena);
   return true;
+}
+
+void CheckDollarOverride(const InstanceParamAssignments& assigns,
+                         const DollarParamValue& param,
+                         const TypeShapeTables& tables, DiagEngine& diag) {
+  const auto* ovr = FindParamOverride(assigns.params, param.name);
+  if (ovr == nullptr) return;
+  DollarParamValue assigned = param;
+  assigned.value = ovr->value_expr;
+  CheckDollarParamValue(assigned, tables, diag);
 }
 
 struct ParamPortCtx {
@@ -406,19 +423,17 @@ void Elaborator::ElaborateParamPortList(const ModuleDecl* decl,
     RecordTypeParamActual(pd, mod->params, typedefs_, arena_);
     const DataType* param_type =
         has_param_type ? &decl->param_types[i] : nullptr;
+    const bool kUnpacked = decl->param_port_unpacked_dims.count(pname) != 0;
     ApplyParamOverride(pd, kAssigns, pname, param_type, arena_);
-    if (!pd.is_resolved && pval) {
+    CheckDollarOverride(kAssigns, {pname, nullptr, param_type, kUnpacked},
+                        kShapeTables, diag_);
+    if (!pd.is_resolved && !pd.from_override && pval) {
       bool refers_to_unbounded = pval->kind == ExprKind::kIdentifier &&
                                  RefersToUnboundedParam(mod, pval->text);
       bool contains_dollar = ContainsDollarSubexpr(pval);
-      ParamValueExpr val{pval,
-                         pname,
-                         refers_to_unbounded,
-                         contains_dollar,
-                         has_param_type,
-                         param_type,
-                         decl->param_port_unpacked_dims.count(pname) != 0,
-                         kShapeTables};
+      ParamValueExpr val{
+          pval,           pname,      refers_to_unbounded, contains_dollar,
+          has_param_type, param_type, kUnpacked,           kShapeTables};
       ParamRangeRegistryGuard default_guard(mod);
       ResolveUnresolvedParamValue(pd, val, scope, diag_);
       if (pd.is_real_value) real_param_names_.insert(pname);
@@ -508,7 +523,9 @@ void PushInstParamAssignment(const ModuleDecl* child_decl,
                              std::string_view pname, const Expr* pexpr,
                              const ScopeMap& parent_scope,
                              Elaborator::ParamList& child_params) {
-  if (IsBodyTypeParam(child_decl, pname) ||
+  bool dollar =
+      ContainsDollar(pexpr) && child_decl->type_param_names.count(pname) == 0;
+  if (dollar || IsBodyTypeParam(child_decl, pname) ||
       IsArrayParamPattern(child_decl, pname, pexpr)) {
     child_params.push_back({pname, 0, pexpr});
     return;
