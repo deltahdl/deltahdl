@@ -562,6 +562,8 @@ TEST(ParamValueAssignability, OverrideOfItsTypeIsAccepted) {
       "module t;\n  c #(.T(string), .V(\"a\")) u();\nendmodule\n",
       "module c #(parameter P, parameter int Q = P);\nendmodule\n"
       "module t;\n  c #(.P(1)) u();\nendmodule\n",
+      "class C #(parameter P, parameter int Q = P);\nendclass\nmodule m;\n"
+      "  C #(.P(1)) h;\nendmodule\n",
       "typedef enum {A, B} e_t;\nclass C #(e_t E = A);\nendclass\n"
       "class D extends C #(B);\nendclass\nclass F extends C;\nendclass\n"
       "module m;\n  C #(.E(B)) h;\n  C #(A) g;\n  C k;\nendmodule\n",
