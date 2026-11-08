@@ -128,7 +128,7 @@ struct PackedPart {
   uint32_t width = 0;
 };
 
-enum class LeafKind { kAggregate, kIntegral, kReal, kString };
+enum class LeafKind : uint8_t { kAggregate, kIntegral, kReal, kString };
 
 bool IsTypedPattern(const Expr* value) {
   return value->kind == ExprKind::kCast &&
