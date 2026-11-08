@@ -1,6 +1,3 @@
-/* §38.34 x §37.33 x §9.4: vpi_put_value() on a property of a class object,
- * reached obj -> vpiVariables, is seen by a class task blocked on
- * wait(val == 9) in the same time step. */
 #include "vpi_probe.h"
 static PLI_INT32 calltf(PLI_BYTE8* ud) {
   vpiHandle obj = vpi_handle(vpiClassObj, by_name("top.c", 0));

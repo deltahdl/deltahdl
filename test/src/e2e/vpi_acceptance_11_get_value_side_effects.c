@@ -1,5 +1,3 @@
-/* §37.3.5, §38.15: vpi_get_value() on an argument expression evaluates it
- * fully, side effects included, once per call. */
 #include "vpi_probe.h"
 static PLI_INT32 calltf(PLI_BYTE8* ud) {
   vpiHandle it = vpi_iterate(vpiArgument, vpi_handle(vpiSysTfCall, 0));

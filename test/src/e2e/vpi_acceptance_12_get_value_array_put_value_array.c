@@ -1,6 +1,3 @@
-/* §38.16, §38.35: vpi_get_value_array() reads a run of array elements into
- * the application's buffer when vpiUserAllocFlag says it allocated it, and
- * vpi_put_value_array() writes them back, its flags giving no delay. */
 #include "vpi_probe.h"
 static PLI_INT32 calltf(PLI_BYTE8* ud) {
   vpiHandle arr = by_name("top.arr", 0);

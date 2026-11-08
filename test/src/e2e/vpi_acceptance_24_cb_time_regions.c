@@ -1,10 +1,7 @@
-/* §38.36.2 x §4.4.2: in one time slice cbAtStartOfSimTime precedes the
- * Active events, cbNBASynch precedes the NBA update, cbAtEndOfSimTime and
- * cbReadOnlySynch follow the NBA update; cbNextSimTime fires before the
- * next time queue and cbAfterDelay after the given delay. */
 #include "vpi_probe.h"
 static PLI_INT32 say(p_cb_data cb) {
-  vpi_printf("%s at %u q=%d\n", cb->user_data, (unsigned)cb->time->low, int_of(by_name("top.q", 0)));
+  vpi_printf("%s at %u q=%d\n", cb->user_data, (unsigned)cb->time->low,
+             int_of(by_name("top.q", 0)));
   return 0;
 }
 static PLI_INT32 arm(p_cb_data cb) {

@@ -1,10 +1,12 @@
-/* §38.30, §38.41, §38.5: vpi_printf() returns the number of characters
- * written, vpi_vprintf() takes a va_list, vpi_flush() returns 0 on success. */
-#include "vpi_probe.h"
 #include <stdarg.h>
+
+#include "vpi_probe.h"
 static PLI_INT32 say(const char* fmt, ...) {
-  va_list ap; PLI_INT32 n;
-  va_start(ap, fmt); n = vpi_vprintf((PLI_BYTE8*)fmt, ap); va_end(ap);
+  va_list ap;
+  PLI_INT32 n;
+  va_start(ap, fmt);
+  n = vpi_vprintf((PLI_BYTE8*)fmt, ap);
+  va_end(ap);
   return n;
 }
 static PLI_INT32 calltf(PLI_BYTE8* ud) {

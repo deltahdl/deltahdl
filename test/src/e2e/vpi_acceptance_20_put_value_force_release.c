@@ -1,6 +1,3 @@
-/* §38.34: vpiForceFlag forces a net over its continuous driver;
- * vpiReleaseFlag releases it, the value then following the driver again
- * and value_p receiving the released value. */
 #include "vpi_probe.h"
 static PLI_INT32 calltf(PLI_BYTE8* ud) {
   vpiHandle w = by_name("top.w", 0);

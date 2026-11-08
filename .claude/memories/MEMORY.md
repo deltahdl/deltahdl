@@ -66,6 +66,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 - [Letter suffixes on split test files](test-file-letter-suffixes.md) — every file in a split family ends with a letter; the bare name means one file.
 - [Check the letter before writing](checking-for-the-letter-before-writing.md) — `ls test/src/unit/` first, or a redirect silently destroys existing cases.
 - [A VpiDesignRun SetUp calls the base first](vpi-design-run-setup.md) — an override of `SetUp` that skips `VpiDesignRun::SetUp()` builds no VPI model, and its cases read another case's leftovers.
+- [The VPI error status is read alone](vpi-error-status-is-read-alone.md) — a C test program reads `vpi_chk_error` into a local right after the call it checks; beside another VPI call in one argument list, it may read that call's status.
 - [No empty test files](no-empty-test-files.md) — a file with no `TEST` fails a job; a new lettered file lands with its first test.
 - [Sweeping a citation change](sweeping-a-citation-change.md) — grep the message the diagnostic prints, across the whole tree; the files named after the old subclause are not the set.
 - [A braced case's closing brace is a line](braced-case-closing-brace-is-a-line.md) — `case X: { …; break; }` leaves a `}` llvm-cov counts and nothing runs; move the work into a helper.
