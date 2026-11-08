@@ -593,21 +593,32 @@ TEST(ScopeRulesElaboration,
       "    endsequence");
 }
 
+struct UnitConstantWrite {
+  const char* src;
+  const char* message;
+  const char* subclause;
+};
+
 TEST(ScopeRulesElaboration, AWrittenCompilationUnitConstantIsNotUndeclared) {
-  const char* const kSources[] = {
-      "parameter int G = 1;\nmodule m;\n  initial G = 2;\nendmodule\n",
-      "localparam int G = 1;\nmodule m;\n  initial G = 2;\nendmodule\n",
-      "parameter int G = 1;\nmodule m;\n  initial $unit::G = 2;\n"
-      "endmodule\n",
-      "typedef enum {G, H} e_t;\nmodule m;\n  initial G = H;\nendmodule\n",
+  const UnitConstantWrite kWrites[] = {
+      {"parameter int G = 1;\nmodule m;\n  initial G = 2;\nendmodule\n",
+       "assignment to constant 'G'", "6.20"},
+      {"localparam int G = 1;\nmodule m;\n  initial G = 2;\nendmodule\n",
+       "assignment to constant 'G'", "6.20"},
+      {"parameter int G = 1;\nmodule m;\n  initial $unit::G = 2;\n"
+       "endmodule\n",
+       "assignment to constant '$unit::G'", "6.20"},
+      {"typedef enum {G, H} e_t;\nmodule m;\n  initial G = H;\nendmodule\n",
+       "assignment of constant 'G', which is not a variable", "10.4"},
   };
-  for (const char* src : kSources) {
-    SCOPED_TRACE(src);
+  for (const UnitConstantWrite& write : kWrites) {
+    SCOPED_TRACE(write.src);
     ElabFixture f;
-    ElaborateSrc(src, f);
+    ElaborateSrc(write.src, f);
     EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "undeclared identifier", 3,
                                "23.9"));
-    EXPECT_TRUE(f.diag.HasErrors());
+    EXPECT_TRUE(
+        ReportedError(f.diag.Diagnostics(), write.message, 3, write.subclause));
   }
 }
 

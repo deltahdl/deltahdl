@@ -5,6 +5,7 @@
 #include <initializer_list>
 #include <utility>
 
+#include "fixture_elaborator.h"
 #include "fixture_simulator.h"
 #include "helpers_generate_block_items.h"
 #include "helpers_reported_error.h"
@@ -216,6 +217,50 @@ TEST(ProceduralAssignmentElaboration,
         line, "10.4"));
   }
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "of constant", 8, "10.4"));
+}
+
+struct EnumConstantWrite {
+  const char* where;
+  const char* src;
+  uint32_t line;
+};
+
+TEST(ProceduralAssignmentElaboration,
+     AssignmentOfAnEnumerationConstantOutsideAModuleIsError) {
+  const EnumConstantWrite kWrites[] = {
+      {"a compilation-unit function",
+       "typedef enum {A, B} e_t;\nfunction void f();\n  A = B;\n"
+       "endfunction\nmodule m;\nendmodule\n",
+       3},
+      {"a package function",
+       "package p;\n  typedef enum {A, B} e_t;\n  function void f();\n"
+       "    A = B;\n  endfunction\nendpackage\nmodule m;\nendmodule\n",
+       4},
+  };
+  for (const EnumConstantWrite& write : kWrites) {
+    SCOPED_TRACE(write.where);
+    SimFixture f;
+    ElaborateSrc(write.src, f);
+    EXPECT_TRUE(
+        ReportedError(f.diag.Diagnostics(),
+                      "assignment of constant 'A', which is not a variable",
+                      write.line, "10.4"));
+  }
+}
+
+TEST(ProceduralAssignmentElaboration,
+     AssignmentOfAnEnumerationVariableOutsideAModuleIsAccepted) {
+  const char* const kSources[] = {
+      "typedef enum {A, B} e_t;\ne_t v;\nfunction void f();\n  v = B;\n"
+      "endfunction\nmodule m;\nendmodule\n",
+      "package p;\n  typedef enum {A, B} e_t;\n  e_t v;\n"
+      "  function void f();\n    v = B;\n  endfunction\nendpackage\n"
+      "module m;\nendmodule\n",
+  };
+  for (const char* src : kSources) {
+    SCOPED_TRACE(src);
+    EXPECT_TRUE(ElabOk(src));
+  }
 }
 
 TEST(ProceduralAssignmentElaboration,

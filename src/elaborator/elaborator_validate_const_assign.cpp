@@ -15,6 +15,7 @@
 #include "common/source_loc.h"
 #include "common/string_methods.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_enum_constants.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "lexer/token.h"
@@ -127,6 +128,19 @@ const ModuleDecl* FindDefinition(const CompilationUnit* unit,
     }
   }
   return nullptr;
+}
+
+NameSet EnumMembersIn(const std::vector<ModuleItem*>& items) {
+  NameSet names;
+  for (const ModuleItem* item : items) {
+    ForEachEnumTypeOfItem(item,
+                          [&names](std::string_view, const DataType& type) {
+                            for (const EnumMember& member : type.enum_members) {
+                              names.insert(member.name);
+                            }
+                          });
+  }
+  return names;
 }
 
 const PackageDecl* FindPackage(const CompilationUnit* unit,
@@ -713,16 +727,19 @@ void Elaborator::ValidateConstAssignments(const ModuleDecl* decl) {
 }
 
 void Elaborator::ValidateUnitConstAssignments() {
-  const NameSet kNoEnumMembers;
   const NameSet kClassNames = ClassNamesIn(class_names_, unit_);
-  const ConstantWriteTables kTables{unit_, kClassNames, kNoEnumMembers,
+  const NameSet kUnitEnumMembers = EnumMembersIn(unit_->cu_items);
+  const ConstantWriteTables kTables{unit_, kClassNames, kUnitEnumMembers,
                                     nullptr};
   ConstantWriteWalk walk(kTables, diag_);
   walk.DeclareItems(unit_->cu_items);
   walk.WalkItems(unit_->cu_items);
   for (const ClassDecl* cls : unit_->classes) walk.WalkClass(cls);
   for (const PackageDecl* pkg : unit_->packages) {
-    ConstantWriteWalk package_walk(kTables, diag_);
+    const NameSet kPackageEnumMembers = EnumMembersIn(pkg->items);
+    const ConstantWriteTables kPackageTables{unit_, kClassNames,
+                                             kPackageEnumMembers, nullptr};
+    ConstantWriteWalk package_walk(kPackageTables, diag_);
     package_walk.WalkScope(pkg->items);
   }
 }
