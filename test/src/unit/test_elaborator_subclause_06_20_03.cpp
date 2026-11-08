@@ -728,6 +728,52 @@ TEST(TypeParameterElab, RestrictedDefaultInEveryPlaceMustConform) {
        "package pk;\n  typedef @ t;\n  parameter type % P = t;\nendpackage\n"
        "module m; endmodule\n",
        8},
+      {"function in a checker",
+       "module m;\n  checker chk;\n    function void f();\n"
+       "      parameter type % P = @;\n    endfunction\n  endchecker\n"
+       "endmodule\n",
+       9},
+      {"final procedure in a checker",
+       "module m;\n  checker chk;\n    final begin\n"
+       "      parameter type % P = @;\n    end\n  endchecker\nendmodule\n",
+       9},
+      {"if-generate block in a checker",
+       "module m;\n  checker chk;\n    if (1) begin : g\n"
+       "      function void f();\n        parameter type % P = @;\n"
+       "      endfunction\n    end\n  endchecker\nendmodule\n",
+       10},
+      {"else-generate block in a checker",
+       "module m;\n  checker chk;\n    if (0) begin : g\n    end else begin : "
+       "h\n"
+       "      final begin\n        parameter type % P = @;\n      end\n"
+       "    end\n  endchecker\nendmodule\n",
+       11},
+      {"case-generate block in a checker",
+       "module m;\n  checker chk;\n    case (1)\n      1: begin : g\n"
+       "        function void f();\n          parameter type % P = @;\n"
+       "        endfunction\n      end\n    endcase\n  endchecker\n"
+       "endmodule\n",
+       11},
+      {"loop-generate block in a checker",
+       "module m;\n  checker chk;\n"
+       "    for (genvar i = 0; i < 1; i++) begin : g\n"
+       "      function void f();\n        parameter type % P = @;\n"
+       "      endfunction\n    end\n  endchecker\nendmodule\n",
+       10},
+      {"checker in a package",
+       "package pk;\n  checker chk;\n    function void f();\n"
+       "      parameter type % P = @;\n    endfunction\n  endchecker\n"
+       "endpackage\nmodule m; endmodule\n",
+       9},
+      {"checker in the compilation unit",
+       "checker chk;\n  final begin\n    parameter type % P = @;\n  end\n"
+       "endchecker\nmodule m; endmodule\n",
+       8},
+      {"checker in a checker",
+       "checker outer;\n  checker inner;\n    function void f();\n"
+       "      parameter type % P = @;\n    endfunction\n  endchecker\n"
+       "endchecker\nmodule m; endmodule\n",
+       9},
   };
   for (const RestrictionSite& site : kSites) ExpectRestrictionEnforced(site);
 }

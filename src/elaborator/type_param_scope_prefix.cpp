@@ -182,23 +182,43 @@ bool DeclaresChecker(const ModuleItem& item) {
          item.nested_module_decl->decl_kind == ModuleDeclKind::kChecker;
 }
 
+bool HoldsStatements(const ModuleItem& item) {
+  return item.kind == ModuleItemKind::kFunctionDecl ||
+         item.kind == ModuleItemKind::kTaskDecl ||
+         IsProceduralItemKind(item.kind);
+}
+
 void WalkScopeItems(const std::vector<ModuleItem*>& items,
-                    const PrefixWalk& walk) {
-  LocalTypeNames locals;
-  for (const ModuleItem* item : items) {
-    if (item->kind == ModuleItemKind::kTypedef) {
-      DeclareTypeName(*item, false, locals, walk);
-    } else if (DeclaresTypeParam(*item)) {
-      DeclareTypeName(*item, true, locals, walk);
-    } else if (item->kind == ModuleItemKind::kVarDecl) {
-      JudgeTypeRef(item->data_type, item->loc, locals, walk);
-    } else if (item->kind == ModuleItemKind::kFunctionDecl ||
-               item->kind == ModuleItemKind::kTaskDecl) {
-      WalkProcedure(*item, locals, walk);
-    } else if (DeclaresChecker(*item)) {
-      WalkScopeItems(item->nested_module_decl->items, walk);
-    }
+                    LocalTypeNames locals, const PrefixWalk& walk);
+
+void WalkGenerateBlocks(const ModuleItem& item, const LocalTypeNames& locals,
+                        const PrefixWalk& walk) {
+  WalkScopeItems(item.gen_body, locals, walk);
+  if (item.gen_else != nullptr) WalkScopeItems({item.gen_else}, locals, walk);
+  for (const GenerateCaseItem& branch : item.gen_case_items)
+    WalkScopeItems(branch.body, locals, walk);
+}
+
+void WalkScopeItem(const ModuleItem& item, LocalTypeNames& locals,
+                   const PrefixWalk& walk) {
+  if (item.kind == ModuleItemKind::kTypedef) {
+    DeclareTypeName(item, false, locals, walk);
+  } else if (DeclaresTypeParam(item)) {
+    DeclareTypeName(item, true, locals, walk);
+  } else if (item.kind == ModuleItemKind::kVarDecl) {
+    JudgeTypeRef(item.data_type, item.loc, locals, walk);
+  } else if (HoldsStatements(item)) {
+    WalkProcedure(item, locals, walk);
+  } else if (DeclaresChecker(item)) {
+    WalkScopeItems(item.nested_module_decl->items, {}, walk);
+  } else {
+    WalkGenerateBlocks(item, locals, walk);
   }
+}
+
+void WalkScopeItems(const std::vector<ModuleItem*>& items,
+                    LocalTypeNames locals, const PrefixWalk& walk) {
+  for (const ModuleItem* item : items) WalkScopeItem(*item, locals, walk);
 }
 
 }  // namespace
@@ -208,7 +228,7 @@ void ReportItemTypeParamErrors(const ModuleItem& item,
                                const TypeParamRestrictionScope& restriction,
                                DiagEngine& diag) {
   if (DeclaresChecker(item)) {
-    WalkScopeItems(item.nested_module_decl->items,
+    WalkScopeItems(item.nested_module_decl->items, {},
                    {&scope, restriction, diag, true});
     return;
   }
@@ -219,8 +239,10 @@ void ReportUnitScopeTypeParamErrors(const TypeParamRestrictionScope& scope,
                                     DiagEngine& diag) {
   const PrefixWalk kWalk{nullptr, scope, diag};
   for (const PackageDecl* pkg : scope.unit->packages)
-    WalkScopeItems(pkg->items, kWalk);
-  WalkScopeItems(scope.unit->cu_items, kWalk);
+    WalkScopeItems(pkg->items, {}, kWalk);
+  WalkScopeItems(scope.unit->cu_items, {}, kWalk);
+  for (const ModuleDecl* checker : scope.unit->checkers)
+    WalkScopeItems(checker->items, {}, kWalk);
   for (const ClassDecl* cls : AllClassDecls(scope.unit)) {
     for (const ClassMember* m : cls->members) {
       if (m->method != nullptr) WalkProcedure(*m->method, {}, kWalk);
