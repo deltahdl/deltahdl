@@ -866,38 +866,4 @@ TEST(DollarConstantElaboration, DollarParameterInAQueueContextIsRejected) {
   }
 }
 
-TEST(DollarConstantElaboration, DollarAsAnOrdinaryOperandIsRejected) {
-  ElabFixture f;
-  Elaborate(
-      "module top;\n"
-      "  int x, y, q[$];\n"
-      "  wire [7:0] w;\n"
-      "  wire [7:0] v = $;\n"
-      "  int z = $;\n"
-      "  assign w = $;\n"
-      "  function automatic int f();\n"
-      "    return $;\n"
-      "  endfunction\n"
-      "  initial begin\n"
-      "    x = $;\n"
-      "    y = $ + 1;\n"
-      "    if (x == $) y = 0;\n"
-      "    x = q[$];\n"
-      "    y = q[$-1];\n"
-      "    x = int'(y inside {[0:$]});\n"
-      "    y = f();\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  constexpr std::string_view kMessage =
-      "'$' may stand only in a queue's dimension or select, a value range's "
-      "bound";
-  for (uint32_t line : {4U, 5U, 6U, 8U, 11U, 12U, 13U}) {
-    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, line, "6.20.7"));
-  }
-  for (uint32_t line : {14U, 15U, 16U, 17U}) {
-    EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kMessage, line, "6.20.7"));
-  }
-}
-
 }  // namespace

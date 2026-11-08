@@ -7,6 +7,7 @@
 
 namespace delta {
 
+struct CompilationUnit;
 struct Expr;
 struct ModuleDecl;
 
@@ -19,6 +20,7 @@ void CheckUnboundedParamsInQueueContexts(
     const std::unordered_set<std::string_view>& unbounded,
     const std::unordered_set<std::string_view>& queues, DiagEngine& diag);
 
-void CheckDollarOperands(const ModuleDecl* decl, DiagEngine& diag);
+void CheckDollarOperands(const ModuleDecl* decl, const CompilationUnit& unit,
+                         DiagEngine& diag);
 
 }  // namespace delta

@@ -159,7 +159,7 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl,
     if (info.is_queue) queues.insert(name);
   }
   CheckUnboundedParamsInQueueContexts(decl, unbounded, queues, diag_);
-  CheckDollarOperands(decl, diag_);
+  CheckDollarOperands(decl, *unit_, diag_);
   CheckVariableReadsInUnpackedDims(decl, var_types_, diag_);
   CheckUntypedDefaultPatternValues(decl, diag_);
   CheckContinuousPropertyWrites(decl, class_var_types_, unit_, diag_);

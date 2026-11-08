@@ -1,13 +1,17 @@
 #include "elaborator/dollar_contexts.h"
 
+#include <algorithm>
 #include <format>
 #include <string_view>
 #include <unordered_set>
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "elaborator/declared_types.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/queue_dim.h"
+#include "lexer/token.h"
+#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
@@ -133,6 +137,7 @@ namespace {
 
 struct DollarScan {
   const std::unordered_set<std::string_view>& non_queues;
+  const std::unordered_set<std::string_view>& dollar_takers;
   DiagEngine& diag;
 };
 
@@ -152,10 +157,59 @@ static std::unordered_set<std::string_view> NonQueueNames(
   return names;
 }
 
+static void AddDollarTakerNames(const std::vector<ModuleItem*>& items,
+                                std::unordered_set<std::string_view>& names) {
+  for (const ModuleItem* item : items) {
+    if (item->kind == ModuleItemKind::kSequenceDecl ||
+        item->kind == ModuleItemKind::kPropertyDecl) {
+      names.insert(item->name);
+    }
+    const ModuleDecl* nested = item->nested_module_decl;
+    if (nested != nullptr && nested->decl_kind == ModuleDeclKind::kChecker)
+      names.insert(nested->name);
+  }
+}
+
+static std::unordered_set<std::string_view> DollarTakers(
+    const ModuleDecl* decl, const CompilationUnit& unit) {
+  std::unordered_set<std::string_view> names;
+  AddDollarTakerNames(decl->items, names);
+  AddDollarTakerNames(unit.cu_items, names);
+  for (const PackageDecl* pkg : unit.packages)
+    AddDollarTakerNames(pkg->items, names);
+  for (const ModuleDecl* checker : unit.checkers) names.insert(checker->name);
+  return names;
+}
+
 static bool SelectsANonQueue(const Expr* select, const DollarScan& scan) {
   const Expr* base = select->base;
   return base != nullptr && base->kind == ExprKind::kIdentifier &&
          scan.non_queues.count(base->text) != 0;
+}
+
+static void CheckDollarOperand(const Expr* e, const DollarScan& scan);
+
+static void CheckRangeBound(const Expr* bound, const DollarScan& scan) {
+  if (bound != nullptr && IsLoneDollar(bound)) return;
+  CheckDollarOperand(bound, scan);
+}
+
+static bool IsToleranceRange(const Expr* range) {
+  return range->op == TokenKind::kPlusSlashMinus ||
+         range->op == TokenKind::kPlusPercentMinus;
+}
+
+static void CheckSelect(const Expr* e, const DollarScan& scan) {
+  if (e->base == nullptr && !IsToleranceRange(e)) {
+    CheckRangeBound(e->index, scan);
+    CheckRangeBound(e->index_end, scan);
+    return;
+  }
+  CheckDollarOperand(e->base, scan);
+  if (e->base == nullptr || SelectsANonQueue(e, scan)) {
+    CheckDollarOperand(e->index, scan);
+    CheckDollarOperand(e->index_end, scan);
+  }
 }
 
 static void CheckDollarOperand(const Expr* e, const DollarScan& scan) {
@@ -165,40 +219,84 @@ static void CheckDollarOperand(const Expr* e, const DollarScan& scan) {
     return;
   }
   if (e->kind == ExprKind::kSelect) {
-    CheckDollarOperand(e->base, scan);
-    if (SelectsANonQueue(e, scan)) {
-      CheckDollarOperand(e->index, scan);
-      CheckDollarOperand(e->index_end, scan);
-    }
+    CheckSelect(e, scan);
     return;
   }
-  if (e->kind == ExprKind::kCall) return;
+  if (e->kind == ExprKind::kCall && scan.dollar_takers.count(e->callee) != 0)
+    return;
   ForEachExprChild(
       e, [&scan](const Expr* child) { CheckDollarOperand(child, scan); });
 }
 
+static void CheckUnpackedDims(const std::vector<Expr*>& dims,
+                              const DollarScan& scan) {
+  for (const Expr* dim : dims) {
+    CheckDollarOperand(IsQueueDim(dim) ? dim->rhs : dim, scan);
+  }
+}
+
+static void CheckDeclaredDims(const DataType& type,
+                              const std::vector<Expr*>& unpacked_dims,
+                              const DollarScan& scan) {
+  CheckDollarOperand(type.packed_dim_left, scan);
+  CheckDollarOperand(type.packed_dim_right, scan);
+  for (const auto& [left, right] : type.extra_packed_dims) {
+    CheckDollarOperand(left, scan);
+    CheckDollarOperand(right, scan);
+  }
+  CheckUnpackedDims(unpacked_dims, scan);
+}
+
 static void CheckDollarStmt(const Stmt* s, const DollarScan& scan) {
   if (s == nullptr) return;
-  const Expr* const kOperands[] = {s->lhs,       s->rhs,      s->expr,
-                                   s->condition, s->var_init, s->for_cond};
-  for (const Expr* e : kOperands) CheckDollarOperand(e, scan);
+  const std::vector<Expr*>& dims = s->var_unpacked_dims;
+  ForEachChildExpr(s, [&scan, &dims](const Expr* e) {
+    if (std::ranges::find(dims, e) == dims.end()) CheckDollarOperand(e, scan);
+  });
   ForEachChildStmt(s,
                    [&scan](Stmt* const& sub) { CheckDollarStmt(sub, scan); });
 }
 
-void CheckDollarOperands(const ModuleDecl* decl, DiagEngine& diag) {
-  const std::unordered_set<std::string_view> kNonQueues = NonQueueNames(decl);
-  const DollarScan kScan{kNonQueues, diag};
-  for (const ModuleItem* item : decl->items) {
-    if (item->kind == ModuleItemKind::kVarDecl ||
-        item->kind == ModuleItemKind::kNetDecl) {
-      CheckDollarOperand(item->init_expr, kScan);
-    }
-    CheckDollarOperand(item->assign_lhs, kScan);
-    CheckDollarOperand(item->assign_rhs, kScan);
-    CheckDollarStmt(item->body, kScan);
-    for (const Stmt* s : item->func_body_stmts) CheckDollarStmt(s, kScan);
+static void CheckInstanceActuals(const ModuleItem* item,
+                                 const DollarScan& scan) {
+  if (scan.dollar_takers.count(item->inst_module) != 0) return;
+  for (const auto& [name, actual] : item->inst_ports)
+    CheckDollarOperand(actual, scan);
+}
+
+static void CheckDollarItem(const ModuleItem* item, const DollarScan& scan) {
+  switch (item->kind) {
+    case ModuleItemKind::kVarDecl:
+    case ModuleItemKind::kNetDecl:
+      CheckDollarOperand(item->init_expr, scan);
+      CheckDeclaredDims(item->data_type, item->unpacked_dims, scan);
+      break;
+    case ModuleItemKind::kTypedef:
+      CheckDeclaredDims(item->typedef_type, item->unpacked_dims, scan);
+      break;
+    case ModuleItemKind::kModuleInst:
+      CheckInstanceActuals(item, scan);
+      break;
+    default:
+      for (const auto& [target, value] : item->defparam_assigns)
+        CheckDollarOperand(value, scan);
+      break;
   }
+  CheckDollarOperand(item->assign_lhs, scan);
+  CheckDollarOperand(item->assign_rhs, scan);
+  CheckDollarStmt(item->body, scan);
+  for (const Stmt* s : item->func_body_stmts) CheckDollarStmt(s, scan);
+}
+
+void CheckDollarOperands(const ModuleDecl* decl, const CompilationUnit& unit,
+                         DiagEngine& diag) {
+  const std::unordered_set<std::string_view> kNonQueues = NonQueueNames(decl);
+  const std::unordered_set<std::string_view> kTakers = DollarTakers(decl, unit);
+  const DollarScan kScan{kNonQueues, kTakers, diag};
+  for (const ModuleItem* item : decl->items) CheckDollarItem(item, kScan);
+  ForEachInnerDeclaredType(decl, [&kScan](const DeclaredType& declared) {
+    CheckDeclaredDims(declared.type, declared.unpacked_dims, kScan);
+  });
 }
 
 }  // namespace delta
