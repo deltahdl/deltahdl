@@ -496,10 +496,19 @@ TEST(
       "  assert property (@(posedge clk) disable iff ($) a);\n"
       "  ck k1(a, $);\n"
       "  ck k2(a, $ + 1);\n"
+      "  sequence s6;\n"
+      "    s5(a, $ - 1) ##1 b;\n"
+      "  endsequence\n"
+      "  sequence s7;\n"
+      "    s5(a, $) ##1 b;\n"
+      "  endsequence\n"
+      "  assert property (p5(a, $ + 2));\n"
+      "  assert property (p5(a, $));\n"
       "endmodule\n",
       f);
-  ExpectDollarReportedOnlyOn(f, {6, 9, 12, 18, 21, 24, 35, 39, 40, 41, 43},
-                             {15, 27, 32, 38, 42});
+  ExpectDollarReportedOnlyOn(f,
+                             {6, 9, 12, 18, 21, 24, 35, 39, 40, 41, 43, 45, 50},
+                             {15, 27, 32, 38, 42, 48, 51});
 }
 
 TEST(DollarConstantElaboration,
