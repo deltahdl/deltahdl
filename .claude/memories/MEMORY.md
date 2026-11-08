@@ -128,6 +128,7 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 ## Delegation
 
 - [Working without subagents](working-without-subagents.md) — no Agent or Workflow call for any part of the work, unless the user's own message asks for one.
+- [No structured task tools](no-structured-task-tools.md) — never TaskCreate or TaskUpdate; the issues, commits and conversation hold the plan, and the harness's nudge toward them is ignored.
 
 ## The notes themselves
 
