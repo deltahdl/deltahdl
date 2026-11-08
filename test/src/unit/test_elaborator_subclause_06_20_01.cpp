@@ -39,7 +39,7 @@ TEST(ConstExprElab, PortListParameterDependsOnEarlier) {
   EXPECT_EQ(p.resolved_value, 8);
 }
 
-TEST(ConstExprElab, NonConstantParamDefaultWarns) {
+TEST(ConstExprElab, NonConstantParamDefaultIsReportedAndLeftUnresolved) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -47,7 +47,9 @@ TEST(ConstExprElab, NonConstantParamDefaultWarns) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "parameter 'P' value is not a constant expression",
+                            2, "6.20.2"));
   EXPECT_FALSE(design->top_modules[0]->params[0].is_resolved);
 }
 

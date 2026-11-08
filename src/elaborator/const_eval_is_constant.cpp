@@ -123,6 +123,12 @@ static bool IsConstantMemberAccessExpr(const Expr* expr,
   return key && scope.count(*key) > 0;
 }
 
+static bool IsConstantMinTypMaxExpr(const Expr* expr, const ScopeMap& scope) {
+  return IsConstantExpr(expr->lhs, scope) &&
+         IsConstantExpr(expr->condition, scope) &&
+         IsConstantExpr(expr->rhs, scope);
+}
+
 bool IsConstantExpr(const Expr* expr, const ScopeMap& scope) {
   if (!expr) return false;
 
@@ -168,9 +174,7 @@ bool IsConstantExpr(const Expr* expr, const ScopeMap& scope) {
     case ExprKind::kMemberAccess:
       return IsConstantMemberAccessExpr(expr, scope);
     case ExprKind::kMinTypMax:
-      return IsConstantExpr(expr->lhs, scope) &&
-             IsConstantExpr(expr->condition, scope) &&
-             IsConstantExpr(expr->rhs, scope);
+      return IsConstantMinTypMaxExpr(expr, scope);
     default:
       return false;
   }
