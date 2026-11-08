@@ -19,6 +19,15 @@
 
 namespace delta {
 
+bool Parser::AtDollarEndingRange() {
+  if (!Check(TokenKind::kDollar)) return false;
+  auto saved = lexer_.SavePos();
+  Consume();
+  const bool kEnds = Check(TokenKind::kRBracket);
+  lexer_.RestorePos(saved);
+  return kEnds;
+}
+
 struct ParserSeqLinearHelpers {
   static bool ParseSeqDelayBound(Parser& p, uint32_t& val, Expr*& expr,
                                  bool dollar, bool bracketed) {
@@ -26,11 +35,13 @@ struct ParserSeqLinearHelpers {
       val = ParseSeqDelayLiteral(p);
       return true;
     }
-    if (dollar && p.Match(TokenKind::kDollar)) {
+    if (dollar && p.AtDollarEndingRange()) {
+      p.Consume();
       val = SeqCycleDelay::kUnbounded;
       return true;
     }
-    if (p.Check(TokenKind::kIdentifier) && !bracketed) {
+    if ((p.Check(TokenKind::kIdentifier) || p.Check(TokenKind::kDollar)) &&
+        !bracketed) {
       Token tok = p.Consume();
       expr = p.arena_.Create<Expr>();
       expr->kind = ExprKind::kIdentifier;

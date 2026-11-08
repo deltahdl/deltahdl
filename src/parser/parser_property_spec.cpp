@@ -420,7 +420,8 @@ PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyAlways(
     if (node->range_min == nullptr || !p.Match(TokenKind::kColon)) {
       return nullptr;
     }
-    if (p.Match(TokenKind::kDollar)) {
+    if (p.AtDollarEndingRange()) {
+      p.Consume();
       node->range_unbounded = true;
     } else {
       node->range_max = p.ParseExpr();

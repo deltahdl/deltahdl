@@ -128,9 +128,22 @@ void CheckUnboundedParamsInQueueContexts(
 static void ReportDollar(const Expr* e, DiagEngine& diag) {
   diag.Error(e->range.start,
              "'$' may stand only in a queue's dimension or select, a value "
-             "range's bound, a cycle delay range's bound, a sequence, "
+             "range's bound, a cycle delay range's upper bound, a sequence, "
              "property or checker argument, or a parameter's value",
              Subclause("6.20.7"));
+}
+
+bool ReportDollarsIn(const Expr* e, DiagEngine& diag) {
+  if (e == nullptr) return false;
+  if (IsLoneDollar(e)) {
+    ReportDollar(e, diag);
+    return true;
+  }
+  bool reported = false;
+  ForEachExprChild(e, [&diag, &reported](const Expr* child) {
+    reported = ReportDollarsIn(child, diag) || reported;
+  });
+  return reported;
 }
 
 namespace {

@@ -145,4 +145,82 @@ TEST(DollarConstantElaboration, DollarBoundsAValueRangeOnlyStandingAlone) {
   ExpectDollarReportedOnlyOn(f, {4, 5, 8, 10, 15, 18}, {6, 7, 11, 12});
 }
 
+TEST(DollarConstantElaboration,
+     DollarEndsACycleDelayOrRepetitionRangeOnlyAsItsWholeUpperBound) {
+  ElabFixture f;
+  Elaborate(
+      "module top;\n"
+      "  bit clk, a, b;\n"
+      "  sequence s1;\n"
+      "    a ##[$:3] b;\n"
+      "  endsequence\n"
+      "  sequence s2;\n"
+      "    a ##[1:$-1] b;\n"
+      "  endsequence\n"
+      "  sequence s3;\n"
+      "    a ##[1:$] b ##[0:$] a ##[*] b ##[+] a;\n"
+      "  endsequence\n"
+      "  property p1;\n"
+      "    @(posedge clk) a[*$] |-> b;\n"
+      "  endproperty\n"
+      "  property p2;\n"
+      "    @(posedge clk) a[*$:3] |-> b;\n"
+      "  endproperty\n"
+      "  property p3;\n"
+      "    @(posedge clk) a[=1:$-1] |-> b;\n"
+      "  endproperty\n"
+      "  property p4;\n"
+      "    @(posedge clk) a[->$] |-> b;\n"
+      "  endproperty\n"
+      "  property p5;\n"
+      "    @(posedge clk) a[*1:$] ##1 b[=1:$] ##1 a[->1:$] ##1 b[*] |-> a;\n"
+      "  endproperty\n"
+      "  a1: assert property (@(posedge clk) a ##($) b);\n"
+      "  a2: assert property (@(posedge clk) a ##[$+1:4] b);\n"
+      "  a3: assert property (@(posedge clk) a ##[2:$] b);\n"
+      "  always @(posedge clk) begin\n"
+      "    a4: assert property (a[*2:$-1] ##1 b);\n"
+      "    a5: assert property (a[*2:$] ##1 b);\n"
+      "  end\n"
+      "  a6: assert property (@(posedge clk) a ##$ b);\n"
+      "  a7: assert property (@(posedge clk) a ##[$:$] b);\n"
+      "  a8: assert property (@(posedge clk) ##3 a ##[0:$] b);\n"
+      "  a9: assert property (@(posedge clk) b[->$:3] ##1 a);\n"
+      "  a10: assert property (@(posedge clk) b[=$] ##1 a);\n"
+      "  a11: assert property (@(posedge clk) b[->1:3] ##1 a[=0:$]);\n"
+      "  sequence s4;\n"
+      "    ##$ a;\n"
+      "  endsequence\n"
+      "endmodule\n",
+      f);
+  ExpectDollarReportedOnlyOn(
+      f, {4, 7, 13, 16, 19, 22, 27, 28, 31, 34, 35, 37, 38, 41},
+      {10, 25, 29, 32, 36, 39});
+}
+
+TEST(DollarConstantElaboration,
+     DollarEndsAnAlwaysOrEventuallyRangeOnlyAsItsWholeUpperBound) {
+  ElabFixture f;
+  Elaborate(
+      "module top;\n"
+      "  bit clk, a;\n"
+      "  property p1;\n"
+      "    @(posedge clk) always [$:3] a;\n"
+      "  endproperty\n"
+      "  property p2;\n"
+      "    @(posedge clk) s_eventually [1:$-1] a;\n"
+      "  endproperty\n"
+      "  property p3;\n"
+      "    @(posedge clk) always [1:$] a;\n"
+      "  endproperty\n"
+      "  a1: assert property (@(posedge clk) s_eventually [$:2] a);\n"
+      "  a2: assert property (@(posedge clk) always [2:$+1] a);\n"
+      "  a3: assert property (@(posedge clk) s_eventually [2:$] a);\n"
+      "  a4: assert property (@(posedge clk) s_always [1:$-1] a);\n"
+      "  a5: assert property (@(posedge clk) eventually [$:2] a);\n"
+      "endmodule\n",
+      f);
+  ExpectDollarReportedOnlyOn(f, {4, 7, 12, 13, 15, 16}, {10, 14});
+}
+
 }  // namespace

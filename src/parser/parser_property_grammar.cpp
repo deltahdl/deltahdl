@@ -560,7 +560,7 @@ class ParserPropertyGrammar::Scan {
   }
 
   bool RangeEnd(bool dollar) {
-    if (!p_.Check(TokenKind::kDollar)) return Expression(Reading::kExpression);
+    if (!p_.AtDollarEndingRange()) return Expression(Reading::kExpression);
     if (!dollar) return Fail();
     p_.Consume();
     return true;

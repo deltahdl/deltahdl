@@ -699,6 +699,7 @@ class Parser {
   Token Consume();
   Token CurrentToken();
   bool Check(TokenKind kind);
+  bool AtDollarEndingRange();
   bool AtEnd();
   SourceLoc CurrentLoc();
   void Synchronize();
