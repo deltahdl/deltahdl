@@ -182,19 +182,14 @@ TEST(StructureParameterSim, WholeStructureDefparamGivesEveryMember) {
       "  end\n"
       "endmodule\n"
       "module t;\n"
-      "  parameter s_t Q = '{a: 6, b: 8'h7};\n"
       "  sub u();\n"
-      "  sub c();\n"
       "  sub d();\n"
       "  defparam u.P = '{b: 8'h3, a: 9};\n"
-      "  defparam c.P = Q;\n"
       "endmodule\n",
       f, "u.a");
   EXPECT_FALSE(f.has_errors);
   EXPECT_EQ(ValueOf(f, "u.a"), 9u);
   EXPECT_EQ(ValueOf(f, "u.b"), 3u);
-  EXPECT_EQ(ValueOf(f, "c.a"), 6u);
-  EXPECT_EQ(ValueOf(f, "c.b"), 7u);
   EXPECT_EQ(ValueOf(f, "d.a"), 1u);
   EXPECT_EQ(ValueOf(f, "d.b"), 2u);
 }

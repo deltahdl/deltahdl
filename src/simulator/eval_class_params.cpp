@@ -94,9 +94,12 @@ static Logic4Vec ParamDefaultValue(const Expr* expr, uint32_t width,
 static Logic4Vec ParamValueOfType(const DataType& type, const Expr* expr,
                                   uint32_t width, SimContext& ctx,
                                   Arena& arena) {
-  const StructTypeInfo* layout = NamedLayout(type, ctx);
-  const Expr* pattern = UnwrapTypedPattern(expr);
-  if (layout != nullptr && pattern->kind == ExprKind::kAssignmentPattern)
+  const Expr* pattern = expr != nullptr ? UnwrapTypedPattern(expr) : nullptr;
+  const StructTypeInfo* layout =
+      pattern != nullptr && pattern->kind == ExprKind::kAssignmentPattern
+          ? NamedLayout(type, ctx)
+          : nullptr;
+  if (layout != nullptr)
     return EvalStructPatternValue(pattern, layout, ctx, arena);
   return ParamDefaultValue(expr, width, ctx, arena);
 }
