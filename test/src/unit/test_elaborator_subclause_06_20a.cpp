@@ -505,6 +505,10 @@ TEST(ConstAssignElaboration, AWriteToAConstantIsReportedInEveryFormAndPlace) {
        "module c(i ifc);\n  initial ifc.P = 2;\nendmodule\nmodule m;\n"
        "  i u();\n  c v(u);\nendmodule\n",
        "assignment to constant 'ifc.P'", 5},
+      {"an interface's parameter, through a virtual interface",
+       "interface i;\n  parameter int P = 1;\nendinterface\nmodule m;\n"
+       "  i u();\n  virtual i vi = u;\n  initial vi.P = 2;\nendmodule\n",
+       "assignment to constant 'vi.P'", 7},
       {"a module's own parameter, by a name from $root",
        "module m;\n  parameter int P = 1;\n  initial $root.m.P = 2;\n"
        "endmodule\n",
@@ -652,6 +656,8 @@ TEST(ConstAssignElaboration,
       "  import p::*;\n  int P;\n  initial P = 2;\nendmodule\n",
       "interface i;\n  int v;\n  initial v = 2;\nendinterface\nmodule m;\n"
       "  i u();\nendmodule\n",
+      "interface i;\n  int v;\nendinterface\nmodule m;\n  i u();\n"
+      "  virtual i vi = u;\n  initial vi.v = 2;\nendmodule\n",
       "parameter int G = 1;\nmodule m;\n  int G;\n  initial G = 2;\n"
       "endmodule\n",
       "module m;\n  parameter int N = 1;\n  class B;\n    int N;\n"

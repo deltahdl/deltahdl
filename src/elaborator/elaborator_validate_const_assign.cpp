@@ -46,6 +46,7 @@ struct DeclaredName {
   Constness constness = Constness::kWritable;
   const ModuleDecl* instance_of = nullptr;
   size_t unpacked_dims = 0;
+  const DataType* type = nullptr;
 };
 
 struct SelectedObject {
@@ -131,9 +132,10 @@ std::optional<DeclaredName> DeclaredAmong(const std::vector<ModuleItem*>& items,
     std::optional<Constness> constness =
         item->name == name ? ConstnessOfItem(item, class_names) : std::nullopt;
     if (constness.has_value())
-      return DeclaredName{*constness, nullptr, item->unpacked_dims.size()};
+      return DeclaredName{*constness, nullptr, item->unpacked_dims.size(),
+                          &item->data_type};
     if (DeclaresEnumMember(DeclaredTypeOf(item), name))
-      return DeclaredName{Constness::kEnumMember, nullptr, 0};
+      return DeclaredName{Constness::kEnumMember, nullptr, 0, nullptr};
   }
   return std::nullopt;
 }
@@ -234,6 +236,48 @@ const ModuleDecl* ChildInstanceModule(const CompilationUnit* unit,
       return FindDefinition(unit, item->inst_module);
   }
   return nullptr;
+}
+
+const ModuleDecl* ModuleAlongPath(const CompilationUnit* unit,
+                                  const ModuleDecl* decl,
+                                  const std::vector<std::string_view>& path) {
+  for (size_t i = 1; i + 1 < path.size() && decl != nullptr; ++i) {
+    decl = ChildInstanceModule(unit, decl, path[i]);
+  }
+  return decl;
+}
+
+const ModuleItem* SubroutineAmong(const std::vector<ModuleItem*>& items,
+                                  std::string_view name) {
+  for (const ModuleItem* item : items) {
+    bool subroutine = item->kind == ModuleItemKind::kFunctionDecl ||
+                      item->kind == ModuleItemKind::kTaskDecl ||
+                      item->kind == ModuleItemKind::kDpiImport;
+    if (subroutine && item->method_class.empty() && item->name == name)
+      return item;
+  }
+  return nullptr;
+}
+
+const ClassMember* ClassMemberOf(const ClassDecl* cls, std::string_view name,
+                                 ClassMemberKind kind,
+                                 const CompilationUnit* unit) {
+  std::vector<const ClassDecl*> lineage;
+  for (; cls != nullptr && std::ranges::find(lineage, cls) == lineage.end();
+       cls = FindBaseClass(cls, unit)) {
+    lineage.push_back(cls);
+    for (const ClassMember* m : cls->members) {
+      if (m->kind == kind && m->name == name) return m;
+    }
+  }
+  return nullptr;
+}
+
+const ModuleItem* MethodOf(const ClassDecl* cls, std::string_view name,
+                           const CompilationUnit* unit) {
+  const ClassMember* method =
+      ClassMemberOf(cls, name, ClassMemberKind::kMethod, unit);
+  return method == nullptr ? nullptr : method->method;
 }
 
 bool IsIncOrDec(const Expr* e) {
@@ -338,9 +382,9 @@ class ConstantWriteWalk {
   void Restore(const Mark& mark);
   void Declare(std::string_view name, Constness constness,
                const ModuleDecl* instance_of = nullptr,
-               size_t unpacked_dims = 0) {
-    names_.emplace_back(name,
-                        DeclaredName{constness, instance_of, unpacked_dims});
+               size_t unpacked_dims = 0, const DataType* type = nullptr) {
+    names_.emplace_back(
+        name, DeclaredName{constness, instance_of, unpacked_dims, type});
   }
   void DeclareItem(const ModuleItem* item);
   void DeclareEnumMembers(const DataType& type);
@@ -352,6 +396,15 @@ class ConstantWriteWalk {
   std::optional<DeclaredName> ImportedName(std::string_view name) const;
   const ClassDecl* FindClass(std::string_view name) const;
   const ModuleItem* FindSubroutine(std::string_view name) const;
+  const ModuleItem* CalledSubroutine(const Expr* callee) const;
+  const ModuleItem* ScopedSubroutine(std::string_view scope,
+                                     std::string_view name) const;
+  const ModuleItem* HierarchicalSubroutine(const Expr* callee) const;
+  const ClassDecl* ClassOfObject(const Expr* object) const;
+  const ClassDecl* ClassOfProperty(const Expr* access) const;
+  const ClassDecl* SelfClass(std::string_view self) const;
+  const ClassDecl* ClassOfType(const DataType* type) const;
+  const ModuleDecl* RootScope(const Expr* root) const;
   std::optional<Constness> ScopeMemberConstness(std::string_view scope,
                                                 std::string_view name) const;
   SelectedObject ObjectSelected(const Expr* object) const;
@@ -395,6 +448,7 @@ class ConstantWriteWalk {
   std::vector<const ModuleItem*> subroutines_;
   std::vector<const ImportItem*> imports_;
   std::vector<const ClassDecl*> classes_;
+  const ClassDecl* current_class_ = nullptr;
 };
 
 void ConstantWriteWalk::Restore(const Mark& mark) {
@@ -416,7 +470,8 @@ void ConstantWriteWalk::DeclareModule(const ModuleDecl* decl) {
         port.is_interface_port
             ? FindDefinition(tables_.unit, port.data_type.type_name)
             : nullptr;
-    Declare(port.name, Constness::kWritable, bound, port.unpacked_dims.size());
+    Declare(port.name, Constness::kWritable, bound, port.unpacked_dims.size(),
+            &port.data_type);
   }
   DeclareItems(decl->items);
 }
@@ -446,7 +501,8 @@ void ConstantWriteWalk::DeclareItem(const ModuleItem* item) {
       break;
   }
   if (auto constness = ConstnessOfItem(item, tables_.class_names))
-    Declare(item->name, *constness, nullptr, item->unpacked_dims.size());
+    Declare(item->name, *constness, nullptr, item->unpacked_dims.size(),
+            &item->data_type);
   DeclareEnumMembers(DeclaredTypeOf(item));
 }
 
@@ -478,7 +534,7 @@ void ConstantWriteWalk::DeclareClassMembers(const ClassDecl* cls) {
     if (m->kind == ClassMemberKind::kProperty) {
       Declare(m->name,
               m->is_param ? Constness::kConstant : Constness::kWritable,
-              nullptr, m->unpacked_dims.size());
+              nullptr, m->unpacked_dims.size(), &m->data_type);
     } else if (m->kind == ClassMemberKind::kMethod && m->method != nullptr) {
       subroutines_.push_back(m->method);
     }
@@ -532,6 +588,86 @@ const ModuleItem* ConstantWriteWalk::FindSubroutine(
   if (tables_.subroutines == nullptr) return nullptr;
   auto it = tables_.subroutines->find(name);
   return it == tables_.subroutines->end() ? nullptr : it->second;
+}
+
+const ModuleItem* ConstantWriteWalk::CalledSubroutine(
+    const Expr* callee) const {
+  if (callee->kind == ExprKind::kIdentifier) {
+    return callee->scope_prefix.empty()
+               ? FindSubroutine(callee->text)
+               : ScopedSubroutine(callee->scope_prefix, callee->text);
+  }
+  bool member = callee->kind == ExprKind::kMemberAccess &&
+                callee->lhs != nullptr && callee->rhs != nullptr;
+  if (member && callee->is_scope_resolution)
+    return ScopedSubroutine(ExprIdent(callee->lhs), callee->rhs->text);
+  const ClassDecl* cls = member ? ClassOfObject(callee->lhs) : nullptr;
+  if (cls != nullptr) return MethodOf(cls, callee->rhs->text, tables_.unit);
+  return member ? HierarchicalSubroutine(callee) : nullptr;
+}
+
+const ModuleItem* ConstantWriteWalk::ScopedSubroutine(
+    std::string_view scope, std::string_view name) const {
+  if (scope == "$unit") return SubroutineAmong(tables_.unit->cu_items, name);
+  if (const PackageDecl* pkg = FindPackage(tables_.unit, scope))
+    return SubroutineAmong(pkg->items, name);
+  const ClassDecl* cls = FindClass(scope);
+  return cls == nullptr ? nullptr : MethodOf(cls, name, tables_.unit);
+}
+
+const ModuleItem* ConstantWriteWalk::HierarchicalSubroutine(
+    const Expr* callee) const {
+  const Expr* root = MemberRoot(callee);
+  std::vector<std::string_view> path;
+  if (root == nullptr || !AppendMemberPath(callee, path)) return nullptr;
+  const ModuleDecl* decl = ModuleAlongPath(tables_.unit, RootScope(root), path);
+  return decl == nullptr ? nullptr : SubroutineAmong(decl->items, path.back());
+}
+
+const ClassDecl* ConstantWriteWalk::ClassOfObject(const Expr* object) const {
+  if (object->kind == ExprKind::kIdentifier &&
+      (object->text == "this" || object->text == "super"))
+    return SelfClass(object->text);
+  if (object->kind == ExprKind::kMemberAccess) return ClassOfProperty(object);
+  SelectedObject selected = ObjectSelected(object);
+  bool element = selected.declared.has_value() &&
+                 selected.selects >= selected.declared->unpacked_dims;
+  return element ? ClassOfType(selected.declared->type) : nullptr;
+}
+
+const ClassDecl* ConstantWriteWalk::ClassOfProperty(const Expr* access) const {
+  bool owned = !access->is_scope_resolution && access->lhs != nullptr &&
+               access->rhs != nullptr;
+  const ClassDecl* owner = owned ? ClassOfObject(access->lhs) : nullptr;
+  const ClassMember* property =
+      owner == nullptr
+          ? nullptr
+          : ClassMemberOf(owner, access->rhs->text, ClassMemberKind::kProperty,
+                          tables_.unit);
+  return property == nullptr ? nullptr : ClassOfType(&property->data_type);
+}
+
+const ClassDecl* ConstantWriteWalk::SelfClass(std::string_view self) const {
+  if (self == "this" || current_class_ == nullptr) return current_class_;
+  return FindBaseClass(current_class_, tables_.unit);
+}
+
+const ClassDecl* ConstantWriteWalk::ClassOfType(const DataType* type) const {
+  if (type == nullptr || type->kind != DataTypeKind::kNamed) return nullptr;
+  return FindClass(type->type_name);
+}
+
+const ModuleDecl* ConstantWriteWalk::RootScope(const Expr* root) const {
+  std::optional<DeclaredName> declared =
+      root->scope_prefix == "$root" ? std::nullopt : Find(root->text);
+  if (!declared.has_value()) return FindDefinition(tables_.unit, root->text);
+  if (declared->instance_of != nullptr) return declared->instance_of;
+  bool virtual_interface =
+      declared->type != nullptr &&
+      declared->type->kind == DataTypeKind::kVirtualInterface;
+  return virtual_interface
+             ? FindDefinition(tables_.unit, declared->type->type_name)
+             : nullptr;
 }
 
 std::optional<Constness> ConstantWriteWalk::ScopeMemberConstness(
@@ -612,9 +748,7 @@ std::string ConstantWriteWalk::MemberConstant(const Expr* e) const {
       from_root ? std::nullopt : Find(root->text);
   if (declared.has_value() && declared->constness == Constness::kConstant)
     return std::string(root->text);
-  const ModuleDecl* scope = declared.has_value()
-                                ? declared->instance_of
-                                : FindDefinition(tables_.unit, root->text);
+  const ModuleDecl* scope = RootScope(root);
   std::vector<std::string_view> path;
   if (scope == nullptr || !AppendMemberPath(e, path)) return {};
   std::string written = HierarchicalConstant(scope, path);
@@ -623,9 +757,7 @@ std::string ConstantWriteWalk::MemberConstant(const Expr* e) const {
 
 std::string ConstantWriteWalk::HierarchicalConstant(
     const ModuleDecl* decl, const std::vector<std::string_view>& path) const {
-  for (size_t i = 1; i + 1 < path.size() && decl != nullptr; ++i) {
-    decl = ChildInstanceModule(tables_.unit, decl, path[i]);
-  }
+  decl = ModuleAlongPath(tables_.unit, decl, path);
   if (decl == nullptr) return {};
   std::optional<Constness> constness =
       ConstnessInModule(decl, path.back(), tables_.class_names);
@@ -689,8 +821,10 @@ void ConstantWriteWalk::WalkOutOfBlockMethod(const ModuleItem* item) {
   const ClassDecl* cls = FindClass(item->method_class);
   if (cls == nullptr) return;
   Mark mark = Here();
+  const ClassDecl* outer = std::exchange(current_class_, cls);
   DeclareClass(cls);
   WalkSubroutine(item);
+  current_class_ = outer;
   Restore(mark);
 }
 
@@ -698,7 +832,7 @@ void ConstantWriteWalk::WalkSubroutine(const ModuleItem* item) {
   Mark mark = Here();
   for (const FunctionArg& formal : item->func_args) {
     Declare(formal.name, Constness::kWritable, nullptr,
-            formal.unpacked_dims.size());
+            formal.unpacked_dims.size(), &formal.data_type);
   }
   for (const Stmt* s : item->func_body_stmts) WalkStmt(s);
   Restore(mark);
@@ -706,6 +840,7 @@ void ConstantWriteWalk::WalkSubroutine(const ModuleItem* item) {
 
 void ConstantWriteWalk::WalkClass(const ClassDecl* cls) {
   Mark mark = Here();
+  const ClassDecl* outer = std::exchange(current_class_, cls);
   DeclareClass(cls);
   for (const ClassMember* m : cls->members) {
     if (m->kind == ClassMemberKind::kMethod && m->method != nullptr) {
@@ -714,6 +849,7 @@ void ConstantWriteWalk::WalkClass(const ClassDecl* cls) {
       WalkClass(m->nested_class);
     }
   }
+  current_class_ = outer;
   Restore(mark);
 }
 
@@ -736,7 +872,8 @@ void ConstantWriteWalk::WalkStmt(const Stmt* s) {
                         : ConstnessOfVariable(s->var_is_const, s->var_decl_type,
                                               tables_.class_names);
     DeclareEnumMembers(s->var_decl_type);
-    Declare(s->var_name, constness, nullptr, s->var_unpacked_dims.size());
+    Declare(s->var_name, constness, nullptr, s->var_unpacked_dims.size(),
+            &s->var_decl_type);
     return;
   }
   Mark mark = Here();
@@ -830,8 +967,8 @@ void ConstantWriteWalk::CheckSystemCall(const Expr* call) {
 }
 
 void ConstantWriteWalk::CheckActuals(const Expr* call) {
-  if (call->lhs == nullptr || call->lhs->kind != ExprKind::kIdentifier) return;
-  const ModuleItem* subroutine = FindSubroutine(call->callee);
+  const ModuleItem* subroutine =
+      call->lhs == nullptr ? nullptr : CalledSubroutine(call->lhs);
   if (subroutine == nullptr) return;
   size_t positional = call->args.size() - call->arg_names.size();
   for (size_t i = 0; i < subroutine->func_args.size(); ++i) {

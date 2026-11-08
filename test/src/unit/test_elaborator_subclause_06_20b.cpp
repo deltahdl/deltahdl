@@ -355,4 +355,133 @@ TEST(ConstAssignElaboration,
       "module m;\nendmodule\n");
 }
 
+TEST(ConstAssignElaboration,
+     AConstantActualOfAWritingFormalIsReportedThroughEveryCalleeName) {
+  const BuiltInWrite kWrites[] = {
+      {"p::pt(P)",
+       "constant 'P' cannot be the actual of output argument 'o' of 'pt'"},
+      {"$unit::ut(P)",
+       "constant 'P' cannot be the actual of output argument 'o' of 'ut'"},
+      {"C::sf(P)",
+       "constant 'P' cannot be the actual of output argument 'o' of 'sf'"},
+      {"h.mf(P)",
+       "constant 'P' cannot be the actual of output argument 'o' of 'mf'"},
+      {"hs[0].mf(P)",
+       "constant 'P' cannot be the actual of output argument 'o' of 'mf'"},
+      {"h.next.mf(P)",
+       "constant 'P' cannot be the actual of output argument 'o' of 'mf'"},
+      {"u.ct(P)",
+       "constant 'P' cannot be the actual of ref argument 'o' of 'ct'"},
+      {"u.w.gt(P)",
+       "constant 'P' cannot be the actual of output argument 'o' of 'gt'"},
+      {"$root.m.u.ct(P)",
+       "constant 'P' cannot be the actual of ref argument 'o' of 'ct'"},
+      {"iu.it(P)",
+       "constant 'P' cannot be the actual of inout argument 'o' of 'it'"},
+      {"vi.it(P)",
+       "constant 'P' cannot be the actual of inout argument 'o' of 'it'"},
+  };
+  ExpectEachWriteReported(
+      "package p;\n  task pt(output int o); o = 1; endtask\nendpackage\n"
+      "interface ifc;\n  task it(inout int o); o = 1; endtask\nendinterface\n"
+      "module g;\n  task gt(output int o); o = 1; endtask\nendmodule\n"
+      "module c;\n  task automatic ct(ref int o); o = 1; endtask\n  g w();\n"
+      "endmodule\nclass C;\n"
+      "  static function void sf(output int o); o = 1; endfunction\n"
+      "  function void mf(output int o); o = 1; endfunction\n  C next;\n"
+      "endclass\ntask ut(output int o); o = 1; endtask\nmodule m;\n"
+      "  parameter int P = 1;\n  ifc iu();\n  c u();\n  C h = new;\n"
+      "  C hs[2];\n  virtual ifc vi = iu;\n  initial ",
+      27, kWrites);
+}
+
+TEST(ConstAssignElaboration,
+     AConstantActualOfAWritingFormalIsReportedInAClassAPackageAndAPort) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class B;\n"
+      "  function void bf(output int o); o = 1; endfunction\n"
+      "endclass\n"
+      "class D #(int N = 1) extends B;\n"
+      "  function void df(output int o); o = 1; endfunction\n"
+      "  function void f();\n"
+      "    this.df(N);\n"
+      "    super.bf(N);\n"
+      "    this.bf(N);\n"
+      "  endfunction\n"
+      "endclass\n"
+      "class F;\n"
+      "  localparam int L = 1;\n"
+      "  extern function void f();\n"
+      "  function void ff(output int o); o = 1; endfunction\n"
+      "endclass\n"
+      "function void F::f();\n"
+      "  this.ff(L);\n"
+      "endfunction\n"
+      "package p;\n"
+      "  task pt(output int o); o = 1; endtask\n"
+      "endpackage\n"
+      "package q;\n"
+      "  parameter int Q = 1;\n"
+      "  function void f();\n"
+      "    p::pt(Q);\n"
+      "  endfunction\n"
+      "endpackage\n"
+      "interface ifc;\n"
+      "  task it(output int o); o = 1; endtask\n"
+      "endinterface\n"
+      "module k(ifc ip);\n"
+      "  parameter int K = 1;\n"
+      "  initial ip.it(K);\n"
+      "endmodule\n"
+      "module m;\n"
+      "  ifc iu();\n"
+      "  k kk(iu);\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(
+      diags, "constant 'N' cannot be the actual of output argument 'o' of 'df'",
+      7, "6.20"));
+  EXPECT_TRUE(ReportedError(
+      diags, "constant 'N' cannot be the actual of output argument 'o' of 'bf'",
+      8, "6.20"));
+  EXPECT_TRUE(ReportedError(
+      diags, "constant 'N' cannot be the actual of output argument 'o' of 'bf'",
+      9, "6.20"));
+  EXPECT_TRUE(ReportedError(
+      diags, "constant 'L' cannot be the actual of output argument 'o' of 'ff'",
+      18, "6.20"));
+  EXPECT_TRUE(ReportedError(
+      diags, "constant 'Q' cannot be the actual of output argument 'o' of 'pt'",
+      26, "6.20"));
+  EXPECT_TRUE(ReportedError(
+      diags, "constant 'K' cannot be the actual of output argument 'o' of 'it'",
+      34, "6.20"));
+}
+
+TEST(ConstAssignElaboration,
+     AConstantActualOfAnInputFormalIsAcceptedThroughEveryCalleeName) {
+  ExpectNoError(
+      "package p;\n  task t(input int i); endtask\nendpackage\n"
+      "interface ifc;\n  task t(input int i); endtask\nendinterface\n"
+      "module c;\n  task t(input int i); endtask\nendmodule\n"
+      "class C;\n  static function void s(input int i); endfunction\n"
+      "  function void t(input int i); endfunction\nendclass\n"
+      "task ut(input int i); endtask\nmodule m;\n  parameter int P = 1;\n"
+      "  int v;\n  ifc iu();\n  c u();\n  C h = new;\n"
+      "  virtual ifc vi = iu;\n  task t(output int o); o = 1; endtask\n"
+      "  task s(output int o); o = 1; endtask\n"
+      "  task ut(output int o); o = 1; endtask\n  initial begin\n"
+      "    p::t(P);\n    C::s(P);\n    h.t(P);\n    u.t(P);\n"
+      "    iu.t(P);\n    vi.t(P);\n    $root.m.u.t(P);\n"
+      "    $unit::ut(P);\n    t(v);\n  end\nendmodule\n");
+  ExpectNoError(
+      "module m;\n  task t(output int o); o = 1; endtask\n  class K;\n"
+      "    localparam int L = 1;\n"
+      "    function void t(input int i); endfunction\n"
+      "    function void f();\n      this.t(L);\n      t(L);\n"
+      "    endfunction\n  endclass\nendmodule\n");
+}
+
 }  // namespace
