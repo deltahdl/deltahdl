@@ -1,6 +1,7 @@
 #include "elaborator/design_name_lookup.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <string_view>
 #include <vector>
 
