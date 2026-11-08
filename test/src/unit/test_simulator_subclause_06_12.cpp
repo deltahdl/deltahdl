@@ -111,6 +111,10 @@ TEST(RealDataType, ShortrealHoldsTheNearestBinary32InEveryPlaceItIsGiven) {
        "    begin : blk\n      static shortreal x = 0.1;\n      w = x;\n"
        "    end\n",
        "w"},
+      {"block local assignment", "", "",
+       "    begin : blk\n      shortreal x;\n      x = 0.1;\n      w = x;\n"
+       "    end\n",
+       "w"},
   };
   for (const ShortrealSource& source : kSources) {
     SCOPED_TRACE(source.where);

@@ -397,6 +397,7 @@ static void InitPackageCarrier(const Expr* init, std::string_view key,
   const uint32_t kWidth = var->value.width;
   bool sized = !var->is_real && !var->is_event && !ctx.IsStringVariable(key);
   Logic4Vec value = EvalExpr(init, ctx, arena, sized ? kWidth : 0);
+  if (var->is_real) value = ConvertRealForKnownLhs(value, true, kWidth, arena);
   var->value = sized ? HeldAtWidth(value, kWidth, *var, arena) : value;
   if (init->kind != ExprKind::kTagged || init->rhs == nullptr) return;
   ctx.SetVariableTag(*arena.Create<std::string>(std::string(key)),

@@ -111,7 +111,7 @@ static bool IsTwoStateIntegerKind(DataTypeKind kind) {
          kind == DataTypeKind::kLongint;
 }
 
-static bool IsRealMemberKind(DataTypeKind kind) {
+bool IsRealMemberKind(DataTypeKind kind) {
   return kind == DataTypeKind::kReal || kind == DataTypeKind::kShortreal ||
          kind == DataTypeKind::kRealtime;
 }

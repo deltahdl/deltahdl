@@ -65,8 +65,13 @@ std::optional<Logic4Vec> EvalPackedArrayPattern(const Expr* pattern,
 
 static Logic4Vec ElementBits(const StructFieldInfo& f, const Logic4Vec& val,
                              uint32_t width, Arena& arena) {
-  return f.type_kind == DataTypeKind::kString ? StringMemberHandle(val, arena)
-                                              : MemberBits(val, width, arena);
+  if (f.type_kind == DataTypeKind::kString)
+    return StringMemberHandle(val, arena);
+  const bool kRealMember = IsRealMemberKind(f.type_kind);
+  if (!kRealMember && !val.is_real) return MemberBits(val, width, arena);
+  Logic4Vec converted = ConvertRealForKnownLhs(val, kRealMember, width, arena);
+  converted.is_real = false;
+  return converted;
 }
 
 static void PlaceFieldValue(Logic4Vec& result, const StructFieldInfo& f,

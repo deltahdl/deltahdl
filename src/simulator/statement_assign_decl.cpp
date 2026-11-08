@@ -386,7 +386,6 @@ static void CreateDeclVariable(const Stmt* stmt, uint32_t width, bool is_real,
     CreateDeclAggregate(stmt, 0, ctx, arena);
   } else {
     if (width == 0) width = 32;
-    if (is_real && width < 64) width = 64;
     Variable* var = CreateVarInScope(stmt->var_name, width, is_signed, ctx);
     var->is_real = is_real;
     if (is_real) ctx.RegisterRealVariable(stmt->var_name);

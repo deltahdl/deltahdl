@@ -202,6 +202,23 @@ TEST(RealConversion, IntegerConvertsToRealByItsSignedOrUnsignedValue) {
   }
 }
 
+TEST(RealConversion, StructurePatternItemConvertsToItsMembersType) {
+  const std::string kSrc =
+      "module t;\n"
+      "  struct { int k; real r; shortreal s; } st = '{2.5, -3, 0.1};\n"
+      "  int k;\n"
+      "  bit [63:0] b, c;\n"
+      "  initial begin\n"
+      "    k = st.k;\n"
+      "    b = $realtobits(st.r);\n"
+      "    c = $realtobits(real'(st.s));\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(kSrc, "k"), 3u);
+  EXPECT_EQ(RunAndGet(kSrc, "b"), 0xC008000000000000u);
+  EXPECT_EQ(RunAndGet(kSrc, "c"), 0x3FB99999A0000000u);
+}
+
 TEST(RealConversion, DeclInitIntToReal) {
   SimFixture f;
   auto* var = RunAndFindVar(
