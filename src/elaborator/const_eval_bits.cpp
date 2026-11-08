@@ -67,6 +67,10 @@ const DataType* RegisteredTypedef(std::string_view name) {
   return it == g_typedefs->end() ? nullptr : &it->second;
 }
 
+const std::unordered_map<std::string_view, DataType>* RegisteredTypedefMap() {
+  return g_typedefs;
+}
+
 uint32_t RegisteredTypeWidth(const DataType& type, const ScopeMap& scope) {
   return g_typedefs == nullptr ? EvalTypeWidth(type)
                                : EvalTypeWidth(type, *g_typedefs, scope);

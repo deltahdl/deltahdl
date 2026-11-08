@@ -18,6 +18,7 @@
 #include "elaborator/elaborator_items_params.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
+#include "elaborator/unit_aggregate_params.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
@@ -78,10 +79,11 @@ static bool MentionsFormalOrSpecparam(const Expr* pexpr,
 }
 
 static void RecordClassParam(std::string_view pname, const Expr* pexpr,
-                             const DataType* type, bool is_array,
+                             const DataType* type,
+                             const std::vector<Expr*>& dims,
                              ClassParamRegistration& reg) {
   if (!pexpr || ContainsDollar(pexpr)) return;
-  is_array = is_array || pexpr->kind == ExprKind::kAssignmentPattern;
+  bool is_array = !dims.empty() || pexpr->kind == ExprKind::kAssignmentPattern;
   bool is_real = !is_array && TakesRealClassParamValue(pexpr, type);
   std::optional<int64_t> val;
   if (!is_real && !is_array)
@@ -100,6 +102,10 @@ static void RecordClassParam(std::string_view pname, const Expr* pexpr,
     }
     return;
   }
+  static const DataType kUntyped;
+  RegisterUnitAggregateParam({reg.key_prefix, pname, pexpr,
+                              type != nullptr ? *type : kUntyped, dims,
+                              reg.values});
   if (is_array || is_real) return;
   auto* qname = reg.arena.Create<std::string>(std::string(reg.key_prefix) +
                                               "." + std::string(pname));
@@ -110,20 +116,27 @@ static void RecordClassParam(std::string_view pname, const Expr* pexpr,
   SetTwoStateReading(reg.cu_param_scope, *qname, reading);
 }
 
+static const std::vector<Expr*>& PortParamDims(const ClassDecl& cls,
+                                               std::string_view pname) {
+  static const std::vector<Expr*> kNoDims;
+  auto it = cls.param_port_unpacked_dims.find(pname);
+  return it != cls.param_port_unpacked_dims.end() ? it->second : kNoDims;
+}
+
 static void RegisterOneClassParams(ClassParamRegistration& reg) {
+  UnitNamePrefixGuard prefix_guard(reg.key_prefix);
   const auto& params = reg.cls->params;
   const auto& types = reg.cls->param_types;
   for (size_t i = 0; i < params.size(); ++i) {
     const auto& [pname, pexpr] = params[i];
     if (reg.cls->type_param_names.count(pname)) continue;
     RecordClassParam(pname, pexpr, i < types.size() ? &types[i] : nullptr,
-                     reg.cls->param_port_unpacked_dims.count(pname) != 0, reg);
+                     PortParamDims(*reg.cls, pname), reg);
   }
   for (const auto* m : reg.cls->members) {
     if (m->kind != ClassMemberKind::kProperty || !m->is_param) continue;
     DataType type = InClassScope(m->data_type, *reg.cls, reg.type_scope);
-    RecordClassParam(m->name, m->init_expr, &type, !m->unpacked_dims.empty(),
-                     reg);
+    RecordClassParam(m->name, m->init_expr, &type, m->unpacked_dims, reg);
   }
 }
 

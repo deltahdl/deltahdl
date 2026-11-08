@@ -102,6 +102,7 @@ static std::optional<ConstVal> ConstEvalMemberAccessFull(
       arg.supplied)
     return arg.value;
   if (auto builtin = ConstEvalBuiltinMethodFull(expr, scope)) return builtin;
+  if (auto part = ConstEvalAggregatePart(expr, scope)) return part;
   if (auto key = ScopedNameKey(expr)) {
     auto it = scope.find(*key);
     if (it == scope.end()) return std::nullopt;

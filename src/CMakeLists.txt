@@ -165,6 +165,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/unit_hier_names_from_root.cpp
     elaborator/compilation_unit_set.cpp
     elaborator/unit_scope_switch.cpp
+    elaborator/unit_aggregate_params.cpp
     elaborator/time_literal_scale.cpp
     elaborator/semantic_leading_clocks.cpp
     elaborator/procedural_concurrent_assertion.cpp
@@ -286,6 +287,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/uwire_drivers.cpp
     elaborator/viewport_resolution.cpp
     elaborator/const_eval.cpp
+    elaborator/const_eval_aggregate_param.cpp
     elaborator/const_eval_array_query.cpp
     elaborator/const_eval_bits.cpp
     elaborator/const_eval_func.cpp

@@ -173,6 +173,7 @@ const RtlirParamDecl* RegisteredParamNamed(std::string_view name);
 ScopeMap RegisteredModuleScope();
 
 const DataType* RegisteredTypedef(std::string_view name);
+const std::unordered_map<std::string_view, DataType>* RegisteredTypedefMap();
 uint32_t RegisteredTypeWidth(const DataType& type, const ScopeMap& scope);
 
 std::optional<int64_t> RegisteredTypeRefCompare(const Expr* expr);
@@ -218,5 +219,13 @@ std::optional<bool> BuiltinMethodCallIsConstant(const Expr* expr,
                                                 const ScopeMap& scope);
 
 std::optional<std::string> ScopedNameKey(const Expr* expr);
+
+bool NamesAggregateParam(const Expr* expr);
+
+std::optional<ConstVal> ConstEvalAggregatePart(const Expr* expr,
+                                               const ScopeMap& scope);
+
+std::optional<PackedRange> AggregatePartRange(const Expr* expr,
+                                              const ScopeMap& scope);
 
 }  // namespace delta

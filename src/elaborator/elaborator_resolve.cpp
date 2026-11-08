@@ -26,6 +26,7 @@
 #include "elaborator/std_package.h"
 #include "elaborator/type_eval.h"
 #include "elaborator/type_ref_walks.h"
+#include "elaborator/unit_aggregate_params.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
@@ -174,6 +175,8 @@ struct PackageRegistration {
 void RegisterOnePackageParam(ModuleItem* item, PackageRegistration& reg) {
   if (item->kind != ModuleItemKind::kParamDecl || !item->init_expr) return;
   const DataType kType = InPackageScope(item->data_type, reg.pkg);
+  RegisterUnitAggregateParam({reg.pkg.name, item->name, item->init_expr, kType,
+                              item->unpacked_dims, reg.values});
   auto val = FoldDeclaredParamValue(item->init_expr, kType, reg.values);
   if (!val) return;
   RecordPackageConstant(reg.pkg.name, item->name, *val, reg.cu_param_scope,
@@ -189,6 +192,7 @@ void RegisterOnePackageParam(ModuleItem* item, PackageRegistration& reg) {
 void RegisterPackageParams(CompilationUnit* unit, ScopeMap& cu_param_scope,
                            Arena& arena) {
   for (auto* pkg : unit->packages) {
+    UnitNamePrefixGuard prefix_guard(pkg->name);
     PackageRegistration reg{*pkg, cu_param_scope, cu_param_scope, arena};
     for (auto* item : pkg->items) {
       BindPackageImportConstants(pkg, item, cu_param_scope, reg.values);
@@ -287,6 +291,12 @@ void ClassifyCuScopeItem(ModuleItem* item, CuScope& scope) {
     if (!item->class_decl->params.empty())
       scope.parameterized_classes.insert(item->class_decl->name);
   } else if (item->kind == ModuleItemKind::kParamDecl && item->init_expr) {
+    RegisterUnitAggregateParam({{},
+                                item->name,
+                                item->init_expr,
+                                item->data_type,
+                                item->unpacked_dims,
+                                scope.param_scope});
     if (!IsConstantExpr(item->init_expr, scope.param_scope)) {
       scope.diag.Error(item->loc,
                        std::format("localparam '{}' initializer is not a "

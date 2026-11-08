@@ -67,6 +67,7 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 - [Check the letter before writing](checking-for-the-letter-before-writing.md) — `ls test/src/unit/` first, or a redirect silently destroys existing cases.
 - [A VpiDesignRun SetUp calls the base first](vpi-design-run-setup.md) — an override skipping `VpiDesignRun::SetUp()` builds no VPI model, and its cases read leftovers.
 - [The VPI error status is read alone](vpi-error-status-is-read-alone.md) — read `vpi_chk_error` into a local right after the call it checks, never beside another VPI call.
+- [Parenthesizing a split-literal array element](parenthesizing-a-split-literal-array-element.md) — wrap each array element made of adjacent string literals in parentheses, or `-Wstring-concatenation` fails the build.
 - [No empty test files](no-empty-test-files.md) — a file with no `TEST` fails a job; a new lettered file lands with its first test.
 - [Sweeping a citation change](sweeping-a-citation-change.md) — grep the whole tree for the message the diagnostic prints, not only the files named after the old subclause.
 - [A braced case's closing brace is a line](braced-case-closing-brace-is-a-line.md) — `case X: { …; break; }` leaves a `}` llvm-cov counts and nothing runs; move the work into a helper.

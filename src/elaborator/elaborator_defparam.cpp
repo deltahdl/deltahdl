@@ -267,6 +267,8 @@ void Elaborator::RecomputeDependentParams(RtlirModule* mod) {
   ParamRangeRegistryGuard param_range_guard(mod);
   const TypedefMap kTypedefs =
       ModuleTypedefTable(typedefs_, FindModule(mod->name));
+  TypedefRegistryGuard typedef_guard(&kTypedefs, &aggregate_typedef_names_,
+                                     &type_ref_compare_);
   for (auto& p : mod->params) {
     if (p.is_type_param) continue;
     if (p.is_unbounded) continue;

@@ -28,6 +28,7 @@
 #include "elaborator/rtlir_scopes.h"
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
+#include "elaborator/unit_aggregate_params.h"
 #include "elaborator/uwire_drivers.h"
 #include "parser/ast_design.h"
 #include "parser/ast_module.h"
@@ -419,6 +420,8 @@ class ElaboratorData {
   ScopeMap pla_ascending_scope_;
 
   ScopeMap procedural_typedef_scope_;
+
+  UnitAggregateParams unit_aggregate_params_;
 };
 
 }  // namespace delta

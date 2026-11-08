@@ -28,6 +28,7 @@
 #include "elaborator/rtlir.h"
 #include "elaborator/sdf_annotate_calls.h"
 #include "elaborator/time_literal_scale.h"
+#include "elaborator/unit_aggregate_params.h"
 #include "elaborator/unit_hier_names_from_root.h"
 #include "elaborator/unit_scope_order.h"
 #include "elaborator/unit_scope_switch.h"
@@ -500,6 +501,7 @@ RtlirDesign* Elaborator::ElaborateTops(
 }
 
 RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
+  UnitAggregateParamGuard unit_aggregate_guard(unit_aggregate_params_);
   if (top_module_name.empty()) {
     if (unit_->DeclaresNothing()) return nullptr;
     UnitScopeTables::RunPreElaborationValidations(*this);
@@ -526,6 +528,7 @@ RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
 
 RtlirDesign* Elaborator::Elaborate(
     const std::vector<std::string_view>& top_names) {
+  UnitAggregateParamGuard unit_aggregate_guard(unit_aggregate_params_);
   if (top_names.empty()) {
     diag_.Error(SourceLoc::None(), "no top-level module was named to elaborate",
                 Subclause::None());
@@ -731,6 +734,7 @@ void Elaborator::CollectConfigRuleTables(const ConfigDecl* cfg) {
 }
 
 RtlirDesign* Elaborator::Elaborate(const ConfigDecl* cfg) {
+  UnitAggregateParamGuard unit_aggregate_guard(unit_aggregate_params_);
   in_config_elaboration_ = true;
   active_config_ = ConfigLibCell(cfg, arena_);
 

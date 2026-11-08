@@ -364,4 +364,35 @@ TEST(StructureParameterSim, MembersAreReadInAnInterface) {
   EXPECT_EQ(ValueOf(f, "d.a"), 3u);
 }
 
+TEST(StructureParameterSim, MembersAreReadInAProgramAFunctionAndANamedBlock) {
+  SimFixture f;
+  RunAndFindVar(
+      "typedef struct { int a; logic [7:0] b; } s_t;\n"
+      "program prg #(parameter s_t P = '{b: 8'h3, a: 2});\n"
+      "  parameter int A[2] = '{4, 5};\n"
+      "  int r;\n"
+      "  initial r = P.a * 100 + P.b * 10 + A[1];\n"
+      "endprogram\n"
+      "module t;\n"
+      "  function automatic int f();\n"
+      "    localparam s_t K = '{b: 8'h6, a: 7};\n"
+      "    localparam int A[2] = '{8, 9};\n"
+      "    return K.a * 100 + K.b * 10 + A[0];\n"
+      "  endfunction\n"
+      "  prg #(.P('{a: 1, b: 8'h2})) p();\n"
+      "  int nf, nb;\n"
+      "  initial begin : blk\n"
+      "    localparam s_t K = '{a: 4, b: 8'h1};\n"
+      "    localparam int A[2] = '{3, 6};\n"
+      "    nf = f();\n"
+      "    nb = K.a * 100 + K.b * 10 + A[1];\n"
+      "  end\n"
+      "endmodule\n",
+      f, "nf");
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ValueOf(f, "p.r"), 125u);
+  EXPECT_EQ(ValueOf(f, "nf"), 768u);
+  EXPECT_EQ(ValueOf(f, "nb"), 416u);
+}
+
 }  // namespace

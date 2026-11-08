@@ -600,8 +600,10 @@ std::optional<ConstVal> ConstEvalBinaryFull(const Expr* expr,
   return NormalizeConstVal(*result, w, s);
 }
 
-static std::optional<PackedRange> SelectBaseRange(const Expr* base) {
-  if (!base || base->kind != ExprKind::kIdentifier) return std::nullopt;
+static std::optional<PackedRange> SelectBaseRange(const Expr* base,
+                                                  const ScopeMap& scope) {
+  if (base->kind != ExprKind::kIdentifier)
+    return AggregatePartRange(base, scope);
   return RegisteredParamRange(base->text);
 }
 
@@ -633,60 +635,14 @@ static std::optional<ConstVal> SelectBitRange(const ConstVal& value,
   return ConstValOfWords(words, kWidth, false);
 }
 
-static const RtlirParamDecl* RegisteredParam(std::string_view name) {
-  const RtlirModule* mod = RegisteredModule();
-  if (mod == nullptr) return nullptr;
-  for (const auto& p : mod->params) {
-    if (p.name == name) return &p;
-  }
-  return nullptr;
-}
-
-static std::optional<int64_t> ElementOffset(const Expr* dim, const Expr* index,
-                                            const ScopeMap& scope) {
-  if (dim == nullptr) return std::nullopt;
-  auto idx = ConstEvalFull(index, scope);
-  bool ranged = dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon;
-  auto left = ConstEvalFull(ranged ? dim->lhs : nullptr, scope);
-  auto right = ConstEvalFull(ranged ? dim->rhs : dim, scope);
-  if (!idx || !right || (ranged && !left)) return std::nullopt;
-  int64_t lo = ranged ? left->value : 0;
-  int64_t hi = ranged ? right->value : right->value - 1;
-  return lo <= hi ? idx->value - lo : lo - idx->value;
-}
-
-static std::optional<ConstVal> ParamArrayElement(const Expr* expr,
-                                                 const ScopeMap& scope) {
-  if (expr->index_end != nullptr || expr->base == nullptr ||
-      expr->base->kind != ExprKind::kIdentifier) {
-    return std::nullopt;
-  }
-  const RtlirParamDecl* p = RegisteredParam(expr->base->text);
-  if (p == nullptr || p->unpacked_dims == nullptr ||
-      p->unpacked_dims->size() != 1) {
-    return std::nullopt;
-  }
-  const Expr* value = p->override_expr ? p->override_expr : p->default_value;
-  if (value == nullptr || value->kind != ExprKind::kAssignmentPattern ||
-      !value->pattern_keys.empty()) {
-    return std::nullopt;
-  }
-  auto offset = ElementOffset(p->unpacked_dims->front(), expr->index, scope);
-  if (!offset || *offset < 0 ||
-      *offset >= static_cast<int64_t>(value->elements.size())) {
-    return std::nullopt;
-  }
-  return ConstEvalFull(value->elements[static_cast<size_t>(*offset)], scope);
-}
-
 std::optional<ConstVal> ConstEvalSelectFull(const Expr* expr,
                                             const ScopeMap& scope) {
-  if (auto element = ParamArrayElement(expr, scope)) return element;
+  if (auto element = ConstEvalAggregatePart(expr, scope)) return element;
   auto base_val = ConstEvalFull(expr->base, scope);
   if (!base_val) return std::nullopt;
   auto idx = ConstEvalFull(expr->index, scope);
   if (!idx) return std::nullopt;
-  auto range = SelectBaseRange(expr->base);
+  auto range = SelectBaseRange(expr->base, scope);
   if (expr->index_end) {
     auto end = ConstEvalFull(expr->index_end, scope);
     if (!end) return std::nullopt;

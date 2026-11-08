@@ -120,7 +120,7 @@ static bool IsConstantMemberAccessExpr(const Expr* expr,
       IsConstantExpr(expr->lhs, scope))
     return true;
   std::optional<std::string> key = ScopedNameKey(expr);
-  return key && scope.count(*key) > 0;
+  return (key && scope.count(*key) > 0) || NamesAggregateParam(expr);
 }
 
 static bool IsConstantMinTypMaxExpr(const Expr* expr, const ScopeMap& scope) {
@@ -142,7 +142,7 @@ bool IsConstantExpr(const Expr* expr, const ScopeMap& scope) {
     case ExprKind::kIdentifier:
       if (expr->text == "$") return true;
       if (expr->text == "null") return true;
-      return scope.count(expr->text) > 0;
+      return scope.count(expr->text) > 0 || NamesAggregateParam(expr);
     case ExprKind::kUnary:
       return IsConstantExpr(expr->lhs, scope);
     case ExprKind::kBinary:
