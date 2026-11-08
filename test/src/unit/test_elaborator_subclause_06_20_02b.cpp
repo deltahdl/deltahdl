@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 
 #include "common/diagnostic.h"
 #include "elaborator/rtlir.h"
@@ -541,6 +542,71 @@ TEST(ValueParameters, ValueSetFromConstantsAndAggregateMembersIsAccepted) {
       if (diag.severity == DiagSeverity::kError)
         ADD_FAILURE() << "line " << diag.loc.line << ": " << diag.message;
     }
+  }
+}
+
+constexpr const char* kStructureDesign =
+    "typedef struct { int a; logic [7:0] b; } s_t;\n"
+    "module sub;\n"
+    "  parameter s_t P = '{a: 1, b: 8'h2};\n"
+    "  parameter s_t S [2] = '{'{a: 0, b: 8'h0}, '{a: 1, b: 8'h1}};\n"
+    "  parameter int A[2] = '{1, 2};\n"
+    "  localparam s_t L = '{a: 1, b: 8'h2};\n"
+    "endmodule\n"
+    "interface ifc;\n"
+    "  parameter s_t P = '{a: 1, b: 8'h2};\n"
+    "endinterface\n";
+
+TEST(AggregateParameters, DefparamNamingAPartOfAParameterIsReported) {
+  ElabFixture f;
+  ElaborateSrc(std::string(kStructureDesign) +
+                   "module top;\n"
+                   "  parameter s_t Q = '{a: 3, b: 8'h4};\n"
+                   "  sub u();\n"
+                   "  ifc i();\n"
+                   "  if (1) begin : g\n"
+                   "    sub w();\n"
+                   "  end\n"
+                   "  defparam u.P.a = 5;\n"
+                   "  defparam u.S[1].b = 8'h6;\n"
+                   "  defparam i.P.b = 8'h7;\n"
+                   "  defparam Q.a = 9;\n"
+                   "  defparam top.u.P.b = 8'h8;\n"
+                   "  defparam g.w.P.a = 4;\n"
+                   "  defparam u.L = '{a: 2, b: 8'h3};\n"
+                   "endmodule\n",
+               f);
+  for (uint32_t line : {18u, 19u, 20u, 21u, 22u, 23u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "defparam names a part of parameter", line,
+                              "6.20.2"))
+        << "line " << line;
+  }
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "defparam cannot override a local parameter", 24,
+                            "23.10.1"));
+}
+
+TEST(AggregateParameters, DefparamOfAWholeAggregateParameterIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(std::string(kStructureDesign) +
+                   "module top;\n"
+                   "  parameter s_t Q = '{a: 3, b: 8'h4};\n"
+                   "  sub u();\n"
+                   "  ifc i();\n"
+                   "  if (1) begin : g\n"
+                   "    sub w();\n"
+                   "  end\n"
+                   "  defparam u.P = '{a: 5, b: 8'h6};\n"
+                   "  defparam u.S = '{'{a: 1, b: 8'h1}, '{a: 2, b: 8'h2}};\n"
+                   "  defparam u.A = '{3, 4};\n"
+                   "  defparam i.P = '{a: 7, b: 8'h7};\n"
+                   "  defparam top.Q = '{a: 9, b: 8'h9};\n"
+                   "  defparam g.w.P = '{a: 4, b: 8'h4};\n"
+                   "endmodule\n",
+               f);
+  for (const Diagnostic& diag : f.diag.Diagnostics()) {
+    ADD_FAILURE() << "line " << diag.loc.line << ": " << diag.message;
   }
 }
 

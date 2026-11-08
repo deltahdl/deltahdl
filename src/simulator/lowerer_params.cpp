@@ -76,6 +76,17 @@ static bool NamesOwnEnumConstant(const Expr* expr, const RtlirModule& mod) {
   return found;
 }
 
+static void BindParamLayout(const RtlirParamDecl& p, std::string_view full,
+                            uint32_t width, SimContext& ctx, Arena& arena) {
+  const DataType* type = ParamValueType(p);
+  if (type == nullptr) return;
+  if (type->kind == DataTypeKind::kNamed) {
+    BindNamedLayout(full, *type, ctx);
+    return;
+  }
+  RegisterAggregateLayout(full, type, width, ctx, arena);
+}
+
 void Lowerer::LowerParam(const RtlirModule& mod, const RtlirParamDecl& p,
                          std::string_view full) {
   if (p.is_unbounded) {
@@ -109,6 +120,7 @@ void Lowerer::LowerParam(const RtlirModule& mod, const RtlirParamDecl& p,
   ParamStorageShape shape = ParamStorageShapeOf(p);
   uint32_t width = shape.width;
   auto* var = ctx_.CreateVariable(full, width);
+  BindParamLayout(p, full, width, ctx_, arena_);
   var->value =
       MakeLogic4VecVal(arena_, width, static_cast<uint64_t>(p.resolved_value));
   if (p.override_expr != nullptr || !NamesOwnEnumConstant(p.default_value, mod))

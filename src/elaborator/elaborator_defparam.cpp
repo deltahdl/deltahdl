@@ -373,6 +373,37 @@ static const Expr* DefparamOverrideExpr(const Expr* val_expr) {
   return val_expr->kind == ExprKind::kIntegerLiteral ? val_expr : nullptr;
 }
 
+static bool SetWholeAggregateDefparamValue(DiagEngine& diag,
+                                           RtlirParamDecl& param,
+                                           const DefparamOverride& ovr,
+                                           const DefparamAppliedRecord& rec) {
+  if (!DefparamOverrideAllowed(diag, &param, ovr.val_expr, ovr.loc)) {
+    rec.applied.insert(rec.key);
+    return false;
+  }
+  if (auto folded = FoldParamValue(param, ovr.val_expr, ovr.scope))
+    param.resolved_value = ConvertOverrideValue(*folded, param);
+  param.override_expr = ovr.val_expr;
+  return true;
+}
+
+static bool SetDefparamValue(DiagEngine& diag, RtlirParamDecl& param,
+                             const DefparamOverride& ovr,
+                             const DefparamAppliedRecord& rec) {
+  if (ovr.val_expr->kind == ExprKind::kAssignmentPattern) {
+    if (!SetWholeAggregateDefparamValue(diag, param, ovr, rec)) return false;
+  } else {
+    auto value = EvalDefparamOverride(diag, ovr, rec);
+    if (!value) return false;
+    param.resolved_value = *value;
+    ApplyOverrideRealness(param, RealOverrideValue(ovr.val_expr, ovr.scope));
+    param.override_expr = DefparamOverrideExpr(ovr.val_expr);
+  }
+  param.is_resolved = true;
+  param.from_override = true;
+  return true;
+}
+
 void Elaborator::ApplyDefparamSite(RtlirModule* mod, const DefparamSite& site,
                                    const ScopeMap& scope) {
   for (size_t idx = 0; idx < site.item->defparam_assigns.size(); ++idx) {
@@ -397,14 +428,7 @@ void Elaborator::ApplyDefparamSite(RtlirModule* mod, const DefparamSite& site,
     RtlirModule* target_mod = rooted.target_mod;
     DefparamOverride ovr{param, val_expr, scope, site.item->loc};
     DefparamAppliedRecord rec{applied_defparams_, key};
-    auto value = EvalDefparamOverride(diag_, ovr, rec);
-    if (!value) continue;
-
-    param->resolved_value = *value;
-    param->is_resolved = true;
-    param->from_override = true;
-    ApplyOverrideRealness(*param, RealOverrideValue(val_expr, scope));
-    param->override_expr = DefparamOverrideExpr(val_expr);
+    if (!SetDefparamValue(diag_, *param, ovr, rec)) continue;
     RecordResolvedHighWords(*param, val_expr, scope);
     param->defparam_value_expr = val_expr;
     param->defparam_value_scope = scope;
@@ -549,6 +573,29 @@ static bool DefparamTargetsSpecparam(RtlirModule* mod, const HierPath& path,
   return false;
 }
 
+static const RtlirParamDecl* OwnParamNamed(const RtlirModule& mod,
+                                           std::string_view name) {
+  for (const auto& p : mod.params) {
+    if (p.gen_block_prefix.empty() && p.name == name) return &p;
+  }
+  return nullptr;
+}
+
+const RtlirParamDecl* Elaborator::ParamWithStepsAfterIt(RtlirModule* mod,
+                                                        const HierPath& path) {
+  for (size_t len = 1; len < path.size(); ++len) {
+    HierPath prefix(path.begin(),
+                    path.begin() + static_cast<std::ptrdiff_t>(len));
+    const RtlirParamDecl* p = len == 1
+                                  ? OwnParamNamed(*mod, prefix.front().name)
+                                  : ResolveDefparamSteps(mod, prefix, {});
+    DefparamTopRooted any{nullptr, prefix, mod};
+    if (p == nullptr) p = ResolveDefparamFromTop(prefix, any);
+    if (p != nullptr) return p;
+  }
+  return nullptr;
+}
+
 void Elaborator::ReportUnresolvedDefparamSite(RtlirModule* mod,
                                               const DefparamSite& site,
                                               const ScopeMap& mod_scope) {
@@ -578,6 +625,16 @@ void Elaborator::ReportUnresolvedDefparamSite(RtlirModule* mod,
                   "defparam inside a generate block or an array of instances "
                   "reaches a parameter outside that hierarchy",
                   Subclause("23.10.1"));
+      continue;
+    }
+    const RtlirParamDecl* whole =
+        read ? ParamWithStepsAfterIt(mod, path) : nullptr;
+    if (whole != nullptr) {
+      diag_.Error(site.item->loc,
+                  std::format("defparam names a part of parameter '{}', which "
+                              "is overridden only as a whole",
+                              whole->name),
+                  Subclause("6.20.2"));
       continue;
     }
     if (read && DefparamTargetsSpecparam(mod, path, defparam_top_roots_)) {

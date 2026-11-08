@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -116,6 +117,46 @@ TEST(DeclarationListParsing, ValueParameterOfAPackageScopedType) {
   EXPECT_EQ(top->items[0]->name, "R");
   EXPECT_EQ(top->items[0]->data_type.scope_name, "p");
   EXPECT_EQ(top->items[0]->data_type.type_name, "word_t");
+}
+
+TEST(AggregateParameterParsing, InstanceOverrideOfAnElementIsReported) {
+  auto r = Parse(
+      "module top;\n"
+      "  sub #(.A[0](5)) u();\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "expected '(', got '['", 2, "23.10.2.2"));
+}
+
+TEST(AggregateParameterParsing, InstanceOverrideOfAMemberIsReported) {
+  auto r = Parse(
+      "module top;\n"
+      "  sub #(.P.a(5)) u();\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "expected '(', got '.'", 2, "23.10.2.2"));
+}
+
+TEST(AggregateParameterParsing, ConfigurationOverrideOfAnElementIsReported) {
+  auto r = Parse(
+      "config cfg;\n"
+      "  design top;\n"
+      "  instance top.u use #(.A[0](5));\n"
+      "endconfig\n");
+  EXPECT_TRUE(ReportedError(r.diags, "expected '(', got '['", 3, "33.4.3"));
+}
+
+TEST(AggregateParameterParsing, WholeAggregateOverridesAreAccepted) {
+  auto r = Parse(
+      "module top;\n"
+      "  sub #(.A('{5, 6}), .P('{a: 1, b: 2})) u();\n"
+      "  sub #('{5, 6}) v();\n"
+      "  defparam u.A = '{7, 8};\n"
+      "endmodule\n"
+      "config cfg;\n"
+      "  design top;\n"
+      "  instance top.u use #(.A('{5, 6}));\n"
+      "endconfig\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
 }
 
 }  // namespace
