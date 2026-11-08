@@ -45,6 +45,7 @@ jobs:
         run: >-
           assert-no-comments
           --verbose
+          ${{ github.workspace }}/.claude/statusline.sh
           ${{ github.workspace }}/.github/workflows/scripts.yml
           ${{ github.workspace }}/lib/__init__.py
           ${{ github.workspace }}/lib/python/
@@ -514,6 +515,7 @@ on:
   push:
     branches: [main]
     paths:
+      - .claude/statusline.sh
       - .github/workflows/scripts.yml
       - lib/__init__.py
       - lib/python/**

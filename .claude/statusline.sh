@@ -1,9 +1,6 @@
 #!/bin/bash
-# Claude Code status line: tokens in context, the weekly usage bar, and the repo's open issue count.
 
 input=$(cat)
-# The tokens in context now: the last request's input, cache writes and cache
-# reads, or the used share of the window where no request has reported yet.
 ctx=$(echo "$input" | jq -r '.context_window as $w
   | if $w.current_usage then
       ($w.current_usage | (.input_tokens // 0) + (.cache_creation_input_tokens // 0) + (.cache_read_input_tokens // 0))
@@ -33,7 +30,6 @@ out=''
 [ -n "$ctx" ] && out=$(printf 'Context %.0fK' "$(echo "$ctx / 1000" | bc -l)")
 [ -n "$wk" ] && out="${out}${out:+  |  }$(bar Weekly "$wk")"
 
-# gh is slow, so the count is cached per working directory for two minutes.
 if [ -n "$cwd" ]; then
   cache="${TMPDIR:-/tmp}/claude-statusline-issues-$(printf '%s' "$cwd" | cksum | cut -d' ' -f1)"
   if [ ! -s "$cache" ] || [ -n "$(find "$cache" -mmin +2 2>/dev/null)" ]; then
