@@ -85,7 +85,7 @@ void Elaborator::ProcessPendingGenerate(const PendingGenerate& pg) {
     default:
       break;
   }
-  ValidateGenerateValueParams(pg.item, pg.mod, scope, diag_);
+  ValidateGenerateValueParams(pg.item, pg.mod, scope, diag_, arena_);
   const TypeShapeTables kTables{typedefs_, td_array_dims_, class_names_};
   RecordParamDefaultMismatches(
       *pg.mod, kFirstParam, {kTables, BuildParamScope(pg.mod), unit_}, arena_);

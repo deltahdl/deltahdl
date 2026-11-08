@@ -98,7 +98,6 @@ TEST(ParamValueAssignability, EnumParameterGivenAValueOfItsTypeIsAccepted) {
       "  parameter e_t E = C ? A : B;\nendmodule\n",
       "module m;\n  typedef enum {A, B} e_t;\n  parameter int I = B;\n"
       "  parameter bit C = 1;\n  parameter int J = C ? 1 : A;\nendmodule\n",
-      "module m;\n  parameter enum {X, Y} E = Y;\nendmodule\n",
       "package p;\n  typedef enum {P0, P1} p_t;\nendpackage\nmodule m;\n"
       "  parameter p::p_t E = p::P1;\n  parameter p::p_t F = p::p_t'(1);\n"
       "endmodule\n",

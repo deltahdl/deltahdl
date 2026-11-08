@@ -2,6 +2,7 @@
 
 #include "fixture_elaborator.h"
 #include "helpers_param_value.h"
+#include "helpers_param_value_assignability.h"
 #include "helpers_reported_error.h"
 #include "helpers_rtlir_lookup.h"
 
@@ -358,6 +359,55 @@ TEST(LocalparamElaboration, ConstantInitializerInAGenerateBlockIsAccepted) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+}
+
+TEST(LocalparamElaboration,
+     GenerateBlockLocalparamFoldsAnEnumConstantOfItsOwnBlock) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  if (1) begin : g\n"
+      "    typedef enum { A = 3, B = 5 } e_t;\n"
+      "    localparam int X = B;\n"
+      "    if (1) begin : h\n"
+      "      localparam int Y = A | B;\n"
+      "    end\n"
+      "  end\n"
+      "  case (1)\n"
+      "    1: begin : c\n"
+      "      enum { C = 2, D = 9 } v;\n"
+      "      localparam int Z = D;\n"
+      "    end\n"
+      "  endcase\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* x = FindParam(design, "m", "X");
+  ASSERT_NE(x, nullptr);
+  EXPECT_EQ(x->resolved_value, 5);
+  const auto* y = FindParam(design, "m", "Y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->resolved_value, 7);
+  const auto* z = FindParam(design, "m", "Z");
+  ASSERT_NE(z, nullptr);
+  EXPECT_EQ(z->resolved_value, 9);
+}
+
+TEST(LocalparamElaboration,
+     EnumConstantOfItsOwnBlockIsAcceptedInEveryGenerateArm) {
+  const char* const kSources[] = {
+      "module m;\n  if (0) begin\n  end else begin\n"
+      "    typedef enum { A, B } e_t;\n    localparam int N = B;\n"
+      "  end\nendmodule\n",
+      "module m;\n  for (genvar i = 0; i < 1; i++) begin : b\n"
+      "    enum { A, B } v;\n    localparam int N = B + i;\n"
+      "  end\nendmodule\n",
+      "module m;\n  localparam int S = 0;\n  case (S)\n    0: begin\n"
+      "      typedef enum { A, B } e_t;\n      localparam e_t N = B;\n"
+      "    end\n  endcase\nendmodule\n",
+  };
+  ExpectEachAccepted(kSources);
 }
 
 TEST(LocalparamElaboration, GenvarInitializerInAGenerateLoopIsAccepted) {

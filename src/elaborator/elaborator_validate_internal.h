@@ -11,6 +11,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
@@ -444,7 +445,8 @@ void WarnDiscardedReturn(SourceLoc loc, std::string_view callee,
                          std::string_view remedy, DiagEngine& diag);
 
 void ValidateGenerateValueParams(const ModuleItem* item, const RtlirModule* mod,
-                                 const ScopeMap& scope, DiagEngine& diag);
+                                 const ScopeMap& scope, DiagEngine& diag,
+                                 Arena& arena);
 
 void ValidateUnitClassCallArgs(const CompilationUnit& unit, DiagEngine& diag);
 

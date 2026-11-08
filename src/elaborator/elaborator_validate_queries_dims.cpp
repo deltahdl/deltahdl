@@ -8,6 +8,7 @@
 #include <utility>
 #include <vector>
 
+#include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
@@ -716,6 +717,7 @@ void ValidateOneValueParam(const ModuleItem* item, const ScopeMap& constants,
 struct GenerateParamCtx {
   const RtlirModule* mod;
   DiagEngine& diag;
+  Arena& arena;
 };
 
 void AddInstancePrefixes(const ModuleItem* item, const RtlirModule* mod,
@@ -751,6 +753,7 @@ void ValidateValueParamsInGenerateBody(const std::vector<ModuleItem*>& items,
                                        GenBlockPrefixes prefixes,
                                        const GenerateParamCtx& ctx) {
   for (const auto* item : items) {
+    BindEnumConstantsOfItem(item, scope, ctx.arena);
     if (item->kind == ModuleItemKind::kParamDecl) {
       {
         RegisteredGenScopeGuard in_block(prefixes);
@@ -788,8 +791,9 @@ void Elaborator::ValidateValueParams(const ModuleDecl* decl,
 }
 
 void ValidateGenerateValueParams(const ModuleItem* item, const RtlirModule* mod,
-                                 const ScopeMap& scope, DiagEngine& diag) {
-  GenerateParamCtx ctx{mod, diag};
+                                 const ScopeMap& scope, DiagEngine& diag,
+                                 Arena& arena) {
+  GenerateParamCtx ctx{mod, diag, arena};
   ValidateValueParamsInGenerate(
       item,
       WithEveryDeclaredConstant(scope, mod, DeclaredSpecparamNames(mod->decl)),
