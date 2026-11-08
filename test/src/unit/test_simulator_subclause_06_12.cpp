@@ -87,6 +87,30 @@ TEST(RealDataType, ShortrealHoldsTheNearestBinary32InEveryPlaceItIsGiven) {
        "module c(input var shortreal x, output real y);\n  assign y = x;\n"
        "endmodule\n",
        "  real r = 0.1;\n  real y;\n  c u(r, y);\n", "    #1;\n", "y"},
+      {"package variable initializer",
+       "package pk;\n  shortreal s = 0.1;\nendpackage\n", "", "", "pk::s"},
+      {"compilation-unit variable initializer", "shortreal s = 0.1;\n", "", "",
+       "s"},
+      {"interface variable initializer",
+       "interface ifc;\n  shortreal s = 0.1;\nendinterface\n", "  ifc i();\n",
+       "", "i.s"},
+      {"class property initializer",
+       "class C;\n  shortreal s = 0.1;\nendclass\n", "  C h = new;\n", "",
+       "h.s"},
+      {"static class property initializer",
+       "class C;\n  static shortreal s = 0.1;\nendclass\n", "", "", "C::s"},
+      {"unpacked array element initializer", "",
+       "  shortreal a[2] = '{0.1, 0.2};\n", "", "a[0]"},
+      {"unpacked structure member initializer", "",
+       "  struct { shortreal m; int k; } st = '{0.1, 1};\n", "", "st.m"},
+      {"function local initializer", "",
+       "  function automatic real f();\n    shortreal x = 0.1;\n"
+       "    return x;\n  endfunction\n",
+       "", "f()"},
+      {"block local initializer", "", "",
+       "    begin : blk\n      static shortreal x = 0.1;\n      w = x;\n"
+       "    end\n",
+       "w"},
   };
   for (const ShortrealSource& source : kSources) {
     SCOPED_TRACE(source.where);
