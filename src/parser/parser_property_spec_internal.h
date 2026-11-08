@@ -44,6 +44,7 @@ struct ParserPropertySpecHelpers {
   static bool AheadListsNamesOnly(Parser& p);
   static Expr* ParseListedNamesActual(Parser& p);
   static Expr* ParseWholeExpressionActual(Parser& p);
+  static Expr* ParseLoneDollarActual(Parser& p);
   static Expr* ParsePropertyActualArg(Parser& p, bool& plain);
   static PropertyExprNode* ParseWholeSequenceActual(Parser& p);
   static Expr* ParseFormalDefault(Parser& p);

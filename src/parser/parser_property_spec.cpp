@@ -202,21 +202,25 @@ Expr* ParserPropertySpecHelpers::ParseWholeExpressionActual(Parser& p) {
   return nullptr;
 }
 
+Expr* ParserPropertySpecHelpers::ParseLoneDollarActual(Parser& p) {
+  if (!p.Check(TokenKind::kDollar)) return nullptr;
+  auto saved = p.lexer_.SavePos();
+  Token tok = p.Consume();
+  if (!p.Check(TokenKind::kComma) && !p.Check(TokenKind::kRParen)) {
+    p.lexer_.RestorePos(saved);
+    return nullptr;
+  }
+  auto* dollar = p.arena_.Create<Expr>();
+  dollar->kind = ExprKind::kIdentifier;
+  dollar->text = tok.text;
+  dollar->range.start = tok.loc;
+  return dollar;
+}
+
 Expr* ParserPropertySpecHelpers::ParsePropertyActualArg(Parser& p,
                                                         bool& plain) {
   SourceLoc loc = p.CurrentLoc();
-  if (p.Check(TokenKind::kDollar)) {
-    auto saved = p.lexer_.SavePos();
-    Token tok = p.Consume();
-    if (p.Check(TokenKind::kComma) || p.Check(TokenKind::kRParen)) {
-      auto* dollar = p.arena_.Create<Expr>();
-      dollar->kind = ExprKind::kIdentifier;
-      dollar->text = tok.text;
-      dollar->range.start = tok.loc;
-      return dollar;
-    }
-    p.lexer_.RestorePos(saved);
-  }
+  if (Expr* dollar = ParseLoneDollarActual(p)) return dollar;
   if (IsEdgeKeyword(p.CurrentToken().kind) ||
       (p.Check(TokenKind::kLParen) && p.OpensEventGroup(true))) {
     plain = false;
