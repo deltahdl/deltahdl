@@ -548,21 +548,22 @@ TEST(StructPatternSim, AKeyedPatternSetsAProceduralVariableByItsKeys) {
       "    r = v.a * 100 + v.b;\n"
       "  endtask\n"
       "  initial begin : blk\n"
-      "    s_t v = '{b: 8'h1, a: 5};\n"
-      "    struct { int a; logic [7:0] b; } u = '{b: 8'h3, a: 4};\n"
+      "    automatic s_t v = '{b: 8'h1, a: 5};\n"
+      "    static struct { int a; logic [7:0] b; } u = '{b: 8'h3, a: 4};\n"
       "    int r;\n"
       "    tk(r);\n"
       "    $display(\"%0d %0d %0d %0d %0d\", fa(), fs(), r, v.a * 100 + v.b,\n"
       "             u.a * 100 + u.b);\n"
       "    fork\n"
       "      begin\n"
-      "        s_t w = '{b: 8'h8, a: 2};\n"
+      "        automatic s_t w = '{b: 8'h8, a: 2};\n"
       "        $display(\"%0d\", w.a * 100 + w.b);\n"
       "      end\n"
       "    join\n"
       "  end\n"
       "endmodule\n",
       f);
+  EXPECT_FALSE(f.has_errors);
   EXPECT_EQ(out, "706 302 904 501 403\n208\n");
 }
 
