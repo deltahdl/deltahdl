@@ -6,12 +6,13 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
 #include "common/packed_range.h"
 #include "common/types.h"
-#include "elaborator/const_eval.h"
+#include "elaborator/assertion_walk.h"
 #include "elaborator/elaborator_scope_rules_names.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_class.h"
@@ -91,23 +92,60 @@ static uint32_t MethodClassTypedefWidth(std::string_view name,
   return 0;
 }
 
+static void CollectChainNames(const Expr* e, std::vector<const Expr*>& names) {
+  while (e != nullptr &&
+         (e->kind == ExprKind::kMemberAccess || e->kind == ExprKind::kSelect)) {
+    if (e->kind == ExprKind::kMemberAccess) {
+      e = e->lhs;
+      continue;
+    }
+    CollectBareIdents(e->index, names);
+    CollectBareIdents(e->index_end, names);
+    e = e->base;
+  }
+  CollectBareIdents(e, names);
+}
+
+static void CollectRunningNames(const Expr* bound,
+                                std::vector<const Expr*>& names) {
+  CollectBareIdents(bound, names);
+  ForEachSubExpr(bound, [&names](const Expr* e) {
+    if (e->kind == ExprKind::kMemberAccess) CollectChainNames(e, names);
+  });
+}
+
+static std::optional<uint64_t> RunningSpan(const Expr* left, const Expr* right,
+                                           SimContext& ctx) {
+  Logic4Vec l = EvalExpr(left, ctx, ctx.GetArena());
+  Logic4Vec r = EvalExpr(right, ctx, ctx.GetArena());
+  if (!l.IsKnown() || !r.IsKnown()) return std::nullopt;
+  int64_t lv = SelectBoundValue(l);
+  int64_t rv = SelectBoundValue(r);
+  return static_cast<uint64_t>((lv >= rv ? lv - rv : rv - lv) + 1);
+}
+
 static uint32_t RunningPackedDimProduct(const DataType& type, SimContext& ctx) {
   if (!type.packed_dim_left || !type.packed_dim_right) return 0;
+  std::vector<std::pair<Expr*, Expr*>> dims{
+      {type.packed_dim_left, type.packed_dim_right}};
+  dims.insert(dims.end(), type.extra_packed_dims.begin(),
+              type.extra_packed_dims.end());
   std::vector<const Expr*> names;
-  CollectBareIdents(type.packed_dim_left, names);
-  CollectBareIdents(type.packed_dim_right, names);
-  for (const auto& [left, right] : type.extra_packed_dims) {
-    CollectBareIdents(left, names);
-    CollectBareIdents(right, names);
+  for (const auto& [left, right] : dims) {
+    CollectRunningNames(left, names);
+    CollectRunningNames(right, names);
   }
   if (names.empty()) return 0;
-  ScopeMap scope;
   for (const Expr* name : names) {
-    const Variable* var = ctx.FindVariable(name->text);
-    if (var == nullptr || !var->value.IsKnown()) return 0;
-    scope[name->text] = SelectBoundValue(var->value);
+    if (ctx.FindVariable(name->text) == nullptr) return 0;
   }
-  return PackedDimProduct(type, scope);
+  uint64_t product = 1;
+  for (const auto& [left, right] : dims) {
+    std::optional<uint64_t> span = RunningSpan(left, right, ctx);
+    if (!span) return 0;
+    product *= *span;
+  }
+  return static_cast<uint32_t>(product);
 }
 
 static uint32_t DeclaredPackedDimProduct(const DataType& type,

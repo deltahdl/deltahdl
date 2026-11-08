@@ -78,6 +78,17 @@ static bool MentionsFormalOrSpecparam(const Expr* pexpr,
   return ExprMentionsAny(pexpr, reg.formals);
 }
 
+static void ReportNonConstantClassParam(std::string_view pname,
+                                        const Expr* pexpr,
+                                        ClassParamRegistration& reg) {
+  if (MentionsFormalOrSpecparam(pexpr, reg)) return;
+  reg.diag.Error(pexpr->range.start,
+                 std::format("class parameter '{}' value is not a constant "
+                             "expression",
+                             pname),
+                 Subclause("6.20.2"));
+}
+
 static void RecordClassParam(std::string_view pname, const Expr* pexpr,
                              const DataType* type,
                              const std::vector<Expr*>& dims,
@@ -93,13 +104,7 @@ static void RecordClassParam(std::string_view pname, const Expr* pexpr,
                   : is_real ? ConstEvalReal(pexpr, reg.values).has_value()
                             : val.has_value();
   if (!constant) {
-    if (!MentionsFormalOrSpecparam(pexpr, reg)) {
-      reg.diag.Error(pexpr->range.start,
-                     std::format("class parameter '{}' value is not a constant "
-                                 "expression",
-                                 pname),
-                     Subclause("6.20.2"));
-    }
+    ReportNonConstantClassParam(pname, pexpr, reg);
     return;
   }
   static const DataType kUntyped;

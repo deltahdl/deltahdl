@@ -123,6 +123,11 @@ static bool IsConstantMemberAccessExpr(const Expr* expr,
   return (key && scope.count(*key) > 0) || NamesAggregateParam(expr);
 }
 
+static bool IsConstantIdentifierExpr(const Expr* expr, const ScopeMap& scope) {
+  if (expr->text == "$" || expr->text == "null") return true;
+  return scope.count(expr->text) > 0 || NamesAggregateParam(expr);
+}
+
 static bool IsConstantMinTypMaxExpr(const Expr* expr, const ScopeMap& scope) {
   return IsConstantExpr(expr->lhs, scope) &&
          IsConstantExpr(expr->condition, scope) &&
@@ -140,9 +145,7 @@ bool IsConstantExpr(const Expr* expr, const ScopeMap& scope) {
     case ExprKind::kTimeLiteral:
       return true;
     case ExprKind::kIdentifier:
-      if (expr->text == "$") return true;
-      if (expr->text == "null") return true;
-      return scope.count(expr->text) > 0 || NamesAggregateParam(expr);
+      return IsConstantIdentifierExpr(expr, scope);
     case ExprKind::kUnary:
       return IsConstantExpr(expr->lhs, scope);
     case ExprKind::kBinary:

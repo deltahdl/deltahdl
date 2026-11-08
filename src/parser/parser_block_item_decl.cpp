@@ -279,6 +279,7 @@ void Parser::ParseBlockVarDecls(std::vector<Stmt*>& stmts) {
       s->var_decl_type = param->data_type;
       s->var_name = param->name;
       s->var_init = param->init_expr;
+      s->var_unpacked_dims = param->unpacked_dims;
       s->var_is_param = true;
       s->decl_item = param;
       s->attrs = attrs;

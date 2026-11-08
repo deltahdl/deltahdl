@@ -166,6 +166,9 @@ Logic4Vec EvalTaggedOrPlain(const Expr* init, const StructTypeInfo* layout,
   if (layout != nullptr) {
     if (auto tagged = EvalTaggedForLayout(init, *layout, ctx, arena))
       return *tagged;
+    const Expr* pattern = UnwrapTypedPattern(init);
+    if (pattern->kind == ExprKind::kAssignmentPattern)
+      return EvalStructPatternValue(pattern, layout, ctx, arena);
   }
   return EvalExpr(init, ctx, arena, context_width);
 }
