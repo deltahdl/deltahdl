@@ -237,4 +237,91 @@ TEST(TypeParameterSim, PropertyDeclaredThroughAClassTypeNameIsItsWidth) {
   }
 }
 
+TEST(TypeParameterSim, PortsTakeEachInstancesOverridingType) {
+  const char* kOrders[] = {
+      "  ma #(.TP(logic [15:0])) u(x, y);\n  ma v(p, q);\n",
+      "  ma v(p, q);\n  ma #(.TP(logic [15:0])) u(x, y);\n",
+  };
+  for (const char* order : kOrders) {
+    SCOPED_TRACE(order);
+    SimFixture f;
+    EXPECT_EQ(RunCapture(std::string("module ma #(parameter type TP = logic "
+                                     "[7:0]) (input TP a, output TP b);\n"
+                                     "  assign b = a;\n"
+                                     "endmodule\n"
+                                     "module t;\n"
+                                     "  logic [15:0] x = 16'hABCD, y;\n"
+                                     "  logic [15:0] p = 16'hABCD, q;\n") +
+                             order +
+                             "  initial #1 $display(\"%0d %0d %h %0d %0d "
+                             "%h\", $bits(u.a), $bits(u.b), y, $bits(v.a), "
+                             "$bits(v.b), q);\n"
+                             "endmodule\n",
+                         f),
+              "16 16 abcd 8 8 00cd\n");
+  }
+}
+
+TEST(TypeParameterSim, InterfaceDataTakesTheOverridingType) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("interface ifc #(parameter type T = byte);\n"
+                       "  T d;\n"
+                       "endinterface\n"
+                       "module t;\n"
+                       "  ifc #(.T(shortint)) i();\n"
+                       "  initial begin\n"
+                       "    i.d = 70000;\n"
+                       "    #1 $display(\"%0d %0d\", $bits(i.d), i.d);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "16 4464\n");
+}
+
+TEST(TypeParameterSim, ProgramDataTakesEachInstancesType) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("program prg #(parameter type T = byte, "
+                       "parameter int D = 1);\n"
+                       "  T d;\n"
+                       "  initial #D begin\n"
+                       "    d = 300;\n"
+                       "    $display(\"%0d %0d\", $bits(d), d);\n"
+                       "  end\n"
+                       "endprogram\n"
+                       "module t;\n"
+                       "  prg #(.T(int)) p();\n"
+                       "  prg #(.D(2)) r();\n"
+                       "endmodule\n",
+                       f),
+            "32 300\n8 44\n");
+}
+
+TEST(TypeParameterSim, InterfaceInstancesKeepTheirOwnTypes) {
+  const char* kOrders[] = {
+      "  I u();\n  I #(.T(int)) v();\n  I #(int) w();\n",
+      "  I #(int) w();\n  I #(.T(int)) v();\n  I u();\n",
+  };
+  for (const char* order : kOrders) {
+    SCOPED_TRACE(order);
+    SimFixture f;
+    EXPECT_EQ(RunCapture(std::string("interface I #(parameter type T = logic "
+                                     "[3:0]);\n"
+                                     "  T d;\n"
+                                     "endinterface\n"
+                                     "module t;\n") +
+                             order +
+                             "  initial begin\n"
+                             "    u.d = 5'h1F;\n"
+                             "    v.d = -1;\n"
+                             "    w.d = -1;\n"
+                             "    #1 $display(\"%0d %h %0d %0d %0d %0d\", "
+                             "$bits(u.d), u.d, $bits(v.d), v.d < 0, "
+                             "$bits(w.d), w.d < 0);\n"
+                             "  end\n"
+                             "endmodule\n",
+                         f),
+              "4 f 32 1 32 1\n");
+  }
+}
+
 }  // namespace
