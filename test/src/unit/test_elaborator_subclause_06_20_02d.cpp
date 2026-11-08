@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 
 #include "fixture_elaborator.h"
 #include "helpers_param_value_assignability.h"
@@ -10,6 +11,19 @@
 using namespace delta;
 
 namespace {
+
+void ExpectReportedOnlyWithTheWrongValue(const std::string& reported_src,
+                                         const std::string& accepted_src,
+                                         std::string_view param,
+                                         uint32_t line) {
+  ElabFixture reported;
+  ElaborateSrc(reported_src, reported);
+  EXPECT_TRUE(ReportedError(reported.diag.Diagnostics(), NotAssignable(param),
+                            line, "6.20.2"));
+  ElabFixture accepted;
+  ElaborateSrc(accepted_src, accepted);
+  EXPECT_FALSE(accepted.has_errors);
+}
 
 TEST(ParamValueAssignability, NamedParameterIsFoundInEveryScope) {
   const IncompatibleValue kCases[] = {
@@ -185,19 +199,100 @@ TEST(ParamValueAssignability, SpecializationValueIsJudgedInEveryPlace) {
        "function automatic void f(C #(1) h);\nendfunction\nmodule m;\n"
        "endmodule\n",
        4},
+      {"a checker typedef",
+       "checker ck;\n  typedef C #(1) c_t;\nendchecker\nmodule m;\n"
+       "  ck c();\nendmodule\n",
+       5},
+      {"a variable of a function in a checker",
+       "module m;\n  checker ck;\n    function automatic int f();\n"
+       "      C #(1) h;\n      return 0;\n    endfunction\n  endchecker\n"
+       "  ck c();\nendmodule\n",
+       7},
   };
   for (const Place& place : kPlaces) {
     SCOPED_TRACE(place.where);
     const std::string kSrc = std::string(kClass) + place.rest;
     std::string allowed = kSrc;
     allowed.replace(allowed.find("#(1)"), 4, "#(B)");
-    ElabFixture reported;
-    ElaborateSrc(kSrc, reported);
-    EXPECT_TRUE(ReportedError(reported.diag.Diagnostics(), NotAssignable("E"),
-                              place.line, "6.20.2"));
-    ElabFixture accepted;
-    ElaborateSrc(allowed, accepted);
-    EXPECT_FALSE(accepted.has_errors);
+    ExpectReportedOnlyWithTheWrongValue(kSrc, allowed, "E", place.line);
+  }
+}
+
+TEST(ParamValueAssignability, ValueIsJudgedInACheckerAndAGenerateSubroutine) {
+  struct Place {
+    const char* where;
+    const char* src;
+    uint32_t line;
+  };
+  const Place kPlaces[] = {
+      {"a function of a checker declared in a module",
+       "typedef enum {A, B} e_t;\nmodule m;\n  checker ck;\n"
+       "    function automatic int f();\n      parameter e_t E = @;\n"
+       "      return 0;\n    endfunction\n  endchecker\n  ck c();\n"
+       "endmodule\n",
+       5},
+      {"a named block of a final procedure in a checker",
+       "typedef enum {A, B} e_t;\nchecker ck;\n  final begin : b\n"
+       "    parameter e_t E = @;\n  end\nendchecker\nmodule m;\n"
+       "  ck c();\nendmodule\n",
+       4},
+      {"a function of a checker declaring the parameter's type",
+       "checker ck;\n  typedef enum {A, B} e_t;\n"
+       "  function automatic int f();\n    parameter e_t E = @;\n"
+       "    return 0;\n  endfunction\nendchecker\nmodule m;\n  ck c();\n"
+       "endmodule\n",
+       4},
+      {"a function of a checker declared in a package",
+       "package p;\n  typedef enum {A, B} e_t;\n  checker ck;\n"
+       "    function automatic int f();\n      parameter e_t E = @;\n"
+       "      return 0;\n    endfunction\n  endchecker\nendpackage\n"
+       "module m;\n  import p::*;\n  ck c();\nendmodule\n",
+       5},
+      {"a function of a checker declared in a checker",
+       "typedef enum {A, B} e_t;\nchecker outer;\n  checker inner;\n"
+       "    function automatic int f();\n      parameter e_t E = @;\n"
+       "      return 0;\n    endfunction\n  endchecker\n  inner i();\n"
+       "endchecker\nmodule m;\n  outer o();\nendmodule\n",
+       5},
+      {"a function in an if-generate block of a checker",
+       "typedef enum {A, B} e_t;\nchecker ck;\n  if (1) begin : g\n"
+       "    function automatic int f();\n      parameter e_t E = @;\n"
+       "      return 0;\n    endfunction\n  end\nendchecker\nmodule m;\n"
+       "  ck c();\nendmodule\n",
+       5},
+      {"a final procedure in an else-generate block of a checker",
+       "typedef enum {A, B} e_t;\nchecker ck;\n  if (0) begin : g\n"
+       "  end else begin : h\n    final begin : b\n"
+       "      parameter e_t E = @;\n    end\n  end\nendchecker\n"
+       "module m;\n  ck c();\nendmodule\n",
+       6},
+      {"a function in a case-generate block of a checker",
+       "typedef enum {A, B} e_t;\nchecker ck;\n  case (1)\n"
+       "    1: begin : g\n      function automatic int f();\n"
+       "        parameter e_t E = @;\n        return 0;\n"
+       "      endfunction\n    end\n  endcase\nendchecker\nmodule m;\n"
+       "  ck c();\nendmodule\n",
+       6},
+      {"a function in a loop-generate block of a checker",
+       "typedef enum {A, B} e_t;\nchecker ck;\n"
+       "  for (genvar i = 0; i < 1; i++) begin : g\n"
+       "    function automatic int f();\n      parameter e_t E = @;\n"
+       "      return 0;\n    endfunction\n  end\nendchecker\nmodule m;\n"
+       "  ck c();\nendmodule\n",
+       5},
+      {"a function in a generate block of a module",
+       "typedef enum {A, B} e_t;\nmodule m;\n  if (1) begin : g\n"
+       "    function automatic int f();\n      parameter e_t E = @;\n"
+       "      return 0;\n    endfunction\n  end\nendmodule\n",
+       5},
+  };
+  for (const Place& place : kPlaces) {
+    SCOPED_TRACE(place.where);
+    std::string reported = place.src;
+    reported.replace(reported.find('@'), 1, "1");
+    std::string accepted = place.src;
+    accepted.replace(accepted.find('@'), 1, "B");
+    ExpectReportedOnlyWithTheWrongValue(reported, accepted, "E", place.line);
   }
 }
 
