@@ -14,4 +14,4 @@ metadata:
 
 **Why:** The unit tests of those programs run in `.github/workflows/scripts.yml`. Without the entries, a change to one of them would be exercised by its unit tests alone and never by the job that runs it.
 
-**How to apply:** When a job in a workflow starts running a program from another tree, add that tree to the workflow's `paths` filter in the same commit, and add it to the tree list of the workflow's `assert-no-comments` job, which mirrors the filter. Related: [[path-filters-spell-out-the-dot]].
+**How to apply:** When a job in a workflow starts running a program from another tree, add that tree to the workflow's `paths` filter in the same commit, and add it to the tree list of the workflow's `assert-no-comments` job, which mirrors the filter.

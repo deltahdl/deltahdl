@@ -106,7 +106,6 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 - [The test clang-tidy config mirrors the source one](clang-tidy-test-config-mirrors-src.md) — change `etc/clang_tidy/src.yml` and `test_src_unit.yml` together.
 - [Scans stand on their own](scans-stand-on-their-own.md) — no scanning job needs another or a path detector; each step reporting findings carries `if: ${{ !cancelled() }}`.
 - [A workflow's paths name the programs its jobs run](workflow-paths-name-the-programs-its-jobs-run.md) — a tree whose program a job runs goes in the `paths` filter and the `assert-no-comments` trees.
-- [Path filters spell out the dot](path-filters-spell-out-the-dot.md) — `**` never enters `.claude/`; give each file type a second entry that writes the dot directory.
 - [The cache budget is two generations](cache-budget-is-two-generations.md) — twice what one run of every cached job stores has to fit in the 10 GB Actions cache.
 - [RETRY_TIMEOUT is set generously](retry-timeout-is-generous.md) — install-llvm's per-attempt bound catches a stall; raise it for a long command, never tighten it.
 

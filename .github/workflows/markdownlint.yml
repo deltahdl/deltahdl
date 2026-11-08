@@ -104,6 +104,5 @@ on:
     branches: [main]
     paths:
       - '**/*.md'
-      - .claude/**/*.md
       - .github/workflows/markdownlint.yml
   workflow_dispatch: {}
