@@ -18,6 +18,7 @@
 #include "elaborator/elaborator_items_params.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
+#include "elaborator/system_function_types.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -37,7 +38,10 @@ static std::optional<ConstVal> ConstEvalSysCallFull(const Expr* expr,
   if (expr->callee == "$typename") return ConstEvalStringLiteral(expr);
   auto val = EvalConstSysCall(expr, scope);
   if (!val) return std::nullopt;
-  return ConstVal{*val, 32, true};
+  auto listed = std::ranges::find(kSystemFunctionTypes, expr->callee,
+                                  &SystemFunctionType::name);
+  if (listed == kSystemFunctionTypes.end()) return ConstVal{*val, 32, true};
+  return NormalizeConstVal(*val, listed->type.width, listed->type.is_signed);
 }
 
 static const RtlirModule* g_param_range_module = nullptr;

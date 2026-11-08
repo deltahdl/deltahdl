@@ -436,6 +436,25 @@ TEST(ConstExpr, RtoiIsConstantSysFunc) {
   EXPECT_TRUE(IsConstantExpr(e, {}));
 }
 
+TEST(ConstExpr, RealBitPatternFunctionsAreConstantOnlyWithConstantOperands) {
+  const char* const kConstant[] = {
+      "$realtobits(0.1)", "$bitstoreal(64'h3FB999999999999A)",
+      "$shortrealtobits(0.1)", "$bitstoshortreal(32'h3DCCCCCD)"};
+  for (const char* text : kConstant) {
+    SCOPED_TRACE(text);
+    EvalFixture f;
+    EXPECT_TRUE(IsConstantExpr(ParseExprFrom(text, f), {}));
+  }
+  const char* const kNotConstant[] = {"$realtobits(x)", "$bitstoreal(x)",
+                                      "$shortrealtobits(x)",
+                                      "$bitstoshortreal(x)"};
+  for (const char* text : kNotConstant) {
+    SCOPED_TRACE(text);
+    EvalFixture f;
+    EXPECT_FALSE(IsConstantExpr(ParseExprFrom(text, f), {}));
+  }
+}
+
 TEST(ConstExpr, BitsConstantEvenWhenArgIsNonConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("$bits(x)", f);

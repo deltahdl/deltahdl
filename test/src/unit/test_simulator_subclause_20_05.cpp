@@ -242,6 +242,69 @@ TEST(ConversionSim, ConversionFunctionsGiveTheirStandardResultTypes) {
   }
 }
 
+TEST(ConversionSim,
+     BitPatternFunctionsGiveIeee754ValuesAtRunTimeAndAsConstants) {
+  struct Probe {
+    const char* what;
+    const char* expr;
+    uint64_t expected;
+  };
+  const Probe kProbes[] = {
+      {"package parameter from $realtobits", "pk::A", 0x3FB999999999999Au},
+      {"package parameter from $shortrealtobits", "pk::B", 0x3DCCCCCDu},
+      {"package parameter from $bitstoreal", "$realtobits(pk::C)",
+       0x3FB999999999999Au},
+      {"package parameter from $bitstoshortreal", "$shortrealtobits(pk::D)",
+       0x3DCCCCCDu},
+      {"module localparam from $realtobits", "MA", 0x3FB999999999999Au},
+      {"module localparam from $shortrealtobits", "MB", 0x3DCCCCCDu},
+      {"module localparam from $bitstoreal", "$realtobits(MC)",
+       0x3FB999999999999Au},
+      {"module localparam from $bitstoshortreal", "$shortrealtobits(MD)",
+       0x3DCCCCCDu},
+      {"$itor folds to a real", "$realtobits(HALF)", 0x4004000000000000u},
+      {"packed range bound from $rtoi", "$bits(v4)", 4},
+      {"constant beyond the binary32 range", "INF", 0x7F800000u},
+      {"constant binary32 subnormal", "$realtobits(SUB)", 0x36A0000000000000u},
+      {"constant infinity round trip", "PINF", 0x7FF0000000000000u},
+      {"run-time value beyond the binary32 range", "$shortrealtobits(big)",
+       0x7F800000u},
+      {"run-time negative value beyond the binary32 range",
+       "$shortrealtobits(-big)", 0xFF800000u},
+      {"run-time binary32 subnormal", "$realtobits($bitstoshortreal(32'h1))",
+       0x36A0000000000000u},
+      {"run-time infinity round trip",
+       "$realtobits($bitstoreal(64'h7FF0000000000000))", 0x7FF0000000000000u},
+  };
+  for (const Probe& probe : kProbes) {
+    SCOPED_TRACE(probe.what);
+    const std::string kSrc =
+        std::string(
+            "package pk;\n"
+            "  parameter logic [63:0] A = $realtobits(0.1);\n"
+            "  parameter logic [31:0] B = $shortrealtobits(0.1);\n"
+            "  parameter real C = $bitstoreal(64'h3FB999999999999A);\n"
+            "  parameter shortreal D = $bitstoshortreal(32'h3DCCCCCD);\n"
+            "endpackage\n"
+            "module t;\n"
+            "  localparam logic [63:0] MA = $realtobits(0.1);\n"
+            "  localparam logic [31:0] MB = $shortrealtobits(0.1);\n"
+            "  localparam real MC = $bitstoreal(64'h3FB999999999999A);\n"
+            "  localparam shortreal MD = $bitstoshortreal(32'h3DCCCCCD);\n"
+            "  localparam real HALF = $itor(5) / 2;\n"
+            "  localparam logic [31:0] INF = $shortrealtobits(1e39);\n"
+            "  localparam real SUB = $bitstoshortreal(32'h1);\n"
+            "  localparam logic [63:0] PINF =\n"
+            "      $realtobits($bitstoreal(64'h7FF0000000000000));\n"
+            "  logic [$rtoi(3.9):0] v4;\n"
+            "  real big = 1e39;\n"
+            "  bit [63:0] v;\n"
+            "  initial v = ") +
+        probe.expr + ";\nendmodule\n";
+    EXPECT_EQ(RunAndGet(kSrc, "v"), probe.expected);
+  }
+}
+
 TEST(ConversionSim, ItorAndBitstorealResultsAreReals) {
   SimFixture f;
   EXPECT_EQ(

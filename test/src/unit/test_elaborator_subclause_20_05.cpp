@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "fixture_elaborator.h"
 
 using namespace delta;
@@ -107,6 +109,37 @@ TEST(ConversionFunctions, ConversionFoldsWithLocalparamArgument) {
   ASSERT_GE(design->top_modules[0]->params.size(), 2u);
   EXPECT_EQ(design->top_modules[0]->params[1].name, "C");
   EXPECT_EQ(design->top_modules[0]->params[1].resolved_value, 5);
+}
+
+TEST(ConversionFunctions, BitPatternFunctionsFoldToTheirExactValue) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam logic [63:0] A = $realtobits(0.1);\n"
+      "  localparam logic [31:0] B = $shortrealtobits(0.1);\n"
+      "  localparam real C = $bitstoreal(64'h3FB999999999999A);\n"
+      "  localparam real D = $bitstoshortreal(32'h3DCCCCCD);\n"
+      "  parameter bit [63:0] E = $realtobits(-2.0);\n"
+      "  localparam longint F = $shortrealtobits(-1.0);\n"
+      "  localparam G = $realtobits(0.1);\n"
+      "  localparam real H = $itor(5) / 2;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto& params = design->top_modules[0]->params;
+  ASSERT_EQ(params.size(), 8u);
+  EXPECT_EQ(static_cast<uint64_t>(params[0].resolved_value),
+            0x3FB999999999999Au);
+  EXPECT_EQ(params[1].resolved_value, 0x3DCCCCCD);
+  EXPECT_EQ(params[2].resolved_real, 0.1);
+  EXPECT_EQ(params[3].resolved_real, static_cast<double>(0.1F));
+  EXPECT_EQ(static_cast<uint64_t>(params[4].resolved_value),
+            0xC000000000000000u);
+  EXPECT_EQ(params[5].resolved_value, 0xBF800000);
+  EXPECT_EQ(static_cast<uint64_t>(params[6].resolved_value),
+            0x3FB999999999999Au);
+  EXPECT_EQ(params[7].resolved_real, 2.5);
 }
 
 TEST(ConversionFunctions, RtoiFoldsToA32BitInteger) {
