@@ -856,8 +856,8 @@ TEST(DollarConstantElaboration, DollarParameterInAQueueContextIsRejected) {
       f);
   for (uint32_t line : {6U, 7U, 13U, 16U, 17U, 18U}) {
     EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                              "parameter 'P' holds '$', which a queue context "
-                              "does not permit",
+                              "parameter 'P' holds '$', so it may stand only "
+                              "where '$' itself may",
                               line, "6.20.7"));
   }
   for (uint32_t line : {19U, 20U, 21U, 22U, 23U}) {

@@ -28,8 +28,9 @@ void ValidateAssertionExprRules(const ModuleInUnit& scope,
                                 const PropertyRegistry& registry,
                                 DiagEngine& diag);
 
-void ValidateAssertionBoundRules(const ModuleDecl* decl, const ScopeMap& params,
-                                 DiagEngine& diag);
+void ValidateAssertionBoundRules(
+    const ModuleDecl* decl, const ScopeMap& params,
+    const std::unordered_set<std::string_view>& unbounded, DiagEngine& diag);
 
 void ValidateAssertionContextRules(const ModuleDecl* decl,
                                    const RtlirModule* mod,

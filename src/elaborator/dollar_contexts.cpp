@@ -3,10 +3,12 @@
 #include <algorithm>
 #include <cstdint>
 #include <format>
+#include <optional>
 #include <set>
 #include <string_view>
 #include <tuple>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "common/diagnostic.h"
@@ -57,86 +59,15 @@ bool ContainsDollar(const Expr* e) {
 
 namespace {
 
-struct QueueContextScan {
-  const std::unordered_set<std::string_view>& unbounded;
-  const std::unordered_set<std::string_view>& queues;
-  DiagEngine& diag;
-};
-
-}  // namespace
-
-static bool NamesUnboundedParam(const Expr* e, const QueueContextScan& scan) {
-  return e->kind == ExprKind::kIdentifier && e->scope_prefix.empty() &&
-         scan.unbounded.count(e->text) != 0;
-}
-
-static void Report(const Expr* param, const QueueContextScan& scan) {
-  scan.diag.Error(param->range.start,
-                  std::format("parameter '{}' holds '$', which a queue context "
-                              "does not permit",
-                              param->text),
-                  Subclause("6.20.7"));
-}
-
-static void ReportUnboundedParamsIn(const Expr* e,
-                                    const QueueContextScan& scan) {
-  if (e == nullptr) return;
-  if (NamesUnboundedParam(e, scan)) Report(e, scan);
-  ForEachExprChild(
-      e, [&scan](const Expr* child) { ReportUnboundedParamsIn(child, scan); });
-}
-
-static void CheckDims(const std::vector<Expr*>& dims,
-                      const QueueContextScan& scan) {
-  for (const Expr* dim : dims) {
-    if (IsQueueDim(dim)) {
-      ReportUnboundedParamsIn(dim->rhs, scan);
-    } else if (dim != nullptr && NamesUnboundedParam(dim, scan)) {
-      Report(dim, scan);
-    }
-  }
-}
-
-static void CheckExpr(const Expr* e, const QueueContextScan& scan) {
-  if (e == nullptr) return;
-  if (e->kind == ExprKind::kSelect && e->base != nullptr &&
-      e->base->kind == ExprKind::kIdentifier &&
-      scan.queues.count(e->base->text) != 0) {
-    ReportUnboundedParamsIn(e->index, scan);
-    ReportUnboundedParamsIn(e->index_end, scan);
-  }
-  ForEachExprChild(e, [&scan](const Expr* child) { CheckExpr(child, scan); });
-}
-
-static void CheckStmt(const Stmt* s, const QueueContextScan& scan) {
-  if (s == nullptr) return;
-  if (s->kind == StmtKind::kVarDecl) CheckDims(s->var_unpacked_dims, scan);
-  ForEachChildExpr(s, [&scan](const Expr* e) { CheckExpr(e, scan); });
-  ForEachChildStmt(s, [&scan](Stmt* const& sub) { CheckStmt(sub, scan); });
-}
-
-void CheckUnboundedParamsInQueueContexts(
-    const ModuleDecl* decl,
-    const std::unordered_set<std::string_view>& unbounded,
-    const std::unordered_set<std::string_view>& queues, DiagEngine& diag) {
-  if (unbounded.empty()) return;
-  const QueueContextScan kScan{unbounded, queues, diag};
-  for (const ModuleItem* item : decl->items) {
-    CheckDims(item->unpacked_dims, kScan);
-    CheckExpr(item->init_expr, kScan);
-    CheckExpr(item->assign_lhs, kScan);
-    CheckExpr(item->assign_rhs, kScan);
-    CheckStmt(item->body, kScan);
-    for (const Stmt* s : item->func_body_stmts) CheckStmt(s, kScan);
-  }
-}
-
-namespace {
-
 using NameSet = std::unordered_set<std::string_view>;
+
+struct DollarParams {
+  std::set<std::pair<std::string_view, std::string_view>> scoped;
+};
 
 struct DollarReport {
   const NameSet& dollar_takers;
+  const DollarParams& params;
   DiagEngine& diag;
   std::set<std::tuple<uint32_t, uint32_t, uint32_t>> reported;
 };
@@ -145,6 +76,7 @@ struct DollarScope {
   const DollarScope* outer = nullptr;
   NameSet non_queues;
   NameSet others;
+  NameSet dollar_params;
 };
 
 struct DollarScan {
@@ -152,17 +84,72 @@ struct DollarScan {
   DollarReport& report;
 };
 
+enum class NameRole : uint8_t { kUnknown, kNonQueue, kOther, kDollarParam };
+
 }  // namespace
 
-static void ReportDollar(const Expr* e, DollarReport& report) {
+static bool MarkReported(const Expr* e, DollarReport& report) {
   const SourceLoc& at = e->range.start;
-  if (!report.reported.emplace(at.file_id, at.line, at.column).second) return;
-  report.diag.Error(at,
+  return report.reported.emplace(at.file_id, at.line, at.column).second;
+}
+
+static void ReportDollar(const Expr* e, DollarReport& report) {
+  if (!MarkReported(e, report)) return;
+  report.diag.Error(e->range.start,
                     "'$' may stand only in a queue's dimension or select, a "
                     "value range's bound, a cycle delay range's upper bound, "
                     "a sequence, property or checker argument, or a "
                     "parameter's value",
                     Subclause("6.20.7"));
+}
+
+static void ReportDollarParam(const Expr* e, std::string_view name,
+                              DollarReport& report) {
+  if (!MarkReported(e, report)) return;
+  report.diag.Error(
+      e->range.start,
+      std::format("parameter '{}' holds '$', so it may stand only where '$' "
+                  "itself may, and never in a queue's dimension or select",
+                  name),
+      Subclause("6.20.7"));
+}
+
+static NameRole RoleOf(const DollarScope* scope, std::string_view name) {
+  for (; scope != nullptr; scope = scope->outer) {
+    if (scope->non_queues.count(name) != 0) return NameRole::kNonQueue;
+    if (scope->others.count(name) != 0) return NameRole::kOther;
+    if (scope->dollar_params.count(name) != 0) return NameRole::kDollarParam;
+  }
+  return NameRole::kUnknown;
+}
+
+static std::string_view ScopedDollarParam(std::string_view scope_name,
+                                          std::string_view name,
+                                          const DollarParams& params) {
+  return params.scoped.count({scope_name, name}) != 0 ? name
+                                                      : std::string_view{};
+}
+
+static std::string_view DollarParamNamed(const Expr* e,
+                                         const DollarScope& scope,
+                                         const DollarParams& params) {
+  if (e->kind == ExprKind::kIdentifier && !e->scope_prefix.empty())
+    return ScopedDollarParam(e->scope_prefix, e->text, params);
+  if (e->kind == ExprKind::kIdentifier)
+    return RoleOf(&scope, e->text) == NameRole::kDollarParam
+               ? e->text
+               : std::string_view{};
+  const bool kScoped = e->kind == ExprKind::kMemberAccess &&
+                       e->is_scope_resolution && e->lhs != nullptr &&
+                       e->rhs != nullptr &&
+                       e->lhs->kind == ExprKind::kIdentifier;
+  return kScoped ? ScopedDollarParam(e->lhs->text, e->rhs->text, params)
+                 : std::string_view{};
+}
+
+static std::string_view DollarParamNamed(const Expr* e,
+                                         const DollarScan& scan) {
+  return DollarParamNamed(e, scan.scope, scan.report.params);
 }
 
 static void NoteDeclaredName(std::string_view name, const DataType& type,
@@ -174,22 +161,75 @@ static void NoteDeclaredName(std::string_view name, const DataType& type,
   (kFixedFirst || kPlain ? scope.non_queues : scope.others).insert(name);
 }
 
-static bool NamesNonQueue(const DollarScope* scope, std::string_view name) {
-  for (; scope != nullptr; scope = scope->outer) {
-    if (scope->non_queues.count(name) != 0) return true;
-    if (scope->others.count(name) != 0) return false;
+static void NoteParamName(std::string_view name, const Expr* value,
+                          const DollarParams& params, DollarScope& scope) {
+  const bool kHoldsDollar =
+      value != nullptr &&
+      (IsLoneDollar(value) || !DollarParamNamed(value, scope, params).empty());
+  (kHoldsDollar ? scope.dollar_params : scope.others).insert(name);
+}
+
+static void NoteResolvedParam(std::string_view name, const NameSet& resolved,
+                              DollarScope& scope) {
+  (resolved.count(name) != 0 ? scope.dollar_params : scope.others).insert(name);
+}
+
+static void NoteImport(const ImportItem& import, const DollarParams& params,
+                       DollarScope& scope) {
+  for (const auto& [package, name] : params.scoped) {
+    if (package == import.package_name &&
+        (import.is_wildcard || name == import.item_name)) {
+      scope.dollar_params.insert(name);
+    }
   }
-  return false;
+}
+
+static bool NamesNonQueue(const DollarScope* scope, std::string_view name) {
+  return RoleOf(scope, name) == NameRole::kNonQueue;
+}
+
+static void NoteItemName(const ModuleItem* item, const DollarParams& params,
+                         const NameSet* resolved, DollarScope& scope) {
+  if (item->kind == ModuleItemKind::kVarDecl ||
+      item->kind == ModuleItemKind::kNetDecl) {
+    NoteDeclaredName(item->name, item->data_type, item->unpacked_dims, scope);
+  } else if (item->kind == ModuleItemKind::kImportDecl) {
+    NoteImport(item->import_item, params, scope);
+  } else if (item->kind != ModuleItemKind::kParamDecl) {
+    return;
+  } else if (resolved != nullptr) {
+    NoteResolvedParam(item->name, *resolved, scope);
+  } else {
+    NoteParamName(item->name, item->init_expr, params, scope);
+  }
 }
 
 static void NoteItemNames(const std::vector<ModuleItem*>& items,
+                          const DollarParams& params, const NameSet* resolved,
                           DollarScope& scope) {
+  for (const ModuleItem* item : items)
+    NoteItemName(item, params, resolved, scope);
+}
+
+static void AddScopedDollarParams(std::string_view scope_name,
+                                  const std::vector<ModuleItem*>& items,
+                                  DollarParams& params) {
+  DollarScope scope;
+  NoteItemNames(items, params, nullptr, scope);
   for (const ModuleItem* item : items) {
-    if (item->kind == ModuleItemKind::kVarDecl ||
-        item->kind == ModuleItemKind::kNetDecl) {
-      NoteDeclaredName(item->name, item->data_type, item->unpacked_dims, scope);
+    if (item->kind == ModuleItemKind::kParamDecl &&
+        scope.dollar_params.count(item->name) != 0) {
+      params.scoped.emplace(scope_name, item->name);
     }
   }
+}
+
+static DollarParams UnitDollarParams(const CompilationUnit& unit) {
+  DollarParams params;
+  for (const PackageDecl* pkg : unit.packages)
+    AddScopedDollarParams(pkg->name, pkg->items, params);
+  AddScopedDollarParams("$unit", unit.cu_items, params);
+  return params;
 }
 
 static void NoteLocalNames(const Stmt* s, DollarScope& scope) {
@@ -235,6 +275,54 @@ static bool SelectsANonQueue(const Expr* select, const DollarScan& scan) {
          NamesNonQueue(&scan.scope, base->text);
 }
 
+template <typename Visit>
+static void ForEachValueChild(const Expr* e, Visit visit) {
+  if (e->kind == ExprKind::kMemberAccess) {
+    visit(e->lhs);
+    return;
+  }
+  ForEachExprChild(e, visit);
+}
+
+static bool IsIsunboundedCall(const Expr* e) {
+  return e->kind == ExprKind::kSystemCall && e->callee == "$isunbounded" &&
+         e->args.size() == 1 && e->args[0] != nullptr;
+}
+
+static bool IsShortCircuit(const Expr* e) {
+  return e->kind == ExprKind::kBinary &&
+         (e->op == TokenKind::kAmpAmp || e->op == TokenKind::kPipePipe);
+}
+
+static std::optional<bool> FoldIsunbounded(const Expr* arg,
+                                           const DollarScan& scan) {
+  if (!DollarParamNamed(arg, scan).empty()) return true;
+  const bool kBounded = arg->kind == ExprKind::kIdentifier &&
+                        arg->scope_prefix.empty() &&
+                        RoleOf(&scan.scope, arg->text) == NameRole::kOther;
+  return kBounded ? std::optional<bool>(false) : std::nullopt;
+}
+
+static std::optional<bool> FoldConnective(TokenKind op, std::optional<bool> lhs,
+                                          std::optional<bool> rhs) {
+  const bool kDecisive = op == TokenKind::kPipePipe;
+  if (lhs == kDecisive || rhs == kDecisive) return kDecisive;
+  if (lhs.has_value() && rhs.has_value()) return !kDecisive;
+  return std::nullopt;
+}
+
+static std::optional<bool> FoldGuard(const Expr* e, const DollarScan& scan) {
+  if (e == nullptr) return std::nullopt;
+  if (IsIsunboundedCall(e)) return FoldIsunbounded(e->args[0], scan);
+  if (e->kind == ExprKind::kUnary && e->op == TokenKind::kBang) {
+    const std::optional<bool> kInner = FoldGuard(e->lhs, scan);
+    return kInner.has_value() ? std::optional<bool>(!*kInner) : std::nullopt;
+  }
+  if (!IsShortCircuit(e)) return std::nullopt;
+  return FoldConnective(e->op, FoldGuard(e->lhs, scan),
+                        FoldGuard(e->rhs, scan));
+}
+
 static void CheckDollarOperand(const Expr* e, const DollarScan& scan);
 
 static void CheckConstraintItems(const std::vector<ConstraintItem*>& items,
@@ -244,8 +332,21 @@ static void CheckDollarTree(const PropertyExprNode* tree,
                             const DollarScan& scan);
 
 static void CheckAdmittingLoneDollar(const Expr* e, const DollarScan& scan) {
-  if (e != nullptr && IsLoneDollar(e)) return;
+  if (e != nullptr && (IsLoneDollar(e) || !DollarParamNamed(e, scan).empty())) {
+    return;
+  }
   CheckDollarOperand(e, scan);
+}
+
+static void ReportDollarParamsIn(const Expr* e, const DollarScan& scan) {
+  if (e == nullptr) return;
+  const std::string_view kName = DollarParamNamed(e, scan);
+  if (!kName.empty()) {
+    ReportDollarParam(e, kName, scan.report);
+    return;
+  }
+  ForEachValueChild(
+      e, [&scan](const Expr* child) { ReportDollarParamsIn(child, scan); });
 }
 
 static bool IsToleranceRange(const Expr* range) {
@@ -260,25 +361,50 @@ static void CheckSelect(const Expr* e, const DollarScan& scan) {
     return;
   }
   CheckDollarOperand(e->base, scan);
-  if (e->base == nullptr || SelectsANonQueue(e, scan)) {
-    CheckDollarOperand(e->index, scan);
-    CheckDollarOperand(e->index_end, scan);
+  const bool kOperands = e->base == nullptr || SelectsANonQueue(e, scan);
+  const auto kCheck = kOperands ? CheckDollarOperand : ReportDollarParamsIn;
+  kCheck(e->index, scan);
+  kCheck(e->index_end, scan);
+}
+
+static void CheckAttachedOperands(const Expr* e, const DollarScan& scan) {
+  if (e->inline_constraint != nullptr)
+    CheckConstraintItems(e->inline_constraint->constraint_items, scan);
+  CheckDollarTree(e->property_actual, scan);
+  if (e->dist_items == nullptr) return;
+  for (const ConstraintDistItem& item : *e->dist_items)
+    CheckDollarOperand(item.weight, scan);
+}
+
+static bool CheckLeafOperand(const Expr* e, const DollarScan& scan) {
+  if (IsQueueDim(e)) {
+    ReportDollar(e, scan.report);
+    return true;
   }
+  const std::string_view kName = DollarParamNamed(e, scan);
+  if (!kName.empty()) ReportDollarParam(e, kName, scan.report);
+  return !kName.empty() || IsIsunboundedCall(e);
+}
+
+static bool CheckEvaluatedOperands(const Expr* e, const DollarScan& scan) {
+  if (e->kind == ExprKind::kTernary) {
+    CheckDollarOperand(e->condition, scan);
+    const std::optional<bool> kTaken = FoldGuard(e->condition, scan);
+    if (kTaken != false) CheckDollarOperand(e->true_expr, scan);
+    if (kTaken != true) CheckDollarOperand(e->false_expr, scan);
+    return true;
+  }
+  if (!IsShortCircuit(e)) return false;
+  CheckDollarOperand(e->lhs, scan);
+  if (FoldGuard(e->lhs, scan) != (e->op == TokenKind::kPipePipe))
+    CheckDollarOperand(e->rhs, scan);
+  return true;
 }
 
 static void CheckDollarOperand(const Expr* e, const DollarScan& scan) {
   if (e == nullptr) return;
-  if (e->inline_constraint != nullptr)
-    CheckConstraintItems(e->inline_constraint->constraint_items, scan);
-  CheckDollarTree(e->property_actual, scan);
-  if (e->dist_items != nullptr) {
-    for (const ConstraintDistItem& item : *e->dist_items)
-      CheckDollarOperand(item.weight, scan);
-  }
-  if (IsQueueDim(e)) {
-    ReportDollar(e, scan.report);
-    return;
-  }
+  CheckAttachedOperands(e, scan);
+  if (CheckLeafOperand(e, scan) || CheckEvaluatedOperands(e, scan)) return;
   if (e->kind == ExprKind::kSelect) {
     CheckSelect(e, scan);
     return;
@@ -288,7 +414,7 @@ static void CheckDollarOperand(const Expr* e, const DollarScan& scan) {
     for (const Expr* actual : e->args) CheckAdmittingLoneDollar(actual, scan);
     return;
   }
-  ForEachExprChild(
+  ForEachValueChild(
       e, [&scan](const Expr* child) { CheckDollarOperand(child, scan); });
 }
 
@@ -347,7 +473,7 @@ static void CheckEvents(const std::vector<EventExpr>& events,
 static void CheckBounds(const SeqCycleDelay& bounds, const DollarScan& scan) {
   CheckDollarOperand(bounds.min_expr, scan);
   if (bounds.max_expr != bounds.min_expr)
-    CheckDollarOperand(bounds.max_expr, scan);
+    CheckAdmittingLoneDollar(bounds.max_expr, scan);
 }
 
 static void CheckDollarSequence(const ModuleItem* seq, const DollarScan& scan) {
@@ -379,16 +505,30 @@ static void CheckDollarTree(const PropertyExprNode* tree,
 }
 
 static void CheckDollarDeclaration(const ModuleItem* decl,
-                                   const DollarScan& scan) {
+                                   const DollarScan& outer) {
   for (const Expr* actual : decl->prop_formal_defaults)
-    CheckAdmittingLoneDollar(actual, scan);
+    CheckAdmittingLoneDollar(actual, outer);
+  DollarScope scope;
+  scope.outer = &outer.scope;
+  scope.others.insert(decl->prop_formals.begin(), decl->prop_formals.end());
   for (const SeqLocalDecl& local : decl->prop_locals)
-    CheckDollarOperand(local.init, scan);
-  CheckEvents(decl->prop_clock, scan);
-  CheckDollarOperand(decl->prop_disable_iff, scan);
-  CheckDollarOperand(decl->prop_body_expr, scan);
-  CheckDollarTree(decl->prop_body_tree, scan);
-  CheckDollarSequence(decl, scan);
+    scope.others.insert(local.name);
+  const DollarScan kScan{scope, outer.report};
+  for (const SeqLocalDecl& local : decl->prop_locals)
+    CheckDollarOperand(local.init, kScan);
+  CheckEvents(decl->prop_clock, kScan);
+  CheckDollarOperand(decl->prop_disable_iff, kScan);
+  CheckDollarOperand(decl->prop_body_expr, kScan);
+  CheckDollarTree(decl->prop_body_tree, kScan);
+  CheckDollarSequence(decl, kScan);
+}
+
+static void CheckDollarStmt(const Stmt* s, const DollarScan& scan);
+
+static void CheckTakenBranches(const Stmt* s, const DollarScan& scan) {
+  const std::optional<bool> kTaken = FoldGuard(s->condition, scan);
+  if (kTaken.value_or(true)) CheckDollarStmt(s->then_branch, scan);
+  if (!kTaken.value_or(false)) CheckDollarStmt(s->else_branch, scan);
 }
 
 static void CheckDollarStmt(const Stmt* s, const DollarScan& scan) {
@@ -401,6 +541,10 @@ static void CheckDollarStmt(const Stmt* s, const DollarScan& scan) {
   ForEachChildExpr(s, [&scan, &dims](const Expr* e) {
     if (std::ranges::find(dims, e) == dims.end()) CheckDollarOperand(e, scan);
   });
+  if (s->kind == StmtKind::kIf) {
+    CheckTakenBranches(s, scan);
+    return;
+  }
   ForEachChildStmt(s,
                    [&scan](Stmt* const& sub) { CheckDollarStmt(sub, scan); });
 }
@@ -438,18 +582,24 @@ static void CheckInstanceActuals(const ModuleItem* item,
 }
 
 static void CheckDollarItems(const std::vector<ModuleItem*>& items,
-                             const DollarScan& outer);
+                             const DollarScan& outer, const NameSet* resolved);
+
+static void CheckGenerateArms(const ModuleItem* item, const DollarScan& scan) {
+  for (const ModuleItem* arm = item; arm != nullptr; arm = arm->gen_else) {
+    CheckDollarOperand(arm->gen_cond, scan);
+    const std::optional<bool> kTaken = FoldGuard(arm->gen_cond, scan);
+    if (kTaken.value_or(true)) CheckDollarItems(arm->gen_body, scan, nullptr);
+    if (kTaken.value_or(false)) return;
+  }
+}
 
 static void CheckGenerate(const ModuleItem* item, const DollarScan& scan) {
   CheckDollarStmt(item->gen_init, scan);
   CheckDollarStmt(item->gen_step, scan);
-  for (const ModuleItem* arm = item; arm != nullptr; arm = arm->gen_else) {
-    CheckDollarOperand(arm->gen_cond, scan);
-    CheckDollarItems(arm->gen_body, scan);
-  }
+  CheckGenerateArms(item, scan);
   for (const GenerateCaseItem& arm : item->gen_case_items) {
     for (const Expr* pattern : arm.patterns) CheckDollarOperand(pattern, scan);
-    CheckDollarItems(arm.body, scan);
+    CheckDollarItems(arm.body, scan, nullptr);
   }
 }
 
@@ -487,13 +637,24 @@ static void CheckDollarItem(const ModuleItem* item, const DollarScan& scan) {
   if (item->class_decl != nullptr) CheckDollarClass(item->class_decl, scan);
 }
 
+static void NoteClassNames(const ClassDecl* cls, const DollarParams& params,
+                           DollarScope& scope) {
+  for (const auto& [name, value] : cls->params)
+    NoteParamName(name, value, params, scope);
+  for (const ClassMember* m : cls->members) {
+    if (m->kind != ClassMemberKind::kProperty) continue;
+    if (m->is_param) {
+      NoteParamName(m->name, m->init_expr, params, scope);
+    } else {
+      NoteDeclaredName(m->name, m->data_type, m->unpacked_dims, scope);
+    }
+  }
+}
+
 static void CheckDollarClass(const ClassDecl* cls, const DollarScan& outer) {
   DollarScope scope;
   scope.outer = &outer.scope;
-  for (const ClassMember* m : cls->members) {
-    if (m->kind == ClassMemberKind::kProperty)
-      NoteDeclaredName(m->name, m->data_type, m->unpacked_dims, scope);
-  }
+  NoteClassNames(cls, outer.report.params, scope);
   const DollarScan kScan{scope, outer.report};
   for (const Expr* arg : cls->extends_args) CheckDollarOperand(arg, kScan);
   for (const ClassMember* m : cls->members) {
@@ -506,10 +667,10 @@ static void CheckDollarClass(const ClassDecl* cls, const DollarScan& outer) {
 }
 
 static void CheckDollarItems(const std::vector<ModuleItem*>& items,
-                             const DollarScan& outer) {
+                             const DollarScan& outer, const NameSet* resolved) {
   DollarScope scope;
   scope.outer = &outer.scope;
-  NoteItemNames(items, scope);
+  NoteItemNames(items, outer.report.params, resolved, scope);
   const DollarScan kScan{scope, outer.report};
   for (const ModuleItem* item : items) {
     CheckDollarItem(item, kScan);
@@ -520,30 +681,38 @@ static void CheckDollarItems(const std::vector<ModuleItem*>& items,
 }
 
 void CheckDollarOperands(const ModuleDecl* decl, const CompilationUnit& unit,
+                         const std::unordered_set<std::string_view>& unbounded,
                          DiagEngine& diag) {
   NameSet takers = UnitDollarTakers(unit);
   AddDollarTakerNames(decl->items, takers);
-  DollarReport report{takers, diag, {}};
+  const DollarParams kParams = UnitDollarParams(unit);
+  DollarReport report{takers, kParams, diag, {}};
+  DollarScope unit_scope;
+  NoteItemNames(unit.cu_items, kParams, nullptr, unit_scope);
   DollarScope ports;
+  ports.outer = &unit_scope;
+  for (const auto& [name, value] : decl->params)
+    NoteResolvedParam(name, unbounded, ports);
   for (const PortDecl& port : decl->ports)
     NoteDeclaredName(port.name, port.data_type, port.unpacked_dims, ports);
   const DollarScan kScan{ports, report};
   for (const PortDecl& port : decl->ports)
     CheckDeclaredDims(port.data_type, port.unpacked_dims, kScan);
-  CheckDollarItems(decl->items, kScan);
+  CheckDollarItems(decl->items, kScan, &unbounded);
 }
 
 void CheckUnitDollarOperands(const CompilationUnit& unit, DiagEngine& diag) {
   const NameSet kTakers = UnitDollarTakers(unit);
-  DollarReport report{kTakers, diag, {}};
+  const DollarParams kParams = UnitDollarParams(unit);
+  DollarReport report{kTakers, kParams, diag, {}};
   const DollarScope kRoot;
   const DollarScan kPackageScan{kRoot, report};
   for (const PackageDecl* pkg : unit.packages)
-    CheckDollarItems(pkg->items, kPackageScan);
+    CheckDollarItems(pkg->items, kPackageScan, nullptr);
   DollarScope unit_scope;
-  NoteItemNames(unit.cu_items, unit_scope);
+  NoteItemNames(unit.cu_items, kParams, nullptr, unit_scope);
   const DollarScan kScan{unit_scope, report};
-  CheckDollarItems(unit.cu_items, kScan);
+  CheckDollarItems(unit.cu_items, kScan, nullptr);
   for (const ClassDecl* cls : unit.classes) {
     CheckDollarClass(cls, kScan);
     ForEachClassDeclaredType(cls, [&kScan](const DeclaredType& declared) {

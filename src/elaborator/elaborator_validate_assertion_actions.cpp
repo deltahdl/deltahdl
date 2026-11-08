@@ -164,7 +164,11 @@ void Elaborator::ValidateSequenceEventArgs(const ModuleDecl* decl,
   const ScopeMap kParams = BuildParamScope(mod);
   ValidateAssertionExprRules(ModuleInUnit{*decl, *unit_}, mod, kParams,
                              property_registry_, diag_);
-  ValidateAssertionBoundRules(decl, kParams, diag_);
+  std::unordered_set<std::string_view> unbounded;
+  for (const auto& param : mod->params) {
+    if (param.is_unbounded) unbounded.insert(param.name);
+  }
+  ValidateAssertionBoundRules(decl, kParams, unbounded, diag_);
   ValidateAssertionContextRules(decl, mod, property_registry_, diag_);
   ValidateLocalVariableFlow(decl, diag_);
   ValidateCheckerFormalDefaults(decl, diag_);

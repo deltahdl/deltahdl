@@ -33,6 +33,7 @@ struct BoundEnv {
 
 struct BoundScope {
   const ScopeMap& values;
+  const NameSet& unbounded;
   const NameSet& formals;
   bool formals_only = false;
 };
@@ -169,7 +170,7 @@ void CheckInstance(const Expr* call, const ModuleItem* seq,
     if (value.has_value()) values[seq->prop_formals[i]] = *value;
   }
   if (!env.active.insert(seq).second) return;
-  const BoundScope kInner{values, kFormals, true};
+  const BoundScope kInner{values, outer.unbounded, kFormals, true};
   CheckBodyDelays(seq->seq_linear, kInner, env.diag);
   ForEachBodyExpr(seq->seq_linear,
                   [&](const Expr* e) { CheckOperand(e, kInner, env); });
@@ -190,6 +191,10 @@ void CheckSequenceItem(const ModuleItem* seq, const BoundScope& scope,
                   [&](const Expr* e) { CheckOperand(e, scope, env); });
 }
 
+bool HoldsDollar(const Expr* e, const BoundScope& scope) {
+  return ContainsDollar(e) || ExprMentionsAny(e, scope.unbounded);
+}
+
 void CheckTree(const PropertyExprNode* node, const BoundScope& scope,
                BoundEnv& env) {
   ForEachTreeNode(node, [&](const PropertyExprNode& n) {
@@ -197,7 +202,7 @@ void CheckTree(const PropertyExprNode* node, const BoundScope& scope,
     if (n.kind == Kind::kNexttime) {
       CheckNexttime(n, scope, env.diag);
     } else if (n.kind == Kind::kAlways || n.kind == Kind::kEventually) {
-      if (!ContainsDollar(n.range_min) && !ContainsDollar(n.range_max))
+      if (!HoldsDollar(n.range_min, scope) && !HoldsDollar(n.range_max, scope))
         CheckRange(n, scope, env.diag);
     } else {
       CheckOperand(n.boolean, scope, env);
@@ -209,19 +214,22 @@ void CheckTree(const PropertyExprNode* node, const BoundScope& scope,
 }  // namespace
 
 void ValidateAssertionBoundRules(const ModuleDecl* decl, const ScopeMap& params,
-                                 DiagEngine& diag) {
+                                 const NameSet& unbounded, DiagEngine& diag) {
   const NamedDecls kNamed = NamedDeclsByName(decl, true);
   BoundEnv env{kNamed, diag, {}};
   for (const ModuleItem* item : decl->items) {
     if (kNamed.count(item->name) == 0) continue;
     const NameSet kFormals(item->prop_formals.begin(),
                            item->prop_formals.end());
-    const BoundScope kOwn{params, kFormals, false};
+    NameSet own_unbounded = unbounded;
+    for (std::string_view formal : item->prop_formals)
+      own_unbounded.erase(formal);
+    const BoundScope kOwn{params, own_unbounded, kFormals, false};
     CheckSequenceItem(item, kOwn, env);
     CheckTree(item->prop_body_tree, kOwn, env);
   }
   const NameSet kNone;
-  const BoundScope kModule{params, kNone, false};
+  const BoundScope kModule{params, unbounded, kNone, false};
   ForEachConcurrentAssertion(decl, [&](const Stmt* s) {
     CheckTree(s->assert_property, kModule, env);
     if (s->assert_sequence != nullptr) {

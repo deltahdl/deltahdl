@@ -152,14 +152,10 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl,
   CheckTimeformatArgs(decl, diag_);
   std::unordered_set<std::string_view> unbounded;
   for (const auto& param : mod->params) {
-    if (param.is_unbounded) unbounded.insert(param.name);
+    if (param.is_unbounded && param.gen_block_prefix.empty())
+      unbounded.insert(param.name);
   }
-  std::unordered_set<std::string_view> queues;
-  for (const auto& [name, info] : var_array_info_) {
-    if (info.is_queue) queues.insert(name);
-  }
-  CheckUnboundedParamsInQueueContexts(decl, unbounded, queues, diag_);
-  CheckDollarOperands(decl, *unit_, diag_);
+  CheckDollarOperands(decl, *unit_, unbounded, diag_);
   CheckVariableReadsInUnpackedDims(decl, var_types_, diag_);
   CheckUntypedDefaultPatternValues(decl, diag_);
   CheckContinuousPropertyWrites(decl, class_var_types_, unit_, diag_);
