@@ -78,6 +78,7 @@ struct DollarScope {
   NameSet non_queues;
   NameSet others;
   NameSet dollar_params;
+  NameSet overridden;
 };
 
 struct DollarScan {
@@ -170,9 +171,12 @@ static void NoteParamName(std::string_view name, const Expr* value,
   (kHoldsDollar ? scope.dollar_params : scope.others).insert(name);
 }
 
-static void NoteResolvedParam(std::string_view name, const NameSet& resolved,
+static void NoteInstanceParam(std::string_view name,
+                              const InstanceParams& instance,
                               DollarScope& scope) {
-  (resolved.count(name) != 0 ? scope.dollar_params : scope.others).insert(name);
+  const bool kUnbounded = instance.unbounded.count(name) != 0;
+  (kUnbounded ? scope.dollar_params : scope.others).insert(name);
+  if (instance.overridden.count(name) != 0) scope.overridden.insert(name);
 }
 
 static void NoteImport(const ImportItem& import, const DollarParams& params,
@@ -190,7 +194,7 @@ static bool NamesNonQueue(const DollarScope* scope, std::string_view name) {
 }
 
 static void NoteItemName(const ModuleItem* item, const DollarParams& params,
-                         const NameSet* resolved, DollarScope& scope) {
+                         const InstanceParams* instance, DollarScope& scope) {
   if (item->kind == ModuleItemKind::kVarDecl ||
       item->kind == ModuleItemKind::kNetDecl) {
     NoteDeclaredName(item->name, item->data_type, item->unpacked_dims, scope);
@@ -198,18 +202,18 @@ static void NoteItemName(const ModuleItem* item, const DollarParams& params,
     NoteImport(item->import_item, params, scope);
   } else if (item->kind != ModuleItemKind::kParamDecl) {
     return;
-  } else if (resolved != nullptr) {
-    NoteResolvedParam(item->name, *resolved, scope);
+  } else if (instance != nullptr) {
+    NoteInstanceParam(item->name, *instance, scope);
   } else {
     NoteParamName(item->name, item->init_expr, params, scope);
   }
 }
 
 static void NoteItemNames(const std::vector<ModuleItem*>& items,
-                          const DollarParams& params, const NameSet* resolved,
-                          DollarScope& scope) {
+                          const DollarParams& params,
+                          const InstanceParams* instance, DollarScope& scope) {
   for (const ModuleItem* item : items)
-    NoteItemName(item, params, resolved, scope);
+    NoteItemName(item, params, instance, scope);
 }
 
 static void AddScopedDollarParams(std::string_view scope_name,
@@ -451,9 +455,15 @@ static void CheckUnpackedDims(const std::vector<Expr*>& dims,
   }
 }
 
+static void CheckParamValue(const Expr* e, const DollarScan& scan);
+
+static void CheckTypeArgs(const std::vector<DataType>& args,
+                          const DollarScan& scan);
+
 static void CheckDeclaredDims(const DataType& type,
                               const std::vector<Expr*>& unpacked_dims,
                               const DollarScan& scan) {
+  CheckTypeArgs(type.type_params, scan);
   CheckDollarOperand(type.packed_dim_left, scan);
   CheckDollarOperand(type.packed_dim_right, scan);
   for (const auto& [left, right] : type.extra_packed_dims) {
@@ -463,12 +473,28 @@ static void CheckDeclaredDims(const DataType& type,
   CheckUnpackedDims(unpacked_dims, scan);
 }
 
+static void CheckTypeArgs(const std::vector<DataType>& args,
+                          const DollarScan& scan) {
+  for (const DataType& arg : args) {
+    if (arg.type_name.empty() && arg.type_ref_expr != nullptr) {
+      CheckParamValue(arg.type_ref_expr, scan);
+    } else {
+      CheckDeclaredDims(arg, {}, scan);
+    }
+  }
+}
+
 static void CheckEvents(const std::vector<EventExpr>& events,
                         const DollarScan& scan) {
   for (const EventExpr& event : events) {
     CheckDollarOperand(event.signal, scan);
     CheckDollarOperand(event.iff_condition, scan);
   }
+}
+
+static void CheckParamValue(const Expr* e, const DollarScan& scan) {
+  if (e == nullptr || ContainsDollar(e)) return;
+  CheckAdmittingLoneDollar(e, scan);
 }
 
 static void CheckBounds(const SeqCycleDelay& bounds, const DollarScan& scan) {
@@ -588,7 +614,8 @@ static void CheckInstanceActuals(const ModuleItem* item,
 }
 
 static void CheckDollarItems(const std::vector<ModuleItem*>& items,
-                             const DollarScan& outer, const NameSet* resolved);
+                             const DollarScan& outer,
+                             const InstanceParams* instance);
 
 static void CheckGenerateArms(const ModuleItem* item, const DollarScan& scan) {
   for (const ModuleItem* arm = item; arm != nullptr; arm = arm->gen_else) {
@@ -625,6 +652,12 @@ static void CheckDollarItem(const ModuleItem* item, const DollarScan& scan) {
       break;
     case ModuleItemKind::kModuleInst:
       CheckInstanceActuals(item, scan);
+      for (const auto& [name, value] : item->inst_params)
+        CheckParamValue(value, scan);
+      break;
+    case ModuleItemKind::kParamDecl:
+      if (scan.scope.overridden.count(item->name) == 0)
+        CheckParamValue(item->init_expr, scan);
       break;
     case ModuleItemKind::kSequenceDecl:
     case ModuleItemKind::kPropertyDecl:
@@ -738,11 +771,24 @@ static void NoteClassNames(const ClassDecl* cls, const DollarParams& params,
   }
 }
 
+static void CheckClassParamValues(const ClassDecl* cls,
+                                  const DollarScan& scan) {
+  for (const auto& [name, value] : cls->params) {
+    if (cls->type_param_names.count(name) == 0) CheckParamValue(value, scan);
+  }
+  for (const ClassMember* m : cls->members) {
+    if (m->kind == ClassMemberKind::kProperty && m->is_param)
+      CheckParamValue(m->init_expr, scan);
+  }
+  CheckTypeArgs(cls->base_class_type_params, scan);
+}
+
 static void CheckDollarClass(const ClassDecl* cls, const DollarScan& outer) {
   DollarScope scope;
   scope.outer = &outer.scope;
   NoteClassNames(cls, outer.report.params, scope);
   const DollarScan kScan{scope, outer.report};
+  CheckClassParamValues(cls, kScan);
   for (const Expr* arg : cls->extends_args) CheckDollarOperand(arg, kScan);
   for (const ClassMember* m : cls->members) {
     if (m->kind == ClassMemberKind::kProperty && !m->is_param)
@@ -755,10 +801,11 @@ static void CheckDollarClass(const ClassDecl* cls, const DollarScan& outer) {
 }
 
 static void CheckDollarItems(const std::vector<ModuleItem*>& items,
-                             const DollarScan& outer, const NameSet* resolved) {
+                             const DollarScan& outer,
+                             const InstanceParams* instance) {
   DollarScope scope;
   scope.outer = &outer.scope;
-  NoteItemNames(items, outer.report.params, resolved, scope);
+  NoteItemNames(items, outer.report.params, instance, scope);
   const DollarScan kScan{scope, outer.report};
   for (const ModuleItem* item : items) {
     CheckDollarItem(item, kScan);
@@ -769,8 +816,7 @@ static void CheckDollarItems(const std::vector<ModuleItem*>& items,
 }
 
 void CheckDollarOperands(const ModuleDecl* decl, const CompilationUnit& unit,
-                         const std::unordered_set<std::string_view>& unbounded,
-                         DiagEngine& diag) {
+                         const InstanceParams& instance, DiagEngine& diag) {
   NameSet takers = UnitDollarTakers(unit);
   AddDollarTakerNames(decl->items, takers);
   const DollarParams kParams = UnitDollarParams(unit);
@@ -780,13 +826,19 @@ void CheckDollarOperands(const ModuleDecl* decl, const CompilationUnit& unit,
   DollarScope ports;
   ports.outer = &unit_scope;
   for (const auto& [name, value] : decl->params)
-    NoteResolvedParam(name, unbounded, ports);
+    NoteInstanceParam(name, instance, ports);
   for (const PortDecl& port : decl->ports)
     NoteDeclaredName(port.name, port.data_type, port.unpacked_dims, ports);
   const DollarScan kScan{ports, report};
+  for (const auto& [name, value] : decl->params) {
+    if (decl->type_param_names.count(name) == 0 &&
+        ports.overridden.count(name) == 0) {
+      CheckParamValue(value, kScan);
+    }
+  }
   for (const PortDecl& port : decl->ports)
     CheckDeclaredDims(port.data_type, port.unpacked_dims, kScan);
-  CheckDollarItems(decl->items, kScan, &unbounded);
+  CheckDollarItems(decl->items, kScan, &instance);
 }
 
 void CheckUnitDollarOperands(const CompilationUnit& unit, DiagEngine& diag) {

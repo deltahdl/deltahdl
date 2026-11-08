@@ -1,7 +1,6 @@
 #include <cstddef>
 #include <functional>
 #include <string_view>
-#include <unordered_set>
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
@@ -150,12 +149,13 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl,
   }
   CheckIsunboundedArgs(decl, mod, diag_);
   CheckTimeformatArgs(decl, diag_);
-  std::unordered_set<std::string_view> unbounded;
+  InstanceParams instance_params;
   for (const auto& param : mod->params) {
-    if (param.is_unbounded && param.gen_block_prefix.empty())
-      unbounded.insert(param.name);
+    if (!param.gen_block_prefix.empty()) continue;
+    if (param.is_unbounded) instance_params.unbounded.insert(param.name);
+    if (param.from_override) instance_params.overridden.insert(param.name);
   }
-  CheckDollarOperands(decl, *unit_, unbounded, diag_);
+  CheckDollarOperands(decl, *unit_, instance_params, diag_);
   CheckVariableReadsInUnpackedDims(decl, var_types_, diag_);
   CheckUntypedDefaultPatternValues(decl, diag_);
   CheckContinuousPropertyWrites(decl, class_var_types_, unit_, diag_);

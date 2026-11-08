@@ -385,4 +385,59 @@ TEST(DollarConstantElaboration,
       {7, 16, 24, 36, 48, 49, 55, 57, 63, 66, 72, 80});
 }
 
+TEST(DollarConstantElaboration, DollarParameterIsAParametersValueOnlyAlone) {
+  ElabFixture f;
+  Elaborate(
+      "parameter U = $;\n"
+      "parameter UV = U + 1;\n"
+      "parameter UW = U;\n"
+      "package pk;\n"
+      "  parameter P = $;\n"
+      "  parameter R = P + 1;\n"
+      "  parameter S = P;\n"
+      "endpackage\n"
+      "class C #(parameter K = $,\n"
+      "          parameter L = K + 1,\n"
+      "          parameter M = K);\n"
+      "  parameter N = K - 1;\n"
+      "  parameter O = K;\n"
+      "endclass\n"
+      "class D extends C #(U - 1);\n"
+      "endclass\n"
+      "class E extends C #(U);\n"
+      "endclass\n"
+      "module sub #(parameter A = $,\n"
+      "             parameter B = A + 1,\n"
+      "             parameter N = 1)();\n"
+      "endmodule\n"
+      "module sub2 #(parameter A = $,\n"
+      "              parameter B = A + 1)();\n"
+      "endmodule\n"
+      "module top;\n"
+      "  parameter P = $;\n"
+      "  parameter Q = 4;\n"
+      "  parameter R = P + 1;\n"
+      "  localparam S = P;\n"
+      "  localparam T = Q + 1;\n"
+      "  localparam V = $isunbounded(P) ? 0 : P + 1;\n"
+      "  sub #(.N(P + 1)) s1();\n"
+      "  sub #(.N(P)) s2();\n"
+      "  sub #(P - 1) s3();\n"
+      "  sub2 #(.B(3)) s4();\n"
+      "  C #(P - 1) c1;\n"
+      "  C #(P) c2;\n"
+      "  C #(.K(P + 1)) c3;\n"
+      "  C #(.K(Q + 1)) c4;\n"
+      "  if (1) begin : g\n"
+      "    localparam G = $;\n"
+      "    localparam H = G * 2;\n"
+      "    localparam I = G;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ExpectDollarParamReportedOnlyOn(
+      f, {2, 6, 10, 12, 15, 20, 29, 33, 35, 37, 39, 43},
+      {3, 7, 11, 13, 17, 24, 30, 31, 32, 34, 38, 40, 44});
+}
+
 }  // namespace

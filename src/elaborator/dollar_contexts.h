@@ -15,9 +15,13 @@ bool IsLoneDollar(const Expr* e);
 
 bool ContainsDollar(const Expr* e);
 
+struct InstanceParams {
+  std::unordered_set<std::string_view> unbounded;
+  std::unordered_set<std::string_view> overridden;
+};
+
 void CheckDollarOperands(const ModuleDecl* decl, const CompilationUnit& unit,
-                         const std::unordered_set<std::string_view>& unbounded,
-                         DiagEngine& diag);
+                         const InstanceParams& instance, DiagEngine& diag);
 
 void CheckUnitDollarOperands(const CompilationUnit& unit, DiagEngine& diag);
 
