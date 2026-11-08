@@ -532,9 +532,21 @@ TEST(DollarConstantElaboration,
       "    expect (@(posedge clk) a ##1 b[->1:$]);\n"
       "    expect (@(posedge clk) a ##[1:$ - 1] b);\n"
       "  end\n"
+      "  task t;\n"
+      "    expect (@(posedge clk) a ##[$:1] b);\n"
+      "    expect (@(posedge clk) a ##[1:$] b);\n"
+      "  endtask\n"
+      "  class c;\n"
+      "    bit clk, a, b;\n"
+      "    task m;\n"
+      "      expect (@(posedge clk) a[=$] ##1 b);\n"
+      "      expect (@(posedge clk) a[=1:$] ##1 b);\n"
+      "    endtask\n"
+      "  endclass\n"
       "endmodule\n",
       f);
-  ExpectDollarReportedOnlyOn(f, {6, 8, 9, 11, 14, 16}, {7, 10, 12, 15});
+  ExpectDollarReportedOnlyOn(f, {6, 8, 9, 11, 14, 16, 19, 25},
+                             {7, 10, 12, 15, 20, 26});
 }
 
 TEST(
@@ -560,6 +572,12 @@ TEST(
       "checker chk(logic clk, logic a);\n"
       "  assert property (@(posedge clk) a ##[1:$ - 1] a);\n"
       "  assert property (@(posedge clk) a ##[1:$] a);\n"
+      "  property pk;\n"
+      "    @(posedge clk) a[*$:1];\n"
+      "  endproperty\n"
+      "  sequence sk;\n"
+      "    a[*0:$];\n"
+      "  endsequence\n"
       "endchecker\n"
       "module top;\n"
       "  bit clk, a, b;\n"
@@ -586,8 +604,8 @@ TEST(
       "  endclocking\n"
       "endmodule\n",
       f);
-  ExpectDollarReportedOnlyOn(f, {4, 6, 12, 17, 27, 29, 30, 32, 36},
-                             {7, 14, 18, 31, 39});
+  ExpectDollarReportedOnlyOn(f, {4, 6, 12, 17, 20, 33, 35, 36, 38, 42},
+                             {7, 14, 18, 23, 37, 45});
 }
 
 TEST(DollarConstantElaboration,
