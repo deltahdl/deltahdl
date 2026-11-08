@@ -183,20 +183,8 @@ void CheckOperand(const Expr* e, const BoundScope& scope, BoundEnv& env) {
   });
 }
 
-void ReportBoundDollars(const SeqCycleDelay& bounds, DiagEngine& diag) {
-  ReportDollarsIn(bounds.min_expr, diag);
-  if (bounds.max_expr != bounds.min_expr)
-    ReportDollarsIn(bounds.max_expr, diag);
-}
-
 void CheckSequenceItem(const ModuleItem* seq, const BoundScope& scope,
                        BoundEnv& env) {
-  ForEachBody(seq->seq_linear, [&env](const SeqLinearBody& b) {
-    for (const SeqCycleDelay& delay : b.delays)
-      ReportBoundDollars(delay, env.diag);
-    for (const SeqRepetition& rep : b.repetitions)
-      ReportBoundDollars(rep, env.diag);
-  });
   CheckBodyDelays(seq->seq_linear, scope, env.diag);
   ForEachBodyExpr(seq->seq_linear,
                   [&](const Expr* e) { CheckOperand(e, scope, env); });
@@ -209,9 +197,8 @@ void CheckTree(const PropertyExprNode* node, const BoundScope& scope,
     if (n.kind == Kind::kNexttime) {
       CheckNexttime(n, scope, env.diag);
     } else if (n.kind == Kind::kAlways || n.kind == Kind::kEventually) {
-      const bool kMinDollar = ReportDollarsIn(n.range_min, env.diag);
-      const bool kMaxDollar = ReportDollarsIn(n.range_max, env.diag);
-      if (!kMinDollar && !kMaxDollar) CheckRange(n, scope, env.diag);
+      if (!ContainsDollar(n.range_min) && !ContainsDollar(n.range_max))
+        CheckRange(n, scope, env.diag);
     } else {
       CheckOperand(n.boolean, scope, env);
     }

@@ -1,12 +1,17 @@
 #include "elaborator/dollar_contexts.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <format>
+#include <set>
 #include <string_view>
+#include <tuple>
 #include <unordered_set>
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
+#include "elaborator/assertion_walk.h"
 #include "elaborator/declared_types.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/queue_dim.h"
@@ -126,30 +131,15 @@ void CheckUnboundedParamsInQueueContexts(
   }
 }
 
-static void ReportDollar(const Expr* e, DiagEngine& diag) {
-  diag.Error(e->range.start,
-             "'$' may stand only in a queue's dimension or select, a value "
-             "range's bound, a cycle delay range's upper bound, a sequence, "
-             "property or checker argument, or a parameter's value",
-             Subclause("6.20.7"));
-}
-
-bool ReportDollarsIn(const Expr* e, DiagEngine& diag) {
-  if (e == nullptr) return false;
-  if (IsLoneDollar(e)) {
-    ReportDollar(e, diag);
-    return true;
-  }
-  bool reported = false;
-  ForEachExprChild(e, [&diag, &reported](const Expr* child) {
-    reported = ReportDollarsIn(child, diag) || reported;
-  });
-  return reported;
-}
-
 namespace {
 
 using NameSet = std::unordered_set<std::string_view>;
+
+struct DollarReport {
+  const NameSet& dollar_takers;
+  DiagEngine& diag;
+  std::set<std::tuple<uint32_t, uint32_t, uint32_t>> reported;
+};
 
 struct DollarScope {
   const DollarScope* outer = nullptr;
@@ -159,11 +149,21 @@ struct DollarScope {
 
 struct DollarScan {
   const DollarScope& scope;
-  const NameSet& dollar_takers;
-  DiagEngine& diag;
+  DollarReport& report;
 };
 
 }  // namespace
+
+static void ReportDollar(const Expr* e, DollarReport& report) {
+  const SourceLoc& at = e->range.start;
+  if (!report.reported.emplace(at.file_id, at.line, at.column).second) return;
+  report.diag.Error(at,
+                    "'$' may stand only in a queue's dimension or select, a "
+                    "value range's bound, a cycle delay range's upper bound, "
+                    "a sequence, property or checker argument, or a "
+                    "parameter's value",
+                    Subclause("6.20.7"));
+}
 
 static void NoteDeclaredName(std::string_view name, const DataType& type,
                              const std::vector<Expr*>& dims,
@@ -212,6 +212,11 @@ static void AddDollarTakerNames(const std::vector<ModuleItem*>& items,
     const ModuleDecl* nested = item->nested_module_decl;
     if (nested != nullptr && nested->decl_kind == ModuleDeclKind::kChecker)
       names.insert(nested->name);
+    AddDollarTakerNames(item->clocking_decls, names);
+    for (const ModuleItem* arm = item; arm != nullptr; arm = arm->gen_else)
+      AddDollarTakerNames(arm->gen_body, names);
+    for (const GenerateCaseItem& arm : item->gen_case_items)
+      AddDollarTakerNames(arm.body, names);
   }
 }
 
@@ -235,9 +240,12 @@ static void CheckDollarOperand(const Expr* e, const DollarScan& scan);
 static void CheckConstraintItems(const std::vector<ConstraintItem*>& items,
                                  const DollarScan& scan);
 
-static void CheckRangeBound(const Expr* bound, const DollarScan& scan) {
-  if (bound != nullptr && IsLoneDollar(bound)) return;
-  CheckDollarOperand(bound, scan);
+static void CheckDollarTree(const PropertyExprNode* tree,
+                            const DollarScan& scan);
+
+static void CheckAdmittingLoneDollar(const Expr* e, const DollarScan& scan) {
+  if (e != nullptr && IsLoneDollar(e)) return;
+  CheckDollarOperand(e, scan);
 }
 
 static bool IsToleranceRange(const Expr* range) {
@@ -247,8 +255,8 @@ static bool IsToleranceRange(const Expr* range) {
 
 static void CheckSelect(const Expr* e, const DollarScan& scan) {
   if (e->base == nullptr && !IsToleranceRange(e)) {
-    CheckRangeBound(e->index, scan);
-    CheckRangeBound(e->index_end, scan);
+    CheckAdmittingLoneDollar(e->index, scan);
+    CheckAdmittingLoneDollar(e->index_end, scan);
     return;
   }
   CheckDollarOperand(e->base, scan);
@@ -262,16 +270,24 @@ static void CheckDollarOperand(const Expr* e, const DollarScan& scan) {
   if (e == nullptr) return;
   if (e->inline_constraint != nullptr)
     CheckConstraintItems(e->inline_constraint->constraint_items, scan);
+  CheckDollarTree(e->property_actual, scan);
+  if (e->dist_items != nullptr) {
+    for (const ConstraintDistItem& item : *e->dist_items)
+      CheckDollarOperand(item.weight, scan);
+  }
   if (IsQueueDim(e)) {
-    ReportDollar(e, scan.diag);
+    ReportDollar(e, scan.report);
     return;
   }
   if (e->kind == ExprKind::kSelect) {
     CheckSelect(e, scan);
     return;
   }
-  if (e->kind == ExprKind::kCall && scan.dollar_takers.count(e->callee) != 0)
+  if (e->kind == ExprKind::kCall &&
+      scan.report.dollar_takers.count(e->callee) != 0) {
+    for (const Expr* actual : e->args) CheckAdmittingLoneDollar(actual, scan);
     return;
+  }
   ForEachExprChild(
       e, [&scan](const Expr* child) { CheckDollarOperand(child, scan); });
 }
@@ -283,8 +299,8 @@ static void CheckDistItem(const ConstraintDistItem& item,
     CheckDollarOperand(item.lo, scan);
     CheckDollarOperand(item.tolerance, scan);
   } else if (item.is_range) {
-    CheckRangeBound(item.lo, scan);
-    CheckRangeBound(item.hi, scan);
+    CheckAdmittingLoneDollar(item.lo, scan);
+    CheckAdmittingLoneDollar(item.hi, scan);
   } else {
     CheckDollarOperand(item.value, scan);
   }
@@ -320,8 +336,67 @@ static void CheckDeclaredDims(const DataType& type,
   CheckUnpackedDims(unpacked_dims, scan);
 }
 
+static void CheckEvents(const std::vector<EventExpr>& events,
+                        const DollarScan& scan) {
+  for (const EventExpr& event : events) {
+    CheckDollarOperand(event.signal, scan);
+    CheckDollarOperand(event.iff_condition, scan);
+  }
+}
+
+static void CheckBounds(const SeqCycleDelay& bounds, const DollarScan& scan) {
+  CheckDollarOperand(bounds.min_expr, scan);
+  if (bounds.max_expr != bounds.min_expr)
+    CheckDollarOperand(bounds.max_expr, scan);
+}
+
+static void CheckDollarSequence(const ModuleItem* seq, const DollarScan& scan) {
+  CheckEvents(seq->seq_clock, scan);
+  ForEachBody(seq->seq_linear, [&scan](const SeqLinearBody& body) {
+    for (const SeqCycleDelay& delay : body.delays) CheckBounds(delay, scan);
+    for (const SeqRepetition& rep : body.repetitions) CheckBounds(rep, scan);
+    for (const SeqLocalDecl& local : body.locals)
+      CheckDollarOperand(local.init, scan);
+    for (const auto& clock : body.clocks) CheckEvents(clock, scan);
+    CheckEvents(body.clock_out, scan);
+  });
+  ForEachBodyExpr(seq->seq_linear,
+                  [&scan](const Expr* e) { CheckDollarOperand(e, scan); });
+}
+
+static void CheckDollarTree(const PropertyExprNode* tree,
+                            const DollarScan& scan) {
+  ForEachTreeNode(tree, [&scan](const PropertyExprNode& node) {
+    CheckDollarOperand(node.boolean, scan);
+    CheckDollarOperand(node.range_min, scan);
+    CheckAdmittingLoneDollar(node.range_max, scan);
+    for (const auto& values : node.case_values) {
+      for (const Expr* value : values) CheckDollarOperand(value, scan);
+    }
+    CheckEvents(node.clock, scan);
+    if (node.sequence != nullptr) CheckDollarSequence(node.sequence, scan);
+  });
+}
+
+static void CheckDollarDeclaration(const ModuleItem* decl,
+                                   const DollarScan& scan) {
+  for (const Expr* actual : decl->prop_formal_defaults)
+    CheckAdmittingLoneDollar(actual, scan);
+  for (const SeqLocalDecl& local : decl->prop_locals)
+    CheckDollarOperand(local.init, scan);
+  CheckEvents(decl->prop_clock, scan);
+  CheckDollarOperand(decl->prop_disable_iff, scan);
+  CheckDollarOperand(decl->prop_body_expr, scan);
+  CheckDollarTree(decl->prop_body_tree, scan);
+  CheckDollarSequence(decl, scan);
+}
+
 static void CheckDollarStmt(const Stmt* s, const DollarScan& scan) {
   if (s == nullptr) return;
+  CheckDollarOperand(s->assert_disable_iff, scan);
+  CheckDollarTree(s->assert_property, scan);
+  if (s->assert_sequence != nullptr)
+    CheckDollarSequence(s->assert_sequence, scan);
   const std::vector<Expr*>& dims = s->var_unpacked_dims;
   ForEachChildExpr(s, [&scan, &dims](const Expr* e) {
     if (std::ranges::find(dims, e) == dims.end()) CheckDollarOperand(e, scan);
@@ -334,7 +409,7 @@ static void CheckProcedure(const Stmt* body, const DollarScan& outer) {
   DollarScope scope;
   scope.outer = &outer.scope;
   NoteLocalNames(body, scope);
-  CheckDollarStmt(body, {scope, outer.dollar_takers, outer.diag});
+  CheckDollarStmt(body, {scope, outer.report});
 }
 
 static void CheckSubroutine(const ModuleItem* item, const DollarScan& outer) {
@@ -345,15 +420,21 @@ static void CheckSubroutine(const ModuleItem* item, const DollarScan& outer) {
     NoteDeclaredName(arg.name, arg.data_type, arg.unpacked_dims, scope);
   }
   for (const Stmt* s : item->func_body_stmts) NoteLocalNames(s, scope);
-  const DollarScan kInner{scope, outer.dollar_takers, outer.diag};
+  const DollarScan kInner{scope, outer.report};
   for (const Stmt* s : item->func_body_stmts) CheckDollarStmt(s, kInner);
 }
 
 static void CheckInstanceActuals(const ModuleItem* item,
                                  const DollarScan& scan) {
-  if (scan.dollar_takers.count(item->inst_module) != 0) return;
-  for (const auto& [name, actual] : item->inst_ports)
-    CheckDollarOperand(actual, scan);
+  const bool kTakesDollar =
+      scan.report.dollar_takers.count(item->inst_module) != 0;
+  for (const auto& [name, actual] : item->inst_ports) {
+    if (kTakesDollar) {
+      CheckAdmittingLoneDollar(actual, scan);
+    } else {
+      CheckDollarOperand(actual, scan);
+    }
+  }
 }
 
 static void CheckDollarItems(const std::vector<ModuleItem*>& items,
@@ -386,6 +467,10 @@ static void CheckDollarItem(const ModuleItem* item, const DollarScan& scan) {
     case ModuleItemKind::kModuleInst:
       CheckInstanceActuals(item, scan);
       break;
+    case ModuleItemKind::kSequenceDecl:
+    case ModuleItemKind::kPropertyDecl:
+      CheckDollarDeclaration(item, scan);
+      break;
     default:
       for (const auto& [target, value] : item->defparam_assigns)
         CheckDollarOperand(value, scan);
@@ -396,6 +481,9 @@ static void CheckDollarItem(const ModuleItem* item, const DollarScan& scan) {
   CheckProcedure(item->body, scan);
   CheckSubroutine(item, scan);
   CheckGenerate(item, scan);
+  CheckEvents(item->clocking_event, scan);
+  for (const ModuleItem* decl : item->clocking_decls)
+    CheckDollarItem(decl, scan);
   if (item->class_decl != nullptr) CheckDollarClass(item->class_decl, scan);
 }
 
@@ -406,7 +494,7 @@ static void CheckDollarClass(const ClassDecl* cls, const DollarScan& outer) {
     if (m->kind == ClassMemberKind::kProperty)
       NoteDeclaredName(m->name, m->data_type, m->unpacked_dims, scope);
   }
-  const DollarScan kScan{scope, outer.dollar_takers, outer.diag};
+  const DollarScan kScan{scope, outer.report};
   for (const Expr* arg : cls->extends_args) CheckDollarOperand(arg, kScan);
   for (const ClassMember* m : cls->members) {
     if (m->kind == ClassMemberKind::kProperty && !m->is_param)
@@ -422,7 +510,7 @@ static void CheckDollarItems(const std::vector<ModuleItem*>& items,
   DollarScope scope;
   scope.outer = &outer.scope;
   NoteItemNames(items, scope);
-  const DollarScan kScan{scope, outer.dollar_takers, outer.diag};
+  const DollarScan kScan{scope, outer.report};
   for (const ModuleItem* item : items) {
     CheckDollarItem(item, kScan);
     ForEachItemDeclaredType(item, [&kScan](const DeclaredType& declared) {
@@ -435,10 +523,11 @@ void CheckDollarOperands(const ModuleDecl* decl, const CompilationUnit& unit,
                          DiagEngine& diag) {
   NameSet takers = UnitDollarTakers(unit);
   AddDollarTakerNames(decl->items, takers);
+  DollarReport report{takers, diag, {}};
   DollarScope ports;
   for (const PortDecl& port : decl->ports)
     NoteDeclaredName(port.name, port.data_type, port.unpacked_dims, ports);
-  const DollarScan kScan{ports, takers, diag};
+  const DollarScan kScan{ports, report};
   for (const PortDecl& port : decl->ports)
     CheckDeclaredDims(port.data_type, port.unpacked_dims, kScan);
   CheckDollarItems(decl->items, kScan);
@@ -446,13 +535,14 @@ void CheckDollarOperands(const ModuleDecl* decl, const CompilationUnit& unit,
 
 void CheckUnitDollarOperands(const CompilationUnit& unit, DiagEngine& diag) {
   const NameSet kTakers = UnitDollarTakers(unit);
+  DollarReport report{kTakers, diag, {}};
   const DollarScope kRoot;
-  const DollarScan kPackageScan{kRoot, kTakers, diag};
+  const DollarScan kPackageScan{kRoot, report};
   for (const PackageDecl* pkg : unit.packages)
     CheckDollarItems(pkg->items, kPackageScan);
   DollarScope unit_scope;
   NoteItemNames(unit.cu_items, unit_scope);
-  const DollarScan kScan{unit_scope, kTakers, diag};
+  const DollarScan kScan{unit_scope, report};
   CheckDollarItems(unit.cu_items, kScan);
   for (const ClassDecl* cls : unit.classes) {
     CheckDollarClass(cls, kScan);

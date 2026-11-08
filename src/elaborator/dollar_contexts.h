@@ -15,8 +15,6 @@ bool IsLoneDollar(const Expr* e);
 
 bool ContainsDollar(const Expr* e);
 
-bool ReportDollarsIn(const Expr* e, DiagEngine& diag);
-
 void CheckUnboundedParamsInQueueContexts(
     const ModuleDecl* decl,
     const std::unordered_set<std::string_view>& unbounded,

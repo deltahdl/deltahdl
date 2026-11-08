@@ -448,4 +448,170 @@ TEST(DollarConstantElaboration,
       {11, 15, 17, 19, 29, 34, 41, 55});
 }
 
+TEST(
+    DollarConstantElaboration,
+    DollarStandsInADeclaredSequenceOrPropertyOnlyAsARangesUpperBoundOrAWholeActual) {
+  ElabFixture f;
+  Elaborate(
+      "checker ck(x, n);\n"
+      "endchecker\n"
+      "module top;\n"
+      "  bit clk, a, b;\n"
+      "  property p1;\n"
+      "    @(posedge clk) a ##[$:3] b;\n"
+      "  endproperty\n"
+      "  property p2;\n"
+      "    @(posedge clk) a ##[$:$] b;\n"
+      "  endproperty\n"
+      "  property p3;\n"
+      "    @(posedge clk) ##$ a;\n"
+      "  endproperty\n"
+      "  property p4;\n"
+      "    @(posedge clk) a ##[1:$] b;\n"
+      "  endproperty\n"
+      "  sequence s1;\n"
+      "    a[*$] ##1 b;\n"
+      "  endsequence\n"
+      "  sequence s2;\n"
+      "    a ##1 b[->$:3];\n"
+      "  endsequence\n"
+      "  sequence s3;\n"
+      "    a ##1 b[=$];\n"
+      "  endsequence\n"
+      "  sequence s4;\n"
+      "    a[*1:$] ##1 b[->1:3] ##1 a[=0:$];\n"
+      "  endsequence\n"
+      "  sequence s5(x, n);\n"
+      "    x ##[1:n] x;\n"
+      "  endsequence\n"
+      "  property p5(x, n = $);\n"
+      "    @(posedge clk) x ##[1:n] x;\n"
+      "  endproperty\n"
+      "  property p6(x, n = $ + 1);\n"
+      "    @(posedge clk) x ##[1:n] x;\n"
+      "  endproperty\n"
+      "  assert property (@(posedge clk) s5(a, $));\n"
+      "  assert property (@(posedge clk) s5(a, $ - 1));\n"
+      "  assert property (@(posedge clk) a ##1 (b == $));\n"
+      "  assert property (@(posedge clk) disable iff ($) a);\n"
+      "  ck k1(a, $);\n"
+      "  ck k2(a, $ + 1);\n"
+      "endmodule\n",
+      f);
+  ExpectDollarReportedOnlyOn(f, {6, 9, 12, 18, 21, 24, 35, 39, 40, 41, 43},
+                             {15, 27, 32, 38, 42});
+}
+
+TEST(DollarConstantElaboration,
+     DollarIsJudgedInACoverSequenceAnExpectASequenceActualAndADist) {
+  ElabFixture f;
+  Elaborate(
+      "module top;\n"
+      "  bit clk, a, b;\n"
+      "  sequence s(x);\n"
+      "    x ##1 b;\n"
+      "  endsequence\n"
+      "  cover sequence (@(posedge clk) a ##[$:2] b);\n"
+      "  cover sequence (@(posedge clk) a ##[2:$] b);\n"
+      "  cover sequence (@(posedge clk) a[*$:2] ##1 b);\n"
+      "  assert property (@(posedge clk) s(b[*$:2]));\n"
+      "  assert property (@(posedge clk) s(b[*2:$]));\n"
+      "  assert property (@(posedge clk) a dist {[0:1] := $});\n"
+      "  assert property (@(posedge clk) a dist {[0:$] := 1});\n"
+      "  initial begin\n"
+      "    expect (@(posedge clk) a ##1 b[->$]);\n"
+      "    expect (@(posedge clk) a ##1 b[->1:$]);\n"
+      "    expect (@(posedge clk) a ##[1:$ - 1] b);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ExpectDollarReportedOnlyOn(f, {6, 8, 9, 11, 14, 16}, {7, 10, 12, 15});
+}
+
+TEST(
+    DollarConstantElaboration,
+    DollarIsJudgedInTheAssertionsOfEveryDesignElementGenerateAndClockingBlock) {
+  ElabFixture f;
+  Elaborate(
+      "interface ifc(input bit clk);\n"
+      "  bit a, b;\n"
+      "  sequence si;\n"
+      "    a ##[$:2] b;\n"
+      "  endsequence\n"
+      "  assert property (@(posedge clk) a[*$] ##1 b);\n"
+      "  assert property (@(posedge clk) a[*1:$] ##1 b);\n"
+      "endinterface\n"
+      "program prg(input bit clk);\n"
+      "  bit a, b;\n"
+      "  property pp;\n"
+      "    @(posedge clk) always [$:3] a;\n"
+      "  endproperty\n"
+      "  assert property (@(posedge clk) a ##[1:$] b);\n"
+      "endprogram\n"
+      "checker chk(logic clk, logic a);\n"
+      "  assert property (@(posedge clk) a ##[1:$ - 1] a);\n"
+      "  assert property (@(posedge clk) a ##[1:$] a);\n"
+      "endchecker\n"
+      "module top;\n"
+      "  bit clk, a, b;\n"
+      "  ifc i1(clk);\n"
+      "  prg p1(clk);\n"
+      "  chk c1(clk, a);\n"
+      "  if (1) begin : g\n"
+      "    sequence sg;\n"
+      "      a ##1 b[=$];\n"
+      "    endsequence\n"
+      "    assert property (@(posedge clk) a ##[$:1] b);\n"
+      "    assert property (@(posedge clk) a[*1:$ - 1] ##1 b);\n"
+      "    assert property (@(posedge clk) a ##[0:$] b);\n"
+      "    always @(posedge clk) assert property (@(posedge clk) s_eventually "
+      "[$:2] a);\n"
+      "  end\n"
+      "  clocking cb @(posedge clk);\n"
+      "    property pc;\n"
+      "      a ##[$:2] b;\n"
+      "    endproperty\n"
+      "    sequence sc;\n"
+      "      a ##[2:$] b;\n"
+      "    endsequence\n"
+      "  endclocking\n"
+      "endmodule\n",
+      f);
+  ExpectDollarReportedOnlyOn(f, {4, 6, 12, 17, 27, 29, 30, 32, 36},
+                             {7, 14, 18, 31, 39});
+}
+
+TEST(DollarConstantElaboration,
+     DollarIsJudgedInTheSequencesAndPropertiesOfAPackageAndTheCompilationUnit) {
+  ElabFixture f;
+  Elaborate(
+      "package p;\n"
+      "  sequence ps(x, y);\n"
+      "    x ##[$:2] y;\n"
+      "  endsequence\n"
+      "  sequence pt(x, y);\n"
+      "    x ##[1:$] y;\n"
+      "  endsequence\n"
+      "  property pp(x);\n"
+      "    always [1:$ - 1] x;\n"
+      "  endproperty\n"
+      "endpackage\n"
+      "sequence us(x, y);\n"
+      "  x[*$:2] ##1 y;\n"
+      "endsequence\n"
+      "sequence uo(x, y);\n"
+      "  x ##[2:$ - 1] y;\n"
+      "endsequence\n"
+      "property up(x, y);\n"
+      "  x |-> ##[0:$] y;\n"
+      "endproperty\n"
+      "property uq(x, n = $);\n"
+      "  x ##[1:n] x;\n"
+      "endproperty\n"
+      "module top;\n"
+      "endmodule\n",
+      f);
+  ExpectDollarReportedOnlyOn(f, {3, 9, 13, 16}, {6, 19, 21});
+}
+
 }  // namespace
