@@ -4,8 +4,11 @@
 #include <string>
 
 #include "common/diagnostic.h"
+#include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
+#include "helpers_rtlir_lookup.h"
+#include "parser/ast_expr.h"
 
 using namespace delta;
 
@@ -457,6 +460,27 @@ TEST(SpecparamElaboration, ParameterValueNamingASpecparamIsReportedEverywhere) {
     EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), use.message, use.line,
                               use.subclause));
   }
+}
+
+TEST(SpecparamElaboration, DefparamAimedAtASpecparamLeavesItsValue) {
+  ElabFixture f;
+  RtlirDesign* design = ElaborateSrc(
+      "module cell;\n"
+      "  specparam sp = 1;\n"
+      "endmodule\n"
+      "module m;\n"
+      "  cell u();\n"
+      "  defparam u.sp = 5;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "defparam cannot override specparam 'sp'", 6,
+                            "6.20.5"));
+  ASSERT_NE(design, nullptr);
+  const RtlirVariable* sp = FindVar(design, "cell", "sp");
+  ASSERT_NE(sp, nullptr);
+  ASSERT_NE(sp->init_expr, nullptr);
+  EXPECT_EQ(sp->init_expr->int_val, 1u);
 }
 
 TEST(SpecparamElaboration, ParameterValueNamingAParameterIsAcceptedEverywhere) {
